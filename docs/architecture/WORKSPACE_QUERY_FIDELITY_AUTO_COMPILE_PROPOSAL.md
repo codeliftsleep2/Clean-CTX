@@ -1,9 +1,10 @@
-# Workspace-query fidelity-aware auto-compilation proposal
+# Query-boundary completeness and redundant-work proposal
 
-**Status:** Proposed and deferred
+**Status:** Expanded investigation proposal; implementation deferred
 **Recorded:** 2026-09-26
 **Production behavior:** Unchanged
-**Primary surfaces:** `workspace_query.entities_in_file`, `workspace_query.has_cycle`
+**Primary surfaces:** `workspace_query`, `graph_trace`/CBM `trace_path`,
+`cbm_proxy`, and `provide_code_context.focusMethods`
 
 ## 1. Decision summary
 
@@ -21,6 +22,15 @@ requires a separate architectural decision before implementation.
 
 No production change is authorized by this document. It records the verified
 boundary and the recommended future work.
+
+This document also records four adjacent query-boundary candidates discovered by
+auditing for the same broader failure shape: a caller must perform a discovery
+call that the queried operation could potentially perform itself, or a request
+is accepted while its answer does not clearly disclose missing resolution or
+ignored input. Current-source review closed the project-resolution candidate as
+already fixed; the other three have not all been freshly reproduced through the
+live MCP/CBM boundary and remain investigation items until the live gates in
+section 11 confirm them.
 
 ## 2. Problem
 
@@ -309,3 +319,170 @@ workspace_query request
   -> MCP structured/text response
   -> live no-prior-provide verification
 ```
+
+## 10. Wider query-boundary audit
+
+The following candidates are ordered by potential correctness impact. Source
+inspection establishes the current code shape, but it does not substitute for
+live reproduction across the external tool boundary. No item in this section
+is scheduled for implementation solely because it appears here.
+
+### 10.1 `trace_path` / `graph_trace`: unresolved bare names
+
+**Potential severity:** High — a successful-looking empty or unrelated edge
+set can be interpreted as verified absence.
+
+The two public surfaces have different request shapes:
+
+- CBM `trace_path` accepts `function_name`, `direction`, optional `depth`, and
+  a project; and
+- the structured Clean-CTX `graph_trace` wrapper accepts `from` and `to`.
+
+The current bridge forwards the caller's `from`/function name to CBM and then
+filters returned edges against `to` when a target is supplied. It does not
+first resolve a bare written name through `search_graph`. Consequently, the
+reported two-call workaround is architecturally plausible: search first for a
+canonical path-qualified identity, then trace that identity.
+
+This must be verified independently for native proxy `trace_path` and the
+structured `graph_trace` wrapper. A bare-name empty result, an incorrect edge
+set, a CBM error, and a Clean-CTX validation error are materially different
+outcomes and must not be grouped together.
+
+If live-confirmed, the recommended contract is:
+
+1. accept either a canonical identity or a bare name;
+2. preserve canonical identities without an extra search;
+3. resolve a bare name within the explicitly selected project;
+4. trace automatically when exactly one candidate matches;
+5. return a structured disambiguation error listing bounded candidate
+   identities when multiple candidates match; and
+6. return an explicit not-found/resolution failure rather than a plausible
+   empty trace when no candidate matches.
+
+Resolution must not mutate the active project unexpectedly, cross project
+boundaries, or select the first result by ordering. The implementation should
+share one resolver between proxy and structured surfaces while preserving their
+different response shapes.
+
+### 10.2 `cbm_proxy`: project-name resolution parity — resolved
+
+**Status:** Already fixed on this branch by `4a86ee43` (`Fix CBM project
+identity: resolve canonical path slugs for all graph calls`). No new production
+work is proposed.
+
+The current source does not support the premise that `cbm_proxy` still requires
+an exact slug while wrappers accept a repository basename. Both paths reach
+`GraphBridge::resolve_project_id`:
+
+- `cbm_proxy::resolve_proxy_target_project` resolves a project supplied in
+  native parameters, top-level arguments, or `workspaceRoot`; and
+- structured wrappers call `GraphBridge::set_project`, whose lifecycle path
+  resolves the supplied project identity.
+
+`resolve_project_id` accepts a known slug, a path/root, or a configured root's
+directory basename before falling back to the literal value for authoritative
+CBM rejection. The reported stricter-proxy behavior describes the pre-fix
+boundary, not the current source architecture.
+
+Do not schedule a second resolver or retain this as an open verification
+candidate. A future live parity failure would be a new regression against the
+shared-resolution contract and should enter the normal RED/GREEN process with
+fresh evidence.
+
+### 10.3 `focusMethods` outside Edit fidelity
+
+**Potential severity:** Medium — accepted input is silently ineffective and
+can make the returned context look more specifically targeted than it is.
+
+Current source confirms the boundary. `provide_code_context` parses
+`focusMethods` at every fidelity, but passes it into body selection only when
+the heuristically effective fidelity is `Edit`. The public schema describes
+the field as optional with Edit; it does not reject the incompatible
+combination. The operational guide currently warns callers that non-Edit use
+is silently ignored.
+
+If live verification confirms the externally visible behavior, prefer an
+explicit `-32602` incompatible-arguments error when a non-empty `focusMethods`
+array is supplied and effective fidelity is not Edit. Silent auto-promotion is
+not the default recommendation because it changes fidelity, body exposure,
+token economics, persistence/autosave behavior, and the meaning of an explicit
+caller choice. Auto-promotion would require a separate public-contract
+approval.
+
+The design must also decide how heuristic fidelity interacts with focus. A
+caller that omits explicit fidelity but supplies `focusMethods` should not have
+its focus silently invalidated by a heuristic decision. Reasonable options are
+to require explicit `fidelity: edit`, or to treat focus as an explicit Edit
+request only when fidelity was omitted. That choice remains open pending live
+evidence and call-site review.
+
+### 10.4 Name-only workspace edge and traversal queries
+
+**Potential severity:** Medium — primarily redundant discovery work, with a
+correctness risk if a caller guesses domain/type or mistakes a required-field
+error for absence.
+
+Current handlers for `forward_edges`, `reverse_edges`, and
+`transitive_dependencies` require the complete Model-C identity
+`(domain, entity_type, name)` before hydration begins. Missing `domain` or
+`entity_type` already produces a precise `-32602` error. `find_entities`, by
+contrast, can search by name across domains and types. The documented two-call
+flow is therefore real at the code-contract level when only a name is known.
+
+If live usage demonstrates that the two-call pattern is common enough to
+justify a contract expansion, allow `domain` and `entity_type` to be omitted
+together while retaining the exact-identity fast path:
+
+1. perform the existing scoped name discovery/hydration;
+2. collect matching identities within the effective workspace/`withinPath`;
+3. run the requested query automatically for exactly one identity;
+4. return a structured disambiguation error with bounded candidates for more
+   than one identity; and
+5. distinguish no match, incomplete discovery coverage, and a real empty edge
+   or dependency result.
+
+Supplying only one of `domain` or `entity_type` should either act as an explicit
+filter or remain invalid; it must never be ignored. Resolution must reuse
+`find_entities`/hydration semantics rather than introduce a second discovery
+algorithm, and it must retain the existing scoped occurrence/provenance rules.
+
+## 11. Live-verification gate for the wider audit
+
+Before implementation planning, capture each case against a real indexed
+repository and the actual MCP stdio path:
+
+| Candidate | Required live comparison | Decision evidence |
+| --- | --- | --- |
+| Bare-name trace | bare name vs canonical identity, proxy and wrapper | response status, resolved candidate count, edge equality |
+| Non-Edit focus | omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
+| Name-only workspace query | `find_entities` + exact query vs proposed name-only inputs | candidate cardinality, domain/type ambiguity, final edge equality |
+
+The live record must distinguish a tool error, explicit incomplete coverage,
+an empty but complete answer, and a successful-looking incomplete or wrongly
+resolved answer. Only the last category establishes a silent-correctness defect.
+
+Recommended scheduling after verification:
+
+1. trace resolution, if the silent-wrong/empty result reproduces;
+2. non-Edit `focusMethods` validation;
+3. name-only workspace-query resolution if real workflows show recurring
+   two-call overhead.
+
+## 12. RED/GREEN and approval boundaries
+
+Every reproducible behavior defect must use the tracked RED/GREEN procedure.
+Each surface needs its own unchanged RED test because a proxy fix does not prove
+the structured wrapper, and a handler-unit test does not prove MCP schema or
+stdio reachability.
+
+These changes are externally observable tool-contract decisions. Live
+verification authorizes investigation only. Before implementation, approve the
+specific contract for each confirmed item, including ambiguity, not-found,
+partial-coverage, and compatibility behavior. In particular:
+
+- automatic trace-name resolution adds a hidden discovery operation;
+- focus auto-promotion changes fidelity and is not presently recommended;
+- name-only workspace queries alter which arguments are required; and
+- exhaustive `has_cycle` compilation remains a separate workspace-completeness
+  decision, not an instance of name resolution.
