@@ -8,8 +8,8 @@ use crate::error::to_jsonrpc_error;
 use crate::ir::delta::SequenceDeltaComputer;
 use crate::mcp::McpState;
 use crate::mcp::tool_helpers::{
-    compile_file_ir_candidate, diff_code_context_handler, inject_baseline_breakpoint,
-    inject_tail_breakpoint, resolve_file_path_checked,
+    compile_file_ir_candidate, count_tokens_with_tokenizer, diff_code_context_handler,
+    inject_baseline_breakpoint, inject_tail_breakpoint, resolve_file_path_checked,
 };
 use crate::mcp::tools::{parse_fidelity_arg, parse_tokenizer_arg};
 use crate::protocol::send_response;
@@ -116,6 +116,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref = tokenizer_box.as_deref();
+    let fidelity_name = format!("{:?}", fidelity).to_lowercase();
+    let is_angular = state.config.auto_angular
+        && crate::angular_meta::detect::is_angular_file(source.as_str());
 
     // A-08: Check if source has changed before compiling
     let path_alias = state
@@ -165,6 +168,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     economic.selected,
                     crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
                 );
+                let raw_tokens = economic.raw_tokens;
+                let compressed_tokens = economic.selected_tokens();
                 let content = economic.text;
                 let (content_kind, byte_exact) =
                     contract_fields_for_hierarchy(fidelity, &hierarchy);
@@ -190,6 +195,16 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     let text_owned = text.to_string();
                     inject_baseline_breakpoint(&mut response, state, &text_owned);
                 }
+                state.record_compression(
+                    &resolved_path,
+                    raw_tokens,
+                    compressed_tokens,
+                    &fidelity_name,
+                    is_angular,
+                    "full",
+                    None,
+                    "ir_compression",
+                );
                 send_response(&response);
                 return;
             }
@@ -284,11 +299,17 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 "Δ delta for {} (v{} → v{}): +{} ~{} -{} ops",
                 compiled.file_id, d.from, d.to, adds, mods, dels
             );
+            let raw_tokens = count_tokens_with_tokenizer(source.as_str(), tokenizer_ref);
+            let compressed_tokens = count_tokens_with_tokenizer(&content, tokenizer_ref);
+            let previous_full_tokens = state
+                .session_stats_lock()
+                .file_stats(&resolved_path)
+                .map(|stats| stats.compressed_tokens);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
                     "content": [{ "type": "text", "text": content }],
                     "delta": wire_delta, "from_version": d.from, "to_version": d.to,
-                    "strategy": "delta", "fidelity": format!("{:?}", fidelity).to_lowercase(),
+                    "strategy": "delta", "fidelity": fidelity_name,
                     "content_kind": ContentKind::DeltaSummary,
                     "byte_exact": [],
                     "degradation": null
@@ -296,6 +317,16 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             });
             // Delta output is rolling dynamic content — mark as tail (ephemeral).
             inject_tail_breakpoint(&mut response, state);
+            state.record_compression(
+                &resolved_path,
+                raw_tokens,
+                compressed_tokens,
+                &fidelity_name,
+                is_angular,
+                "delta",
+                previous_full_tokens,
+                "ir_compression",
+            );
             send_response(&response);
         }
         None => {
@@ -358,6 +389,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 economic.selected,
                 crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
             );
+            let raw_tokens = economic.raw_tokens;
+            let compressed_tokens = economic.selected_tokens();
             let content = economic.text;
             let (content_kind, byte_exact) = contract_fields_for_hierarchy(fidelity, &hierarchy);
             let mut response = serde_json::json!({
@@ -379,6 +412,16 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 let text_owned = text.to_string();
                 inject_baseline_breakpoint(&mut response, state, &text_owned);
             }
+            state.record_compression(
+                &resolved_path,
+                raw_tokens,
+                compressed_tokens,
+                &fidelity_name,
+                is_angular,
+                "full",
+                None,
+                "ir_compression",
+            );
             send_response(&response);
         }
     }
@@ -403,3 +446,7 @@ mod fidelity_persistence_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delta_presentation_boundary.rs"]
 mod delta_presentation_boundary_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_stats_lifecycle.rs"]
+mod delta_stats_lifecycle_tests;

@@ -330,6 +330,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Gate** | `cargo test --all-features` |
 
 ---
+### IRDELTA-003 Delta Statistics Mirror the Successful Response Lifecycle
+
+| Property | Value |
+|----------|-------|
+| **Intent** | The read-only statistics dashboard must describe what a successful delta-capable handler actually returned; observability must not invent, omit, or double-count transport events. |
+| **Invariant** | Every successful `delta_code_context` response records exactly one session event using its resolved fidelity, Angular classification, selected token counts, and actual strategy. Initial, cached, and no-difference complete responses are `full`; a non-empty generated sequence delta is `delta` and retains the prior full-compression token baseline for efficiency accounting. An automatic-delta attempt that produces no sequence delta and returns complete content is recorded once as `full`, never again as `delta`. `context_stats` remains a read-only projection of this already-recorded state. |
+| **Enforcement** | `src/tests/mcp/delta_stats_lifecycle.rs` crosses registered dispatch for the dedicated full-baseline → external-change → generated-delta lifecycle and the unchanged automatic-delta full fallback. The regressions assert strategy, fidelity, Angular status, non-zero tokens, and per-file/session delta counts. |
+| **Authority** | `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/provide.rs`, `src/mcp/session_stats.rs`, `src/mcp/tool_handlers/stats/mod.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+| **Relationship to IRDELTA-002** | IRDELTA-002 governs pending-transition authority and acknowledgement. IRDELTA-003 governs truthful observation of generation and complete-response events; recording statistics never applies or acknowledges a delta. |
+
+---
 ### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
 
 | Property | Value |

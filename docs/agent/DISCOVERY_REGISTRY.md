@@ -46,6 +46,38 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-023: Delta Trigger Expectations Masked Incomplete and False Session Statistics
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by production-path source audit and controlled local reproduction |
+| **Repository/context** | Repeated context reads and genuine `apply_edit` cycles across small and approximately 500-line TypeScript/Angular fixtures plus a real production file. |
+| **Symptom** | No `Δ delta for ...` response appeared after repeated explicit-High reads or after `apply_edit`; `context_stats` remained empty after successful `delta_code_context` output and populated only after `provide_code_context`. Audit also found that an unchanged automatic-delta attempt returned a full response while recording its statistics as a delta. |
+| **Root cause** | The missing post-edit delta was not a transport failure: explicit `fidelity`/`intent` deliberately selects full `provide_code_context`, while `apply_edit` atomically installs its edited IR as the new canonical baseline, leaving no unapplied transition for a reread. Two independent observability defects were real. `delta_code_context` never called `record_compression` on its initial-full, cached-full, or generated-delta paths. Separately, the automatic-delta `None` fallback correctly recorded a full response inside its match arm and then executed a second trailing statistics write mislabeled `delta`. |
+| **Classification** | Emergent lifecycle diagnosis + observability correctness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/delta_stats_lifecycle.rs` covers the dedicated full-baseline → external-change → generated-delta statistics lifecycle and the unchanged auto-delta full fallback. Both tracked regressions were observed RED, stashed without production changes, restored byte-identically, and reported GREEN with the identical focused command. |
+| **Live scenario required?** | Yes — after rebuilding, repeat the original dedicated `delta_code_context` workflow and confirm `context_stats` reports the full baseline and later delta truthfully. Auto-delta selection and host-consumer policy remain a separate architectural discussion. |
+| **Architectural invariant** | IRDELTA-003 (delta statistics mirror the successful response lifecycle) |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** Every successful `delta_code_context` content path now
+records the selected representation's token counts, resolved fidelity, Angular
+classification, and actual `full`/`delta` strategy. Generated deltas retain the
+preceding full-compression token baseline for efficiency accounting. The stale
+trailing write in `provide_code_context` was removed, so an unchanged delta
+attempt that falls back to complete content remains a single full event.
+
+**Boundary retained:** `apply_edit` still publishes its verified target as the
+canonical live baseline and clears obsolete pending transitions. An unchanged
+reread does not fabricate an empty delta. The existing rule that explicit
+fidelity or intent disables automatic delta was not changed; whether automatic
+delta belongs in the LLM-facing provider without a negotiated host consumer is
+deferred to a separate architectural decision.
+
+---
+
 ## DIS-2026-022: RxJS Meta Annotations Lost Method Identity and Emitted Parameter Fragments
 
 | Field | Value |

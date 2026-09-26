@@ -432,22 +432,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 }
             }
             let _total_ms = overall_start.elapsed().as_millis() as u64;
-            // The delta branch already recorded stats inside `Some(d)`.
-            // The `None` branch (baseline stored) records a full compression
-            // below. This trailing call is now a no-op for the delta case
-            // (it would double-record), so we only record for the None branch.
-            if delta.is_none() {
-                state.record_compression(
-                    &resolved_path,
-                    raw_tokens,
-                    comp_tokens,
-                    &format!("{:?}", effective_fidelity).to_lowercase(),
-                    is_angular,
-                    "delta",
-                    None,
-                    "ir_compression",
-                );
-            }
         }
         crate::mcp::heuristics::ContextStrategy::FullCompress => {
             let compile_start = Instant::now();
