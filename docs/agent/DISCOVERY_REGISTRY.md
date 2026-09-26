@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-022: RxJS Meta Annotations Lost Method Identity and Emitted Parameter Fragments
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by controlled local reproduction |
+| **Repository/context** | A generated 40-method Angular/RxJS probe and an independent real approximately 700-line Angular service. Methods returned multi-operator `of(...).pipe(...)` expressions and included typed/defaulted parameters. |
+| **Symptom** | Every SCHEMA-v5 `T @pipeRx` annotation named the first method in the class, even when the pipe occurred in later methods. `T @obs` also emitted context-free fragments such as `false)` from method parameter defaults. The output was deterministic but misleading and visually confusable with valid framework facts. |
+| **Root cause** | Two whole-prefix string scans in the RxJS meta-layer crossed declaration boundaries. Pipe ownership used `rfind('=')` over all source preceding a `.pipe(` call, then split that entire prefix at its first `:`, so later pipes collapsed onto the first method signature. Observable extraction treated `): Observable<T>` method return annotations as field declarations and selected the final parameter token as the field name. SCHEMA-v5 rendering faithfully projected these malformed `CoreOp::TypeAlias` inputs. |
+| **Classification** | Semantic presentation |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/angular_meta/rx.rs` independently pins method-local pipe ownership and rejects method-parameter/default fragments as observable names. `src/tests/mcp/rxjs_meta_presentation.rs` crosses registered `provide_code_context`, the production meta-layer pipeline, `CoreOp::TypeAlias`, hierarchical projection, and SCHEMA-v5 rendering. Both tracked regressions were observed RED before the fix, restored from the test-only stash, and reported GREEN with the same focused commands. |
+| **Live scenario required?** | Yes — re-run the original 40-method probe and real Angular service; every `@pipeRx` annotation must identify its containing method and no `@obs` annotation may be a parameter/default fragment. |
+| **Architectural invariant** | META-001 (framework annotations retain declaration-local ownership and intelligible values) |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** RxJS declaration extraction now excludes method return
+annotations from observable-field detection. Pipe ownership is resolved from
+the current assignment statement or, for returned/unassigned pipes, from the
+actual enclosing TypeScript method; earlier declarations are never candidates.
+The activated oversized `rx.rs` was decomposed by responsibility into
+`rx/extract.rs` and `rx/pipes.rs`, leaving every modified/new Rust file within
+the active-file ceiling. The SCHEMA-v5 renderer was unchanged because it was
+not the source of either defect.
+
+---
+
 ## DIS-2026-021: Observable Pattern Fact Borrowed Evidence from Neighboring Methods
 
 | Field | Value |
@@ -59,7 +86,7 @@ behavior is superseded.
 | **Reproducible locally?** | Yes |
 | **Local regression** | `src/tests/ir/layers/patterns.rs` (foreign-owner evidence and incomplete-evidence regressions); `src/tests/mcp/pattern_fact_ownership.rs` (registered `provide_code_context` and initial-full `delta_code_context` production paths). The tracked tests were observed RED before the implementation change, stashed, restored byte-identically, and then reported GREEN with the same focused commands. |
 | **Live scenario required?** | Yes — re-run the original real Angular service through `provide_code_context` and confirm plain methods no longer carry `pf:OBSERVABLE` while legitimately classified methods retain it. |
-| **Architectural invariant** | Compiler-derived presentation facts must be supported by evidence owned by the declaration receiving the fact; neighboring declarations are never evidence sources. |
+| **Architectural invariant** | IRFACT-001 (derived facts use declaration-local evidence) |
 | **Status** | Fixed locally; live re-verification pending |
 
 **Fix (2026-09-25):** `try_observable_pattern` now stops at the next method

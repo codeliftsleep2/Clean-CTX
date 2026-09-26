@@ -43,3 +43,7 @@ mod content_kind_lifecycle_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/pattern_fact_ownership.rs"]
 mod pattern_fact_ownership_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/rxjs_meta_presentation.rs"]
+mod rxjs_meta_presentation_tests;

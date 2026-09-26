@@ -170,6 +170,20 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### META-001 Framework Annotations Retain Declaration-Local Ownership and Intelligible Values
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Framework enrichment must add compact, useful facts without losing which declaration supplied them or turning incidental syntax into plausible-looking annotations. |
+| **Invariant** | A framework annotation is derived only from evidence inside its owning declaration or statement. An annotation that represents a method-local construct identifies that containing method; an assignment-owned construct uses only the assignment's local left-hand declaration. Field/declaration annotations contain genuine declaration identities, never parameter types, default values, punctuation fragments, or text borrowed from an earlier declaration. Projection and rendering preserve these values but do not guess or repair ownership after extraction. |
+| **Enforcement** | RxJS extraction separates observable/subject declarations from pipe/combinator extraction. Observable-field recognition rejects method parameter lists and return annotations. Pipe ownership examines only the current assignment statement or resolves the actual enclosing TypeScript method. Unit regressions pin both rules, and the registered MCP regression verifies the complete `provide_code_context` → meta-layer → `CoreOp::TypeAlias` → hierarchy → SCHEMA-v5 lifecycle. |
+| **Authority** | `src/angular_meta/rx/extract.rs`, `src/angular_meta/rx/pipes.rs`, `src/ir/pipeline/meta_layer.rs`, `src/tests/angular_meta/rx.rs`, `src/tests/mcp/rxjs_meta_presentation.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+| **Relationship to C-22** | C-22 establishes the canonical type-level source span delivered to a meta-layer. META-001 governs declaration- and statement-level ownership inside that span; receiving the correct class source does not authorize whole-prefix evidence borrowing within the class. |
+
+---
+
 ### CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
 
 | Property | Value |
@@ -340,6 +354,20 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 | **Relationship to IRPAT-001** | IRPAT-001 is the decline rule that protects M-referencing annotations whose payload a `PatternOp` cannot represent. PATID-001 is the stronger, unconditional property that makes the identity survive regardless; IRPAT-001's conservative decline is retained unchanged (weakening it would newly compress shapes that have never been compressed — a separate compression-policy decision). |
+
+---
+
+### IRFACT-001 Derived Facts Use Declaration-Local Evidence
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Compiler-derived facts are presented as verified conclusions, so their evidence must belong to the declaration receiving the fact. |
+| **Invariant** | An additive fact keyed to method `M` may use only operations whose canonical owner is `M` and may not scan across the next declaration boundary for supporting evidence. Every evidence component required by the fact's established contract must be present; independent partial signals are not interchangeable. Downstream hierarchy and presentation layers project the canonical fact and must not infer, relocate, or repair its ownership. This rule applies to every derived fact family, not only `PatternFact::Observable`. |
+| **Enforcement** | `CodePatternRecognizer::try_observable_pattern` stops at the next `DefMethod`, accepts `Return` and `MethodModifiers` evidence only for the triggering method ID, and requires both the qualifying Promise/Observable return and `Async` modifier. Unit regressions reject neighboring-method evidence and either partial signal; registered MCP regressions cover both `provide_code_context` and the initial-full `delta_code_context` path. |
+| **Authority** | `src/ir/layers/patterns.rs`, `src/tests/ir/layers/patterns.rs`, `src/tests/mcp/pattern_fact_ownership.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test --all-features` |
+| **Relationship to IRPAT-001 and PATID-001** | IRPAT-001 and PATID-001 preserve declaration identity during consumptive transformations. IRFACT-001 governs the separate additive-producer boundary: a surviving identity must not receive a fact derived from another declaration. |
 
 ---
 
