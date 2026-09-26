@@ -54,15 +54,8 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         Some(hierarchy) => hierarchy,
         None => return,
     };
-    let compact = || {
-        super::content::presentation_document(
-            &session_ir,
-            &hierarchy,
-            restored.fidelity,
-            &durable_path,
-            state,
-        )
-    };
+    let compact =
+        || super::content::presentation_document(&session_ir, &hierarchy, restored.fidelity, state);
     let (full, raw_passthrough) = match state.read_source(&durable_path) {
         Ok(source) => {
             let source_matches =
@@ -73,7 +66,6 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
                 &session_ir,
                 &hierarchy,
                 restored.fidelity,
-                &durable_path,
                 &source,
                 state,
                 tokenizer_kind,

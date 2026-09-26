@@ -204,13 +204,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             None => return,
         };
 
-        let candidate = super::content::presentation_document(
-            &ir,
-            &hir,
-            effective_fidelity,
-            &resolved_path,
-            state,
-        );
+        let candidate = super::content::presentation_document(&ir, &hir, effective_fidelity, state);
         let economic = super::content::select_complete_content(
             source,
             candidate,

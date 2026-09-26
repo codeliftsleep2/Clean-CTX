@@ -15,32 +15,23 @@ pub(crate) fn presentation_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,
     fidelity: Fidelity,
-    source_path: &str,
     state: &McpState,
 ) -> String {
     let llm_text = crate::ir::render_hierarchical_for_llm(hierarchy, fidelity);
     let footer = state.format_dict_footer_for_aliases(&[&ir.file_id]);
-    format!(
-        "{}\n// ── {} ({}) ──\n{}",
-        llm_text.trim(),
-        ir.file_id,
-        source_path,
-        footer.trim()
-    )
+    format!("{}\n// {}\n{}", llm_text.trim(), ir.file_id, footer.trim())
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn economical_presentation_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,
     fidelity: Fidelity,
-    source_path: &str,
     raw_source: &str,
     state: &McpState,
     tokenizer_kind: crate::tokenizer::TokenizerKind,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
 ) -> crate::mcp::content_economics::EconomicContent {
-    let candidate = presentation_document(ir, hierarchy, fidelity, source_path, state);
+    let candidate = presentation_document(ir, hierarchy, fidelity, state);
     crate::mcp::content_economics::select_with_local_tokenizer(
         raw_source,
         candidate,
@@ -91,6 +82,10 @@ pub(crate) fn select_complete_content(
 // `control_full_delta` was removed. Delta operations are returned only in the
 // code-side `result.delta`; model-visible content is a minimal acknowledgement
 // (or the explicitly classified raw-source economics fallback).
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/presentation_footer.rs"]
+mod presentation_footer_tests;
 
 // Presentation boundary guard: the model-visible `content` must be a compact
 // projection (SCHEMA v5 presentation), never the CONTROL-FULL codec — whose

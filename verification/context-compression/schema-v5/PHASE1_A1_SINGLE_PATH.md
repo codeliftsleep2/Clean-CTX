@@ -1,10 +1,9 @@
 # SCHEMA-vNext Phase 1 — A1 single-path experiment
 
-**Status:** Economics and deterministic isolation pass; reasoning and live
-gates pending
+**Status:** Production and refreshed baseline verified; live gate pending
 **Measured:** 2026-09-26
-**Production renderer:** Unchanged
-**Model calls:** Zero
+**Production renderer:** A1 implemented at the shared content boundary
+**Model calls:** Six paired Codex cases
 
 ## Candidate
 
@@ -65,12 +64,36 @@ A1 passes the economics gate and deterministic candidate-isolation gate. The
 win is consistent across both measured tokenizers, removes genuine duplicate
 text, and retains the exact path at its authoritative mapping boundary.
 
-A1 is therefore accepted for the next Phase 1 gates, but is not yet approved
-for production. Before changing the externally visible grammar:
+A1 passed the pre-production gates and received explicit approval for the
+externally visible footer change. Completion requires:
 
 1. add a model-reasoning case that resolves the visible alias through
-   `§PATHMAP` and rejects a missing or invented path;
+   `§PATHMAP` and rejects a missing or invented path (**implemented as three
+   paired baseline/candidate language cases**);
 2. run the candidate reasoning gate with the same model/version as its
-   baseline;
-3. implement the production change with tracked contract coverage; and
+   baseline (**passed 6/6: three baseline and three candidate cases, using the
+   configured default Codex model in fresh isolated invocations**);
+3. implement the production change with tracked contract coverage
+   (**implemented; focused contract reported GREEN**);
 4. verify the changed footer in the live Claude pilot.
+
+## Reasoning result
+
+The paired gate passed all six cases with no failures or unrun rows. For each
+language, baseline and A1 produced the same exact alias-to-path answer and
+identified `§PATHMAP` as authoritative. Generated answers and scoring remain
+under `target/context-compression-verification/captures/`; they are experiment
+evidence, not tracked-test evidence.
+
+## Production verification
+
+The focused footer contract and registered provide/compress presentation suite
+were reported GREEN. The complete production capture was then refreshed:
+
+- SCHEMA-v5 and byte-exact economic raw fallbacks passed capture verification;
+- all six `workspace_query` oracle captures were present;
+- post-A1 candidate totals matched the isolated A1 prediction exactly; and
+- only the path-framing family changed (40–45 tokens per response).
+
+The current post-A1 numbers are recorded in `PHASE0_BASELINE.md`. The remaining
+completion boundary is live Claude acceptance on the pilot workspace.

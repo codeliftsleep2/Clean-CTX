@@ -79,3 +79,25 @@ fn measurement_helper_prefers_complete_named_ir_over_reduced_auxiliary_ir() {
         "both production-candidate and oracle rendering must share the complete-IR boundary"
     );
 }
+
+#[test]
+fn schema_capture_verifier_accepts_byte_exact_economic_raw_passthrough() {
+    let verifier_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "verification/context-compression/schema-v5/scripts/Verify-Captures.ps1",
+    );
+    let verifier = fs::read_to_string(&verifier_path)
+        .unwrap_or_else(|error| panic!("failed to read {}: {error}", verifier_path.display()));
+
+    assert!(
+        verifier.contains("raw_passthrough"),
+        "the verifier must recognize production's explicit economic raw fallback"
+    );
+    assert!(
+        verifier.contains("raw-source.txt"),
+        "raw passthrough must be checked against the source captured for that response"
+    );
+    assert!(
+        verifier.contains("ReadAllBytes"),
+        "raw passthrough acceptance must require byte-exact content/source equality"
+    );
+}

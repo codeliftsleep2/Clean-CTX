@@ -64,6 +64,16 @@ The first isolated Tier A experiment is measured with
 production renderer. Its result and gate status are recorded in
 [`PHASE1_A1_SINGLE_PATH.md`](PHASE1_A1_SINGLE_PATH.md).
 
+Prepare and run the paired A1 path-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-A1ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-a1-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-a1-reasoning-results-codex.json `
+  -ExpectedCaseCount 6 -Restart
+```
+
 ## 3. Oracle catalog
 
 Three lanes. **File** and **lifecycle** feed the SCHEMA-v5 presentation

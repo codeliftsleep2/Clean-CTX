@@ -550,7 +550,7 @@ focused edit. Laboratory token wins do not replace this gate.
 
 | Candidate | Expected impact | Correctness risk | Implementation scope | Initial recommendation |
 |---|---|---|---|---|
-| A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Economics/isolation pass; reasoning + live gates pending |
+| A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Production and refreshed baseline verified; live gate pending |
 | A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
 | A3 import handle removal | Small recurring | Low pending meaning audit | renderer/prompt/tests | Audit then measure |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
@@ -578,8 +578,10 @@ focused edit. Laboratory token wins do not replace this gate.
 
 1. **In progress:** implement candidates in the measurement harness first. A1
    has a harness-only isolated transform and passed economics plus deterministic
-   byte-isolation. Production remains unchanged pending its reasoning and live
-   gates; see
+   byte-isolation plus all six paired reasoning cases. The approved production
+   footer is implemented with focused tracked coverage; refreshed baseline and
+   production capture verification passed with the predicted totals. Live
+   acceptance remains pending. See
    `verification/context-compression/schema-v5/PHASE1_A1_SINGLE_PATH.md`.
 2. Measure each independently on the full corpus.
 3. Evaluate A4a and A4b independently; do not infer method attribution from a

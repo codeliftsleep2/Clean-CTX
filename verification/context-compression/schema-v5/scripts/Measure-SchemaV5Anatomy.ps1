@@ -93,7 +93,7 @@ function Split-SchemaAnatomy([string]$capture, [string]$candidate, [object[]]$me
         if (-not $line) { continue }
         $content = $line.TrimEnd("`r", "`n")
 
-        if ($inFileFooter -or $content -match '^// ── α') {
+        if ($inFileFooter -or $content -match '^// (?:── )?α\d+(?: |$)') {
             $inFileFooter = $true
             Add-Fragment $families "file_path" $line
             continue

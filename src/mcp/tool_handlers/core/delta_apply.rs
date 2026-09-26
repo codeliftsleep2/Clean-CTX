@@ -265,15 +265,8 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             // availability must therefore never turn a successful mutation
             // into an error response, and raw source is valid only when it is
             // the exact source snapshot represented by the committed target.
-            let compact = || {
-                super::content::presentation_document(
-                    &target_ir,
-                    &hierarchy,
-                    fidelity,
-                    &durable_file,
-                    state,
-                )
-            };
+            let compact =
+                || super::content::presentation_document(&target_ir, &hierarchy, fidelity, state);
             let (rendered, raw_passthrough) = match state.read_source(&durable_file) {
                 Ok(source) if state.cache_read().compute_hash(source.as_bytes()) == source_hash => {
                     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
@@ -282,7 +275,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                         &target_ir,
                         &hierarchy,
                         fidelity,
-                        &durable_file,
                         &source,
                         state,
                         tokenizer_kind,

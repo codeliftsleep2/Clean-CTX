@@ -171,8 +171,8 @@ fn render_prod(args: &[String]) {
         })
         .unwrap_or_else(|| args[3].clone());
     let footer = format!(
-        "// ── {} ({}) ──\n§PATHMAP\n  {} = {}",
-        ir.file_id, source_path, ir.file_id, source_path
+        "// {}\n§PATHMAP\n  {} = {}",
+        ir.file_id, ir.file_id, source_path
     );
     let candidate = format!("{}\n{}", rendered.trim(), footer);
     let output = if args[7] == "provide-fallback" {

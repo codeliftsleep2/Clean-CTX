@@ -1,8 +1,8 @@
-# SCHEMA-vNext Phase 0 baseline
+# SCHEMA-vNext current baseline
 
-**Status:** Complete  
+**Status:** Refreshed after production A1
 **Captured:** 2026-09-26  
-**Capture commit:** `2f13a7536f4b88e169a2c7638d6e7e1b49c87dd1`
+**Capture commit:** `db15d37c1106f88cf93194aa79b8f389f91a67ec`
 **Tokenizer implementation:** `tiktoken-rs 0.12.0`  
 **Model calls:** Zero
 
@@ -56,61 +56,61 @@ records and capture metadata.
 
 | Language | Fidelity/focus | Complete | Legend | Path | Declarations | Facts | Imports | Bodies | Selected |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Angular | Edit/all | 4054 | 65 | 84 | 763 | 313 | 164 | 2687 | raw: 3912 |
-| Angular | Edit/focused | 1570 | 65 | 84 | 758 | 313 | 164 | 203 | SCHEMA-v5: 1570 |
-| Angular | High | 1465 | 65 | 84 | 743 | 409 | 181 | 0 | SCHEMA-v5: 1465 |
-| Angular | Low | 980 | 65 | 84 | 413 | 313 | 131 | 0 | SCHEMA-v5: 980 |
-| Angular | Medium | 1349 | 65 | 84 | 740 | 313 | 164 | 0 | SCHEMA-v5: 1349 |
-| C# | Edit/all | 4006 | 65 | 90 | 1255 | 287 | 209 | 2134 | raw: 3590 |
-| C# | Edit/focused | 2115 | 65 | 90 | 1250 | 287 | 209 | 243 | SCHEMA-v5: 2115 |
-| C# | High | 2001 | 65 | 90 | 1250 | 393 | 232 | 0 | SCHEMA-v5: 2001 |
-| C# | Low | 1301 | 65 | 90 | 749 | 287 | 152 | 0 | SCHEMA-v5: 1301 |
-| C# | Medium | 1841 | 65 | 90 | 1232 | 287 | 209 | 0 | SCHEMA-v5: 1841 |
-| TypeScript | Edit/all | 3223 | 65 | 84 | 299 | 149 | 267 | 2368 | raw: 2957 |
-| TypeScript | Edit/focused | 1220 | 65 | 84 | 295 | 149 | 267 | 365 | SCHEMA-v5: 1220 |
-| TypeScript | High | 947 | 65 | 84 | 295 | 209 | 299 | 0 | SCHEMA-v5: 947 |
-| TypeScript | Low | 665 | 65 | 84 | 108 | 149 | 267 | 0 | SCHEMA-v5: 665 |
-| TypeScript | Medium | 855 | 65 | 84 | 295 | 149 | 267 | 0 | SCHEMA-v5: 855 |
+| Angular | Edit/all | 4014 | 65 | 44 | 763 | 313 | 164 | 2687 | raw: 3912 |
+| Angular | Edit/focused | 1530 | 65 | 44 | 758 | 313 | 164 | 203 | SCHEMA-v5: 1530 |
+| Angular | High | 1425 | 65 | 44 | 743 | 409 | 181 | 0 | SCHEMA-v5: 1425 |
+| Angular | Low | 940 | 65 | 44 | 413 | 313 | 131 | 0 | SCHEMA-v5: 940 |
+| Angular | Medium | 1309 | 65 | 44 | 740 | 313 | 164 | 0 | SCHEMA-v5: 1309 |
+| C# | Edit/all | 3963 | 65 | 47 | 1255 | 287 | 209 | 2134 | raw: 3590 |
+| C# | Edit/focused | 2072 | 65 | 47 | 1250 | 287 | 209 | 243 | SCHEMA-v5: 2072 |
+| C# | High | 1958 | 65 | 47 | 1250 | 393 | 232 | 0 | SCHEMA-v5: 1958 |
+| C# | Low | 1258 | 65 | 47 | 749 | 287 | 152 | 0 | SCHEMA-v5: 1258 |
+| C# | Medium | 1798 | 65 | 47 | 1232 | 287 | 209 | 0 | SCHEMA-v5: 1798 |
+| TypeScript | Edit/all | 3183 | 65 | 44 | 299 | 149 | 267 | 2368 | raw: 2957 |
+| TypeScript | Edit/focused | 1180 | 65 | 44 | 295 | 149 | 267 | 365 | SCHEMA-v5: 1180 |
+| TypeScript | High | 907 | 65 | 44 | 295 | 209 | 299 | 0 | SCHEMA-v5: 907 |
+| TypeScript | Low | 625 | 65 | 44 | 108 | 149 | 267 | 0 | SCHEMA-v5: 625 |
+| TypeScript | Medium | 815 | 65 | 44 | 295 | 149 | 267 | 0 | SCHEMA-v5: 815 |
 
 ## o200k anatomy
 
 | Language | Fidelity/focus | Complete | Legend | Path | Declarations | Facts | Imports | Bodies | Selected |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---|
-| Angular | Edit/all | 4226 | 66 | 88 | 809 | 314 | 167 | 2805 | raw: 4091 |
-| Angular | Edit/focused | 1636 | 66 | 88 | 803 | 314 | 167 | 214 | SCHEMA-v5: 1636 |
-| Angular | High | 1520 | 66 | 88 | 787 | 410 | 185 | 0 | SCHEMA-v5: 1520 |
-| Angular | Low | 1025 | 66 | 88 | 449 | 314 | 134 | 0 | SCHEMA-v5: 1025 |
-| Angular | Medium | 1403 | 66 | 88 | 784 | 314 | 167 | 0 | SCHEMA-v5: 1403 |
-| C# | Edit/all | 4234 | 66 | 94 | 1317 | 287 | 222 | 2287 | raw: 3826 |
-| C# | Edit/focused | 2208 | 66 | 94 | 1311 | 287 | 222 | 257 | SCHEMA-v5: 2208 |
-| C# | High | 2087 | 66 | 94 | 1311 | 400 | 245 | 0 | SCHEMA-v5: 2087 |
-| C# | Low | 1309 | 66 | 94 | 748 | 287 | 157 | 0 | SCHEMA-v5: 1309 |
-| C# | Medium | 1913 | 66 | 94 | 1287 | 287 | 222 | 0 | SCHEMA-v5: 1913 |
-| TypeScript | Edit/all | 3330 | 66 | 88 | 308 | 150 | 273 | 2454 | raw: 3060 |
-| TypeScript | Edit/focused | 1249 | 66 | 88 | 305 | 150 | 273 | 373 | SCHEMA-v5: 1249 |
-| TypeScript | High | 968 | 66 | 88 | 305 | 210 | 306 | 0 | SCHEMA-v5: 968 |
-| TypeScript | Low | 684 | 66 | 88 | 115 | 150 | 273 | 0 | SCHEMA-v5: 684 |
-| TypeScript | Medium | 876 | 66 | 88 | 305 | 150 | 273 | 0 | SCHEMA-v5: 876 |
+| Angular | Edit/all | 4184 | 66 | 46 | 809 | 314 | 167 | 2805 | raw: 4091 |
+| Angular | Edit/focused | 1594 | 66 | 46 | 803 | 314 | 167 | 214 | SCHEMA-v5: 1594 |
+| Angular | High | 1478 | 66 | 46 | 787 | 410 | 185 | 0 | SCHEMA-v5: 1478 |
+| Angular | Low | 983 | 66 | 46 | 449 | 314 | 134 | 0 | SCHEMA-v5: 983 |
+| Angular | Medium | 1361 | 66 | 46 | 784 | 314 | 167 | 0 | SCHEMA-v5: 1361 |
+| C# | Edit/all | 4189 | 66 | 49 | 1317 | 287 | 222 | 2287 | raw: 3826 |
+| C# | Edit/focused | 2163 | 66 | 49 | 1311 | 287 | 222 | 257 | SCHEMA-v5: 2163 |
+| C# | High | 2042 | 66 | 49 | 1311 | 400 | 245 | 0 | SCHEMA-v5: 2042 |
+| C# | Low | 1264 | 66 | 49 | 748 | 287 | 157 | 0 | SCHEMA-v5: 1264 |
+| C# | Medium | 1868 | 66 | 49 | 1287 | 287 | 222 | 0 | SCHEMA-v5: 1868 |
+| TypeScript | Edit/all | 3288 | 66 | 46 | 308 | 150 | 273 | 2454 | raw: 3060 |
+| TypeScript | Edit/focused | 1207 | 66 | 46 | 305 | 150 | 273 | 373 | SCHEMA-v5: 1207 |
+| TypeScript | High | 926 | 66 | 46 | 305 | 210 | 306 | 0 | SCHEMA-v5: 926 |
+| TypeScript | Low | 642 | 66 | 46 | 115 | 150 | 273 | 0 | SCHEMA-v5: 642 |
+| TypeScript | Medium | 834 | 66 | 46 | 305 | 150 | 273 | 0 | SCHEMA-v5: 834 |
 
 ## Findings
 
 1. **Focused Edit is economically and contractually distinct.** Production
    selected SCHEMA-v5 for every focused fixture, reducing o200k tokens versus
-   raw by 60.01% (Angular), 42.29% (C#), and 59.18% (TypeScript). Unfocused
+   raw by 61.04% (Angular), 43.47% (C#), and 60.56% (TypeScript). Unfocused
    Edit selected raw source because every complete candidate was larger than
-   raw: 3.30% for Angular, 10.66% for C#, and 8.82% for TypeScript. This is the
+   raw: 2.27% for Angular, 9.49% for C#, and 7.45% for TypeScript. This is the
    expected strict economics decision, not a separate safety-margin policy.
 2. **Declarations/signatures are the dominant C# cost.** Independent o200k
-   declaration/signature measurements are 57.1% of Low, 67.3% of Medium, and
-   62.8% of High candidate tokens. This supports testing recurring method and
+   declaration/signature measurements are 59.2% of Low, 68.9% of Medium, and
+   64.2% of High candidate tokens. This supports testing recurring method and
    signature grammar before marker-vocabulary changes.
-3. **Fixed cold cost matters most at Low.** Legend plus path framing is 154
-   o200k tokens for Angular/TypeScript and 160 for C#. It represents 22.5% of
-   TypeScript Low, 15.0% of Angular Low, and 12.2% of C# Low. Only part of the
-   path family is removable; A1 must isolate the duplicated path before making
-   a savings claim.
+3. **A1 removed the duplicated-path portion of fixed cold cost.** Legend plus
+   path framing is now 112 o200k tokens for Angular/TypeScript and 115 for C#,
+   down from 154 and 160 respectively. It represents 17.4% of TypeScript Low,
+   11.4% of Angular Low, and 9.1% of C# Low. The remaining path family carries
+   the visible alias and authoritative exact mapping and is not redundant.
 4. **Imports/type aliases are material in TypeScript.** Their independent
-   o200k count is 273 tokens at Low/Medium and 306 at High, or 39.9% of the
+   o200k count is 273 tokens at Low/Medium and 306 at High, or 42.5% of the
    TypeScript Low candidate. A3 requires the planned handle-meaning audit
    because the family total is not the removable handle cost.
 5. **High behavior facts are meaningful but not the largest structural cost.**
@@ -126,7 +126,9 @@ records and capture metadata.
 
 ## Phase result
 
-Phase 0 is complete. The first measured Tier A work should isolate A1's single
-duplicated-path removal. A3 follows after its semantic audit. A2 and A4 are
-blocked on a qualifying corpus opportunity rather than implementation effort.
-B4 and Tier C remain deferred under the proposal's stronger gates.
+The baseline is current after production A1. Its measured totals match the
+isolated candidate exactly, and the presentation/workspace capture verifier
+passed. A1 still requires live Claude acceptance. A3 follows after its semantic
+audit; A2 and A4 remain blocked on a qualifying corpus opportunity rather than
+implementation effort. B4 and Tier C remain deferred under the proposal's
+stronger gates.

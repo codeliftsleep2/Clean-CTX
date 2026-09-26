@@ -52,6 +52,12 @@ Read the annotation groups `mod:` (modifiers), `ctl:` (control summary), `pf:`
 `se:` (side effects), `ec:` (execution contexts). Do not infer a fact that is
 absent.
 
+## RULE 7 — File Alias: Resolve Through `§PATHMAP`
+
+The final `// αN` line identifies the file by a request-scoped alias. Resolve
+its exact source path only through the trailing `§PATHMAP` entry. The alias is
+not itself a path, and a path must never be guessed from it.
+
 ---
 
 ## Quick Reference
@@ -66,3 +72,4 @@ absent.
 | `→` (second) | return type |
 | `mod:` `ctl:` `pf:` `fl:` `cf:` `df:` `se:` `ec:` | annotation groups |
 | `$ alias` / `T alias` / `P name` | import / type alias / pattern |
+| `// αN` + `§PATHMAP` | file alias + authoritative exact path mapping |

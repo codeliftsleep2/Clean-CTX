@@ -159,7 +159,6 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             &ir,
             &hir,
             effective_fidelity,
-            &resolved_path,
             source_text,
             state,
             tokenizer_kind,

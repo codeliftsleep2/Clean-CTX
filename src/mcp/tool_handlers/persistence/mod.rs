@@ -89,7 +89,6 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         &session_ir,
         &hierarchy,
         fidelity,
-        &durable_path,
         state,
     );
     let durable_ir = crate::mcp::persistence_ir::baseline(&session_ir, &durable_path);
@@ -403,7 +402,6 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             &ir,
             &hierarchy,
             restored.fidelity,
-            file_path,
             state,
         )
     };
@@ -418,7 +416,6 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
                     &ir,
                     &hierarchy,
                     restored.fidelity,
-                    file_path,
                     &source,
                     state,
                     tokenizer_kind,

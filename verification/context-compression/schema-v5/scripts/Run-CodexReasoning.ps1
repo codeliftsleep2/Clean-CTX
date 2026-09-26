@@ -1,6 +1,7 @@
 param(
     [string]$Model = "",
     [string]$CodexPath = "",
+    [string]$TemplatePath = "",
     [string]$ResultsPath = "",
     [int]$ExpectedCaseCount = 30,
     [ValidateSet("codex", "deepseek")][string]$ModelRunner = "codex",
@@ -20,7 +21,9 @@ if (-not $resultLane) { $resultLane = "schema-v5-reasoning-results-codex" }
 $workingRoot = Join-Path $repositoryRoot "target\context-compression-verification\codex-reasoning\$resultLane"
 $scoreSchema = Join-Path $definitionRoot "score.schema.json"
 $reasoningInstructions = Get-Content -Raw (Join-Path $definitionRoot "schema-v5\REASONING_INSTRUCTIONS.md")
-$templatePath = Join-Path $captures "schema-v5-reasoning-results.json"
+if (-not $TemplatePath) {
+    $TemplatePath = Join-Path $captures "schema-v5-reasoning-results.json"
+}
 
 if ($ModelRunner -eq "codex") {
     if (-not $CodexPath) {
