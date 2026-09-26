@@ -24,8 +24,8 @@ Structure:
 - `// ── ClassName ──` opens each class; interfaces open with `// Q=interface`
   followed by `Q Name`.
 - `X Parent` extends, `I Iface` implements, `F name:type` declares a field.
-- `M name` declares a method; overloads are disambiguated by parameter count as
-  `M name(+N)`.
+- `M name` declares a method; visible parameter signatures distinguish
+  overloads without changing the method name.
 - `$ alias module [named]` imports; `T alias = original` aliases a type;
   `P name args` records a pattern.
 

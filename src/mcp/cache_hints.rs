@@ -285,7 +285,7 @@ pub fn generate_vocabulary_text() -> String {
         "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
         "// ── ClassName ── opens a class; Q Name opens an interface",
         "X: extends   I: implements   F: field",
-        "M: method; overloads disambiguated by parameter count as M name(+N)",
+        "M: method; visible parameter signatures distinguish overloads",
         "$: import   T: type alias   P: pattern",
         "→: scope; p:name:type params, → return, then mod:/ctl:/pf:/fl:/cf:/df:/se:/ec:",
         "workspace_query: forward/reverse/multi-hop/framework graph facts and provenance",

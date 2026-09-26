@@ -62,8 +62,9 @@ fn test_spring_boot_class_with_meta() {
     assert!(result.contains("X BaseController"));
     assert!(result.contains("F userService:UserService"));
     assert!(result.contains("M getAll"));
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+3)"));
+    assert!(result.contains("M find  → p:id:$n"));
+    assert!(result.contains("M find  → p:name:$n age:$n role:$s"));
+    assert!(!result.contains("find(+"));
     assert!(result.contains("ctl:RET,IF"));
     assert!(result.contains("T @rest = UserController"));
     assert!(result.contains("T @map = GET /users POST /users"));
@@ -90,9 +91,10 @@ fn test_triple_overloaded_methods() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("M process(+1)"));
-    assert!(result.contains("M process(+2)"));
-    assert!(result.contains("M process(+3)"));
+    assert!(result.contains("M process  → p:arg1:$n"));
+    assert!(result.contains("M process  → p:arg1:$n arg2:$n"));
+    assert!(result.contains("M process  → p:arg1:$n arg2:$n arg3:$n"));
+    assert!(!result.contains("process(+"));
 }
 
 #[test]
@@ -107,13 +109,9 @@ fn test_no_name_collision_with_unique_methods() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    // None should have +N
     assert!(result.contains("M init\n"));
     assert!(result.contains("M start\n"));
     assert!(result.contains("M stop\n"));
-    assert!(!result.contains("init(+0)"));
-    assert!(!result.contains("start(+0)"));
-    assert!(!result.contains("stop(+0)"));
 }
 
 #[test]

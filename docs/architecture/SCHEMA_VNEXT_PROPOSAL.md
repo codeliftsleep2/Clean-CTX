@@ -558,6 +558,8 @@ focused edit. Laboratory token wins do not replace this gate.
 | B1 one method arrow | 15-57 tokens per fixture; up to 5.25% on the current corpus | Low; 10/10 paired reasoning passed | versioned grammar/prompt/tests | Isolated laboratory gate passed; production decision pending |
 | B2 `C` class record | 3 tokens on single-class fixtures; 84–95 on 15-class C# | Low; 12/12 paired reasoning passed | versioned grammar/prompt/tests | Isolated laboratory gate passed; production decision pending |
 | B3 grouped fields | 10–126 tokens; 1.13–9.67% on Medium/High | Medium risk; corrected full restart passed 16/16 paired reasoning | renderer/reasoning tests | Isolated laboratory gate passed; combined selection pending |
+| Combined B1+B2+B3 | 18–206 cl100k tokens; 0.57–13.66% across all lanes | Combined ownership/parsing gate passed on clean 20/20 restart; symmetric replication exposed model/evaluator variability, not candidate regression | full paired laboratory gate | Combined laboratory gate passed; production decision pending |
+| B5 remove `(+N)` overload suffix | Small variable token win; correctness/readability motivated | Low: overload parameters already remain visible at every structural fidelity | renderer/prompt/regression tests | Approved narrow correction; unchanged regression demonstrated RED then GREEN |
 | B4 marker vocabulary | Unknown and tokenizer-unstable | Medium plus readability cost | broad grammar changes | Lowest priority; defer without a substantial three-tokenizer win |
 | C acknowledged legend | Large fixed | High transport risk | MCP/client contract | Do not build until a concrete host proves acknowledgement |
 

@@ -10,7 +10,7 @@
 //
 // Key design decisions:
 //   - Uses class/method **names** only, never internal alias IDs (C1, M1)
-//   - Overloaded methods disambiguated with `+N` (parameter count)
+//   - Overloaded methods disambiguated by their visible parameter signatures
 //   - Fidelity controls field layout (Low = space-separated, Medium/High = one-per-line)
 //   - Meta-layer `@` annotations always shown regardless of fidelity
 //   - The `// SCHEMA v5` header opens every output with the legend table
@@ -45,10 +45,8 @@ use std::collections::{HashMap, HashSet};
 /// | Imports | Always | Always | Always | Always | Always |
 /// | Type aliases | Always | Always | Always | Always | Always |
 ///
-/// # Overloaded method disambiguation
-///
-/// When a class has multiple methods with the same name, `+N` is appended
-/// where N is the parameter count (e.g., `M find(+1)`, `M find(+3)`).
+/// Overloaded methods retain visible parameter signatures at every structural
+/// fidelity so their declarations remain distinct without decorating names.
 pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> String {
     render_hierarchical_for_llm_focused(hir, fidelity, None)
 }
@@ -227,10 +225,8 @@ fn render_fields(output: &mut String, fields: &[FieldNode], fidelity: Fidelity) 
     }
 }
 
-/// Render methods for a class with overload disambiguation.
-///
-/// First pass: count occurrences of each method name.
-/// Second pass: emit with `+N` for duplicates.
+/// Render methods for a class, retaining parameters for overloaded names even
+/// at Low fidelity so their signatures remain distinct.
 ///
 /// At `Fidelity::Edit`, a method's full verbatim body is appended only when
 /// `focus` is `None` (every method) or the method's name is in the focus set.
@@ -252,7 +248,6 @@ fn render_methods(
     }
 
     // Second pass: emit methods
-    let mut name_indices: HashMap<&str, usize> = HashMap::new();
     for method in methods {
         let return_declares_observable = method
             .return_type
@@ -260,8 +255,6 @@ fn render_methods(
             .is_some_and(is_observable_return_type);
 
         let count = name_counts[&method.name.as_str()];
-        let idx = name_indices.entry(&method.name).or_insert(0);
-        *idx += 1;
 
         // Method-level patterns first
         for pat in &method.patterns {
@@ -271,14 +264,8 @@ fn render_methods(
             render_pattern(output, pat);
         }
 
-        // Method declaration
-        if count > 1 {
-            // Overloaded: disambiguate with +N (parameter count)
-            let param_count = method.params.len();
-            output.push_str(&format!("M {}(+{})", method.name, param_count));
-        } else {
-            output.push_str(&format!("M {}", method.name));
-        }
+        // Method declaration. Parameter signatures below distinguish overloads.
+        output.push_str(&format!("M {}", method.name));
 
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();

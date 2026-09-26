@@ -151,12 +151,10 @@ fn render_hierarchical_for_llm_spring_boot_class() {
     // Abbreviated meta-layer ops (Phase 2-4)
     assert!(result.contains("@rest"));
     assert!(result.contains("@map"));
-    // Overloaded method disambiguation (Fix B)
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+2)"));
-    // Params shown in Medium fidelity
-    assert!(result.contains("p:id:$n"));
-    assert!(result.contains("p:name:$n age:$n"));
+    // Visible signatures disambiguate overloads without decorating names.
+    assert!(result.contains("M find  → p:id:$n"));
+    assert!(result.contains("M find  → p:name:$n age:$n"));
+    assert!(!result.contains("find(+"));
 }
 
 #[test]

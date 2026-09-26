@@ -80,6 +80,20 @@ The independent B3 experiment measures grouped fields at body-free fidelities
 with `scripts/Measure-B3GroupedFields.ps1`; its field-run audit and gate status
 are recorded in [`PHASE2_B3_GROUPED_FIELDS.md`](PHASE2_B3_GROUPED_FIELDS.md).
 
+After B1, B2, and B3 pass independently, measure their selected combined
+grammar with `scripts/Measure-CombinedGrammar.ps1`; the interaction contract is
+recorded in [`PHASE2_COMBINED_GRAMMAR.md`](PHASE2_COMBINED_GRAMMAR.md).
+
+Prepare and run the combined interaction-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-CombinedReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-combined-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-combined-reasoning-results-codex.json `
+  -ExpectedCaseCount 20
+```
+
 Prepare and run the paired B3 field-reasoning gate with:
 
 ```powershell
@@ -140,7 +154,7 @@ Three lanes. **File** and **lifecycle** feed the SCHEMA-v5 presentation
 | id | question | expected | zero-tolerance |
 |----|----------|----------|----------------|
 | `typed-ownership` | Which type owns each `run` method? | Alpha owns its `run` overload family; Beta and `InheritanceProbe` each own distinct `run` methods; `Runner` declares `run` on an interface. Identity is typed owner + name, not an ID. | wrong owner; ID-invented identity |
-| `overload-arity` | How are same-name methods on Alpha distinguished? | By parameter count — `run(+1)` and `run(+2)` are distinct arity groups. | deduplication; merging distinct arities |
+| `overload-arity` | How are same-name methods on Alpha distinguished? | By their visible parameter signatures; the method name remains `run`. | deduplication; merging distinct signatures; invented name suffix |
 | `inheritance` | What does each type extend / implement / interface-extend? | Report the `X` (extends) and `I` (implements) relations per owner; keep class and interface families distinct. | class/interface collapse; invented relation |
 | `signatures` | What are the parameters and declared return of method M? | Read `p:` and the `→` return from the method line; name + params + return. | wrong param; wrong return |
 | `behavior-facts` | Which methods are async / mutating / IO / transactional? | Read the annotation groups `mod:`/`ctl:`/`pf:`/`fl:`/`cf:`/`df:`/`se:`/`ec:`; report only what the question asks. Do not infer absent facts. | wrong owner; invented fact |

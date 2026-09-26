@@ -291,11 +291,10 @@ fn test_overloaded_methods_disambiguation() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+3)"));
+    assert!(result.contains("M find  → p:id:$n"));
+    assert!(result.contains("M find  → p:name:$n age:$n role:$s"));
     assert!(result.contains("M clear"));
-    // The non-overloaded method should NOT have +0
-    assert!(!result.contains("clear(+0)"));
+    assert!(!result.contains("find(+"));
 }
 
 #[test]
@@ -317,10 +316,41 @@ fn test_overloaded_methods_params_shown_in_low_fidelity() {
 
     // Even in Low fidelity, overloaded methods show params for disambiguation
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+2)"));
-    // Overloaded methods get +N shown even in low fidelity
-    assert!(result.contains("p:id:$n") || result.contains("p:name:$n"));
+    assert!(result.contains("M find  → p:id:$n"));
+    assert!(result.contains("M find  → p:name:$n age:$n"));
+    assert!(!result.contains("find(+"));
+}
+
+#[test]
+fn overloaded_methods_use_visible_signatures_without_arity_suffixes() {
+    let mut hir = empty_hir();
+    let mut class = make_class("Service");
+
+    let mut by_id = make_method("find");
+    by_id
+        .params
+        .push(vec!["P1".into(), "$s".into(), "id".into()]);
+
+    let mut by_name = make_method("find");
+    by_name
+        .params
+        .push(vec!["P1".into(), "$s".into(), "name".into()]);
+
+    class.methods.push(by_id);
+    class.methods.push(by_name);
+    hir.classes.push(class);
+
+    for fidelity in [Fidelity::Low, Fidelity::Medium, Fidelity::High] {
+        let result = render_hierarchical_for_llm(&hir, fidelity);
+
+        assert!(result.contains("M find"));
+        assert!(result.contains("p:id:$s"));
+        assert!(result.contains("p:name:$s"));
+        assert!(
+            !result.contains("find(+1)"),
+            "visible parameter signatures already disambiguate overloads: {result}"
+        );
+    }
 }
 
 #[test]

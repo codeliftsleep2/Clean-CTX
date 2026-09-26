@@ -54,6 +54,7 @@ fn retired_vocabulary_is_not_taught_as_current_semantics() {
         "§SYM",
         "COMPACT-A A2",
         "FILE-CONTEXT-DELTA v1",
+        "name(+N)",
     ] {
         assert!(
             !SYSTEM_PROMPT.contains(tok),

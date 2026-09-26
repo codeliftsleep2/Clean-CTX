@@ -14,16 +14,18 @@ and no occurrence indices; do not invent them.
 
 ```
 // ── Alpha ──
-M run(+1) → p:value:string → string mod:async
-M run(+2) → p:value:number → string
+M run → p:value:string → string mod:async
+M run → p:value:number → string
 ```
 
-`Alpha.run(+1)` and `Alpha.run(+2)` are two distinct overloads of `Alpha.run`.
+These are two distinct overloads of `Alpha.run`, distinguished by their visible
+parameter signatures.
 
-## RULE 2 — Overloads: `name(+N)`, Never Merge
+## RULE 2 — Overloads: Visible Signatures, Never Merge
 
-Same-name methods on one owner are distinguished by **parameter count**, written
-`name(+N)`. Never collapse `run(+1)` and `run(+2)` into a single method.
+Same-name methods on one owner are distinguished by their visible parameter
+signatures. Never collapse distinct `run` declarations into a single method,
+and never invent an arity or occurrence suffix on the method name.
 
 ## RULE 3 — Exact Source: Request Edit/Verbatim, NEVER Reconstruct
 
@@ -67,7 +69,7 @@ not itself a path, and a path must never be guessed from it.
 | `// ── ClassName ──` | class boundary |
 | `X Parent` / `I Iface` | extends / implements |
 | `F name:type` | field |
-| `M name(+N)` | method (overload by arity) |
+| `M name` | method; visible parameters distinguish overloads |
 | `→` (first) | scope arrow before `p:` params |
 | `→` (second) | return type |
 | `mod:` `ctl:` `pf:` `fl:` `cf:` `df:` `se:` `ec:` | annotation groups |

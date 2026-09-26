@@ -119,7 +119,7 @@ In the table, “payload” means the normal High-fidelity `provide_code_context
 | File | yes | yes | trailer plus `§PATHMAP` alias/path | yes, by path alias mapping | one response-local occurrence | yes | no | one file handle plus exact path map |
 | Class | yes | yes | `// ── Name ──` | name only; no class ID | class order yes | yes | canonical spelling may be replaced by bijective local handle | distinct typed class handle |
 | Interface | yes | yes | `// Q=interface`, then `Q Name` | name only; no interface ID | interface order yes | yes | no type-family collapse | distinct typed interface handle |
-| Method | yes | yes | `M name` or `M name(+N)` | no method ID; `+N` is not identity | method order yes | yes | no; ID spelling itself may be elided if a bijection remains | unique method handle scoped to typed owner |
+| Method | yes | yes | `M name` plus visible signature for overloads | no method ID | method order yes | yes | no; ID spelling itself may be elided if a bijection remains | unique method handle scoped to typed owner |
 | Field | yes | yes | `F name:type` | no field ID | order yes | often | only when no question can address/compare fields; unsafe as global rule | unique field handle or lossless scoped ordinal |
 | Parameter | yes | yes except Low non-overload | `p:name:type` | no parameter ID | order yes | yes for signatures/overloads | no in correctness-complete structural view | ordered ID/ordinal, name, type |
 | Return type | yes | yes | `→ type` | attached by line position | one per method | yes | no | method-scoped value |
@@ -158,7 +158,7 @@ Two qualifications matter:
 
 ### Same-name methods and overloads
 
-Block position lets a reader infer an enclosing class, but there is no stable method handle to cite. Two classes can each contain `save`; two same-owner overloads can both render `M find(+1)`. Parameters may visually distinguish the lines at Medium/High, but references elsewhere cannot point to one line unambiguously. Low hides parameters for unique names and shows them only for repeated names, making the identity grammar data-dependent.
+Block position lets a reader infer an enclosing class, but there is no stable method handle to cite. Two classes can each contain `save`; same-owner overloads are distinguished by visible parameter signatures, including at Low fidelity. References elsewhere still cannot point to one declaration through a stable handle, so the identity limitation remains.
 
 ### Same-name classes across files or namespaces
 

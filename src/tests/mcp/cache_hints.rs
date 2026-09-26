@@ -325,6 +325,7 @@ fn test_generate_vocabulary_text() {
         "FILE-CONTEXT-DELTA v1",
         "g.K:",
         "d.c/d.i",
+        "name(+N)",
     ] {
         assert!(
             !text.contains(banned),
