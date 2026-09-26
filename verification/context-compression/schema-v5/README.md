@@ -72,6 +72,20 @@ The first versioned Tier B experiment measures the complete B1 method grammar
 with `scripts/Measure-B1MethodArrow.ps1`; its shape audit and gate status are
 recorded in [`PHASE2_B1_METHOD_GRAMMAR.md`](PHASE2_B1_METHOD_GRAMMAR.md).
 
+The independent B2 experiment measures typed `C` class records with
+`scripts/Measure-B2ClassRecord.ps1`; its shape audit and gate status are
+recorded in [`PHASE2_B2_CLASS_RECORD.md`](PHASE2_B2_CLASS_RECORD.md).
+
+Prepare and run the paired B2 class-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-B2ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-b2-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-b2-reasoning-results-codex.json `
+  -ExpectedCaseCount 12
+```
+
 Prepare and run the paired B1 method-reasoning gate with:
 
 ```powershell
