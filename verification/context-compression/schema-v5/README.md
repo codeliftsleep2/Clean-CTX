@@ -64,6 +64,20 @@ The first isolated Tier A experiment is measured with
 production renderer. Its result and gate status are recorded in
 [`PHASE1_A1_SINGLE_PATH.md`](PHASE1_A1_SINGLE_PATH.md).
 
+The next isolated Tier A experiment audits and measures generated import
+handles with `scripts/Measure-A3ImportHandles.ps1`; its code/corpus evidence is
+recorded in [`PHASE1_A3_IMPORT_HANDLES.md`](PHASE1_A3_IMPORT_HANDLES.md).
+
+Prepare and run the paired A3 import-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-A3ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-a3-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-a3-reasoning-results-codex.json `
+  -ExpectedCaseCount 8 -Restart
+```
+
 Prepare and run the paired A1 path-reasoning gate with:
 
 ```powershell

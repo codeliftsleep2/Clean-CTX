@@ -552,7 +552,7 @@ focused edit. Laboratory token wins do not replace this gate.
 |---|---|---|---|---|
 | A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Production and refreshed baseline verified; live gate pending |
 | A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
-| A3 import handle removal | Small recurring | Low pending meaning audit | renderer/prompt/tests | Audit then measure |
+| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus and 8/8 paired reasoning gates passed | renderer/prompt/tests | Request production approval; then tracked contracts, refreshed baseline, and live gate |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
@@ -586,7 +586,10 @@ focused edit. Laboratory token wins do not replace this gate.
 2. Measure each independently on the full corpus.
 3. Evaluate A4a and A4b independently; do not infer method attribution from a
    class-attribution result.
-4. Run deterministic and model reasoning gates for candidates that win.
+4. Run deterministic and model reasoning gates for candidates that win. A3
+   passed its code/corpus audit, isolated economics gate, and all eight paired
+   import-meaning and source-alias cases using fresh isolated invocations of
+   the configured default Codex model.
 5. Approve and implement only the individually proven subset.
 
 ### Phase 2 — versioned grammar experiment
