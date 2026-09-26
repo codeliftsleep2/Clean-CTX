@@ -68,6 +68,20 @@ The next isolated Tier A experiment audits and measures generated import
 handles with `scripts/Measure-A3ImportHandles.ps1`; its code/corpus evidence is
 recorded in [`PHASE1_A3_IMPORT_HANDLES.md`](PHASE1_A3_IMPORT_HANDLES.md).
 
+The first versioned Tier B experiment measures the complete B1 method grammar
+with `scripts/Measure-B1MethodArrow.ps1`; its shape audit and gate status are
+recorded in [`PHASE2_B1_METHOD_GRAMMAR.md`](PHASE2_B1_METHOD_GRAMMAR.md).
+
+Prepare and run the paired B1 method-reasoning gate with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Prepare-B1ReasoningWorksheet.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schema-v5/scripts/Run-CodexReasoning.ps1 `
+  -TemplatePath ./target/context-compression-verification/captures/schema-vnext-b1-reasoning-template.json `
+  -ResultsPath ./target/context-compression-verification/captures/schema-vnext-b1-reasoning-results-codex.json `
+  -ExpectedCaseCount 10
+```
+
 Prepare and run the paired A3 import-reasoning gate with:
 
 ```powershell

@@ -555,7 +555,7 @@ focused edit. Laboratory token wins do not replace this gate.
 | A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Laboratory production gate complete; live gate pending |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
-| B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
+| B1 one method arrow | 15-57 tokens per fixture; up to 5.25% on the current corpus | Low; 10/10 paired reasoning passed | versioned grammar/prompt/tests | Isolated laboratory gate passed; production decision pending |
 | B2 `C` class record | Small-to-medium | Low | versioned grammar/prompt/tests | Pair with B1 only after isolation |
 | B3 grouped fields | Workload-dependent | Medium reasoning risk | renderer/reasoning tests | A/B test |
 | B4 marker vocabulary | Unknown and tokenizer-unstable | Medium plus readability cost | broad grammar changes | Lowest priority; defer without a substantial three-tokenizer win |
