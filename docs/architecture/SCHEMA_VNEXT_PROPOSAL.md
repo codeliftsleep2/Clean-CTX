@@ -247,23 +247,37 @@ Drop the internal import handle only after a production-corpus assertion proves
 that it is not referenced elsewhere in the visible document and is not a
 source-written alias with user-facing meaning.
 
-#### A4. Strip checked pattern-owner IDs
+#### A4. Reduce checked pattern-owner IDs without losing visible attribution
 
-Pattern placement already occurs after checked class/method ownership has been
-resolved. Visible rows should retain only pattern-specific payload:
+Checked ownership inside the renderer does not by itself establish ownership
+for the model. This candidate is therefore split into two decisions.
+
+**A4a — class-owner elision.** A class ID may be removed when the enclosing
+typed class/interface section makes class ownership unambiguous. Canonical IDs
+remain in the pattern operation and all code-side forms.
+
+**A4b — method-owner elision or replacement.** A method ID may be removed only
+when the visible grammar still supplies an unambiguous method discriminator,
+such as source name plus arity or strict method-local nesting. Merely emitting
+the row somewhere inside a class section is insufficient when multiple methods
+can own the same pattern family.
+
+Current shape:
 
 ```text
 P CTOR C1 M1 repo
 ```
 
-candidate:
+The shortest possible candidate:
 
 ```text
 P CTOR repo
 ```
 
-This is safe only for the model-facing projection. Canonical IDs remain in the
-pattern operation and all code-side forms.
+is admissible only for a pattern whose method ownership is uniquely recoverable
+from the visible grammar. If that cannot be proven, retain or replace the
+method discriminator rather than stripping it. A reasoning test cannot make an
+intrinsically ambiguous grammar safe.
 
 ### Tier B — grammar revision
 
@@ -315,16 +329,34 @@ rejected regardless of token savings.
 
 #### B4. Tokenizer-selected marker vocabulary
 
-Measure complete alternatives for labels such as `mod:`, `ctl:`, `df:`, and
-`se:`. Do not assume the shortest character spelling is cheapest. Unicode,
-punctuation-heavy, and numeric opcode candidates must beat readable ASCII
-mnemonics on the actual tokenizers and pass the same reasoning suite.
+This is the lowest-priority grammar candidate and is not part of the planned
+vNext implementation sequence. Labels such as `mod:`, `ctl:`, `df:`, and
+`se:` are readable operational vocabulary, while their tokenizer economics can
+change across model releases. Do not optimize them against cl100k/o200k alone
+or assume the shortest character spelling is cheapest.
+
+Reconsider B4 only if a complete alternative:
+
+- produces a substantial rather than marginal win;
+- wins across `cl100k_base`, `o200k_base`, and the native tokenizer for the
+  Claude model used in field testing;
+- does not lose badly for any language or fidelity;
+- remains stable across the tokenizer/model versions available to the
+  experiment;
+- passes the complete reasoning suite; and
+- saves enough tokens to justify its readability, diagnosis, and documentation
+  costs.
+
+If a repeatable native Claude count is unavailable, B4 remains deferred.
+Readable ASCII mnemonics are the default, not merely one equally weighted
+candidate.
 
 ### Tier C — acknowledged stable schema
 
 The full inline legend is a substantial cold fixed cost. It may be replaced by
-a minimal version/digest only when the client explicitly acknowledges the exact
-schema contract that the model will receive.
+a minimal version/digest only when a concrete supported host demonstrates that
+the client can explicitly acknowledge the exact schema contract and that the
+corresponding schema is available to the model.
 
 Illustrative negotiation:
 
@@ -336,6 +368,12 @@ server emits:        // SCHEMA vNext <digest-prefix>
 Neither MCP prompt-resource availability, a previous response, nor provider
 prompt caching is acknowledgement. If the host cannot prove schema visibility,
 the complete cold legend remains inline.
+
+Do not implement or prototype an acknowledgement protocol before that host
+capability is demonstrated end to end. Tier C is an architectural possibility,
+not scheduled work. After a qualifying host exists, negotiation design still
+requires separate architectural approval because it changes an external
+transport contract.
 
 An adaptive legend containing only markers used in the current payload may be
 tested as a separate cold-mode candidate. It must remain self-contained and
@@ -424,6 +462,25 @@ evidence. The 2026-09-26 table above is the comparison baseline. Aggregate
 raw-to-presentation capture is complete; the per-family anatomy items in this
 list remain to be recorded before candidate implementation.
 
+### Baseline invalidation rule
+
+Re-capture the complete baseline after every RED/GREEN regression fix or other
+change that can alter model-visible presentation bytes. This includes changes
+to:
+
+- SCHEMA rendering or visible fact collapsing;
+- compiler or meta-layer facts consumed by the renderer;
+- fidelity-dependent presentation;
+- legends, headers, paths, signatures, annotations, or exact-body inclusion;
+- raw-versus-structured selection and its economics boundary.
+
+Capture occurs after the unchanged regression has returned GREEN and before a
+later compression candidate is compared. A baseline record should identify the
+Git commit, capture date, fixture revision or hashes, and tokenizer/version in
+addition to the token counts. Test-only changes and changes proven to remain
+entirely code-side—for example Binary `0x04`, `dv:2`, or persistence work that
+cannot affect visible content—do not invalidate the presentation baseline.
+
 ### Candidate isolation
 
 Apply one candidate at a time to captured canonical fixtures. For every row,
@@ -463,12 +520,21 @@ scoring rules for baseline and candidate. Add explicit cases for:
 - reading the vNext method signature without the scope arrow;
 - distinguishing class and interface scopes under `C`/`Q`;
 - selecting one field from a grouped field row;
-- associating a pattern payload with its method after owner IDs are hidden;
+- associating distinct same-family pattern payloads with same-named methods in
+  two different classes after class-owner IDs are hidden, including two `CTOR`
+  patterns with different dependency payloads;
+- associating two same-family pattern payloads with differently named methods
+  in one class after method-owner IDs are hidden or replaced;
+- associating same-family pattern payloads with two overloads in one class,
+  using arity to prevent cross-attribution;
 - requesting `workspace_query` for facts deliberately outside file context;
 - requesting Edit or Verbatim when the structural presentation is insufficient.
 
 Zero tolerance remains in force for wrong ownership, wrong edit target,
 fabricated resolution, lost duplicates/order, or source corruption.
+Passing the cross-class case does not prove method-level elision safe; A4b must
+also pass the same-class and overload cases. If the visible grammar supplies no
+method discriminator, reject A4b rather than relying on a favorable model run.
 
 ### Live gate
 
@@ -486,12 +552,13 @@ focused edit. Laboratory token wins do not replace this gate.
 | A1 single path | Small fixed | Very low | content assembly + contracts | Measure first |
 | A2 Promise collapse | Small-to-medium on async-heavy TS | Very low | renderer + tests | Measure first |
 | A3 import handle removal | Small recurring | Low pending meaning audit | renderer/prompt/tests | Audit then measure |
-| A4 pattern owner-ID stripping | Medium on pattern-dense files | Low-to-medium | renderer/reasoning tests | Measure independently |
+| A4a class-owner ID elision | Small-to-medium on pattern-dense files | Low | renderer + adversarial reasoning tests | Measure independently |
+| A4b method-owner elision/replacement | Medium on pattern-dense files | Medium-to-high ambiguity risk | grammar + adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | Medium recurring | Low | versioned grammar/prompt/tests | Highest-priority vNext experiment |
 | B2 `C` class record | Small-to-medium | Low | versioned grammar/prompt/tests | Pair with B1 only after isolation |
 | B3 grouped fields | Workload-dependent | Medium reasoning risk | renderer/reasoning tests | A/B test |
-| B4 marker vocabulary | Unknown | Medium | broad grammar changes | Micro-benchmark before design |
-| C acknowledged legend | Large fixed | High transport risk | MCP/client contract | Defer until host trace |
+| B4 marker vocabulary | Unknown and tokenizer-unstable | Medium plus readability cost | broad grammar changes | Lowest priority; defer without a substantial three-tokenizer win |
+| C acknowledged legend | Large fixed | High transport risk | MCP/client contract | Do not build until a concrete host proves acknowledgement |
 
 ---
 
@@ -509,24 +576,28 @@ focused edit. Laboratory token wins do not replace this gate.
 
 1. Implement candidates in the measurement harness first.
 2. Measure each independently on the full corpus.
-3. Run deterministic and model reasoning gates for candidates that win.
-4. Approve and implement only the individually proven subset.
+3. Evaluate A4a and A4b independently; do not infer method attribution from a
+   class-attribution result.
+4. Run deterministic and model reasoning gates for candidates that win.
+5. Approve and implement only the individually proven subset.
 
 ### Phase 2 — versioned grammar experiment
 
 1. Define a complete vNext cold legend and grammar.
 2. Prototype B1, B2, and B3 independently.
-3. Select marker spellings from tokenizer results, not visual preference.
+3. Retain readable marker vocabulary; B4 is not part of this phase.
 4. Run the complete laboratory and live gates.
 5. If approved, update renderer, MCP prompt resource, vocabulary resource,
    tests, examples, and documentation atomically.
 
-### Phase 3 — optional stable-schema acknowledgement
+### Tier C capability gate — blocked pending a real host
 
-1. Trace what the real MCP host places in model context.
-2. Specify explicit version/digest acknowledgement.
-3. Preserve cold self-contained output for all unacknowledged clients.
-4. Measure cached and uncached economics separately.
+No implementation phase exists until a concrete supported host proves both
+explicit schema acknowledgement and model access to that exact schema. The
+evidence must come from the real host boundary, not a simulated client, prompt
+cache, prior response, or available-but-unread resource. If that prerequisite
+is ever met, create a separately approved design for version/digest
+negotiation, cold fallback, and cached-versus-uncached measurement.
 
 ---
 
@@ -553,10 +624,15 @@ Reject or defer a candidate when any of the following occurs:
 
 - it loses a required fact, occurrence, owner, order, or duplicate;
 - it makes an edit target ambiguous;
+- it removes a pattern-owner field without leaving an unambiguous visible
+  class and method discriminator;
 - it depends on conversation memory or an unverified prompt-resource read;
 - it increases selected tokens on the qualifying corpus;
 - it wins aggregate tokens only by losing one language/fidelity family badly;
 - it reduces reasoning reliability or increases unsupported claims;
+- a marker-vocabulary change lacks a substantial win across cl100k, o200k, and
+  the native field-test Claude tokenizer, or its readability cost outweighs
+  that win;
 - it adds a dictionary/table whose own legend and lookup cost erase the win;
 - it requires canonical, persistence, or delta changes merely to shorten the
   model-facing projection.
@@ -586,14 +662,16 @@ Reject or defer a candidate when any of the following occurs:
    every externally visible textual change wait for vNext?
 2. Is the first import operand always internal presentation machinery?
 3. Which pattern payloads remain reasoning-relevant after their declaration
-   signature and modifiers are visible?
+   signature and modifiers are visible, and what visible method discriminator
+   does each retained payload require?
 4. Does grouping fields degrade real model selection or comparison tasks?
 5. Can Claude's native token counter be used in the repeatable local/field
    measurement loop?
-6. Does any supported MCP host reliably expose server initialization
-   instructions or acknowledged prompt resources to the model?
-7. Is a minimal cold header plus optional detailed vocabulary more reliable
-   than a dynamically generated used-marker legend?
+6. Can any concrete supported MCP host prove both explicit schema
+   acknowledgement and model access to that exact schema? Until demonstrated,
+   Tier C has no implementation phase.
+7. Does any marker-vocabulary alternative produce a substantial, readable,
+   stable win across cl100k, o200k, and the native field-test Claude tokenizer?
 
 These questions are measurement and architecture gates, not details for an
 implementer to decide implicitly.
