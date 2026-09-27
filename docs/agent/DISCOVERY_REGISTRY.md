@@ -58,9 +58,9 @@ behavior is superseded.
 | **Classification** | Semantic policy + protocol evidence/completeness |
 | **Reproducible locally?** | Yes |
 | **Local regression** | `src/tests/workspace/index_cycle_policy.rs`; `src/tests/mcp/workspace_query_cycle_witness.rs`; existing WSC-004 scope/`withinPath` traversal suites |
-| **Live scenario required?** | Yes — run the Phase 5 stdio harness against a freshly built server; field evidence remains separate from tracked test authority. |
+| **Live scenario required?** | Completed 2026-09-27 — the operator-run stdio harness passed schema, no-implicit-compilation, excluded-`Calls`, and positive witnessed-`Injects` scenarios. Field evidence remains separate from tracked test authority. |
 | **Architectural invariant** | WSC-007 |
-| **Status** | Fixed locally; live verification pending |
+| **Status** | Verified |
 
 **Resolution:** `has_cycle` is now an explicitly typed dependency-cycle query.
 It admits exactly `Injects` and `ImportsModule`, returns one deterministic closed
