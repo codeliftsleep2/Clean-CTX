@@ -1,6 +1,6 @@
 # `has_cycle` semantic policy and cycle-witness proposal
 
-**Status:** Phase 0 approved; Phase 1 RED contract in progress  
+**Status:** Phases 0–4 implemented and locally GREEN; live stdio and final audit pending
 **Recorded:** 2026-09-27  
 **Current production surface:** `workspace_query(type = "has_cycle")`  
 **Primary boundaries:** `WorkspaceIndex`, workspace scope, MCP structured output,
@@ -19,14 +19,36 @@ query into an unpredictable workspace-wide compilation operation. This proposal
 therefore treats cycle semantics, evidence, and completeness as a distinct
 architectural process.
 
-This document does not authorize implementation. In particular, it does not
-approve a final relation set, exhaustive source compilation, or a breaking
-change to the existing `has_cycle` field.
+Implementation was authorized after Phase 0 approved the narrow dependency
+policy. This document does not authorize exhaustive source compilation or a
+breaking change to the existing `has_cycle` field.
+
+## Implementation outcome (2026-09-27)
+
+- `kind` is optional, defaults to `dependency`, and rejects unknown values.
+- Eligible relations are exactly `Injects` and `ImportsModule`.
+- `WorkspaceIndex` owns one iterative deterministic closed-witness primitive;
+  the compatible boolean delegates to it.
+- Query-local outgoing-edge ordering makes equivalent insertion histories
+  select the same witness. Full cost includes node/edge sorting, not only DFS.
+- Witness steps retain asserting-file provenance. Semantic tuple collisions are
+  explicitly listed with their admitted occurrence files.
+- MCP structured and model-facing responses report
+  `indexed_evidence_only` and `source_complete=false`.
+- The operation performs no discovery, hydration, source compilation,
+  persistence, rendered-context publication, or compression-statistics write.
+- Tracked authorities are `src/tests/workspace/index_cycle_policy.rs` and
+  `src/tests/mcp/workspace_query_cycle_witness.rs`, with existing WSC-004 suites
+  retaining scope-security authority.
 
 Phase 0 findings and the four decisions awaiting approval are recorded in
 `HAS_CYCLE_PHASE0_SEMANTIC_AUDIT.md`.
 
 ## 2. Code-authority findings
+
+The findings in this section describe the pre-implementation boundary that
+motivated the approved change. The implementation outcome above and WSC-007
+describe current production behavior.
 
 ### 2.1 Current index algorithm
 
@@ -281,7 +303,7 @@ expects the same witness.
 
 ## 8. Phased implementation plan
 
-### Phase 0 — relation-policy audit and approval
+### Phase 0 — relation-policy audit and approval — complete
 
 1. Inventory every current `SemanticRelation` producer.
 2. Record what a cycle containing each relation would mean.
@@ -294,7 +316,7 @@ expects the same witness.
 **Exit gate:** maintainer approval of the semantic policy. No production change
 occurs in this phase.
 
-### Phase 1 — tracked index-level RED contract
+### Phase 1 — tracked index-level RED contract — complete
 
 Add the narrowest tracked regressions under `src/tests/**` proving:
 
@@ -314,7 +336,7 @@ Follow the repository RED/GREEN procedure exactly: observe focused RED against
 the unfixed implementation, stash only the test and registration, implement the
 production change, restore the unchanged test, and observe focused GREEN.
 
-### Phase 2 — index-owned witness primitive
+### Phase 2 — index-owned witness primitive — complete
 
 Introduce the smallest index-owned return type required to carry a witness.
 Extend or complement the existing three-color DFS so it retains parent edge
@@ -329,10 +351,10 @@ Requirements:
 - relation eligibility is one explicit policy, not duplicated by callers;
 - `has_cycle` may delegate to the witness primitive so boolean and witness
   semantics cannot drift;
-- the existing generic `graph_utils::has_cycle` remains untouched unless a
-  reusable witness primitive is demonstrably simpler at that boundary.
+- the obsolete generic boolean-only `graph_utils::has_cycle` is removed after
+  the index-owned witness primitive becomes the sole production cycle path.
 
-### Phase 3 — MCP contract and coverage honesty
+### Phase 3 — MCP contract and coverage honesty — complete
 
 Add tracked MCP regressions proving:
 
@@ -350,7 +372,7 @@ for unrelated query types merely to fix `has_cycle`. Prefer query-specific
 authority/status inputs or a narrow cycle-specific projection over a global
 semantic downgrade.
 
-### Phase 4 — documentation and discovery record
+### Phase 4 — documentation and discovery record — complete
 
 After tracked tests are GREEN:
 

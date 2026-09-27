@@ -1,6 +1,7 @@
 # Query-boundary completeness and redundant-work proposal
 
-**Status:** Phase E1 implemented and locally verified; wider audit remains open
+**Status:** Phase E1 implemented and locally verified; `has_cycle` bounded
+witness contract implemented; wider audit remains open
 **Recorded:** 2026-09-26
 **Production behavior:** `entities_in_file` now performs fidelity-aware,
 freshness-checked semantic compilation on first touch
@@ -15,17 +16,18 @@ Its optional `fidelity` argument should mean **compile semantic facts at least
 as completely as the requested fidelity requires**, including recompilation
 when an existing index entry was produced at a lower semantic fidelity.
 
-`has_cycle` must not adopt a superficially similar single-file shortcut. It is
+`has_cycle` did not adopt a superficially similar single-file shortcut. It is
 a workspace-scoped graph property and currently has no target file. Compiling
 one file before querying a partially populated graph can still return a clean
 `false` while relevant files remain unindexed. Its completeness policy therefore
-requires a separate architectural decision before implementation. That process
-is now scoped in `HAS_CYCLE_WITNESS_PROPOSAL.md`; this document remains the
+required a separate architectural decision. That process is implemented through
+Phase 4 in `HAS_CYCLE_WITNESS_PROPOSAL.md`; this document remains the
 authority for the fidelity-aware `entities_in_file` work.
 
-Phase E1 was explicitly authorized and implemented through tracked RED/GREEN
-regressions. `has_cycle` and the wider audit remain decision/investigation work;
-Phase E1 does not authorize their contracts.
+Phase E1 and the separate `has_cycle` witness contract were explicitly
+authorized and implemented through tracked RED/GREEN regressions. The wider
+audit remains investigation work; neither completed item authorizes its other
+contracts.
 
 This document also records four adjacent query-boundary candidates discovered by
 auditing for the same broader failure shape: a caller must perform a discovery
@@ -79,12 +81,15 @@ The operation uses no name-based discovery diagnostic. A successful empty
 response now means the authorized current file was semantically compiled and
 produced no entities at the requested semantic fidelity.
 
-### 3.2 `has_cycle`
+### 3.2 `has_cycle` — resolved through the dedicated witness process
 
 The production handler in `src/mcp/tool_handlers/query/graph.rs` resolves an
-effective workspace scope and calls `WorkspaceIndex::has_cycle` or
-`has_cycle_in_scope`. It accepts no target file and performs no coverage or
-hydration step.
+effective workspace scope and calls the index-owned deterministic dependency
+witness primitive. It accepts optional/default `kind=dependency`, admits only
+`Injects` and `ImportsModule`, and performs no discovery, coverage hydration, or
+source compilation. Its response preserves the compatible boolean while adding
+the ordered witness, asserting-file provenance, semantic-identity ambiguity,
+and explicit `indexed_evidence_only` / `source_complete=false` coverage.
 
 This is materially different from `entities_in_file`: the answer depends on
 all relevant edge occurrences in the effective scope, not one explicit file.
@@ -205,7 +210,7 @@ clear or replace the metadata together with the file's semantic occurrences.
 An independent map is acceptable only if the implementation proves that it
 cannot drift across those lifecycle operations.
 
-## 6. `has_cycle` decision still required
+## 6. `has_cycle` decision — resolved as bounded Option B
 
 ### Option A — exhaustive scoped compilation
 
@@ -250,12 +255,13 @@ workspace graph is insufficient. Other files may contain the missing edge that
 closes a cycle. This preserves the same false-completeness failure under a more
 confident-looking API.
 
-### Recommendation
+### Implemented decision
 
-Implement `entities_in_file` independently. For `has_cycle`, choose Option A
-only if definitive one-call workspace cycle detection justifies exhaustive
-scope compilation. Otherwise choose Option B. Do not represent a partially
-indexed graph as a complete negative answer.
+`entities_in_file` remains independent. `has_cycle` implements Option B: a
+bounded deterministic query over scoped retained index evidence, with one
+actionable witness and an explicit non-source-complete coverage statement.
+Exhaustive compilation remains deferred as a separately named and approved
+operation if a concrete host later requires it.
 
 ## 7. Compatibility and response behavior
 
@@ -298,12 +304,14 @@ The complete eight-test E1 module is green. Existing WSC-004 scope suites remain
 the authority for path/root/`withinPath` security. Live no-prior-provide use is
 the remaining field gate.
 
-### Phase C1 — `has_cycle`
+### Phase C1 — `has_cycle` — complete locally through dedicated phases 0–4
 
-Do not write implementation tests until Option A or B is approved. The chosen
-contract must include multi-file cases where the closing cycle edge is in a
-previously unindexed file; a one-file fixture cannot prove workspace
-completeness.
+Option B was approved and implemented under
+`HAS_CYCLE_WITNESS_PROPOSAL.md`. Tracked tests prove relation policy,
+deterministic closed witnesses, provenance, identity-collision disclosure,
+scope isolation, honest empty results, and absence of hydration/compilation
+side effects. The remaining gates are the optional live stdio scenario and the
+final repository audit/verification gate.
 
 ## 9. Documentation updates required on implementation
 

@@ -122,3 +122,40 @@ fn has_cycle_discloses_semantic_identity_collisions_in_its_witness() {
             .is_some_and(|files| files.len() > 1)
     }));
 }
+
+#[test]
+fn has_cycle_no_cycle_response_is_empty_index_only_and_side_effect_free() {
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    let before_stats = state.session_stats_lock().summary();
+    let before_cache_len = state.source_cache_lock().len();
+
+    let response = call_has_cycle(
+        &state,
+        json!({
+            "type": "has_cycle",
+            "kind": "dependency",
+            "workspaceRoot": "C:/workspace-that-need-not-exist"
+        }),
+    );
+    let structured = &response["result"]["structuredContent"];
+    assert_eq!(structured["has_cycle"], false);
+    assert_eq!(structured["cycle"], json!([]));
+    assert_eq!(structured["coverage"]["status"], "indexed_evidence_only");
+    assert_eq!(structured["coverage"]["source_complete"], false);
+
+    let text = response["result"]["content"][0]["text"]
+        .as_str()
+        .expect("model-facing content");
+    assert!(text.contains("\"authority\": \"workspace_index\""));
+    assert!(text.contains("\"status\": \"indexed_evidence_only\""));
+    assert!(!text.contains("authoritative_index_snapshot_for_effective_scope"));
+
+    let after_stats = state.session_stats_lock().summary();
+    assert_eq!(after_stats.total_files, before_stats.total_files);
+    assert_eq!(
+        after_stats.full_compress_count,
+        before_stats.full_compress_count
+    );
+    assert_eq!(state.source_cache_lock().len(), before_cache_len);
+    assert!(state.workspace_index_read().is_empty());
+}

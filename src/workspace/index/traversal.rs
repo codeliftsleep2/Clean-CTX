@@ -231,7 +231,8 @@ impl WorkspaceIndex {
                 .unwrap_or_default();
             // Hash-backed index storage has no semantic iteration order. Sort
             // once per query so identical index state selects the same witness.
-            // This makes witness construction O(V + E log E), not plain O(V+E).
+            // Together with sorted node construction, this makes the full query
+            // O(V log V + sum(d(v) log d(v)) + V + E), not plain O(V+E).
             outgoing.sort_by(|(_, left), (_, right)| {
                 (
                     left.object.domain.as_str(),

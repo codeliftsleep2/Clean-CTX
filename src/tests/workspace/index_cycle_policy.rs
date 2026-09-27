@@ -195,6 +195,48 @@ fn dependency_cycle_witness_is_deterministic_when_two_cycles_exist() {
 }
 
 #[test]
+fn equivalent_insertion_orders_select_the_same_dependency_cycle_witness() {
+    let evidence = [
+        ("z-one.ts", "ZuluService", "YankeeService"),
+        ("z-two.ts", "YankeeService", "ZuluService"),
+        ("a-one.ts", "AlphaService", "BetaService"),
+        ("a-two.ts", "BetaService", "AlphaService"),
+    ];
+    let mut forward = WorkspaceIndex::new();
+    let mut reverse = WorkspaceIndex::new();
+    for (file, from, to) in evidence {
+        forward.add_edges(
+            file,
+            vec![edge(
+                SemanticRelation::Injects,
+                "angular",
+                "Service",
+                from,
+                to,
+            )],
+        );
+    }
+    for (file, from, to) in evidence.into_iter().rev() {
+        reverse.add_edges(
+            file,
+            vec![edge(
+                SemanticRelation::Injects,
+                "angular",
+                "Service",
+                from,
+                to,
+            )],
+        );
+    }
+
+    assert_eq!(
+        forward.dependency_cycle_witness(),
+        reverse.dependency_cycle_witness(),
+        "witness selection must not depend on edge insertion history"
+    );
+}
+
+#[test]
 fn dependency_cycle_witness_is_empty_for_an_acyclic_graph() {
     let mut index = WorkspaceIndex::new();
     index.add_edges(

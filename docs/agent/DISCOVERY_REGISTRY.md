@@ -46,6 +46,32 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-025: `has_cycle` Mixed Unrelated Relations and Returned No Actionable Evidence
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Query-boundary source audit following the live `entities_in_file` completeness investigation, then controlled tracked RED/GREEN reproduction |
+| **Repository/context** | Session- and workspace-scoped `WorkspaceIndex` evidence across Angular, Spring, .NET, and generic semantic relation families |
+| **Symptom** | `workspace_query(type="has_cycle")` returned only a boolean. Any non-`Calls` relation could close the graph loop, so containment, routing, mapping, testing, or unreliable `Autowired` identity could be reported as an architectural cycle. A negative result looked authoritative even though the query inspected retained index evidence only, and a positive result gave no path, relation, or asserting-file evidence. |
+| **Root cause** | The old handler delegated to a generic three-color boolean over every indexed relation except `Calls`. Relation eligibility had no cycle-specific semantic policy, the DFS discarded parent edges, the MCP response had no witness or coverage contract, and semantic tuple collisions across physical files were not disclosed. |
+| **Classification** | Semantic policy + protocol evidence/completeness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/workspace/index_cycle_policy.rs`; `src/tests/mcp/workspace_query_cycle_witness.rs`; existing WSC-004 scope/`withinPath` traversal suites |
+| **Live scenario required?** | Yes — run the Phase 5 stdio harness against a freshly built server; field evidence remains separate from tracked test authority. |
+| **Architectural invariant** | WSC-007 |
+| **Status** | Fixed locally; live verification pending |
+
+**Resolution:** `has_cycle` is now an explicitly typed dependency-cycle query.
+It admits exactly `Injects` and `ImportsModule`, returns one deterministic closed
+witness with asserting-file provenance, exposes admitted semantic-identity
+collisions, and labels both positive and negative answers as index-only rather
+than source-complete. The boolean remains for compatibility and delegates to
+the same index-owned witness primitive. Scope is applied during traversal, and
+the operation performs no discovery, hydration, or compilation.
+
+---
+
 ## DIS-2026-024: `entities_in_file` Returned Ambiguous Empty Results Before Prior Compilation
 
 | Field | Value |

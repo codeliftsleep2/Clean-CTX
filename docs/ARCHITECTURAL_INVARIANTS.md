@@ -515,6 +515,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-007 Dependency-Cycle Results Are Witnessed, Scoped Index Evidence
+
+| Property | Value |
+|----------|-------|
+| **Intent** | `has_cycle` must return an actionable architectural dependency cycle without implying that the retained index is a complete or fresh inventory of every source file in the workspace. |
+| **Invariant** | `workspace_query(type="has_cycle")` defaults to and currently accepts only `kind="dependency"`; unknown kinds return `-32602`. A dependency cycle may contain only `SemanticRelation::Injects` and `ImportsModule`; native calls, containment, routing, mapping, testing, event flow, and `Autowired` are excluded. The existing boolean and the ordered closed witness share one index-owned iterative traversal. Nodes use semantic tuple identity `(domain, entity_type, name)`; every witness edge retains its asserting file. Multiple admitted physical occurrences of a witness identity are disclosed through `identity_ambiguous` and `identity_ambiguities`, never presented as unique physical resolution. Workspace scope and `withinPath` filter edge occurrences during traversal. Stable node and query-local edge ordering make witness selection independent of insertion history; the full query includes node/edge sorting rather than claiming plain DFS complexity. Responses explicitly report `indexed_evidence_only` and `source_complete=false`. The operation performs no discovery, hydration, source compilation, persistence, rendered-context publication, or statistics mutation. |
+| **Enforcement** | `src/workspace/index/traversal.rs` owns relation eligibility, deterministic witness reconstruction, scope filtering, and identity-ambiguity projection. `src/mcp/tool_handlers/query/graph.rs` owns kind validation and the additive MCP response. `src/tests/workspace/index_cycle_policy.rs` covers approved/excluded/mixed relations, self-loops, acyclic graphs, deterministic insertion-order independence, provenance, and scoped isolation. `src/tests/mcp/workspace_query_cycle_witness.rs` covers the compatible boolean, ordered witness, invalid kind, honest coverage, collision disclosure, empty response, and absence of compile/cache/statistics side effects. Existing WSC-004 suites retain root/additional-root/`withinPath` security authority. |
+| **Authority** | `WorkspaceIndex::dependency_cycle_witness`, `WorkspaceIndex::dependency_cycle_witness_in_scope`, `handle_has_cycle` |
+| **Type** | ENFORCED (state ownership + test) |
+| **Gate** | `cargo test --all-features cycle_policy_tests` and `cargo test --all-features tests_cycle_witness` |
+
+---
+
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |
