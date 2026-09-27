@@ -67,6 +67,7 @@ pub(super) fn render(
         "name": args.get("name"),
         "file_path": args.get("file_path"),
         "depth": args.get("depth"),
+        "kind": args.get("kind"),
     });
     if file_local_calls {
         let query = query
@@ -96,8 +97,8 @@ pub(super) fn render(
             "within_path": args.get("withinPath"),
         },
         "completeness": {
-            "authority": if file_local_calls { "fresh_canonical_file_ir" } else { "workspace_index_after_registered_hydration" },
-            "status": if file_local_calls { "authoritative_file_snapshot" } else { "authoritative_index_snapshot_for_effective_scope" },
+            "authority": if file_local_calls { "fresh_canonical_file_ir" } else if query_type == "has_cycle" { "workspace_index" } else { "workspace_index_after_registered_hydration" },
+            "status": if file_local_calls { "authoritative_file_snapshot" } else if query_type == "has_cycle" { "indexed_evidence_only" } else { "authoritative_index_snapshot_for_effective_scope" },
             "zero_result": count == Some(0),
             "discovery": structured.get("discovery"),
         },

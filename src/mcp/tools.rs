@@ -93,6 +93,16 @@ fn workspace_query_discovery_schema() -> Value {
     })
 }
 
+/// Build cycle output fields separately so `workspace_query` remains below
+/// `serde_json::json!`'s default macro-recursion limit.
+fn workspace_query_cycle_schema() -> Value {
+    serde_json::json!({
+        "type": "array",
+        "description": "One deterministic ordered dependency-cycle witness (has_cycle).",
+        "items": { "type": "object" }
+    })
+}
+
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     let tools = vec![
         serde_json::json!({
@@ -340,6 +350,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file. Edit and verbatim normalize to High because this query publishes no source bodies. Defaults to the configured fidelity." },
+                    "kind": { "type": "string", "enum": ["dependency"], "description": "Optional cycle policy for has_cycle. Defaults to dependency." },
                     "filePath": { "type": "string", "description": "Trusted source file for calls_in_file." },
                     "owner": { "type": "object", "description": "Typed caller owner for calls_in_file.", "properties": { "kind": { "type": "string", "enum": ["class", "interface"] }, "name": { "type": "string" } }, "required": ["kind", "name"] },
                     "method": { "type": "object", "description": "Caller method for calls_in_file. Omit signature fields for the complete overload family.", "properties": { "name": { "type": "string" }, "parameters": { "type": "array", "items": { "type": "string" }, "description": "Optional exact visible parameter-signature selector." }, "return_type": { "type": "string" } }, "required": ["name"] },
@@ -375,6 +386,11 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "type": "boolean",
                         "description": "Cycle detection result (has_cycle)."
                     },
+                    "cycle": workspace_query_cycle_schema(),
+                    "coverage": { "type": "object", "description": "Index-evidence coverage limits for has_cycle." },
+                    "identity_model": { "type": "string", "description": "Semantic identity model used by has_cycle." },
+                    "identity_ambiguous": { "type": "boolean", "description": "Whether a has_cycle witness identity has multiple admitted physical occurrences." },
+                    "identity_ambiguities": { "type": "array", "description": "Ambiguous witness identities and their admitted occurrence files.", "items": { "type": "object" } },
                     "depth_used": {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."

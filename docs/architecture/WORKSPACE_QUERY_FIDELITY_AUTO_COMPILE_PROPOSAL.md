@@ -19,7 +19,9 @@ when an existing index entry was produced at a lower semantic fidelity.
 a workspace-scoped graph property and currently has no target file. Compiling
 one file before querying a partially populated graph can still return a clean
 `false` while relevant files remain unindexed. Its completeness policy therefore
-requires a separate architectural decision before implementation.
+requires a separate architectural decision before implementation. That process
+is now scoped in `HAS_CYCLE_WITNESS_PROPOSAL.md`; this document remains the
+authority for the fidelity-aware `entities_in_file` work.
 
 Phase E1 was explicitly authorized and implemented through tracked RED/GREEN
 regressions. `has_cycle` and the wider audit remain decision/investigation work;

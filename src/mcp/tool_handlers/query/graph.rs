@@ -133,8 +133,21 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
 /// ASSERTED inside that workspace count as cycle edges, so two repositories that
 /// each contribute one half of a cycle can never be combined into a cycle report
 /// that neither workspace actually contains. Cycle membership itself is
-/// unchanged (`Calls` stays excluded, see `WorkspaceIndex::has_cycle_in_scope`).
+/// unchanged (only the approved dependency-cycle relation set participates;
+/// see `WorkspaceIndex::has_cycle_in_scope`).
 pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
+    if let Some(kind) = args.get("kind")
+        && kind.as_str() != Some("dependency")
+    {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": {
+                "code": -32602,
+                "message": "Invalid 'kind' for has_cycle: expected 'dependency'."
+            }
+        }));
+        return;
+    }
     // The effective scope is resolved BEFORE the index lock is taken, so an
     // unauthorized `withinPath` is refused without touching the index at all.
     let scope = match query_scope(state, args) {
@@ -145,11 +158,26 @@ pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
         }
     };
     let idx = state.workspace_index_read();
-    let has_cycle = match scope.as_ref() {
-        Some(scope) => idx.has_cycle_in_scope(scope),
-        None => idx.has_cycle(),
+    let witness = match scope.as_ref() {
+        Some(scope) => idx.dependency_cycle_witness_in_scope(scope),
+        None => idx.dependency_cycle_witness(),
     };
-    let structured = serde_json::json!({ "has_cycle": has_cycle });
+    let identity_ambiguities = match (&witness, scope.as_ref()) {
+        (Some(witness), Some(scope)) => idx.cycle_identity_ambiguities_in_scope(witness, scope),
+        (Some(witness), None) => idx.cycle_identity_ambiguities(witness),
+        (None, _) => Vec::new(),
+    };
+    let structured = serde_json::json!({
+        "has_cycle": witness.is_some(),
+        "cycle": witness.unwrap_or_default(),
+        "coverage": {
+            "status": "indexed_evidence_only",
+            "source_complete": false,
+        },
+        "identity_model": "semantic_tuple",
+        "identity_ambiguous": !identity_ambiguities.is_empty(),
+        "identity_ambiguities": identity_ambiguities,
+    });
     let content = super::content::render(
         "has_cycle",
         args,

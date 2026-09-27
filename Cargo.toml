@@ -41,6 +41,26 @@ path = "src/lib.rs"
 name = "clean-ctx"
 path = "src/main.rs"
 
+# Fast local development/test profile: retain source locations for panic
+# backtraces without paying the compile/link/PDB cost of full debugger data.
+# `cargo test` inherits this profile. Use `--profile debugging` when an
+# interactive debugger needs complete variables and type information.
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies rarely need debugger metadata during Clean-CTX development.
+# Build dependencies and proc macros are already unoptimized by Cargo's fast
+# defaults; this override removes their remaining runtime dependency debuginfo.
+[profile.dev.package."*"]
+debug = false
+
+[profile.debugging]
+inherits = "dev"
+debug = "full"
+
+[profile.debugging.package."*"]
+debug = "full"
+
 [profile.release]
 strip = true
 lto = true

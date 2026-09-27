@@ -568,6 +568,10 @@ mod query_tests;
 mod graph_tests;
 
 #[cfg(test)]
+#[path = "../tests/workspace/index_cycle_policy.rs"]
+mod cycle_policy_tests;
+
+#[cfg(test)]
 #[path = "../tests/workspace/index_edge_occurrence.rs"]
 mod edge_occurrence_tests;
 

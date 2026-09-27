@@ -269,6 +269,10 @@ mod tests_filesystem_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_entities_auto_compile.rs"]
 mod tests_entities_auto_compile;
 
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_cycle_witness.rs"]
+mod tests_cycle_witness;
+
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
