@@ -27,7 +27,7 @@
 // `handle_workspace_query` → hydration → composed-scope WorkspaceIndex lookup.
 
 use super::workspace_query_scope::{
-    DOMAIN, Repo, call_fact, facts, seed_call, seed_generic, serialize, state,
+    DOMAIN, Repo, call_fact, facts, seed_call, seed_current_generic, seed_generic, serialize, state,
 };
 use super::workspace_query_scope_entities::{entity_occurrences, structured};
 use super::*;
@@ -403,14 +403,14 @@ fn entities_in_file_is_validated_against_within_path() {
     let billing = file(&repo, "src/Billing/Service.ts");
     let shipping = file(&repo, "src/Shipping/Service.ts");
     let state = state(&[]);
-    seed_generic(
+    seed_current_generic(
         &state,
         &billing,
         SemanticRelation::Injects,
         "BillingService",
         "BillingClock",
     );
-    seed_generic(
+    seed_current_generic(
         &state,
         &shipping,
         SemanticRelation::Injects,

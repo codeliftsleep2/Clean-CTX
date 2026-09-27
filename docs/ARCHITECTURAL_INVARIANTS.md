@@ -541,6 +541,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-008 Incomplete Query Identity Resolves Once Without Guessing
+
+| Property | Value |
+|----------|-------|
+| **Intent** | A caller that knows an entity name should not need a separate `find_entities` round trip solely to discover domain/type, while incomplete identity must never be resolved by arbitrary occurrence ordering. |
+| **Invariant** | `forward_edges`, `reverse_edges`, and `transitive_dependencies` preserve the complete `(domain, entity_type, name)` fast path. When either classification field is omitted, the operation performs its existing registered hydration exactly once, selects occurrences from the exact-name bucket inside the effective workspace/`withinPath` scope, applies every supplied classification field as an exact filter, and groups physical occurrences by semantic identity. Exactly one identity proceeds; zero returns explicit not-found and multiple return `-32602` with distinct deterministic candidates. Repeated files carrying the same semantic identity are not ambiguity. The response exposes `resolved_identity`; resolution never changes Model C identity, scope, edge provenance, or traversal semantics. |
+| **Enforcement** | `src/mcp/tool_handlers/query/identity.rs` owns shared scoped resolution; `src/mcp/tool_handlers/query/{edges,graph}.rs` retain query-family semantics and reuse the resolver's hydration report; `src/tests/mcp/workspace_query_identity_resolution.rs` covers forward/reverse/traversal resolution, occurrence deduplication, partial filtering, deterministic ambiguity, and explicit not-found. Existing WSC-004 suites protect scope/provenance and existing exact-identity suites protect compatibility. |
+| **Authority** | `resolve_identity_or_respond`, `WorkspaceIndex::find_entities_by_name[_in_scope]`, exact identity query methods |
+| **Type** | ENFORCED (shared boundary + test) |
+| **Gate** | `cargo test --all-features tests_identity_resolution` |
+
+---
+
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |

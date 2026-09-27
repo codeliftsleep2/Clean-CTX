@@ -446,11 +446,27 @@ mode receives focused Edit output in one call. Empty focus is not inferred
 because its specialized “Edit structure with no bodies” meaning is not evident
 without an explicit Edit request.
 
-### 10.4 Name-only workspace edge and traversal queries
+### 10.4 Name-only workspace edge and traversal queries — implemented
 
 **Potential severity:** Medium — primarily redundant discovery work, with a
 correctness risk if a caller guesses domain/type or mistakes a required-field
 error for absence.
+
+**Decision (approved 2026-09-27):** preserve the fully specified identity fast
+path and allow either or both classification fields to be omitted. Supplied
+fields are exact filters. After the existing scoped hydration, physical
+occurrences are grouped by semantic identity `(domain, entity_type, name)`:
+zero identities is an explicit not-found error, one runs the requested query,
+and multiple identities return `-32602` with distinct candidates. Repeated
+physical occurrences of the same identity are not ambiguity.
+
+**Implementation status:** Complete under
+`src/mcp/tool_handlers/query/identity.rs` and the unchanged tracked contract in
+`src/tests/mcp/workspace_query_identity_resolution.rs`. The shared resolver
+performs the existing hydration exactly once, applies workspace/`withinPath`
+scope before identity selection, and returns the selected identity in
+`resolved_identity`. Fully specified requests retain their existing direct
+identity query plus hydration path.
 
 Current handlers for `forward_edges`, `reverse_edges`, and
 `transitive_dependencies` require the complete Model-C identity
@@ -471,8 +487,8 @@ together while retaining the exact-identity fast path:
 5. distinguish no match, incomplete discovery coverage, and a real empty edge
    or dependency result.
 
-Supplying only one of `domain` or `entity_type` should either act as an explicit
-filter or remain invalid; it must never be ignored. Resolution must reuse
+Supplying only one of `domain` or `entity_type` acts as an explicit filter and
+must never be ignored. Resolution must reuse
 `find_entities`/hydration semantics rather than introduce a second discovery
 algorithm, and it must retain the existing scoped occurrence/provenance rules.
 

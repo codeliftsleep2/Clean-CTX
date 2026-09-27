@@ -345,8 +345,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
-                    "domain": { "type": "string", "description": "Framework domain for entity queries (e.g. 'angular', 'spring', 'ngrx'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
-                    "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
+                    "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, and transitive_dependencies. With entity_type, uses the exact-identity fast path; alone, filters name resolution." },
+                    "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, and transitive_dependencies. With domain, uses the exact-identity fast path; alone, filters name resolution." },
                     "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
                     "file_path": { "type": "string", "description": "File path for entities_in_file query." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file. Edit and verbatim normalize to High because this query publishes no source bodies. Defaults to the configured fidelity." },
@@ -395,6 +395,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."
                     },
+                    "resolved_identity": { "type": "object", "description": "Exact semantic identity used by forward_edges, reverse_edges, or transitive_dependencies." },
                     "file": { "type": "string", "description": "Resolved source file for calls_in_file." },
                     "owner": { "type": "object", "description": "Resolved typed owner for calls_in_file." },
                     "method": { "type": "string", "description": "Caller method name for calls_in_file." },

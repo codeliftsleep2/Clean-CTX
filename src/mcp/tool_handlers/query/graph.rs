@@ -9,8 +9,8 @@
 // narrowing — may neither extend a path nor close a cycle.
 
 use super::{
-    discovery_field, optional_i32, query_scope, required_str, run_query_with_hydration,
-    send_hydration_failure, send_scope_rejection,
+    discovery_field, identity::resolve_identity_or_respond, optional_i32, query_scope,
+    required_str, run_query_with_hydration, send_hydration_failure, send_scope_rejection,
 };
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -20,32 +20,6 @@ use serde_json::Value;
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
     let name = match required_str(args, "name") {
         Some(n) => n,
         None => {
@@ -73,39 +47,67 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
             return;
         }
     };
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let depth_captured = depth;
-    let (results, count, hydration) =
-        match run_query_with_hydration(state, "transitive_dependencies", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => idx.transitive_dependencies_in_scope(
-                        &domain,
-                        &et,
-                        &name,
-                        depth_captured,
-                        scope,
-                    ),
-                    None => idx.transitive_dependencies(&domain, &et, &name, depth_captured),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        }) {
+    let selection = match resolve_identity_or_respond(
+        id,
+        args,
+        state,
+        "transitive_dependencies",
+        name,
+        scope.as_ref(),
+    ) {
+        Some(selection) => selection,
+        None => return,
+    };
+    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
+    let domain = selection.identity.domain;
+    let entity_type = selection.identity.entity_type;
+    let resolved_name = selection.identity.name;
+    let query = {
+        let scope = scope.clone();
+        move |index: &crate::workspace::index::WorkspaceIndex| {
+            let dependencies = match scope.as_ref() {
+                Some(scope) => index.transitive_dependencies_in_scope(
+                    &domain,
+                    &entity_type,
+                    &resolved_name,
+                    depth,
+                    scope,
+                ),
+                None => index.transitive_dependencies(&domain, &entity_type, &resolved_name, depth),
+            };
+            let count = dependencies.len();
+            (
+                serde_json::to_value(&dependencies).unwrap_or_default(),
+                count,
+            )
+        }
+    };
+    let (results, count, hydration) = match selection.hydration {
+        Some(hydration) => {
+            let (results, count) = {
+                let index = state.workspace_index_read();
+                query(&index)
+            };
+            (results, count, hydration)
+        }
+        None => match run_query_with_hydration(
+            state,
+            "transitive_dependencies",
+            name,
+            workspace_root,
+            query,
+        ) {
             Ok(result) => result,
             Err(error) => return send_hydration_failure(id, error),
-        };
+        },
+    };
     // The semantic answer is `dependencies` + `count` (+ `depth_used`); discovery
     // diagnostics are attached only when discovery deviated from its expected path.
     let mut structured = serde_json::json!({
         "dependencies": results,
         "count": count,
         "depth_used": depth,
+        "resolved_identity": resolved_identity,
     });
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;

@@ -60,6 +60,7 @@ mod diagnostics;
 mod edges;
 mod entities;
 mod graph;
+mod identity;
 
 pub(super) use diagnostics::discovery_field;
 
@@ -272,6 +273,10 @@ mod tests_entities_auto_compile;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_cycle_witness.rs"]
 mod tests_cycle_witness;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_identity_resolution.rs"]
+mod tests_identity_resolution;
 
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.

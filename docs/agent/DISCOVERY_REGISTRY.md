@@ -46,6 +46,29 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-027: Workspace Edge Queries Required a Discovery-Only Preliminary Call
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Broader workspace-query boundary and tool-call economics audit |
+| **Repository/context** | `forward_edges`, `reverse_edges`, and `transitive_dependencies` over scoped `WorkspaceIndex` evidence |
+| **Symptom** | A caller holding only an entity name had to call `find_entities` to learn domain/type and then issue the actual query. Omitting either classification field produced `-32602`, even though the same tool already owned scoped exact-name discovery and hydration. |
+| **Root cause** | Each handler validated the complete Model C tuple before hydration and had no shared boundary for converting exact-name occurrences into distinct candidate identities. |
+| **Classification** | Additive MCP contract and redundant-tool-call elimination |
+| **Reproducible locally?** | Yes; the new additive contract initially reached the existing required-field errors, then all seven unchanged tests passed after implementation. |
+| **Local regression** | `src/tests/mcp/workspace_query_identity_resolution.rs` |
+| **Live scenario required?** | Recommended before pilot closure: compare one-call name-only results with the prior `find_entities` plus exact-query sequence on unique and ambiguous real names. |
+| **Architectural invariant** | WSC-008 |
+| **Status** | Fixed locally; live verification pending |
+
+**Resolution:** One shared resolver now hydrates once, applies scope and any
+partial filters, groups occurrences by semantic identity, and proceeds only for
+one unique identity. Not-found and ambiguity are explicit, deterministic
+errors; fully specified callers retain the existing fast path.
+
+---
+
 ## DIS-2026-026: `focusMethods` Was Silently Ignored Outside Edit Fidelity
 
 | Field | Value |

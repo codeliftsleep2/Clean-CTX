@@ -11,8 +11,8 @@
 // declaration file.
 
 use super::{
-    discovery_field, query_scope, required_str, run_query_with_hydration, send_hydration_failure,
-    send_scope_rejection,
+    discovery_field, identity::resolve_identity_or_respond, query_scope, required_str,
+    run_query_with_hydration, send_hydration_failure, send_scope_rejection,
 };
 use crate::mcp::McpState;
 use crate::protocol::send_response;
@@ -22,32 +22,6 @@ use serde_json::Value;
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
     let name = match required_str(args, "name") {
         Some(n) => n,
         None => {
@@ -74,33 +48,51 @@ pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
             return;
         }
     };
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration) =
-        match run_query_with_hydration(state, "forward_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.forward_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.forward_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        }) {
+    let selection =
+        match resolve_identity_or_respond(id, args, state, "forward_edges", name, scope.as_ref()) {
+            Some(selection) => selection,
+            None => return,
+        };
+    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
+    let domain_owned = selection.identity.domain;
+    let et_owned = selection.identity.entity_type;
+    let name_owned = selection.identity.name;
+    let query = {
+        let scope = scope.clone();
+        move |idx: &crate::workspace::index::WorkspaceIndex| {
+            let r = match scope.as_ref() {
+                Some(scope) => idx.forward_edges_by_identity_in_scope(
+                    &domain_owned,
+                    &et_owned,
+                    &name_owned,
+                    scope,
+                ),
+                None => idx.forward_edges_by_identity(&domain_owned, &et_owned, &name_owned),
+            };
+            let c = r.len();
+            (serde_json::to_value(&r).unwrap_or_default(), c)
+        }
+    };
+    let (results, count, hydration) = match selection.hydration {
+        Some(hydration) => {
+            let (results, count) = {
+                let index = state.workspace_index_read();
+                query(&index)
+            };
+            (results, count, hydration)
+        }
+        None => match run_query_with_hydration(state, "forward_edges", name, workspace_root, query)
+        {
             Ok(result) => result,
             Err(error) => return send_hydration_failure(id, error),
-        };
+        },
+    };
     // The semantic answer is `edges` + `count`; discovery diagnostics are
     // attached only when discovery deviated from its expected path.
     let mut structured = serde_json::json!({
         "edges": results,
         "count": count,
+        "resolved_identity": resolved_identity,
     });
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
@@ -124,32 +116,6 @@ pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
 pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
     let name = match required_str(args, "name") {
         Some(n) => n,
         None => {
@@ -176,33 +142,51 @@ pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
             return;
         }
     };
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration) =
-        match run_query_with_hydration(state, "reverse_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.reverse_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.reverse_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        }) {
+    let selection =
+        match resolve_identity_or_respond(id, args, state, "reverse_edges", name, scope.as_ref()) {
+            Some(selection) => selection,
+            None => return,
+        };
+    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
+    let domain = selection.identity.domain;
+    let entity_type = selection.identity.entity_type;
+    let resolved_name = selection.identity.name;
+    let query = {
+        let scope = scope.clone();
+        move |index: &crate::workspace::index::WorkspaceIndex| {
+            let edges = match scope.as_ref() {
+                Some(scope) => index.reverse_edges_by_identity_in_scope(
+                    &domain,
+                    &entity_type,
+                    &resolved_name,
+                    scope,
+                ),
+                None => index.reverse_edges_by_identity(&domain, &entity_type, &resolved_name),
+            };
+            let count = edges.len();
+            (serde_json::to_value(&edges).unwrap_or_default(), count)
+        }
+    };
+    let (results, count, hydration) = match selection.hydration {
+        Some(hydration) => {
+            let (results, count) = {
+                let index = state.workspace_index_read();
+                query(&index)
+            };
+            (results, count, hydration)
+        }
+        None => match run_query_with_hydration(state, "reverse_edges", name, workspace_root, query)
+        {
             Ok(result) => result,
             Err(error) => return send_hydration_failure(id, error),
-        };
+        },
+    };
     // The semantic answer is `edges` + `count`; discovery diagnostics are
     // attached only when discovery deviated from its expected path.
     let mut structured = serde_json::json!({
         "edges": results,
         "count": count,
+        "resolved_identity": resolved_identity,
     });
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
