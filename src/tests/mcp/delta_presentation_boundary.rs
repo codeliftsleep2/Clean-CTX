@@ -81,7 +81,7 @@ fn red_delta_content_is_not_the_presentation() {
     let root = tempfile::tempdir().expect("temp workspace");
     let text = delta_content(&root);
     assert!(
-        !text.contains("// SCHEMA v5"),
+        !text.contains("// SCHEMA vNext"),
         "delta content must NOT be the full presentation — the delta is code-side \
          only and must not spend LLM tokens rendering a presentation:\n{text}"
     );

@@ -304,13 +304,13 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generated vocabulary teaches the current SCHEMA-v5 presentation.
+/// Verify that generated vocabulary teaches the current SCHEMA-vNext presentation.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("SCHEMA v5"),
-        "vocabulary prompt must teach SCHEMA v5"
+        text.contains("SCHEMA vNext"),
+        "vocabulary prompt must teach SCHEMA vNext"
     );
     assert!(text.contains("M: method"));
     assert!(text.contains("workspace_query:"));

@@ -65,7 +65,7 @@ fn schema_text(response: &Value) -> &str {
     let text = response["result"]["content"][0]["text"]
         .as_str()
         .expect("model-visible text");
-    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+    assert!(text.starts_with("// SCHEMA vNext"), "{text}");
     text
 }
 

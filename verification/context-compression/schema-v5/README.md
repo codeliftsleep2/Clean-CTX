@@ -1,8 +1,8 @@
-# SCHEMA-v5 presentation reasoning harness — scoping
+# SCHEMA-vNext presentation reasoning harness — scoping
 
 **Status:** implemented. This document records the boundary, structure, and
 oracle catalog for a *separate* evaluation harness that scores
-the model against the **model-visible interface** (SCHEMA-v5 presentation +
+the model against the **model-visible interface** (SCHEMA-vNext presentation +
 `workspace_query`) — distinct from the existing codec harness.
 
 ## 1. Why a separate harness
@@ -13,9 +13,9 @@ infrastructure**. It answers one question: *is the reversible file-local wire
 questions — canonical IDs, occurrence order, duplicates, spread, unresolved
 callee spellings, injection occurrences, byte spans. Those facts are real, but
 they moved **off** the model-visible channel when `content` became the
-SCHEMA-v5 presentation (ARCH-003 over CTX-001).
+SCHEMA-vNext presentation (ARCH-003 over CTX-001).
 
-The model never sees the codec. It sees the SCHEMA-v5 presentation in
+The model never sees the codec. It sees the SCHEMA-vNext presentation in
 `content`, plus whatever it fetches via `workspace_query`. A harness that feeds
 the codec to the model and scores codec preservation is therefore measuring a
 channel that no longer exists for the reader.
@@ -26,7 +26,7 @@ about, and edit from, what it actually receives?* Its oracles are
 
 | | codec harness | schema-v5 harness |
 |---|---|---|
-| Object under test | A2/A3 reversible wire | SCHEMA-v5 presentation + `workspace_query` |
+| Object under test | A2/A3 reversible wire | SCHEMA-vNext presentation + `workspace_query` |
 | Oracle kind | preservation / round-trip | understanding / edit-readiness |
 | Identity | canonical IDs (`C6`, `M11`, …) | name + typed owner |
 | Facts exercised | calls, injections, occurrence order, byte spans | names, arity, `X`/`I`, signatures, flags, exact bodies, cross-file edges |
@@ -45,7 +45,7 @@ verification/context-compression/
     workspace-query-oracles.json
     transport-assertions.json
     scripts/                 #   codec measure/capture/verify/reasoning runners
-  schema-v5/                 # SCHEMA-v5 harness (this directory)
+  schema-v5/                 # presentation harness (legacy directory name)
     README.md
     oracles.json             #   the catalog in §3
     workspace-query-oracles.json
@@ -146,10 +146,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/context-compression/schem
 
 ## 3. Oracle catalog
 
-Three lanes. **File** and **lifecycle** feed the SCHEMA-v5 presentation
+Three lanes. **File** and **lifecycle** feed the SCHEMA-vNext presentation
 (`content`); **workspace** feeds `workspace_query` responses. 15 oracles total.
 
-### 3.1 File lane (SCHEMA-v5 presentation)
+### 3.1 File lane (SCHEMA-vNext presentation)
 
 | id | question | expected | zero-tolerance |
 |----|----------|----------|----------------|
@@ -170,7 +170,7 @@ Three lanes. **File** and **lifecycle** feed the SCHEMA-v5 presentation
 
 ### 3.3 Workspace lane (`workspace_query`)
 
-Because SCHEMA-v5 omits cross-file edges/calls/injections from `content`, the
+Because SCHEMA-vNext omits cross-file edges/calls/injections from `content`, the
 model must call `workspace_query` for those facts — so this lane is *more*
 load-bearing than in the codec harness.
 
@@ -187,7 +187,7 @@ load-bearing than in the codec harness.
 
 The runner is a thin variant of `Run-CodexReasoning.ps1`. Each answer prompt
 prepends `REASONING_INSTRUCTIONS.md` — a mandatory-rules guide (modeled on
-`docs/CLAUDE_INTEGRATION_RULES.md`) that teaches the SCHEMA-v5 notation,
+`docs/CLAUDE_INTEGRATION_RULES.md`) that teaches the SCHEMA-vNext notation,
 identity, overload, escalation, workspace-fact, and delta rules before the
 payload and question. The codec prompt's "preserve canonical IDs / occurrence
 indices / unresolved callees / entity IDs" language is **removed**.
@@ -195,7 +195,7 @@ indices / unresolved callees / entity IDs" language is **removed**.
 ## 5. Capture reuse
 
 `Capture-Baselines.ps1` writes the actual model-visible content
-(`content[0].text`) to `content.txt` for every scenario — the SCHEMA-v5
+(`content[0].text`) to `content.txt` for every scenario — the SCHEMA-vNext
 presentation, the byte-exact focused Edit bodies, and the delta summary alike.
 The schema-v5 file and lifecycle lanes consume `content.txt` (never the codec
 CONTROL-FULL oracle, nor the `control-prod-*` reconstruction, which falls back
@@ -217,8 +217,8 @@ occurrence order, or call evidence, which the payload does not contain."
 1. Run the shared captures and the schema-v5 workspace captures, then smoke-run
    the worksheet and reasoning runner against the existing captures.
 2. Record results; iterate on any oracle whose wording is ambiguous or
-   unanswerable from the SCHEMA-v5 presentation.
-3. Once the SCHEMA-v5 reasoning score is known, decide whether Option C (a
-   purpose-built presentation) is warranted or SCHEMA v5 suffices.
+   unanswerable from the SCHEMA-vNext presentation.
+3. Use the recorded SCHEMA-v5 baseline and SCHEMA-vNext production results to
+   evaluate any future purpose-built presentation proposal.
 
 

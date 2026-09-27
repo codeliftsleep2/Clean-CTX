@@ -1,7 +1,7 @@
 # SCHEMA-vNext model-facing presentation proposal
 
-**Status:** Proposed; investigation and measurement only. No production-format
-change is authorized by this document.
+**Status:** Combined B1+B2+B3 grammar implemented and production-recaptured;
+real-workspace Claude pilot acceptance remains pending.
 
 **Scope:** The model-visible file-context presentation emitted by
 `provide_code_context`, `compress_code_context`, restore/replay, and the full
@@ -24,13 +24,14 @@ history:
 
 ## 1. Executive position
 
-SCHEMA-v5 is a sound correctness-first presentation with a strong final
-economics boundary: when the complete candidate is not safely cheaper than raw
-source under the selected local tokenizer, raw source wins. It is not yet the
-best achievable model-facing encoding.
+SCHEMA-v5 established the correctness-first presentation and economics
+boundary. SCHEMA-vNext now carries that same boundary with typed class records,
+grouped structural fields, and a single return arrow per method. When the
+complete candidate is not safely cheaper than raw source under the selected
+local tokenizer, raw source still wins.
 
-The next work should not remove reasoning facts. It should target four kinds of
-avoidable cost:
+Any future work should not remove reasoning facts. It should target four kinds
+of avoidable cost:
 
 1. facts or values already stated elsewhere in the same presentation;
 2. internal handles that no model-visible record references;
@@ -555,10 +556,10 @@ focused edit. Laboratory token wins do not replace this gate.
 | A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Laboratory production gate complete; live gate pending |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
-| B1 one method arrow | 15-57 tokens per fixture; up to 5.25% on the current corpus | Low; 10/10 paired reasoning passed | versioned grammar/prompt/tests | Isolated laboratory gate passed; production decision pending |
-| B2 `C` class record | 3 tokens on single-class fixtures; 84–95 on 15-class C# | Low; 12/12 paired reasoning passed | versioned grammar/prompt/tests | Isolated laboratory gate passed; production decision pending |
-| B3 grouped fields | 10–126 tokens; 1.13–9.67% on Medium/High | Medium risk; corrected full restart passed 16/16 paired reasoning | renderer/reasoning tests | Isolated laboratory gate passed; combined selection pending |
-| Combined B1+B2+B3 | 18–206 cl100k tokens; 0.57–13.66% across all lanes | Combined ownership/parsing gate passed on clean 20/20 restart; symmetric replication exposed model/evaluator variability, not candidate regression | full paired laboratory gate | Combined laboratory gate passed; production decision pending |
+| B1 one method arrow | 15-57 tokens per fixture; up to 5.25% on the current corpus | Low; 10/10 paired reasoning passed | versioned grammar/prompt/tests | Production-verified as part of the combined grammar |
+| B2 `C` class record | 3 tokens on single-class fixtures; 84–95 on 15-class C# | Low; 12/12 paired reasoning passed | versioned grammar/prompt/tests | Production-verified as part of the combined grammar |
+| B3 grouped fields | 10–126 tokens; 1.13–9.67% on Medium/High | Medium risk; corrected full restart passed 16/16 paired reasoning | renderer/reasoning tests | Production-verified as part of the combined grammar |
+| Combined B1+B2+B3 | 18–206 cl100k tokens; 0.57–13.66% across all lanes | Combined ownership/parsing gate passed on clean 20/20 restart; symmetric replication exposed model/evaluator variability, not candidate regression | full paired laboratory gate | Implemented; production recapture exactly matched every predicted corpus total; live pilot pending |
 | B5 remove `(+N)` overload suffix | Small variable token win; correctness/readability motivated | Low: overload parameters already remain visible at every structural fidelity | renderer/prompt/regression tests | Approved narrow correction; unchanged regression demonstrated RED then GREEN |
 | B4 marker vocabulary | Unknown and tokenizer-unstable | Medium plus readability cost | broad grammar changes | Lowest priority; defer without a substantial three-tokenizer win |
 | C acknowledged legend | Large fixed | High transport risk | MCP/client contract | Do not build until a concrete host proves acknowledgement |
@@ -599,14 +600,18 @@ focused edit. Laboratory token wins do not replace this gate.
    and workspace capture verifier passed.
 5. Approve and implement only the individually proven subset.
 
-### Phase 2 — versioned grammar experiment
+### Phase 2 — versioned grammar production integration
 
-1. Define a complete vNext cold legend and grammar.
-2. Prototype B1, B2, and B3 independently.
-3. Retain readable marker vocabulary; B4 is not part of this phase.
-4. Run the complete laboratory and live gates.
-5. If approved, update renderer, MCP prompt resource, vocabulary resource,
+1. **Complete:** define a complete vNext cold legend and grammar.
+2. **Complete:** prototype B1, B2, and B3 independently.
+3. **Complete:** retain readable marker vocabulary; B4 is not part of this phase.
+4. **Complete (laboratory):** run the paired and combined reasoning gates.
+5. **Complete:** update renderer, MCP prompt resource, vocabulary resource,
    tests, examples, and documentation atomically.
+6. **Complete:** recapture production and confirm exact agreement with the
+   independently measured combined candidate across both tokenizers.
+7. **Pending:** exercise the externally visible grammar in the real Claude
+   pilot workspace.
 
 ### Tier C capability gate — blocked pending a real host
 
@@ -621,17 +626,17 @@ negotiation, cold fallback, and cached-versus-uncached measurement.
 
 ## 11. Compatibility and lifecycle requirements
 
-- SCHEMA-v5 remains the production format until a candidate clears every gate
-  and receives explicit architectural approval.
-- A grammar-changing candidate receives a new visible version; it does not
-  silently reinterpret `SCHEMA v5`.
+- SCHEMA-vNext is the production presentation. SCHEMA-v5 remains the recorded
+  baseline for the experiments that justified the migration.
+- The grammar change received a new visible version and did not silently
+  reinterpret `SCHEMA v5`.
 - Persistence does not migrate stored presentation text. Restore/replay decode
   canonical state and regenerate the current approved presentation.
 - Binary `0x04`, `dv:2`, semantic-edge persistence, and workspace-query
   contracts do not change.
 - Exact-body and `byte_exact` metadata contracts do not change.
-- Cache breakers must include the presentation version so cached v5 and vNext
-  payloads cannot be confused.
+- Cache breakers derive from the rendered baseline, so v5 and vNext payloads
+  cannot share an acknowledged baseline.
 - Raw fallback remains byte-exact and carries no schema wrapper or `PATHMAP`.
 
 ---

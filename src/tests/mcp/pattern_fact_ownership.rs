@@ -57,8 +57,8 @@ fn assert_plain_method_has_no_observable_fact(tool: &str, id: i64) {
         .as_str()
         .expect("model-visible text");
     assert!(
-        text.starts_with("// SCHEMA v5"),
-        "fixture must exercise the SCHEMA-v5 presentation, not raw passthrough:\n{text}"
+        text.starts_with("// SCHEMA vNext"),
+        "fixture must exercise the SCHEMA-vNext presentation, not raw passthrough:\n{text}"
     );
     let method = text
         .lines()

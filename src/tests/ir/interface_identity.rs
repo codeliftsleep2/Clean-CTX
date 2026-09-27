@@ -111,6 +111,6 @@ fn binary_v04_and_hierarchy_preserve_interface_semantics() {
     let hierarchy = try_ir_to_hierarchical(&ir).unwrap();
     let rendered = crate::ir::render_llm::render_hierarchical_for_llm(&hierarchy, Fidelity::Low);
     assert!(rendered.contains("// Q=interface\nQ WorkerApi\n"));
-    assert!(rendered.contains("// ── Worker ──\n"));
-    assert!(!rendered.contains("// ── WorkerApi ──"));
+    assert!(rendered.contains("C Worker\n"));
+    assert!(!rendered.contains("C WorkerApi\n"));
 }

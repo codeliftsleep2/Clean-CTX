@@ -88,7 +88,7 @@ pub(crate) fn select_complete_content(
 mod presentation_footer_tests;
 
 // Presentation boundary guard: the model-visible `content` must be a compact
-// projection (SCHEMA v5 presentation), never the CONTROL-FULL codec — whose
+// projection (SCHEMA vNext presentation), never the CONTROL-FULL codec — whose
 // decoder contract (preamble, grammar legend, envelope schema id, body
 // framing) is code-side machinery. These tests pin that boundary rather than
 // any particular presentation shape.

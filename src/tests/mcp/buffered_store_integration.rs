@@ -250,8 +250,8 @@ fn test_integration_compress_multiple_files_then_clear() {
 
 #[test]
 fn test_integration_db_stats_via_provide_code_context() {
-    // provide_code_context is a read-only operation that does NOT persist to DB
-    // This test verifies that it works without persistence
+    // The production default enables auto-save, so a successful read producer
+    // checkpoints its canonical context without modifying source bytes.
     let (state, _tmp) = make_state("provide_test.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -270,14 +270,14 @@ fn test_integration_db_stats_via_provide_code_context() {
     // This should succeed without panicking
     crate::mcp::tools::dispatch_tools_call(&id, "provide_code_context", &params, &state);
 
-    // provide_code_context does not persist, so DB should be empty
+    // Auto-save records the canonical context for restart/restore.
     if let Some(store) = state.persistence_store.lock().unwrap().as_ref() {
         if let Some(guard) = store.sqlite() {
             let db_stats = guard.rebuild_stats().expect("rebuild_stats");
             assert_eq!(
                 db_stats.summary().total_files,
-                0,
-                "provide_code_context should not persist to DB"
+                1,
+                "provide_code_context should checkpoint when auto-save is enabled"
             );
         }
     }

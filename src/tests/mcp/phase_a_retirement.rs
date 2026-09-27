@@ -96,7 +96,7 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
             "[{tool}] message must name ir_unavailable: {message}"
         );
         assert!(
-            message.contains("SCHEMA-v5 structural output"),
+            message.contains("SCHEMA-vNext structural output"),
             "[{tool}] message must name the current presentation boundary: {message}"
         );
         assert!(!message.contains("CONTROL-FULL"), "[{tool}] {message}");
@@ -156,8 +156,8 @@ fn phase_a_success_paths_use_current_content_boundary() {
             .and_then(|t| t.as_str())
             .unwrap_or_else(|| panic!("[{tool}] missing result.content[0].text: {resp}"));
         assert!(
-            text.starts_with("// SCHEMA v5") || text == TS_FIXTURE,
-            "[{tool}] output must be SCHEMA-v5 or exact raw source"
+            text.starts_with("// SCHEMA vNext") || text == TS_FIXTURE,
+            "[{tool}] output must be SCHEMA-vNext or exact raw source"
         );
         assert!(
             text.contains("Greeter"),

@@ -2,14 +2,15 @@
 //
 // Contract tests for SYSTEM_PROMPT notation documentation.
 //
-// Guards the portable model-visible SCHEMA-v5 contract.
+// Guards the portable model-visible SCHEMA-vNext contract.
 
 use super::SYSTEM_PROMPT;
 
 #[test]
 fn teaches_schema_v5_as_primary_notation() {
     for frag in [
-        "// SCHEMA v5",
+        "// SCHEMA vNext",
+        "C=class",
         "X=extends",
         "I=implements",
         "F=field",
@@ -20,7 +21,7 @@ fn teaches_schema_v5_as_primary_notation() {
     ] {
         assert!(
             SYSTEM_PROMPT.contains(frag),
-            "SYSTEM_PROMPT must teach SCHEMA-v5 fragment `{frag}`"
+            "SYSTEM_PROMPT must teach SCHEMA-vNext fragment `{frag}`"
         );
     }
 }
@@ -78,7 +79,7 @@ fn vocabulary_prompt_description_names_the_production_presentation_boundary() {
         .as_str()
         .expect("vocabulary description");
 
-    assert!(description.contains("SCHEMA-v5"), "{description}");
+    assert!(description.contains("SCHEMA-vNext"), "{description}");
     assert!(description.contains("code-side delta"), "{description}");
     assert!(!description.contains("COMPACT-A"), "{description}");
     assert!(!description.contains("CONTROL-FULL"), "{description}");

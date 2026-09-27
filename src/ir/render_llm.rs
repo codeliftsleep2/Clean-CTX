@@ -11,13 +11,13 @@
 // Key design decisions:
 //   - Uses class/method **names** only, never internal alias IDs (C1, M1)
 //   - Overloaded methods disambiguated by their visible parameter signatures
-//   - Fidelity controls field layout (Low = space-separated, Medium/High = one-per-line)
+//   - Fidelity controls field layout (structural = grouped, Edit = one-per-line)
 //   - Meta-layer `@` annotations always shown regardless of fidelity
-//   - The `// SCHEMA v5` header opens every output with the legend table
+//   - The `// SCHEMA vNext` header opens every output with the legend table
 //
-// Notation reference (also in the SCHEMA v5 header):
-//   @=meta  X=extends  I=implements  F=field  M=method
-//   $=import  →=scope  mod:=method-modifiers cmod:=class-modifiers
+// Notation reference (also in the SCHEMA vNext header):
+//   @=meta  C=class  X=extends  I=implements  F=field  M=method
+//   $=import  p:=params  →=return  mod:=method-modifiers cmod:=class-modifiers
 //   ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 
 use super::hierarchical::{
@@ -69,8 +69,8 @@ pub fn render_hierarchical_for_llm_focused(
 ) -> String {
     let mut output = String::new();
 
-    // ── SCHEMA v5 header ──
-    output.push_str("// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n");
+    // ── SCHEMA vNext header ──
+    output.push_str("// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n");
 
     // ── Classes ──
     for class in &hir.classes {
@@ -119,8 +119,8 @@ fn render_class(
     fidelity: Fidelity,
     focus: Option<&HashSet<String>>,
 ) {
-    // Class boundary
-    output.push_str(&format!("// ── {} ──\n", class.name));
+    // Typed class boundary
+    output.push_str(&format!("C {}\n", class.name));
 
     // Class-level patterns (e.g., EMPTY_CTOR)
     for pat in &class.patterns {
@@ -190,16 +190,16 @@ fn render_interface(
 
 /// Render fields for a class.
 ///
-/// Low fidelity: space-separated on one line.
-/// Medium/High: one per line.
+/// Structural fidelities group fields on one owner-local row. Edit and
+/// Verbatim retain one row per field alongside their body-bearing output.
 fn render_fields(output: &mut String, fields: &[FieldNode], fidelity: Fidelity) {
     if fields.is_empty() {
         return;
     }
 
     match fidelity {
-        Fidelity::Low => {
-            // Space-separated on one line
+        Fidelity::Low | Fidelity::Medium | Fidelity::High => {
+            // Space-separated on one owner-local line.
             let field_strs: Vec<String> = fields
                 .iter()
                 .map(|f| {
@@ -212,7 +212,7 @@ fn render_fields(output: &mut String, fields: &[FieldNode], fidelity: Fidelity) 
                 .collect();
             output.push_str(&format!("F {}\n", field_strs.join(" ")));
         }
-        Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
+        Fidelity::Edit | Fidelity::Verbatim => {
             // One per line
             for field in fields {
                 if let Some(ft) = &field.field_type {
@@ -290,8 +290,6 @@ fn render_methods(
             || has_pattern_facts
             || has_flags
         {
-            output.push_str("  →");
-
             // Params (shown in Medium/High, hidden in Low unless overloaded)
             if has_params && (fidelity != Fidelity::Low || count > 1) {
                 let param_strs: Vec<String> = method

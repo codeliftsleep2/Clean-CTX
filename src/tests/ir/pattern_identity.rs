@@ -396,11 +396,7 @@ fn boundary_cases() -> Vec<(&'static str, &'static str, Vec<CoreOp>, &'static st
             vec![
                 boundary_class(),
                 CoreOp::DefMethod("C1".into(), "M1".into(), "load".into()),
-                CoreOp::Return("M1".into(), "$P".into()),
-                CoreOp::MethodModifiers(
-                    "M1".into(),
-                    vec![crate::ir::opcodes::DeclarationModifier::Async],
-                ),
+                CoreOp::Return("M1".into(), "Observable<User>".into()),
             ],
             "M1",
         ),

@@ -134,7 +134,7 @@ impl ContentKind {
 /// Derive the contract from the body coverage that is actually visible in a
 /// regenerated hierarchy. This is intentionally independent of delta
 /// transport: deltas remain code-side, while this helper describes only the
-/// rendered SCHEMA-v5 text returned after a lifecycle operation.
+/// rendered SCHEMA-vNext text returned after a lifecycle operation.
 pub(crate) fn contract_fields_for_hierarchy(
     fidelity: crate::compression::Fidelity,
     hierarchy: &crate::ir::hierarchical::HierarchicalIR,

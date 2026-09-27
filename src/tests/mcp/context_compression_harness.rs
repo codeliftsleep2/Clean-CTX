@@ -82,9 +82,8 @@ fn measurement_helper_prefers_complete_named_ir_over_reduced_auxiliary_ir() {
 
 #[test]
 fn schema_capture_verifier_accepts_byte_exact_economic_raw_passthrough() {
-    let verifier_path = Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "verification/context-compression/schema-v5/scripts/Verify-Captures.ps1",
-    );
+    let verifier_path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("verification/context-compression/schema-v5/scripts/Verify-Captures.ps1");
     let verifier = fs::read_to_string(&verifier_path)
         .unwrap_or_else(|error| panic!("failed to read {}: {error}", verifier_path.display()));
 

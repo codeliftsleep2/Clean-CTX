@@ -13,7 +13,7 @@ fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value)
         .expect("registered handler response")
 }
 
-/// The model-visible presentation text (SCHEMA v5) a response puts in front of
+/// The model-visible presentation text (SCHEMA vNext) a response puts in front of
 /// the LLM. The CONTROL-FULL codec is code-side only (`result.ir`); these tests
 /// assert the presentation, never the codec.
 fn model_text(response: &Value) -> String {
@@ -76,7 +76,7 @@ export class Consumer {
     let text = model_text(&response);
     // Local structural facts survive in the model-visible presentation.
     assert!(
-        text.starts_with("// SCHEMA v5"),
+        text.starts_with("// SCHEMA vNext"),
         "presentation, not codec: {text}"
     );
     assert!(
@@ -213,7 +213,7 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     assert!(
         baseline["result"]["content"][0]["text"]
             .as_str()
-            .is_some_and(|text| text.starts_with("// SCHEMA v5"))
+            .is_some_and(|text| text.starts_with("// SCHEMA vNext"))
     );
 
     let cached = dispatch(&state, 2, "delta_code_context", args());
@@ -258,7 +258,7 @@ fn registered_delta_exposes_full_baseline_then_exact_delta_in_content() {
     );
     let applied_text = model_text(&applied);
     assert!(
-        applied_text.starts_with("// SCHEMA v5"),
+        applied_text.starts_with("// SCHEMA vNext"),
         "applied delta content is the presentation, not the codec: {applied_text}"
     );
 }

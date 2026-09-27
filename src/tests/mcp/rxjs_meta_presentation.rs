@@ -63,8 +63,8 @@ fn provide_code_context_keeps_rxjs_annotations_method_local_and_intelligible() {
         .as_str()
         .expect("model-visible text");
     assert!(
-        text.starts_with("// SCHEMA v5"),
-        "fixture must exercise SCHEMA-v5 rather than raw passthrough:\n{text}"
+        text.starts_with("// SCHEMA vNext"),
+        "fixture must exercise SCHEMA-vNext rather than raw passthrough:\n{text}"
     );
 
     let pipe_lines: Vec<&str> = text

@@ -13,7 +13,7 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     std::fs::write(
         &path,
         format!(
-            "abstract class SemanticService {{\n  constructor(private repo: Repo) {{}}\n  async run(flag: boolean): Promise<number> {{\n    stream.subscribe(value => console.log(value));\n    if (flag) {{ return await Promise.resolve(1); }}\n    return 0;\n  }}\n}}\n/*{padding} */\n"
+            "abstract class SemanticService {{\n  constructor(private repo: Repo) {{}}\n  async run(flag: boolean): Promise<number> {{\n    stream.subscribe(value => console.log(value));\n    if (flag) {{ return await Promise.resolve(1); }}\n    return 0;\n  }}\n  values(): Observable<number> {{\n    return stream.pipe();\n  }}\n}}\n/*{padding} */\n"
         ),
     )
     .expect("semantic source");
@@ -21,7 +21,7 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let args = json!({
         "filePath": file_path.clone(),
         "workspaceRoot": root.path().to_string_lossy(),
-        "fidelity": "low"
+        "fidelity": "high"
     });
     let produced = dispatch(&state, 30, "compress_code_context", args);
     assert!(produced.get("error").is_none(), "{produced}");
@@ -64,43 +64,68 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
             .expect("durable semantic context")
             .0
     };
-    for present in [
-        persisted
+    for (family, present) in [
+        (
+            "ClassModifiers",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::ClassModifiers(..))),
-        persisted
+        ),
+        (
+            "MethodModifiers",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::MethodModifiers(..))),
-        persisted
+        ),
+        (
+            "ControlSummary",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::ControlSummary(..))),
-        persisted
+        ),
+        (
+            "PatternFacts",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::PatternFacts(..))),
-        persisted
+        ),
+        (
+            "SideEffect",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::SideEffect(..))),
-        persisted
+        ),
+        (
+            "ExecutionContext",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::ExecutionContext(..))),
-        persisted
+        ),
+        (
+            "DataFlow",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::DataFlow(..))),
-        persisted
+        ),
+        (
+            "ControlFlow",
+            persisted
             .instructions
             .iter()
             .any(|op| matches!(op, CoreOp::ControlFlow(..))),
+        ),
     ] {
         assert!(
             present,
-            "migrated family missing from persisted canonical IR"
+            "{family} missing from persisted canonical IR: {:?}",
+            persisted.instructions
         );
     }
     let replayed = dispatch(
@@ -114,7 +139,21 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
         .as_str()
         .expect("replayed MCP text");
     let source = std::fs::read_to_string(&path).expect("semantic source remains readable");
-    assert!(replayed_text.starts_with("// COMPACT-A A2") || replayed_text == source);
+    assert!(
+        replayed_text.starts_with("// SCHEMA vNext")
+            || replayed_text.starts_with("// COMPACT-A A2")
+            || replayed_text == source,
+        "unexpected replay presentation: {replayed_text}"
+    );
+    if replayed_text.starts_with("// SCHEMA vNext") {
+        for marker in [
+            "C SemanticService",
+            "M run p:flag:boolean → Promise<number>",
+            "M values → Observable<number>",
+        ] {
+            assert!(replayed_text.contains(marker), "missing replayed {marker}");
+        }
+    }
     if replayed_text.starts_with("// COMPACT-A A2") {
         for marker in ["M[id,name,params", "N.D and N.V index"] {
             assert!(replayed_text.contains(marker), "missing replayed {marker}");

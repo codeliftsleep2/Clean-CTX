@@ -159,8 +159,8 @@ fn edit_metadata_survives_explicit_delta_apply_restart_restore_and_replay() {
     assert!(applied.get("error").is_none(), "{applied}");
     assert_meta_contract(
         &applied,
-        ContentKind::SkeletonWithFocusedVerbatimBodies,
-        json!(["focused_method_bodies"]),
+        ContentKind::SkeletonWithVerbatimBodies,
+        json!(["method_bodies"]),
     );
     drop(state);
 
@@ -177,7 +177,7 @@ fn edit_metadata_survives_explicit_delta_apply_restart_restore_and_replay() {
             .as_str()
             .expect("visible Edit presentation");
         assert!(visible.contains("return 3"), "{tool}: {visible}");
-        assert!(!visible.contains("return 1"), "{tool}: {visible}");
+        assert!(!visible.contains("return 2"), "{tool}: {visible}");
     }
 }
 

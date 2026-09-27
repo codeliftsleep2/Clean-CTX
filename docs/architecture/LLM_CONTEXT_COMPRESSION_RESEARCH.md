@@ -1,6 +1,6 @@
 # LLM-context compression research
 
-**Status:** presentation boundary (ARCH-003) implemented; SCHEMA-v5 density measured and language-dependent; task-based edit evaluation green (3/3)
+**Status:** presentation boundary (ARCH-003) implemented; SCHEMA-vNext production density measured and language-dependent; task-based edit evaluation green (3/3)
 **Date:** 2026-09-21  
 **Scope:** the representation delivered to an LLM. Canonical IR and tool input contracts are unchanged. File-context content is being corrected to exclude unsolicited workspace graph snapshots; those facts remain available on demand through `workspace_query`. Structured file snapshots use a compact candidate only when it is safely cheaper than byte-exact raw source; otherwise raw is returned without a wrapper. Sections 1–13 preserve the pre-repair research findings; Section 14 records the approved production boundary and current checkpoint.
 
@@ -603,7 +603,7 @@ Registered-path verification, token capture, and the corrected 36-case reasoning
 ## 15. Current measurement checkpoint (2026-09-26)
 
 The presentation boundary (ARCH-003) is implemented and mechanically enforced:
-structural `content` is SCHEMA-v5, while explicitly classified raw-source,
+structural `content` is SCHEMA-vNext, while explicitly classified raw-source,
 Angular-template, and delta-acknowledgement responses retain their dedicated
 visible forms. Canonical semantics remain `CompiledIR` plus semantic edges;
 binary `0x04` plus the aligned edge snapshot is the physical durable authority,
@@ -614,35 +614,36 @@ for small files at structural fidelity and for Edit all-bodies.
 The measurement harness now splits into `codec/` (reversible wire) and
 `schema-v5/` (model-visible presentation) under `verification/context-compression/`.
 
-### Measured SCHEMA-v5 density (raw → presentation)
+### Measured SCHEMA-vNext density (raw → presentation)
 
-The production captures were regenerated after the corrected
-Observable/Promise classification and the presentation collapse for
-return-derived Observable facts. Percentages are token reduction from raw
-source; token counts are shown as `raw → SCHEMA-v5`.
+The production captures were regenerated after the combined B1+B2+B3 grammar
+landed: typed `C` class records, grouped structural fields, and one return arrow
+per method. The recapture matched the independently measured combined candidate
+exactly across every language, fidelity, and tokenizer. Percentages are token
+reduction from raw source; token counts are shown as `raw → SCHEMA-vNext`.
 
 #### cl100k
 
 | Fixture (language) | Low | Medium | High |
 |---|---:|---:|---:|
-| LargeService.ts (typescript) | 77.51% (`2957 → 665`) | 71.09% (`2957 → 855`) | 67.97% (`2957 → 947`) |
-| UserManagementService.ts (angular) | 74.95% (`3912 → 980`) | 65.52% (`3912 → 1349`) | 62.55% (`3912 → 1465`) |
-| OrderManagementService.cs (csharp) | 63.76% (`3590 → 1301`) | 48.72% (`3590 → 1841`) | 44.26% (`3590 → 2001`) |
+| LargeService.ts (typescript) | 80.83% (`2957 → 567`) | 74.74% (`2957 → 747`) | 71.63% (`2957 → 839`) |
+| UserManagementService.ts (angular) | 77.45% (`3912 → 882`) | 71.24% (`3912 → 1125`) | 68.28% (`3912 → 1241`) |
+| OrderManagementService.cs (csharp) | 69.86% (`3590 → 1082`) | 56.32% (`3590 → 1568`) | 51.87% (`3590 → 1728`) |
 
 #### o200k
 
 | Fixture (language) | Low | Medium | High |
 |---|---:|---:|---:|
-| LargeService.ts (typescript) | 77.65% (`3060 → 684`) | 71.37% (`3060 → 876`) | 68.37% (`3060 → 968`) |
-| UserManagementService.ts (angular) | 74.95% (`4091 → 1025`) | 65.71% (`4091 → 1403`) | 62.85% (`4091 → 1520`) |
-| OrderManagementService.cs (csharp) | 65.79% (`3826 → 1309`) | 50.00% (`3826 → 1913`) | 45.45% (`3826 → 2087`) |
+| LargeService.ts (typescript) | 80.92% (`3060 → 584`) | 74.97% (`3060 → 766`) | 71.96% (`3060 → 858`) |
+| UserManagementService.ts (angular) | 77.39% (`4091 → 925`) | 71.23% (`4091 → 1177`) | 68.37% (`4091 → 1294`) |
+| OrderManagementService.cs (csharp) | 71.35% (`3826 → 1096`) | 56.98% (`3826 → 1646`) | 52.43% (`3826 → 1820`) |
 
-Against the prior recorded o200k checkpoint, the new presentation improves by
-1.27–1.35pp for TypeScript, 1.05–1.11pp for Angular, and 1.55–1.60pp for
-C#. cl100k and o200k track closely for TypeScript and Angular, but C# differs
-by 1.19–2.03pp. Tokenizer sensitivity must therefore be reported explicitly;
-the former blanket claim that cl100k was within approximately 1% is no longer
-valid for every fixture and fidelity.
+Against the immediately preceding production grammar, the combined change
+saves 18–28 tokens on TypeScript, 52–178 on Angular, and 141–206 on C#,
+depending on tokenizer and fidelity. The largest wins occur where B2 removes
+many decorative class boundaries and B3 collapses many field rows. Tokenizer
+sensitivity remains explicit; the production totals above are reported for
+both supported counters rather than inferred from character count.
 
 Density is **language-dependent**, and it is the high-fidelity annotation load,
 not the schema, that drives the gap. C# is lowest because its idiom is

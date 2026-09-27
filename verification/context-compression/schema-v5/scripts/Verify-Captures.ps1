@@ -14,7 +14,7 @@ if (-not (Test-Path -LiteralPath $captures)) {
 function Require([bool]$condition, [string]$message) { if (-not $condition) { $failures.Add($message) } }
 
 # File and lifecycle lanes must contain the actual model-visible content. That
-# is normally SCHEMA-v5, but the production economics boundary may explicitly
+# is normally SCHEMA-vNext, but the production economics boundary may explicitly
 # select byte-exact raw source when the complete candidate is not smaller.
 foreach ($oracle in $oracles | Where-Object { $_.lane -ne "workspace" }) {
     foreach ($capture in @($oracle.captures)) {
@@ -26,7 +26,7 @@ foreach ($oracle in $oracles | Where-Object { $_.lane -ne "workspace" }) {
             Require ($text.StartsWith([char]0x0394 + " delta for")) "delta-flow-delta: content.txt is not the delta summary"
             continue
         }
-        if ($text.StartsWith("// SCHEMA v5")) { continue }
+        if ($text.StartsWith("// SCHEMA vNext")) { continue }
 
         $responsePath = Join-Path $captures "$capture\response.json"
         Require (Test-Path -LiteralPath $responsePath) "${capture}: non-SCHEMA content has no response metadata"
@@ -57,6 +57,6 @@ foreach ($op in $workspaceOps) {
 }
 
 $result = [ordered]@{ pass = ($failures.Count -eq 0); failure_count = $failures.Count; failures = @($failures) }
-$result | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $captures "schema-v5-verification-result.json")
+$result | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $captures "schema-vnext-verification-result.json")
 if ($failures.Count) { $failures | ForEach-Object { Write-Host "FAIL: $_" -ForegroundColor Red }; exit 1 }
-Write-Host "PASS: SCHEMA-v5 presentation and workspace-query captures verified (operator evidence, not CI proof)."
+Write-Host "PASS: SCHEMA-vNext presentation and workspace-query captures verified (operator evidence, not CI proof)."

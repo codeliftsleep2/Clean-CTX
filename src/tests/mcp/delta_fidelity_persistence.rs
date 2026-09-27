@@ -220,7 +220,7 @@ fn explicit_delta_missing_baseline_preserves_high_fidelity_across_restart_restor
     let text = restored["result"]["content"][0]["text"]
         .as_str()
         .expect("restored presentation");
-    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+    assert!(text.starts_with("// SCHEMA vNext"), "{text}");
     assert!(
         text.contains("ctl:") && text.contains("IF"),
         "High-only control-flow presentation must survive restore: {text}"
@@ -258,8 +258,8 @@ fn committed_delta_acknowledgement_survives_missing_source() {
     assert_eq!(applied["result"]["_meta"]["content_kind"], "skeleton");
     let text = applied["result"]["content"][0]["text"]
         .as_str()
-        .expect("SCHEMA-v5 acknowledgement");
-    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+        .expect("SCHEMA-vNext acknowledgement");
+    assert!(text.starts_with("// SCHEMA vNext"), "{text}");
     assert!(text.contains("second"), "{text}");
     assert_eq!(state.file_version(&alias), Some(target_version));
     assert_eq!(state.pending_transition_count(&alias), 0);
@@ -287,8 +287,8 @@ fn committed_delta_acknowledgement_rejects_newer_raw_source() {
     assert_eq!(applied["result"]["_meta"]["content_kind"], "skeleton");
     let text = applied["result"]["content"][0]["text"]
         .as_str()
-        .expect("SCHEMA-v5 acknowledgement");
-    assert!(text.starts_with("// SCHEMA v5"), "{text}");
+        .expect("SCHEMA-vNext acknowledgement");
+    assert!(text.starts_with("// SCHEMA vNext"), "{text}");
     assert!(text.contains("second"), "{text}");
     assert!(!text.contains("third"), "{text}");
 }

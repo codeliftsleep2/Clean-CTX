@@ -33,7 +33,7 @@ into a structured intermediate representation—a stream of `CoreOp`
 instructions. `CompiledIR` together with the extracted semantic-edge state is
 the canonical semantic source for subsequent operations:
 
-- **Rendering**: checked hierarchy → SCHEMA-v5 model presentation
+- **Rendering**: checked hierarchy → SCHEMA-vNext model presentation
 - **Delta transport**: IR → occurrence-aware `dv:2` sequence edits → explicit application
 - **Persistence**: binary `0x04` IR + aligned semantic-edge snapshot + checked delta history
 - **Auxiliary wire views**: reduced hierarchy and legacy named/positional debug representations
@@ -44,7 +44,7 @@ The IR subsystem replaces the earlier text-only compression pipeline with a stru
 
 ### Key Design Decisions
 
-- **IR-first output**: structural responses render checked SCHEMA-v5; raw source is an explicit economics fallback, not a legacy text fallback
+- **IR-first output**: structural responses render checked SCHEMA-vNext; raw source is an explicit economics fallback, not a legacy text fallback
 - **Fidelity-aware compilation**: each canonical baseline records the fidelity used to compile it
 - **Deterministic deltas**: positional sequence edits preserve semantic identity, occurrence multiplicity, and order
 - **Cross-file semantics**: complete semantic edges are owned separately and published through `WorkspaceIndex`
@@ -119,7 +119,7 @@ The IR subsystem introduces a layered approach:
      ▼                                 ▼
 ┌──────────────────┐          ┌──────────────────┐
 │ Canonical        │          │ Checked hierarchy│
-│ code-side forms  │          │ → SCHEMA-v5      │
+│ code-side forms  │          │ → SCHEMA-vNext   │
 │ binary v04       │          │ model output     │
 │ dv:2 delta       │          └──────────────────┘
 └────────┬─────────┘
@@ -208,7 +208,7 @@ src/ir/
 ├── compiler_methods.rs   # MethodSig, parse_method_sig, emit_method_ir, emit_import_ir,
 │                         # resolve_forward_aliases
 ├── render.rs             # ir_to_text(), ir_to_text_ops() — fidelity-aware text rendering
-├── render_llm.rs         # render_hierarchical_for_llm() — SCHEMA-v5 model presentation
+├── render_llm.rs         # render_hierarchical_for_llm() — SCHEMA-vNext model presentation
 ├── wire.rs               # op_to_tuple(), tuple_to_op(), ir_to_wire(), wire_to_ir()
 ├── delta.rs              # SequenceDelta + legacy IRDelta compatibility
 ├── delta/sequence.rs     # occurrence-aware dv:2 computation and compact transport
@@ -327,7 +327,7 @@ legacy `pretty` response field where that field is still exposed pending R-46.
 
 The hierarchy reorganizes the flat CoreOp stream into a
 class→method→parameter tree. A deliberately reduced form is exposed as
-`result.ir`; SCHEMA-v5 text rendered from the checked full hierarchy is the
+`result.ir`; SCHEMA-vNext text rendered from the checked full hierarchy is the
 model-visible structural presentation.
 
 ```json
@@ -351,16 +351,16 @@ model-visible structural presentation.
 }
 ```
 
-### LLM-Optimized Text (SCHEMA v5)
+### LLM-Optimized Text (SCHEMA vNext)
 
 The hierarchical IR is rendered to compact LLM-friendly text via `render_hierarchical_for_llm()`:
 
 ```
-// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
-// ── UserService ──
+// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
+C UserService
 X BaseService
 F userRepo:UserRepository
-M processData(payload:$s):$b  ctl:IF,RET
+M processData p:payload:$s → $b ctl:IF,RET
 ```
 
 ---
@@ -504,13 +504,13 @@ The state machine supports:
 ### Current Legacy Result-Level Response Shape
 
 Until the separately versioned R-46 migration, context tools retain legacy
-result-level fields. `content` is the model-visible SCHEMA-v5 presentation (or
+result-level fields. `content` is the model-visible SCHEMA-vNext presentation (or
 an explicitly classified alternative), while `ir` is a reduced,
 non-reversible auxiliary hierarchy. It is not the persistence authority.
 
 ```json
 {
-  "content": [{ "type": "text", "text": "// SCHEMA v5 ..." }],
+  "content": [{ "type": "text", "text": "// SCHEMA vNext ..." }],
   "ir": { "encoding": "hierarchical", "file": "α1", "v": 1, "ir": { ... } },
   "pretty": { "encoding": "named", "file": "α1", "v": 1, "ir": [...] },
   "v": 1,
@@ -552,7 +552,7 @@ non-reversible auxiliary hierarchy. It is not the persistence authority.
 | compiler | `tests/ir/compiler.rs` | ~20 | DefClass/DefMethod emission, fidelity, determinism |
 | wire | `tests/ir/wire.rs` | ~40 | op_to_tuple all variants, round-trip, decode errors |
 | render | `tests/ir/render.rs` | ~20 | fidelity comparison, round-trip |
-| render_llm | `tests/ir/render_llm.rs` | ~20 | SCHEMA v5, overloaded methods, fidelity layout |
+| render_llm | `tests/ir/render_llm.rs` | ~20 | SCHEMA vNext, overloaded methods, fidelity layout |
 | delta | `tests/ir/delta.rs` | ~30 | add/modify/remove, version chain, compact encode |
 | replay | `tests/ir/replay.rs` | ~30 | apply, remove/replace/append, error cases, sequential |
 | symbol_table | `tests/ir/symbol_table.rs` | ~30 | registration, lookup, versioning, unregister |

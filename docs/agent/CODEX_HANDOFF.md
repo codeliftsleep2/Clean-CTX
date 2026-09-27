@@ -1,4 +1,4 @@
-# Clean-CTX hand-off: SCHEMA-v5 presentation boundary + annotation-redundancy A/B
+# Clean-CTX hand-off: SCHEMA-vNext presentation boundary + annotation-redundancy A/B
 
 > For the comprehensive code-grounded branch history, current production
 > architecture, SCHEMA-v2 comparison, and live-use expectations, start with
@@ -22,7 +22,7 @@ Clean-CTX has four distinct representation roles:
 3. **Application-facing auxiliary view** — reduced `result.ir` is useful
    structured output but is intentionally non-reversible and is not a
    correctness or persistence authority.
-4. **LLM projection / presentation** — SCHEMA-v5, produced by
+4. **LLM projection / presentation** — SCHEMA-vNext, produced by
    `render_hierarchical_for_llm`. This is the **model-visible `content`**; its
    job is maximum information per token for the model.
 
@@ -30,7 +30,7 @@ COMPACT-A1/A3 are research codecs. A2 remains a non-authoritative
 compatibility/diagnostic `pretty_text` snapshot on the delta persistence path;
 restore and replay never trust or decode it.
 
-**Invariant:** structural model content uses SCHEMA-v5. Explicitly classified
+**Invariant:** structural model content uses SCHEMA-vNext. Explicitly classified
 raw-source fallbacks, Angular-template content, and delta acknowledgements are
 the only alternate visible representations. Delta operations remain code-side.
 Workspace facts (semantic edges/calls/injections) are served separately via
@@ -43,7 +43,7 @@ The branch wired the CONTROL-FULL codec as the model-visible `content` across
 
 1. **The codec expands — it does not compress.** On the large fixtures, A2/A3
    emit *more* tokens than raw source (preamble, grammar legend, envelope schema
-   id, canonical IDs, occurrence groups, `§BODIES` framing). SCHEMA-v5 is the
+   id, canonical IDs, occurrence groups, `§BODIES` framing). SCHEMA-vNext is the
    only thing that actually compresses: **56–76% vs raw**.
 2. **It shipped machinery nothing consumes.** The codec's decode side
    (`decode_cold`/`decode_declarations`/`decode_facts`) has **no production
@@ -60,14 +60,14 @@ genuinely compressed presentation was never emitted.
 
 ## What has been fixed
 
-- Structural `content` is the SCHEMA-v5 presentation; raw, template, and delta
+- Structural `content` is the SCHEMA-vNext presentation; raw, template, and delta
   acknowledgement alternatives are explicitly classified.
 - Delta presentation is the minimal summary
   `Δ delta for … (v{from} → v{to}): +N ~N -N ops`, with the op list in
   `result.delta` — never a full presentation or a `FILE-CONTEXT-DELTA v1`
   envelope.
 - `content_kind` is a typed `ContentKind` enum (was stringly-typed).
-- Prompts/vocabulary teach SCHEMA-v5, not the retired COMPACT-A codec.
+- Prompts/vocabulary teach SCHEMA-vNext, not the retired COMPACT-A codec.
 - Harness split: `verification/context-compression/codec/` (reversibility) vs
   `schema-v5/` (presentation), plus measurement and a task-based edit eval
   (**3/3 green**, deterministic grading + `apply_edit` round-trip).

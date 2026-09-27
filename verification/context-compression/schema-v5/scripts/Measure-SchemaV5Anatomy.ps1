@@ -1,8 +1,8 @@
-# Measure independent token anatomy for the model-visible SCHEMA-v5 candidate.
+# Measure independent token anatomy for the model-visible SCHEMA-vNext candidate.
 #
 # Uses existing economics captures only. Low/Medium/High use the exact captured
 # content. Edit captures selected raw source at the economics boundary, so the
-# helper regenerates the complete SCHEMA-v5 candidate from captured canonical
+# helper regenerates the complete SCHEMA-vNext candidate from captured canonical
 # IR solely for measurement. No model or Clean-CTX server is invoked.
 
 param([string]$CapturePattern = "economics-*")
@@ -18,7 +18,7 @@ if (-not (Test-Path -LiteralPath $measure)) {
 
 function Count-TextTokens([string]$tokenizer, [string]$text) {
     if (-not $text) { return 0 }
-    $temp = Join-Path $env:TEMP ("schema-v5-anatomy-$([guid]::NewGuid().ToString('N')).txt")
+    $temp = Join-Path $env:TEMP ("schema-vnext-anatomy-$([guid]::NewGuid().ToString('N')).txt")
     try {
         [IO.File]::WriteAllText($temp, $text, [Text.UTF8Encoding]::new($false))
         return [int]((& $measure count $tokenizer $temp | Out-String).Trim())
@@ -98,7 +98,7 @@ function Split-SchemaAnatomy([string]$capture, [string]$candidate, [object[]]$me
             Add-Fragment $families "file_path" $line
             continue
         }
-        if ($content.StartsWith("// SCHEMA v5")) {
+        if ($content.StartsWith("// SCHEMA vNext")) {
             Add-Fragment $families "fixed_legend" $line
             continue
         }
@@ -142,13 +142,13 @@ function Split-SchemaAnatomy([string]$capture, [string]$candidate, [object[]]$me
         }
 
         if (-not $content -or $content -match '^// ' -or
-            $content -match '^(?:Q|X|I|F) ' -or $content -eq '// Q=interface') {
+            $content -match '^(?:C|Q|X|I|F) ' -or $content -eq '// Q=interface') {
             $inMethodSignature = $false
             Add-Fragment $families "declaration_signature" $line
             continue
         }
 
-        throw "${capture}: unclassified SCHEMA-v5 line: $content"
+        throw "${capture}: unclassified SCHEMA-vNext line: $content"
     }
     return $families
 }
@@ -184,7 +184,7 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory |
     $methods = @(Get-Methods $semantic)
     $candidatePath = Join-Path $dir.FullName "schema-v5-candidate.txt"
 
-    if ($selected.StartsWith("// SCHEMA v5")) {
+    if ($selected.StartsWith("// SCHEMA vNext")) {
         $candidate = $selected
         [IO.File]::WriteAllText($candidatePath, $candidate, [Text.UTF8Encoding]::new($false))
     } elseif ($meta.fidelity -eq "edit") {
@@ -193,14 +193,14 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory |
             $focus = ([string]$meta.focus_target -split '\.')[-1]
         }
         & $measure prod $responsePath ([string]$semantic.file.source_path) edit $focus o200k renderer $candidatePath
-        if ($LASTEXITCODE -ne 0) { throw "SCHEMA-v5 Edit render failed for $($dir.Name)" }
+        if ($LASTEXITCODE -ne 0) { throw "SCHEMA-vNext Edit render failed for $($dir.Name)" }
         $candidate = [IO.File]::ReadAllText($candidatePath, [Text.Encoding]::UTF8)
     } else {
         continue
     }
 
-    if (-not $candidate.StartsWith("// SCHEMA v5")) {
-        throw "$($dir.Name): complete candidate is not SCHEMA-v5"
+    if (-not $candidate.StartsWith("// SCHEMA vNext")) {
+        throw "$($dir.Name): complete candidate is not SCHEMA-vNext"
     }
     $families = Split-SchemaAnatomy $dir.Name $candidate $methods
     $rawHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $rawPath).Hash.ToLowerInvariant()
@@ -218,8 +218,8 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory |
             tokenizer = $tokenizer
             tokenizer_implementation = "tiktoken-rs $tiktokenVersion"
             raw_tokens = $rawTokens
-            complete_schema_v5_tokens = $candidateTokens
-            selected_representation = if ($selected.StartsWith("// SCHEMA v5")) { "schema_v5" } else { [string]$response.result.content_kind }
+            complete_schema_vnext_tokens = $candidateTokens
+            selected_representation = if ($selected.StartsWith("// SCHEMA vNext")) { "schema_vnext" } else { [string]$response.result.content_kind }
             selected_tokens = $selectedTokens
             fixed_legend_tokens = Count-TextTokens $tokenizer (Join-Fragments $families.fixed_legend)
             file_path_tokens = Count-TextTokens $tokenizer (Join-Fragments $families.file_path)
@@ -238,12 +238,12 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory |
     }
 }
 
-if (-not $records.Count) { throw "No SCHEMA-v5 economics captures were measured" }
+if (-not $records.Count) { throw "No SCHEMA-vNext economics captures were measured" }
 $outputName = if ($CapturePattern -eq "economics-*") {
-    "schema-v5-anatomy-records.json"
+    "schema-vnext-anatomy-records.json"
 } else {
     $safePattern = $CapturePattern -replace '[^A-Za-z0-9._-]', '_'
-    "schema-v5-anatomy-records.$safePattern.json"
+    "schema-vnext-anatomy-records.$safePattern.json"
 }
 $output = Join-Path $captures $outputName
 $records | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM $output
@@ -257,7 +257,7 @@ foreach ($tokenizer in @("cl100k", "o200k")) {
         Write-Host (
             "  {0,-10} {1,-6}/{2,-10} total={3,5} legend={4,3} path={5,3} decl={6,5} facts={7,4} imports={8,4} bodies={9,5} selected={10}:{11}" -f
             $row.language, $row.fidelity, $row.focus_mode,
-            $row.complete_schema_v5_tokens, $row.fixed_legend_tokens,
+            $row.complete_schema_vnext_tokens, $row.fixed_legend_tokens,
             $row.file_path_tokens, $row.declaration_signature_tokens,
             $row.behavior_fact_tokens, $row.imports_type_alias_tokens,
             $row.exact_body_tokens, $row.selected_representation,

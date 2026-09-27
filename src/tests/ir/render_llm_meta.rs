@@ -58,12 +58,12 @@ fn test_spring_boot_class_with_meta() {
     ));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("// ── UserController ──"));
+    assert!(result.contains("C UserController\n"));
     assert!(result.contains("X BaseController"));
     assert!(result.contains("F userService:UserService"));
     assert!(result.contains("M getAll"));
-    assert!(result.contains("M find  → p:id:$n"));
-    assert!(result.contains("M find  → p:name:$n age:$n role:$s"));
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n role:$s"));
     assert!(!result.contains("find(+"));
     assert!(result.contains("ctl:RET,IF"));
     assert!(result.contains("T @rest = UserController"));
@@ -91,9 +91,9 @@ fn test_triple_overloaded_methods() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("M process  → p:arg1:$n"));
-    assert!(result.contains("M process  → p:arg1:$n arg2:$n"));
-    assert!(result.contains("M process  → p:arg1:$n arg2:$n arg3:$n"));
+    assert!(result.contains("M process p:arg1:$n"));
+    assert!(result.contains("M process p:arg1:$n arg2:$n"));
+    assert!(result.contains("M process p:arg1:$n arg2:$n arg3:$n"));
     assert!(!result.contains("process(+"));
 }
 
@@ -132,8 +132,8 @@ fn test_multiple_classes_with_imports_and_type_aliases() {
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
 
     // Order should be: classes first, then imports, then type aliases
-    let alpha_pos = result.find("// ── Alpha ──").unwrap();
-    let beta_pos = result.find("// ── Beta ──").unwrap();
+    let alpha_pos = result.find("C Alpha\n").unwrap();
+    let beta_pos = result.find("C Beta\n").unwrap();
     let import_pos = result.find("$ lib [A, B]").unwrap();
     let alias_pos = result.find("T TypeA").unwrap();
 
@@ -153,7 +153,7 @@ fn test_empty_class_name_still_renders() {
     let mut hir = empty_hir();
     hir.classes.push(make_class(""));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ──  ──"));
+    assert!(result.contains("C \n"));
 }
 
 #[test]
@@ -202,9 +202,12 @@ fn test_renderer_no_panic_on_large_hir() {
     }
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── Class0 ──"));
-    assert!(result.contains("// ── Class49 ──"));
-    assert_eq!(result.matches("// ── ").count(), 50);
+    assert!(result.contains("C Class0\n"));
+    assert!(result.contains("C Class49\n"));
+    assert_eq!(
+        result.lines().filter(|line| line.starts_with("C ")).count(),
+        50
+    );
 }
 
 #[test]

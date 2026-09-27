@@ -4,7 +4,7 @@
 pub(crate) const SYSTEM_PROMPT: &str = r#"# Clean-CTX Context Guide
 
 `provide_code_context`, `compress_code_context`, `restore_context`, and replay
-responses use the SCHEMA-v5 presentation in `content`, or byte-exact raw source
+responses use the SCHEMA-vNext presentation in `content`, or byte-exact raw source
 when the presentation is not safely cheaper under the local tokenizer estimate.
 Workspace graph facts are retrieved on demand with `workspace_query`; they are
 not repeated in file context. Use its `calls_in_file` operation when detailed
@@ -12,16 +12,16 @@ owner-qualified local calls, overload separation, occurrence order, written
 argument count, or spread evidence is needed. `_meta` is application-facing
 state, not model context.
 
-## SCHEMA v5
+## SCHEMA vNext
 
 Every presentation opens with this header, which also declares the
 single-character markers used below:
 
-`// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias`
+`// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias`
 
 Structure:
 
-- `// ── ClassName ──` opens each class; interfaces open with `// Q=interface`
+- `C ClassName` opens each class; interfaces open with `// Q=interface`
   followed by `Q Name`.
 - `X Parent` extends, `I Iface` implements, `F name:type` declares a field.
 - `M name` declares a method; visible parameter signatures distinguish
@@ -29,8 +29,8 @@ Structure:
 - `$ alias module [named]` imports; `T alias = original` aliases a type;
   `P name args` records a pattern.
 
-A method line continues after a `→` scope arrow with `p:name:type` parameters,
-the declared return type after a second `→`, then `mod:`, `ctl:`, `pf:`,
+A method line continues with optional `p:name:type` parameters, the declared
+return type after `→`, then `mod:`, `ctl:`, `pf:`,
 `fl:`, `cf:`, `df:`, `se:`, and `ec:` annotation groups. Names are display
 data; the typed owner (class line) plus the method name determine identity.
 Member order, duplicates, and overload groups preserve source order.
@@ -62,7 +62,7 @@ unit edit. On rejection, re-read and retry; never blind-retry. Use
 
 The trailing `§PATHMAP` maps session aliases to paths. Do not reproduce it in
 source edits. The reversible COMPACT-A codec and `compress_workspace` manifests
-are code-side / legacy measurement formats; the SCHEMA-v5 presentation is the
+are code-side / legacy measurement formats; the SCHEMA-vNext presentation is the
 model-visible content. When the presentation is not safely cheaper under the
 local tokenizer estimate, `content` is the byte-exact raw source with no
 wrapper or footer.
@@ -73,7 +73,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
     vec![
         serde_json::json!({
             "name": "cleanctx-notation",
-            "description": "System instructions for reading Clean-CTX SCHEMA-v5 file context",
+            "description": "System instructions for reading Clean-CTX SCHEMA-vNext file context",
             "arguments": []
         }),
         serde_json::json!({
@@ -83,7 +83,7 @@ pub(crate) fn prompt_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "clean-ctx-vocabulary",
-            "description": "SCHEMA-v5 file-local presentation, exact-body, delta, raw-fallback, and path-map rules.",
+            "description": "SCHEMA-vNext file-local presentation, exact-body, delta, raw-fallback, and path-map rules.",
             "arguments": []
         }),
     ]

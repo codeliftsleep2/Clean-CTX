@@ -53,7 +53,7 @@ The current result is:
 - a typed, identity-checked, occurrence-preserving canonical IR;
 - binary `0x04` plus semantic-edge snapshots as durable authority;
 - checked `SequenceDelta`/`dv:2` transport on the code side;
-- SCHEMA-v5 as the compact model-visible structural presentation;
+- SCHEMA-vNext as the compact model-visible structural presentation;
 - WorkspaceIndex for cross-file graph facts;
 - `calls_in_file` for the narrow owner/overload detail that global Model-C
   method identity cannot represent;
@@ -120,7 +120,7 @@ added regression coverage at the real registered MCP paths.
 ## Current representation architecture
 
 ```text
-                         +-> SCHEMA-v5 / raw fallback -> LLM content
+                         +-> SCHEMA-vNext / raw fallback -> LLM content
                          |
 source -> CompiledIR ----+-> reduced structured IR ----> application view
        + SemanticEdge[]  |
@@ -156,16 +156,16 @@ the complete `CompiledIR` identity and semantic-operand format. Persistence
 normalizes session aliases to durable file identity, stores the binary IR with
 the aligned semantic-edge snapshot, and restores both transactionally.
 
-Binary `0x04` did not replace SCHEMA-v5 or a former COMPACT-FULL presentation.
+Binary `0x04` did not replace SCHEMA-vNext or a former COMPACT-FULL presentation.
 It superseded older binary persistence versions for the expanded canonical
 model. It is intentionally non-human-readable and code-side.
 
 ### 3. Model-visible presentation
 
 `src/mcp/tool_handlers/core/content.rs` routes structural model content through
-`render_hierarchical_for_llm`, whose current header is SCHEMA-v5.
+`render_hierarchical_for_llm`, whose current header is SCHEMA-vNext.
 
-SCHEMA-v5 retains SCHEMA-v2's compact, name-oriented structure and adds the
+SCHEMA-vNext retains SCHEMA-v2's compact, name-oriented structure and adds the
 distinctions supported by the hardened canonical model:
 
 - explicit interface sections and interface-owned members;
@@ -186,12 +186,12 @@ structural candidate is not safely cheaper. Focused Edit is an exception: it
 must preserve the resolved focused-body contract and cannot substitute the full
 raw document.
 
-#### Does SCHEMA-v5 provide information that raw source does not?
+#### Does SCHEMA-vNext provide information that raw source does not?
 
 Yes, in the limited and important sense that it makes compiler-derived facts
 explicit. Raw source contains the evidence from which these facts are derived,
 but usually does not state the normalized conclusions directly. Depending on
-fidelity and available evidence, SCHEMA-v5 can expose:
+fidelity and available evidence, SCHEMA-vNext can expose:
 
 - normalized declaration modifiers through `mod:` / `cmod:` / `imod:`;
 - typed control summaries through `ctl:`;
@@ -207,7 +207,7 @@ model receives the conclusion compactly instead of having to rediscover it by
 reading every body.
 
 The stronger statement once associated with the CONTROL-FULL/COMPACT work is
-not valid for SCHEMA-v5. SCHEMA-v5 is intentionally a lossy presentation, not a
+not valid for SCHEMA-vNext. SCHEMA-vNext is intentionally a lossy presentation, not a
 reversible or correctness-complete encoding of canonical IR. It omits canonical
 IDs, occurrence framing, navigation machinery, the complete call table,
 workspace graph facts, persistence grammar, and delta transport. It may also
@@ -216,12 +216,12 @@ structural available level—without deleting the underlying canonical facts.
 
 Therefore the precise contract is:
 
-> SCHEMA-v5 can contain useful normalized and derived semantic facts that are
+> SCHEMA-vNext can contain useful normalized and derived semantic facts that are
 > not textually explicit in raw source, but it is not a lossless replacement
 > for canonical IR.
 
 When token economics selects raw passthrough, the model receives the byte-exact
-source instead of these SCHEMA-v5 annotations for that response. The canonical
+source instead of these SCHEMA-vNext annotations for that response. The canonical
 facts remain code-side, and the appropriate workspace facts remain available
 through on-demand queries.
 
@@ -268,7 +268,7 @@ canonical IDs, resolve the callee, or change global Model-C identity.
 
 ### Presentation quality
 
-- SCHEMA-v5 exposes richer reasoning facts without exposing storage grammar.
+- SCHEMA-vNext exposes richer reasoning facts without exposing storage grammar.
 - Model content uses names and ownership rather than internal aliases.
 - Content metadata is a typed `ContentKind` derived from the visible result.
 - `byte_exact` identifies the document or bodies that are genuinely safe for
@@ -315,7 +315,7 @@ canonical IDs, resolve the callee, or change global Model-C identity.
 ### MCP contract clarity
 
 - Visible content kind and byte-exact coverage describe the actual response.
-- SCHEMA-v5 vocabulary is taught in the system/cache prompt rather than the
+- SCHEMA-vNext vocabulary is taught in the system/cache prompt rather than the
   research codec grammar.
 - Workspace-query answers use the canonical MCP content plus
   `structuredContent` envelope.
@@ -332,14 +332,14 @@ for research and verification, but wiring them directly into model-visible
 The reversible formats include information needed by a decoder—canonical IDs,
 grammar/version markers, positional framing, and occurrence structure. The
 production model does not decode that format. Measurements also showed that
-some variants were larger than raw source or materially worse than SCHEMA-v5.
+some variants were larger than raw source or materially worse than SCHEMA-vNext.
 
 The correction was not to delete the research. It was to restore the boundary:
 
 - normalized CONTROL-FULL: regenerated correctness oracle;
 - COMPACT-A/A3: research codecs and measurement fixtures;
 - binary `0x04`: physical durable authority;
-- SCHEMA-v5: production LLM presentation.
+- SCHEMA-vNext: production LLM presentation.
 
 No production claim should call these interchangeable.
 
@@ -366,7 +366,7 @@ The branch followed an incremental preservation strategy:
 6. integrate persistence, replay, restore, deletion, and edit transactions;
 7. trace production MCP handlers rather than relying on custom pipelines;
 8. separate reversible codecs from model presentation after measurement;
-9. restore SCHEMA-v5 as the production presentation and align metadata;
+9. restore the structural schema as the production presentation and align metadata;
 10. repair configuration, fidelity, auto-save, delta acknowledgement, and
     source-snapshot lifecycle defects found by the final audit;
 11. add the narrow `calls_in_file` operation without widening global identity.
@@ -386,7 +386,7 @@ and trustworthy through Claude's real MCP workflow.
 
 Healthy behavior should look like:
 
-- ordinary context arrives as SCHEMA-v5 or a declared raw/template form;
+- ordinary context arrives as SCHEMA-vNext or a declared raw/template form;
 - Edit/focused requests expose only the regions declared byte-exact;
 - repeated reads can use compact code-side deltas without asking the model to
   reconstruct state from a delta stream;

@@ -274,20 +274,20 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 }
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
-/// prompt resource. Teaches the portable SCHEMA-v5 presentation contract.
+/// prompt resource. Teaches the portable SCHEMA-vNext presentation contract.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (SCHEMA v5)",
+        "Clean-CTX Response Vocabulary (SCHEMA vNext)",
         "==========================================",
         "",
-        "// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
-        "// ── ClassName ── opens a class; Q Name opens an interface",
+        "// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
+        "C ClassName opens a class; Q Name opens an interface",
         "X: extends   I: implements   F: field",
         "M: method; visible parameter signatures distinguish overloads",
         "$: import   T: type alias   P: pattern",
-        "→: scope; p:name:type params, → return, then mod:/ctl:/pf:/fl:/cf:/df:/se:/ec:",
+        "p:name:type params, → return, then mod:/ctl:/pf:/fl:/cf:/df:/se:/ec:",
         "workspace_query: forward/reverse/multi-hop/framework graph facts and provenance",
         "",
         "Member order, duplicates, and overload groups preserve source order.",

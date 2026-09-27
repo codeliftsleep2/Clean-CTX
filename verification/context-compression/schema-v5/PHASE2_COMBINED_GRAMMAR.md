@@ -1,9 +1,9 @@
 # SCHEMA-vNext Phase 2 — combined B1+B2+B3 grammar
 
-**Status:** Combined laboratory gate passed; production decision pending
+**Status:** Implemented and production-recaptured; live pilot pending
 **Recorded:** 2026-09-26
-**Production renderer:** Unchanged
-**Model calls:** Zero
+**Production renderer:** SCHEMA-vNext combined grammar
+**Production recapture model calls:** Zero
 
 ## Selected candidate
 
@@ -85,5 +85,7 @@ not reported as a passing gate.
 
 Acceptance rests on the clean 20/20 full restart plus paired non-regression:
 the diagnostic produced no baseline-pass/candidate-fail distinction for the
-suffix behavior. The combined laboratory gate is complete. Production remains
-unchanged pending explicit approval and tracked contract implementation.
+suffix behavior. The approved renderer, system prompt, vocabulary resource,
+and tracked contracts now emit the combined grammar. The production recapture
+matched every independently predicted token total across all languages,
+fidelities, and both tokenizers. Live Claude pilot consumption remains pending.

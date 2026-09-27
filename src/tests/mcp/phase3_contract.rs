@@ -214,8 +214,9 @@ fn provide_code_context_uses_meta_not_ad_hoc_fields() {
         .and_then(|k| k.as_str());
 
     assert!(
-        text.contains("// SCHEMA v5") || content_kind == Some(ContentKind::RawPassthrough.as_str()),
-        "content must be the SCHEMA-v5 presentation or raw passthrough: {text}"
+        text.contains("// SCHEMA vNext")
+            || content_kind == Some(ContentKind::RawPassthrough.as_str()),
+        "content must be the SCHEMA-vNext presentation or raw passthrough: {text}"
     );
 
     for banned in [

@@ -244,7 +244,7 @@ fn test_synthetic_class_is_rendered() {
 
     // Synthetic classes are still rendered (they show as regular classes)
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── __synthetic_C1 ──"));
+    assert!(result.contains("C __synthetic_C1\n"));
     assert!(result.contains("F orphan:$n"));
 }
 

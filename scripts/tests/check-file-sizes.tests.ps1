@@ -35,8 +35,8 @@ function New-TestRepository {
     Invoke-Git $repository @('config', 'user.email', 'file-size-tests@example.invalid')
     Invoke-Git $repository @('config', 'user.name', 'File Size Tests')
     Invoke-Git $repository @('config', 'core.autocrlf', 'false')
-    Write-Lines (Join-Path $repository 'normal.md') 10
-    Write-Lines (Join-Path $repository 'legacy.md') 616
+    Write-Lines (Join-Path $repository 'normal.rs') 10
+    Write-Lines (Join-Path $repository 'legacy.rs') 616
     Invoke-Git $repository @('add', '.')
     Invoke-Git $repository @('commit', '--quiet', '-m', 'baseline')
     return $repository
@@ -74,27 +74,27 @@ try {
 
     $result = Invoke-Validator $repository
     Assert-Case 'untouched oversized legacy file is non-blocking' (
-        $result.ExitCode -eq 0 -and ($result.LegacyDebt -join "`n") -match 'LEGACY-DEBT.*legacy.md.*616 lines'
+        $result.ExitCode -eq 0 -and ($result.LegacyDebt -join "`n") -match 'LEGACY-DEBT.*legacy.rs.*616 lines'
     ) ($result | Out-String)
 
-    [System.IO.File]::AppendAllText((Join-Path $repository 'legacy.md'), "line`n", $Utf8NoBom)
+    [System.IO.File]::AppendAllText((Join-Path $repository 'legacy.rs'), "line`n", $Utf8NoBom)
     $result = Invoke-Validator $repository
     Assert-Case 'modified oversized legacy file fails' (
-        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*modified.*legacy.md.*617 lines'
+        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*modified.*legacy.rs.*617 lines'
     ) ($result | Out-String)
-    Write-Lines (Join-Path $repository 'legacy.md') 616
+    Write-Lines (Join-Path $repository 'legacy.rs') 616
 
-    Write-Lines (Join-Path $repository 'new.md') 616
+    Write-Lines (Join-Path $repository 'new.rs') 616
     $result = Invoke-Validator $repository
     Assert-Case 'new oversized file fails' (
-        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*new.md.*616 lines'
+        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*new.rs.*616 lines'
     ) ($result | Out-String)
-    [System.IO.File]::Delete((Join-Path $repository 'new.md'))
+    [System.IO.File]::Delete((Join-Path $repository 'new.rs'))
 
-    Write-Lines (Join-Path $repository 'allowed.md') 615
+    Write-Lines (Join-Path $repository 'allowed.rs') 615
     $result = Invoke-Validator $repository
     Assert-Case 'new file at 615-line ceiling passes' ($result.ExitCode -eq 0) ($result | Out-String)
-    [System.IO.File]::Delete((Join-Path $repository 'allowed.md'))
+    [System.IO.File]::Delete((Join-Path $repository 'allowed.rs'))
 
     Write-Lines (Join-Path $repository 'Cargo.lock') 700
     Write-Lines (Join-Path $repository 'package-lock.json') 700
@@ -123,21 +123,21 @@ try {
         ($result.LegacyDebt -join "`n") -notmatch 'DISCOVERY_REGISTRY'
     ) ($result | Out-String)
 
-    Write-Lines (Join-Path $registryDirectory 'OTHER.md') 700
+    Write-Lines (Join-Path $registryDirectory 'OTHER.rs') 700
     $result = Invoke-Validator $repository
-    Assert-Case 'a sibling document in the same directory remains enforced' (
+    Assert-Case 'a sibling code file in the same directory remains enforced' (
         $result.ExitCode -eq 1 -and
-        ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*docs/agent/OTHER.md.*700 lines'
+        ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*docs/agent/OTHER.rs.*700 lines'
     ) ($result | Out-String)
-    [System.IO.File]::Delete((Join-Path $registryDirectory 'OTHER.md'))
+    [System.IO.File]::Delete((Join-Path $registryDirectory 'OTHER.rs'))
     [System.IO.File]::Delete((Join-Path $registryDirectory 'DISCOVERY_REGISTRY.md'))
 
-    Write-Lines (Join-Path $repository 'committed.md') 616
-    Invoke-Git $repository @('add', 'committed.md')
+    Write-Lines (Join-Path $repository 'committed.rs') 616
+    Invoke-Git $repository @('add', 'committed.rs')
     Invoke-Git $repository @('commit', '--quiet', '-m', 'oversized active file')
     $result = Invoke-Validator $repository $base
     Assert-Case 'base-relative committed new file fails' (
-        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*committed.md.*616 lines'
+        $result.ExitCode -eq 1 -and ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*new.*committed.rs.*616 lines'
     ) ($result | Out-String)
 
     Write-Host "PASS: $Passed file-size validator behavior tests."

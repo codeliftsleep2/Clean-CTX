@@ -1,8 +1,8 @@
-# Measure SCHEMA-v5 token savings for the large economics fixtures.
+# Measure production SCHEMA-vNext token savings for the large economics fixtures.
 #
 # The economics captures (produced by Capture-Baselines.ps1) store the production
 # response as oracle-source-response.json; its result.content[0].text IS the
-# SCHEMA-v5 presentation (for the large fixtures where it is emitted). This
+# SCHEMA-vNext presentation (for the large fixtures where it is emitted). This
 # script counts that content against raw-source.txt — no re-capture required.
 
 $ErrorActionPreference = "Stop"
@@ -27,7 +27,7 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory | Where-Object 
     if (-not (Test-Path -LiteralPath $responsePath) -or -not (Test-Path -LiteralPath $rawPath)) { continue }
     $response = Get-Content -Raw -LiteralPath $responsePath | ConvertFrom-Json -Depth 100
     $schema = [string]$response.result.content[0].text
-    if (-not $schema.StartsWith("// SCHEMA v5")) { continue }
+    if (-not $schema.StartsWith("// SCHEMA vNext")) { continue }
     $raw = Get-Content -Raw -LiteralPath $rawPath
     $meta = if (Test-Path -LiteralPath $metaPath) { Get-Content -Raw -LiteralPath $metaPath | ConvertFrom-Json } else { $null }
     $language = if ($meta -and $meta.language) { $meta.language } else { "?" }
@@ -41,16 +41,16 @@ foreach ($dir in Get-ChildItem -LiteralPath $captures -Directory | Where-Object 
             fidelity = $fidelity
             tokenizer = $tokenizer
             raw_tokens = $rawTokens
-            schema_v5_tokens = $schemaTokens
+            schema_vnext_tokens = $schemaTokens
             saved_tokens = $rawTokens - $schemaTokens
             reduction_percent = if ($rawTokens) { [Math]::Round(($rawTokens - $schemaTokens) * 100.0 / $rawTokens, 2) } else { 0 }
         }
     }
 }
 
-if (-not $records.Count) { throw "No economics captures with SCHEMA-v5 content found. Run Capture-Baselines.ps1 first." }
-$records | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $captures "schema-v5-token-records.json")
-Write-Host "Wrote schema-v5-token-records.json ($($records.Count) records)"
+if (-not $records.Count) { throw "No economics captures with SCHEMA-vNext content found. Run Capture-Baselines.ps1 first." }
+$records | ConvertTo-Json -Depth 10 | Set-Content -Encoding utf8NoBOM (Join-Path $captures "schema-vnext-token-records.json")
+Write-Host "Wrote schema-vnext-token-records.json ($($records.Count) records)"
 Write-Host ""
 foreach ($tokenizer in @("cl100k", "o200k")) {
     Write-Host "=== $tokenizer ==="
@@ -59,9 +59,9 @@ foreach ($tokenizer in @("cl100k", "o200k")) {
             $rows = @($records | Where-Object { $_.tokenizer -eq $tokenizer -and $_.language -eq $lang -and $_.fidelity -eq $fid })
             if (-not $rows.Count) { continue }
             $raw = ($rows.raw_tokens | Measure-Object -Sum).Sum
-            $schema = ($rows.schema_v5_tokens | Measure-Object -Sum).Sum
+            $schema = ($rows.schema_vnext_tokens | Measure-Object -Sum).Sum
             $pct = if ($raw) { [Math]::Round(($raw - $schema) * 100.0 / $raw, 2) } else { 0 }
-            Write-Host ("  {0,-12} {1,-8} raw {2,6} -> SCHEMA-v5 {3,6} ({4}%)" -f $lang, $fid, $raw, $schema, $pct)
+            Write-Host ("  {0,-12} {1,-8} raw {2,6} -> SCHEMA-vNext {3,6} ({4}%)" -f $lang, $fid, $raw, $schema, $pct)
         }
     }
 }

@@ -13,7 +13,7 @@
 use super::*;
 use crate::mcp::tool_handlers::core::ContentKind;
 
-// The SCHEMA-v5 presentation is selected only when the local counter proves it
+// The SCHEMA-vNext presentation is selected only when the local counter proves it
 // cheaper than the exact raw document. Raw passthrough is the mandatory
 // economic fallback.
 
@@ -132,7 +132,7 @@ fn structural_fidelities_keep_the_correctness_baseline() {
         let text = resp_text(&resp);
         assert!(count_tokens(&text) <= raw_tokens, "{fidelity}");
         assert!(
-            text.starts_with("// SCHEMA v5") || text == source,
+            text.starts_with("// SCHEMA vNext") || text == source,
             "{fidelity}"
         );
     }
@@ -175,7 +175,7 @@ fn large_files_never_exceed_raw_even_when_a1_does_not_win() {
             .expect("handler must send resp");
         let text = resp_text(&resp);
         assert!(count_tokens(&text) <= raw_tokens, "{fidelity}");
-        assert!(text.starts_with("// SCHEMA v5") || text == source);
+        assert!(text.starts_with("// SCHEMA vNext") || text == source);
         assert!(raw_tokens > 0);
     }
 }
@@ -199,5 +199,5 @@ fn intent_edit_selects_control_full_edit_mode() {
         .expect("handler must send resp");
     let text = resp_text(&resp);
     assert!(count_tokens(&text) <= raw_tokens);
-    assert!(text.starts_with("// SCHEMA v5") || text == source);
+    assert!(text.starts_with("// SCHEMA vNext") || text == source);
 }

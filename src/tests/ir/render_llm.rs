@@ -118,8 +118,8 @@ fn test_empty_hir() {
     let hir = empty_hir();
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Should contain schema header but nothing else
-    assert!(result.starts_with("// SCHEMA v5"));
-    assert!(!result.contains("// ──"));
+    assert!(result.starts_with("// SCHEMA vNext"));
+    assert!(!result.contains("\nC "));
     assert!(!result.contains("$ "));
     assert!(!result.contains("T "));
 }
@@ -129,15 +129,44 @@ fn test_schema_header_present() {
     let mut hir = empty_hir();
     hir.classes.push(make_class("TestClass"));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// SCHEMA v5"));
+    assert!(result.contains("// SCHEMA vNext"));
+    assert!(result.contains("C=class"));
     assert!(result.contains("@=meta"));
     assert!(result.contains("X=extends"));
     assert!(result.contains("I=implements"));
     assert!(result.contains("F=field"));
     assert!(result.contains("M=method"));
     assert!(result.contains("$=import"));
-    assert!(result.contains("→=scope"));
+    assert!(result.contains("p:=params"));
+    assert!(result.contains("→=return"));
     assert!(result.contains("pf:=pattern-facts"));
+}
+
+#[test]
+fn schema_vnext_combines_typed_classes_grouped_fields_and_single_method_arrow() {
+    let mut class = make_class("Service");
+    class.fields.push(make_field("first", Some("$s")));
+    class.fields.push(make_field("second", Some("$n")));
+
+    let mut method = make_method("find");
+    method
+        .params
+        .push(vec!["P1".into(), "$s".into(), "id".into()]);
+    method.return_type = Some("User".into());
+    class.methods.push(method);
+
+    let mut hir = empty_hir();
+    hir.classes.push(class);
+    let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
+
+    assert!(result.starts_with("// SCHEMA vNext "), "{result}");
+    assert!(result.contains("C=class"), "{result}");
+    assert!(result.contains("p:=params →=return"), "{result}");
+    assert!(result.contains("\nC Service\n"), "{result}");
+    assert!(!result.contains("// ── Service ──"), "{result}");
+    assert!(result.contains("\nF first:$s second:$n\n"), "{result}");
+    assert!(result.contains("\nM find p:id:$s → User\n"), "{result}");
+    assert!(!result.contains("M find  →"), "{result}");
 }
 
 #[test]
@@ -145,7 +174,7 @@ fn test_single_class_no_fields_no_methods() {
     let mut hir = empty_hir();
     hir.classes.push(make_class("User"));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── User ──"));
+    assert!(result.contains("C User\n"));
     // Should have no F or M lines
     assert!(!result.contains("\nF "));
     assert!(!result.contains("\nM "));
@@ -176,12 +205,14 @@ fn test_class_with_fields_medium_fidelity() {
     class.fields.push(make_field("name", Some("$s")));
     hir.classes.push(class);
 
-    // Medium fidelity: one per line
+    // Medium fidelity: grouped on one owner-local line.
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("F id:$n\n"));
-    assert!(result.contains("F name:$s\n"));
+    assert!(result.contains("F id:$n name:$s\n"));
     let f_count = result.matches("\nF ").count();
-    assert_eq!(f_count, 2, "Medium fidelity should have two F lines");
+    assert_eq!(
+        f_count, 1,
+        "Medium fidelity should group owner-local fields"
+    );
 }
 
 #[test]
@@ -192,12 +223,11 @@ fn test_class_with_fields_high_fidelity() {
     class.fields.push(make_field("name", Some("$s")));
     hir.classes.push(class);
 
-    // High fidelity: one per line (same as Medium)
+    // High fidelity: grouped on one owner-local line (same as Medium).
     let result = render_hierarchical_for_llm(&hir, Fidelity::High);
-    assert!(result.contains("F id:$n\n"));
-    assert!(result.contains("F name:$s\n"));
+    assert!(result.contains("F id:$n name:$s\n"));
     let f_count = result.matches("\nF ").count();
-    assert_eq!(f_count, 2, "High fidelity should have two F lines");
+    assert_eq!(f_count, 1, "High fidelity should group owner-local fields");
 }
 
 #[test]
@@ -262,7 +292,11 @@ fn test_method_low_fidelity_hides_params() {
     // Check that return type is still shown
     assert!(result.contains("→ $s"));
     // Check that params are NOT shown in low fidelity
-    assert!(!result.contains("p:"));
+    assert!(
+        !result
+            .lines()
+            .any(|line| line.starts_with("M ") && line.contains("p:"))
+    );
 }
 
 #[test]
@@ -291,8 +325,8 @@ fn test_overloaded_methods_disambiguation() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("M find  → p:id:$n"));
-    assert!(result.contains("M find  → p:name:$n age:$n role:$s"));
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n role:$s"));
     assert!(result.contains("M clear"));
     assert!(!result.contains("find(+"));
 }
@@ -316,8 +350,8 @@ fn test_overloaded_methods_params_shown_in_low_fidelity() {
 
     // Even in Low fidelity, overloaded methods show params for disambiguation
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("M find  → p:id:$n"));
-    assert!(result.contains("M find  → p:name:$n age:$n"));
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n"));
     assert!(!result.contains("find(+"));
 }
 
@@ -507,11 +541,10 @@ fn test_full_typescript_class() {
         .push(make_import("IM1", "./core", "OnInit, OnDestroy"));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("// ── UserListComponent ──"));
+    assert!(result.contains("C UserListComponent\n"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit OnDestroy"));
-    assert!(result.contains("F users:$s[]"));
-    assert!(result.contains("F selectedUser:$n"));
+    assert!(result.contains("F users:$s[] selectedUser:$n"));
     assert!(result.contains("M ngOnInit"));
     assert!(result.contains("M trackById"));
     assert!(result.contains("p:index:$n user:$s"));
@@ -551,8 +584,8 @@ fn test_full_rust_class() {
     hir.classes.push(svc);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── User ──"));
-    assert!(result.contains("// ── UserService ──"));
+    assert!(result.contains("C User\n"));
+    assert!(result.contains("C UserService\n"));
     assert!(result.contains("P EMPTY_CTOR"));
     assert!(result.contains("X Repository<User>"));
     assert!(result.contains("F id:$n name:$s email:$s"));

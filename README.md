@@ -236,11 +236,11 @@ Returns the component entity that exposes the `app-user-card` selector. Other qu
 }
 ```
 
-**Structural output (SCHEMA v5):**
+**Structural output (SCHEMA vNext):**
 ```
-// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
-// ── SampleService ──
-M doWork(payload:$s[]):$b
+// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
+C SampleService
+M doWork p:payload:$s[] → $b
 ```
 
 ### AST-level diff (track changes over time)
@@ -265,7 +265,7 @@ M doWork(payload:$s[]):$b
 
 ---
 
-## Response Notation (SCHEMA v5)
+## Response Notation (SCHEMA vNext)
 
 Structural `provide_code_context`, `compress_code_context`, and
 `restore_context` presentations start with this legend. Byte-exact raw
@@ -273,19 +273,19 @@ fallbacks, Angular-template output, and delta acknowledgements use their own
 explicit content kinds instead.
 
 ```
-// SCHEMA v5  @=meta X=extends I=implements F=field M=method $=import →=scope mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
+// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 ```
 
 | Symbol | Meaning |
 |--------|---------|
-| `// ── Name ──` | opens a class scope |
+| `C Name` | opens a class scope |
 | `cmod:` | class modifiers |
 | `cl:` | additional class metadata |
 | `X <Parent>` | extends |
 | `I <Iface...>` | implements |
 | `F name:type` | field |
-| `M name(+N)` | method (`+N` = overload by param count) |
-| `→ p:name:type ...` / `→ type` | parameters / return type |
+| `M name` | method; visible signatures distinguish overloads |
+| `p:name:type ...` / `→ type` | parameters / return type |
 | `mod:` | method modifiers such as `ASYNC`, `STATIC`, or visibility |
 | `ctl:` / `pf:` | control summary and typed pattern facts |
 | `fl:` | compatibility-only legacy flags when present |
@@ -297,7 +297,7 @@ explicit content kinds instead.
 effect), and `ec:` (execution context). **Edit fidelity appends the selected
 method bodies as byte-exact source.** Types render exactly as captured.
 
-The full SCHEMA-v5 notation reference is in
+The full SCHEMA-vNext notation reference is in
 [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md).
 
 ---

@@ -61,8 +61,8 @@ fn render_hierarchical_for_llm_typescript_class() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Phase 6 IR-first format: compact LLM schema with typed semantic families.
-    assert!(result.contains("SCHEMA v5"));
-    assert!(result.contains("// ── UserListComponent ──"));
+    assert!(result.contains("SCHEMA vNext"));
+    assert!(result.contains("C UserListComponent\n"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit"));
     assert!(result.contains("F users:$s[]"));
@@ -152,8 +152,8 @@ fn render_hierarchical_for_llm_spring_boot_class() {
     assert!(result.contains("@rest"));
     assert!(result.contains("@map"));
     // Visible signatures disambiguate overloads without decorating names.
-    assert!(result.contains("M find  → p:id:$n"));
-    assert!(result.contains("M find  → p:name:$n age:$n"));
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n"));
     assert!(!result.contains("find(+"));
 }
 
@@ -201,7 +201,7 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Always has schema header even with empty HIR
-    assert!(result.starts_with("// SCHEMA v5"));
+    assert!(result.starts_with("// SCHEMA vNext"));
 }
 
 #[test]
@@ -250,7 +250,7 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
 }
 
 #[test]
-fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
+fn render_hierarchical_for_llm_fidelity_medium_groups_owner_fields() {
     use crate::ir::*;
     let class = ClassNode {
         id: "C1".into(),
@@ -284,10 +284,9 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    // Medium fidelity: one field per line
-    assert!(result.contains("F x:$n\n"));
-    assert!(result.contains("F y:$n\n"));
-    assert_eq!(result.matches("\nF ").count(), 2);
+    // Medium fidelity: owner-local fields share one row.
+    assert!(result.contains("F x:$n y:$n\n"));
+    assert_eq!(result.matches("\nF ").count(), 1);
 }
 
 #[test]
@@ -326,12 +325,12 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     // Insert into cache
     state
         .llm_text_cache_lock()
-        .insert("α1".to_string(), "// SCHEMA v5\n// ── Foo ──\n".to_string());
+        .insert("α1".to_string(), "// SCHEMA vNext\nC Foo\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
     assert!(cached.is_some());
-    assert!(cached.unwrap().contains("SCHEMA v5"));
+    assert!(cached.unwrap().contains("SCHEMA vNext"));
     assert!(cached.unwrap().contains("Foo"));
 }
 
