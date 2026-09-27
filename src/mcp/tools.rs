@@ -340,7 +340,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships or inspect owner-qualified calls in one trusted source file. Cross-file operations use WorkspaceIndex plus registered hydration. calls_in_file compiles a read-only canonical candidate and preserves owner, overload, call order, duplicates, written argument count, and spread evidence without claiming resolved callees. Results respect workspaceRoot plus configured additional roots and optional withinPath narrowing.",
+            "description": "Query cross-file semantic relationships or inspect owner-qualified calls in one trusted source file. Name-bearing cross-file operations use WorkspaceIndex plus registered hydration; has_cycle is a bounded index-only query and never hydrates or compiles. calls_in_file compiles a read-only canonical candidate and preserves owner, overload, call order, duplicates, written argument count, and spread evidence without claiming resolved callees. Results respect workspaceRoot plus configured additional roots and optional withinPath narrowing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

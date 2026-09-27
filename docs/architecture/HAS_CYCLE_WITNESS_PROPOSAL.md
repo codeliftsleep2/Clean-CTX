@@ -1,6 +1,6 @@
 # `has_cycle` semantic policy and cycle-witness proposal
 
-**Status:** Phases 0–5 complete; final audit and repository verification pending
+**Status:** Complete locally; targeted verification GREEN; repository-wide suite remains CI-owned
 **Recorded:** 2026-09-27  
 **Current production surface:** `workspace_query(type = "has_cycle")`  
 **Primary boundaries:** `WorkspaceIndex`, workspace scope, MCP structured output,
@@ -407,6 +407,19 @@ The live harness is field evidence only. It cannot replace the tracked tests or
 be reported as a CI gate.
 
 ### Phase 6 — final audit and user-run verification gate
+
+**Audit result (2026-09-27):** the production lifecycle is coherent from
+approved semantic-edge producers through occurrence storage/removal, scoped
+deterministic traversal, MCP dispatch/schema, the model-facing envelope, and
+the live stdio boundary. The audit found one presentation inconsistency:
+no-cycle responses exposed an empty witness but reported
+`completeness.zero_result=false`. A tracked RED/GREEN regression now derives
+that field from `has_cycle` for this query family while leaving count-based
+families unchanged. No critical or high-severity gap remains. The operator-run
+targeted local gate passed: formatting, all-target/all-feature Clippy, cycle
+policy and MCP witness suites, file-size guard tests and active-file guard,
+UTF-8 validation, and the encoding test. The repository-wide test suite was
+not run locally and remains CI-owned by explicit maintainer policy.
 
 Audit the complete production lifecycle:
 

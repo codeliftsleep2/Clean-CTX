@@ -148,6 +148,10 @@ fn has_cycle_no_cycle_response_is_empty_index_only_and_side_effect_free() {
         .expect("model-facing content");
     assert!(text.contains("\"authority\": \"workspace_index\""));
     assert!(text.contains("\"status\": \"indexed_evidence_only\""));
+    assert!(
+        text.contains("\"zero_result\": true"),
+        "a false cycle result with an empty witness is a zero result: {text}"
+    );
     assert!(!text.contains("authoritative_index_snapshot_for_effective_scope"));
 
     let after_stats = state.session_stats_lock().summary();

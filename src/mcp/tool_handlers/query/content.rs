@@ -54,6 +54,11 @@ pub(super) fn render(
 ) -> String {
     let count = structured.get("count").and_then(Value::as_u64);
     let file_local_calls = query_type == "calls_in_file";
+    let zero_result = if query_type == "has_cycle" {
+        structured.get("has_cycle").and_then(Value::as_bool) == Some(false)
+    } else {
+        count == Some(0)
+    };
     let direction = match query_type {
         "forward_edges" => Some("outgoing"),
         "reverse_edges" => Some("incoming"),
@@ -99,7 +104,7 @@ pub(super) fn render(
         "completeness": {
             "authority": if file_local_calls { "fresh_canonical_file_ir" } else if query_type == "has_cycle" { "workspace_index" } else { "workspace_index_after_registered_hydration" },
             "status": if file_local_calls { "authoritative_file_snapshot" } else if query_type == "has_cycle" { "indexed_evidence_only" } else { "authoritative_index_snapshot_for_effective_scope" },
-            "zero_result": count == Some(0),
+            "zero_result": zero_result,
             "discovery": structured.get("discovery"),
         },
         "result": model_result(query_type, structured),

@@ -235,17 +235,17 @@ impl WorkspaceIndex {
             // O(V log V + sum(d(v) log d(v)) + V + E), not plain O(V+E).
             outgoing.sort_by(|(_, left), (_, right)| {
                 (
+                    cycle_relation_sort_key(left.relation),
                     left.object.domain.as_str(),
                     left.object.entity_type.as_str(),
                     left.object.name.as_str(),
-                    cycle_relation_sort_key(left.relation),
                     left.asserting_file.as_str(),
                 )
                     .cmp(&(
+                        cycle_relation_sort_key(right.relation),
                         right.object.domain.as_str(),
                         right.object.entity_type.as_str(),
                         right.object.name.as_str(),
-                        cycle_relation_sort_key(right.relation),
                         right.asserting_file.as_str(),
                     ))
             });
