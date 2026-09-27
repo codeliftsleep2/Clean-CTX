@@ -502,6 +502,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware
+
+| Property | Value |
+|----------|-------|
+| **Intent** | `entities_in_file` must answer an explicit authorized file in one call without confusing an uncompiled file, stale projection, or insufficient semantic fidelity with a genuine empty result. |
+| **Invariant** | WorkspaceIndex owns semantic coverage beside the file occurrences it qualifies: canonical file identity, normalized semantic fidelity, and source hash. A projection is reusable only when its hash matches current source and its fidelity is at least the requested semantic level. Query Edit/Verbatim normalize to High; an actual Edit/Verbatim compilation does not claim High completeness because extractors are not globally monotonic. Missing, stale, or insufficient coverage compiles a read-only candidate and atomically replaces the file's entities, edges, and coverage, including an empty edge set. Removal clears coverage with occurrences. Query-only compilation creates no session alias, rendered context, persistence record, or compression-statistics claim. |
+| **Enforcement** | `src/workspace/index/coverage.rs`; `src/workspace/index/remove.rs`; `src/mcp/tool_handlers/query/entities.rs`; `src/mcp/tool_handlers/core/provide.rs`; `src/tests/mcp/workspace_query_entities_auto_compile.rs` (one-call first touch, invalid fidelity, schema, High→Low reuse without recompilation, Low→Medium .NET action upgrade, source invalidation, empty replacement, no context/alias publication, and provide→query reuse). WSC-004 suites retain path/root/withinPath authority. |
+| **Authority** | `WorkspaceIndex::has_current_semantic_projection`, `WorkspaceIndex::replace_semantic_projection`, `SemanticFidelity` |
+| **Type** | ENFORCED (state ownership + test) |
+| **Gate** | `cargo test --all-features tests_entities_auto_compile` |
+
+---
+
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |

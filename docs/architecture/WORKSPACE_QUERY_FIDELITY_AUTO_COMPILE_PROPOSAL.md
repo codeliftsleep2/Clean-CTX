@@ -1,14 +1,15 @@
 # Query-boundary completeness and redundant-work proposal
 
-**Status:** Expanded investigation proposal; implementation deferred
+**Status:** Phase E1 implemented and locally verified; wider audit remains open
 **Recorded:** 2026-09-26
-**Production behavior:** Unchanged
+**Production behavior:** `entities_in_file` now performs fidelity-aware,
+freshness-checked semantic compilation on first touch
 **Primary surfaces:** `workspace_query`, `graph_trace`/CBM `trace_path`,
 `cbm_proxy`, and `provide_code_context.focusMethods`
 
 ## 1. Decision summary
 
-`entities_in_file` should eventually auto-compile its explicit file when the
+`entities_in_file` now auto-compiles its explicit file when the
 WorkspaceIndex has no sufficiently complete semantic projection for that file.
 Its optional `fidelity` argument should mean **compile semantic facts at least
 as completely as the requested fidelity requires**, including recompilation
@@ -20,8 +21,9 @@ one file before querying a partially populated graph can still return a clean
 `false` while relevant files remain unindexed. Its completeness policy therefore
 requires a separate architectural decision before implementation.
 
-No production change is authorized by this document. It records the verified
-boundary and the recommended future work.
+Phase E1 was explicitly authorized and implemented through tracked RED/GREEN
+regressions. `has_cycle` and the wider audit remain decision/investigation work;
+Phase E1 does not authorize their contracts.
 
 This document also records four adjacent query-boundary candidates discovered by
 auditing for the same broader failure shape: a caller must perform a discovery
@@ -34,9 +36,9 @@ section 11 confirm them.
 
 ## 2. Problem
 
-`entities_in_file` currently resolves and authorizes `file_path`, then queries
-only the existing WorkspaceIndex. When the file has not previously contributed
-semantic facts, the response is indistinguishable from a genuinely empty file:
+Before Phase E1, `entities_in_file` resolved and authorized `file_path`, then
+queried only the existing WorkspaceIndex. An uncompiled file was therefore
+indistinguishable from a genuinely empty file:
 
 ```json
 { "entities": [], "count": 0 }
@@ -59,17 +61,21 @@ Medium or High request could silently omit facts.
 
 ### 3.1 `entities_in_file`
 
-The production handler in `src/mcp/tool_handlers/query/entities.rs`:
+The production handler in `src/mcp/tool_handlers/query/entities.rs` now:
 
 1. validates `file_path` through `resolve_file_path_checked`;
 2. enforces `workspaceRoot`, configured roots, and optional `withinPath`;
 3. canonicalizes the resolved path; and
-4. calls `WorkspaceIndex::entities_in_file` without compiling or checking
-   semantic-fidelity coverage.
+4. validates and normalizes the optional semantic fidelity;
+5. hashes current source and checks WorkspaceIndex-owned coverage;
+6. compiles a read-only candidate when coverage is absent, stale, or
+   insufficient;
+7. atomically replaces facts plus coverage, including empty projections; and
+8. calls `WorkspaceIndex::entities_in_file`.
 
-The existing empty response intentionally carries no discovery diagnostic.
-Consequently, an uncompiled file and a compiled file with no registered
-entities share the same response.
+The operation uses no name-based discovery diagnostic. A successful empty
+response now means the authorized current file was semantically compiled and
+produced no entities at the requested semantic fidelity.
 
 ### 3.2 `has_cycle`
 
@@ -268,7 +274,7 @@ constant “auto-compile attempted” flag to every successful response.
 This is a reproducible behavioral gap, so implementation must follow the
 tracked RED/GREEN procedure in `docs/agent/architecture.md`.
 
-### Phase E1 — `entities_in_file`
+### Phase E1 — `entities_in_file` — complete locally
 
 Add focused tracked regressions proving:
 
@@ -284,9 +290,11 @@ Add focused tracked regressions proving:
    claim; and
 9. the MCP schema advertises the optional fidelity contract accurately.
 
-Observe RED against the current implementation, stash the exact regression,
-implement the production boundary, restore the unchanged test, and observe
-GREEN with the same focused command.
+The initial one-call/schema/validation tests and the reuse/cross-publication
+tests were each observed RED, stashed, restored unchanged, and observed GREEN.
+The complete eight-test E1 module is green. Existing WSC-004 scope suites remain
+the authority for path/root/`withinPath` security. Live no-prior-provide use is
+the remaining field gate.
 
 ### Phase C1 — `has_cycle`
 

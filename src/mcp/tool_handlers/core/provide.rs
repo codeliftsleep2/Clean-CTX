@@ -242,12 +242,22 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
         state
             .ir_context_lock()
-            .load_ir(ir.clone(), Some(source_hash));
+            .load_ir(ir.clone(), Some(source_hash.clone()));
         state.remember_context_fidelity(&ir.file_id, effective_fidelity);
         {
             let mut idx = state.workspace_index_lock();
-            idx.remove_file(&canonical_path);
-            idx.add_edges(&canonical_path, semantic_edges.clone());
+            match crate::workspace::index::SemanticFidelity::from_compilation(effective_fidelity) {
+                Some(semantic_fidelity) => idx.replace_semantic_projection(
+                    &canonical_path,
+                    semantic_edges.clone(),
+                    semantic_fidelity,
+                    source_hash,
+                ),
+                None => {
+                    idx.remove_file(&canonical_path);
+                    idx.add_edges(&canonical_path, semantic_edges.clone());
+                }
+            }
         }
         state.remember_semantic_edges(&ir.file_id, semantic_edges.clone());
         state

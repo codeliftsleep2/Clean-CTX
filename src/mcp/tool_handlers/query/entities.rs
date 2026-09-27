@@ -23,6 +23,35 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+fn semantic_fidelity(
+    id: &Value,
+    args: &Value,
+    state: &McpState,
+) -> Option<crate::compression::Fidelity> {
+    use crate::compression::Fidelity;
+
+    let requested = match args["fidelity"].as_str() {
+        Some(value) => match Fidelity::parse(value) {
+            Ok(fidelity) => fidelity,
+            Err(error) => {
+                send_response(&serde_json::json!({
+                    "jsonrpc": "2.0", "id": id,
+                    "error": {
+                        "code": -32602,
+                        "message": error.to_string()
+                    }
+                }));
+                return None;
+            }
+        },
+        None => state.config.default_fidelity,
+    };
+    Some(match requested {
+        Fidelity::Edit | Fidelity::Verbatim => Fidelity::High,
+        fidelity => fidelity,
+    })
+}
+
 /// `find_entities`: find entities by name (cross-domain/type).
 ///
 /// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
@@ -144,14 +173,74 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
         send_empty_entities_in_file(id, args, state);
         return;
     }
+    let fidelity = match semantic_fidelity(id, args, state) {
+        Some(fidelity) => fidelity,
+        None => return,
+    };
+    let source = match state.read_source(&resolved_path) {
+        Ok(source) => source,
+        Err(error) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error.to_string(),
+                None,
+            ));
+            return;
+        }
+    };
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
+    if state
+        .workspace_index_read()
+        .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
+    {
+        return send_entities_in_file(id, args, state, &canonical_path);
+    }
+    if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
+        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+            id.clone(),
+            -32603,
+            error,
+            None,
+        ));
+        return;
+    }
+    let (semantic_edges, compiled_hash) = match crate::mcp::tool_helpers::compile_file_ir_candidate(
+        &resolved_path,
+        fidelity,
+        state,
+    ) {
+        Ok((_, edges, hash)) => (edges, hash),
+        Err(error) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error.to_string(),
+                None,
+            ));
+            return;
+        }
+    };
+    {
+        let mut idx = state.workspace_index_lock();
+        idx.replace_semantic_projection(
+            &canonical_path,
+            semantic_edges,
+            workspace_fidelity,
+            compiled_hash,
+        );
+    }
+    send_entities_in_file(id, args, state, &canonical_path);
+}
+
+fn send_entities_in_file(id: &Value, args: &Value, state: &McpState, canonical_path: &str) {
     let idx = state.workspace_index_read();
-    let results = idx.entities_in_file(&canonical_path);
+    let results = idx.entities_in_file(canonical_path);
     let serialized = serde_json::to_value(&results).unwrap_or_default();
     let count = results.len();
-    // entities_in_file is NOT hydration-eligible (no entity name for CBM search),
-    // so its response carries no discovery diagnostics at all: a constant
-    // "attempted: false" says nothing a caller can act on, and absence is the
-    // documented meaning of "nothing noteworthy happened".
+    // The explicit path is compiled directly; name-based discovery diagnostics
+    // do not apply and query-only compilation does not publish rendered context.
     let structured = serde_json::json!({ "entities": serialized, "count": count });
     let content = super::content::render(
         "entities_in_file",

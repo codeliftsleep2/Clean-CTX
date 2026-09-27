@@ -68,58 +68,58 @@ fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
         (
             "ClassModifiers",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::ClassModifiers(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::ClassModifiers(..))),
         ),
         (
             "MethodModifiers",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::MethodModifiers(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::MethodModifiers(..))),
         ),
         (
             "ControlSummary",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::ControlSummary(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::ControlSummary(..))),
         ),
         (
             "PatternFacts",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::PatternFacts(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::PatternFacts(..))),
         ),
         (
             "SideEffect",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::SideEffect(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::SideEffect(..))),
         ),
         (
             "ExecutionContext",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::ExecutionContext(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::ExecutionContext(..))),
         ),
         (
             "DataFlow",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::DataFlow(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::DataFlow(..))),
         ),
         (
             "ControlFlow",
             persisted
-            .instructions
-            .iter()
-            .any(|op| matches!(op, CoreOp::ControlFlow(..))),
+                .instructions
+                .iter()
+                .any(|op| matches!(op, CoreOp::ControlFlow(..))),
         ),
     ] {
         assert!(

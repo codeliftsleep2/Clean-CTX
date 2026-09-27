@@ -265,6 +265,10 @@ mod tests_hydration_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_9.rs"]
 mod tests_filesystem_discovery_cache;
 
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_entities_auto_compile.rs"]
+mod tests_entities_auto_compile;
+
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
 #[cfg(all(test, feature = "rust", feature = "csharp"))]

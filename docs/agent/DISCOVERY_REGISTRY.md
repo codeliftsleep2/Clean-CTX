@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-024: `entities_in_file` Returned Ambiguous Empty Results Before Prior Compilation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-26 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by source audit and controlled RED/GREEN reproduction |
+| **Repository/context** | Real large workspace workflow plus TypeScript and .NET local fixtures |
+| **Symptom** | `workspace_query(type="entities_in_file")` returned the same empty result for an uncompiled file and a genuinely entity-free file, forcing `provide_code_context` plus retry. It also had no fidelity contract, so stale Low semantic facts could not be distinguished from sufficient coverage. |
+| **Root cause** | The handler validated the explicit path and queried WorkspaceIndex directly. WorkspaceIndex owned occurrences but no file-local source-hash/fidelity coverage, and `provide_code_context` published facts without recording reusable semantic completeness. |
+| **Classification** | Semantic lifecycle and tool-boundary completeness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_entities_auto_compile.rs` (eight production-dispatch regressions, including independently observed RED/GREEN first-touch, reuse, and provide→query boundaries) |
+| **Live scenario required?** | Yes — verify a no-prior-provide call against the pilot workspace and confirm fidelity upgrade behavior on a real .NET controller. |
+| **Architectural invariant** | WSC-006 |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Resolution:** `entities_in_file` now accepts optional fidelity, normalizes
+Edit/Verbatim semantic requests to High, and compiles its already-authorized
+explicit file without publishing rendered/session state. WorkspaceIndex owns
+source-hash and semantic-fidelity coverage with atomic file replacement;
+fresh sufficient projections are reused, while stale/lower projections and
+empty recompilations replace prior facts. `provide_code_context` publishes
+coverage only for actual Low/Medium/High compilations, never falsely treating
+Edit/Verbatim as High-complete.
+
+---
+
 ## DIS-2026-023: Delta Trigger Expectations Masked Incomplete and False Session Statistics
 
 | Field | Value |
