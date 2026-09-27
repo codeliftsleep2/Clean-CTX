@@ -17,6 +17,33 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
                 .filter_map(|s| s.as_str().map(String::from))
                 .collect()
         });
+    let explicit_fidelity = params["arguments"]["fidelity"].as_str();
+    let explicit_intent = params["arguments"]["intent"].as_str();
+    let focus_was_supplied = focus_methods.is_some();
+    let focus_is_empty = focus_methods.as_ref().is_some_and(HashSet::is_empty);
+
+    if focus_was_supplied {
+        let fidelity_conflicts = explicit_fidelity.is_some_and(|value| value != "edit");
+        let intent_conflicts = explicit_intent.is_some_and(|value| value != "edit");
+        let empty_without_explicit_edit =
+            focus_is_empty && explicit_fidelity != Some("edit") && explicit_intent != Some("edit");
+        if fidelity_conflicts || intent_conflicts || empty_without_explicit_edit {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                "focusMethods requires Edit fidelity; use fidelity \"edit\" or intent \"edit\". A non-empty focus may imply Edit only when neither fidelity nor intent is supplied.",
+                None,
+            ));
+            return;
+        }
+    }
+
+    let inferred_focus_fidelity = (focus_methods
+        .as_ref()
+        .is_some_and(|focus| !focus.is_empty())
+        && explicit_fidelity.is_none()
+        && explicit_intent.is_none())
+    .then_some("edit");
     let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     if file_path_str.is_empty() {
         send_response(
@@ -90,15 +117,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         return;
     }
     state.remember_persisted_path(&alias, &resolved_path);
-    let explicit_fidelity = params["arguments"]["fidelity"].as_str();
-    let explicit_intent = params["arguments"]["intent"].as_str();
-
     let heuristics_start = Instant::now();
     let stored_fidelity = state.context_fidelity(&alias);
     let ir_read = state.ir_context_read();
     let decision = match crate::mcp::heuristics::decide(
         &resolved_path,
-        explicit_fidelity,
+        explicit_fidelity.or(inferred_focus_fidelity),
         explicit_intent,
         &state.config,
         &ir_read,

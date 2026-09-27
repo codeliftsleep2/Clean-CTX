@@ -195,8 +195,8 @@ pub(crate) fn contract_fields(
 /// `"skeleton_with_verbatim_bodies"`/`["method_bodies"]` — every method's body
 /// is byte-exact (legacy behavior).
 ///
-/// When `focus` is `Some(_)` (silently ignored unless the effective fidelity is
-/// `Edit`), only the focused method bodies are byte-exact. The contract reports
+/// When `focus` is `Some(_)` (validated as Edit-compatible by the request
+/// boundary), only the focused method bodies are byte-exact. The contract reports
 /// `"skeleton_with_focused_verbatim_bodies"`/`["focused_method_bodies"]` so the
 /// LLM knows NOT to attempt `replace_in_file` SEARCH on unfocused method bodies.
 pub(crate) fn contract_fields_focused(

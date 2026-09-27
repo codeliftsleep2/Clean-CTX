@@ -46,6 +46,29 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-026: `focusMethods` Was Silently Ignored Outside Edit Fidelity
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Broader query/tool-boundary streamlining audit on `(feat)Architectural-Hardening` |
+| **Repository/context** | `provide_code_context` request validation and heuristic fidelity selection |
+| **Symptom** | Supplying `focusMethods` with Low, Medium, High, Verbatim, or a non-Edit intent returned success while producing the same structural output as an unfocused request. Supplying focus without a mode could likewise select a heuristic non-Edit fidelity and silently discard the requested targeting. |
+| **Root cause** | The handler parsed focus independently of fidelity selection, passed it to body filtering only when the eventual fidelity happened to be Edit, and exposed no incompatible-argument validation or inference rule. |
+| **Classification** | MCP request-contract correctness and tool-call economics |
+| **Reproducible locally?** | Yes; all four unchanged tracked assertions observed RED before the fix and GREEN afterward. |
+| **Local regression** | `src/tests/mcp/focus_fidelity_contract.rs` |
+| **Live scenario required?** | No for closure; the behavior is deterministic at registered production dispatch. A later pilot call may provide optional field evidence. |
+| **Architectural invariant** | MCP-002 |
+| **Status** | Verified locally |
+
+**Resolution:** A non-empty otherwise-unspecified focus now implies Edit in one
+call. Explicit non-Edit fidelity or intent returns `-32602` rather than being
+ignored or overridden. Empty focus remains meaningful only with explicit Edit.
+Validation occurs before file IO or state mutation.
+
+---
+
 ## DIS-2026-025: `has_cycle` Mixed Unrelated Relations and Returned No Actionable Evidence
 
 | Field | Value |

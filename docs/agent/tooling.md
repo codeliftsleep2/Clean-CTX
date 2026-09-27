@@ -566,10 +566,13 @@ required, or when `provide_code_context` cannot handle the file.
 auto-delta transport. `compress_code_context` is a lower-level mechanism
 without these benefits.
 
-### ❌ Do Not pass `focusMethods` without Edit fidelity
+### ❌ Do Not combine `focusMethods` with an explicit non-Edit mode
 
-At `low`/`medium`/`high` / non-edit fidelities, `focusMethods` is silently
-ignored. You will receive skeleton-only output but no error.
+A non-empty `focusMethods` array implies Edit when both `fidelity` and `intent`
+are omitted. Explicit non-Edit fidelity or intent conflicts with focus and
+returns `-32602`; it is never silently ignored or overridden. An empty array
+retains its specialized Edit-only meaning and therefore requires explicit
+`fidelity: edit` or `intent: edit`.
 
 ### ❌ Prefer `cbm_proxy` over structured wrappers for token efficiency
 

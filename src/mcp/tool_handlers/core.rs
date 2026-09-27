@@ -33,6 +33,10 @@ mod context_compression_harness_tests;
 mod control_full_content_tests;
 
 #[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/focus_fidelity_contract.rs"]
+mod focus_fidelity_contract_tests;
+
+#[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/meta_layer_config.rs"]
 mod meta_layer_config_tests;
 

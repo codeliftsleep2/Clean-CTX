@@ -345,10 +345,10 @@ inspection establishes the current code shape, but it does not substitute for
 live reproduction across the external tool boundary. No item in this section
 is scheduled for implementation solely because it appears here.
 
-### 10.1 `trace_path` / `graph_trace`: unresolved bare names
+### 10.1 `trace_path` / `graph_trace`: unique bare names work; ambiguity remains unverified
 
-**Potential severity:** High — a successful-looking empty or unrelated edge
-set can be interpreted as verified absence.
+**Status:** Broad defect rejected by current code and tracked live evidence.
+Same-name ambiguity remains a field-verification question, not scheduled work.
 
 The two public surfaces have different request shapes:
 
@@ -356,18 +356,28 @@ The two public surfaces have different request shapes:
   a project; and
 - the structured Clean-CTX `graph_trace` wrapper accepts `from` and `to`.
 
-The current bridge forwards the caller's `from`/function name to CBM and then
-filters returned edges against `to` when a target is supplied. It does not
-first resolve a bare written name through `search_graph`. Consequently, the
-reported two-call workaround is architecturally plausible: search first for a
-canonical path-qualified identity, then trace that identity.
+The bridge forwards the caller's `from`/function name to CBM and filters
+returned qualified endpoints against `to`. That is not itself a defect: CBM
+accepts an unambiguous bare name, and Clean-CTX's endpoint matcher deliberately
+matches a bare final segment against the qualified wire identity.
 
-This must be verified independently for native proxy `trace_path` and the
-structured `graph_trace` wrapper. A bare-name empty result, an incorrect edge
-set, a CBM error, and a Clean-CTX validation error are materially different
-outcomes and must not be grouped together.
+Tracked live tests in `src/tests/cbm/trace_wire.rs` already establish that:
 
-If live-confirmed, the recommended contract is:
+- an unambiguous bare source and target return the correct outbound edge;
+- the same bare pair is found through the inbound fallback when appropriate;
+- a genuinely unrelated pair returns a successful empty result; and
+- CBM's `function not found` soft-error envelope becomes an explicit tool
+  error before edge parsing, never a plausible empty result.
+
+The old claim that bare names generally require `search_graph` first is
+therefore stale. Adding a compulsory pre-search would impose a hidden second
+CBM operation on a path that already works and would duplicate CBM's own
+resolution behavior.
+
+The only unresolved question is how the installed CBM version handles a bare
+name shared by multiple qualified symbols. That case must be observed live
+before Clean-CTX adds policy. If CBM guesses or merges candidates silently, the
+recommended contract would be:
 
 1. accept either a canonical identity or a bare name;
 2. preserve canonical identities without an extra search;
@@ -375,13 +385,12 @@ If live-confirmed, the recommended contract is:
 4. trace automatically when exactly one candidate matches;
 5. return a structured disambiguation error listing bounded candidate
    identities when multiple candidates match; and
-6. return an explicit not-found/resolution failure rather than a plausible
-   empty trace when no candidate matches.
+6. preserve the existing explicit not-found failure when no candidate matches.
 
 Resolution must not mutate the active project unexpectedly, cross project
-boundaries, or select the first result by ordering. The implementation should
-share one resolver between proxy and structured surfaces while preserving their
-different response shapes.
+boundaries, or select the first result by ordering. No implementation is
+authorized until duplicate-name live evidence demonstrates a real ambiguity
+failure on the current CBM boundary.
 
 ### 10.2 `cbm_proxy`: project-name resolution parity — resolved
 
@@ -408,10 +417,21 @@ candidate. A future live parity failure would be a new regression against the
 shared-resolution contract and should enter the normal RED/GREEN process with
 fresh evidence.
 
-### 10.3 `focusMethods` outside Edit fidelity
+### 10.3 `focusMethods` outside Edit fidelity — implemented
 
 **Potential severity:** Medium — accepted input is silently ineffective and
 can make the returned context look more specifically targeted than it is.
+
+**Decision (approved 2026-09-27):** use a hybrid compatibility contract. A
+non-empty focus implies Edit only when both `fidelity` and `intent` are omitted.
+An explicit non-Edit fidelity or intent is contradictory and returns `-32602`
+rather than being overridden. An empty focus retains its existing Edit-only
+meaning and is rejected when Edit was not explicitly selected.
+
+**Implementation status:** Complete under the tracked RED/GREEN contract in
+`src/tests/mcp/focus_fidelity_contract.rs`. Validation occurs before file IO or
+session mutation. The public tool description and operational guidance expose
+the same precedence rules.
 
 Current source confirms the boundary. `provide_code_context` parses
 `focusMethods` at every fidelity, but passes it into body selection only when
@@ -420,20 +440,11 @@ the field as optional with Edit; it does not reject the incompatible
 combination. The operational guide currently warns callers that non-Edit use
 is silently ignored.
 
-If live verification confirms the externally visible behavior, prefer an
-explicit `-32602` incompatible-arguments error when a non-empty `focusMethods`
-array is supplied and effective fidelity is not Edit. Silent auto-promotion is
-not the default recommendation because it changes fidelity, body exposure,
-token economics, persistence/autosave behavior, and the meaning of an explicit
-caller choice. Auto-promotion would require a separate public-contract
-approval.
-
-The design must also decide how heuristic fidelity interacts with focus. A
-caller that omits explicit fidelity but supplies `focusMethods` should not have
-its focus silently invalidated by a heuristic decision. Reasonable options are
-to require explicit `fidelity: edit`, or to treat focus as an explicit Edit
-request only when fidelity was omitted. That choice remains open pending live
-evidence and call-site review.
+This preserves explicit caller choices while removing the common redundant
+retry: a caller that supplies an actual target without otherwise choosing a
+mode receives focused Edit output in one call. Empty focus is not inferred
+because its specialized “Edit structure with no bodies” meaning is not evident
+without an explicit Edit request.
 
 ### 10.4 Name-only workspace edge and traversal queries
 
@@ -472,7 +483,7 @@ repository and the actual MCP stdio path:
 
 | Candidate | Required live comparison | Decision evidence |
 | --- | --- | --- |
-| Bare-name trace | bare name vs canonical identity, proxy and wrapper | response status, resolved candidate count, edge equality |
+| Duplicate bare-name trace | duplicated bare name vs each canonical identity, proxy and wrapper | response status, candidate behavior, edge equality |
 | Non-Edit focus | omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
 | Name-only workspace query | `find_entities` + exact query vs proposed name-only inputs | candidate cardinality, domain/type ambiguity, final edge equality |
 
@@ -482,8 +493,8 @@ resolved answer. Only the last category establishes a silent-correctness defect.
 
 Recommended scheduling after verification:
 
-1. trace resolution, if the silent-wrong/empty result reproduces;
-2. non-Edit `focusMethods` validation;
+1. non-Edit `focusMethods` validation;
+2. duplicate-name trace resolution only if silent guessing/merging reproduces;
 3. name-only workspace-query resolution if real workflows show recurring
    two-call overhead.
 

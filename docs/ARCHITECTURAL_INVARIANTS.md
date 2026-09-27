@@ -294,6 +294,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Gate** | `cargo test` |
 
 ---
+
+### MCP-002 Focused Context Requests Have One Explicit Fidelity Meaning
+
+| Property | Value |
+|----------|-------|
+| **Intent** | A caller that requests selected method bodies must never receive a successful structural response in which that selection was silently ignored, nor have an explicit non-Edit choice silently overridden. |
+| **Invariant** | `provide_code_context.focusMethods` is Edit-only targeting. A non-empty focus with neither `fidelity` nor `intent` implies Edit. Explicit Edit fidelity or intent accepts focus. Any explicit non-Edit fidelity or intent conflicts and returns `-32602` before file IO or session mutation. An empty focus retains its specialized “Edit structure with no bodies” meaning and therefore requires explicit Edit fidelity or intent. Focus resolution and ambiguity rules remain governed by CTX-001 after this request-boundary validation. |
+| **Enforcement** | `src/mcp/tool_handlers/core/provide.rs`; `src/tests/mcp/focus_fidelity_contract.rs` (implicit Edit, explicit-fidelity conflict, explicit-intent conflict, and empty implicit-focus rejection); existing canonical focus tests under `src/tests/ir/focus.rs` and `src/tests/mcp/control_full_content.rs`. |
+| **Authority** | `handle_provide_code_context` request validation followed by `heuristics::decide` and canonical focus resolution |
+| **Type** | ENFORCED (request boundary + test) |
+| **Gate** | `cargo test --all-features focus_fidelity_contract_tests` |
+
+---
 ### IRWIRE-001 Semantic Binary Round Trip
 
 | Property | Value |
