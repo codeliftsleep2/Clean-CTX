@@ -58,14 +58,20 @@ behavior is superseded.
 | **Classification** | Additive MCP contract and redundant-tool-call elimination |
 | **Reproducible locally?** | Yes; the new additive contract initially reached the existing required-field errors, then all seven unchanged tests passed after implementation. |
 | **Local regression** | `src/tests/mcp/workspace_query_identity_resolution.rs` |
-| **Live scenario required?** | Recommended before pilot closure: compare one-call name-only results with the prior `find_entities` plus exact-query sequence on unique and ambiguous real names. |
+| **Live scenario required?** | Completed through the actual MCP stdio boundary: unique bare names matched fully qualified results; reverse and transitive queries resolved correctly; repeated occurrences remained one identity; distinct identities produced bounded candidates; partial filters disambiguated; missing names failed explicitly; and `withinPath` constrained resolution and returned occurrences. |
 | **Architectural invariant** | WSC-008 |
-| **Status** | Fixed locally; live verification pending |
+| **Status** | Verified locally and through live MCP stdio |
 
 **Resolution:** One shared resolver now hydrates once, applies scope and any
 partial filters, groups occurrences by semantic identity, and proceeds only for
 one unique identity. Not-found and ambiguity are explicit, deterministic
 errors; fully specified callers retain the existing fast path.
+
+The tracked operator harness at
+`verification/workspace-query/scripts/Verify-IdentityResolutionLive.ps1`
+supplied the live field evidence. It is not a regression test or CI gate; the
+authoritative local contract remains
+`src/tests/mcp/workspace_query_identity_resolution.rs`.
 
 ---
 

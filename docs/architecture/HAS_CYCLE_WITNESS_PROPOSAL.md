@@ -388,14 +388,14 @@ After tracked tests are GREEN:
 ### Phase 5 — live stdio MCP verification
 
 **Result (2026-09-27): PASS.** The operator-run
-`target/tmp/verify_has_cycle_live.ps1` harness drove a freshly built server and
+`verification/workspace-query/scripts/Verify-HasCycleLive.ps1` drove a freshly built server and
 confirmed schema exposure, first-touch index-only behavior without implicit
 compilation, exclusion of a real two-file native `Calls` loop, and a scoped
 two-step `Injects` witness with asserting-file provenance. This is field
 evidence only; the tracked Phase 1/3 tests remain the regression authority.
 
-Create an optional operator harness under `target/tmp/**` that drives a freshly
-built server and demonstrates:
+Maintain the operator harness under `verification/workspace-query/scripts/`
+and use it to drive a freshly built server and demonstrate:
 
 1. a scoped approved-relation cycle returns the expected witness;
 2. an excluded-relation loop returns no cycle;

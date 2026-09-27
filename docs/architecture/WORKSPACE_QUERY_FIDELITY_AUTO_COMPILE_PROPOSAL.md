@@ -468,6 +468,15 @@ scope before identity selection, and returns the selected identity in
 `resolved_identity`. Fully specified requests retain their existing direct
 identity query plus hydration path.
 
+**Live status:** Verified through a freshly built server over MCP stdio. The
+field run established unique bare-name equivalence with fully qualified
+`forward_edges`, unique `reverse_edges`, resolved transitive traversal,
+non-ambiguous repeated physical occurrences, explicit multi-identity
+disambiguation, partial-filter resolution, explicit not-found behavior, and
+`withinPath` isolation. The live Angular fixture also confirmed why ambiguity
+must remain explicit: one source declaration may legitimately project as
+multiple semantic identities across the builtin and framework domains.
+
 Current handlers for `forward_edges`, `reverse_edges`, and
 `transitive_dependencies` require the complete Model-C identity
 `(domain, entity_type, name)` before hydration begins. Missing `domain` or
@@ -501,7 +510,7 @@ repository and the actual MCP stdio path:
 | --- | --- | --- |
 | Duplicate bare-name trace | duplicated bare name vs each canonical identity, proxy and wrapper | response status, candidate behavior, edge equality |
 | Non-Edit focus | omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
-| Name-only workspace query | `find_entities` + exact query vs proposed name-only inputs | candidate cardinality, domain/type ambiguity, final edge equality |
+| Name-only workspace query | **Complete:** live stdio comparison of bare, exact, partial, ambiguous, missing, repeated-occurrence, and narrowed requests | unique result equality, explicit candidates, and scoped occurrence isolation verified |
 
 The live record must distinguish a tool error, explicit incomplete coverage,
 an empty but complete answer, and a successful-looking incomplete or wrongly
