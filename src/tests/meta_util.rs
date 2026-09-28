@@ -6,6 +6,29 @@
 
 use crate::compression::capture_pipeline::CapEntry;
 
+#[test]
+fn lexical_regions_match_legacy_scanner_at_every_byte_boundary() {
+    let fixtures = [
+        "const code = value; // line comment\nnext();",
+        "before /* block\ncomment */ after",
+        r#"const single = 'escaped \' quote'; const double = "value";"#,
+        "const template = `before ${call({ nested: true })} after`;",
+        r#"// comment
+const mixed = `text ${"inner"}`; /* tail */"#,
+    ];
+
+    for source in fixtures {
+        let regions = crate::meta_util::LexicalRegions::new(source);
+        for pos in 0..=source.len() {
+            assert_eq!(
+                regions.contains(pos),
+                crate::meta_util::is_inside_comment_or_string(source, pos),
+                "lexical membership differs at byte {pos} in {source:?}"
+            );
+        }
+    }
+}
+
 // ── find_class_source_start: TS decorators ────────────────────────
 
 #[test]

@@ -43,6 +43,9 @@ proposals should point to the resulting invariant and production owners;
 superseded measurements remain historical evidence rather than being silently
 rewritten as current benchmarks.
 
+The active phased meta-layer performance migration is documented in
+[`architecture/META_LAYER_SINGLE_PASS_MIGRATION_PLAN_2026-09-28.md`](architecture/META_LAYER_SINGLE_PASS_MIGRATION_PLAN_2026-09-28.md).
+
 The chronological release ledger is
 [`changelogs/CHANGELOG.md`](changelogs/CHANGELOG.md). The roadmap is directional;
 implemented behavior is determined by production code and the invariant catalog.
