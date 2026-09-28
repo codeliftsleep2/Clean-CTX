@@ -2,7 +2,9 @@
 
 > **Owner:** System + module architecture · **Status:** Living reference
 > **Version:** 0.8.0-rc
-> **Last updated:** 2026-09-21 (typed canonical IR, physical `0x04`, `dv:2`, transactional semantic persistence, explicit interfaces)
+> **Last updated:** 2026-09-27 (SCHEMA-vNext, workspace-query boundaries,
+> fidelity-aware semantic projections, dependency-cycle witnesses, and CBM
+> trace identity resolution)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -10,82 +12,43 @@
 
 ## System Architecture
 
+```text
+MCP stdio tools / prompts
+        │
+        ├── provide_code_context ── heuristics + explicit request contract
+        ├── delta/apply/restore  ── explicit state-transition lifecycle
+        └── workspace_query      ── scoped semantic graph reads
+        │
+        ▼
+Trusted source + tree-sitter parsers
+(TypeScript, C#, Rust, Java; feature-gated)
+        │
+        ▼
+Canonical compiler IR (`CompiledIR` / `CoreOp`)
+        │
+        ├── language + framework passes
+        │     Angular/RxJS/NgRx │ .NET │ Spring Boot
+        │
+        ├── checked hierarchy ── fidelity ── SCHEMA-vNext
+        │                                  or explicit economic raw fallback
+        │
+        ├── semantic edges + provenance ── WorkspaceIndex
+        │                                  identity, scope, traversal, witnesses
+        │
+        ├── physical `0x04` + `dv:2` ── BufferedStore / SqliteStore
+        │                               transactional replay + semantic snapshot
+        │
+        └── explicit delta_code_context / apply_delta acknowledgement
+
+Supporting boundaries:
+PathDictionary + source cache │ configured tokenizer economics │ CBM advisory
+candidate discovery and graph tools │ dispatcher + response writer
 ```
-┌─────────────────────────────────────────────────────────┐
-│  MCP stdio Interface (JSON-RPC 2.0)                     │
-│                                                         │
-│  ┌──────────────────────┐  ┌──────────────────────────┐ │
-│  │ Zero-Touch Workflow  │  │ Heuristics Engine        │ │
-│  │ provide_code_context │  │  fidelity + strategy     │ │
-│  │  restore_context     │  │  selection per file      │ │
-│  │  context_history     │  └──────────┬───────────────┘ │
-│  │  context_stats       │             │                 │
-│  └──────────┬───────────┘             │                 │
-│             │                         │                 │
-│  ┌──────────▼─────────────────────────▼──────────────┐  │
-│  │              Compressor Engine                    │  │
-│  │  AST Extraction → Fidelity Filter → Opcode Encode │  │
-│  │  + Text Delta Snapshots + IR Source Cache         │  │
-│  └──────────┬────────────────────────────────────────┘  │
-│             │                                           │
-│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ SymbolDictionary      │  │ Decompressor           │  │
-│  │ PathDictionary        │  │ Opcode → Readable      │  │
-│  └──────────┬────────────┘  └────────────────────────┘  │
-│             │                                           │
-│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ Tree-sitter AST       │  │ LocalStateCache        │  │
-│  │ Parser (TS + C#)      │  │ Hash + baseline snaps  │  │
-│  └───────────────────────┘  └────────────────────────┘  │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ TokenAnalytics (cl100k tiktoken estimator)       │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ IR Subsystem (Compiler IR + Delta Transport)     │   │
-│  │  compile → wire → string_table → delta → replay  │   │
-│  │  exec_semantics → program_graph → inference →    │   │
-│  │  validation → query                              │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ ContextStore (ContextStore trait)                │   │
-│  │InMemoryContextStore | BufferedStore → SqliteStore│   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ Angular Meta-Layer (Φ markers + semantic edges)  │   │
-│  │   detect → decorators → markers → bundler →      │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ SpringBoot Meta-Layer (Φ markers +semantic edges)│   │
-│  │   detect → annotations → markers →               │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ .NET Meta-Layer (Φ markers + semantic edges)     │   │
-│  │   detect → attributes → markers →                │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  All meta-layers dispatched via LayerRegistry:          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ LayerRegistry (singleton)                        │   │
-│  │   MetaLayer::is_applicable() → detect framework  │   │
-│  │   MetaLayer::enrich(source, class_captures, ...) │   │
-│  │     → class_captures derived per C-22 from       │   │
-│  │       PassContext.captures, NOT DefClass.name    │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ MCP Prompts (cleanctx-notation + dashboard)      │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+
+The canonical IR is the fan-out boundary. SCHEMA-vNext is a model-facing
+file-local projection, `WorkspaceIndex` owns cross-file semantic facts, and the
+binary/delta forms are code-side persistence and transport. None is a lossy
+replacement for another.
 
 ### A-09: Production-Grade Multi-Threaded Request Dispatch
 
@@ -101,35 +64,30 @@ stdin reader thread           Dispatcher thread pool (N workers)
 └──────────────────┘           └───────────────────────────────────┘
                                                │
                                    ┌───────────▼─────────────┐
-                                   │     RwLock<McpState>    │  
-                                   │     Parallel reads,     │  
-                                   │     Serial writes       │ 
+                                   │     Arc<McpState>       │
+                                   │ interior Mutex/RwLock   │
+                                   │ at owned state boundaries│
                                    └────────────┬────────────┘
                                                 │
-                                   ┌────────────▼────────┐
-                                   │  Stdout writer      │ 
-                                   │  Dedicated thread,  │
-                                   │ no interleaving     │  
-                                   └─────────────────────┘
+                                   protocol::send_response()
+                                   serializes stdout via mutex
 ```
 
 **How it works:**
 
 1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and enqueues via `dispatcher.spawn()`. Never waits for completion.
-2. **Worker threads** — bounded crossbeam_channel queue with configurable depth (default: 1000). Workers acquire `RwLock` write access for compression, read access for stats/queries.
-3. **Panic recovery** — `catch_unwind` wraps every handler. Poisoned RwLock locks are reclaimed via `poisoned.into_inner()`.
-4. **Dedicated stdout writer** — a separate thread serializes JSON responses, preventing interleaving.
+2. **Worker threads** — per-worker bounded channels (default depth: 1000) receive requests round-robin. Workers share `Arc<McpState>`; state owners provide their own interior synchronization, so there is no outer lock serializing every request.
+3. **Panic recovery** — `catch_unwind` wraps every handler; dispatcher-owned poisoned locks are recovered explicitly.
+4. **Response serialization** — `protocol::send_response()` protects stdout with its own global mutex; there is no dedicated writer thread.
 
-**Configuration:**
-```json
-{
-  "dispatcher": { "worker_count": 8, "max_queue_depth": 2000 }
-}
-```
+`DispatcherConfig` is currently an internal construction API used by the
+server/tests, not a `.clean-ctx.json` field. Production uses its defaults:
+auto-detected worker count, per-worker queue depth 1000, one-second send
+timeout, five-second slow-request threshold, and 1000 retained traces.
 
 **Why this matters:** Before A-09, a slow CBM query or large file compression blocked ALL subsequent requests. The dispatcher also includes request tracing with IDs, timestamps, slow-request logging (5s threshold), and graceful shutdown with configurable timeout.
 
-**See:** `src/mcp/dispatcher.rs` (312 lines, 6+ unit tests)
+**See:** `src/mcp/dispatcher.rs` and `src/tests/mcp/dispatcher*.rs`.
 
 ---
 
@@ -194,7 +152,7 @@ complete current representation:
           │              - persisted/session fidelity evidence
           ▼              - Angular detection
 ┌─────────────────────┐
-│ Complete Provider   │──→ Full SCHEMA-v5 presentation
+│ Complete Provider   │──→ Full SCHEMA-vNext presentation
 │                     │    or economics-selected raw source
 │                     │    + canonical IR publication/persistence
 └─────────┬───────────┘
@@ -416,6 +374,12 @@ src/
 Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Both are designed to reduce **CPU load** and **local compute time** on subsequent calls, rather than reducing LLM token usage.
 
 ### How Delta Saves Resources (Not LLM Tokens)
+
+> **Historical measurement note:** the numeric comparisons in this subsection
+> predate the current `dv:2` lifecycle and SCHEMA-vNext renderer. The durable
+> architectural point is that delta is explicit code-side transport, not
+> automatically substituted model context. Current economics are measured by
+> the verification package linked from `docs/PERFORMANCE.md`.
 
 | What delta **does** save | What delta does **not** save |
 |--------------------------|------------------------------|
@@ -845,6 +809,12 @@ emitted through the existing meta-layer pipeline.
 ---
 
 ## Measured Compression Performance
+
+> **Historical baseline:** the tables below describe the retired presentation
+> measured in June 2026. They remain useful comparative evidence but are not
+> current SCHEMA-vNext claims. Current reproducible token records live under
+> `verification/context-compression/schema-v5/`; see
+> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` for interpretation.
 
 All numbers below were produced by the `compress_code_context` tool on the in-repo TypeScript fixtures, using the **cl100k BPE** estimator (`tiktoken-rs`). "Raw tokens" is the encoded length of the source file as-is; "Retained tokens" is the encoded length of the compressed output (including the report header, the `§PATHMAP` footer, and all behavior markers).
 

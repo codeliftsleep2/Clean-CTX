@@ -1,5 +1,11 @@
 # Clean-CTX Semantic Relationship Model — Implementation Plan
 
+**Status:** Implemented and superseded as production authority. The resulting
+semantic model is owned by `InferenceLayer.semantic_edges`, `WorkspaceIndex`,
+and the workspace-query invariants in
+[`docs/ARCHITECTURAL_INVARIANTS.md`](../ARCHITECTURAL_INVARIANTS.md). This file
+remains decision and migration history.
+
 ## Consolidated Single Report
 
 *Incorporates the architectural investigation and all six resolved uncertainties.*

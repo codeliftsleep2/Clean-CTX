@@ -1,5 +1,9 @@
 # Semantic-Completeness Audit — Clean-CTX (2026-08-22)
 
+**Status:** Historical pre-hardening audit evidence. Its gaps motivated later
+canonical-IR, presentation, and WorkspaceIndex work; current authority is the
+invariant catalog and IR architecture certification.
+
 **Scope:** Read-only production-path audit. No implementation code was modified, nothing was committed, no roadmap changes made. Every claim below is traced through actual production entry points with exact file/function citations. CBM-specific issues are isolated in §9.
 
 **Reference commit:** `129e080` (Angular decorator fix), reconciled branch `feature/angular-deepening-ngrx-rxjs`.

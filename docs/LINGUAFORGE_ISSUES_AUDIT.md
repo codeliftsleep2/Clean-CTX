@@ -1,5 +1,8 @@
 # LinguaForge Issues Audit Report (v2 — Expanded)
 
+**Status:** Historical field-audit evidence. It records the source state and
+decisions at the dates below; it is not a current behavior reference.
+
 **Date:** 2026-08-21  
 **Auditor:** Clean-CTX Code Audit  
 **Scope:** 

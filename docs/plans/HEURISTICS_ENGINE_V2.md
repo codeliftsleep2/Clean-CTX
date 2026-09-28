@@ -1,5 +1,10 @@
 # Heuristics Engine V2 — Auto-Inferred Intent
 
+**Status:** Implemented historical design record. The current contract is
+owned by `src/mcp/heuristics.rs`, `src/config_defaults.rs`, and
+[`docs/CONFIGURATION.md`](../CONFIGURATION.md); the V1/V2 narrative below is
+preserved as implementation history.
+
 ## Current State (V1)
 
 The current heuristics engine (`src/mcp/heuristics.rs`) decides fidelity on a simple 5-priority system:

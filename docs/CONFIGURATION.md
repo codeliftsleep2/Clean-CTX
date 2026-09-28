@@ -19,7 +19,24 @@ Example: If `fidelity` is passed as a tool argument, it overrides both the env v
 
 Location: Project root (walks up from current directory to find it)
 
-### Complete Example
+### Representative Example
+
+This example covers the most commonly changed settings; it is not a serialized
+dump of every `CleanCtxConfig` field. The typed configuration structs in
+`src/config.rs` and their defaults are authoritative for accepted keys. Focused
+sections below document proxy, observability, additional-root, and other
+specialized settings.
+
+The accepted top-level keys are exactly: `type_aliases`,
+`fidelity_overrides`, `exclude_patterns`, `additional_roots`,
+`custom_markers`, `default_fidelity`, `diff_compression`,
+`workspace_type_detection`, `meta_layers`, `smart_defaults`, `heuristics`,
+`persistence`, `auto_angular`, `auto_delta`, `tokenizer`, `cache`,
+`resource_limits`, `cbm`, `intelligence`, `observability`, and `proxy`.
+Nested keys are owned by the typed structs in `src/config.rs`,
+`src/config_defaults.rs`, `src/config_meta_layers.rs`, and
+`src/cbm/config.rs`. There is no public dispatcher configuration block;
+dispatcher sizing and queues use internal production defaults.
 
 ```json
 {
@@ -289,6 +306,12 @@ Per-framework meta-layer settings:
 ```
 
 Currently supported: `angular`, `spring_boot`, `dotnet`. Each meta-layer can be toggled at compile time via Cargo feature flags (see `Cargo.toml` for the full dependency tree). Future: `react`, `vue`, `svelte`.
+
+Layer-specific current references are
+[`ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md),
+[`ANGULAR_ECOSYSTEM_DEEPENING.md`](ANGULAR_ECOSYSTEM_DEEPENING.md),
+[`DOTNET_META_LAYER.md`](DOTNET_META_LAYER.md), and
+[`SPRING_META_LAYER.md`](SPRING_META_LAYER.md).
 
 **Compile-time feature flags vs runtime config:**
 

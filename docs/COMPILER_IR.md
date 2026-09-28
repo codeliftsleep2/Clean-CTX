@@ -4,7 +4,8 @@
 > **Version:** 1.0.0 (Implemented) · **Last updated:** 2026-06-18
 > **Status:** All phases A–H implemented and deployed in production.
 >
-> **Test coverage:** see `docs/CHANGELOG.md` for the current workspace test count (this document does not duplicate it).
+> **Verification:** see `docs/agent/verification.md` for the authoritative gate;
+> this document intentionally carries no volatile test count.
 >
 > **Living document.** This document describes the Compiler IR subsystem as implemented. It replaces the original proposal/spec with accurate details about the actual wire formats, module structure, MCP integration, and test coverage.
 
@@ -582,4 +583,6 @@ non-reversible auxiliary hierarchy. It is not the persistence authority.
 | MCP regression | `tests/mcp/tool_handlers.rs` | ~40 | Handler smoke tests, relative paths, IR-first format |
 | CBM integration | `tests/cbm/integration.rs` | 5 | CBM enrichment compression |
 
-**Total: 530+ IR-specific tests. See `docs/CHANGELOG.md` for the current workspace test count.**
+IR behavior is protected by focused suites under `src/tests/ir/` and by the
+repository gate defined in `docs/agent/verification.md`; volatile test counts
+are intentionally not duplicated here.

@@ -3,10 +3,10 @@
 // Persistence boundary for compression contexts.
 //
 // Defines the `ContextStore` trait that abstracts how compression
-// baselines, deltas, and metadata are persisted. The current
-// implementation (`InMemoryContextStore`) lives entirely in RAM
-// and is session-scoped. A future `SqliteContextStore` will back
-// the same trait with SQLite for cross-session persistence.
+// baselines, deltas, and metadata are persisted. `InMemoryContextStore` owns
+// session-scoped compatibility state; `SqliteStore`, wrapped by
+// `BufferedStore`, implements the same boundary for production cross-session
+// persistence and transactional semantic lifecycle operations.
 //
 // Design invariant: tool handlers talk to `dyn ContextStore`, not
 // to concrete storage implementations. This means zero handler
@@ -52,19 +52,11 @@ struct DeltaRecord {
 
 /// Trait for persisting and restoring compression contexts.
 ///
-/// Current: `InMemoryContextStore` (session-only, lives in `McpState`).
-/// Future: `SqliteContextStore` (survives IDE restarts, backed by
-/// `persistence.db` in the `.clean-ctx/` directory).
+/// Implementations include session-only `InMemoryContextStore` and durable
+/// `SqliteStore`; production wraps the latter in `BufferedStore` for queued
+/// checkpoints plus explicit transactional mutation boundaries.
 ///
-/// All methods are fallible to accommodate future I/O-bound
-/// implementations.
-///
-/// # Persistence readiness
-///
-/// Most methods are unused today because the SQLite layer is deferred.
-/// They define the contract that the future `SqliteContextStore` will
-/// fulfill. The `#[allow(dead_code)]` supressions keep the codebase
-/// warning-free while preserving the trait boundary.
+/// All methods are fallible because durable implementations perform I/O.
 #[allow(dead_code)]
 pub trait ContextStore {
     /// Save a full compression context (baseline) for a file.

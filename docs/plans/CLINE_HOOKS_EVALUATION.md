@@ -1,5 +1,8 @@
 # Cline Hooks Evaluation
 
+**Status:** Completed decision record. No hook/plugin infrastructure was
+adopted; tracked git hooks and CI remain the enforcement mechanisms.
+
 **Conclusion: NO new Cline lifecycle hook/plugin infrastructure for now.**
 Existing git hooks + CI are the preferred deterministic enforcement mechanism.
 This document records the candidates evaluated and the adopted/rejected

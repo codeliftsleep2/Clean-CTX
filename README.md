@@ -369,7 +369,8 @@ Unsafe code is test-only (environment-variable manipulation).
 | [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) | Users | Common issues, error codes, diagnostic commands |
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Architects | Benchmarks, caching, memory profile, optimization checklist |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Administrators | Compliance checklist, hardening, SBOM, air-gap deployment |
-| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
+| [`docs/README.md`](docs/README.md) | All | Documentation map: current authority, guides, and historical records |
+| [`docs/changelogs/CHANGELOG.md`](docs/changelogs/CHANGELOG.md) | All | Version history with all additions, fixes, and deferrals |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | Contributors | Future plans, prioritized items, carry-over from audit |
 
 ---

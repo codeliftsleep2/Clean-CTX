@@ -1,9 +1,9 @@
 # IR Architecture Lock-Down Implementation Plan
 
-**Status:** Phases 1-9 implemented and user-verified. Phase 9 certified the
-registered production lifecycle on 2026-09-21. Phase 10 documentation and
-release-candidate finalization is in progress for `0.8.0-rc`; final `0.8.0`
-remains gated on live field testing.
+**Status:** Implemented migration record. Phases 1-10 produced the certified
+`0.8.0-rc` architecture; the normative result is
+[`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md) and the
+durable invariant catalog. Final `0.8.0` remains gated on live field testing.
 
 **Date:** 2026-09-17
 

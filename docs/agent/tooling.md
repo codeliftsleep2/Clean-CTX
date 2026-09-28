@@ -9,7 +9,7 @@ Three related files exist with different roles:
 | File | Role |
 |------|------|
 | **`docs/agent/tooling.md`** (this file) | Authoritative detailed agent/tooling guidance |
-| `docs/CLAUDE_INTEGRATION_RULES.md` | Portable projection for automated CI/runner workflows |
+| `docs/CLAUDE_INTEGRATION_RULES.md` | Compact Claude-facing projection of the current with-CBM/without-CBM workflow |
 | `src/mcp/prompts.rs` | Runtime MCP system prompt (injected during initialization) |
 
 Do not treat the more-compact files as contradictory — each serves its
@@ -18,6 +18,10 @@ audience. This document governs agent decision-making.
 ---
 
 ## 1. Tool Inventory
+
+The registered schemas in `src/mcp/tools.rs` and `src/cbm/tools.rs` are the
+machine-readable authority. This inventory covers every currently registered
+public tool; internal handler helpers are intentionally absent.
 
 ### 1.1 Standard Host Tools
 
@@ -40,8 +44,7 @@ as `filePath`.
 |------|----------|----------|-----------|
 | `provide_code_context` | `filePath` | `intent`, `fidelity`, `focusMethods`, `workspaceRoot`, `tokenizer` | **Primary model-facing entry point.** Heuristics select fidelity and classify the file; every success returns complete current context. Prefer over `compress_code_context`. |
 | `compress_code_context` | `filePath` | `fidelity`, `encoding`, `tokenizer`, `workspaceRoot` | Direct AST compilation without heuristics. Lower-level tool; prefer `provide_code_context`. |
-| `restore_context` | `filePath` | `fidelity`, `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
-| `decompress_code_context` | `compressedText` | — | Expand compressed IR back to human-readable format. |
+| `restore_context` | `filePath` | `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `context_stats` | — | `filePath`, `format` | Token-savings dashboard. Shows raw vs compressed tokens, delta hit rate, per-file breakdown. |
 
 ### 1.3 Diff/Delta Tools (Read-Only Comparisons)
@@ -50,14 +53,13 @@ as `filePath`.
 |------|----------|----------|-----------|
 | `diff_code_context` | `filePath` | `workspaceRoot`, `fidelity` | AST-level diff: compares in-session baseline against current on-disk state for a **single file**. |
 | `delta_code_context` | `filePath` | `workspaceRoot`, `fidelity` | Generate an IR-level delta from opcode differences and retain its server-owned pending semantic transition. The structured payload is code-side only; generation does not apply it. |
-| `delta_text_context` | `filePath` | `workspaceRoot`, `fidelity` | Text-level line-oriented delta. Source-code files only (not markdown/json/yaml). |
 | `diff_commits` | `fromRef` | `toRef`, `workspaceRoot`, `fidelity` | **Multi-file git-ref diff.** Compares an entire workspace between two Git refs and emits per-file AST-level change-sets. Most token-efficient way to understand PR/commit-level changes. |
 
 ### 1.4 Edit/Mutation Tools
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `apply_edit` | `filePath`, `operations` | `verify` | Byte-exact structural edit (`replace_body`, `delete`, `insert_after`, `insert_before`) over tracked units. Requires matching disk/live/durable source identity and commits source plus semantic state through the staged durable transaction. Full-body fidelity remains available when safe editing requires it. |
+| `apply_edit` | `filePath`, `operations` | `verify`, `workspaceRoot` | Byte-exact structural edit (`replace_body`, `delete`, `insert_after`, `insert_before`) over tracked units. Requires matching disk/live/durable source identity and commits source plus semantic state through the staged durable transaction. Full-body fidelity remains available when safe editing requires it. |
 | `apply_delta` | `delta`, `currentVersion` | — | Explicitly acknowledge and apply an exact pending IR delta, committing durable and live semantic state before consuming the pending transition. This is a code-side protocol, not an LLM workflow. Clean-CTX does not ship an automatic host consumer, so repository-local use is manual or verification-driven. |
 ### 1.5 Admin/Persistence Tools
 
@@ -68,27 +70,27 @@ as `filePath`.
 | `list_sessions` | — | — | List all persisted file contexts with fidelity, token counts, and timestamps. |
 | `replay_history` | `filePath` | `targetSequence`, `fidelity` | Replay delta history from the DB. |
 | `purge_old_deltas` | — | `days`, `filePath` | Purge old delta entries. |
-| `context_history` | `filePath` | — | View compression history for a specific file. |
+| `context_history` | — | `filePath` | View compression history, optionally narrowed to a specific file. |
 | `inspect_legacy_fallbacks` | — | — | Read-only inspection of quarantined legacy fallback artifacts. Reports why they are incomplete; never imports, repairs, deletes, or mutates semantic state. |
 
 ### 1.6 CBM / Graph Tools (Architectural Intelligence)
 
 | Tool | Required | Optional | Status |
 |------|----------|----------|--------|
-| `cbm_proxy` | — | `cbm_tool`, `parameters`, `query`, `project` | **MANDATORY** — the only permitted entry point for all CBM queries. Intercepts raw ~5000-token CBM response and compresses it to ~1100 tokens. |
-| `get_cbm_status` | — | — | **ONLY direct CBM call permitted.** Returns `available`, `degraded`, or `unavailable`. |
+| `cbm_proxy` | — | `cbm_tool`, `parameters`, `query`, `project` | **Preferred compact path** for raw CBM operations. Project resolution is call-scoped and does not mutate the wrapper bridge's active project. |
+| `get_cbm_status` | — | — | Availability probe. Returns `available`, `degraded`, or `unavailable`. |
 | `list_projects` | — | — | **AVAILABLE** — list CBM-indexed projects. Project-independent, no project parameter required. |
-| `index_repository` | `repo_path` | `mode` | **AVAILABLE** — trigger CBM to index/reindex a repository. `mode`: `"fast"` (normal refresh, default) or `"full"` (rebuild/recovery). |
-| `graph_search` | `query` | `project` | **STRUCTURED** — returns typed results (cached). Prefer `cbm_proxy` for token efficiency. |
-| `graph_query` | `query` | `project` | **STRUCTURED** — returns typed `{nodes, edges}` (cached). Prefer `cbm_proxy` for token efficiency. |
-| `graph_trace` | `from`, `to` | `project` | **STRUCTURED** — returns typed `{edges}` (cached). Prefer `cbm_proxy` for token efficiency. |
-| `get_architecture` | — | `project` | **STRUCTURED** — returns typed `{modules, dependencies}` (cached). Prefer `cbm_proxy` for token efficiency. |
+| `index_repository` | `repo_path` | `mode` | **AVAILABLE** — trigger CBM to index/reindex a repository. `mode` is optional: `"fast"` (normal refresh, default) or `"full"` (rebuild/recovery). |
+| `graph_search` | `query` | `name_pattern`, `project` | **STRUCTURED** — returns typed results (cached). Prefer when the typed identity/file result is useful. |
+| `graph_query` | `query` | `project` | **STRUCTURED** — returns typed `{nodes, edges}` (cached). |
+| `graph_trace` | `from`, `to` | `project` | **STRUCTURED** — resolves bare identities uniquely or rejects ambiguity, then returns typed `{edges}`. |
+| `get_architecture` | — | `project` | **STRUCTURED** — returns typed `{modules, dependencies}` (cached). |
 
 ### 1.7 Workspace Tools
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `fidelity`, `kind`, `depth`, `workspaceRoot` | **READ-ONLY** — Query semantic relationships without publishing rendered context. Name-bearing operations use registered CBM/filesystem candidate hydration. Edge/traversal operations retain their exact `(domain, entity_type, name)` fast path, but may omit either classification field: supplied fields filter scoped exact-name resolution, one semantic identity runs automatically, and ambiguity/not-found is explicit rather than guessed or returned as an empty graph. `entities_in_file` instead owns an explicit trusted path: it compiles that file on first touch and accepts optional `fidelity` (`low|medium|high|edit|verbatim`; configured default when omitted). Edit/Verbatim requests normalize to High semantic compilation. WorkspaceIndex reuses a fresh sufficient projection, recompiles stale or lower-fidelity coverage, and atomically replaces old facts even when the new projection is empty. This query-only path creates no session alias, rendered baseline, persistence record, or compression statistics. `has_cycle` is different: it accepts optional/default `kind=dependency`, performs no discovery or compilation, and returns one deterministic closed witness from scoped retained index evidence using only `Injects` and `ImportsModule`. Its coverage is always `indexed_evidence_only`, never a source-completeness claim; identity collisions are disclosed with occurrence files. Existing workspaceRoot/additional-roots/withinPath security remains authoritative. |
+| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `fidelity`, `kind`, `depth`, `workspaceRoot`, `withinPath` | **READ-ONLY** — Query semantic relationships without publishing rendered context. Name-bearing operations use registered CBM/filesystem candidate hydration. Edge/traversal operations retain their exact `(domain, entity_type, name)` fast path, but may omit either classification field: supplied fields filter scoped exact-name resolution, one semantic identity runs automatically, and ambiguity/not-found is explicit rather than guessed or returned as an empty graph. `entities_in_file` instead owns an explicit trusted path: it compiles that file on first touch and accepts optional `fidelity` (`low|medium|high|edit|verbatim`; configured default when omitted). Edit/Verbatim requests normalize to High semantic compilation. WorkspaceIndex reuses a fresh sufficient projection, recompiles stale or lower-fidelity coverage, and atomically replaces old facts even when the new projection is empty. This query-only path creates no session alias, rendered baseline, persistence record, or compression statistics. `has_cycle` is different: it accepts optional/default `kind=dependency`, performs no discovery or compilation, and returns one deterministic closed witness from scoped retained index evidence using only `Injects` and `ImportsModule`. Its coverage is always `indexed_evidence_only`, never a source-completeness claim; identity collisions are disclosed with occurrence files. Existing workspaceRoot/additional-roots/withinPath security remains authoritative. |
 
 The seventh operation, `calls_in_file`, requires `filePath`, `workspaceRoot`,
 `owner: {kind: "class"|"interface", name}`, and `method: {name}`. Optional
@@ -106,7 +108,7 @@ expose canonical IDs, or claim that a written callee is resolved.
 
 | Situation | Preferred Tool | Why | Avoid |
 |-----------|---------------|-----|-------|
-| Understand a code file | `provide_code_context` | Complete current SCHEMA-v5 context with signatures, fields, and flags; heuristics select appropriate fidelity | `read_files` (wasteful — full raw content), `compress_code_context` (no heuristics) |
+| Understand a code file | `provide_code_context` | Complete current SCHEMA-vNext context with signatures, fields, and flags; heuristics select appropriate fidelity | `read_files` (wasteful — full raw content), `compress_code_context` (no heuristics) |
 | Understand a non-code file | `read_files` | `provide_code_context` only supports `.ts`/`.cs`/`.rs`/`.java` | `provide_code_context` (will fail or produce no useful output) |
 | Exact line/byte inspection | `read_files` | Line-range reads, byte-level exactness | `provide_code_context` (IR is structural, not byte-exact at non-verbatim fidelities) |
 | Discover a symbol, file, class, method, or concept | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` | Graph-aware semantic search across CBM-indexed symbols and files | Regex-only `search_codebase` (text search, misses graph relationships) |
@@ -150,10 +152,10 @@ When you explicitly specify `fidelity` instead of `intent`, these are the values
 
 | Fidelity | What the Agent Sees | Method Bodies | Verbatim? |
 |----------|---------------------|:-------------:|:---------:|
-| `low` | SCHEMA-v5 structural presentation of the compiled Low hierarchy | ❌ | ❌ |
-| `medium` | SCHEMA-v5 structural presentation with Medium semantic detail | ❌ | ❌ |
-| `high` | SCHEMA-v5 reasoning presentation with control/data-flow metadata | ❌ | ❌ |
-| `edit` | SCHEMA-v5 structure plus exact bodies for all or the resolved focus | ✅ (all or resolved focus) | ✅ (bodies) |
+| `low` | SCHEMA-vNext structural presentation of the compiled Low hierarchy | ❌ | ❌ |
+| `medium` | SCHEMA-vNext structural presentation with Medium semantic detail | ❌ | ❌ |
+| `high` | SCHEMA-vNext reasoning presentation with control/data-flow metadata | ❌ | ❌ |
+| `edit` | SCHEMA-vNext structure plus exact bodies for all or the resolved focus | ✅ (all or resolved focus) | ✅ (bodies) |
 | `verbatim` | Full raw source, entire document | ✅ | ✅ (all) |
 
 ---
@@ -240,10 +242,11 @@ controls **which** method bodies receive verbatim content at Edit fidelity.
 
 ## 7. CBM/Graph Rules
 
-### Mandatory Entry Point
+### Compact and structured entry points
 
-`cbm_proxy` is the **sole permitted entry point** for all CBM architectural
-intelligence queries. It:
+Use `graph_search` first for typed symbol/file discovery. Use the structured
+wrappers when typed nodes, edges, or modules matter; use `cbm_proxy` when a
+compact rendering of a raw CBM operation is more economical. `cbm_proxy`:
 
 1. Forwards the query to CBM via stdin pipe.
 2. Intercepts the raw ~5000-token structural response at the pipe level.
@@ -448,10 +451,12 @@ Do **not** pass `get_symbol_importance` or `get_dead_code` as `cbm_tool`.
 These are not CBM proxy tool names — they are implemented internally via
 `query_graph` Cypher queries.
 
-### The Only Allowed Direct Call
+### Raw-service bypass boundary
 
-`get_cbm_status` is the **only** CBM tool that may be called directly. Its
-response is a tiny status object that does not benefit from compression.
+Do not bypass Clean-CTX to invoke the underlying CBM server directly.
+`get_cbm_status`, the structured wrappers, and `cbm_proxy` are all registered
+Clean-CTX tools; `get_cbm_status` is the availability probe and its tiny status
+object needs no compression.
 
 ### CBM Unavailable Fallback
 

@@ -1,7 +1,7 @@
 # Query-boundary completeness and redundant-work proposal
 
-**Status:** Phase E1 implemented and locally verified; `has_cycle` bounded
-witness contract implemented; wider audit remains open
+**Status:** Implemented and live-verified except for the optional
+`focusMethods` stdio field scenario; retained as the decision record
 **Recorded:** 2026-09-26
 **Production behavior:** `entities_in_file` now performs fidelity-aware,
 freshness-checked semantic compilation on first touch
@@ -301,8 +301,9 @@ Add focused tracked regressions proving:
 The initial one-call/schema/validation tests and the reuse/cross-publication
 tests were each observed RED, stashed, restored unchanged, and observed GREEN.
 The complete eight-test E1 module is green. Existing WSC-004 scope suites remain
-the authority for path/root/`withinPath` security. Live no-prior-provide use is
-the remaining field gate.
+the authority for path/root/`withinPath` security. The no-prior-provide behavior
+was verified through the tracked live stdio harness under
+`verification/workspace-query/scripts/`.
 
 ### Phase C1 — `has_cycle` — complete locally through dedicated phases 0–4
 
@@ -310,8 +311,8 @@ Option B was approved and implemented under
 `HAS_CYCLE_WITNESS_PROPOSAL.md`. Tracked tests prove relation policy,
 deterministic closed witnesses, provenance, identity-collision disclosure,
 scope isolation, honest empty results, and absence of hydration/compilation
-side effects. The remaining gates are the optional live stdio scenario and the
-final repository audit/verification gate.
+side effects. The live stdio witness scenario is complete; repository-wide
+verification remains CI-owned.
 
 ## 9. Documentation updates required on implementation
 
@@ -495,29 +496,9 @@ disambiguation, partial-filter resolution, explicit not-found behavior, and
 must remain explicit: one source declaration may legitimately project as
 multiple semantic identities across the builtin and framework domains.
 
-Current handlers for `forward_edges`, `reverse_edges`, and
-`transitive_dependencies` require the complete Model-C identity
-`(domain, entity_type, name)` before hydration begins. Missing `domain` or
-`entity_type` already produces a precise `-32602` error. `find_entities`, by
-contrast, can search by name across domains and types. The documented two-call
-flow is therefore real at the code-contract level when only a name is known.
-
-If live usage demonstrates that the two-call pattern is common enough to
-justify a contract expansion, allow `domain` and `entity_type` to be omitted
-together while retaining the exact-identity fast path:
-
-1. perform the existing scoped name discovery/hydration;
-2. collect matching identities within the effective workspace/`withinPath`;
-3. run the requested query automatically for exactly one identity;
-4. return a structured disambiguation error with bounded candidates for more
-   than one identity; and
-5. distinguish no match, incomplete discovery coverage, and a real empty edge
-   or dependency result.
-
-Supplying only one of `domain` or `entity_type` acts as an explicit filter and
-must never be ignored. Resolution must reuse
-`find_entities`/hydration semantics rather than introduce a second discovery
-algorithm, and it must retain the existing scoped occurrence/provenance rules.
+The earlier two-call discovery requirement is superseded by the implemented
+shared identity resolver described above. Supplying one classification field
+remains an exact filter; omitting both resolves only a unique scoped identity.
 
 ## 11. Live-verification gate for the wider audit
 
@@ -526,8 +507,8 @@ repository and the actual MCP stdio path:
 
 | Candidate | Required live comparison | Decision evidence |
 | --- | --- | --- |
-| Duplicate bare-name trace | **Complete:** two canonical Rust functions compared through wrapper and proxy | both bare surfaces silently selected Alpha; both canonical traces were correct |
-| Non-Edit focus | omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
+| Duplicate bare-name trace | **Complete:** pre-fix reproduction plus post-fix wrapper/proxy verification | ambiguity now returns `-32602` with canonical candidates; canonical paths remain direct |
+| Non-Edit focus | **Tracked GREEN; live stdio optional:** omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
 | Name-only workspace query | **Complete:** live stdio comparison of bare, exact, partial, ambiguous, missing, repeated-occurrence, and narrowed requests | unique result equality, explicit candidates, and scoped occurrence isolation verified |
 
 The live record must distinguish a tool error, explicit incomplete coverage,

@@ -3,7 +3,7 @@
 > **Owner:** .NET/C# Meta-Layer design (R-35  R-41/R-42) · **Status:** Living per-layer reference (shipped)
 >
 > **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core  EF Core  SignalR  AutoMapper  and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
-> **Ship status:** see `docs/ROADMAP.md`. **Test counts / audit rounds:** see `docs/CHANGELOG.md`. This document does not duplicate them.
+> **Ship status:** see `docs/ROADMAP.md`. **Release record:** see `docs/changelogs/CHANGELOG.md`. This document does not duplicate volatile test counts.
 > **Note (v0.6.0):** The .NET graph infrastructure (`DotnetGraph`, `graph_state.rs`) was **replaced** by `extract_semantic_edges()` and `WorkspaceIndex`. Semantic edges now flow through `InferenceLayer.semantic_edges` alongside existing Phi markers.
 
 ---
@@ -31,11 +31,14 @@
 | `α / β / γ` | Path aliases — file references | `α7` = `/path/to/file.cs` |
 | `Φ` (new) | Framework-annotation markers | `Φctrl:`  `Φef:`  `Φhub:`  `Φmap:`  `Φsvc:`  `Φdi:` |
 
-> **Notation scope:** `$xx` opcodes and `⊕` markers are emitted by the LEGACY text compressor (`compress_workspace` manifests; `⊕` at Medium/High, `§` micro-codes at Low) and decoded by `decompress_code_context`. Interactive responses use SCHEMA v2 notation instead. The `Φ` framework vocabulary remains current.
+> **Historical notation scope:** `$xx`, `⊕`, and the decompressor references
+> below describe the retired legacy text path. Current interactive responses
+> render canonical IR as SCHEMA-vNext. .NET semantic relationships are typed
+> edges owned by `WorkspaceIndex` and queried through `workspace_query`.
 
 ---
 
-## Proposed .NET Φ Markers
+## Shipped .NET Φ markers
 
 ### ASP.NET Core
 
@@ -228,7 +231,8 @@ You will know Phase 1 is complete when **all** of the following are true:
 - `cargo clippy --all-targets -- -D warnings` is clean.
 
 **Round-trip**
-- `decompress_code_context` expands `Φctrl:` → `[Controller]`  `Φhub:` → `[Hub]`  etc.
+- Historical legacy decompression expanded `Φctrl:` to `[Controller]`,
+  `Φhub:` to `[Hub]`, and related markers. That public tool is retired.
 - The expanded output is human-readable and preserves all original class names.
 
 **Tests**

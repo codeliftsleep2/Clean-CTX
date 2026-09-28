@@ -276,7 +276,7 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub heuristics: HeuristicsConfig,
 
-    /// Persistence configuration (placeholder for future SQLite layer).
+    /// SQLite-backed persistence configuration.
     #[serde(default)]
     pub persistence: PersistenceConfig,
 

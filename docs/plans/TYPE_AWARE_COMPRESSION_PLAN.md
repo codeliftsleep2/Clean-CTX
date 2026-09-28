@@ -1,6 +1,8 @@
 # R-02 — Type-Aware Compression Plan
 
-**Status:** 📋 Proposed → 🚧 In-progress (approved 2026-08-04)
+**Status:** Implemented historical design record. Current configuration and
+behavior are documented in [`docs/CONFIGURATION.md`](../CONFIGURATION.md) and
+protected by the production type-alias paths; estimates below are historical.
 **Target release:** v0.3.0
 **Effort:** 2-3 days
 **Priority:** 🔴 High

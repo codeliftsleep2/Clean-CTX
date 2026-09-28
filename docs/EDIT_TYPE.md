@@ -1,6 +1,7 @@
 # Clean-CTX — 50-Edit Simulation: Per-Edit Breakdown by Fidelity
 
-> **Owner:** 50-edit simulation per-edit data appendix · **Status:** Living reference
+> **Owner:** Historical 50-edit simulation appendix · **Status:** Superseded
+> measurement retained for comparison; not a current SCHEMA-vNext benchmark
 > **Cross-fidelity summary table:** owned by `docs/PERFORMANCE.md` (this document provides the **per-edit** detail only — the summary is not duplicated here).
 
 This document provides the complete per-edit breakdown of the 50-edit simulation on `UserManagementService.ts` (~440 lines) across **all three fidelity levels**. The aggregate cross-fidelity summary lives in `docs/PERFORMANCE.md`.

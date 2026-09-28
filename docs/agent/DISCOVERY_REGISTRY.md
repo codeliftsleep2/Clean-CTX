@@ -5,7 +5,7 @@
 resolution, so field findings become institutional engineering knowledge rather
 than disappearing into a development conversation.
 
-This is NOT a changelog (see `docs/CHANGELOG.md`) and NOT release accounting
+This is NOT a changelog (see `docs/changelogs/CHANGELOG.md`) and NOT release accounting
 (see `docs/agent/releases.md`). It exists to close the two-environment gap:
 
 ```text

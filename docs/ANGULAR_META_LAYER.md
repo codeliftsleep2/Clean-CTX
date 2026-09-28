@@ -2,7 +2,7 @@
 
 > **Owner:** Angular Meta-Layer design (Phases 1–4) · **Status:** Living per-layer reference (shipped)
 >
-> **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
+> **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Release record:** see `docs/changelogs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.
 >
 > **Note (v0.6.0):** The Angular cross-file dependency graph infrastructure (`AngularGraph`, `GraphCollector`, `graph_state.rs`) was **replaced** by `extract_semantic_edges()` and `WorkspaceIndex`. The Phase 3 documentation below describes the original implementation, which has been migrated. Semantic edges now carry structured relationships through `InferenceLayer.semantic_edges` alongside the existing Phi text markers.
 >
@@ -31,7 +31,11 @@
 | `α / β / γ`    | Path aliases — file references             | `α7` = `/path/to/file.ts`                          |
 | `Φ` (new)      | Framework-annotation markers               | `Φcmp:`  `Φsvc:`  `Φin:`  `Φout:`  `ΦBUNDLE`     |
 
-> **Notation scope:** `$xx` opcodes and `⊕` markers are emitted by the LEGACY text compressor (`compress_workspace` manifests; `⊕` at Medium/High, `§` micro-codes at Low) and decoded by `decompress_code_context`. Interactive responses use SCHEMA v2 notation instead. The `Φ` framework vocabulary remains current.
+> **Historical notation scope:** `$xx`, `⊕`, and the decompressor references
+> below describe the retired legacy text path. Current interactive responses
+> render canonical IR as SCHEMA-vNext. Angular semantic relationships are
+> produced as typed edges and consumed through `WorkspaceIndex`/
+> `workspace_query`; the marker tables remain extraction vocabulary history.
 
 ---
 
@@ -85,7 +89,8 @@ You will know Phase 1 is complete when **all** of the following are true:
 - `compress_code_context` on a non-Angular file produces byte-identical output to v0.2.0.
 
 **Round-trip**
-- `decompress_code_context` on a compressed Angular file expands `Φcmp:` → `@Component`  `Φsvc:` → `@Injectable`  etc.
+- Historical legacy decompression expanded `Φcmp:` to `@Component`, `Φsvc:`
+  to `@Injectable`, and related markers. That public tool is retired.
 - The expanded output is human-readable and preserves all original class names.
 
 **LLM discoverability**

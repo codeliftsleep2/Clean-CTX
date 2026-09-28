@@ -1,9 +1,11 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.6.0 · **Last updated:** 2026-08-31
+> **Version:** 0.8.0-rc · **Last updated:** 2026-09-27
 >
-> **Test count:** see `docs/CHANGELOG.md` for the current workspace test count.
+> **Positioning:** This is the extension guide. Current architecture is owned
+> by `ARCHITECTURE_OVERVIEW.md` and `ARCHITECTURAL_INVARIANTS.md`; the exact
+> verification gate is owned only by `agent/verification.md`.
 
 ---
 
@@ -38,8 +40,8 @@ cd Clean-CTX
 # Enable the automatic UTF-8 pre-commit guard (idempotent; run once per clone)
 pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
 
-# Build (debug) with all default features
-cargo build
+# Development build with every supported layer
+cargo build --all-features
 
 # Build (release) with default features
 cargo build --release
@@ -79,14 +81,19 @@ The binary uses Cargo feature flags to select which languages and meta-layers to
 
 ## Project Overview
 
-Clean-CTX is an MCP (Model Context Protocol) server that compresses TypeScript and C# source code into a token-efficient notation for LLM consumption. It runs as a single statically-linked binary, communicating over stdin/stdout via JSON-RPC 2.0.
+Clean-CTX is an MCP (Model Context Protocol) context compiler for TypeScript,
+C#, Rust, and Java, with Angular, .NET, and Spring Boot semantic layers. It
+compiles source into canonical IR, publishes compact SCHEMA-vNext file context,
+and maintains a provenance-bearing workspace semantic index. The primary server
+communicates over stdin/stdout via JSON-RPC 2.0.
 
 The core workflow is:
 1. **Parse** source code with tree-sitter into an AST
 2. **Extract** structural nodes (classes, methods, fields, imports, control flow)
-3. **Filter** by fidelity level (Low/Medium/High)
-4. **Encode** repeated tokens as short opcodes (`$c` = `class`, `$s` = `string`, etc.)
-5. **Report** token savings using the cl100k BPE estimator
+3. **Enrich** canonical IR through language and framework semantic passes
+4. **Project** task-appropriate SCHEMA-vNext context by fidelity
+5. **Index** cross-file semantic entities and provenance-bearing relationships
+6. **Measure** economics with the configured tokenizer
 
 The **recommended model-facing entry point** is `provide_code_context` — a single tool that handles compression, Angular detection, and fidelity selection while always returning complete current context. Structured delta generation and acknowledgement are explicit through `delta_code_context` and `apply_delta`.
 
@@ -98,33 +105,34 @@ The system architecture is documented in detail in [`docs/ARCHITECTURE_OVERVIEW.
 
 - **MCP stdio Interface** — JSON-RPC 2.0 request/response loop over stdin/stdout
 - **Heuristics Engine** — selects fidelity and classification per file based on intent, size, language, and Angular detection
-- **Compressor Engine** — AST extraction → fidelity filter → opcode encoding → text delta snapshots
+- **Context compiler** — AST extraction → canonical IR → checked hierarchy → SCHEMA-vNext or explicit economic raw fallback
 - **IR Subsystem** — structured intermediate representation with delta-based state transport (see [Compiler IR Subsystem](#compiler-ir-subsystem))
-- **Decompressor** — opcode → readable expansion (precomputed sorted opcodes for O(L×N) performance)
 - **Meta-Layer** — framework/dialect-specific annotation layers that enrich compressed output (see [Meta-Layer Architecture](#meta-layer-architecture))
-- **Persistence Layer** — built-in SQLite cross-session storage for baselines and deltas, with three-tier reliability (batched writes, exponential backoff retry, JSON file fallback) — see [Persistence Layer](#persistence-layer)
+- **Persistence Layer** — built-in SQLite cross-session storage for canonical
+  snapshots, checked deltas, semantic edges, and edit intents — see
+  [Persistence Layer](#persistence-layer)
 
-For the full system diagram, module dependency graph, and design decisions (tree-sitter, no network, HashMap over BTreeMap), see [`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md).
+For the full system diagram, module dependency graph, and design decisions, see
+[`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md). The core MCP
+transport is stdio; optional CBM and proxy integrations have their own process
+and network boundaries.
 
 ---
 
 ## Building & Testing
 
 ```bash
-# Debug build (fast iteration)
-cargo build
+# Debug build (all development features)
+cargo build --all-features
 
 # Release build (optimized, stripped)
 cargo build --release
 
-# Run the full test suite
-cargo test
-
-# Run a specific test
-cargo test fidelity_is_hashable
+# Run a focused test during development
+cargo test --all-features fidelity_is_hashable
 
 # Run clippy (must pass with -D warnings)
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 
 # Check for outdated dependencies
 cargo outdated
@@ -133,7 +141,10 @@ cargo outdated
 cargo audit
 ```
 
-The CI pipeline (see `.github/workflows/ci.yml`) runs `cargo check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, and `cargo audit` on every push to `main`/`master` and every PR.
+The complete, current command list lives only in
+[`docs/agent/verification.md`](agent/verification.md). CI remains the
+authoritative release-time enforcement; do not copy a second gate into this
+guide.
 
 ---
 
@@ -150,11 +161,9 @@ src/
 │   ├── router.rs           # Method dispatch
 │   ├── handlers.rs         # Lifecycle + discovery handlers
 │   ├── tools.rs            # Tool definitions + get_tool_definitions()
-│   ├── tool_handlers.rs    # Tool handler implementations (handle_*)
+│   ├── tool_handlers/      # Core, query, edit, persistence, and stats handlers
 │   ├── tool_helpers.rs     # Shared helper functions for tool handlers
 │   ├── prompts.rs          # System prompts (cleanctx-notation + dashboard)
-│   ├── workspace.rs        # Workspace compression
-│   ├── workspace_util.rs   # Workspace utility functions
 │   ├── state.rs            # McpState (shared session state + persistence)
 │   ├── heuristics.rs       # Heuristics engine (fidelity + strategy selection)
 │   ├── context_store.rs    # ContextStore trait + InMemoryContextStore
@@ -210,22 +219,30 @@ src/
 │   ├── semantic.rs         # SemanticEdge extraction (Angular/NgRx/RxJS/Signals/Routing)
 ├── diff/                   # AST-level diff engine
 ├── compaction/             # AST node compaction
-├── decompression/          # Opcode → readable output
 ├── dictionary/             # Path + symbol registries
-├── cache.rs                # Content hash + baseline cache
 ├── config.rs               # .clean-ctx.json config
-├── queries.rs              # Tree-sitter query patterns
-├── analytics.rs            # Token counting (cl100k BPE)
+├── workspace/              # Semantic index, identity, provenance, traversal
+├── layers/                 # Language-layer registry and implementations
+├── angular_meta/           # Angular/RxJS/NgRx/signals/routing semantics
+├── dotnet_meta/            # ASP.NET/EF/SignalR/etc. semantics
+├── spring_meta/            # Spring Boot semantics
 └── protocol.rs             # JSON-RPC types
 ```
+
+This is an ownership map, not a complete file manifest. The source tree and
+`docs/ARCHITECTURE_OVERVIEW.md` are authoritative when modules move.
 
 **Key design principles:**
 - **Single Responsibility Principle** — each module owns one concern
 - **No unsafe code** — the entire codebase is safe Rust
-- **No network dependencies** — stdio-only MCP transport
-- **HashMap over BTreeMap** — no caller iterates in sorted order; HashMap is faster
-- **Meta-Layer is purely additive** — non-Angular files produce byte-identical output with zero overhead
-- **Non-fatal persistence** — DB writes are fire-and-forget; compression never fails due to DB issues
+- **Explicit transport boundaries** — the primary MCP server is stdio; the
+  optional HTTP proxy and CBM subprocess have separate lifecycle/security rules
+- **Canonical-first state** — presentation, persistence, and workspace graph
+  views derive from typed IR and semantic evidence rather than stored prose
+- **Framework layers are evidence-producing passes** — they may enrich IR and
+  `WorkspaceIndex` only when their applicability and source evidence hold
+- **Durable mutations are transactional** — accepted edits, deltas, and
+  deletions fail rather than publishing live state that durable state rejected
 
 ---
 
@@ -243,7 +260,7 @@ The zero-touch workflow is the **recommended model-facing entry point** for file
    - Project config overrides
 
 2. **Complete Provider**:
-   - Runs IR compilation and selects complete SCHEMA-v5 or raw-source content
+   - Runs IR compilation and selects complete SCHEMA-vNext or raw-source content
    - Publishes the canonical session baseline and applies persistence policy
    - Never substitutes a code-side delta acknowledgement for model context
 
@@ -267,15 +284,28 @@ provider from the mere existence of a server baseline.
 
 ## Persistence Layer
 
-The persistence layer provides **cross-session persistence** for compression contexts via SQLite. It is **enabled by default** (stored in `.clean-ctx/persistence.db` relative to the project root) and can be disabled in `.clean-ctx.json` with `"persistence": { "enabled": false }`.
+The persistence layer provides **cross-session canonical state** via SQLite. It
+is enabled by default (stored in `.clean-ctx/persistence.db` relative to the
+project root) and can be disabled in `.clean-ctx.json` with
+`"persistence": { "enabled": false }`.
+
+Durable authority is not stored presentation text. A checkpoint aligns
+physical binary `0x04` IR, source hash, version, fidelity, and the semantic-edge
+snapshot. Checked `dv:2` history replays from that baseline; SCHEMA-vNext is
+regenerated after restore. Stored `pretty_text` is compatibility/diagnostic
+data and is never canonical restore authority.
 
 ### Architecture
 
 ```
-ContextStore trait (src/mcp/context_store.rs)
-    ├── InMemoryContextStore  (session-scoped, in RAM)
-    ├── SqliteStore           (cross-session, SQLite on disk)
-    └── BufferedStore         (three-tier reliability wrapper)
+ContextStore boundary (src/mcp/context_store.rs)
+    ├── InMemoryContextStore  session compatibility state
+    └── BufferedStore
+          └── SqliteStore     durable canonical + semantic state
+
+Accepted mutation lifecycle
+    preflight → edit intent → source write → durable semantic commit
+              → live IR/index publication → intent cleanup
 ```
 
 The `BufferedStore` wraps `SqliteStore` with a **three-tier reliability stack**:
@@ -313,20 +343,29 @@ The `SqliteStore` implementation (`src/mcp/sqlite_store.rs`) provides:
 - **`rebuild_stats()`** — reconstruct SessionStats from persisted data
 - **`purge_old_deltas(days)`** — trim old history
 
-### Schema (v1)
+### Schema (current migration level: v5)
 
 - **`contexts`** — baselines (content-hash PK, IR BLOB, fidelity, pretty text)
 - **`deltas`** — sequential delta payloads (FK → contexts, auto-increment edit_sequence)
 - **`symbols`** — symbol table entries (FK → contexts, phi markers)
 - **`sessions`** — workspace session tracking
+- **semantic state / edit recovery records** — aligned edge snapshots and
+  staged mutation recovery authority
 - **`_schema_version`** — migration version tracking
 
 ### Persistence Hooks
 
 Persistence hooks fire automatically in:
-- `provide_code_context` → complete baseline publication
-- `delta_code_context` / `apply_delta` → explicit delta lifecycle
-- `restore_context` → checked durable restoration
+- `provide_code_context` / `compress_code_context` → checkpoint according to
+  `persistence.auto_save`; Edit authority remains durable even when automatic
+  read checkpoints are disabled
+- `save_context` → explicit durable checkpoint
+- `delta_code_context` → pending transition only; no acknowledged state change
+- `apply_delta` → transactional durable delta plus semantic snapshot before
+  live publication
+- `apply_edit` → staged edit intent plus transactional source/semantic update
+- `delete_context` → transactional durable and live semantic deletion
+- `restore_context` / `replay_history` → checked durable decode and replay
 
 ### Adding a New ContextStore Implementation
 
@@ -342,12 +381,16 @@ To add a new storage backend:
 
 ## Compiler IR Subsystem
 
-The Compiler IR subsystem transforms source code into a structured intermediate representation (IR) for efficient delta-based state transport. It is documented in full in [`docs/COMPILER_IR.md`](COMPILER_IR.md). Key capabilities:
+The Compiler IR subsystem transforms source code into the canonical structured
+state used by presentation, persistence, semantic extraction, and explicit
+delta transport. It is documented in full in
+[`docs/COMPILER_IR.md`](COMPILER_IR.md). Key capabilities:
 
 - **Compilation** — `IRCompiler` transforms source → `CompiledIR` (a sequence of structured instructions with CoreOp opcodes)
 - **Wire formats** — `ir_to_wire` serializes CompiledIR into compact tuple format; `binary_wire::encode/decode` provides a binary BLOB format for persistence
 - **String tables** — reduces repeated identifiers to compact index references
-- **Delta transport** — `DeltaComputer` computes instruction-level deltas between two IR states; deltas are represented as `IRDelta` envelopes with `+`/`-`/`~` operations
+- **Delta transport** — `DeltaComputer` computes occurrence-aware `dv:2`
+  sequence deltas between acknowledged IR states
 - **State replay** — `ContextState` maintains a baseline and applies deltas incrementally without re-compilation
 - **Language-specific compilation layers** — `src/ir/layers/` contains per-language compilation rules
 
@@ -762,14 +805,15 @@ Tests follow these conventions:
 - **Error paths** — invalid inputs produce appropriate errors (not panics)
 - **Round-trips** — compress → decompress produces the original structure
 
-### Running tests
+### Running focused tests
 ```bash
-cargo test                          # All tests
-cargo test fidelity                 # Tests matching "fidelity"
-cargo test -- --ignored             # Integration tests (tagged with #[ignore])
-cargo test cbm::tests               # Full CBM suite incl. live probes
-cargo test --workspace --all-targets --all-features   # Full verification gate
+cargo test --all-features fidelity  # Tests matching "fidelity"
+cargo test --all-features <module_or_test_name> -- --nocapture
 ```
+
+Use focused all-feature tests for local iteration. Repository-wide test and
+Clippy execution is CI-owned for this project; the authoritative gate and
+operator boundary are defined in `docs/agent/verification.md`.
 
 ### Live-CBM semantic tests
 
@@ -902,21 +946,11 @@ For a verbose metrics dump (JSON format), use the `MetricsSnapshot` which implem
 
 ## Code Quality Gates
 
-Every pull request must pass these checks:
-
-1. **`cargo check`** — compiles without errors
-2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test --workspace --all-targets --all-features`** — all 2,522 workspace tests pass (2,182 core library)
-4. **`cargo audit`** — no known security vulnerabilities
-5. **No new `#![allow(...)]`** annotations without a `// SAFETY:` or `// Phase N:` comment
-6. **No new `.unwrap()` calls** without a `// SAFETY:` comment explaining why it cannot fail
-7. **`let _ = ...`** dead-code suppression is not accepted — remove the unused variable
-
-### Pre-commit checklist
-
-```bash
-cargo check && cargo clippy --all-targets -- -D warnings && cargo test && cargo audit --ignore RUSTSEC-2025-0009
-```
+The single authoritative gate is
+[`docs/agent/verification.md`](agent/verification.md). Local development uses
+targeted all-feature commands; CI owns repository-wide test, Clippy, audit,
+formatting, file-size, tree-sitter ABI, and encoding enforcement. Do not copy
+volatile test counts or a second command list into this guide.
 
 > **Encoding guard is automatic in CI and locally.** `scripts/check-utf8.ps1`
 > runs in CI on every push/PR. Locally, enable the versioned pre-commit hook once

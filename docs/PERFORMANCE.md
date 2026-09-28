@@ -1,7 +1,16 @@
 # Clean-CTX — Performance Guide
 
-> **Owner:** Compression/benchmark data (**50-edit simulation summary is the canonical cross-fidelity table; per-edit detail lives in `docs/EDIT_TYPE.md`**) · **Status:** Living reference
-> **Last updated:** 2026-06-12
+> **Owner:** Historical compression/benchmark evidence
+> **Status:** Superseded baseline — retained for renderer and delta history;
+> do not use the figures below as current SCHEMA-vNext claims
+> **Measured:** 2026-06-12
+>
+> Current SCHEMA-vNext measurements, tokenizer comparisons, anatomy records,
+> and reasoning gates live under
+> `verification/context-compression/schema-v5/` and are interpreted by
+> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md`. Re-run those artifacts after
+> presentation-affecting RED/GREEN changes instead of editing historical
+> numbers here.
 
 ---
 

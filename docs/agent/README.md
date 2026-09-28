@@ -20,6 +20,10 @@ are tracked and versioned.
 `docs/ARCHITECTURAL_INVARIANTS.md` remains authoritative for durable
 architectural facts and is NOT duplicated here.
 
+The repository-wide documentation taxonomy and current entry points live in
+[`docs/README.md`](../README.md). This directory contains agent procedures, not
+the product architecture overview.
+
 ## Why this separation exists
 
 - Always-loaded context is paid for on every task, so it must stay small and

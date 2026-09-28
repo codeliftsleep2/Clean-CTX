@@ -1,7 +1,9 @@
 # IR Production Integration Audit — Continuation 2
 
-**Status:** Phase 9 in progress. Continues
-[`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md).
+**Status:** Historical Phase 9 audit volume 3. Continues
+[`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md);
+the completed result is certified in
+[`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md).
 
 ## 38. Finding P9-25: file-scoped lifecycle operations globally flush storage
 

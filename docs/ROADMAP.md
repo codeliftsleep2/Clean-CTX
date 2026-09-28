@@ -1,6 +1,13 @@
 # Clean-CTX — Future Roadmap
 
-**Last updated:** 2026-09-21 (`0.8.0-rc`: IR architecture lockdown and production lifecycle certification complete; final `0.8.0` awaits live field testing)
+**Last reviewed:** 2026-09-27
+**Current release line:** `0.8.0-rc`
+
+> **Positioning:** This file is a directional and historical release ledger,
+> not production architecture authority. Current behavior is defined by code,
+> `ARCHITECTURAL_INVARIANTS.md`, and the living subsystem references. Older
+> target-release headings below are retained as history and must not be read as
+> the current release plan.
 
 > **Living document.** Items are reviewed and pruned every release. Status legend: 📋 proposed · 🚧 in-progress · ✅ done · ⏸️ deferred
 
@@ -11,17 +18,20 @@
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
 | **Release candidate** | v0.8.0-rc | Typed IR, exact persistence, lifecycle safety | ✅ Phase 9 certified; live field gate pending |
-| **Now** | v0.3.0 | Advanced capabilities | ✅ 0 (all complete) |
-| **Next** | v0.5.0 | Advanced capabilities | 6 |
-| **Later** | v1.0.0+ | Ecosystem & integrations | 6 |
-| **Architectural** | Continuous | Code health & tooling | 3 (A-01, A-03, A-05) |
-| **Community** | Continuous | Docs & marketing | 5 |
+| **Field gate** | v0.8.0 | Real-workspace validation of the certified release candidate | Pending |
+| **Future** | Unscheduled | Demand-driven items retained below | Proposed/deferred |
 
 ---
 
 ## Completed (v0.1.x – v0.4.0) — shipped ✅
 
-These items are complete and documented. Listed for historical context.
+Canonical release history lives in
+[`docs/changelogs/CHANGELOG.md`](changelogs/CHANGELOG.md). The older detailed
+roadmap ledger is retained below only for historical traceability and is
+collapsed so it does not obscure the active release horizon.
+
+<details>
+<summary>Expand the historical completed-item ledger</summary>
 
 | ID | Title | Shipped in | Notes |
 |----|-------|-----------|-------|
@@ -46,7 +56,7 @@ These items are complete and documented. Listed for historical context.
 | **R-35 (P2)** | CBM Phase 2 — Intelligence Layer seeding | v0.1.9 | Fixed CBM client API mismatches (`search_graph`/`trace_path` param names, replaced non-existent `get_symbol_importance`/`get_dead_code` with Cypher queries). Intelligence Layer (pagerank.rs, fidelity.rs) now correctly blends CBM cross-file `in_degree` scores (60% IR + 40% CBM) for adaptive per-symbol fidelity. `enrich_with_cbm` in tool_handlers injects compressed CBM metadata into responses. |
 | **Compiler-IR Audit** | Compiler-IR audit + clippy cleanup | v0.1.8 | Verified all 8 phases (A–H). Resolved 29 clippy warnings across entire build. Rewrote COMPILER_IR.md from spec to implementation docs. All 1,277 tests pass with 0 clippy warnings. |
 | **CBM Graph-Intel Audit** | Graph-intelligence live audit fixes | v0.4.0 | 4 findings resolved via fresh-process/fresh-index live probes: HIGH blast-radius Cypher fail-open (`m.name` -> `f.name`), MED silent tool-failure conflation (`CbmError::ToolError` + `Result` propagation: `Ok(empty)` = zero results, `Err` = CBM failure), MED dead code now covers Function + Method labels, MED dead DATAFLOW path removed (no such edge type in CBM 0.8.1). New 9-probe audit suite `src/tests/cbm/graph_intel.rs`. See `docs/ARCHITECTURE_OVERVIEW.md` (CBM Compatibility & Verified Limitations). |
-| **CBM Trace-Wire Audit** | Typed graph_trace wire-contract fixes | v0.4.0 | 2 defects + boundary normalization resolved via verbatim raw-capture fixtures and fresh-process live probes over a synthetic fixture repo: HIGH typed `graph_trace` parsed a phantom `inner["edges"]` key — CBM 0.8.1 answers with directional `callers`/`callees` arrays keyed by `name`/`qualified_name`/`hop`, so every typed trace silently collapsed to zero edges while the raw proxy path worked; DIRECTION determination hardcoded outbound whenever both endpoints were supplied, making inbound-only relationships undiscoverable (outbound-first behavior preserved byte-for-byte; single inbound fallback fires only on success-but-filtered-empty); BOUNDARY normalization — M-01 target predicate matches exact-qualified OR final-dot-segment against canonical endpoints, so a bare-to name retains edges whose wire endpoints are qualified. hop>1 entries are flat BFS discoveries without parent linkage and never convert into invented edges. New trace_wire.rs suite: 16 tests (verbatim capture pins + synthetic policy pins + 4 fresh-process `serial(cbm_live)` probes); workspace at cycle close: 2,497 passed / 0 failed / 5 ignored. Normative invariant `CBM-WIRE-001` in `docs/ARCHITECTURAL_INVARIANTS.md`. See `docs/CHANGELOG.md` and commit `193f885`. |
+| **CBM Trace-Wire Audit** | Typed graph_trace wire-contract fixes | v0.4.0 | 2 defects + boundary normalization resolved via verbatim raw-capture fixtures and fresh-process live probes over a synthetic fixture repo: HIGH typed `graph_trace` parsed a phantom `inner["edges"]` key — CBM 0.8.1 answers with directional `callers`/`callees` arrays keyed by `name`/`qualified_name`/`hop`, so every typed trace silently collapsed to zero edges while the raw proxy path worked; DIRECTION determination hardcoded outbound whenever both endpoints were supplied, making inbound-only relationships undiscoverable (outbound-first behavior preserved byte-for-byte; single inbound fallback fires only on success-but-filtered-empty); BOUNDARY normalization — M-01 target predicate matches exact-qualified OR final-dot-segment against canonical endpoints, so a bare-to name retains edges whose wire endpoints are qualified. hop>1 entries are flat BFS discoveries without parent linkage and never convert into invented edges. Normative invariant `CBM-WIRE-001` lives in `docs/ARCHITECTURAL_INVARIANTS.md`; see `docs/changelogs/CHANGELOG.md` and commit `193f885`. |
 | **A-09** | Multi-threaded MCP server dispatch | v0.2.0-rc1 | ✅ Production-grade `Dispatcher` with `crossbeam_channel` bounded queue + backpressure, `RwLock`-protected state for parallel reads, `catch_unwind` panic recovery, dedicated stdout writer thread, request tracing/observability, configurable worker count (auto-detect CPU count). Includes 6+ unit tests covering spawn lifecycle, concurrent mutations, panic recovery, and tracing. **Formerly P0 Critical — #1 adoption blocker.** See `src/mcp/dispatcher.rs`. |
 | **A-10** | Proxy hardening: auth + rate limiting | v0.2.0-rc1 | ✅ Optional `X-Api-Key` header authentication via `PROXY_API_KEY` env var. Per-client-IP token bucket rate limiter (configurable `RATE_LIMIT_RPS`/`RATE_LIMIT_BURST`, default 60/10). Returns `401 Unauthorized` for bad/missing keys, `429 Too Many Requests` when rate limited. Rate limiter uses GC-enabled sliding window to prevent unbounded map growth. Stats endpoint exposes rate limiter status. Nginx sidecar pattern documented in `docs/PROXY.md`. 141 proxy tests passing (6 new rate limiter tests + 5 new server tests). |
 | **A-12** | Tree-sitter version migration | v0.2.0-rc1 | ✅ Migrated from `=0.20.x` pinned versions to `^0.26.x` semver ranges. All 6 tree-sitter crates updated (`tree-sitter` 0.26.10, `c-sharp` 0.23.5, `typescript` 0.23.2, `html` 0.23.2, `rust` 0.24.2, `java` 0.23.5). Parser API migrated (LanguageFn → Language, `&Language` borrows, `StreamingIterator` for QueryMatches). CI guard (`scripts/check-tree-sitter-versions.ps1`) ensures all grammars share the same `tree-sitter-language` ABI. **Unblocks F-20 (Parser is now `Send`).** |
@@ -64,7 +74,7 @@ These items are complete and documented. Listed for historical context.
 | **F-21** | Deterministic alias assignment | v0.2.0 | ✅ Pre-assigns α1, α2…αN aliases sequentially before the parallel Rayon loop. Once assigned, `get_or_create_alias` is a read-only HashMap lookup safe for concurrent access. |
 | **F-22** | Workspace compression result caching | v0.2.0 | ✅ Caches the complete `WorkspaceResult` keyed by a content hash of file paths + mtimes/sizes. Subsequent calls with no file changes return the cached result instantly. Saves 5-15s per redundant call for a 100-file workspace. |
 | **R-43a** | IR Evolution — Execution Semantics (Phase 1) | v0.3.0 | ✅ 4 new `CoreOp` variants (DataFlow, ControlFlow, SideEffect, ExecutionContext) for behavioral reasoning. Full wire-format support (named/positional/binary/hierarchical/string_table/compact). `SemanticIntent` delta metadata with detection in `DeltaComputer::compute()` (rename/add/remove method, change return type/signature, add injection). Compact delta intent preservation. Rust/C#/TypeScript language-layer behavioral extraction. `IRValidator` behavioral consistency checks. See `docs/COMPILER_IR.md`. |
-| **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | v0.3.0 | ✅ `ProgramGraph` (local graph), `InferenceLayer` (confidence-scored ephemeral overlay), `PassPipeline` (composable `IRPass` chain), `IRValidator` (structural + behavioral invariants), `IRQueryEngine` (queryable IR). All wired into `src/ir/mod.rs`. See `docs/COMPILER_IR.md`. **Phase 3 CBM enrichment ✅:** `InferenceLayer::enrich_from_cbm()` consumes cross-file CALLS edges + importance/dead-code annotations (confidence 0.75); `GraphBridge::get_call_edges()` added; `InferenceLayerPass::with_cbm()` wires enrichment into the pipeline. Dataflow enrichment is unavailable - CBM 0.8.1 exposes no DATAFLOW edge type (the originally added `get_dataflow_edges()` was removed in the 2026-08-24 graph-intelligence audit). See `docs/CHANGELOG.md` [0.3.0]. |
+| **R-43b** | IR Evolution — Program Graph + Inference Layer + Semantic Delta + Validation + Query (Phases 2-6) | v0.3.0 | ✅ `ProgramGraph` (local graph), `InferenceLayer` (confidence-scored ephemeral overlay), `PassPipeline` (composable `IRPass` chain), `IRValidator` (structural + behavioral invariants), `IRQueryEngine` (queryable IR). All wired into `src/ir/mod.rs`. See `docs/COMPILER_IR.md`. **Phase 3 CBM enrichment ✅:** `InferenceLayer::enrich_from_cbm()` consumes cross-file CALLS edges + importance/dead-code annotations (confidence 0.75); `GraphBridge::get_call_edges()` added; `InferenceLayerPass::with_cbm()` wires enrichment into the pipeline. Dataflow enrichment is unavailable - CBM 0.8.1 exposes no DATAFLOW edge type (the originally added `get_dataflow_edges()` was removed in the 2026-08-24 graph-intelligence audit). See `docs/changelogs/CHANGELOG.md` [0.3.0]. |
 | **R-44** | Angular HTML Template Compression | v0.3.0 | ✅ Fidelity-gated template compression for Angular `.component.html` files. New `template_compress.rs` module with `compress_template()` / `compress_template_with_prime_ng()`. `TemplateShape::to_marker_lines(fidelity)` produces Low (single-line), Medium (multi-line structural), High (near-full) output. `PhiLineKind` extended with `TemplateBinding`/`TemplateDirective`/`TemplateComponent`. GitDiff routes `.component.html` through the compressor (AST-level change-sets). Heuristics classify `.component.html` as Implementation/Medium, upgrade to High on `intent="edit"`. `provide_code_context` routes `.component.html` through the compressor with DB persistence. PrimeNG `Φp-<name>:` markers. Post-implementation FAANG audit fixed a word-boundary bug (`@if`/`@for` in string literals) and a persistence gap. |
 | **R-45** | `apply_edit` Write Path | v0.4.0 | ✅ Shipped 2026-08-25. Clean-CTX-native single-unit editing: replace_body/delete (byte-exact `expectedOldText` verification) + insert_after/insert_before, verified at unit granularity instead of the host's whole-file raw-read precondition. Span-tracked `CoreOp::Body(method_id, text, start, end)` with dual-shape wire compat (legacy 3-tuple decodes span-less; spanned 5-tuples; binary wire v0x03 with flag+varint offsets; hierarchical `bs`/`be`). Pure `src/edit/` core: fingerprint-keyed unit relocation (qualified name + class + ordered param types, bare-name only when unique), deterministic instruction-order unit tables, splice engine, non-bypassable tree-sitter syntax gate before disk. Handler requires prior tracked state, refreshes the canonical session baseline, and returns a minimal hash/span response with opt-in `verify` echo plus structured bounded mismatch payloads. A subsequent `provide_code_context` returns complete current context; code-side transitions are explicitly requested through `delta_code_context`. Adversarial coverage: same-unit double-edit rejected, different-units independent. Guidance shipped with capability (RULE 1b + SYSTEM_PROMPT). Post-ship regression fix: body units are BRACE-DELIMITED — the original line-start backup embedded Allman-style leading indentation in tracked bodies, permanently rejecting natural `{`..`}` agent copies (byte-exact gate held throughout); guarded by the `edit::spans` suite (LF/CRLF/multibyte/C#-attributes/expression shapes + env-gated real-file probe). Write-side token benchmark: `examples/apply_edit_comparison.rs`. See `docs/plans/APPLY_EDIT_PLAN.md`. |
 | **R-23** | NgRx Meta-Layer | v0.3.0 | ✅ Shipped 2026-08-11. `src/angular_meta/ngrx.rs` — actions, reducers (incl. inline `createReducer` in `createFeature`), effects, selectors, entity adapters, NgRx Data `EntityCollectionServiceBase<T>` (`Φentity:T (data-layer)`), `{ dispatch:false }`, Store DI, dispatch/select sites. Namespaced `NgRxKind` (`Φngrx:`/`Φaction:`/`Φreducer:`/`Φeffect:`/`Φselector:`/`Φentity:`/`Φstore:`/`Φdispatch:`/`Φselect:`). |
@@ -73,7 +83,9 @@ These items are complete and documented. Listed for historical context.
 
 ---
 
-## Now (v0.3.0) — "Advanced capabilities" ✅ ALL COMPLETE
+</details>
+
+## Historical completed horizon: v0.3.0
 
 **ALL ITEMS COMPLETE.** v0.3.0 is fully shipped.
 
@@ -81,7 +93,7 @@ All Foundation items (A-09 through A-15), all Now items (F-19 through F-22, A-08
 
 ---
 
-## Next (v0.5.0) — "Advanced capabilities"
+## Historical v0.5.0 planning snapshot — "Advanced capabilities"
 
 **GATE:** All Foundation (A-09 through A-15), Now (A-08, F-19 through F-22), Sliding Context Window (R-41, R-42), IR Evolution (R-43a, R-43b, R-44), and the Angular Ecosystem Deepening (R-23, R-24, R-25) items are complete. The Angular Ecosystem Deepening meta-layers shipped through Round-11 audits in v0.3.0; the v0.4.0 slot carries the CBM graph-intelligence and trace-wire audit fixes (both audit rows above), and planned feature work targets v0.5.0.
 

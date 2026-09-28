@@ -1,5 +1,9 @@
 # Graph Tool Surface Audit Report
 
+**Status:** Historical audit evidence. Findings were resolved or superseded by
+the current CBM identity/project contracts; current authority is
+`docs/agent/tooling.md` and `docs/ARCHITECTURAL_INVARIANTS.md`.
+
 **Date:** 2026-08-27
 **Auditor:** Clean-CTX Code Audit
 **Scope:**

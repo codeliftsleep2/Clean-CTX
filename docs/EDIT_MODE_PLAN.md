@@ -1,5 +1,9 @@
 # Edit Mode & Gap Closure Plan
 
+**Status:** Implemented historical plan. Current edit-fidelity and `apply_edit`
+contracts are documented in `docs/agent/tooling.md`,
+`docs/ARCHITECTURAL_INVARIANTS.md`, and the registered MCP schema.
+
 ## Overview
 
 Six gaps were identified from real-world usage of Clean-CTX with Claude. This document outlines the full implementation plan across four phases, introducing a new `edit` fidelity mode that carries verbatim method bodies for byte-exact `replace_in_file` operations.

@@ -1,7 +1,9 @@
 # Forward Thinking — Option C and the next presentation work
 
-**Status:** forward-looking hand-off. Read after the Option-A work (SCHEMA-v5 as
-`content`) and the annotation-redundancy collapse are finalized and committed.
+**Status:** Historical Option-C hand-off, partially implemented. Individual ADR
+status lines below record what shipped; SCHEMA-vNext behavior and remaining
+presentation work are owned by `SCHEMA_VNEXT_PROPOSAL.md` and
+`LLM_CONTEXT_COMPRESSION_RESEARCH.md`.
 
 **Audience:** the next agent (Codex) resuming this work.
 
