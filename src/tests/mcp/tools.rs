@@ -110,6 +110,68 @@ fn schema_provide_code_context_includes_focus_methods() {
     );
 }
 
+/// Phase 0 MCP-to-LLM contract cleanup: model-facing schemas must use the
+/// current structural edit tool and must steer path-bearing calls toward an
+/// explicit workspace root without removing the compatibility fallback.
+#[test]
+fn schema_guidance_uses_current_model_workflow_terms() {
+    let tools = tool_list();
+    let tools_by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+
+    let compress_fidelity = tools_by_name["compress_code_context"]["inputSchema"]
+        ["properties"]["fidelity"]["description"]
+        .as_str()
+        .expect("compress fidelity description");
+    let provide_intent = tools_by_name["provide_code_context"]["inputSchema"]["properties"]
+        ["intent"]["description"]
+        .as_str()
+        .expect("provide intent description");
+
+    for description in [compress_fidelity, provide_intent] {
+        assert!(
+            description.contains("apply_edit"),
+            "Edit guidance must name the registered structural edit tool: {description}"
+        );
+        assert!(
+            !description.contains("replace_in_file"),
+            "Edit guidance must not name the obsolete host operation: {description}"
+        );
+    }
+
+    for name in [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "restore_context",
+        "provide_code_context",
+        "apply_edit",
+        "diff_commits",
+    ] {
+        let description = tools_by_name[name]["inputSchema"]["properties"]["workspaceRoot"]
+            ["description"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{name} workspaceRoot description"));
+        assert!(
+            description.contains("Strongly recommended"),
+            "{name} must steer the model toward explicit workspaceRoot: {description}"
+        );
+        assert!(
+            description.contains("backward compatibility"),
+            "{name} must explain why the CWD fallback remains: {description}"
+        );
+    }
+
+    let proxy_description = tools_by_name["cbm_proxy"]["description"]
+        .as_str()
+        .expect("cbm_proxy description");
+    assert!(proxy_description.contains("compact raw CBM"));
+    assert!(proxy_description.contains("typed structured result"));
+    assert!(!proxy_description.contains("Primary CBM integration point"));
+}
+
 #[test]
 fn apply_edit_discovery_describes_only_the_structural_transaction_contract() {
     let tools = tool_list();

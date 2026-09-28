@@ -26,16 +26,17 @@ not already known.
 ### CBM is `available`
 
 Use the structured Clean-CTX graph wrappers when their typed result matches the
-job:
+job. `graph_search` is the normal symbol/file discovery entry point:
 
 - `graph_search` — locate symbols and authoritative repository-relative files;
 - `graph_query` — obtain typed nodes and edges;
 - `graph_trace` — trace between symbol identities; and
 - `get_architecture` — inspect modules and dependencies.
 
-Use `cbm_proxy` when a compact rendering of a raw CBM operation is more useful
-than typed wrapper output. Both paths are registered Clean-CTX tools; do not
-bypass Clean-CTX to invoke the underlying CBM server directly.
+Use `cbm_proxy` when a compact or explicitly fresh rendering of a raw CBM
+operation is more useful than typed wrapper output. Both paths are registered
+Clean-CTX tools; do not bypass Clean-CTX to invoke the underlying CBM server
+directly.
 
 ### CBM is `degraded` or `unavailable`
 
@@ -55,7 +56,7 @@ path completed, not that CBM facts became semantic authority.
 
 ## 2. Read source through `provide_code_context`
 
-For supported code (`.ts`, `.js`, `.cs`, `.rs`, `.java` when compiled into the
+For supported code (`.ts`, `.cs`, `.rs`, `.java` when compiled into the
 running binary), call `provide_code_context` before native `Read`:
 
 ```text

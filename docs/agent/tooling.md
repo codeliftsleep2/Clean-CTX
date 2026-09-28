@@ -328,8 +328,9 @@ Edits performed outside Clean-CTX are not automatically observed; use `index_rep
 
 ### Direct Call Comparison
 
-`cbm_proxy` is the preferred tool for token-efficient CBM access. The following tools exist for
-cases where structured/typed responses are preferred over compressed text:
+Choose the CBM surface by the result shape the task needs. Use the structured
+wrappers for typed identities, nodes, edges, paths, or modules. Use `cbm_proxy`
+when compact or explicitly fresh raw CBM output is preferable:
 
 - `graph_search` — typed `{nodes, count}` (cached, uncompressed)
 - `graph_query` — typed `{nodes, edges, count}` (cached, uncompressed)
@@ -573,9 +574,9 @@ required, or when `provide_code_context` cannot handle the file.
 
 ### ❌ Do Not use `compress_code_context` as a first resort
 
-`provide_code_context` provides heuristics, content classification, and
-auto-delta transport. `compress_code_context` is a lower-level mechanism
-without these benefits.
+`provide_code_context` provides intent/fidelity heuristics, content
+classification, and complete current context. `compress_code_context` is a
+lower-level mechanism without these benefits.
 
 ### ❌ Do Not combine `focusMethods` with an explicit non-Edit mode
 
@@ -585,12 +586,13 @@ returns `-32602`; it is never silently ignored or overridden. An empty array
 retains its specialized Edit-only meaning and therefore requires explicit
 `fidelity: edit` or `intent: edit`.
 
-### ❌ Prefer `cbm_proxy` over structured wrappers for token efficiency
+### ❌ Do Not choose a CBM surface without matching the required result shape
 
-`graph_search`, `graph_query`, `graph_trace`, and `get_architecture` return
-structured/typed Clean-CTX responses rather than compressed text. Prefer `cbm_proxy`
-when minimizing token usage is important, and use the structured wrappers when
-programmatic access to typed data (nodes, edges, architecture overview) is needed.
+Use `graph_search` as the normal symbol/file discovery entry point. Use
+`graph_query`, `graph_trace`, or `get_architecture` when their typed result is
+required. Use `cbm_proxy` when compact or explicitly fresh raw CBM output is
+the better result shape; it is not a universal replacement for the structured
+wrappers.
 
 ### ❌ Do Not use `apply_edit` for changes it cannot safely represent
 

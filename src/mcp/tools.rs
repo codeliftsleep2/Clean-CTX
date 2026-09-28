@@ -112,10 +112,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe apply_edit operations), 'verbatim' (full raw source, zero compression). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
                     "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -128,7 +128,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -141,7 +141,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "filePath": { "type": "string" },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -165,10 +165,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
+                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe apply_edit operations. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
                     "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Select qualified Owner.method names, or a bare name owned by exactly one typed owner. A non-empty focus implies Edit only when both fidelity and intent are omitted; explicit non-Edit modes conflict and fail. An empty array is valid only with explicit Edit and selects no bodies. Selectors resolve to canonical method IDs before body filtering; ambiguous selectors fail. A same-owner overload family selects all overload occurrences. Omit at Edit fidelity to render every method body." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." },
                     "tokenizer": { "type": "string" }
                 },
                 "required": ["filePath"]
@@ -181,7 +181,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -199,7 +199,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "items": { "type": "object" }
                     },
                     "verify": { "type": "boolean", "description": "Optional. When true, echoes each replacement's new verbatim text back as a receipt. Default false." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath", "operations"]
             },
@@ -330,7 +330,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "workspaceRoot": { "type": "string", "description": "Optional. Defaults to CWD. Resolved against trusted root." },
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root resolved against the trusted root; defaults to CWD for backward compatibility." },
                     "fromRef": { "type": "string", "description": "Required. e.g. HEAD~1, main, abc123, v1.0. Strictly validated." },
                     "toRef": { "type": "string", "description": "Optional. Defaults to working tree (uncommitted changes)." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." }
