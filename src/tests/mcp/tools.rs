@@ -125,10 +125,10 @@ fn schema_guidance_uses_current_model_workflow_terms() {
         ["properties"]["fidelity"]["description"]
         .as_str()
         .expect("compress fidelity description");
-    let provide_intent = tools_by_name["provide_code_context"]["inputSchema"]["properties"]
-        ["intent"]["description"]
-        .as_str()
-        .expect("provide intent description");
+    let provide_intent =
+        tools_by_name["provide_code_context"]["inputSchema"]["properties"]["intent"]["description"]
+            .as_str()
+            .expect("provide intent description");
 
     for description in [compress_fidelity, provide_intent] {
         assert!(
@@ -150,10 +150,10 @@ fn schema_guidance_uses_current_model_workflow_terms() {
         "apply_edit",
         "diff_commits",
     ] {
-        let description = tools_by_name[name]["inputSchema"]["properties"]["workspaceRoot"]
-            ["description"]
-            .as_str()
-            .unwrap_or_else(|| panic!("{name} workspaceRoot description"));
+        let description =
+            tools_by_name[name]["inputSchema"]["properties"]["workspaceRoot"]["description"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{name} workspaceRoot description"));
         assert!(
             description.contains("Strongly recommended"),
             "{name} must steer the model toward explicit workspaceRoot: {description}"
@@ -191,7 +191,9 @@ fn every_registered_tool_has_conservative_standard_annotations() {
             "openWorldHint",
         ] {
             assert!(
-                annotations.get(hint).is_some_and(serde_json::Value::is_boolean),
+                annotations
+                    .get(hint)
+                    .is_some_and(serde_json::Value::is_boolean),
                 "{name}.{hint} must be an explicit boolean"
             );
         }
@@ -234,6 +236,71 @@ fn every_registered_tool_has_conservative_standard_annotations() {
             "{name} must retain the conservative destructive classification"
         );
     }
+}
+
+/// Phase 4 MCP schema precision: polymorphic tools must expose each supported
+/// operation as a discriminated branch with its operation-specific inputs.
+#[test]
+fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
+    let tools = tool_list();
+    let by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+
+    let assert_branches =
+        |branches: &serde_json::Value, expected: &[(&str, &[&str])], contract: &str| {
+            let branches = branches
+                .as_array()
+                .unwrap_or_else(|| panic!("{contract} must use oneOf branches"));
+            assert_eq!(branches.len(), expected.len(), "{contract} branch count");
+
+            for (kind, required) in expected {
+                let branch = branches
+                    .iter()
+                    .find(|branch| branch["properties"]["type"]["const"] == *kind)
+                    .unwrap_or_else(|| panic!("{contract} is missing the '{kind}' branch"));
+                let actual: std::collections::HashSet<&str> = branch["required"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("{contract}.{kind} must declare required fields"))
+                    .iter()
+                    .map(|field| field.as_str().expect("required field name"))
+                    .collect();
+                let expected: std::collections::HashSet<&str> = required.iter().copied().collect();
+                assert_eq!(actual, expected, "{contract}.{kind} required fields");
+            }
+        };
+
+    assert_branches(
+        &by_name["apply_edit"]["inputSchema"]["properties"]["operations"]["items"]["oneOf"],
+        &[
+            (
+                "replace_body",
+                &["type", "target", "expectedOldText", "newText"],
+            ),
+            ("delete", &["type", "target", "expectedOldText"]),
+            ("insert_after", &["type", "anchor", "unitText"]),
+            ("insert_before", &["type", "anchor", "unitText"]),
+        ],
+        "apply_edit.operations",
+    );
+
+    assert_branches(
+        &by_name["workspace_query"]["inputSchema"]["oneOf"],
+        &[
+            ("find_entities", &["type", "name"]),
+            ("forward_edges", &["type", "name"]),
+            ("reverse_edges", &["type", "name"]),
+            ("entities_in_file", &["type", "file_path"]),
+            ("transitive_dependencies", &["type", "name"]),
+            ("has_cycle", &["type"]),
+            (
+                "calls_in_file",
+                &["type", "filePath", "workspaceRoot", "owner", "method"],
+            ),
+        ],
+        "workspace_query",
+    );
 }
 
 #[test]

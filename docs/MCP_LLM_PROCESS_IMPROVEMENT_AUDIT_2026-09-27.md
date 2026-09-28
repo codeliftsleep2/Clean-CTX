@@ -141,7 +141,30 @@ The tracked regression is
 `src/tests/mcp/tools.rs`. The unchanged regression failed on the first
 unannotated public tool and passed after the exhaustive Phase 3 classification.
 
-Later compatible phases map to RC-5 and RC-6. AD-1 through AD-3 remain
+### Phase 4 — Polymorphic request schemas
+
+**Status:** Complete; focused RED→GREEN verification confirmed
+
+Phase 4 is RC-5: the consolidated `apply_edit` and `workspace_query` surfaces
+now expose discriminated JSON Schema `oneOf` branches instead of relying on
+descriptions to convey operation-specific requirements. `apply_edit` declares
+the four supported structural operations and their exact required fields.
+`workspace_query` declares all seven variants, including the compatibility-safe
+root fallback for `entities_in_file` and the existing explicit-root requirement
+for `calls_in_file`.
+
+The public tool names, handler validation, shared optional properties, trusted
+path boundaries, and runtime semantics are unchanged. Schema construction lives
+in `src/mcp/tool_schemas.rs` so the catalog remains readable without introducing
+a new public abstraction.
+
+The tracked regression is
+`polymorphic_tool_schemas_encode_operation_specific_requirements` in
+`src/tests/mcp/tools.rs`. The unchanged regression failed because
+`apply_edit.operations.items` had no `oneOf` and passed after the discriminated
+operation schemas were installed.
+
+The remaining compatible phase maps to RC-6. AD-1 through AD-3 remain
 separate approval-gated architectural decisions rather than implementation
 phases.
 

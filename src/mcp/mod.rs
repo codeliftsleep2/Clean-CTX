@@ -31,6 +31,7 @@ pub(crate) mod token_economics;
 pub(crate) mod tool_annotations;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
+pub(crate) mod tool_schemas;
 pub(crate) mod tools;
 
 pub use state::McpState;

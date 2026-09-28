@@ -196,7 +196,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "operations": {
                         "type": "array",
                         "description": "Structural operations applied atomically (all-or-nothing). Each: {\"type\":\"replace_body\",\"target\":\"Class.method\",\"expectedOldText\":\"{...}\",\"newText\":\"{...}\"} | {\"type\":\"delete\",\"target\":..., \"expectedOldText\":...} | {\"type\":\"insert_after\",\"anchor\":\"Class.method\",\"unitText\":...} | {\"type\":\"insert_before\",...}. expectedOldText must byte-match the text this session last delivered for that unit.",
-                        "items": { "type": "object" }
+                        "items": super::tool_schemas::apply_edit_operations()
                     },
                     "verify": { "type": "boolean", "description": "Optional. When true, echoes each replacement's new verbatim text back as a receipt. Default false." },
                     "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
@@ -358,6 +358,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "withinPath": { "type": "string", "description": "Optional. Narrows an ALREADY authorized workspace to one file or directory subtree: occurrences whose ASSERTING file lies under it, and traversal/cycle evidence likewise. Relative paths resolve against workspaceRoot; absolute paths are used as declared. Rejected (-32602) when the path lies outside workspaceRoot plus configured additional roots, or when no workspaceRoot is given — it never widens a workspace and never becomes a root of its own. Omit to query the whole authorized workspace." },
                     "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
                 },
+                "oneOf": super::tool_schemas::workspace_query_variants(),
                 "required": ["type"]
             },
             "outputSchema": {
