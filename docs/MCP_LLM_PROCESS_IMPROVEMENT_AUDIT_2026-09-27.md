@@ -98,7 +98,26 @@ regression is `initialize_includes_compact_workflow_instructions` in
 `src/tests/mcp/prompts.rs`. The unchanged regression failed when initialization
 omitted server instructions and passed after the Phase 1 implementation.
 
-Later compatible phases map to RC-3 through RC-6. AD-1 through AD-3 remain
+### Phase 2 — Optimistic graph-first discovery
+
+**Status:** Complete; focused RED→GREEN verification confirmed
+
+Phase 2 is RC-3: graph operations consult live CBM health directly, so ordinary
+discovery starts with the useful graph call rather than a separate
+`get_cbm_status` preflight. An unavailable first call prescribes the direct
+`search_codebase` then `provide_code_context` fallback. Indexing responses state
+that the graph is temporarily unavailable rather than empty, permit one bounded
+retry, and then prescribe fallback instead of status polling.
+
+`get_cbm_status` remains available for setup diagnostics, recovery checks, and
+explicit indexing-progress inspection. No health gate, indexing state, graph
+authority, or empty-result semantic changed. The tracked regression is
+`graph_search_returns_is_error_when_cbm_unavailable` in
+`src/tests/cbm/handler_unavailable.rs`. The unchanged regression failed when
+the first unavailable graph call gave setup advice without a direct workflow
+fallback and passed after the Phase 2 implementation.
+
+Later compatible phases map to RC-4 through RC-6. AD-1 through AD-3 remain
 separate approval-gated architectural decisions rather than implementation
 phases.
 

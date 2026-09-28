@@ -456,13 +456,15 @@ These are not CBM proxy tool names — they are implemented internally via
 
 Do not bypass Clean-CTX to invoke the underlying CBM server directly.
 `get_cbm_status`, the structured wrappers, and `cbm_proxy` are all registered
-Clean-CTX tools; `get_cbm_status` is the availability probe and its tiny status
-object needs no compression.
+Clean-CTX tools. Graph handlers consult live CBM health directly; reserve
+`get_cbm_status` for setup diagnostics, recovery checks, or explicit
+indexing-progress inspection rather than routine task preflight.
 
 ### CBM Unavailable Fallback
 
-When `get_cbm_status` returns `unavailable` or `degraded`, do NOT attempt
-to bypass the proxy by calling raw CBM tools directly. Instead:
+When a graph operation reports CBM as unavailable or degraded, do NOT add a
+status probe or attempt to bypass the proxy by calling raw CBM tools directly.
+Instead:
 
 1. Use `search_codebase` for symbol/pattern discovery.
 2. Use `provide_code_context` on discovered files for structural understanding.

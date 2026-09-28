@@ -38,6 +38,10 @@ mod trace_identity_resolution;
 #[path = "../tests/cbm/handlers.rs"]
 mod handlers;
 
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/cbm/handler_unavailable.rs"]
+mod handler_unavailable;
+
 // CBM 0.8.1 query_graph wire contract (typed graph_query edge extraction,
 // strict positional [from, type, to] convention), pinned by verbatim live
 // captures and fresh-process probes over a synthetic fixture repo.

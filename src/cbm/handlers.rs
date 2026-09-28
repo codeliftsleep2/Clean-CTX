@@ -9,6 +9,8 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+const CBM_FALLBACK_GUIDANCE: &str = "Use `search_codebase` for symbol/file discovery, then `provide_code_context` for supported source files.";
+
 /// Circuit breaker guard: check if CBM is healthy before proceeding.
 /// Returns `true` if CBM is available, otherwise sends error response.
 ///
@@ -23,7 +25,7 @@ fn check_cbm_healthy(id: &Value, status: &crate::cbm::CbmStatus) -> bool {
     if !status.is_available() {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32603, "message": format!("CBM unavailable: {}", status.summary()) }
+            "error": { "code": -32603, "message": format!("CBM unavailable: {} {CBM_FALLBACK_GUIDANCE}", status.summary()) }
         }));
         return false;
     }
@@ -43,7 +45,7 @@ fn with_bridge<'a>(
     if bridge_opt.is_none() {
         send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32603, "message": "CBM not available. Install codebase-memory-mcp on PATH." }
+            "error": { "code": -32603, "message": format!("CBM not available. Install codebase-memory-mcp on PATH. {CBM_FALLBACK_GUIDANCE}") }
         }));
         return None;
     }
@@ -105,10 +107,10 @@ fn send_indexing_gate(
         Ok(IndexingStatus::Ready) => true,
         Ok(IndexingStatus::StillIndexing { elapsed_secs }) => {
             let msg = if elapsed_secs < 5 {
-                "CBM project indexing in progress. Retry the query in a few seconds, or use `get_cbm_status` to check when indexing completes.".to_string()
+                "CBM project indexing is in progress; this is temporary, not an empty graph. Retry the same graph query once after indexing progresses. If immediate progress is required, use `search_codebase` and then `provide_code_context`.".to_string()
             } else {
                 format!(
-                    "CBM is still indexing this project ({elapsed_secs}s elapsed). This is normal for large codebases. Retry the query shortly."
+                    "CBM is still indexing this project ({elapsed_secs}s elapsed); this is temporary, not an empty graph. Retry the same graph query once. If it remains unavailable, use `search_codebase` and then `provide_code_context` instead of polling status."
                 )
             };
             send_response(&serde_json::json!({

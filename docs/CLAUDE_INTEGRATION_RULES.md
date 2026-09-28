@@ -18,10 +18,12 @@ project slug.
 
 ---
 
-## 1. Start by checking CBM availability
+## 1. Start with the useful graph operation
 
-For repository discovery, call `get_cbm_status` once for the task when status is
-not already known.
+For repository discovery, call the useful graph operation directly. The graph
+handlers consult CBM's live status themselves, so a separate `get_cbm_status`
+preflight adds no authority. Reserve `get_cbm_status` for setup diagnostics,
+recovery checks, or explicit indexing-progress inspection.
 
 ### CBM is `available`
 
@@ -40,8 +42,9 @@ directly.
 
 ### CBM is `degraded` or `unavailable`
 
-Do not retry equivalent CBM calls in a loop and do not treat provider failure as
-an authoritative empty graph. Fall back to:
+The failed graph call reports the direct fallback. Do not add a status probe,
+retry equivalent CBM calls in a loop, or treat provider failure as an
+authoritative empty graph. Fall back to:
 
 1. `search_codebase` for symbol/file discovery;
 2. `provide_code_context` for supported source files; and
