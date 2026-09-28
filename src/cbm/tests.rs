@@ -42,6 +42,10 @@ mod handlers;
 #[path = "../tests/cbm/handler_unavailable.rs"]
 mod handler_unavailable;
 
+// Raw-proxy failures must remain failures rather than compressed partial data.
+#[path = "../tests/cbm/proxy_errors.rs"]
+mod proxy_errors;
+
 // CBM 0.8.1 query_graph wire contract (typed graph_query edge extraction,
 // strict positional [from, type, to] convention), pinned by verbatim live
 // captures and fresh-process probes over a synthetic fixture repo.

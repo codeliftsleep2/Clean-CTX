@@ -432,6 +432,11 @@ The `cbm_proxy` tool does **not** change the active project:
 
 - A project supplied to `cbm_proxy` is resolved only for that proxy
   invocation.
+- An exact configured-root basename is accepted as an alias and rewritten to
+  the canonical CBM slug before dispatch. Partial or invented slug names are
+  not fuzzy-matched; CBM rejects them with one explicit `isError` result.
+- A rejected project never returns candidate, caller, or other result-shaped
+  data as partial success.
 - The next `graph_search()` or `graph_query()` call will still target
   whatever project was active before the proxy call.
 

@@ -46,6 +46,31 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-029: `cbm_proxy` Gated a Canonical Project but Forwarded Its Short Alias
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-28 |
+| **Environment** | Claude + freshly built Clean-CTX release candidate with installed CBM |
+| **Repository/context** | One real indexed repository queried twice through `cbm_proxy`: once with its canonical path-derived slug and once with the configured root's directory basename |
+| **Symptom** | The canonical slug returned three real raw candidates and a complete three-hop call chain. The basename returned zero candidates and no callers, then appended `project not found or indexed` after success-looking fields. The failure was easy for an LLM to overlook because it appeared to be a partially successful graph result. |
+| **Root cause** | `resolve_proxy_target_project` canonicalized the supplied basename for Clean-CTX's indexing/readiness gate, but the proxy forwarded the original uncanonicalized `arguments.project` to CBM. CBM correctly returned a tool-level `result.isError` envelope. Because `cbm_proxy` uses the raw transport path, that envelope bypassed the parsed client's `check_soft_error` gate and was verified/compressed as ordinary result data. |
+| **Classification** | Protocol and project-identity routing |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/cbm/proxy_errors.rs` — `cbm_proxy_rewrites_configured_root_basename_to_canonical_slug` and `cbm_proxy_rejects_soft_project_error_before_compressing_partial_data` |
+| **Live scenario required?** | Yes — repeat the canonical-slug/basename comparison through the freshly built MCP server and confirm equivalent successful graph data; also submit an unknown partial slug and confirm one clean `isError` result with no candidate/caller fields. |
+| **Architectural invariant** | CBM project identity invariant and CBM-E-001 in `docs/ARCHITECTURAL_INVARIANTS.md` |
+| **Status** | Fixed locally; post-fix live rerun pending |
+
+**Resolution:** `resolve_and_apply_proxy_target_project` now writes the resolved
+canonical slug into the exact argument object sent to CBM. `proxy_tool_error`
+checks raw proxy responses before caller verification or compression and turns
+CBM tool failures into one explicit MCP `isError` result with recovery guidance.
+Unknown or partial names remain strict failures; only exact configured-root
+basenames receive alias resolution.
+
+---
+
 ## DIS-2026-028: CBM Trace Silently Selected One Duplicate Bare-Name Identity
 
 | Field | Value |

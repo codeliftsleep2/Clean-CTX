@@ -164,6 +164,10 @@ A CBM project slug and a filesystem path are different namespaces. Only
   active project for later structured-wrapper calls.
 - `cbm_proxy` project resolution is scoped to that one call and does not change
   the active project.
+- An exact configured-root basename may be used as a project alias; Clean-CTX
+  rewrites it to the canonical slug before dispatch. Do not abbreviate or
+  partially copy a slug—unknown names fail explicitly and return no partial
+  candidate or caller data.
 - A bare trace source is accepted only when it resolves to one canonical
   identity. Ambiguity returns all canonical candidates; never select the first
   match silently.
