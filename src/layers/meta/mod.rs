@@ -23,7 +23,7 @@ mod angular_semantic;
 mod context;
 pub mod semantic;
 
-pub use context::MetaLayerContext;
+pub use context::{MetaLayerContext, MetaLayerEvaluation};
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
@@ -55,13 +55,6 @@ pub struct MetaLayerOutput {
     pub spring_block: Option<crate::spring_meta::MetaBlock>,
     /// Structured .NET block. `None` when not a .NET file.
     pub dotnet_block: Option<crate::dotnet_meta::MetaBlock>,
-}
-
-/// Marker and semantic results produced by one applicable meta-layer.
-#[derive(Debug, Default)]
-pub struct MetaLayerEvaluation {
-    pub output: Option<MetaLayerOutput>,
-    pub semantic_edges: Vec<SemanticEdge>,
 }
 
 /// A meta-layer that enriches compressed output with framework-specific
@@ -208,6 +201,15 @@ pub trait MetaLayer: Send + Sync {
             output: self.enrich_context(context),
             semantic_edges: self.extract_semantic_edges_context(context),
         }
+    }
+
+    /// Decide applicability and evaluate without discarding detection evidence.
+    fn evaluate_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerEvaluation> {
+        self.is_applicable(context.source, context.path, context.config)
+            .then(|| self.evaluate_context(context))
     }
 }
 
@@ -357,6 +359,7 @@ impl MetaLayer for AngularMetaLayer {
             None,
             None,
             None,
+            None,
         );
 
         let testing_enabled = meta_config.map(|c| c.testing.enabled).unwrap_or(true);
@@ -382,7 +385,7 @@ impl MetaLayer for AngularMetaLayer {
             .map(|(_, text)| text.clone())
             .collect();
         let mut edges = angular_semantic::extract_non_testing_edges(
-            source, &captures, fidelity, config, None, None, None,
+            source, &captures, fidelity, config, None, None, None, None,
         );
         let testing_enabled = config
             .and_then(|value| value.meta_layers.get("angular"))
@@ -412,6 +415,7 @@ impl MetaLayer for AngularMetaLayer {
             Some(context.lexical_regions),
             None,
             None,
+            None,
         );
         let testing_enabled = context
             .config
@@ -431,7 +435,14 @@ impl MetaLayer for AngularMetaLayer {
     }
 
     fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
-        angular_semantic::evaluate(self.name(), context)
+        angular_semantic::evaluate(self.name(), context, None)
+    }
+
+    fn evaluate_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerEvaluation> {
+        angular_semantic::evaluate_if_applicable(self.name(), context)
     }
 }
 
@@ -544,8 +555,19 @@ impl MetaLayer for SpringBootMetaLayer {
         #[cfg(test)]
         crate::spring_meta::record_evaluation();
 
+        let output = crate::spring_meta::run_meta_layer_for_applicable_source(
+            context.class_captures,
+            context.fidelity,
+        )
+        .filter(|block| !block.is_empty())
+        .map(|block| MetaLayerOutput {
+            layer_name: self.name(),
+            rendered: block.render(),
+            spring_block: Some(block),
+            ..Default::default()
+        });
         MetaLayerEvaluation {
-            output: self.enrich_context(context),
+            output,
             semantic_edges: self.extract_semantic_edges_context(context),
         }
     }

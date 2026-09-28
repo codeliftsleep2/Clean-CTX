@@ -25,6 +25,8 @@
 pub mod aspnet;
 pub mod automapper;
 pub(crate) mod detect;
+#[cfg(test)]
+mod detect_metrics;
 pub mod efcore;
 #[cfg(test)]
 mod evaluation_metrics;
@@ -38,6 +40,8 @@ pub mod testing;
 
 #[cfg(test)]
 pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
+#[cfg(test)]
+pub(crate) use detect_metrics::{detection_count, reset_detection_count};
 
 use crate::compression::Fidelity;
 
@@ -115,6 +119,14 @@ pub fn run_meta_layer_with_config(
         return None;
     }
 
+    run_meta_layer_for_applicable_source(class_captures, fidelity, config)
+}
+
+fn run_meta_layer_for_applicable_source(
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+) -> Option<MetaBlock> {
     // Tier 1 (extraction): walk each class capture and emit Φ lines.
     let mut block = MetaBlock::default();
     for raw_class in class_captures {
@@ -271,8 +283,23 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         #[cfg(test)]
         evaluation_metrics::record_evaluation();
 
+        let meta_config = context
+            .config
+            .and_then(|value| value.meta_layers.get("dotnet"));
+        let output = run_meta_layer_for_applicable_source(
+            context.class_captures,
+            context.fidelity,
+            meta_config,
+        )
+        .filter(|block| !block.is_empty())
+        .map(|block| crate::layers::meta::MetaLayerOutput {
+            layer_name: self.name(),
+            rendered: block.render(),
+            dotnet_block: Some(block),
+            ..Default::default()
+        });
         crate::layers::meta::MetaLayerEvaluation {
-            output: self.enrich_context(context),
+            output,
             semantic_edges: self.extract_semantic_edges_context(context),
         }
     }

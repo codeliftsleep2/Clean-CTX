@@ -160,6 +160,22 @@ fn production_angular_evaluation_extracts_routing_shape_once() {
 }
 
 #[test]
+fn production_angular_layer_runs_framework_detection_once() {
+    crate::angular_meta::reset_detection_count();
+
+    let _ = compile_edges(
+        "import { Component } from '@angular/core'; @Component({ template: '' }) export class AppComponent {}",
+        "C:/repo/app.component.ts",
+    );
+
+    assert_eq!(
+        crate::angular_meta::detection_count(),
+        1,
+        "Angular decorator evidence must not be reparsed during evaluation"
+    );
+}
+
+#[test]
 fn production_dotnet_layer_uses_combined_evaluation_override() {
     crate::dotnet_meta::reset_evaluation_count();
 
@@ -176,6 +192,22 @@ fn production_dotnet_layer_uses_combined_evaluation_override() {
 }
 
 #[test]
+fn production_dotnet_layer_runs_framework_detection_once() {
+    crate::dotnet_meta::reset_detection_count();
+
+    let _ = compile_csharp_edges(
+        "[ApiController] public class UsersController : ControllerBase { }",
+        "C:/repo/UsersController.cs",
+    );
+
+    assert_eq!(
+        crate::dotnet_meta::detection_count(),
+        1,
+        ".NET applicability evidence must not be reparsed during evaluation"
+    );
+}
+
+#[test]
 fn production_spring_layer_uses_combined_evaluation_override() {
     crate::spring_meta::reset_evaluation_count();
 
@@ -188,6 +220,22 @@ fn production_spring_layer_uses_combined_evaluation_override() {
         crate::spring_meta::evaluation_count(),
         1,
         "Spring must own one explicit combined evaluation per compilation"
+    );
+}
+
+#[test]
+fn production_spring_layer_runs_framework_detection_once() {
+    crate::spring_meta::reset_detection_count();
+
+    let _ = compile_java_edges(
+        "@RestController class UsersController { @GetMapping String get() { return \"ok\"; } }",
+        "C:/repo/UsersController.java",
+    );
+
+    assert_eq!(
+        crate::spring_meta::detection_count(),
+        1,
+        "Spring applicability evidence must not be reparsed during evaluation"
     );
 }
 

@@ -297,10 +297,9 @@ impl LayerRegistry {
         let mut outputs = Vec::new();
         let mut edges = Vec::new();
         for layer in &self.meta_layers {
-            if !layer.is_applicable(context.source, context.path, context.config) {
+            let Some(evaluation) = layer.evaluate_if_applicable(context) else {
                 continue;
-            }
-            let evaluation = layer.evaluate_context(context);
+            };
             if let Some(output) = evaluation.output {
                 outputs.push(output);
             }

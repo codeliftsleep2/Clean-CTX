@@ -327,6 +327,8 @@ registered layer per compilation.
 
 ### Phase 6 — Remove redundant detection parses
 
+**Status:** Complete (2026-09-28).
+
 **Goal:** Use the cheapest already-owned evidence that preserves detection
 semantics.
 
@@ -343,6 +345,16 @@ For Angular, .NET, and Spring independently:
 **Exit criterion:** No framework reparses the same file more than once within
 one meta-layer evaluation, and zero reparses occur where capture evidence is
 sufficient.
+
+Angular now carries its decorator-detection result through applicability,
+marker extraction, and semantic projection. .NET and Spring similarly retain
+their successful applicability evidence and use explicit applicable-source
+evaluation paths rather than invoking framework detection again. Focused
+production regressions enforce one detection pass per compilation:
+
+- `production_angular_layer_runs_framework_detection_once`
+- `production_dotnet_layer_runs_framework_detection_once`
+- `production_spring_layer_runs_framework_detection_once`
 
 ### Phase 7 — Measure before broader scan fusion
 

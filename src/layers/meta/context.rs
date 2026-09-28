@@ -4,7 +4,17 @@ use std::path::Path;
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
+use crate::layers::meta::semantic::SemanticEdge;
 use crate::meta_util::LexicalRegions;
+
+use super::MetaLayerOutput;
+
+/// Marker and semantic results produced by one applicable meta-layer.
+#[derive(Debug, Default)]
+pub struct MetaLayerEvaluation {
+    pub output: Option<MetaLayerOutput>,
+    pub semantic_edges: Vec<SemanticEdge>,
+}
 
 /// Immutable inputs and shared lexical evidence for one meta-layer pass.
 pub struct MetaLayerContext<'a> {

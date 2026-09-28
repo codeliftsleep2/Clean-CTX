@@ -88,6 +88,9 @@ const SPRING_IMPORT: &str = "org.springframework";
 /// contexts, and a false positive would inject meaningless `Φ` markers
 /// into non-Spring output.
 pub fn is_spring_file(source: &str) -> bool {
+    #[cfg(test)]
+    super::record_detection();
+
     // A-11: Try AST-based detection first (eliminates false positives
     // from comments and string literals).
     //

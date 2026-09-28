@@ -158,6 +158,9 @@ const CS_BASE_CLASS_QUERY: &str = r#"
 /// Plain C# files (utility classes, POCOs, enums, etc.) return `false`
 /// — they should not get any Φ markers.
 pub fn is_dotnet_file(source: &str) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
     // A-11: Try AST-based detection first (eliminates false positives
     // from comments and string literals).
     if ast_based_dotnet_detect(source) {

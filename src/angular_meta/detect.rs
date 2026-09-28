@@ -77,6 +77,9 @@ const ANGULAR_CORE_IMPORT: &str = "@angular/core";
 /// also used by MobX / Vue, and a false positive would inject
 /// meaningless `Φ` markers into non-Angular output.
 pub fn is_angular_file(source: &str) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
     // A-11: Try AST-based detection first (eliminates false positives
     // from comments and string literals).
     if ast_based_angular_detect(source) {

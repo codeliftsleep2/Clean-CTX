@@ -28,6 +28,8 @@ pub(crate) mod decorator_args;
 pub(crate) mod decorator_scan;
 pub(crate) mod decorators;
 pub(crate) mod detect;
+#[cfg(test)]
+mod detect_metrics;
 pub mod formly;
 pub(crate) mod markers;
 pub mod ngrx;
@@ -42,6 +44,9 @@ pub mod template;
 pub mod template_compress;
 pub mod testing;
 pub mod util;
+
+#[cfg(test)]
+pub(crate) use detect_metrics::{detection_count, reset_detection_count};
 
 use crate::compression::Fidelity;
 
@@ -221,6 +226,7 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
         lexical_regions,
         None,
         None,
+        None,
     )
 }
 
@@ -233,9 +239,11 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_ngrx(
     lexical_regions: &crate::meta_util::LexicalRegions,
     precomputed_ngrx: Option<Option<ngrx::NgRxShape>>,
     precomputed_routing: Option<Option<routing::RouteShape>>,
+    precomputed_angular: Option<bool>,
 ) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
-    let is_angular = detect::is_angular_file(source_code);
+    let is_angular =
+        precomputed_angular.unwrap_or_else(|| detect::is_angular_file(source_code));
 
     // Resolve per-layer enabled flags from config (defaults: all enabled).
     let rxjs_enabled = config.map(|c| c.rxjs.enabled).unwrap_or(true);

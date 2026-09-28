@@ -12,11 +12,12 @@ pub(super) fn extract_non_testing_edges(
     lexical_regions: Option<&crate::meta_util::LexicalRegions>,
     precomputed_ngrx: Option<Option<&crate::angular_meta::ngrx::NgRxShape>>,
     precomputed_routing: Option<Option<&crate::angular_meta::routing::RouteShape>>,
+    precomputed_angular: Option<bool>,
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
     let mut edges = Vec::new();
 
-    if crate::angular_meta::detect::is_angular_file(source) {
+    if precomputed_angular.unwrap_or_else(|| crate::angular_meta::detect::is_angular_file(source)) {
         let mut decl_types = std::collections::HashMap::new();
         for raw_class in class_captures {
             if let Some((class_name, kind, _, _, _)) =
@@ -91,6 +92,7 @@ pub(super) fn extract_non_testing_edges(
 pub(super) fn evaluate(
     layer_name: &'static str,
     context: &super::MetaLayerContext<'_>,
+    precomputed_angular: Option<bool>,
 ) -> super::MetaLayerEvaluation {
     let meta_config = context
         .config
@@ -122,6 +124,7 @@ pub(super) fn evaluate(
         context.lexical_regions,
         Some(ngrx_shape.clone()),
         Some(routing_shape.clone()),
+        precomputed_angular,
     );
     let output = block.filter(|block| !block.is_empty()).map(|block| {
         super::MetaLayerOutput {
@@ -144,6 +147,7 @@ pub(super) fn evaluate(
         Some(context.lexical_regions),
         Some(ngrx_shape.as_ref()),
         Some(routing_shape.as_ref()),
+        precomputed_angular,
     );
     if meta_config.map(|config| config.testing.enabled).unwrap_or(true) {
         semantic_edges.extend(
@@ -158,4 +162,33 @@ pub(super) fn evaluate(
         output,
         semantic_edges,
     }
+}
+
+pub(super) fn evaluate_if_applicable(
+    layer_name: &'static str,
+    context: &super::MetaLayerContext<'_>,
+) -> Option<super::MetaLayerEvaluation> {
+    let meta_config = context
+        .config
+        .and_then(|config| config.meta_layers.get("angular"));
+    if meta_config.is_some_and(|config| !config.enabled) {
+        return None;
+    }
+    let is_angular = crate::angular_meta::detect::is_angular_file(context.source);
+    let testing_enabled = meta_config.map(|config| config.testing.enabled).unwrap_or(true);
+    let reactive_forms_enabled = meta_config
+        .map(|config| config.reactive_forms.enabled)
+        .unwrap_or(true);
+    let formly_enabled = meta_config.map(|config| config.formly.enabled).unwrap_or(true);
+    let applicable = is_angular
+        || crate::angular_meta::rx::has_rxjs_imports(context.source)
+        || crate::angular_meta::ngrx::has_ngrx_imports(context.source)
+        || crate::angular_meta::signals::has_signal_imports(context.source)
+        || reactive_forms_enabled
+            && crate::angular_meta::reactive_forms::has_reactive_forms(context.source)
+        || formly_enabled && crate::angular_meta::formly::has_formly(context.source)
+        || crate::angular_meta::routing::has_router_imports(context.source)
+        || testing_enabled
+            && crate::angular_meta::testing::is_testing_source(context.source, context.path);
+    applicable.then(|| evaluate(layer_name, context, Some(is_angular)))
 }
