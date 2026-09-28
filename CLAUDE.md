@@ -4,8 +4,9 @@ Use Clean-CTX as the primary code-intelligence layer.
 
 - Start repository discovery with `graph_search`; do not routinely call
   `get_cbm_status` first.
-- If graph discovery is unavailable, use `search_codebase`, then
-  `provide_code_context`.
+- If graph discovery is unavailable, use Claude's native `Grep`/`Glob` tools
+  for text/file discovery, then `provide_code_context`. For an exact semantic
+  name, `workspace_query(type="find_entities")` can use filesystem discovery.
 - Use `provide_code_context` first for supported `.ts`, `.cs`, `.rs`, and
   `.java` source.
 - Always pass `workspaceRoot` explicitly.

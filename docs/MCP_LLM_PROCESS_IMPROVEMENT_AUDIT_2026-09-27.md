@@ -105,7 +105,10 @@ omitted server instructions and passed after the Phase 1 implementation.
 Phase 2 is RC-3: graph operations consult live CBM health directly, so ordinary
 discovery starts with the useful graph call rather than a separate
 `get_cbm_status` preflight. An unavailable first call prescribes the direct
-`search_codebase` then `provide_code_context` fallback. Indexing responses state
+the active host's text/file search, or `workspace_query(find_entities)` for an
+exact semantic name, then `provide_code_context`. `search_codebase` is a
+Cline-specific host-tool name rather than a registered Clean-CTX MCP tool.
+Indexing responses state
 that the graph is temporarily unavailable rather than empty, permit one bounded
 retry, and then prescribe fallback instead of status polling.
 

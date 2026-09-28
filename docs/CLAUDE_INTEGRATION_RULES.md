@@ -46,9 +46,15 @@ The failed graph call reports the direct fallback. Do not add a status probe,
 retry equivalent CBM calls in a loop, or treat provider failure as an
 authoritative empty graph. Fall back to:
 
-1. `search_codebase` for symbol/file discovery;
-2. `provide_code_context` for supported source files; and
-3. native `Read` only for exact source ranges or unsupported/non-code files.
+1. Claude's native `Grep`/`Glob` tools for text or file discovery;
+2. `workspace_query(type="find_entities")` when an exact semantic name is
+   known and filesystem-backed semantic discovery is preferable;
+3. `provide_code_context` for supported source files; and
+4. native `Read` only for exact source ranges or unsupported/non-code files.
+
+`search_codebase` is a Cline host-tool name, not a registered Clean-CTX MCP
+tool and not a Claude Code tool. Never attempt to call it from Claude merely
+because older fallback text names it.
 
 `workspace_query` may also use its registered filesystem discovery path for
 eligible name-bearing semantic queries. Its sparse `discovery` metadata reports
@@ -207,7 +213,8 @@ or broader edits that do not fit those structural operations.
 | Locate a symbol with CBM available | `graph_search` |
 | Typed graph nodes/edges | `graph_query` / `graph_trace` |
 | Compact raw CBM operation | `cbm_proxy` |
-| Locate code without CBM | `search_codebase` |
+| Locate text/files without CBM | Claude `Grep` / `Glob` |
+| Locate an exact semantic name without CBM | `workspace_query(type="find_entities")` |
 | Understand a supported source file | `provide_code_context` |
 | Exact known source lines/body | Native `Read` after context, or when context fails |
 | Semantic entities/edges/dependencies | `workspace_query` |

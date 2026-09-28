@@ -25,10 +25,15 @@ public tool; internal handler helpers are intentionally absent.
 
 ### 1.1 Standard Host Tools
 
+These are host capabilities, not registered Clean-CTX MCP tools. Their names
+vary by client: Cline exposes `read_files`/`search_codebase`, Claude Code uses
+`Read`/`Grep`/`Glob`, and terminal-capable agents may use `rg`. Never instruct a
+client to call a host-tool name that its active tool catalog does not expose.
+
 | Tool | Description |
 |------|-------------|
 | `read_files` | Read text/image files from disk. Use for non-code files and exact line inspection. |
-| `search_codebase` | Regex search across all files (asynchronous, multiple patterns in one call). |
+| Host text/file search (`search_codebase`, `Grep`/`Glob`, or `rg`) | Search file names and content using the active host's available capability. |
 | `fetch_web_content` | Fetch external URLs. Primarily for documentation/API references. |
 | `ask_question` | Ask the user a clarifying question. Use when information is genuinely missing. |
 | `run_commands` | Execute non-interactive shell commands. Use for builds, tests, git operations, and command-line verification. |
@@ -121,15 +126,15 @@ local workspace/provider boundary and declare `openWorldHint: false`.
 | Understand a code file | `provide_code_context` | Complete current SCHEMA-vNext context with signatures, fields, and flags; heuristics select appropriate fidelity | `read_files` (wasteful — full raw content), `compress_code_context` (no heuristics) |
 | Understand a non-code file | `read_files` | `provide_code_context` only supports `.ts`/`.cs`/`.rs`/`.java` | `provide_code_context` (will fail or produce no useful output) |
 | Exact line/byte inspection | `read_files` | Line-range reads, byte-level exactness | `provide_code_context` (IR is structural, not byte-exact at non-verbatim fidelities) |
-| Discover a symbol, file, class, method, or concept | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` | Graph-aware semantic search across CBM-indexed symbols and files | Regex-only `search_codebase` (text search, misses graph relationships) |
-| Text/regex search across file content | `search_codebase` | Regex across all file content, supports parallel patterns | Reading every file manually |
+| Discover a symbol, file, class, method, or concept | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` | Graph-aware semantic search across CBM-indexed symbols and files | Host text search alone (misses graph relationships) |
+| Text/regex search across file content | Active host search (`search_codebase`, `Grep`, or `rg`) | Uses the discovery capability actually exposed by the client | Reading every file manually |
 | Quick token-savings check | `context_stats` | Dashboard compression metrics | Manual token counting |
 
 ### 2.2 For Bug Investigation
 
 | Phase | Tool Sequence | Rationale |
 |-------|--------------|-----------|
-| 1. Locate relevant code | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` with symbol/function/error patterns | Clean-CTX graph-aware discovery. Use `search_codebase` as fallback when CBM is unavailable. |
+| 1. Locate relevant code | `graph_search` or `cbm_proxy(cbm_tool: "search_graph")` with symbol/function/error patterns | Clean-CTX graph-aware discovery. When CBM is unavailable, use `workspace_query(find_entities)` for an exact semantic name or the active host's text/file search (`search_codebase`, Claude `Grep`/`Glob`, or `rg`). |
 | 2. Understand suspects | `provide_code_context(intent="debug")` on located files | Compressed overview with balanced detail |
 | 3. Deep dive (if needed) | `provide_code_context(intent="debug" or "refactor", fidelity="high")` | Higher detail when debug mode is insufficient |
 | 4. Cross-file relationships | `cbm_proxy(cbm_tool="search_graph" or "trace_path")` | Architectural/relationship context — only when needed |
@@ -481,7 +486,11 @@ When a graph operation reports CBM as unavailable or degraded, do NOT add a
 status probe or attempt to bypass the proxy by calling raw CBM tools directly.
 Instead:
 
-1. Use `search_codebase` for symbol/pattern discovery.
+1. Use the active host's text/file search for symbol/pattern discovery
+   (`search_codebase` in Cline, `Grep`/`Glob` in Claude Code, or `rg` in a
+   terminal-capable host). For an exact semantic name, prefer
+   `workspace_query(type="find_entities")` so Clean-CTX can use its filesystem
+   discovery path.
 2. Use `provide_code_context` on discovered files for structural understanding.
 3. Use `read_files` for exact source inspection when needed.
 
