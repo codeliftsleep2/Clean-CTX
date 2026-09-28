@@ -10,7 +10,7 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::language::LanguageLayer;
 use crate::layers::meta::semantic::SemanticEdge;
-use crate::layers::meta::{MetaLayer, MetaLayerOutput};
+use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerOutput};
 use std::path::Path;
 use std::sync::OnceLock;
 
@@ -177,6 +177,22 @@ impl LayerRegistry {
         results
     }
 
+    /// Dispatch marker extraction through one compilation-scoped context.
+    pub fn run_meta_layers_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Vec<MetaLayerOutput> {
+        let mut results = Vec::new();
+        for layer in &self.meta_layers {
+            if layer.is_applicable(context.source, context.path, context.config) {
+                if let Some(output) = layer.enrich_context(context) {
+                    results.push(output);
+                }
+            }
+        }
+        results
+    }
+
     /// Collect semantic edges from all applicable meta-layers (phase 0).
     ///
     /// Mirrors `run_meta_layers_pipeline` dispatch: each layer checks
@@ -223,6 +239,20 @@ impl LayerRegistry {
                     fidelity,
                     config,
                 ));
+            }
+        }
+        edges
+    }
+
+    /// Dispatch semantic extraction through one compilation-scoped context.
+    pub fn collect_semantic_edges_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Vec<SemanticEdge> {
+        let mut edges = Vec::new();
+        for layer in &self.meta_layers {
+            if layer.is_applicable(context.source, context.path, context.config) {
+                edges.extend(layer.extract_semantic_edges_context(context));
             }
         }
         edges

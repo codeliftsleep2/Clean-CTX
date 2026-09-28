@@ -18,7 +18,10 @@
 // this pattern.
 
 pub mod builtin;
+mod context;
 pub mod semantic;
+
+pub use context::MetaLayerContext;
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
@@ -107,6 +110,17 @@ pub trait MetaLayer: Send + Sync {
         self.enrich(source, class_captures, fidelity, config)
     }
 
+    /// Compilation-context adapter used during the single-pass migration.
+    fn enrich_context(&self, context: &MetaLayerContext<'_>) -> Option<MetaLayerOutput> {
+        self.enrich_with_path(
+            context.source,
+            context.path,
+            context.class_captures,
+            context.fidelity,
+            context.config,
+        )
+    }
+
     /// Extract structured semantic edges for the given source file.
     ///
     /// Legacy text-only contract. Framework meta-layers implement this from
@@ -163,6 +177,20 @@ pub trait MetaLayer: Send + Sync {
         config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
         self.extract_semantic_edges_paired(source, class_captures, fidelity, config)
+    }
+
+    /// Compilation-context semantic adapter used during the single-pass migration.
+    fn extract_semantic_edges_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Vec<SemanticEdge> {
+        self.extract_semantic_edges_paired_with_path(
+            context.source,
+            context.path,
+            context.paired_class_captures,
+            context.fidelity,
+            context.config,
+        )
     }
 }
 

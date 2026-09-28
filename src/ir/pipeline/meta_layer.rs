@@ -38,23 +38,20 @@ impl IRPass for MetaLayerPass {
             .unwrap_or_else(|| state.file_id.clone());
         let path = Path::new(&file_provenance);
         let registry = crate::layers::LayerRegistry::global();
-
-        let meta_results = registry.run_meta_layers_pipeline_with_path(
+        let lexical_regions = crate::meta_util::LexicalRegions::new(&state.source);
+        let context = crate::layers::meta::MetaLayerContext::new(
             &state.source,
             path,
             &class_captures,
-            state.fidelity,
-            state.config.as_ref(),
-        );
-        append_marker_aliases(state, &meta_results);
-
-        let mut semantic_edges = registry.collect_semantic_edges_with_path(
-            &state.source,
-            path,
             &class_entries,
             state.fidelity,
             state.config.as_ref(),
+            &lexical_regions,
         );
+
+        let meta_results = registry.run_meta_layers_context(&context);
+        let mut semantic_edges = registry.collect_semantic_edges_context(&context);
+        append_marker_aliases(state, &meta_results);
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {
                 edge.subject.file = Some(file_provenance.clone());

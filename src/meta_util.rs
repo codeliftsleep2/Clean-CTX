@@ -21,6 +21,8 @@ pub use class_source::{
 };
 pub use declaration::{extract_decl_name, extract_entity_type, extract_first_quoted};
 pub use lexical_regions::LexicalRegions;
+#[cfg(test)]
+pub(crate) use lexical_regions::{construction_count, reset_construction_count};
 pub use scanner::{
     collect_call_body, consume_call_expression, extract_quoted_value, find_enclosing_brace,
     find_first_top_level, find_matching_brace, is_inside_comment_or_string, skip_string,

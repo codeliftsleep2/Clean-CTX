@@ -23,6 +23,22 @@ fn compile_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
 }
 
 #[test]
+fn production_meta_pass_constructs_one_shared_lexical_index() {
+    crate::meta_util::reset_construction_count();
+
+    let _ = compile_edges(
+        "import { signal } from '@angular/core'; const count = signal(0);",
+        "C:/repo/state.ts",
+    );
+
+    assert_eq!(
+        crate::meta_util::construction_count(),
+        1,
+        "MetaLayerPass must construct one lexical index for both dispatches"
+    );
+}
+
+#[test]
 fn canonical_path_reaches_testing_extractor_in_production_pass() {
     let edges = compile_edges(
         "describe('account', () => { it('works', () => {}); });",

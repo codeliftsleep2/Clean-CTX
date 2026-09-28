@@ -1,5 +1,20 @@
 //! Reusable per-source comment and string membership index.
 
+#[cfg(test)]
+thread_local! {
+    static CONSTRUCTION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_construction_count() {
+    CONSTRUCTION_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn construction_count() -> usize {
+    CONSTRUCTION_COUNT.with(std::cell::Cell::get)
+}
+
 /// Immutable index of byte regions that the shared meta-layer scanner treats
 /// as comments, strings, or template literals.
 ///
@@ -12,6 +27,9 @@ impl LexicalRegions {
     /// Scans `source` once and records the half-open byte ranges where
     /// [`super::is_inside_comment_or_string`] returns `true`.
     pub fn new(source: &str) -> Self {
+        #[cfg(test)]
+        CONSTRUCTION_COUNT.with(|count| count.set(count.get() + 1));
+
         let bytes = source.as_bytes();
         let mut spans = Vec::new();
         let mut span_start = None;

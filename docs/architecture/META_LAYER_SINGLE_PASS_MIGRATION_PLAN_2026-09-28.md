@@ -1,6 +1,6 @@
 # Meta-layer single-pass migration plan — 2026-09-28
 
-**Status:** Approved investigation and phased implementation plan; Phases 0–2
+**Status:** Approved investigation and phased implementation plan; Phases 0–3
 complete, later phases pending RED/GREEN implementation.
 
 **Scope:** Framework detection, marker extraction, and semantic-edge extraction
@@ -215,6 +215,9 @@ lexical corpus and has no framework vocabulary.
 
 ### Phase 3 — Establish a compilation-scoped meta context
 
+**Status:** Complete; focused adapter, registry-dispatch, and production-lifecycle
+RED/GREEN regressions reported.
+
 **Goal:** Give every layer access to shared immutable per-file evidence without
 global caching or repeated allocation.
 
@@ -224,6 +227,20 @@ global caching or repeated allocation.
 4. Avoid cloning every class capture solely to cross the registry boundary.
 5. Add adapters so existing layer behavior can migrate incrementally.
 6. Pin layer order, disabled-layer behavior, and output equivalence.
+
+The production `MetaLayerPass` now constructs one `LexicalRegions` and one
+borrowed `MetaLayerContext`, then reuses that context for marker and semantic
+dispatch. Compatibility adapters deliberately retain the pre-existing owned
+class-text projection until framework implementations migrate; the registry
+boundary itself adds no capture cloning.
+
+Regression authority:
+
+- `src/tests/layers/registry.rs::compilation_context_adapter_preserves_legacy_layer_output`
+- `src/tests/layers/registry.rs::compilation_context_adapter_preserves_legacy_semantic_edges`
+- `src/tests/layers/registry.rs::registry_context_dispatch_preserves_applicable_layer_output`
+- `src/tests/layers/registry.rs::registry_context_dispatch_preserves_applicable_semantic_edges`
+- `src/tests/ir/pipeline_meta_layer.rs::production_meta_pass_constructs_one_shared_lexical_index`
 
 **Exit criterion:** Existing layers can consume the context through adapters;
 no production behavior changes and no old path has been removed prematurely.
