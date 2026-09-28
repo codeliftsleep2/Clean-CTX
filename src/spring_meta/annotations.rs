@@ -2,21 +2,8 @@
 //
 // Spring annotation extraction — Tier 1 of the Meta-Layer.
 //
-// Given the raw text of a class/interface/record capture, extract every
-// Spring annotation and emit the corresponding `Φ` marker lines.
-// Also detects field-level `@Autowired` and `@Value` annotations.
-//
-// # Strategy
-//
-// We do NOT re-parse the AST. The Java capture pipeline already
-// produced a class/interface/record capture that may include the leading
-// `@…` annotations. We scan the text **before** the first
-// occurrence of the `class` / `interface` / `record` keyword, collect
-// every `@…` annotation, classify it, and emit the appropriate `Φ`
-// marker lines.
-//
-// The string walker is O(L) where L is the length of the class
-// capture, which is bounded by the class body length.
+// Extract Spring annotations and `Φ` markers from Java type captures without
+// reparsing. Field-level declarations are delegated to `annotations::fields`.
 
 use crate::compression::Fidelity;
 use crate::meta_util::{consume_call_expression, split_top_level};
@@ -25,6 +12,9 @@ use crate::spring_meta::markers::{
     build_configuration_properties_line, build_controller_line, build_repository_line,
     build_request_mapping_line, build_rest_controller_line, build_service_line, build_value_line,
 };
+
+mod fields;
+pub(crate) use fields::collect_field_annotations;
 
 /// Result of [`extract_annotations`]: the Φ marker lines.
 pub struct AnnotationsResult {
@@ -186,13 +176,13 @@ pub fn extract_annotations(raw_class: &str, fidelity: Fidelity) -> Option<Annota
     {
         let body = &raw_class[class_body_start..];
         let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for (field_name, anno_kind) in collect_field_annotations(body_inner) {
-            match anno_kind {
+        for field in collect_field_annotations(body_inner) {
+            match field.kind {
                 AnnotationKind::Autowired => {
-                    autowired_fields.push(field_name.clone());
+                    autowired_fields.push(field.name);
                 }
                 AnnotationKind::Value => {
-                    value_fields.push(field_name.clone());
+                    value_fields.push(field.name);
                 }
                 _ => {}
             }
@@ -502,63 +492,6 @@ pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationK
                         i += 1;
                     }
                 }
-            }
-        }
-    }
-
-    out
-}
-
-pub(crate) fn collect_field_annotations(body: &str) -> Vec<(String, AnnotationKind)> {
-    let mut out: Vec<(String, AnnotationKind)> = Vec::new();
-    let bytes = body.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-
-    while i < len {
-        if bytes[i] != b'@' {
-            i += 1;
-            continue;
-        }
-        i += 1;
-        let name_start = i;
-        while i < len {
-            let c = bytes[i];
-            if c.is_ascii_alphanumeric() || c == b'_' || c == b'$' {
-                i += 1;
-            } else {
-                break;
-            }
-        }
-        if i == name_start {
-            continue;
-        }
-        let name = &body[name_start..i];
-        let kind = match name {
-            "Autowired" => Some(AnnotationKind::Autowired),
-            "Value" => Some(AnnotationKind::Value),
-            _ => None,
-        };
-        if let Some(k) = kind {
-            while i < len && (bytes[i] == b' ' || bytes[i] == b'\t') {
-                i += 1;
-            }
-            let field_start = i;
-            while i < len {
-                let c = bytes[i];
-                if c == b'\n' || c == b'{' || c == b'=' || c == b';' || c == b':' {
-                    break;
-                }
-                i += 1;
-            }
-            let field_segment = body[field_start..i].trim();
-            let field_name = field_segment
-                .split_whitespace()
-                .next()
-                .unwrap_or("?")
-                .to_string();
-            if !field_name.is_empty() {
-                out.push((field_name, k));
             }
         }
     }

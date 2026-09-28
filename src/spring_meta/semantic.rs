@@ -129,11 +129,14 @@ pub fn extract_spring_semantic_edges(raw_class: &str, fidelity: Fidelity) -> Vec
                 let body = &raw_class[class_body_start..];
                 let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
                 let controller = EntityRef::new("spring", "Controller", &class_name);
-                for (field_name, _) in collect_field_annotations(body_inner) {
+                for field in collect_field_annotations(body_inner)
+                    .into_iter()
+                    .filter(|field| field.kind == AnnotationKind::Autowired)
+                {
                     edges.push(SemanticEdge {
                         relation: SemanticRelation::Autowired,
                         subject: controller.clone(),
-                        object: EntityRef::new("spring", "Service", &field_name),
+                        object: EntityRef::new("spring", "Service", &field.type_name),
                         layer: "spring",
                         call_evidence: None,
                     });

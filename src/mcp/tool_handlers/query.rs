@@ -284,12 +284,18 @@ mod tests_identity_resolution;
 #[path = "../../tests/mcp/workspace_query_calls.rs"]
 mod tests_native_calls;
 
-// Native call facts for the additional language producers (TypeScript, Java)
+// Native call facts for the additional language producers (TypeScript, Java,
+// Rust)
 // end-to-end: cross-file `reverse_edges` returns Clean-CTX-authored callers for
 // either language, without any CBM-supplied call relationship.
 #[cfg(all(test, feature = "rust", feature = "typescript", feature = "java"))]
 #[path = "../../tests/mcp/workspace_query_calls_languages.rs"]
 mod tests_native_calls_languages;
+
+// Spring Boot semantic edges through the real provide/query MCP lifecycle.
+#[cfg(all(test, feature = "rust", feature = "spring_boot"))]
+#[path = "../../tests/mcp/workspace_query_spring.rs"]
+mod tests_spring_lifecycle;
 
 // BOUND-ARROW callers (TypeScript) end-to-end: the arrow's binding name is the
 // caller, the CALLER's file asserts the fact, and WSC-004 scope holds.

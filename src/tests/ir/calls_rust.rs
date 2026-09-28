@@ -51,7 +51,6 @@ fn rust_native_calls_preserve_caller_callee_and_written_arity() {
         .instructions
         .iter()
         .filter_map(|op| op.call_parts())
-        .map(|(caller, callee, argc, has_spread)| (caller, callee, argc, has_spread))
         .collect();
 
     assert_eq!(

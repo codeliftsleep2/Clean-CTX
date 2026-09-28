@@ -90,6 +90,31 @@ public class AppProperties {
     assert!(has_config_props, "should have ConfigurationProperties edge");
 }
 
+#[test]
+fn autowired_field_maps_controller_to_the_injected_service_type() {
+    let source = r#"
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class UserController {
+    @Autowired
+    private UserService userService;
+}
+"#;
+    let layer = SpringBootMetaLayer::new();
+    let edges = layer.extract_semantic_edges(source, &[source.to_string()], Fidelity::High, None);
+
+    assert!(
+        edges.iter().any(|edge| {
+            edge.relation == SemanticRelation::Autowired
+                && edge.subject == EntityRef::new("spring", "Controller", "UserController")
+                && edge.object == EntityRef::new("spring", "Service", "UserService")
+        }),
+        "the injected Java field type must be the Spring service identity: {edges:?}"
+    );
+}
+
 // ── Class-level @RequestMapping path ─────────────────────────────────
 
 #[test]
