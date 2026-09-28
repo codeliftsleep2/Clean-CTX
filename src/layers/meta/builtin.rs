@@ -9,8 +9,8 @@
 // meta layer (Angular/.NET/Spring) emitted semantic edges. For plain files
 // the pipeline was:
 //
-//   source → CoreIRPass captures → MetaLayerPass → collect_semantic_edges()
-//     → no applicable framework layer → semantic_edges = []
+//   source → CoreIRPass captures → MetaLayerPass → combined meta evaluation
+//     → no applicable framework output → semantic_edges = []
 //     → WorkspaceIndex.add_edges([]) → no entities
 //
 // This layer consumes the SAME capture pairs MetaLayerPass already builds
@@ -140,7 +140,13 @@ impl MetaLayer for BuiltinMetaLayer {
 
         MetaLayerEvaluation {
             output: None,
-            semantic_edges: self.extract_semantic_edges_context(context),
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
         }
     }
 }

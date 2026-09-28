@@ -113,7 +113,7 @@ fn production_testing_family_reuses_meta_pass_lexical_index() {
 
 #[test]
 fn production_meta_pass_uses_one_combined_registry_evaluation() {
-    crate::layers::registry::reset_context_route_counts();
+    crate::layers::registry::reset_context_evaluation_count();
 
     let _ = compile_edges(
         "import { signal } from '@angular/core'; const count = signal(0);",
@@ -121,9 +121,9 @@ fn production_meta_pass_uses_one_combined_registry_evaluation() {
     );
 
     assert_eq!(
-        crate::layers::registry::context_route_counts(),
-        (0, 0, 1),
-        "MetaLayerPass must replace separate marker/semantic routes with one evaluation"
+        crate::layers::registry::context_route_count(),
+        1,
+        "MetaLayerPass must use one combined registry evaluation"
     );
 }
 

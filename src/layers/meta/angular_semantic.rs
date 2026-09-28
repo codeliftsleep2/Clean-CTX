@@ -188,8 +188,19 @@ pub(super) fn evaluate_if_applicable(
         || crate::angular_meta::ngrx::has_ngrx_imports(context.source)
         || crate::angular_meta::signals::has_signal_imports(context.source)
         || reactive_forms_enabled
-            && crate::angular_meta::reactive_forms::has_reactive_forms(context.source)
-        || formly_enabled && crate::angular_meta::formly::has_formly(context.source)
+            && crate::angular_meta::reactive_forms::extract_reactive_form_shape_with_regions(
+                context.source,
+                Fidelity::Low,
+                context.lexical_regions,
+            )
+            .is_some()
+        || formly_enabled
+            && crate::angular_meta::formly::extract_formly_shape_with_regions(
+                context.source,
+                Fidelity::Low,
+                context.lexical_regions,
+            )
+            .is_some()
         || crate::angular_meta::routing::has_router_imports(context.source)
         || testing_enabled
             && crate::angular_meta::testing::is_testing_source(context.source, context.path);

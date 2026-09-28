@@ -162,9 +162,9 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Meta-layer source context MUST be derived from the canonical `CapEntry` capture identity — NOT from the compacted `CoreOp::DefClass.name`. |
-| **Invariant** | `MetaLayerPass` derives each class capture's canonical source span from `PassContext.captures` (the persisted capture identity). `class_source_from_capture()` produces the decorator/annotation/attribute-inclusive class text (TS `@Name(...)`, Java `@Name`, C# `[Name]`). Path-aware dispatch carries the existing canonical source path without changing its authority. `MetaLayer::enrich()` receives `class_captures: &[String]` directly — no `DefClass.name` round-trip. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible). |
-| **Enforcement** | `class_source_from_capture_c22_identity` asserts reconstruction from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline/meta_layer.rs` filters type-root captures and forwards canonical path context. Multi-class cross-contamination tests verify per-class isolation; Angular testing regressions verify canonical-path delivery and backward-compatible path-independent output. |
-| **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/ir/pipeline/meta_layer.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (path-aware dispatch), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests), `src/tests/ir/pipeline_meta_layer.rs` (canonical-path integration) |
+| **Invariant** | `MetaLayerPass` derives each class capture's canonical source span from `PassContext.captures` (the persisted capture identity). `class_source_from_capture()` produces the decorator/annotation/attribute-inclusive class text (TS `@Name(...)`, Java `@Name`, C# `[Name]`). The compilation-scoped `MetaLayerContext` carries those spans and the existing canonical source path into one combined layer evaluation without changing either identity's authority. No `DefClass.name` round-trip is permitted. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible). |
+| **Enforcement** | `class_source_from_capture_c22_identity` asserts reconstruction from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline/meta_layer.rs` filters type-root captures and constructs the shared context. Multi-class cross-contamination tests verify per-class isolation; Angular testing regressions verify canonical-path delivery and backward-compatible path-independent output. |
+| **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/layers/meta/context.rs` (`MetaLayerContext`), `src/ir/pipeline/meta_layer.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (combined context dispatch), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests), `src/tests/ir/pipeline_meta_layer.rs` (canonical-path integration) |
 | **Type** | ENFORCED (test + structural) |
 | **Gate** | `cargo test` |
 
@@ -181,6 +181,19 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test --all-features` |
 | **Relationship to C-22** | C-22 establishes the canonical type-level source span delivered to a meta-layer. META-001 governs declaration- and statement-level ownership inside that span; receiving the correct class source does not authorize whole-prefix evidence borrowing within the class. |
+
+---
+
+### META-002 Compilation-Scoped Single Evaluation
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Framework enrichment must reuse immutable evidence already owned by the current compilation instead of reparsing the file or independently deriving the marker and semantic projections. |
+| **Invariant** | `MetaLayerPass` constructs one `MetaLayerContext`, including one shared `LexicalRegions` index, and sends it through one registry evaluation. Each applicable registered layer makes one applicability decision and returns markers plus semantic edges in one `MetaLayerEvaluation`. Angular and .NET production applicability reuse compilation-scoped evidence and do not invoke their standalone AST detector; standalone detector entry points retain their established behavior for non-pipeline callers. The text compression pipeline may retain its text-oriented API, but it does not create a second compilation-context route. |
+| **Enforcement** | The combined registry regressions pin one applicability check and one evaluation hook per layer. Production-pipeline regressions pin one registry evaluation, one lexical index, one framework detection pass, and zero detection-only AST parses. Framework-specific work counters pin shared Angular testing/NgRx/routing shapes and shared .NET ASP.NET/EF Core analyses where both projections consume the same facts. |
+| **Authority** | `src/layers/meta/context.rs`, `src/layers/meta/mod.rs`, `src/layers/registry.rs`, `src/ir/pipeline/meta_layer.rs`, `src/tests/layers/registry.rs`, `src/tests/ir/pipeline_meta_layer.rs` |
+| **Type** | STRUCTURAL + ENFORCED (test) |
+| **Gate** | Focused meta-layer regressions locally; complete `cargo test --all-features` in CI |
 
 ---
 

@@ -19,18 +19,17 @@ static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
 
 #[cfg(test)]
 thread_local! {
-    static CONTEXT_ROUTE_COUNTS: std::cell::Cell<(usize, usize, usize)> =
-        const { std::cell::Cell::new((0, 0, 0)) };
+    static CONTEXT_EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 #[cfg(test)]
-pub(crate) fn reset_context_route_counts() {
-    CONTEXT_ROUTE_COUNTS.with(|counts| counts.set((0, 0, 0)));
+pub(crate) fn reset_context_evaluation_count() {
+    CONTEXT_EVALUATION_COUNT.with(|count| count.set(0));
 }
 
 #[cfg(test)]
-pub(crate) fn context_route_counts() -> (usize, usize, usize) {
-    CONTEXT_ROUTE_COUNTS.with(std::cell::Cell::get)
+pub(crate) fn context_route_count() -> usize {
+    CONTEXT_EVALUATION_COUNT.with(std::cell::Cell::get)
 }
 
 /// Registry of all enabled language and meta layers.
@@ -193,28 +192,7 @@ impl LayerRegistry {
         results
     }
 
-    /// Dispatch marker extraction through one compilation-scoped context.
-    pub fn run_meta_layers_context(
-        &self,
-        context: &MetaLayerContext<'_>,
-    ) -> Vec<MetaLayerOutput> {
-        #[cfg(test)]
-        CONTEXT_ROUTE_COUNTS.with(|counts| {
-            let (markers, semantics, combined) = counts.get();
-            counts.set((markers + 1, semantics, combined));
-        });
-        let mut results = Vec::new();
-        for layer in &self.meta_layers {
-            if layer.is_applicable(context.source, context.path, context.config) {
-                if let Some(output) = layer.enrich_context(context) {
-                    results.push(output);
-                }
-            }
-        }
-        results
-    }
-
-    /// Collect semantic edges from all applicable meta-layers (phase 0).
+    /// Collect semantic edges through the text-oriented compatibility path.
     ///
     /// Mirrors `run_meta_layers_pipeline` dispatch: each layer checks
     /// `is_applicable` and, if true, calls `extract_semantic_edges`. Edges
@@ -265,35 +243,13 @@ impl LayerRegistry {
         edges
     }
 
-    /// Dispatch semantic extraction through one compilation-scoped context.
-    pub fn collect_semantic_edges_context(
-        &self,
-        context: &MetaLayerContext<'_>,
-    ) -> Vec<SemanticEdge> {
-        #[cfg(test)]
-        CONTEXT_ROUTE_COUNTS.with(|counts| {
-            let (markers, semantics, combined) = counts.get();
-            counts.set((markers, semantics + 1, combined));
-        });
-        let mut edges = Vec::new();
-        for layer in &self.meta_layers {
-            if layer.is_applicable(context.source, context.path, context.config) {
-                edges.extend(layer.extract_semantic_edges_context(context));
-            }
-        }
-        edges
-    }
-
-    /// Compatibility entry point for combined marker and semantic dispatch.
+    /// Combined marker and semantic dispatch for one compilation context.
     pub fn evaluate_meta_layers_context(
         &self,
         context: &MetaLayerContext<'_>,
     ) -> (Vec<MetaLayerOutput>, Vec<SemanticEdge>) {
         #[cfg(test)]
-        CONTEXT_ROUTE_COUNTS.with(|counts| {
-            let (markers, semantics, combined) = counts.get();
-            counts.set((markers, semantics, combined + 1));
-        });
+        CONTEXT_EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
         let mut outputs = Vec::new();
         let mut edges = Vec::new();
         for layer in &self.meta_layers {

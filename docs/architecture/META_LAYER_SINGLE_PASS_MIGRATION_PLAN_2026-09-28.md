@@ -1,7 +1,7 @@
 # Meta-layer single-pass migration plan — 2026-09-28
 
-**Status:** Approved investigation and phased implementation plan; Phases 0–5
-complete, later phases pending RED/GREEN implementation.
+**Status:** Complete (2026-09-28). Phases 0–8 are implemented; focused
+meta-layer verification is green and repository-wide gates remain CI-owned.
 
 **Scope:** Framework detection, marker extraction, and semantic-edge extraction
 for Angular, .NET, and Spring Boot. The migration removes redundant work inside
@@ -234,13 +234,13 @@ dispatch. Compatibility adapters deliberately retain the pre-existing owned
 class-text projection until framework implementations migrate; the registry
 boundary itself adds no capture cloning.
 
-Regression authority:
+Regression authority during migration was provided by the adapter tests. Phase
+8 removed those transitional adapters after the combined registry and
+production-route regressions superseded them. The durable authority is now:
 
-- `src/tests/layers/registry.rs::compilation_context_adapter_preserves_legacy_layer_output`
-- `src/tests/layers/registry.rs::compilation_context_adapter_preserves_legacy_semantic_edges`
-- `src/tests/layers/registry.rs::registry_context_dispatch_preserves_applicable_layer_output`
-- `src/tests/layers/registry.rs::registry_context_dispatch_preserves_applicable_semantic_edges`
+- `src/tests/layers/registry.rs` combined-evaluation regressions
 - `src/tests/ir/pipeline_meta_layer.rs::production_meta_pass_constructs_one_shared_lexical_index`
+- `src/tests/ir/pipeline_meta_layer.rs::production_meta_pass_uses_one_combined_registry_evaluation`
 
 **Exit criterion:** Existing layers can consume the context through adapters;
 no production behavior changes and no old path has been removed prematurely.
@@ -358,7 +358,8 @@ production regressions enforce one detection pass per compilation:
 
 ### Phase 7 — Measure before broader scan fusion
 
-**Status:** Measurement harness implemented; results pending maintainer run.
+**Status:** Complete (2026-09-28); repeated maintainer measurements reject
+broader scan fusion.
 
 **Goal:** Decide whether P4 warrants more architecture.
 
@@ -456,7 +457,16 @@ The same run measured .NET at -0.08% and Spring at 0.26%. All three framework
 meta-layers are therefore within measurement noise, and the evidence rejects
 broader scan fusion unless confirmation runs materially contradict it.
 
+Two confirmation runs reported Angular at 0.52% then 0.31%, .NET at 0.61%
+then -0.01%, and Spring at 0.46% then 0.36%. The repeated result closes the
+measurement decision: retain the independent linear extractors and do not add
+a shared tokenizer or broader scan-fusion architecture.
+
 ### Phase 8 — Finalize the migration
+
+**Status:** Complete (2026-09-28); obsolete context adapters removed, durable
+invariant recorded, post-migration audit complete, and focused regressions
+reported green by the maintainer.
 
 - Remove obsolete adapters, duplicate trait methods, legacy lexical calls, and
   stale comments.
@@ -467,6 +477,30 @@ broader scan fusion unless confirmation runs materially contradict it.
 - Perform the post-task architectural audit from `docs/agent/architecture.md`.
 - Run focused local gates only; repository-wide tests remain CI-owned under the
   maintainer's local-development policy.
+
+Phase 8 audit result before focused verification:
+
+- `MetaLayerPass` has one production compilation-context route:
+  `evaluate_meta_layers_context`.
+- The separate compilation-context marker and semantic adapters and their
+  duplicate trait hooks have been removed.
+- The text-oriented `run_meta_layers_pipeline` remains intentionally because
+  the non-IR compression path consumes it; it is not a duplicate
+  compilation-context route.
+- Remaining production calls to the legacy prefix predicate are confined to
+  class-source boundary reconstruction, where each query operates on a
+  distinct bounded search rather than a framework match loop. Angular
+  full-source extractor families use `LexicalRegions`.
+- No new global cache, tokenizer, synchronization, or persistence owner was
+  introduced. The shared context remains immutable and compilation-scoped.
+- META-002 records the final single-evaluation and evidence-ownership contract;
+  DIS-2026-030 records the field discovery and regression authorities.
+- `combined_registry_`,
+  `production_meta_pass_uses_one_combined_registry_evaluation`, and the full
+  `ir::pipeline::meta_layer::tests::` module were reported green. The broader
+  module initially exposed standalone Reactive Forms and Formly applicability
+  checks constructing two extra lexical indexes; both now consume the shared
+  compilation index, and the exact regression plus the module rerun are green.
 
 ---
 

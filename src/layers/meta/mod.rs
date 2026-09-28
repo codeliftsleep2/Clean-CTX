@@ -112,17 +112,6 @@ pub trait MetaLayer: Send + Sync {
         self.enrich(source, class_captures, fidelity, config)
     }
 
-    /// Compilation-context adapter used during the single-pass migration.
-    fn enrich_context(&self, context: &MetaLayerContext<'_>) -> Option<MetaLayerOutput> {
-        self.enrich_with_path(
-            context.source,
-            context.path,
-            context.class_captures,
-            context.fidelity,
-            context.config,
-        )
-    }
-
     /// Extract structured semantic edges for the given source file.
     ///
     /// Legacy text-only contract. Framework meta-layers implement this from
@@ -181,25 +170,23 @@ pub trait MetaLayer: Send + Sync {
         self.extract_semantic_edges_paired(source, class_captures, fidelity, config)
     }
 
-    /// Compilation-context semantic adapter used during the single-pass migration.
-    fn extract_semantic_edges_context(
-        &self,
-        context: &MetaLayerContext<'_>,
-    ) -> Vec<SemanticEdge> {
-        self.extract_semantic_edges_paired_with_path(
-            context.source,
-            context.path,
-            context.paired_class_captures,
-            context.fidelity,
-            context.config,
-        )
-    }
-
-    /// Evaluate one applicable layer through a single migration boundary.
+    /// Evaluate one applicable layer through one compilation boundary.
     fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
         MetaLayerEvaluation {
-            output: self.enrich_context(context),
-            semantic_edges: self.extract_semantic_edges_context(context),
+            output: self.enrich_with_path(
+                context.source,
+                context.path,
+                context.class_captures,
+                context.fidelity,
+                context.config,
+            ),
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
         }
     }
 
@@ -323,26 +310,6 @@ impl MetaLayer for AngularMetaLayer {
         })
     }
 
-    fn enrich_context(&self, context: &MetaLayerContext<'_>) -> Option<MetaLayerOutput> {
-        let meta_config = context
-            .config
-            .and_then(|config| config.meta_layers.get("angular"));
-        let block = crate::angular_meta::run_meta_layer_with_config_path_and_regions(
-            context.source,
-            context.class_captures,
-            context.fidelity,
-            meta_config,
-            context.path,
-            context.lexical_regions,
-        )?;
-        (!block.is_empty()).then(|| MetaLayerOutput {
-            layer_name: self.name(),
-            rendered: block.render(),
-            angular_block: Some(block),
-            ..Default::default()
-        })
-    }
-
     fn extract_semantic_edges(
         &self,
         source: &str,
@@ -394,42 +361,6 @@ impl MetaLayer for AngularMetaLayer {
         if testing_enabled {
             edges
                 .extend(crate::angular_meta::testing::extract_testing_semantic_edges(source, path));
-        }
-        edges
-    }
-
-    fn extract_semantic_edges_context(
-        &self,
-        context: &MetaLayerContext<'_>,
-    ) -> Vec<SemanticEdge> {
-        let captures: Vec<String> = context
-            .paired_class_captures
-            .iter()
-            .map(|(_, text)| text.clone())
-            .collect();
-        let mut edges = angular_semantic::extract_non_testing_edges(
-            context.source,
-            &captures,
-            context.fidelity,
-            context.config,
-            Some(context.lexical_regions),
-            None,
-            None,
-            None,
-        );
-        let testing_enabled = context
-            .config
-            .and_then(|value| value.meta_layers.get("angular"))
-            .map(|value| value.testing.enabled)
-            .unwrap_or(true);
-        if testing_enabled {
-            edges.extend(
-                crate::angular_meta::testing::extract_testing_semantic_edges_with_regions(
-                    context.source,
-                    context.path,
-                    context.lexical_regions,
-                ),
-            );
         }
         edges
     }
@@ -568,7 +499,13 @@ impl MetaLayer for SpringBootMetaLayer {
         });
         MetaLayerEvaluation {
             output,
-            semantic_edges: self.extract_semantic_edges_context(context),
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
         }
     }
 }

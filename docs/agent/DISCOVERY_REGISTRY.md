@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-030: Framework Meta-Layers Reparsed and Rescanned Each Compilation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-28 |
+| **Environment** | Clean-CTX release-candidate audit with representative Angular, .NET, and Spring sources |
+| **Repository/context** | Production `MetaLayerPass` and framework extractors; the finding generalized an Angular testing rescan report to the shared meta-layer lifecycle |
+| **Symptom** | One compilation repeatedly scanned source prefixes for lexical membership, traversed the registry separately for markers and semantic edges, and reparsed TypeScript/C# during framework applicability even though the compilation already owned equivalent evidence. Initial corrected paired measurements showed stable overhead around 9.26% for Angular and 13.18% for .NET; Spring was within noise. |
+| **Root cause** | The meta-layer boundary exposed independent marker and semantic routes without a compilation-scoped evidence owner. Angular extractors called a byte-zero lexical predicate at many match positions, and Angular/.NET applicability delegated to standalone AST-based detectors instead of consuming evidence already created by the production compilation. |
+| **Classification** | Emergent performance and architectural ownership |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/meta_util.rs`; `src/tests/angular_meta/{testing,signals,routing,rx_lexical,ngrx,reactive_forms,formly}.rs`; `src/tests/layers/registry.rs`; `src/tests/ir/pipeline_meta_layer.rs` |
+| **Live scenario required?** | No — the bounded production-path benchmark supplies directional measurement evidence; correctness and work ownership are enforced by deterministic tracked regressions. |
+| **Architectural invariant** | META-002 |
+| **Status** | Fixed; focused Phase 8 verification green |
+
+**Resolution:** `MetaLayerPass` now creates one borrowed `MetaLayerContext` with
+one reusable `LexicalRegions` index and performs one combined registry
+evaluation. Applicable layers return markers and semantic edges together.
+Angular lexical consumers reuse the index, while Angular and .NET production
+applicability reuse compilation evidence without a detection-only parse.
+Repeated paired-median confirmation runs measured Angular at 0.52% then 0.31%,
+.NET at 0.61% then -0.01%, and Spring at 0.46% then 0.36%; broader scan fusion
+was therefore rejected as unnecessary complexity.
+
+---
+
 ## DIS-2026-029: `cbm_proxy` Gated a Canonical Project but Forwarded Its Short Alias
 
 | Field | Value |
