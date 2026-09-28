@@ -142,11 +142,13 @@ pub fn is_testing_source(source: &str, path: &Path) -> bool {
 pub fn extract_testing_shape(source: &str, _fidelity: Fidelity) -> Option<TestingShape> {
     let describes = collect_literal_calls(source, "describe");
     let tests = collect_literal_calls(source, "it");
+    let describe_count = describes.len();
+    let test_count = tests.len();
     let test_bed = extract_test_bed_summaries(source);
     let spies = extract_vitest_spies(source);
     let shape = TestingShape {
-        describe_count: count_calls(source, "describe"),
-        test_count: count_calls(source, "it"),
+        describe_count,
+        test_count,
         tests: tests.into_iter().map(|call| call.value).collect(),
         test_bed,
         spies,
@@ -222,10 +224,6 @@ fn collect_literal_calls(source: &str, name: &str) -> Vec<LiteralCall> {
             })
         })
         .collect()
-}
-
-fn count_calls(source: &str, name: &str) -> usize {
-    call_positions(source, &format!("{name}(")).len()
 }
 
 fn call_positions(source: &str, needle: &str) -> Vec<usize> {
