@@ -16,11 +16,27 @@ use super::markers::{
 };
 use crate::compression::Fidelity;
 use crate::dotnet_meta::MetaBlock;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+pub(crate) struct AspNetAnalysis {
+    pub block: MetaBlock,
+    pub semantic_edges: Vec<SemanticEdge>,
+}
 
 /// Extract ASP.NET Core markers from a single class capture.
 ///
 /// Returns `None` when the class is not an ASP.NET Core construct.
 pub fn extract_aspnet(class_source: &str, fidelity: Fidelity) -> Option<MetaBlock> {
+    analyze_aspnet(class_source, fidelity).map(|analysis| analysis.block)
+}
+
+pub(crate) fn analyze_aspnet(
+    class_source: &str,
+    fidelity: Fidelity,
+) -> Option<AspNetAnalysis> {
+    #[cfg(test)]
+    super::class_analysis_metrics::record_analysis();
+
     let mut lines = Vec::new();
 
     // Detect controller class
@@ -54,8 +70,16 @@ pub fn extract_aspnet(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     }
 
     // Extract actions (methods with HTTP verb attributes)
-    if fidelity != Fidelity::Low {
-        lines.extend(extract_actions(class_source));
+    let actions = (fidelity != Fidelity::Low).then(|| extract_action_facts(class_source));
+    if let Some(actions) = &actions {
+        lines.extend(actions.iter().filter(|action| action.marker).map(|action| {
+            build_action_line(
+                action.verb,
+                &action.name,
+                &action.params,
+                action.return_type.as_deref(),
+            )
+        }));
     }
 
     // Extract models/DTOs
@@ -66,7 +90,30 @@ pub fn extract_aspnet(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     if lines.is_empty() {
         None
     } else {
-        Some(MetaBlock { lines })
+        let controller = EntityRef::new("dotnet", "Controller", &class_name);
+        let mut semantic_edges = Vec::new();
+        if let Some(route) = extract_semantic_route(class_source) {
+            semantic_edges.push(SemanticEdge {
+                relation: SemanticRelation::HasRoute,
+                subject: controller.clone(),
+                object: EntityRef::new("dotnet", "Route", &route),
+                layer: "dotnet",
+                call_evidence: None,
+            });
+        }
+        if let Some(actions) = actions {
+            semantic_edges.extend(actions.into_iter().map(|action| SemanticEdge {
+                relation: SemanticRelation::ControllerAction,
+                subject: controller.clone(),
+                object: EntityRef::new("dotnet", "Action", &action.name),
+                layer: "dotnet",
+                call_evidence: None,
+            }));
+        }
+        Some(AspNetAnalysis {
+            block: MetaBlock { lines },
+            semantic_edges,
+        })
     }
 }
 
@@ -110,6 +157,14 @@ fn extract_route(source: &str) -> Option<String> {
     None
 }
 
+fn extract_semantic_route(source: &str) -> Option<String> {
+    let pos = source.find("[Route(")?;
+    let rest = &source[pos + "[Route(".len()..];
+    let quote_start = rest.find('"')? + 1;
+    let quote_end = rest[quote_start..].find('"')?;
+    Some(rest[quote_start..quote_start + quote_end].to_string())
+}
+
 /// Extract authorization policy from [Authorize(Policy = "...")] or [Authorize(Roles = "...")].
 fn extract_authorize_policy(source: &str) -> Option<String> {
     if let Some(pos) = source.find("[Authorize(") {
@@ -132,7 +187,15 @@ fn extract_authorize_policy(source: &str) -> Option<String> {
 }
 
 /// Extract action methods with HTTP verb attributes.
-fn extract_actions(class_source: &str) -> Vec<String> {
+struct ActionFact {
+    verb: &'static str,
+    marker: bool,
+    name: String,
+    params: String,
+    return_type: Option<String>,
+}
+
+fn extract_action_facts(class_source: &str) -> Vec<ActionFact> {
     let mut actions = Vec::new();
 
     let verb_patterns = [
@@ -146,16 +209,22 @@ fn extract_actions(class_source: &str) -> Vec<String> {
     ];
 
     for (attr, verb) in &verb_patterns {
-        if let Some(pos) = class_source.find(attr) {
-            let rest = &class_source[pos + attr.len()..];
-            if let Some(method_info) = extract_method_signature(rest) {
-                actions.push(build_action_line(
+        let mut search_start = 0;
+        let mut marker = true;
+        while let Some(pos) = class_source[search_start..].find(attr) {
+            let actual_pos = search_start + pos;
+            let rest = &class_source[actual_pos + attr.len()..];
+            if let Some((name, params, return_type)) = extract_method_signature(rest) {
+                actions.push(ActionFact {
                     verb,
-                    &method_info.0,
-                    &method_info.1,
-                    method_info.2.as_deref(),
-                ));
+                    marker,
+                    name,
+                    params,
+                    return_type,
+                });
             }
+            marker = false;
+            search_start = actual_pos + 1;
         }
     }
 

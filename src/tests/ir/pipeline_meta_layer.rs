@@ -176,6 +176,22 @@ fn production_angular_layer_runs_framework_detection_once() {
 }
 
 #[test]
+fn production_angular_layer_reuses_compilation_evidence_without_detection_parse() {
+    crate::angular_meta::reset_ast_parse_count();
+
+    let _ = compile_edges(
+        "import { Component } from '@angular/core'; @Component({ template: '' }) export class AppComponent {}",
+        "C:/repo/app.component.ts",
+    );
+
+    assert_eq!(
+        crate::angular_meta::ast_parse_count(),
+        0,
+        "Angular applicability must reuse compilation evidence instead of reparsing TypeScript"
+    );
+}
+
+#[test]
 fn production_dotnet_layer_uses_combined_evaluation_override() {
     crate::dotnet_meta::reset_evaluation_count();
 
@@ -204,6 +220,54 @@ fn production_dotnet_layer_runs_framework_detection_once() {
         crate::dotnet_meta::detection_count(),
         1,
         ".NET applicability evidence must not be reparsed during evaluation"
+    );
+}
+
+#[test]
+fn production_dotnet_layer_reuses_compilation_evidence_without_detection_parse() {
+    crate::dotnet_meta::reset_ast_parse_count();
+
+    let _ = compile_csharp_edges(
+        "[ApiController] public class UsersController : ControllerBase { }",
+        "C:/repo/UsersController.cs",
+    );
+
+    assert_eq!(
+        crate::dotnet_meta::ast_parse_count(),
+        0,
+        ".NET applicability must reuse compilation evidence instead of reparsing C#"
+    );
+}
+
+#[test]
+fn production_dotnet_layer_analyzes_each_class_once_for_both_projections() {
+    crate::dotnet_meta::reset_analysis_count();
+
+    let _ = compile_csharp_edges(
+        "[ApiController] public class UsersController : ControllerBase { [HttpGet] public IActionResult Get() => Ok(); }",
+        "C:/repo/UsersController.cs",
+    );
+
+    assert_eq!(
+        crate::dotnet_meta::analysis_count(),
+        1,
+        ".NET marker and semantic projections must share one per-class analysis"
+    );
+}
+
+#[test]
+fn production_dotnet_layer_analyzes_efcore_facts_once_for_both_projections() {
+    crate::dotnet_meta::reset_efcore_analysis_count();
+
+    let _ = compile_csharp_edges(
+        "public class AppDbContext : DbContext { public DbSet<User> Users { get; set; } }",
+        "C:/repo/AppDbContext.cs",
+    );
+
+    assert_eq!(
+        crate::dotnet_meta::efcore_analysis_count(),
+        1,
+        ".NET marker and semantic projections must share one EF Core analysis"
     );
 }
 

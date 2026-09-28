@@ -5,7 +5,28 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod tests {
-    use crate::dotnet_meta::detect::is_dotnet_file;
+    use crate::dotnet_meta::detect::{is_dotnet_file, is_dotnet_file_with_regions};
+    use crate::meta_util::LexicalRegions;
+
+    #[test]
+    fn compilation_scoped_detection_matches_standalone_detection_contract() {
+        let sources = [
+            "public class Controller { [HttpGet] public IActionResult Get() => Ok(); }",
+            "public class AppDbContext : DbContext {}",
+            "public class ProfileConfig : Profile {}",
+            "public class CacheService { IMemoryCache cache; }",
+            "public class Utility { string Format(string value) => value.Trim(); }",
+        ];
+
+        for source in sources {
+            let regions = LexicalRegions::new(source);
+            assert_eq!(
+                is_dotnet_file_with_regions(source, &regions),
+                is_dotnet_file(source),
+                "compilation detector differs for {source:?}"
+            );
+        }
+    }
 
     #[test]
     fn red_t1_detects_pure_mstest_file() {

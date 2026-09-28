@@ -46,7 +46,9 @@ pub mod testing;
 pub mod util;
 
 #[cfg(test)]
-pub(crate) use detect_metrics::{detection_count, reset_detection_count};
+pub(crate) use detect_metrics::{
+    ast_parse_count, detection_count, reset_ast_parse_count, reset_detection_count,
+};
 
 use crate::compression::Fidelity;
 

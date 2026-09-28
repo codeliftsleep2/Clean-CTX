@@ -358,6 +358,8 @@ production regressions enforce one detection pass per compilation:
 
 ### Phase 7 — Measure before broader scan fusion
 
+**Status:** Measurement harness implemented; results pending maintainer run.
+
 **Goal:** Decide whether P4 warrants more architecture.
 
 - Add deterministic instrumentation or a bounded benchmark harness outside the
@@ -367,6 +369,92 @@ production regressions enforce one detection pass per compilation:
 - Retain independent linear sub-layer passes unless remaining cost is material.
 - Any shared tokenizer or broader scan-fusion design requires a separate
   approval with measured evidence and explicit complexity tradeoffs.
+
+`examples/meta_layer_benchmark.rs` provides the bounded production-path
+comparison. It measures each representative framework source with its
+meta-layer enabled and explicitly disabled, reports the directional delta, and
+makes no timing assertion. Run it in release mode with all features enabled;
+repeat runs before using the results to make an architectural decision.
+
+Three maintainer-run samples on 2026-09-28 produced:
+
+| Framework | Run 1 | Run 2 | Run 3 | Mean share | Mean delta |
+|---|---:|---:|---:|---:|---:|
+| Angular | 5.98% | 5.58% | 9.81% | 7.12% | 4,205.34 us |
+| .NET | 13.85% | 18.12% | 13.59% | 15.19% | 13,502.10 us |
+| Spring | 3.33% | 7.10% | 1.39% | 3.94% | 456.36 us |
+
+These initial measurements used block-ordered modes and are retained as the
+historical decision evidence, not as a reliable before/after baseline. A later
+.NET-only change coincided with large apparent Angular and Spring movement,
+including negative Spring deltas, proving that run-order/environment drift was
+material. The harness now alternates enabled and disabled modes for every
+sample and reports the median paired delta. Measurements from the two harness
+versions must not be compared directly.
+
+The evidence does not justify repository-wide scan fusion. Spring should retain
+its current independent passes. Angular remains below the threshold for added
+architecture and should remain unchanged unless a larger representative corpus
+shows a stable material cost. .NET is the only targeted follow-up candidate.
+
+The .NET inventory found seven independent marker extractors per applicable
+class, followed by a semantic projection that re-extracts overlapping ASP.NET,
+EF Core, AutoMapper, SignalR, and testing facts. A shared .NET per-class
+evaluation shape could remove that duplicate work, but it changes ownership
+between marker and semantic projections and therefore requires explicit
+architectural approval before implementation.
+
+The maintainer approved the targeted .NET change on 2026-09-28. The first
+increment moves ASP.NET controller facts into one per-class analysis result
+consumed by both marker and semantic projections. The production regression
+`production_dotnet_layer_analyzes_each_class_once_for_both_projections` was
+observed RED at two analyses and GREEN at one. Remaining .NET families stay on
+their established paths until focused equivalence checks and a follow-up
+measurement show whether further sharing is warranted.
+
+Three runs of the corrected paired-median harness after the ASP.NET increment
+produced:
+
+| Framework | Run 1 | Run 2 | Run 3 | Mean share |
+|---|---:|---:|---:|---:|
+| Angular | 9.14% | 8.82% | 9.82% | 9.26% |
+| .NET | 13.38% | 13.03% | 13.12% | 13.18% |
+| Spring | 0.66% | -1.61% | -0.37% | -0.44% |
+
+Spring requires no broader fusion. The .NET cost remains material and supports
+continuing the approved targeted migration with EF Core next. Angular also has
+a stable measurable cost, but expanding its architecture is a separate
+decision and is not authorized by the .NET approval.
+
+The EF Core shared shape preserved behavior but produced no measurable
+production-path improvement: the next paired run reported 13.22% .NET overhead
+against the 13.18% pre-EF mean. Inspection identified the remaining standalone
+C# tree-sitter parse and two detection queries as the more plausible dominant
+cost. The next .NET increment therefore targets reuse of compilation-scoped
+lexical evidence for applicability, with zero additional framework-detection
+parse, before any more extractor families are consolidated.
+
+The first corrected paired-median run after removing that parse reported .NET
+at 0.66% / 498.75 us, down from 13.22% / 11,674.80 us immediately before the
+change. This identifies the redundant detection parse as the dominant cost;
+further .NET extractor fusion is not justified unless confirmation runs
+contradict this result. The standalone detector retains its AST contract for
+callers outside the compilation pipeline, while the production compilation
+route uses the already-owned lexical evidence.
+
+A confirmation run reported .NET at 0.25% / 189.90 us and Spring at -0.37%,
+closing both as broader-fusion targets. Angular remained material at 11.12% /
+4,919.90 us. The maintainer explicitly directed that stable overhead above 9%
+is not acceptable, authorizing the targeted Angular investigation. Inspection
+found the same dominant pattern: a standalone TypeScript parse and decorator
+query during applicability despite an existing compilation parse and shared
+lexical index.
+
+The first corrected paired-median run after removing the Angular applicability
+parse reported Angular at 0.63% / 238.10 us, down from 11.12% / 4,919.90 us.
+The same run measured .NET at -0.08% and Spring at 0.26%. All three framework
+meta-layers are therefore within measurement noise, and the evidence rejects
+broader scan fusion unless confirmation runs materially contradict it.
 
 ### Phase 8 — Finalize the migration
 

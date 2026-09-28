@@ -174,7 +174,10 @@ pub(super) fn evaluate_if_applicable(
     if meta_config.is_some_and(|config| !config.enabled) {
         return None;
     }
-    let is_angular = crate::angular_meta::detect::is_angular_file(context.source);
+    let is_angular = crate::angular_meta::detect::is_angular_file_with_regions(
+        context.source,
+        context.lexical_regions,
+    );
     let testing_enabled = meta_config.map(|config| config.testing.enabled).unwrap_or(true);
     let reactive_forms_enabled = meta_config
         .map(|config| config.reactive_forms.enabled)
