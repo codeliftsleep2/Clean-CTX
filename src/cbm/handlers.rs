@@ -9,7 +9,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
-const CBM_FALLBACK_GUIDANCE: &str = "Use `search_codebase` for symbol/file discovery, then `provide_code_context` for supported source files.";
+const CBM_FALLBACK_GUIDANCE: &str = "Use host-native text/file search for broad discovery, or `workspace_query(type=\"find_entities\")` for an exact semantic name, then `provide_code_context` for supported source files.";
 
 /// Circuit breaker guard: check if CBM is healthy before proceeding.
 /// Returns `true` if CBM is available, otherwise sends error response.
@@ -107,10 +107,12 @@ fn send_indexing_gate(
         Ok(IndexingStatus::Ready) => true,
         Ok(IndexingStatus::StillIndexing { elapsed_secs }) => {
             let msg = if elapsed_secs < 5 {
-                "CBM project indexing is in progress; this is temporary, not an empty graph. Retry the same graph query once after indexing progresses. If immediate progress is required, use `search_codebase` and then `provide_code_context`.".to_string()
+                format!(
+                    "CBM project indexing is in progress; this is temporary, not an empty graph. Retry the same graph query once after indexing progresses. If immediate progress is required, {CBM_FALLBACK_GUIDANCE}"
+                )
             } else {
                 format!(
-                    "CBM is still indexing this project ({elapsed_secs}s elapsed); this is temporary, not an empty graph. Retry the same graph query once. If it remains unavailable, use `search_codebase` and then `provide_code_context` instead of polling status."
+                    "CBM is still indexing this project ({elapsed_secs}s elapsed); this is temporary, not an empty graph. Retry the same graph query once. If it remains unavailable, {CBM_FALLBACK_GUIDANCE} Do not poll status."
                 )
             };
             send_response(&serde_json::json!({

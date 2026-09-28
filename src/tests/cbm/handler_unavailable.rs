@@ -34,8 +34,15 @@ fn graph_search_returns_is_error_when_cbm_unavailable() {
     assert_eq!(err["code"], -32603);
     let message = err["message"].as_str().expect("error message");
     assert!(
-        message.contains("search_codebase") && message.contains("provide_code_context"),
-        "the first failed graph call must prescribe the direct fallback: {message}"
+        message.contains("host-native text/file search")
+            && message.contains("workspace_query")
+            && message.contains("find_entities")
+            && message.contains("provide_code_context"),
+        "the first failed graph call must prescribe portable direct fallbacks: {message}"
+    );
+    assert!(
+        !message.contains("search_codebase"),
+        "the server must not advertise a host-specific tool as an MCP tool: {message}"
     );
     assert!(
         !message.contains("get_cbm_status"),
