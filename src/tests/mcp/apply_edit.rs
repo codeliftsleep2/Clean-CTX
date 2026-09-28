@@ -97,6 +97,56 @@ fn apply_edit_works_after_raw_passthrough_on_small_file() {
         "edit after raw_passthrough must have written new body to disk:\n{on_disk}"
     );
 }
+
+/// Java must use the same tracked structural-edit lifecycle as the default
+/// languages: provide establishes owned state and apply_edit targets the
+/// qualified method body without a Java-specific write path.
+#[cfg(feature = "java")]
+#[test]
+fn java_provide_then_apply_edit_replaces_the_tracked_method_body() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let root = dir.path().to_string_lossy().into_owned();
+    let path = dir.path().join("Worker.java");
+    std::fs::write(
+        &path,
+        "public class Worker {\n    public int run() {\n        return 1;\n    }\n}\n",
+    )
+    .unwrap();
+    let mut config = crate::tests::test_config();
+    config.additional_roots.push(root.clone());
+    let state = crate::mcp::McpState::new(config);
+    let file_path = path.to_string_lossy().into_owned();
+
+    crate::mcp::tool_handlers::core::handle_provide_code_context(
+        &json!(1),
+        &json!({ "arguments": {
+            "filePath": file_path.clone(),
+            "workspaceRoot": root,
+            "fidelity": "edit"
+        }}),
+        &state,
+    );
+    crate::mcp::tool_handlers::edit::handle_apply_edit(
+        &json!(2),
+        &json!({ "arguments": {
+            "filePath": file_path,
+            "operations": [{
+                "type": "replace_body",
+                "target": "Worker.run",
+                "expectedOldText": "{\n        return 1;\n    }",
+                "newText": "{\n        return 2;\n    }"
+            }],
+            "workspaceRoot": dir.path().to_string_lossy()
+        }}),
+        &state,
+    );
+
+    let on_disk = std::fs::read_to_string(path).unwrap();
+    assert!(
+        on_disk.contains("return 2;"),
+        "Java apply_edit must publish the replacement body: {on_disk}"
+    );
+}
 /// apply_edit requires a prior provide and refuses to act on state-less
 /// files (policy from Open Question 2). In-process (no spawn): the file on
 /// disk must remain untouched.

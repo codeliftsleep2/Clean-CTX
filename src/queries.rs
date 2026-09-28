@@ -356,6 +356,31 @@ pub const RS_QUERY: &str = r#"
     (macro_invocation) @macro.root
 "#;
 
+// Generic invocation captures (native call facts) for Rust.
+//
+// Rust represents both free-function calls and method calls as
+// `call_expression`; a method call's function is a `field_expression`, whose
+// final `field_identifier` is the written callee name. Each named child of the
+// `arguments` node is one explicitly written argument. Macro invocations are a
+// different node type and deliberately remain outside this contract.
+pub const RS_CALL_QUERY: &str = r#"
+    ; --- Generic invocation captures (native call facts) ---
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments))
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments (_) @call.argument))
+    (call_expression
+        function: (field_expression
+            field: (field_identifier) @call.callee)
+        arguments: (arguments))
+    (call_expression
+        function: (field_expression
+            field: (field_identifier) @call.callee)
+        arguments: (arguments (_) @call.argument))
+"#;
+
 // Java AST node types: class_declaration, interface_declaration,
 //   method_declaration, constructor_declaration, field_declaration,
 //   constant_declaration,
