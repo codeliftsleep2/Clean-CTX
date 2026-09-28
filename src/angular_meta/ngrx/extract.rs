@@ -38,6 +38,9 @@ pub(crate) fn extract_ngrx_shape_with_regions(
     _fidelity: Fidelity,
     lexical_regions: &crate::meta_util::LexicalRegions,
 ) -> Option<NgRxShape> {
+    #[cfg(test)]
+    super::extraction_metrics::record_extraction();
+
     // Import gate: skip non-NgRx files
     if !has_ngrx_imports(source) {
         return None;

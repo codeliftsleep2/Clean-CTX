@@ -17,6 +17,22 @@ use std::sync::OnceLock;
 /// Global registry, initialized once per process.
 static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
 
+#[cfg(test)]
+thread_local! {
+    static CONTEXT_ROUTE_COUNTS: std::cell::Cell<(usize, usize, usize)> =
+        const { std::cell::Cell::new((0, 0, 0)) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_context_route_counts() {
+    CONTEXT_ROUTE_COUNTS.with(|counts| counts.set((0, 0, 0)));
+}
+
+#[cfg(test)]
+pub(crate) fn context_route_counts() -> (usize, usize, usize) {
+    CONTEXT_ROUTE_COUNTS.with(std::cell::Cell::get)
+}
+
 /// Registry of all enabled language and meta layers.
 ///
 /// Built at startup from the available Cargo features. Provides dispatch
@@ -182,6 +198,11 @@ impl LayerRegistry {
         &self,
         context: &MetaLayerContext<'_>,
     ) -> Vec<MetaLayerOutput> {
+        #[cfg(test)]
+        CONTEXT_ROUTE_COUNTS.with(|counts| {
+            let (markers, semantics, combined) = counts.get();
+            counts.set((markers + 1, semantics, combined));
+        });
         let mut results = Vec::new();
         for layer in &self.meta_layers {
             if layer.is_applicable(context.source, context.path, context.config) {
@@ -249,6 +270,11 @@ impl LayerRegistry {
         &self,
         context: &MetaLayerContext<'_>,
     ) -> Vec<SemanticEdge> {
+        #[cfg(test)]
+        CONTEXT_ROUTE_COUNTS.with(|counts| {
+            let (markers, semantics, combined) = counts.get();
+            counts.set((markers, semantics + 1, combined));
+        });
         let mut edges = Vec::new();
         for layer in &self.meta_layers {
             if layer.is_applicable(context.source, context.path, context.config) {
@@ -256,6 +282,31 @@ impl LayerRegistry {
             }
         }
         edges
+    }
+
+    /// Compatibility entry point for combined marker and semantic dispatch.
+    pub fn evaluate_meta_layers_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> (Vec<MetaLayerOutput>, Vec<SemanticEdge>) {
+        #[cfg(test)]
+        CONTEXT_ROUTE_COUNTS.with(|counts| {
+            let (markers, semantics, combined) = counts.get();
+            counts.set((markers, semantics, combined + 1));
+        });
+        let mut outputs = Vec::new();
+        let mut edges = Vec::new();
+        for layer in &self.meta_layers {
+            if !layer.is_applicable(context.source, context.path, context.config) {
+                continue;
+            }
+            let evaluation = layer.evaluate_context(context);
+            if let Some(output) = evaluation.output {
+                outputs.push(output);
+            }
+            edges.extend(evaluation.semantic_edges);
+        }
+        (outputs, edges)
     }
 
     /// Check if a specific meta-layer is enabled.

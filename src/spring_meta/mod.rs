@@ -21,9 +21,16 @@
 
 pub(crate) mod annotations;
 pub(crate) mod detect;
+#[cfg(test)]
+mod evaluation_metrics;
 pub(crate) mod markers;
 pub mod properties;
 pub mod semantic;
+
+#[cfg(test)]
+pub(crate) use evaluation_metrics::{
+    evaluation_count, record_evaluation, reset_evaluation_count,
+};
 
 use crate::compression::Fidelity;
 

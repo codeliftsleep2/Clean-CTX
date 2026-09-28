@@ -34,8 +34,28 @@
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
-use crate::layers::meta::{MetaLayer, MetaLayerOutput};
+use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerEvaluation, MetaLayerOutput};
 use std::path::Path;
+
+#[cfg(test)]
+thread_local! {
+    static EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn record_evaluation() {
+    EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
+}
+
+#[cfg(test)]
+pub(crate) fn reset_evaluation_count() {
+    EVALUATION_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn evaluation_count() -> usize {
+    EVALUATION_COUNT.with(std::cell::Cell::get)
+}
 
 /// Fallback meta layer that indexes ordinary type declarations (classes,
 /// interfaces, structs, enums, traits, records) as `builtin` entities.
@@ -112,6 +132,16 @@ impl MetaLayer for BuiltinMetaLayer {
             });
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        #[cfg(test)]
+        record_evaluation();
+
+        MetaLayerEvaluation {
+            output: None,
+            semantic_edges: self.extract_semantic_edges_context(context),
+        }
     }
 }
 

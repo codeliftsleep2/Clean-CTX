@@ -49,8 +49,7 @@ impl IRPass for MetaLayerPass {
             &lexical_regions,
         );
 
-        let meta_results = registry.run_meta_layers_context(&context);
-        let mut semantic_edges = registry.collect_semantic_edges_context(&context);
+        let (meta_results, mut semantic_edges) = registry.evaluate_meta_layers_context(&context);
         append_marker_aliases(state, &meta_results);
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {

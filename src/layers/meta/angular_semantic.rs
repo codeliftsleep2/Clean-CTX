@@ -10,6 +10,8 @@ pub(super) fn extract_non_testing_edges(
     fidelity: Fidelity,
     config: Option<&CleanCtxConfig>,
     lexical_regions: Option<&crate::meta_util::LexicalRegions>,
+    precomputed_ngrx: Option<Option<&crate::angular_meta::ngrx::NgRxShape>>,
+    precomputed_routing: Option<Option<&crate::angular_meta::routing::RouteShape>>,
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
     let mut edges = Vec::new();
@@ -48,32 +50,112 @@ pub(super) fn extract_non_testing_edges(
         }
     }
 
-    if meta_config.map(|value| value.ngrx.enabled).unwrap_or(true)
-        && let Some(shape) = lexical_regions.map_or_else(
+    let ngrx_shape = match precomputed_ngrx {
+        Some(shape) => shape.cloned(),
+        None => lexical_regions.map_or_else(
             || crate::angular_meta::ngrx::extract_ngrx_shape(source, fidelity),
             |regions| {
                 crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
                     source, fidelity, regions,
                 )
             },
-        )
+        ),
+    };
+    if meta_config.map(|value| value.ngrx.enabled).unwrap_or(true)
+        && let Some(shape) = ngrx_shape
     {
         edges.extend(shape.to_ngrx_semantic_edges());
     }
-    if meta_config
-        .map(|value| value.routing.enabled)
-        .unwrap_or(true)
-        && let Some(shape) = lexical_regions.map_or_else(
+    let routing_shape = match precomputed_routing {
+        Some(shape) => shape.cloned(),
+        None => lexical_regions.map_or_else(
             || crate::angular_meta::routing::extract_route_shape(source, fidelity),
             |regions| {
                 crate::angular_meta::routing::extract_route_shape_with_regions(
                     source, fidelity, regions,
                 )
             },
-        )
+        ),
+    };
+    if meta_config
+        .map(|value| value.routing.enabled)
+        .unwrap_or(true)
+        && let Some(shape) = routing_shape
     {
         edges.extend(shape.to_semantic_edges());
     }
 
     edges
+}
+
+pub(super) fn evaluate(
+    layer_name: &'static str,
+    context: &super::MetaLayerContext<'_>,
+) -> super::MetaLayerEvaluation {
+    let meta_config = context
+        .config
+        .and_then(|config| config.meta_layers.get("angular"));
+    let ngrx_enabled = meta_config.map(|config| config.ngrx.enabled).unwrap_or(true);
+    let ngrx_shape = ngrx_enabled
+        .then(|| crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
+            context.source,
+            context.fidelity,
+            context.lexical_regions,
+        ))
+        .flatten();
+    let routing_enabled = meta_config
+        .map(|config| config.routing.enabled)
+        .unwrap_or(true);
+    let routing_shape = routing_enabled
+        .then(|| crate::angular_meta::routing::extract_route_shape_with_regions(
+            context.source,
+            context.fidelity,
+            context.lexical_regions,
+        ))
+        .flatten();
+    let block = crate::angular_meta::run_meta_layer_with_config_path_regions_and_ngrx(
+        context.source,
+        context.class_captures,
+        context.fidelity,
+        meta_config,
+        context.path,
+        context.lexical_regions,
+        Some(ngrx_shape.clone()),
+        Some(routing_shape.clone()),
+    );
+    let output = block.filter(|block| !block.is_empty()).map(|block| {
+        super::MetaLayerOutput {
+            layer_name,
+            rendered: block.render(),
+            angular_block: Some(block),
+            ..Default::default()
+        }
+    });
+    let captures: Vec<String> = context
+        .paired_class_captures
+        .iter()
+        .map(|(_, text)| text.clone())
+        .collect();
+    let mut semantic_edges = extract_non_testing_edges(
+        context.source,
+        &captures,
+        context.fidelity,
+        context.config,
+        Some(context.lexical_regions),
+        Some(ngrx_shape.as_ref()),
+        Some(routing_shape.as_ref()),
+    );
+    if meta_config.map(|config| config.testing.enabled).unwrap_or(true) {
+        semantic_edges.extend(
+            crate::angular_meta::testing::extract_testing_semantic_edges_with_regions(
+                context.source,
+                context.path,
+                context.lexical_regions,
+            ),
+        );
+    }
+    super::MetaLayerEvaluation {
+        output,
+        semantic_edges,
+    }
 }

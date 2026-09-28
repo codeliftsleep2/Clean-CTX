@@ -212,6 +212,28 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
     path: &std::path::Path,
     lexical_regions: &crate::meta_util::LexicalRegions,
 ) -> Option<MetaBlock> {
+    run_meta_layer_with_config_path_regions_and_ngrx(
+        source_code,
+        class_captures,
+        fidelity,
+        config,
+        path,
+        lexical_regions,
+        None,
+        None,
+    )
+}
+
+pub(crate) fn run_meta_layer_with_config_path_regions_and_ngrx(
+    source_code: &str,
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+    path: &std::path::Path,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+    precomputed_ngrx: Option<Option<ngrx::NgRxShape>>,
+    precomputed_routing: Option<Option<routing::RouteShape>>,
+) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     let is_angular = detect::is_angular_file(source_code);
 
@@ -235,7 +257,9 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
     // Detect NgRx independently — NgRx files are typically Angular
     // but may not have decorators (e.g. actions/selectors files).
     let ngrx_shape = if ngrx_enabled {
-        ngrx::extract_ngrx_shape_with_regions(source_code, fidelity, lexical_regions)
+        precomputed_ngrx.unwrap_or_else(|| {
+            ngrx::extract_ngrx_shape_with_regions(source_code, fidelity, lexical_regions)
+        })
     } else {
         None
     };
@@ -251,7 +275,9 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
     // Detect Routing independently — route config files may not have
     // decorators (e.g. `app.routes.ts`).
     let route_shape = if routing_enabled {
-        routing::extract_route_shape_with_regions(source_code, fidelity, lexical_regions)
+        precomputed_routing.unwrap_or_else(|| {
+            routing::extract_route_shape_with_regions(source_code, fidelity, lexical_regions)
+        })
     } else {
         None
     };

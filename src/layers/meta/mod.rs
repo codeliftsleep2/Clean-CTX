@@ -57,6 +57,13 @@ pub struct MetaLayerOutput {
     pub dotnet_block: Option<crate::dotnet_meta::MetaBlock>,
 }
 
+/// Marker and semantic results produced by one applicable meta-layer.
+#[derive(Debug, Default)]
+pub struct MetaLayerEvaluation {
+    pub output: Option<MetaLayerOutput>,
+    pub semantic_edges: Vec<SemanticEdge>,
+}
+
 /// A meta-layer that enriches compressed output with framework-specific
 /// context (e.g. Angular decorators, Spring Boot annotations).
 ///
@@ -193,6 +200,14 @@ pub trait MetaLayer: Send + Sync {
             context.fidelity,
             context.config,
         )
+    }
+
+    /// Evaluate one applicable layer through a single migration boundary.
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        MetaLayerEvaluation {
+            output: self.enrich_context(context),
+            semantic_edges: self.extract_semantic_edges_context(context),
+        }
     }
 }
 
@@ -340,6 +355,8 @@ impl MetaLayer for AngularMetaLayer {
             fidelity,
             config,
             None,
+            None,
+            None,
         );
 
         let testing_enabled = meta_config.map(|c| c.testing.enabled).unwrap_or(true);
@@ -365,7 +382,7 @@ impl MetaLayer for AngularMetaLayer {
             .map(|(_, text)| text.clone())
             .collect();
         let mut edges = angular_semantic::extract_non_testing_edges(
-            source, &captures, fidelity, config, None,
+            source, &captures, fidelity, config, None, None, None,
         );
         let testing_enabled = config
             .and_then(|value| value.meta_layers.get("angular"))
@@ -393,6 +410,8 @@ impl MetaLayer for AngularMetaLayer {
             context.fidelity,
             context.config,
             Some(context.lexical_regions),
+            None,
+            None,
         );
         let testing_enabled = context
             .config
@@ -409,6 +428,10 @@ impl MetaLayer for AngularMetaLayer {
             );
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        angular_semantic::evaluate(self.name(), context)
     }
 }
 
@@ -515,6 +538,16 @@ impl MetaLayer for SpringBootMetaLayer {
             ));
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        #[cfg(test)]
+        crate::spring_meta::record_evaluation();
+
+        MetaLayerEvaluation {
+            output: self.enrich_context(context),
+            semantic_edges: self.extract_semantic_edges_context(context),
+        }
     }
 }
 

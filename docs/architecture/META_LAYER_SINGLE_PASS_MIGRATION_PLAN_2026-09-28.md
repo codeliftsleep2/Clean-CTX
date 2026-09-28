@@ -1,6 +1,6 @@
 # Meta-layer single-pass migration plan — 2026-09-28
 
-**Status:** Approved investigation and phased implementation plan; Phases 0–4
+**Status:** Approved investigation and phased implementation plan; Phases 0–5
 complete, later phases pending RED/GREEN implementation.
 
 **Scope:** Framework detection, marker extraction, and semantic-edge extraction
@@ -291,6 +291,9 @@ operate on a distinct local slice.
 
 ### Phase 5 — Evaluate each framework once
 
+**Status:** Complete; focused registry and production-lifecycle RED/GREEN
+regressions reported.
+
 **Goal:** Collapse marker and semantic extraction into one registry traversal.
 
 1. Add a combined layer evaluation method returning `MetaLayerEvaluation`.
@@ -300,6 +303,24 @@ operate on a distinct local slice.
 5. Preserve marker-alias insertion order and provenance attachment.
 6. Remove the second `is_applicable` traversal when every registered layer uses
    the combined boundary.
+
+`MetaLayerPass` now calls one combined registry route. The registry makes one
+applicability decision and consumes one `MetaLayerEvaluation` from every
+applicable layer. Angular, .NET, Spring, and builtin own explicit evaluation
+overrides; the trait default remains only as a compatibility adapter for future
+out-of-tree or incremental implementations. Angular additionally shares its
+NgRx and Routing shapes between marker rendering and semantic projection.
+
+Regression authority:
+
+- `src/tests/layers/registry.rs::combined_registry_evaluation_checks_applicability_once_per_layer`
+- `src/tests/layers/registry.rs::combined_registry_dispatch_invokes_one_layer_evaluation_hook`
+- `src/tests/ir/pipeline_meta_layer.rs::production_meta_pass_uses_one_combined_registry_evaluation`
+- `src/tests/ir/pipeline_meta_layer.rs::production_angular_evaluation_extracts_ngrx_shape_once`
+- `src/tests/ir/pipeline_meta_layer.rs::production_angular_evaluation_extracts_routing_shape_once`
+- `src/tests/ir/pipeline_meta_layer.rs::production_dotnet_layer_uses_combined_evaluation_override`
+- `src/tests/ir/pipeline_meta_layer.rs::production_spring_layer_uses_combined_evaluation_override`
+- `src/tests/ir/pipeline_meta_layer.rs::production_builtin_layer_uses_combined_evaluation_override`
 
 **Exit criterion:** One applicability decision and one evaluation occur per
 registered layer per compilation.

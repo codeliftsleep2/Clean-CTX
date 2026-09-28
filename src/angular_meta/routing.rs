@@ -17,6 +17,8 @@ use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
 mod extract_guards;
+#[cfg(test)]
+mod extraction_metrics;
 
 // Guard/resolver extraction moved to `routing/extract_guards.rs`; the entry
 // helpers stay module-internal (`pub(super)`) and are used here.
@@ -292,6 +294,9 @@ pub(crate) fn extract_route_shape_with_regions(
     _fidelity: Fidelity,
     lexical_regions: &crate::meta_util::LexicalRegions,
 ) -> Option<RouteShape> {
+    #[cfg(test)]
+    extraction_metrics::record_extraction();
+
     if !has_router_imports(source) {
         return None;
     }
@@ -312,6 +317,9 @@ pub(crate) fn extract_route_shape_with_regions(
     }
     Some(shape)
 }
+
+#[cfg(test)]
+pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 
 /// Extract route objects from `Routes` arrays and `RouterModule` calls.
 fn extract_routes(

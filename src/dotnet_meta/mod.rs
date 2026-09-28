@@ -26,6 +26,8 @@ pub mod aspnet;
 pub mod automapper;
 pub(crate) mod detect;
 pub mod efcore;
+#[cfg(test)]
+mod evaluation_metrics;
 pub mod general;
 mod marker_builders;
 pub(crate) mod markers;
@@ -33,6 +35,9 @@ pub mod semantic;
 pub mod serialization;
 pub mod signalr;
 pub mod testing;
+
+#[cfg(test)]
+pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
 
 use crate::compression::Fidelity;
 
@@ -257,6 +262,19 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         }
 
         edges
+    }
+
+    fn evaluate_context(
+        &self,
+        context: &crate::layers::meta::MetaLayerContext<'_>,
+    ) -> crate::layers::meta::MetaLayerEvaluation {
+        #[cfg(test)]
+        evaluation_metrics::record_evaluation();
+
+        crate::layers::meta::MetaLayerEvaluation {
+            output: self.enrich_context(context),
+            semantic_edges: self.extract_semantic_edges_context(context),
+        }
     }
 }
 

@@ -24,12 +24,16 @@ use crate::compression::Fidelity;
 
 mod extract;
 mod extract_selectors;
+#[cfg(test)]
+mod extraction_metrics;
 mod shape;
 
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.
 pub use extract::extract_ngrx_shape;
 pub(crate) use extract::extract_ngrx_shape_with_regions;
+#[cfg(test)]
+pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 
 // ---------------------------------------------------------------------------
 // NgRxKind — single source of truth for NgRx marker vocabulary
