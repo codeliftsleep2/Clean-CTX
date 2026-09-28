@@ -345,6 +345,12 @@ wrapper call without an explicit `project` uses the last-set active project. `cb
 does **not** mutate the bridge's active project — its project resolution is scoped to the
 individual proxy call.
 
+**Trace identity:** A canonical CBM source identity is traced directly. A bare
+source is first resolved by exact name inside the selected project. Exactly one
+canonical identity proceeds automatically; no match is an explicit not-found
+error, and multiple identities return `-32602` with deterministic canonical
+candidates. `graph_trace` and `cbm_proxy(trace_path)` enforce the same rule.
+
 **Freshness:** The structured tools return TTL-cached results from the bridge (the
 cache TTL is configurable). `cbm_proxy` bypasses the bridge cache and fetches fresh data
 from CBM before compression. The wrapper and proxy paths therefore have intentionally

@@ -235,7 +235,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         }
     };
 
-    let args = tool_params;
+    let mut args = tool_params;
 
     // Explicit reindex of a repository refreshes CBM's graph for it, so any
     // hydration discovery previously recorded against the pre-refresh graph is
@@ -253,9 +253,31 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
     // The indexing gate must resolve against the project actually being queried
     // (never a stale active-project entry), and project-independent calls such
     // as `list_projects` must NOT be gated at all.
-    if let Some(target_project) = resolve_proxy_target_project(bridge, params, &args) {
-        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, &target_project) {
+    let target_project = resolve_proxy_target_project(bridge, params, &args);
+    if let Some(target_project) = target_project.as_deref() {
+        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, target_project) {
             return;
+        }
+    }
+    if cbm_tool == "trace_path" {
+        let source = args
+            .get("function_name")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if !source.is_empty() {
+            match crate::cbm::trace_identity::resolve_trace_source(
+                bridge,
+                source,
+                target_project.as_deref(),
+            ) {
+                Ok(resolved) => {
+                    args["function_name"] = Value::String(resolved);
+                }
+                Err(error) => {
+                    send_response(&error.response(id));
+                    return;
+                }
+            }
         }
     }
     let raw_response = match bridge.proxy_call(cbm_tool, args.clone()) {

@@ -46,6 +46,31 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-028: CBM Trace Silently Selected One Duplicate Bare-Name Identity
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Freshly built Clean-CTX server over MCP stdio with installed CBM; controlled temporary Rust repository |
+| **Repository/context** | Two functions named `duplicate_probe`, in `alpha.rs` and `beta.rs`, each calling a distinct leaf |
+| **Symptom** | Bare `graph_trace` found the Alpha path but returned a successful empty result for the valid Beta path. CBM-native bare `trace_path` also returned only `alpha_leaf`. Both canonical identities traced correctly to their respective leaves. |
+| **Root cause** | CBM accepts an ambiguous bare `function_name` and deterministically selects one qualified identity without returning ambiguity metadata. Clean-CTX forwards the bare name on both trace surfaces and therefore exposes that selection as an apparently authoritative result. |
+| **Classification** | Silent incorrect/incomplete graph answer; externally visible identity-resolution gap |
+| **Reproducible locally?** | Yes, through the tracked live investigation harness and two consecutive wrapper observations in the same run. |
+| **Local regression** | `src/tests/cbm/trace_identity_resolution.rs` protects identical ambiguity behavior across `graph_trace` and `cbm_proxy(trace_path)`, plus the canonical fast path. |
+| **Live scenario required?** | Completed. Pre-fix evidence: `target/cbm-duplicate-trace-verification/20260927-145507.json`. Post-fix evidence: `target/cbm-duplicate-trace-verification/20260927-195506.json`; both public trace surfaces rejected ambiguity with the same candidates and retained canonical fast paths. Generated evidence is not a test gate. |
+| **Architectural invariant** | CBM-IDENTITY-001 |
+| **Status** | Fixed and verified through tracked regression plus live MCP stdio field scenario |
+
+**Resolution:** canonical inputs retain the no-search fast path. A bare source
+name is searched within the selected project, filtered by exact symbol name,
+and grouped by canonical identity. One identity traces automatically, zero is
+explicit not-found, and multiple identities return `-32602` with deterministic
+canonical candidates. `graph_trace` and `cbm_proxy(trace_path)` share this
+resolver; proxy lookup remains call-scoped and does not mutate active project.
+
+---
+
 ## DIS-2026-027: Workspace Edge Queries Required a Discovery-Only Preliminary Call
 
 | Field | Value |

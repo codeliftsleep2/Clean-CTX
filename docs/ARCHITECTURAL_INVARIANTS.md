@@ -206,6 +206,15 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+### CBM-IDENTITY-001 Trace Source Resolution Never Guesses
+
+| Field | Contract |
+|---|---|
+| **Intent** | A trace must never silently select one same-named symbol and present that path as authoritative. |
+| **Invariant** | Canonical CBM source identities are a no-search fast path. A bare trace source is resolved by exact symbol name within the explicitly selected project before tracing. Distinct physical search occurrences with one canonical ID are one identity. Exactly one canonical identity proceeds; zero returns explicit not-found; multiple return JSON-RPC `-32602` with deterministic canonical candidates. `graph_trace` and `cbm_proxy(trace_path)` share this resolution boundary. Proxy resolution is scoped to that call and must not mutate the bridge's active project. |
+| **Enforcement** | `src/cbm/trace_identity.rs` owns exact-name grouping and errors; `GraphBridge::search_scoped` owns non-mutating project lookup; `src/tests/cbm/trace_identity_resolution.rs` protects wrapper/proxy parity and the canonical fast path; `verification/cbm/scripts/Investigate-DuplicateTraceNames.ps1` verifies the built stdio boundary against a controlled duplicate-name repository. |
+| **Authority** | `src/cbm/trace_identity.rs`, `src/cbm/handlers.rs`, `src/cbm/proxy.rs`, `src/cbm/bridge/query.rs` |
+
 ### CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 
 | Property | Value |

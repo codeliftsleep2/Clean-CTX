@@ -22,6 +22,12 @@ mod graph_intel;
 // fresh-process probes over a synthetic fixture repo.
 #[path = "../tests/cbm/trace_wire.rs"]
 mod trace_wire;
+
+// Duplicate bare-name trace resolution contract shared by the structured
+// wrapper and the preferred proxy path.
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/cbm/trace_identity_resolution.rs"]
+mod trace_identity_resolution;
 // CBM handler MCP contract tests (structuredContent, outputSchema conformance).
 // Gated behind `feature = "rust"` because these tests share the global
 // protocol::CAPTURED_RESPONSES sink with the Phase A/B retirement suites

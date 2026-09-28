@@ -437,6 +437,54 @@ impl GraphBridge {
         }
     }
 
+    /// Search one explicitly selected project without changing the bridge's
+    /// active project. The proxy uses this to keep project selection scoped to
+    /// a single call.
+    pub(crate) fn search_scoped(&mut self, query: &str, project: &str) -> Vec<GraphNode> {
+        if project == self.project_str() {
+            return self.search(query);
+        }
+
+        let key = format!("search:{project}:{query}");
+        let q = query.to_string();
+        if self.check_cache(&key) {
+            let result = serde_json::from_value(
+                self.cache
+                    .get(&key)
+                    .expect("cache entry should exist after check_cache() returned true")
+                    .value()
+                    .data
+                    .clone(),
+            )
+            .unwrap_or_default();
+            self.set_last_error(None);
+            return result;
+        }
+
+        let has_regex = q.chars().any(|c| {
+            matches!(
+                c,
+                '.' | '*' | '+' | '[' | '(' | '\\' | '^' | '$' | '{' | '|'
+            )
+        });
+        let name_pattern = if has_regex { q } else { format!(".*{q}.*") };
+        let project = project.to_string();
+        let result = self.query(move |c| c.search_graph(&name_pattern, &project, None));
+        match result {
+            Ok(nodes) => {
+                self.set_last_error(None);
+                let graph_nodes: Vec<GraphNode> =
+                    nodes.iter().filter_map(map_search_result).collect();
+                self.cache_insert(&key, &graph_nodes);
+                graph_nodes
+            }
+            Err(error) => {
+                self.set_last_error(Some(error));
+                vec![]
+            }
+        }
+    }
+
     /// Trace a call path between two symbols. If `to` is empty, traces all
     /// direct edges around `from`. Otherwise post-filters to only include
     /// edges touching `to`.

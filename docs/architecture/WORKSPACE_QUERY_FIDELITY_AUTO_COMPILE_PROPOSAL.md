@@ -345,10 +345,10 @@ inspection establishes the current code shape, but it does not substitute for
 live reproduction across the external tool boundary. No item in this section
 is scheduled for implementation solely because it appears here.
 
-### 10.1 `trace_path` / `graph_trace`: unique bare names work; ambiguity remains unverified
+### 10.1 `trace_path` / `graph_trace`: duplicate bare names silently select one identity
 
-**Status:** Broad defect rejected by current code and tracked live evidence.
-Same-name ambiguity remains a field-verification question, not scheduled work.
+**Status:** Implemented with tracked RED/GREEN coverage and verified through
+the live MCP stdio boundary on 2026-09-27.
 
 The two public surfaces have different request shapes:
 
@@ -374,10 +374,23 @@ therefore stale. Adding a compulsory pre-search would impose a hidden second
 CBM operation on a path that already works and would duplicate CBM's own
 resolution behavior.
 
-The only unresolved question is how the installed CBM version handles a bare
-name shared by multiple qualified symbols. That case must be observed live
-before Clean-CTX adds policy. If CBM guesses or merges candidates silently, the
-recommended contract would be:
+The tracked investigation harness at
+`verification/cbm/scripts/Investigate-DuplicateTraceNames.ps1` indexed two Rust
+functions named `duplicate_probe`, one calling `alpha_leaf` and the other
+calling `beta_leaf`. `graph_search` returned two distinct canonical identities.
+The observed behavior was deterministic and silently selective:
+
+- structured `graph_trace` with bare `duplicate_probe` found the Alpha edge;
+- the same bare source to the Beta target returned zero edges and no error;
+- each canonical source found its own edge;
+- crossed canonical pairs correctly returned zero edges; and
+- CBM-native `trace_path` through `cbm_proxy` likewise returned only
+  `alpha_leaf` for the bare name, while both canonical calls returned their
+  respective callees.
+
+This proves the ambiguity originates at the installed CBM boundary and is
+passed through by Clean-CTX. It is not a speculative endpoint-matching concern.
+The recommended corrective contract is:
 
 1. accept either a canonical identity or a bare name;
 2. preserve canonical identities without an extra search;
@@ -387,10 +400,15 @@ recommended contract would be:
    identities when multiple candidates match; and
 6. preserve the existing explicit not-found failure when no candidate matches.
 
-Resolution must not mutate the active project unexpectedly, cross project
-boundaries, or select the first result by ordering. No implementation is
-authorized until duplicate-name live evidence demonstrates a real ambiguity
-failure on the current CBM boundary.
+The implemented shared resolver preserves canonical inputs as a no-search fast
+path. Bare inputs use exact-name matches from a project-scoped search, collapse
+repeated occurrences of one canonical identity, and return deterministic
+canonical candidates rather than selecting by result order. The proxy's
+project-scoped search does not mutate the bridge's active project. The contract
+is protected by `src/tests/cbm/trace_identity_resolution.rs`; the tracked CBM
+field harness asserted the same behavior through a freshly built stdio server,
+with evidence recorded at
+`target/cbm-duplicate-trace-verification/20260927-195506.json`.
 
 ### 10.2 `cbm_proxy`: project-name resolution parity — resolved
 
@@ -508,7 +526,7 @@ repository and the actual MCP stdio path:
 
 | Candidate | Required live comparison | Decision evidence |
 | --- | --- | --- |
-| Duplicate bare-name trace | duplicated bare name vs each canonical identity, proxy and wrapper | response status, candidate behavior, edge equality |
+| Duplicate bare-name trace | **Complete:** two canonical Rust functions compared through wrapper and proxy | both bare surfaces silently selected Alpha; both canonical traces were correct |
 | Non-Edit focus | omitted focus vs supplied focus at Low/Medium/High and Edit | effective fidelity, content kind, body selection, warning/error |
 | Name-only workspace query | **Complete:** live stdio comparison of bare, exact, partial, ambiguous, missing, repeated-occurrence, and narrowed requests | unique result equality, explicit candidates, and scoped occurrence isolation verified |
 

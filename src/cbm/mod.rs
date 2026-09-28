@@ -27,6 +27,7 @@ pub(crate) mod project_search;
 pub mod proxy;
 pub mod setup;
 pub mod tools;
+pub(crate) mod trace_identity;
 
 // Re-export the public API for external consumers.
 pub use bridge::{

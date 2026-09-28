@@ -279,7 +279,14 @@ pub fn handle_graph_trace(id: &Value, params: &Value, state: &McpState) {
     if !ensure_indexed_or_error(id, bridge) {
         return;
     }
-    let edges = bridge.trace_path(from, to);
+    let resolved_from = match crate::cbm::trace_identity::resolve_trace_source(bridge, from, None) {
+        Ok(source) => source,
+        Err(error) => {
+            send_response(&error.response(id));
+            return;
+        }
+    };
+    let edges = bridge.trace_path(&resolved_from, to);
     let status = bridge.status().clone();
     if let Some(err) = bridge.take_last_error() {
         send_response(&serde_json::json!({
