@@ -193,6 +193,25 @@ pub fn run_meta_layer_with_config_and_path(
     config: Option<&crate::config::MetaLayerConfig>,
     path: &std::path::Path,
 ) -> Option<MetaBlock> {
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source_code);
+    run_meta_layer_with_config_path_and_regions(
+        source_code,
+        class_captures,
+        fidelity,
+        config,
+        path,
+        &lexical_regions,
+    )
+}
+
+pub(crate) fn run_meta_layer_with_config_path_and_regions(
+    source_code: &str,
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+    path: &std::path::Path,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     let is_angular = detect::is_angular_file(source_code);
 
@@ -208,7 +227,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect RxJS independently — a file may be RxJS without being
     // Angular (e.g. a standalone RxJS service or utility).
     let rx_shape = if rxjs_enabled {
-        rx::extract_rx_shape(source_code, fidelity)
+        rx::extract_rx_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };
@@ -216,7 +235,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect NgRx independently — NgRx files are typically Angular
     // but may not have decorators (e.g. actions/selectors files).
     let ngrx_shape = if ngrx_enabled {
-        ngrx::extract_ngrx_shape(source_code, fidelity)
+        ngrx::extract_ngrx_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };
@@ -224,7 +243,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect Signals independently — modern Angular components use
     // signal()/computed()/effect() without decorators.
     let signal_shape = if signals_enabled {
-        signals::extract_signal_shape(source_code, fidelity)
+        signals::extract_signal_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };
@@ -232,7 +251,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect Routing independently — route config files may not have
     // decorators (e.g. `app.routes.ts`).
     let route_shape = if routing_enabled {
-        routing::extract_route_shape(source_code, fidelity)
+        routing::extract_route_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };
@@ -240,7 +259,11 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect Reactive Forms independently. Source construction plus the
     // `@angular/forms` import is sufficient; decorators are not required.
     let reactive_form_shape = if reactive_forms_enabled {
-        reactive_forms::extract_reactive_form_shape(source_code, fidelity)
+        reactive_forms::extract_reactive_form_shape_with_regions(
+            source_code,
+            fidelity,
+            lexical_regions,
+        )
     } else {
         None
     };
@@ -248,7 +271,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect ngx-formly independently. Formly configuration frequently
     // appears in undecorated files and remains separate from Reactive Forms.
     let formly_shape = if formly_enabled {
-        formly::extract_formly_shape(source_code, fidelity)
+        formly::extract_formly_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };
@@ -256,7 +279,7 @@ pub fn run_meta_layer_with_config_and_path(
     // Detect testing independently — Vitest specs and TestBed setup do not
     // require Angular decorators. Path evidence is used only for `.spec.ts`.
     let testing_shape = if testing_enabled && testing::is_testing_source(source_code, path) {
-        testing::extract_testing_shape(source_code, fidelity)
+        testing::extract_testing_shape_with_regions(source_code, fidelity, lexical_regions)
     } else {
         None
     };

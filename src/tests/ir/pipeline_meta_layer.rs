@@ -39,6 +39,22 @@ fn production_meta_pass_constructs_one_shared_lexical_index() {
 }
 
 #[test]
+fn production_testing_family_reuses_meta_pass_lexical_index() {
+    crate::meta_util::reset_construction_count();
+
+    let _ = compile_edges(
+        "describe('account', () => { it('works', () => {}); });",
+        "C:/repo/account.component.spec.ts",
+    );
+
+    assert_eq!(
+        crate::meta_util::construction_count(),
+        1,
+        "Angular testing markers and semantics must reuse the meta-pass lexical index"
+    );
+}
+
+#[test]
 fn canonical_path_reaches_testing_extractor_in_production_pass() {
     let edges = compile_edges(
         "describe('account', () => { it('works', () => {}); });",

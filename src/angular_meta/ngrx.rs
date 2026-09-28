@@ -29,6 +29,7 @@ mod shape;
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.
 pub use extract::extract_ngrx_shape;
+pub(crate) use extract::extract_ngrx_shape_with_regions;
 
 // ---------------------------------------------------------------------------
 // NgRxKind — single source of truth for NgRx marker vocabulary

@@ -1,6 +1,7 @@
 // RxJS pipe-chain and static-combinator extraction.
 
 use super::{CombinatorDecl, ObservableDecl, PipeChain, PipeOperator, RxJsKind, RxShape};
+use crate::meta_util::LexicalRegions;
 
 /// Extract pipe chains from the source.
 ///
@@ -12,7 +13,11 @@ use super::{CombinatorDecl, ObservableDecl, PipeChain, PipeOperator, RxJsKind, R
 /// primitive used by NgRx and the combinator extractor. This is the
 /// single source of truth for bracket-depth + string-literal awareness;
 /// no layer hand-rolls its own scanner (Round-8 structural audit).
-pub(super) fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
+pub(super) fn extract_pipe_chains(
+    source: &str,
+    shape: &mut RxShape,
+    lexical_regions: &LexicalRegions,
+) {
     let mut search_from = 0;
     while let Some(rel) = source[search_from..].find(".pipe(") {
         let abs_idx = search_from + rel;
@@ -28,14 +33,14 @@ pub(super) fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals (e.g. `this.x.pipe(a) // .pipe(b)`).
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + ".pipe(".len();
             continue;
         }
 
         // Resolve ownership only from the current statement or containing
         // method. Earlier declarations are never evidence for this pipe.
-        let owner = pipe_owner(source, abs_idx);
+        let owner = pipe_owner(source, abs_idx, lexical_regions);
 
         // Collect the full pipe body (which may span multiple lines) using
         // the shared string-aware primitive. `after_pipe` is the slice
@@ -65,7 +70,7 @@ pub(super) fn extract_pipe_chains(source: &str, shape: &mut RxShape) {
     }
 }
 
-fn pipe_owner(source: &str, pipe_start: usize) -> String {
+fn pipe_owner(source: &str, pipe_start: usize, lexical_regions: &LexicalRegions) -> String {
     let before = &source[..pipe_start];
     let statement_start = before.rfind([';', '{', '}']).map_or(0, |index| index + 1);
     let statement = before[statement_start..].trim();
@@ -76,7 +81,7 @@ fn pipe_owner(source: &str, pipe_start: usize) -> String {
         }
     }
 
-    enclosing_method_name(source, pipe_start)
+    enclosing_method_name(source, pipe_start, lexical_regions)
         .or_else(|| expression_owner(statement))
         .unwrap_or_else(|| "?".to_string())
 }
@@ -102,7 +107,11 @@ fn expression_owner(statement: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn enclosing_method_name(source: &str, position: usize) -> Option<String> {
+fn enclosing_method_name(
+    source: &str,
+    position: usize,
+    lexical_regions: &LexicalRegions,
+) -> Option<String> {
     let bytes = source.as_bytes();
     let mut cursor = position;
     let mut closed_depth = 0usize;
@@ -110,10 +119,10 @@ fn enclosing_method_name(source: &str, position: usize) -> Option<String> {
     while cursor > 0 {
         cursor -= 1;
         match bytes[cursor] {
-            b'}' if !crate::angular_meta::util::is_inside_comment_or_string(source, cursor) => {
+            b'}' if !lexical_regions.contains(cursor) => {
                 closed_depth += 1;
             }
-            b'{' if !crate::angular_meta::util::is_inside_comment_or_string(source, cursor) => {
+            b'{' if !lexical_regions.contains(cursor) => {
                 if closed_depth > 0 {
                     closed_depth -= 1;
                 } else if let Some(name) = method_name_before_brace(source, cursor) {
@@ -224,7 +233,11 @@ fn operator_to_kind(name: &str) -> RxJsKind {
 /// - `merge(a$, b$)`
 /// - `zip(a$, b$)`
 /// - `race(a$, b$)`
-pub(super) fn extract_combinators(source: &str, shape: &mut RxShape) {
+pub(super) fn extract_combinators(
+    source: &str,
+    shape: &mut RxShape,
+    lexical_regions: &LexicalRegions,
+) {
     let combinator_names = ["combineLatest", "forkJoin", "merge", "zip", "race"];
 
     // Multi-line aware: scan the whole source for `name(` and collect
@@ -248,7 +261,7 @@ pub(super) fn extract_combinators(source: &str, shape: &mut RxShape) {
             // Round-11 audit: reject matches inside trailing comments, block
             // comments, or string literals (e.g. a `combineLatest(` inside a
             // string literal or a trailing `// combineLatest(...)` comment).
-            if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            if lexical_regions.contains(abs_idx) {
                 search_from = abs_idx + pattern.len();
                 continue;
             }

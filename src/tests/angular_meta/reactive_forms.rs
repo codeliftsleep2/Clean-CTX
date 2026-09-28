@@ -5,6 +5,23 @@ use crate::angular_meta::run_meta_layer_with_config;
 use crate::compression::Fidelity;
 use crate::config::MetaLayerConfig;
 
+#[test]
+fn reactive_forms_extraction_does_not_use_legacy_prefix_membership_scans() {
+    let source = builder_source(
+        "form = this.fb.group({ email: ['', [Validators.required, Validators.email]] });",
+    );
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_reactive_form_shape(&source, Fidelity::High).expect("reactive form shape");
+
+    assert!(!shape.is_empty());
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "Reactive Forms extraction must query a reusable lexical index"
+    );
+}
+
 fn render(source: &str, fidelity: Fidelity) -> String {
     extract_reactive_form_shape(source, fidelity)
         .map(|shape| shape.render(fidelity))

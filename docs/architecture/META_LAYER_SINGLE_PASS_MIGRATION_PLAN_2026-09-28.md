@@ -1,6 +1,6 @@
 # Meta-layer single-pass migration plan — 2026-09-28
 
-**Status:** Approved investigation and phased implementation plan; Phases 0–3
+**Status:** Approved investigation and phased implementation plan; Phases 0–4
 complete, later phases pending RED/GREEN implementation.
 
 **Scope:** Framework detection, marker extraction, and semantic-edge extraction
@@ -247,6 +247,9 @@ no production behavior changes and no old path has been removed prematurely.
 
 ### Phase 4 — Migrate Angular lexical consumers
 
+**Status:** Complete; focused work-count RED/GREEN regressions reported for
+every planned extractor family.
+
 **Goal:** Eliminate the known quadratic comment/string checks.
 
 Migrate complete extractor families rather than isolated call sites:
@@ -263,6 +266,24 @@ For each family:
 - pass the shared lexical index through its internal helpers;
 - preserve all existing false-positive regressions;
 - remove its legacy predicate calls only after equivalence is green.
+
+The testing, Signals, Routing, RxJS, NgRx, Reactive Forms, and Formly
+extractors now accept the compilation-scoped index. Helpers that operate on a
+distinct nested expression or reducer-body slice build one local index for
+that slice. The only remaining Angular reference to
+`is_inside_comment_or_string` is the compatibility re-export in
+`angular_meta::util`; no Angular production extractor calls it.
+
+Regression authority:
+
+- `src/tests/angular_meta/testing.rs::testing_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/ir/pipeline_meta_layer.rs::production_testing_family_reuses_meta_pass_lexical_index`
+- `src/tests/angular_meta/signals.rs::signal_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/angular_meta/routing.rs::routing_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/angular_meta/rx_lexical.rs::rxjs_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/angular_meta/ngrx.rs::ngrx_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/angular_meta/reactive_forms.rs::reactive_forms_extraction_does_not_use_legacy_prefix_membership_scans`
+- `src/tests/angular_meta/formly.rs::formly_forms_extraction_does_not_use_legacy_prefix_membership_scans`
 
 **Exit criterion:** No Angular full-source match loop calls the byte-zero legacy
 predicate repeatedly. Legitimate bounded substring scans may remain where they

@@ -32,6 +32,26 @@ fn rejects_non_signal_imports() {
 // ── Signal extraction ──────────────────────────────────────────────
 
 #[test]
+fn signal_extraction_does_not_use_legacy_prefix_membership_scans() {
+    let source = r#"
+import { signal, computed, effect } from '@angular/core';
+const count = signal(0);
+const doubled = computed(() => count() * 2);
+effect(() => console.log(doubled()));
+"#;
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_signal_shape(source, Fidelity::High).expect("signal shape");
+
+    assert_eq!(shape.signals.len(), 3);
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "signal extraction must query a reusable lexical index"
+    );
+}
+
+#[test]
 fn extracts_signal_declaration() {
     let src = r#"
 import { signal } from '@angular/core';

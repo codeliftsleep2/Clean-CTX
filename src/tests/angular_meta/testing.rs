@@ -26,6 +26,20 @@ fn testing_shape_has_no_count_only_rescan_path() {
         "literal-call collection must not add a second count-only position scan"
     );
 }
+
+#[test]
+fn testing_extraction_does_not_use_legacy_prefix_membership_scans() {
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_testing_shape(BASIC_SPEC, Fidelity::High).expect("testing shape");
+
+    assert!(!shape.is_empty());
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "testing extraction must query a reusable lexical index"
+    );
+}
 use crate::compression::Fidelity;
 use crate::config::MetaLayerConfig;
 use crate::layers::meta::semantic::SemanticRelation;

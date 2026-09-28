@@ -15,6 +15,7 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
+use crate::meta_util::LexicalRegions;
 
 // ---------------------------------------------------------------------------
 // SignalKind — single source of truth for Signals marker vocabulary
@@ -193,6 +194,15 @@ pub fn has_signal_imports(source: &str) -> bool {
 
 /// Extract the Signals shape from a source file.
 pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalShape> {
+    let lexical_regions = LexicalRegions::new(source);
+    extract_signal_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_signal_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &LexicalRegions,
+) -> Option<SignalShape> {
     if !has_signal_imports(source) {
         return None;
     }
@@ -200,23 +210,42 @@ pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalS
 
     // Extract `signal()` declarations. Note: the pattern must match
     // `= signal(` AND `= signal<T>(` (type-parameterized).
-    extract_signal_decls(source, &mut shape, "= signal", SignalKind::Signal);
+    extract_signal_decls(
+        source,
+        &mut shape,
+        "= signal",
+        SignalKind::Signal,
+        lexical_regions,
+    );
     // Extract `computed()` declarations
-    extract_signal_decls(source, &mut shape, "= computed", SignalKind::Computed);
+    extract_signal_decls(
+        source,
+        &mut shape,
+        "= computed",
+        SignalKind::Computed,
+        lexical_regions,
+    );
     // Extract `effect()` registrations. IMPORTANT: must NOT match
     // `createEffect(` (NgRx) — the pattern `effect(` would otherwise
     // match inside `createEffect(`, producing garbage `Φsig-effect:`
     // markers in every NgRx effects file. We scan for `effect(` but
     // skip occurrences immediately preceded by `create`.
-    extract_effect_decls(source, &mut shape);
+    extract_effect_decls(source, &mut shape, lexical_regions);
     // Extract `toSignal()` declarations
-    extract_signal_decls(source, &mut shape, "= toSignal", SignalKind::ToSignal);
+    extract_signal_decls(
+        source,
+        &mut shape,
+        "= toSignal",
+        SignalKind::ToSignal,
+        lexical_regions,
+    );
     // Extract `toObservable()` declarations
     extract_signal_decls(
         source,
         &mut shape,
         "= toObservable",
         SignalKind::ToObservable,
+        lexical_regions,
     );
     // Extract `linkedSignal()` declarations
     extract_signal_decls(
@@ -224,6 +253,7 @@ pub fn extract_signal_shape(source: &str, _fidelity: Fidelity) -> Option<SignalS
         &mut shape,
         "= linkedSignal",
         SignalKind::LinkedSignal,
+        lexical_regions,
     );
 
     if shape.is_empty() {
@@ -245,7 +275,13 @@ fn extract_decl_name(before: &str) -> Option<String> {
 }
 
 /// Extract signal declarations matching a pattern.
-fn extract_signal_decls(source: &str, shape: &mut SignalShape, pattern: &str, kind: SignalKind) {
+fn extract_signal_decls(
+    source: &str,
+    shape: &mut SignalShape,
+    pattern: &str,
+    kind: SignalKind,
+    lexical_regions: &LexicalRegions,
+) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(pattern) {
         let abs_idx = search_from + idx;
@@ -261,7 +297,7 @@ fn extract_signal_decls(source: &str, shape: &mut SignalShape, pattern: &str, ki
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + pattern.len();
             continue;
         }
@@ -321,7 +357,11 @@ fn extract_signal_decls(source: &str, shape: &mut SignalShape, pattern: &str, ki
 ///
 /// In all of these, the character preceding `effect` is whitespace, `=`,
 /// `(`, `,`, `;`, or the start of the file — never an identifier char.
-fn extract_effect_decls(source: &str, shape: &mut SignalShape) {
+fn extract_effect_decls(
+    source: &str,
+    shape: &mut SignalShape,
+    lexical_regions: &LexicalRegions,
+) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("effect(") {
         let abs_idx = search_from + idx;
@@ -337,7 +377,7 @@ fn extract_effect_decls(source: &str, shape: &mut SignalShape) {
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "effect(".len();
             continue;
         }

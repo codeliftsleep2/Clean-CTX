@@ -6,8 +6,7 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::angular_meta::util::{
-    consume_call_expression, extract_decl_name, find_matching_brace, is_inside_comment_or_string,
-    split_top_level,
+    consume_call_expression, extract_decl_name, find_matching_brace, split_top_level,
 };
 use crate::compression::Fidelity;
 
@@ -205,12 +204,21 @@ pub fn has_reactive_forms(source: &str) -> bool {
 }
 
 pub fn extract_reactive_form_shape(source: &str, _fidelity: Fidelity) -> Option<ReactiveFormShape> {
-    let imports = extract_forms_imports(source);
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    extract_reactive_form_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_reactive_form_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<ReactiveFormShape> {
+    let imports = extract_forms_imports(source, lexical_regions);
     if imports.is_empty() || !has_construction_hint(source, &imports) {
         return None;
     }
-    let builder_aliases = extract_builder_aliases(source, &imports.builders);
-    let candidates = find_candidates(source, &imports, &builder_aliases);
+    let builder_aliases = extract_builder_aliases(source, &imports.builders, lexical_regions);
+    let candidates = find_candidates(source, &imports, &builder_aliases, lexical_regions);
     let mut artifacts = Vec::new();
     let mut consumed_until = 0usize;
 
@@ -268,6 +276,7 @@ fn find_candidates(
     source: &str,
     imports: &ImportedForms,
     builder_aliases: &[String],
+    lexical_regions: &crate::meta_util::LexicalRegions,
 ) -> Vec<Candidate> {
     let mut candidates = Vec::new();
     collect_explicit_candidates(
@@ -275,18 +284,21 @@ fn find_candidates(
         &imports.groups,
         ConstructionKind::Group,
         &mut candidates,
+        lexical_regions,
     );
     collect_explicit_candidates(
         source,
         &imports.controls,
         ConstructionKind::Control,
         &mut candidates,
+        lexical_regions,
     );
     collect_explicit_candidates(
         source,
         &imports.arrays,
         ConstructionKind::Array,
         &mut candidates,
+        lexical_regions,
     );
     collect_builder_candidates(
         source,
@@ -294,6 +306,7 @@ fn find_candidates(
         "group",
         ConstructionKind::Group,
         &mut candidates,
+        lexical_regions,
     );
     collect_builder_candidates(
         source,
@@ -301,6 +314,7 @@ fn find_candidates(
         "control",
         ConstructionKind::Control,
         &mut candidates,
+        lexical_regions,
     );
     collect_builder_candidates(
         source,
@@ -308,6 +322,7 @@ fn find_candidates(
         "array",
         ConstructionKind::Array,
         &mut candidates,
+        lexical_regions,
     );
     candidates.sort_by_key(|candidate| (candidate.start, candidate.open_paren));
     candidates
@@ -318,11 +333,12 @@ fn collect_explicit_candidates(
     names: &[String],
     kind: ConstructionKind,
     candidates: &mut Vec<Candidate>,
+    lexical_regions: &crate::meta_util::LexicalRegions,
 ) {
     for name in names {
         let pattern = format!("new {name}");
         for (start, _) in source.match_indices(&pattern) {
-            if is_inside_comment_or_string(source, start) || !has_word_boundary(source, start) {
+            if lexical_regions.contains(start) || !has_word_boundary(source, start) {
                 continue;
             }
             let after_name = start + pattern.len();
@@ -345,10 +361,11 @@ fn collect_builder_candidates(
     method: &str,
     kind: ConstructionKind,
     candidates: &mut Vec<Candidate>,
+    lexical_regions: &crate::meta_util::LexicalRegions,
 ) {
     let pattern = format!(".{method}");
     for (dot, _) in source.match_indices(&pattern) {
-        if is_inside_comment_or_string(source, dot) {
+        if lexical_regions.contains(dot) {
             continue;
         }
         let after_method = dot + pattern.len();
@@ -434,7 +451,8 @@ fn extract_group_fields(
             continue;
         };
         let value = parts[1..].join(":");
-        let construction = find_candidates(&value, imports, builder_aliases)
+        let value_regions = crate::meta_util::LexicalRegions::new(&value);
+        let construction = find_candidates(&value, imports, builder_aliases, &value_regions)
             .first()
             .map(|candidate| candidate.kind);
         let kind = match construction {
@@ -485,7 +503,8 @@ fn nested_group_fields(
     imports: &ImportedForms,
     builder_aliases: &[String],
 ) -> Vec<FieldDecl> {
-    let candidates = find_candidates(body, imports, builder_aliases);
+    let lexical_regions = crate::meta_util::LexicalRegions::new(body);
+    let candidates = find_candidates(body, imports, builder_aliases, &lexical_regions);
     let Some(group) = candidates
         .iter()
         .find(|candidate| candidate.kind == ConstructionKind::Group)
@@ -503,7 +522,8 @@ fn nested_array_fields(
     imports: &ImportedForms,
     builder_aliases: &[String],
 ) -> Vec<FieldDecl> {
-    let candidates = find_candidates(body, imports, builder_aliases);
+    let lexical_regions = crate::meta_util::LexicalRegions::new(body);
+    let candidates = find_candidates(body, imports, builder_aliases, &lexical_regions);
     let mut fields = Vec::new();
     let mut consumed_until = 0;
     for group in candidates

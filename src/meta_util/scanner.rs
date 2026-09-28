@@ -522,6 +522,9 @@ pub fn consume_call_expression(text: &str, open_paren: usize) -> Option<(usize, 
 /// The opening quote/comment marker itself is NOT considered "inside" —
 /// only characters after it are.
 pub fn is_inside_comment_or_string(source: &str, pos: usize) -> bool {
+    #[cfg(test)]
+    super::scan_metrics::record_legacy_membership_call();
+
     let bytes = source.as_bytes();
     let mut i = 0usize;
     let mut in_line_comment = false;

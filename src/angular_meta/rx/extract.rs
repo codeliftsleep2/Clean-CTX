@@ -2,6 +2,7 @@
 
 use super::{ObservableDecl, RxShape, SubjectDecl, SubjectKind, has_rxjs_imports};
 use crate::compression::Fidelity;
+use crate::meta_util::LexicalRegions;
 
 /// Extract the RxJS shape from a source file.
 ///
@@ -9,6 +10,15 @@ use crate::compression::Fidelity;
 /// Returns `Some(RxShape)` with detected observables, subjects, pipes,
 /// and combinators.
 pub fn extract_rx_shape(source: &str, _fidelity: Fidelity) -> Option<RxShape> {
+    let lexical_regions = LexicalRegions::new(source);
+    extract_rx_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_rx_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &LexicalRegions,
+) -> Option<RxShape> {
     // Import gate: skip non-RxJS files
     if !has_rxjs_imports(source) {
         return None;
@@ -17,16 +27,16 @@ pub fn extract_rx_shape(source: &str, _fidelity: Fidelity) -> Option<RxShape> {
     let mut shape = RxShape::default();
 
     // Extract observable field declarations
-    extract_observables(source, &mut shape);
+    extract_observables(source, &mut shape, lexical_regions);
 
     // Extract subject instantiations
-    extract_subjects(source, &mut shape);
+    extract_subjects(source, &mut shape, lexical_regions);
 
     // Extract pipe chains
-    super::pipes::extract_pipe_chains(source, &mut shape);
+    super::pipes::extract_pipe_chains(source, &mut shape, lexical_regions);
 
     // Extract static combinator calls
-    super::pipes::extract_combinators(source, &mut shape);
+    super::pipes::extract_combinators(source, &mut shape, lexical_regions);
 
     if shape.is_empty() {
         return None;
@@ -43,7 +53,7 @@ pub fn extract_rx_shape(source: &str, _fidelity: Fidelity) -> Option<RxShape> {
 /// - Creation functions: `of(...)`, `from(...)`, `interval(...)`,
 ///   `timer(...)`, `fromEvent(...)`
 /// - Service calls: `http.get(...)`, `this.http.get(...)`
-fn extract_observables(source: &str, shape: &mut RxShape) {
+fn extract_observables(source: &str, shape: &mut RxShape, lexical_regions: &LexicalRegions) {
     // Scan line-by-line for observable patterns. Track the absolute byte
     // offset of each line so matches inside trailing comments or string
     // literals can be rejected (Round-11 audit: a `// users$ = of(1)`
@@ -65,7 +75,9 @@ fn extract_observables(source: &str, shape: &mut RxShape) {
 
         // Pattern: `name$: Observable<T>` or `name$ = http.get(...)`
         // or `name$ = of(...)`, `name$ = from(...)`, etc.
-        if let Some(obs) = extract_observable_from_line(source, trimmed_abs, trimmed) {
+        if let Some(obs) =
+            extract_observable_from_line(trimmed_abs, trimmed, lexical_regions)
+        {
             shape.observables.push(obs);
         }
         line_start += line.len() + 1;
@@ -77,13 +89,13 @@ fn extract_observables(source: &str, shape: &mut RxShape) {
 /// `line_abs` is the absolute byte offset of `line` within `source`, used
 /// to reject matches inside comments/strings (Round-11 audit).
 fn extract_observable_from_line(
-    source: &str,
     line_abs: usize,
     line: &str,
+    lexical_regions: &LexicalRegions,
 ) -> Option<ObservableDecl> {
     // Check for service calls first (e.g. `name$: Observable<T> = this.http.get(...)`)
     // so the source is captured when the type annotation is also present.
-    if let Some(obs) = extract_service_call_observable(source, line_abs, line) {
+    if let Some(obs) = extract_service_call_observable(line_abs, line, lexical_regions) {
         return Some(obs);
     }
 
@@ -95,7 +107,7 @@ fn extract_observable_from_line(
         // annotation. Method return annotations and typed parameters do.
         if !before.contains('(')
             && !before.contains(')')
-            && !crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + idx)
+            && !lexical_regions.contains(line_abs + idx)
         {
             let name = extract_field_name(before)?;
             let rest = &line[idx + ": Observable<".len()..];
@@ -135,7 +147,7 @@ fn extract_observable_from_line(
 
     for func in &creation_funcs {
         if let Some(idx) = line.find(&format!(" = {}", func)) {
-            if !crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + idx) {
+            if !lexical_regions.contains(line_abs + idx) {
                 let before = &line[..idx];
                 let name = extract_field_name(before)?;
                 return Some(ObservableDecl {
@@ -157,16 +169,16 @@ fn extract_observable_from_line(
 /// `line_abs` is the absolute byte offset of `line` within `source`, used
 /// to reject matches inside comments/strings (Round-11 audit).
 fn extract_service_call_observable(
-    source: &str,
     line_abs: usize,
     line: &str,
+    lexical_regions: &LexicalRegions,
 ) -> Option<ObservableDecl> {
     // Check for service calls: `name$ = this.http.get(...)` or `name$ = http.get(...)`
     // or `name$: Observable<T> = this.http.get(...)`
     let eq_idx = line.find(" = ")?;
     // Reject when the ` = ` itself is inside a comment/string (e.g. a
     // trailing `// users$ = http.get(...)` comment).
-    if crate::angular_meta::util::is_inside_comment_or_string(source, line_abs + eq_idx) {
+    if lexical_regions.contains(line_abs + eq_idx) {
         return None;
     }
     let before = &line[..eq_idx];
@@ -200,10 +212,7 @@ fn extract_service_call_observable(
     for pat in &service_patterns {
         if let Some(pat_idx) = after.find(pat) {
             // Reject when the service pattern is inside a comment/string.
-            if crate::angular_meta::util::is_inside_comment_or_string(
-                source,
-                line_abs + eq_idx + 3 + pat_idx,
-            ) {
+            if lexical_regions.contains(line_abs + eq_idx + 3 + pat_idx) {
                 continue;
             }
             // Extract the URL or first argument.
@@ -247,10 +256,7 @@ fn extract_service_call_observable(
     }
     if let Some(mp_idx) = earliest {
         // Reject when the method pattern is inside a comment/string.
-        if !crate::angular_meta::util::is_inside_comment_or_string(
-            source,
-            line_abs + eq_idx + 3 + mp_idx,
-        ) {
+        if !lexical_regions.contains(line_abs + eq_idx + 3 + mp_idx) {
             // Extract up to the first '('
             let method_call = after.split('(').next().unwrap_or("").trim();
             return Some(ObservableDecl {
@@ -296,7 +302,7 @@ fn extract_field_name(before: &str) -> Option<String> {
 /// - `new BehaviorSubject<T>(initialValue)`
 /// - `new ReplaySubject<T>(n)`
 /// - `new AsyncSubject<T>()`
-fn extract_subjects(source: &str, shape: &mut RxShape) {
+fn extract_subjects(source: &str, shape: &mut RxShape, lexical_regions: &LexicalRegions) {
     let subject_patterns = [
         ("new Subject<", SubjectKind::Subject),
         ("new BehaviorSubject<", SubjectKind::BehaviorSubject),
@@ -324,8 +330,7 @@ fn extract_subjects(source: &str, shape: &mut RxShape) {
             if let Some(idx) = trimmed.find(pattern) {
                 // Round-11 audit: reject when the pattern match is inside a
                 // comment or string literal (e.g. a trailing comment).
-                if crate::angular_meta::util::is_inside_comment_or_string(source, trimmed_abs + idx)
-                {
+                if lexical_regions.contains(trimmed_abs + idx) {
                     continue;
                 }
                 // Extract field name before the `new` keyword.

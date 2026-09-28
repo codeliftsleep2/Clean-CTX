@@ -2,7 +2,7 @@
 
 use super::is_identifier;
 use crate::angular_meta::util::{
-    consume_call_expression, extract_decl_name, is_inside_comment_or_string, split_top_level,
+    consume_call_expression, extract_decl_name, split_top_level,
 };
 
 #[derive(Debug, Default)]
@@ -22,7 +22,10 @@ impl ImportedForms {
     }
 }
 
-pub(super) fn extract_forms_imports(source: &str) -> ImportedForms {
+pub(super) fn extract_forms_imports(
+    source: &str,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> ImportedForms {
     let mut imports = ImportedForms::default();
     let mut search_from = 0usize;
     while let Some(relative) = source[search_from..].find("@angular/forms") {
@@ -31,7 +34,7 @@ pub(super) fn extract_forms_imports(source: &str) -> ImportedForms {
             search_from = package_pos + 1;
             continue;
         };
-        if is_inside_comment_or_string(source, import_pos) {
+        if lexical_regions.contains(import_pos) {
             search_from = package_pos + 1;
             continue;
         }
@@ -89,13 +92,17 @@ pub(super) fn has_construction_hint(source: &str, imports: &ImportedForms) -> bo
             .any(|name| source.contains(&format!("new {name}")))
 }
 
-pub(super) fn extract_builder_aliases(source: &str, builder_types: &[String]) -> Vec<String> {
-    let mut aliases = constructor_aliases(source, builder_types);
+pub(super) fn extract_builder_aliases(
+    source: &str,
+    builder_types: &[String],
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Vec<String> {
+    let mut aliases = constructor_aliases(source, builder_types, lexical_regions);
     let mut search_from = 0usize;
     while let Some(relative) = source[search_from..].find("inject") {
         let pos = search_from + relative;
         search_from = pos + "inject".len();
-        if is_inside_comment_or_string(source, pos) {
+        if lexical_regions.contains(pos) {
             continue;
         }
         let rest = &source[search_from..];
@@ -121,13 +128,17 @@ pub(super) fn extract_builder_aliases(source: &str, builder_types: &[String]) ->
     aliases
 }
 
-fn constructor_aliases(source: &str, builder_types: &[String]) -> Vec<String> {
+fn constructor_aliases(
+    source: &str,
+    builder_types: &[String],
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Vec<String> {
     let mut aliases = Vec::new();
     let mut search_from = 0usize;
     while let Some(relative) = source[search_from..].find("constructor") {
         let pos = search_from + relative;
         search_from = pos + "constructor".len();
-        if is_inside_comment_or_string(source, pos) {
+        if lexical_regions.contains(pos) {
             continue;
         }
         let Some(open_relative) = source[search_from..].find('(') else {

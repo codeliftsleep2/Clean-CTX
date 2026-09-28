@@ -16,7 +16,8 @@ pub(super) fn validators_from_value(
         let items = split_top_level(&trimmed[1..close], ',');
         return collect_validator_list(items.into_iter().skip(1));
     }
-    let candidates = find_candidates(trimmed, imports, builder_aliases);
+    let lexical_regions = crate::meta_util::LexicalRegions::new(trimmed);
+    let candidates = find_candidates(trimmed, imports, builder_aliases, &lexical_regions);
     let Some(control) = candidates
         .iter()
         .find(|candidate| candidate.kind == ConstructionKind::Control)

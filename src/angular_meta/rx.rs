@@ -383,6 +383,7 @@ mod extract;
 mod pipes;
 
 pub use extract::extract_rx_shape;
+pub(crate) use extract::extract_rx_shape_with_regions;
 
 // ---------------------------------------------------------------------------
 // Expansion
@@ -407,3 +408,7 @@ pub fn expand_phi(token: &str) -> Option<&'static str> {
 #[cfg(test)]
 #[path = "../tests/angular_meta/rx.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/rx_lexical.rs"]
+mod lexical_tests;

@@ -10,6 +10,7 @@ use std::path::Path;
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use crate::meta_util::LexicalRegions;
 
 /// Marker vocabulary emitted by the Angular testing meta-layer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -140,12 +141,21 @@ pub fn is_testing_source(source: &str, path: &Path) -> bool {
 /// Extract generic testing markers. The caller owns path-based eligibility;
 /// every emitted fact still requires an actual source shape.
 pub fn extract_testing_shape(source: &str, _fidelity: Fidelity) -> Option<TestingShape> {
-    let describes = collect_literal_calls(source, "describe");
-    let tests = collect_literal_calls(source, "it");
+    let lexical_regions = LexicalRegions::new(source);
+    extract_testing_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_testing_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &LexicalRegions,
+) -> Option<TestingShape> {
+    let describes = collect_literal_calls(source, "describe", lexical_regions);
+    let tests = collect_literal_calls(source, "it", lexical_regions);
     let describe_count = describes.len();
     let test_count = tests.len();
-    let test_bed = extract_test_bed_summaries(source);
-    let spies = extract_vitest_spies(source);
+    let test_bed = extract_test_bed_summaries(source, lexical_regions);
+    let spies = extract_vitest_spies(source, lexical_regions);
     let shape = TestingShape {
         describe_count,
         test_count,
@@ -162,7 +172,19 @@ pub fn extract_testing_semantic_edges(source: &str, path: &Path) -> Vec<Semantic
     if !is_testing_source(source, path) {
         return Vec::new();
     }
-    let explicit = create_component_candidates(source);
+    let lexical_regions = LexicalRegions::new(source);
+    extract_testing_semantic_edges_with_regions(source, path, &lexical_regions)
+}
+
+pub(crate) fn extract_testing_semantic_edges_with_regions(
+    source: &str,
+    path: &Path,
+    lexical_regions: &LexicalRegions,
+) -> Vec<SemanticEdge> {
+    if !is_testing_source(source, path) {
+        return Vec::new();
+    }
+    let explicit = create_component_candidates(source, lexical_regions);
     let filename = component_from_spec_path(path);
 
     let targets: Vec<String> = if explicit.is_empty() {
@@ -208,9 +230,13 @@ struct LiteralCall {
     body_end: Option<usize>,
 }
 
-fn collect_literal_calls(source: &str, name: &str) -> Vec<LiteralCall> {
+fn collect_literal_calls(
+    source: &str,
+    name: &str,
+    lexical_regions: &LexicalRegions,
+) -> Vec<LiteralCall> {
     let needle = format!("{name}(");
-    call_positions(source, &needle)
+    call_positions(source, &needle, lexical_regions)
         .into_iter()
         .filter_map(|start| {
             let open = start + name.len();
@@ -226,7 +252,11 @@ fn collect_literal_calls(source: &str, name: &str) -> Vec<LiteralCall> {
         .collect()
 }
 
-fn call_positions(source: &str, needle: &str) -> Vec<usize> {
+fn call_positions(
+    source: &str,
+    needle: &str,
+    lexical_regions: &LexicalRegions,
+) -> Vec<usize> {
     let mut positions = Vec::new();
     let mut offset = 0;
     while let Some(relative) = source[offset..].find(needle) {
@@ -235,7 +265,7 @@ fn call_positions(source: &str, needle: &str) -> Vec<usize> {
             || !source.as_bytes()[start - 1].is_ascii_alphanumeric()
                 && source.as_bytes()[start - 1] != b'_'
                 && source.as_bytes()[start - 1] != b'.';
-        if boundary_ok && !crate::angular_meta::util::is_inside_comment_or_string(source, start) {
+        if boundary_ok && !lexical_regions.contains(start) {
             positions.push(start);
         }
         offset = start + needle.len();
@@ -306,9 +336,12 @@ fn describe_hierarchy(calls: Vec<LiteralCall>) -> Vec<String> {
     result
 }
 
-fn extract_test_bed_summaries(source: &str) -> Vec<String> {
+fn extract_test_bed_summaries(
+    source: &str,
+    lexical_regions: &LexicalRegions,
+) -> Vec<String> {
     let needle = "TestBed.configureTestingModule(";
-    call_positions(source, needle)
+    call_positions(source, needle, lexical_regions)
         .into_iter()
         .filter_map(|start| {
             let open = start + needle.len() - 1;
@@ -378,16 +411,16 @@ fn extract_provider_token(entry: &str) -> Option<String> {
     identifier_like(token).then(|| token.to_string())
 }
 
-fn extract_vitest_spies(source: &str) -> Vec<String> {
+fn extract_vitest_spies(source: &str, lexical_regions: &LexicalRegions) -> Vec<String> {
     let mut spies = BTreeSet::new();
-    for start in call_positions(source, "vi.fn(") {
+    for start in call_positions(source, "vi.fn(", lexical_regions) {
         let name = enclosing_object_assignment(source, start)
             .unwrap_or_else(|| assignment_target_before(source, start));
         if let Some(name) = name {
             spies.insert(name.to_string());
         }
     }
-    for start in call_positions(source, "vi.spyOn(") {
+    for start in call_positions(source, "vi.spyOn(", lexical_regions) {
         let open = start + "vi.spyOn".len();
         let Some(close) = find_matching(source, open, '(', ')') else {
             continue;
@@ -401,7 +434,7 @@ fn extract_vitest_spies(source: &str) -> Vec<String> {
             spies.insert(format!("{}.{}", args[0].trim(), method));
         }
     }
-    for start in call_positions(source, "vi.mock(") {
+    for start in call_positions(source, "vi.mock(", lexical_regions) {
         let open = start + "vi.mock".len();
         if let Some((module, _)) = first_literal_argument(source, open + 1) {
             spies.insert(format!("module:{module}"));
@@ -437,9 +470,12 @@ fn assignment_target_before(source: &str, end: usize) -> Option<&str> {
         .filter(|name| identifier_like(name))
 }
 
-fn create_component_candidates(source: &str) -> BTreeSet<String> {
+fn create_component_candidates(
+    source: &str,
+    lexical_regions: &LexicalRegions,
+) -> BTreeSet<String> {
     let mut candidates = BTreeSet::new();
-    for start in call_positions(source, "TestBed.createComponent(") {
+    for start in call_positions(source, "TestBed.createComponent(", lexical_regions) {
         let argument = start + "TestBed.createComponent(".len();
         let tail = source[argument..].trim_start();
         let candidate = tail

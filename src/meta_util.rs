@@ -14,6 +14,8 @@
 mod class_source;
 mod declaration;
 mod lexical_regions;
+#[cfg(test)]
+mod scan_metrics;
 mod scanner;
 
 pub use class_source::{
@@ -28,6 +30,8 @@ pub use scanner::{
     find_first_top_level, find_matching_brace, is_inside_comment_or_string, skip_string,
     skip_template, split_top_level,
 };
+#[cfg(test)]
+pub(crate) use scan_metrics::{legacy_membership_call_count, reset_legacy_membership_call_count};
 
 #[cfg(test)]
 #[path = "tests/meta_util.rs"]
