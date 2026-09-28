@@ -84,3 +84,46 @@ fn vocabulary_prompt_description_names_the_production_presentation_boundary() {
     assert!(!description.contains("COMPACT-A"), "{description}");
     assert!(!description.contains("CONTROL-FULL"), "{description}");
 }
+
+/// Phase 1 MCP-to-LLM contract: clients should receive the compact workflow
+/// rules during initialization without having to select an optional prompt.
+#[test]
+fn initialize_includes_compact_workflow_instructions() {
+    let _serial = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
+
+    crate::mcp::handlers::handle_initialize(&serde_json::json!(1));
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("initialize response");
+    let instructions = response["result"]["instructions"]
+        .as_str()
+        .expect("initialize result must include server instructions");
+
+    for required in [
+        "provide_code_context",
+        "workspaceRoot",
+        "graph_search",
+        "cbm_proxy",
+        "delta_code_context",
+        "apply_edit",
+        "index_repository",
+        "indexing",
+        "exact known ranges",
+    ] {
+        assert!(
+            instructions.contains(required),
+            "initialize instructions must include `{required}`: {instructions}"
+        );
+    }
+
+    assert!(
+        instructions.len() < 2_000,
+        "workflow instructions must remain compact: {} bytes",
+        instructions.len()
+    );
+    assert!(
+        !instructions.contains("// SCHEMA vNext"),
+        "initialization must not duplicate the detailed notation prompt"
+    );
+}

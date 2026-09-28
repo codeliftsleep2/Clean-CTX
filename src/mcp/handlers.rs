@@ -19,7 +19,8 @@ pub(crate) fn handle_initialize(id: &Value) {
         "result": {
             "protocolVersion": "2025-11-25",
             "capabilities": { "tools": {}, "prompts": {} },
-            "serverInfo": { "name": "clean-ctx", "version": "1.0.0" }
+            "serverInfo": { "name": "clean-ctx", "version": "1.0.0" },
+            "instructions": prompts::WORKFLOW_INSTRUCTIONS
         }
     }));
 }

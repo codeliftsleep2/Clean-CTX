@@ -1,5 +1,22 @@
 // Prompt content for the MCP server.
 
+/// Compact server-wide workflow guidance returned during MCP initialization.
+///
+/// Keep this focused on tool selection and lifecycle boundaries. Detailed
+/// SCHEMA-vNext notation remains in [`SYSTEM_PROMPT`] and the optional prompts,
+/// so initialization does not charge every session for the full vocabulary.
+pub(crate) const WORKFLOW_INSTRUCTIONS: &str = r#"# Clean-CTX Tool Workflow
+
+- Use `provide_code_context` as the default read for supported source files, and pass `workspaceRoot` explicitly whenever it is known.
+- Use `graph_search` as the normal typed symbol/file discovery entry point. Use the other structured graph wrappers when typed nodes, edges, paths, or modules are required.
+- Use `cbm_proxy` only when compact or explicitly fresh raw CBM output is preferable to a typed structured result. Never bypass Clean-CTX to call CBM directly.
+- Use `delta_code_context`, `apply_delta`, and persistence tools only when the caller intentionally owns their version, acknowledgement, or durable-state lifecycle.
+- Read Edit or Verbatim context before `apply_edit`, and edit only byte-exact regions supplied by the current session.
+- Do not call `index_repository` after `apply_edit`; the next graph operation performs the lazy refresh. Use explicit indexing only after external edits when graph freshness is required.
+- Treat CBM indexing responses as temporary state, not as authoritative empty results; retry in a bounded way or use the documented fallback.
+- Use native file reads for unsupported or non-code files and for exact known ranges when structured context is insufficient.
+"#;
+
 /// The Clean-CTX model-visible context guide.
 pub(crate) const SYSTEM_PROMPT: &str = r#"# Clean-CTX Context Guide
 

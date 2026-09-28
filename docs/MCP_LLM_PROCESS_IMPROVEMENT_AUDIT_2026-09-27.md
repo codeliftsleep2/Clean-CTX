@@ -84,12 +84,19 @@ guidance and passed after the Phase 0 implementation.
 
 ### Phase 1 — Automatic workflow instructions
 
-**Status:** Proposed
+**Status:** Complete; focused RED→GREEN verification confirmed
 
 Phase 1 is RC-1: add concise server instructions to initialization, retain the
 detailed optional prompts, and add initialization contract coverage. This is
 separate from Phase 0 because it changes what compliant hosts may inject into
 the model context even though it does not change tool execution semantics.
+
+The implementation keeps one compact workflow authority in
+`src/mcp/prompts.rs`, returns it as `initialize.result.instructions`, and leaves
+the detailed SCHEMA-vNext notation in the optional prompt surfaces. The tracked
+regression is `initialize_includes_compact_workflow_instructions` in
+`src/tests/mcp/prompts.rs`. The unchanged regression failed when initialization
+omitted server instructions and passed after the Phase 1 implementation.
 
 Later compatible phases map to RC-3 through RC-6. AD-1 through AD-3 remain
 separate approval-gated architectural decisions rather than implementation
