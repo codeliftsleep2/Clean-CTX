@@ -1,8 +1,8 @@
 # Forward Thinking — Option C and the next presentation work
 
 **Status:** Historical Option-C hand-off, partially implemented. Individual ADR
-status lines below record what shipped; SCHEMA-vNext behavior and remaining
-presentation work are owned by `SCHEMA_VNEXT_PROPOSAL.md` and
+status lines below record what shipped; the SCHEMA-vNext production contract
+and remaining presentation research are owned by `SCHEMA_VNEXT_PROPOSAL.md` and
 `LLM_CONTEXT_COMPRESSION_RESEARCH.md`.
 
 **Audience:** the next agent (Codex) resuming this work.

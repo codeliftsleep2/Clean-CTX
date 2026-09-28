@@ -814,7 +814,9 @@ emitted through the existing meta-layer pipeline.
 > measured in June 2026. They remain useful comparative evidence but are not
 > current SCHEMA-vNext claims. Current reproducible token records live under
 > `verification/context-compression/schema-v5/`; see
-> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` for interpretation.
+> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` for the shipped production
+> contract and measurement interpretation (the historical filename is retained
+> for link stability).
 
 All numbers below were produced by the `compress_code_context` tool on the in-repo TypeScript fixtures, using the **cl100k BPE** estimator (`tiktoken-rs`). "Raw tokens" is the encoded length of the source file as-is; "Retained tokens" is the encoded length of the compressed output (including the report header, the `§PATHMAP` footer, and all behavior markers).
 

@@ -1,11 +1,18 @@
-# SCHEMA-vNext model-facing presentation proposal
+# SCHEMA-vNext model-facing production presentation
 
-**Status:** Combined B1+B2+B3 grammar implemented and production-recaptured;
-real-workspace Claude pilot acceptance remains pending.
+**Status:** Shipped production contract. The combined B1+B2+B3 grammar, A1
+path collapse, A3 generated import-handle collapse, and B5 overload correction
+are implemented and production-recaptured. Real-workspace Claude evaluation is
+ongoing post-ship validation, not a prerequisite for production status.
+
+**Document history:** The filename is retained as a stable link from earlier
+design and measurement records. This document is no longer a proposal; it is
+the current presentation contract plus the migration and evaluation record that
+justified it.
 
 **Scope:** The model-visible file-context presentation emitted by
 `provide_code_context`, `compress_code_context`, restore/replay, and the full
-response path of `delta_code_context`. This proposal does not replace canonical
+response path of `delta_code_context`. This presentation does not replace canonical
 IR, Binary `0x04`, `dv:2`, workspace queries, or exact-source modes.
 
 **Primary authority:** Production code is authoritative for current behavior.
@@ -58,14 +65,14 @@ Canonical semantics
           |
           +--> workspace_query           on-demand cross-file and detailed facts
           |
-          `--> SCHEMA-v5                 model-facing file-local presentation
+          `--> SCHEMA-vNext              model-facing file-local presentation
                     |
                     `--> raw source      when the complete presentation is not
                                           safely cheaper, or when explicitly
                                           requested as Verbatim
 ```
 
-SCHEMA-vNext must remain a projection. It must not become canonical storage,
+SCHEMA-vNext remains a projection. It is not canonical storage,
 an edit protocol, a delta protocol, or a substitute for `workspace_query`.
 
 ### Current measured checkpoint
@@ -547,26 +554,26 @@ focused edit. Laboratory token wins do not replace this gate.
 
 ---
 
-## 9. Decision matrix
+## 9. Current disposition and retained evaluation matrix
 
 | Candidate | Expected impact | Correctness risk | Implementation scope | Initial recommendation |
 |---|---|---|---|---|
-| A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Production and refreshed baseline verified; live gate pending |
+| A1 single path | Measured 40–45 tokens/response; 0.99–6.14% | Very low | content assembly + contracts | Shipped and production-recaptured; post-ship live evaluation remains useful |
 | A2 Promise collapse | No opportunity in the current economics corpus | Very low | fixture evidence, then renderer + tests | Defer until a qualifying `P PROMISE` cost exists |
-| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Laboratory production gate complete; live gate pending |
+| A3 import handle removal | Measured 6/24/40 tokens for Angular/C#/TypeScript; 0.14–6.40% | Low; code/corpus, 8/8 paired reasoning, and focused RED/GREEN gates passed | renderer/prompt/tests | Shipped and production-recaptured; post-ship live evaluation remains useful |
 | A4a class-owner ID elision | No opportunity in the current economics corpus | Low | pattern-rich fixture + adversarial reasoning tests | Defer until visible `P` rows establish a cost |
 | A4b method-owner elision/replacement | No current corpus opportunity | Medium-to-high ambiguity risk | grammar + pattern-rich adversarial reasoning tests | Retain/replace discriminator unless all ownership gates pass |
 | B1 one method arrow | 15-57 tokens per fixture; up to 5.25% on the current corpus | Low; 10/10 paired reasoning passed | versioned grammar/prompt/tests | Production-verified as part of the combined grammar |
 | B2 `C` class record | 3 tokens on single-class fixtures; 84–95 on 15-class C# | Low; 12/12 paired reasoning passed | versioned grammar/prompt/tests | Production-verified as part of the combined grammar |
 | B3 grouped fields | 10–126 tokens; 1.13–9.67% on Medium/High | Medium risk; corrected full restart passed 16/16 paired reasoning | renderer/reasoning tests | Production-verified as part of the combined grammar |
-| Combined B1+B2+B3 | 18–206 cl100k tokens; 0.57–13.66% across all lanes | Combined ownership/parsing gate passed on clean 20/20 restart; symmetric replication exposed model/evaluator variability, not candidate regression | full paired laboratory gate | Implemented; production recapture exactly matched every predicted corpus total; live pilot pending |
+| Combined B1+B2+B3 | 18–206 cl100k tokens; 0.57–13.66% across all lanes | Combined ownership/parsing gate passed on clean 20/20 restart; symmetric replication exposed model/evaluator variability, not candidate regression | full paired laboratory gate | Shipped; production recapture exactly matched every predicted corpus total; post-ship live evaluation ongoing |
 | B5 remove `(+N)` overload suffix | Small variable token win; correctness/readability motivated | Low: overload parameters already remain visible at every structural fidelity | renderer/prompt/regression tests | Approved narrow correction; unchanged regression demonstrated RED then GREEN |
 | B4 marker vocabulary | Unknown and tokenizer-unstable | Medium plus readability cost | broad grammar changes | Lowest priority; defer without a substantial three-tokenizer win |
 | C acknowledged legend | Large fixed | High transport risk | MCP/client contract | Do not build until a concrete host proves acknowledgement |
 
 ---
 
-## 10. Rollout plan
+## 10. Implementation and validation record
 
 ### Phase 0 — refresh truth
 
@@ -577,19 +584,18 @@ focused edit. Laboratory token wins do not replace this gate.
 3. **Complete:** record per-family token anatomy and candidate opportunity in
    `verification/context-compression/schema-v5/PHASE0_BASELINE.md`.
 
-### Phase 1 — Tier A experiments
+### Phase 1 — Tier A experiments and shipped subset
 
-1. **In progress:** implement candidates in the measurement harness first. A1
-   has a harness-only isolated transform and passed economics plus deterministic
-   byte-isolation plus all six paired reasoning cases. The approved production
+1. **Complete for A1:** the candidate passed harness economics, deterministic
+   byte-isolation, and all six paired reasoning cases. The approved production
    footer is implemented with focused tracked coverage; refreshed baseline and
-   production capture verification passed with the predicted totals. Live
-   acceptance remains pending. See
+   production capture verification passed with the predicted totals. See
    `verification/context-compression/schema-v5/PHASE1_A1_SINGLE_PATH.md`.
-2. Measure each independently on the full corpus.
-3. Evaluate A4a and A4b independently; do not infer method attribution from a
-   class-attribution result.
-4. Run deterministic and model reasoning gates for candidates that win. A3
+2. **Complete for the shipped subset:** each shipped candidate was measured
+   independently on the full corpus.
+3. **Deferred:** evaluate A4a and A4b independently if a qualifying visible
+   cost appears; do not infer method attribution from a class-attribution result.
+4. **Complete for A3:** deterministic and model reasoning gates passed. A3
    passed its code/corpus audit, isolated economics gate, and all eight paired
    import-meaning and source-alias cases using fresh isolated invocations of
    the configured default Codex model. Its approved presentation-only renderer
@@ -598,7 +604,8 @@ focused edit. Laboratory token wins do not replace this gate.
    renderer/MCP suites were reported GREEN, and the clean production recapture
    matched all isolated A3 token predictions exactly. The schema-v5 production
    and workspace capture verifier passed.
-5. Approve and implement only the individually proven subset.
+5. **Complete:** only the individually proven A1 and A3 subset shipped; A2 and
+   A4 remain deferred under the decision matrix above.
 
 ### Phase 2 — versioned grammar production integration
 
@@ -610,8 +617,10 @@ focused edit. Laboratory token wins do not replace this gate.
    tests, examples, and documentation atomically.
 6. **Complete:** recapture production and confirm exact agreement with the
    independently measured combined candidate across both tokenizers.
-7. **Pending:** exercise the externally visible grammar in the real Claude
-   pilot workspace.
+7. **Post-ship validation:** continue exercising the externally visible grammar
+   in real Claude workspaces. Findings enter the discovery registry and receive
+   tracked regressions when reproducible; they do not make the shipped grammar
+   a proposal again.
 
 ### Tier C capability gate — blocked pending a real host
 
@@ -679,21 +688,19 @@ Reject or defer a candidate when any of the following occurs:
 
 ---
 
-## 14. Open decisions
+## 14. Remaining research questions
 
-1. Should proven Tier A presentation collapses land under SCHEMA-v5, or should
-   every externally visible textual change wait for vNext?
-2. Is the first import operand always internal presentation machinery?
-3. Which pattern payloads remain reasoning-relevant after their declaration
+1. Which pattern payloads remain reasoning-relevant after their declaration
    signature and modifiers are visible, and what visible method discriminator
    does each retained payload require?
-4. Does grouping fields degrade real model selection or comparison tasks?
-5. Can Claude's native token counter be used in the repeatable local/field
+2. Does grouping fields degrade real model selection or comparison tasks in
+   additional real-workspace cases beyond the completed laboratory gates?
+3. Can Claude's native token counter be used in the repeatable local/field
    measurement loop?
-6. Can any concrete supported MCP host prove both explicit schema
+4. Can any concrete supported MCP host prove both explicit schema
    acknowledgement and model access to that exact schema? Until demonstrated,
    Tier C has no implementation phase.
-7. Does any marker-vocabulary alternative produce a substantial, readable,
+5. Does any marker-vocabulary alternative produce a substantial, readable,
    stable win across cl100k, o200k, and the native field-test Claude tokenizer?
 
 These questions are measurement and architecture gates, not details for an

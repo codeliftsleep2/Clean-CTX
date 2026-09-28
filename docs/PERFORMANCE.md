@@ -8,7 +8,8 @@
 > Current SCHEMA-vNext measurements, tokenizer comparisons, anatomy records,
 > and reasoning gates live under
 > `verification/context-compression/schema-v5/` and are interpreted by
-> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md`. Re-run those artifacts after
+> the shipped contract in `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` (the
+> historical filename is retained for link stability). Re-run those artifacts after
 > presentation-affecting RED/GREEN changes instead of editing historical
 > numbers here.
 
