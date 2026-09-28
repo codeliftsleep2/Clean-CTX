@@ -75,9 +75,7 @@ fn extract_observables(source: &str, shape: &mut RxShape, lexical_regions: &Lexi
 
         // Pattern: `name$: Observable<T>` or `name$ = http.get(...)`
         // or `name$ = of(...)`, `name$ = from(...)`, etc.
-        if let Some(obs) =
-            extract_observable_from_line(trimmed_abs, trimmed, lexical_regions)
-        {
+        if let Some(obs) = extract_observable_from_line(trimmed_abs, trimmed, lexical_regions) {
             shape.observables.push(obs);
         }
         line_start += line.len() + 1;

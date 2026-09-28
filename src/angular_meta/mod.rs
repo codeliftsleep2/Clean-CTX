@@ -219,33 +219,37 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
     path: &std::path::Path,
     lexical_regions: &crate::meta_util::LexicalRegions,
 ) -> Option<MetaBlock> {
-    run_meta_layer_with_config_path_regions_and_ngrx(
+    run_meta_layer_with_config_path_regions_and_evidence(
         source_code,
         class_captures,
         fidelity,
         config,
         path,
         lexical_regions,
-        None,
-        None,
-        None,
+        PrecomputedAngularEvidence::default(),
     )
 }
 
-pub(crate) fn run_meta_layer_with_config_path_regions_and_ngrx(
+#[derive(Default)]
+pub(crate) struct PrecomputedAngularEvidence {
+    pub ngrx: Option<Option<ngrx::NgRxShape>>,
+    pub routing: Option<Option<routing::RouteShape>>,
+    pub is_angular: Option<bool>,
+}
+
+pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     source_code: &str,
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&crate::config::MetaLayerConfig>,
     path: &std::path::Path,
     lexical_regions: &crate::meta_util::LexicalRegions,
-    precomputed_ngrx: Option<Option<ngrx::NgRxShape>>,
-    precomputed_routing: Option<Option<routing::RouteShape>>,
-    precomputed_angular: Option<bool>,
+    precomputed: PrecomputedAngularEvidence,
 ) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
-    let is_angular =
-        precomputed_angular.unwrap_or_else(|| detect::is_angular_file(source_code));
+    let is_angular = precomputed
+        .is_angular
+        .unwrap_or_else(|| detect::is_angular_file(source_code));
 
     // Resolve per-layer enabled flags from config (defaults: all enabled).
     let rxjs_enabled = config.map(|c| c.rxjs.enabled).unwrap_or(true);
@@ -267,7 +271,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_ngrx(
     // Detect NgRx independently — NgRx files are typically Angular
     // but may not have decorators (e.g. actions/selectors files).
     let ngrx_shape = if ngrx_enabled {
-        precomputed_ngrx.unwrap_or_else(|| {
+        precomputed.ngrx.unwrap_or_else(|| {
             ngrx::extract_ngrx_shape_with_regions(source_code, fidelity, lexical_regions)
         })
     } else {
@@ -285,7 +289,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_ngrx(
     // Detect Routing independently — route config files may not have
     // decorators (e.g. `app.routes.ts`).
     let route_shape = if routing_enabled {
-        precomputed_routing.unwrap_or_else(|| {
+        precomputed.routing.unwrap_or_else(|| {
             routing::extract_route_shape_with_regions(source_code, fidelity, lexical_regions)
         })
     } else {

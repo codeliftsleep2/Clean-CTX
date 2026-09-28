@@ -357,11 +357,7 @@ fn extract_signal_decls(
 ///
 /// In all of these, the character preceding `effect` is whitespace, `=`,
 /// `(`, `,`, `;`, or the start of the file — never an identifier char.
-fn extract_effect_decls(
-    source: &str,
-    shape: &mut SignalShape,
-    lexical_regions: &LexicalRegions,
-) {
+fn extract_effect_decls(source: &str, shape: &mut SignalShape, lexical_regions: &LexicalRegions) {
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("effect(") {
         let abs_idx = search_from + idx;

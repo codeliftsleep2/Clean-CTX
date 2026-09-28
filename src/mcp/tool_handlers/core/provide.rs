@@ -8,6 +8,27 @@ use crate::mcp::tools::parse_tokenizer_arg;
 use crate::protocol::send_response;
 use serde_json::Value;
 use std::collections::HashSet;
+
+fn raw_token_cache_key(source_hash: &str, tokenizer: crate::tokenizer::TokenizerKind) -> String {
+    format!("{source_hash}::{tokenizer}")
+}
+
+fn cached_raw_token_count(
+    state: &McpState,
+    source_hash: &str,
+    tokenizer_kind: crate::tokenizer::TokenizerKind,
+    source: &str,
+    tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+) -> usize {
+    let cache_key = raw_token_cache_key(source_hash, tokenizer_kind);
+    if let Some(count) = state.cache_read().get_raw_token_count(&cache_key) {
+        return count;
+    }
+    let count = count_tokens_with_tokenizer(source, tokenizer);
+    state.cache_write().store_raw_token_count(&cache_key, count);
+    count
+}
+
 pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &McpState) {
     use std::time::Instant;
     let overall_start = Instant::now();
@@ -152,10 +173,12 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref: Option<&dyn crate::tokenizer::Tokenizer> = tokenizer_box.as_deref();
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    let raw_tokens =
+        cached_raw_token_count(state, &source_hash, tokenizer_kind, source, tokenizer_ref);
 
     if effective_fidelity == crate::compression::Fidelity::Verbatim {
         let full = source.to_string();
-        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
         state.record_compression(
             &resolved_path,
             raw_tokens,
@@ -189,7 +212,6 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("");
-        let raw_tokens = count_tokens_with_tokenizer(source, tokenizer_ref);
         let prediction = crate::mcp::token_economics::should_attempt_compression(
             raw_tokens,
             effective_fidelity,
@@ -218,7 +240,31 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
     .entered();
 
     let compile_start = Instant::now();
-    let ir_result = compile_file_ir_focused(&resolved_path, effective_fidelity, state, None);
+    let cached_ir = if state.context_fidelity(&alias) == Some(effective_fidelity) {
+        let ir_context = state.ir_context_read();
+        if ir_context.is_source_unchanged(&alias, &source_hash) {
+            ir_context
+                .get_ir(&alias)
+                .cloned()
+                .zip(ir_context.file_version(&alias))
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let ir_result = if let Some((instructions, version)) = cached_ir {
+        state.semantic_edges(&alias).map(|semantic_edges| {
+            super::common::compiled_from_tuples(alias.clone(), version, instructions)
+                .map(|ir| (ir, semantic_edges, source_hash.clone()))
+        })
+    } else {
+        None
+    }
+    .unwrap_or_else(|| {
+        compile_file_ir_focused(&resolved_path, effective_fidelity, state, None)
+            .map_err(|error| error.to_string())
+    });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
     if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
@@ -235,6 +281,7 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
             edit_focus.is_some(),
             tokenizer_kind,
             tokenizer_ref,
+            raw_tokens,
         );
         let raw_tokens = economic.raw_tokens;
         let candidate_tokens = economic.candidate_tokens;

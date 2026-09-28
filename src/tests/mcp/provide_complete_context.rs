@@ -62,3 +62,84 @@ fn changed_follow_up_provide_remains_complete_when_auto_delta_is_enabled() {
         "changed declaration must be present: {follow_up}"
     );
 }
+
+#[test]
+fn unchanged_follow_up_provide_reuses_the_compiled_ir_version() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let path = root.path().join("unchanged-provider.ts");
+    let file = path.to_string_lossy().into_owned();
+    let source = format!(
+        "export class UnchangedProvider {{ value(): number {{ return 1; }} }}\n{}",
+        "// unchanged-economics-padding-0123456789abcdef\n".repeat(1_000)
+    );
+    std::fs::write(&path, source).expect("source fixture");
+
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    let args = || {
+        json!({
+            "filePath": file.clone(),
+            "workspaceRoot": root.path().to_string_lossy(),
+            "fidelity": "high"
+        })
+    };
+
+    let baseline = dispatch(&state, 1, args());
+    let follow_up = dispatch(&state, 2, args());
+
+    assert_eq!(
+        follow_up["result"]["_meta"]["version"], baseline["result"]["_meta"]["version"],
+        "byte-identical source must reuse the existing compiled IR: {follow_up}"
+    );
+    assert_eq!(
+        follow_up["result"]["content"][0]["text"], baseline["result"]["content"][0]["text"],
+        "cache reuse must preserve the complete model-visible response"
+    );
+}
+
+#[test]
+fn provide_uses_the_tokenizer_scoped_raw_token_cache() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let path = root.path().join("token-cache-provider.ts");
+    let file = path.to_string_lossy().into_owned();
+    let source = format!(
+        "export class TokenCacheProvider {{ value(): number {{ return 1; }} }}\n{}",
+        "// token-cache-padding-0123456789abcdef\n".repeat(1_000)
+    );
+    std::fs::write(&path, &source).expect("source fixture");
+
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    let content_hash = state.cache_read().compute_hash(source.as_bytes());
+    let cache_key = format!("{content_hash}::o200k");
+    state.cache_write().store_raw_token_count(&cache_key, 7);
+
+    let response = dispatch(
+        &state,
+        1,
+        json!({
+            "filePath": file,
+            "workspaceRoot": root.path().to_string_lossy(),
+            "fidelity": "edit",
+            "tokenizer": "o200k"
+        }),
+    );
+    assert!(response.get("error").is_none(), "{response}");
+
+    let stats = state.session_stats_lock();
+    let file_stats = stats
+        .file_stats(path.to_string_lossy().as_ref())
+        .expect("provide must record file statistics");
+    assert_eq!(
+        file_stats.raw_tokens, 7,
+        "both token-economics stages must consume the cached raw count"
+    );
+}

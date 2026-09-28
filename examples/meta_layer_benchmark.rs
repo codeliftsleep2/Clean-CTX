@@ -35,8 +35,9 @@ fn disabled_config(framework: &str) -> CleanCtxConfig {
 }
 
 fn compile(case: &Case, enabled: bool) {
-    let (language, query) = clean_ctx::compression::language::language_for_extension(case.extension)
-        .expect("benchmark language feature must be enabled");
+    let (language, query) =
+        clean_ctx::compression::language::language_for_extension(case.extension)
+            .expect("benchmark language feature must be enabled");
     let mut compiler = IRCompiler::new();
     if !enabled {
         compiler.set_config(disabled_config(case.framework));
@@ -109,13 +110,13 @@ fn report(case: &Case) {
 
 fn main() {
     let cases: &[Case] = &[
-    #[cfg(feature = "angular")]
-    Case {
-        name: "Angular",
-        extension: "ts",
-        path: "C:/benchmark/app.component.ts",
-        framework: "angular",
-        source: r#"
+        #[cfg(feature = "angular")]
+        Case {
+            name: "Angular",
+            extension: "ts",
+            path: "C:/benchmark/app.component.ts",
+            framework: "angular",
+            source: r#"
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, Validators } from '@angular/forms';
 import { Store, createAction, createReducer, createSelector, on } from '@ngrx/store';
@@ -135,15 +136,14 @@ export const reducer = createReducer({}, on(saveUser, state => state));
 export const selectName = createSelector(selectUser, user => user.name);
 function selectUser(state: any) { return state.user; }
 "#,
-    },
-
-    #[cfg(feature = "dotnet")]
-    Case {
-        name: ".NET",
-        extension: "cs",
-        path: "C:/benchmark/UsersController.cs",
-        framework: "dotnet",
-        source: r#"
+        },
+        #[cfg(feature = "dotnet")]
+        Case {
+            name: ".NET",
+            extension: "cs",
+            path: "C:/benchmark/UsersController.cs",
+            framework: "dotnet",
+            source: r#"
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 [ApiController]
@@ -166,15 +166,14 @@ public class UsersController : ControllerBase {
 public class AppDbContext : DbContext { public DbSet<User> Users { get; set; } }
 public record User(int Id, string Name);
 "#,
-    },
-
-    #[cfg(feature = "spring_boot")]
-    Case {
-        name: "Spring",
-        extension: "java",
-        path: "C:/benchmark/UsersController.java",
-        framework: "spring_boot",
-        source: r#"
+        },
+        #[cfg(feature = "spring_boot")]
+        Case {
+            name: "Spring",
+            extension: "java",
+            path: "C:/benchmark/UsersController.java",
+            framework: "spring_boot",
+            source: r#"
 package example.users;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -202,7 +201,7 @@ class UserService {
 interface UserRepository extends JpaRepository<User, Long> {}
 record User(long id, String name) {}
 "#,
-    },
+        },
     ];
 
     println!("Meta-layer production-path benchmark");

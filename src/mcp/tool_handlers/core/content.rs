@@ -45,11 +45,10 @@ pub(crate) fn economical_presentation_document(
 /// equivalent to focused Edit because it exposes bodies outside the resolved
 /// target set.
 fn required_focused_content(
-    raw_source: &str,
     candidate: String,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+    raw_tokens: usize,
 ) -> crate::mcp::content_economics::EconomicContent {
-    let raw_tokens = crate::mcp::tool_helpers::count_tokens_with_tokenizer(raw_source, tokenizer);
     let candidate_tokens =
         crate::mcp::tool_helpers::count_tokens_with_tokenizer(&candidate, tokenizer);
     crate::mcp::content_economics::EconomicContent {
@@ -66,15 +65,17 @@ pub(crate) fn select_complete_content(
     focused_edit: bool,
     tokenizer_kind: crate::tokenizer::TokenizerKind,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
+    raw_tokens: usize,
 ) -> crate::mcp::content_economics::EconomicContent {
     if focused_edit {
-        required_focused_content(raw_source, candidate, tokenizer)
+        required_focused_content(candidate, tokenizer, raw_tokens)
     } else {
-        crate::mcp::content_economics::select_with_local_tokenizer(
+        crate::mcp::content_economics::select_with_local_tokenizer_and_raw_tokens(
             raw_source,
             candidate,
             tokenizer_kind,
             tokenizer,
+            raw_tokens,
         )
     }
 }

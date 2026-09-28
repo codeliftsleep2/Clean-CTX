@@ -43,18 +43,17 @@ pub mod signalr;
 pub mod testing;
 
 #[cfg(test)]
-pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
+pub(crate) use class_analysis_metrics::{analysis_count, reset_analysis_count};
 #[cfg(test)]
 pub(crate) use detect_metrics::{
     ast_parse_count, detection_count, reset_ast_parse_count, reset_detection_count,
 };
 #[cfg(test)]
-pub(crate) use class_analysis_metrics::{analysis_count, reset_analysis_count};
-#[cfg(test)]
 pub(crate) use efcore_analysis_metrics::{
-    analysis_count as efcore_analysis_count,
-    reset_analysis_count as reset_efcore_analysis_count,
+    analysis_count as efcore_analysis_count, reset_analysis_count as reset_efcore_analysis_count,
 };
+#[cfg(test)]
+pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
 
 use crate::compression::Fidelity;
 
@@ -194,7 +193,10 @@ fn evaluate_applicable_source(
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&crate::config::MetaLayerConfig>,
-) -> (Option<MetaBlock>, Vec<crate::layers::meta::semantic::SemanticEdge>) {
+) -> (
+    Option<MetaBlock>,
+    Vec<crate::layers::meta::semantic::SemanticEdge>,
+) {
     let mut block = MetaBlock::default();
     let mut semantic_edges = Vec::new();
     let testing_enabled = config.map(|value| value.testing.enabled).unwrap_or(true);
@@ -231,9 +233,7 @@ fn evaluate_applicable_source(
                 fidelity,
             ));
         }
-        if testing_enabled
-            && let Some(edge) = testing::extract_testing_semantic_edge(raw_class)
-        {
+        if testing_enabled && let Some(edge) = testing::extract_testing_semantic_edge(raw_class) {
             semantic_edges.push(edge);
         }
     }
@@ -350,11 +350,8 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         let meta_config = context
             .config
             .and_then(|value| value.meta_layers.get("dotnet"));
-        let (block, semantic_edges) = evaluate_applicable_source(
-            context.class_captures,
-            context.fidelity,
-            meta_config,
-        );
+        let (block, semantic_edges) =
+            evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
         let output = block.map(|block| crate::layers::meta::MetaLayerOutput {
             layer_name: self.name(),
             rendered: block.render(),
@@ -376,9 +373,8 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .and_then(|value| value.meta_layers.get("dotnet"))
             .map(|value| value.enabled)
             .unwrap_or(true);
-        (enabled
-            && detect::is_dotnet_file_with_regions(context.source, context.lexical_regions))
-        .then(|| self.evaluate_context(context))
+        (enabled && detect::is_dotnet_file_with_regions(context.source, context.lexical_regions))
+            .then(|| self.evaluate_context(context))
     }
 }
 

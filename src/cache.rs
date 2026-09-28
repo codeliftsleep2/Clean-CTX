@@ -30,17 +30,18 @@ pub struct LocalStateCache {
     /// content hash at the time the baseline was stored. Used by
     /// `diff_code_context` to skip re-parsing when the file hasn't changed.
     baseline_hashes: HashMap<String, String>,
-    /// F-14: Maps content hash → raw-token count so that cache-hit paths
-    /// can skip the expensive BPE encode. Keyed by the hash (not the
-    /// file path) because the same content in two locations yields the
-    /// same raw-token count.
+    /// F-14: Maps a content-derived tokenization key → raw-token count so
+    /// cache-hit paths can skip the expensive BPE encode. Fixed-tokenizer
+    /// callers use the content hash directly; pluggable-tokenizer callers
+    /// namespace that hash by tokenizer kind. The key never includes a file
+    /// path, so identical content using the same tokenizer shares a count.
     /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
     raw_token_counts: HashMap<String, usize>,
     /// H-3 fix: O(1) LRU ordering.
-    /// Maps content hash → the generation number at which it was last used.
+    /// Maps tokenization key → the generation number at which it was stored.
     raw_token_gen: HashMap<String, u64>,
-    /// Maps generation number → content hash, ordered so the minimum (oldest)
-    /// generation can be found and removed in O(log n) time.
+    /// Maps generation number → tokenization key, ordered so the minimum
+    /// (oldest) generation can be found and removed in O(log n) time.
     raw_token_order: BTreeMap<u64, String>,
     /// Monotonically increasing generation counter.
     raw_token_clock: u64,
@@ -133,14 +134,14 @@ impl LocalStateCache {
         });
     }
 
-    /// F-14: Store the raw-token count for a content hash so the cache-hit
-    /// path can skip the BPE encode.
+    /// F-14: Store the raw-token count for a content-derived tokenization key
+    /// so the cache-hit path can skip the BPE encode.
     /// F-FULL-17: LRU-evicting cache bounded by MAX_RAW_TOKEN_COUNT_ENTRIES.
     /// H-3 fix: O(log n) promote/evict using a generation counter + BTreeMap
     /// instead of O(n) VecDeque::iter().position() + remove().
-    pub fn store_raw_token_count(&mut self, content_hash: &str, count: usize) {
+    pub fn store_raw_token_count(&mut self, cache_key: &str, count: usize) {
         // Promote: remove the old ordering entry for this key (if any).
-        if let Some(&old_gen) = self.raw_token_gen.get(content_hash) {
+        if let Some(&old_gen) = self.raw_token_gen.get(cache_key) {
             self.raw_token_order.remove(&old_gen);
         } else if self.raw_token_counts.len() >= MAX_RAW_TOKEN_COUNT_ENTRIES {
             // Evict the entry with the smallest (oldest) generation in O(log n).
@@ -154,16 +155,14 @@ impl LocalStateCache {
         // Assign a fresh generation and record it.
         let clock = self.raw_token_clock;
         self.raw_token_clock += 1;
-        self.raw_token_gen.insert(content_hash.to_string(), clock);
-        self.raw_token_order.insert(clock, content_hash.to_string());
-        self.raw_token_counts
-            .insert(content_hash.to_string(), count);
+        self.raw_token_gen.insert(cache_key.to_string(), clock);
+        self.raw_token_order.insert(clock, cache_key.to_string());
+        self.raw_token_counts.insert(cache_key.to_string(), count);
     }
 
-    /// F-14: Retrieve a previously-stored raw-token count for the given
-    /// content hash. Returns `None` if the hash has never been seen.
-    pub fn get_raw_token_count(&self, content_hash: &str) -> Option<usize> {
-        self.raw_token_counts.get(content_hash).copied()
+    /// F-14: Retrieve a previously stored count for the tokenization key.
+    pub fn get_raw_token_count(&self, cache_key: &str) -> Option<usize> {
+        self.raw_token_counts.get(cache_key).copied()
     }
 
     /// Clear all registries. Useful for tests and for clients that want

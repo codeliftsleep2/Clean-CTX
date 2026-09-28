@@ -252,11 +252,7 @@ fn collect_literal_calls(
         .collect()
 }
 
-fn call_positions(
-    source: &str,
-    needle: &str,
-    lexical_regions: &LexicalRegions,
-) -> Vec<usize> {
+fn call_positions(source: &str, needle: &str, lexical_regions: &LexicalRegions) -> Vec<usize> {
     let mut positions = Vec::new();
     let mut offset = 0;
     while let Some(relative) = source[offset..].find(needle) {
@@ -336,10 +332,7 @@ fn describe_hierarchy(calls: Vec<LiteralCall>) -> Vec<String> {
     result
 }
 
-fn extract_test_bed_summaries(
-    source: &str,
-    lexical_regions: &LexicalRegions,
-) -> Vec<String> {
+fn extract_test_bed_summaries(source: &str, lexical_regions: &LexicalRegions) -> Vec<String> {
     let needle = "TestBed.configureTestingModule(";
     call_positions(source, needle, lexical_regions)
         .into_iter()
@@ -470,10 +463,7 @@ fn assignment_target_before(source: &str, end: usize) -> Option<&str> {
         .filter(|name| identifier_like(name))
 }
 
-fn create_component_candidates(
-    source: &str,
-    lexical_regions: &LexicalRegions,
-) -> BTreeSet<String> {
+fn create_component_candidates(source: &str, lexical_regions: &LexicalRegions) -> BTreeSet<String> {
     let mut candidates = BTreeSet::new();
     for start in call_positions(source, "TestBed.createComponent(", lexical_regions) {
         let argument = start + "TestBed.createComponent(".len();

@@ -1,19 +1,17 @@
 use super::{
-    CountConfidence, SelectedRepresentation, select_economic_content, select_with_local_tokenizer,
+    SelectedRepresentation, select_with_local_tokenizer, select_with_local_tokenizer_and_raw_tokens,
 };
 use crate::tokenizer::{Tokenizer, TokenizerKind};
 
-fn bytes(value: &str) -> usize {
-    value.len()
-}
-
 #[test]
 fn smaller_complete_candidate_wins() {
-    let selected = select_economic_content(
+    let tokenizer = ByteTokenizer;
+    let selected = select_with_local_tokenizer_and_raw_tokens(
         "raw source document",
         "A1".into(),
-        bytes,
-        CountConfidence::ExactLocal,
+        TokenizerKind::Cl100k,
+        Some(&tokenizer),
+        19,
     );
     assert_eq!(selected.selected, SelectedRepresentation::Candidate);
     assert_eq!(selected.text, "A1");
@@ -23,7 +21,14 @@ fn smaller_complete_candidate_wins() {
 
 #[test]
 fn raw_wins_a_tie() {
-    let selected = select_economic_content("raw", "A1!".into(), bytes, CountConfidence::ExactLocal);
+    let tokenizer = ByteTokenizer;
+    let selected = select_with_local_tokenizer_and_raw_tokens(
+        "raw",
+        "A1!".into(),
+        TokenizerKind::Cl100k,
+        Some(&tokenizer),
+        3,
+    );
     assert_eq!(selected.selected, SelectedRepresentation::RawPassthrough);
     assert_eq!(selected.text, "raw");
     assert_eq!(selected.saved_tokens(), 0);
@@ -32,11 +37,13 @@ fn raw_wins_a_tie() {
 #[test]
 fn larger_candidate_falls_back_to_byte_exact_raw() {
     let raw = "{\r\n  const λ = '§PATHMAP';\r\n}\r\n";
-    let selected = select_economic_content(
+    let tokenizer = ByteTokenizer;
+    let selected = select_with_local_tokenizer_and_raw_tokens(
         raw,
         "schema plus a much larger candidate".into(),
-        bytes,
-        CountConfidence::ExactLocal,
+        TokenizerKind::Cl100k,
+        Some(&tokenizer),
+        raw.len(),
     );
     assert_eq!(selected.selected, SelectedRepresentation::RawPassthrough);
     assert_eq!(selected.text.as_bytes(), raw.as_bytes());
@@ -45,23 +52,22 @@ fn larger_candidate_falls_back_to_byte_exact_raw() {
 
 #[test]
 fn approximate_counter_requires_savings_beyond_both_sides_of_error_bound() {
-    let rejected = select_economic_content(
+    let tokenizer = ByteTokenizer;
+    let rejected = select_with_local_tokenizer_and_raw_tokens(
         &"r".repeat(100),
         "c".repeat(97),
-        bytes,
-        CountConfidence::Approximate {
-            error_basis_points: 200,
-        },
+        TokenizerKind::Claude,
+        Some(&tokenizer),
+        100,
     );
     assert_eq!(rejected.selected, SelectedRepresentation::RawPassthrough);
 
-    let accepted = select_economic_content(
+    let accepted = select_with_local_tokenizer_and_raw_tokens(
         &"r".repeat(100),
         "c".repeat(95),
-        bytes,
-        CountConfidence::Approximate {
-            error_basis_points: 200,
-        },
+        TokenizerKind::Claude,
+        Some(&tokenizer),
+        100,
     );
     assert_eq!(accepted.selected, SelectedRepresentation::Candidate);
 }

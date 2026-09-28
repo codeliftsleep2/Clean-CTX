@@ -26,10 +26,7 @@ pub fn extract_efcore(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     analyze_efcore(class_source, fidelity).map(|analysis| analysis.block)
 }
 
-pub(crate) fn analyze_efcore(
-    class_source: &str,
-    fidelity: Fidelity,
-) -> Option<EfCoreAnalysis> {
+pub(crate) fn analyze_efcore(class_source: &str, fidelity: Fidelity) -> Option<EfCoreAnalysis> {
     #[cfg(test)]
     super::efcore_analysis_metrics::record_analysis();
 
@@ -49,7 +46,11 @@ pub(crate) fn analyze_efcore(
     lines.push(build_ef_line(&class_name));
 
     let dbsets = extract_dbsets(class_source);
-    lines.extend(dbsets.iter().map(|(_, property)| build_dbset_line(property)));
+    lines.extend(
+        dbsets
+            .iter()
+            .map(|(_, property)| build_dbset_line(property)),
+    );
 
     // Extract entity configurations
     if fidelity != Fidelity::Low {

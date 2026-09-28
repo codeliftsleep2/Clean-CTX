@@ -30,10 +30,7 @@ pub fn extract_aspnet(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     analyze_aspnet(class_source, fidelity).map(|analysis| analysis.block)
 }
 
-pub(crate) fn analyze_aspnet(
-    class_source: &str,
-    fidelity: Fidelity,
-) -> Option<AspNetAnalysis> {
+pub(crate) fn analyze_aspnet(class_source: &str, fidelity: Fidelity) -> Option<AspNetAnalysis> {
     #[cfg(test)]
     super::class_analysis_metrics::record_analysis();
 

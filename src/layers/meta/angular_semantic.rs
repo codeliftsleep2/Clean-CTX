@@ -4,20 +4,28 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::meta::semantic::SemanticEdge;
 
+#[derive(Default)]
+pub(super) struct ProjectionEvidence<'a> {
+    lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
+    ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
+    routing: Option<Option<&'a crate::angular_meta::routing::RouteShape>>,
+    is_angular: Option<bool>,
+}
+
 pub(super) fn extract_non_testing_edges(
     source: &str,
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&CleanCtxConfig>,
-    lexical_regions: Option<&crate::meta_util::LexicalRegions>,
-    precomputed_ngrx: Option<Option<&crate::angular_meta::ngrx::NgRxShape>>,
-    precomputed_routing: Option<Option<&crate::angular_meta::routing::RouteShape>>,
-    precomputed_angular: Option<bool>,
+    evidence: ProjectionEvidence<'_>,
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
     let mut edges = Vec::new();
 
-    if precomputed_angular.unwrap_or_else(|| crate::angular_meta::detect::is_angular_file(source)) {
+    if evidence
+        .is_angular
+        .unwrap_or_else(|| crate::angular_meta::detect::is_angular_file(source))
+    {
         let mut decl_types = std::collections::HashMap::new();
         for raw_class in class_captures {
             if let Some((class_name, kind, _, _, _)) =
@@ -51,9 +59,9 @@ pub(super) fn extract_non_testing_edges(
         }
     }
 
-    let ngrx_shape = match precomputed_ngrx {
+    let ngrx_shape = match evidence.ngrx {
         Some(shape) => shape.cloned(),
-        None => lexical_regions.map_or_else(
+        None => evidence.lexical_regions.map_or_else(
             || crate::angular_meta::ngrx::extract_ngrx_shape(source, fidelity),
             |regions| {
                 crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
@@ -67,9 +75,9 @@ pub(super) fn extract_non_testing_edges(
     {
         edges.extend(shape.to_ngrx_semantic_edges());
     }
-    let routing_shape = match precomputed_routing {
+    let routing_shape = match evidence.routing {
         Some(shape) => shape.cloned(),
-        None => lexical_regions.map_or_else(
+        None => evidence.lexical_regions.map_or_else(
             || crate::angular_meta::routing::extract_route_shape(source, fidelity),
             |regions| {
                 crate::angular_meta::routing::extract_route_shape_with_regions(
@@ -97,43 +105,51 @@ pub(super) fn evaluate(
     let meta_config = context
         .config
         .and_then(|config| config.meta_layers.get("angular"));
-    let ngrx_enabled = meta_config.map(|config| config.ngrx.enabled).unwrap_or(true);
+    let ngrx_enabled = meta_config
+        .map(|config| config.ngrx.enabled)
+        .unwrap_or(true);
     let ngrx_shape = ngrx_enabled
-        .then(|| crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
-            context.source,
-            context.fidelity,
-            context.lexical_regions,
-        ))
+        .then(|| {
+            crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
+                context.source,
+                context.fidelity,
+                context.lexical_regions,
+            )
+        })
         .flatten();
     let routing_enabled = meta_config
         .map(|config| config.routing.enabled)
         .unwrap_or(true);
     let routing_shape = routing_enabled
-        .then(|| crate::angular_meta::routing::extract_route_shape_with_regions(
-            context.source,
-            context.fidelity,
-            context.lexical_regions,
-        ))
+        .then(|| {
+            crate::angular_meta::routing::extract_route_shape_with_regions(
+                context.source,
+                context.fidelity,
+                context.lexical_regions,
+            )
+        })
         .flatten();
-    let block = crate::angular_meta::run_meta_layer_with_config_path_regions_and_ngrx(
+    let block = crate::angular_meta::run_meta_layer_with_config_path_regions_and_evidence(
         context.source,
         context.class_captures,
         context.fidelity,
         meta_config,
         context.path,
         context.lexical_regions,
-        Some(ngrx_shape.clone()),
-        Some(routing_shape.clone()),
-        precomputed_angular,
+        crate::angular_meta::PrecomputedAngularEvidence {
+            ngrx: Some(ngrx_shape.clone()),
+            routing: Some(routing_shape.clone()),
+            is_angular: precomputed_angular,
+        },
     );
-    let output = block.filter(|block| !block.is_empty()).map(|block| {
-        super::MetaLayerOutput {
+    let output = block
+        .filter(|block| !block.is_empty())
+        .map(|block| super::MetaLayerOutput {
             layer_name,
             rendered: block.render(),
             angular_block: Some(block),
             ..Default::default()
-        }
-    });
+        });
     let captures: Vec<String> = context
         .paired_class_captures
         .iter()
@@ -144,12 +160,17 @@ pub(super) fn evaluate(
         &captures,
         context.fidelity,
         context.config,
-        Some(context.lexical_regions),
-        Some(ngrx_shape.as_ref()),
-        Some(routing_shape.as_ref()),
-        precomputed_angular,
+        ProjectionEvidence {
+            lexical_regions: Some(context.lexical_regions),
+            ngrx: Some(ngrx_shape.as_ref()),
+            routing: Some(routing_shape.as_ref()),
+            is_angular: precomputed_angular,
+        },
     );
-    if meta_config.map(|config| config.testing.enabled).unwrap_or(true) {
+    if meta_config
+        .map(|config| config.testing.enabled)
+        .unwrap_or(true)
+    {
         semantic_edges.extend(
             crate::angular_meta::testing::extract_testing_semantic_edges_with_regions(
                 context.source,
@@ -178,11 +199,15 @@ pub(super) fn evaluate_if_applicable(
         context.source,
         context.lexical_regions,
     );
-    let testing_enabled = meta_config.map(|config| config.testing.enabled).unwrap_or(true);
+    let testing_enabled = meta_config
+        .map(|config| config.testing.enabled)
+        .unwrap_or(true);
     let reactive_forms_enabled = meta_config
         .map(|config| config.reactive_forms.enabled)
         .unwrap_or(true);
-    let formly_enabled = meta_config.map(|config| config.formly.enabled).unwrap_or(true);
+    let formly_enabled = meta_config
+        .map(|config| config.formly.enabled)
+        .unwrap_or(true);
     let applicable = is_angular
         || crate::angular_meta::rx::has_rxjs_imports(context.source)
         || crate::angular_meta::ngrx::has_ngrx_imports(context.source)

@@ -17,9 +17,9 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
-pub mod builtin;
 #[cfg(feature = "angular")]
 mod angular_semantic;
+pub mod builtin;
 mod context;
 pub mod semantic;
 
@@ -323,10 +323,7 @@ impl MetaLayer for AngularMetaLayer {
             class_captures,
             fidelity,
             config,
-            None,
-            None,
-            None,
-            None,
+            Default::default(),
         );
 
         let testing_enabled = meta_config.map(|c| c.testing.enabled).unwrap_or(true);
@@ -352,7 +349,11 @@ impl MetaLayer for AngularMetaLayer {
             .map(|(_, text)| text.clone())
             .collect();
         let mut edges = angular_semantic::extract_non_testing_edges(
-            source, &captures, fidelity, config, None, None, None, None,
+            source,
+            &captures,
+            fidelity,
+            config,
+            Default::default(),
         );
         let testing_enabled = config
             .and_then(|value| value.meta_layers.get("angular"))

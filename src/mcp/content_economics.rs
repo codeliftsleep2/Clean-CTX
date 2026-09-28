@@ -44,35 +44,6 @@ impl EconomicContent {
     }
 }
 
-/// Select model-visible content after both complete alternatives are counted.
-///
-/// `count` must use the same tokenizer for both inputs. The returned raw text
-/// is cloned without trimming, normalization, a footer, or any other wrapper.
-pub(crate) fn select_economic_content(
-    raw: &str,
-    candidate: String,
-    count: impl Fn(&str) -> usize,
-    confidence: CountConfidence,
-) -> EconomicContent {
-    let raw_tokens = count(raw);
-    let candidate_tokens = count(&candidate);
-    if candidate_is_economical(raw_tokens, candidate_tokens, confidence) {
-        EconomicContent {
-            text: candidate,
-            selected: SelectedRepresentation::Candidate,
-            raw_tokens,
-            candidate_tokens,
-        }
-    } else {
-        EconomicContent {
-            text: raw.to_owned(),
-            selected: SelectedRepresentation::RawPassthrough,
-            raw_tokens,
-            candidate_tokens,
-        }
-    }
-}
-
 /// Apply the production token gate using only the already-created local
 /// tokenizer. No model, network, or token-counting API call is permitted here.
 ///
@@ -87,10 +58,35 @@ pub(crate) fn select_with_local_tokenizer(
     tokenizer_kind: TokenizerKind,
     tokenizer: Option<&dyn Tokenizer>,
 ) -> EconomicContent {
+    let raw_tokens = tokenizer.map_or_else(
+        || crate::mcp::tool_helpers::estimate_tokens(raw),
+        |tokenizer| tokenizer.count_tokens(raw),
+    );
+    select_with_local_tokenizer_and_raw_tokens(
+        raw,
+        candidate,
+        tokenizer_kind,
+        tokenizer,
+        raw_tokens,
+    )
+}
+
+/// Apply the production token gate with an already-counted raw document.
+///
+/// The raw count is content-addressed by the caller. Only the candidate still
+/// requires tokenization, avoiding a second full-file encode in two-stage
+/// economics paths.
+pub(crate) fn select_with_local_tokenizer_and_raw_tokens(
+    raw: &str,
+    candidate: String,
+    tokenizer_kind: TokenizerKind,
+    tokenizer: Option<&dyn Tokenizer>,
+    raw_tokens: usize,
+) -> EconomicContent {
     let Some(tokenizer) = tokenizer else {
         return raw_passthrough_with_counts(
             raw,
-            crate::mcp::tool_helpers::estimate_tokens(raw),
+            raw_tokens,
             crate::mcp::tool_helpers::estimate_tokens(&candidate),
         );
     };
@@ -102,17 +98,22 @@ pub(crate) fn select_with_local_tokenizer(
         TokenizerKind::Llama3 => {
             return raw_passthrough_with_counts(
                 raw,
-                tokenizer.count_tokens(raw),
+                raw_tokens,
                 tokenizer.count_tokens(&candidate),
             );
         }
     };
-    select_economic_content(
-        raw,
-        candidate,
-        |text| tokenizer.count_tokens(text),
-        confidence,
-    )
+    let candidate_tokens = tokenizer.count_tokens(&candidate);
+    if candidate_is_economical(raw_tokens, candidate_tokens, confidence) {
+        EconomicContent {
+            text: candidate,
+            selected: SelectedRepresentation::Candidate,
+            raw_tokens,
+            candidate_tokens,
+        }
+    } else {
+        raw_passthrough_with_counts(raw, raw_tokens, candidate_tokens)
+    }
 }
 
 fn candidate_is_economical(

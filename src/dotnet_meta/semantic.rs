@@ -31,9 +31,7 @@ pub fn extract_dotnet_semantic_edges(
             .unwrap_or_default(),
     );
     edges.extend(extract_non_aspnet_efcore_semantic_edges(
-        raw_class,
-        class_name,
-        fidelity,
+        raw_class, class_name, fidelity,
     ));
     edges
 }

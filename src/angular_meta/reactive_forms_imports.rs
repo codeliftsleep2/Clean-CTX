@@ -1,9 +1,7 @@
 //! Import and local `FormBuilder` alias detection for Reactive Forms.
 
 use super::is_identifier;
-use crate::angular_meta::util::{
-    consume_call_expression, extract_decl_name, split_top_level,
-};
+use crate::angular_meta::util::{consume_call_expression, extract_decl_name, split_top_level};
 
 #[derive(Debug, Default)]
 pub(super) struct ImportedForms {

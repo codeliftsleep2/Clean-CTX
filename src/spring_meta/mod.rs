@@ -29,8 +29,8 @@ pub mod semantic;
 
 #[cfg(test)]
 pub(crate) use evaluation_metrics::{
-    detection_count, evaluation_count, record_detection, record_evaluation,
-    reset_detection_count, reset_evaluation_count,
+    detection_count, evaluation_count, record_detection, record_evaluation, reset_detection_count,
+    reset_evaluation_count,
 };
 
 use crate::compression::Fidelity;

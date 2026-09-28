@@ -4,9 +4,7 @@
 //! evaluating TypeScript or reproducing user-facing configuration text.
 
 use crate::angular_meta::phi::PhiMarker;
-use crate::angular_meta::util::{
-    find_matching_brace, split_top_level,
-};
+use crate::angular_meta::util::{find_matching_brace, split_top_level};
 use crate::compression::Fidelity;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -198,10 +196,7 @@ pub(crate) fn extract_formly_shape_with_regions(
     (!fields.is_empty()).then_some(FormlyShape { fields })
 }
 
-fn has_formly_import(
-    source: &str,
-    lexical_regions: &crate::meta_util::LexicalRegions,
-) -> bool {
+fn has_formly_import(source: &str, lexical_regions: &crate::meta_util::LexicalRegions) -> bool {
     for (start, _) in source.match_indices("import") {
         if lexical_regions.contains(start) || !word_boundary(source, start, "import") {
             continue;
