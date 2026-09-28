@@ -117,7 +117,31 @@ authority, or empty-result semantic changed. The tracked regression is
 the first unavailable graph call gave setup advice without a direct workflow
 fallback and passed after the Phase 2 implementation.
 
-Later compatible phases map to RC-4 through RC-6. AD-1 through AD-3 remain
+### Phase 3 — Standard MCP tool annotations
+
+**Status:** Complete; focused RED→GREEN verification confirmed
+
+Phase 3 is RC-4: every public tool now receives an explicit standard MCP
+classification for read-only, destructive, idempotent, and open-world effects.
+The classification is centralized and exhaustive in
+`src/mcp/tool_annotations.rs`; adding a public tool without an effect decision
+fails instead of silently accepting protocol defaults.
+
+The hints describe externally relevant effects. Internal caches, baselines,
+and session projections do not make source/query operations externally
+mutating. Exact source/delta mutations, semantic deletion/purge, graph
+reindexing, and the generic proxy retain conservative classifications. All
+tools remain inside the configured local workspace/provider boundary and use
+`openWorldHint: false`. Annotations are client guidance only; existing
+authorization, trusted-root, ownership, and transaction checks remain the
+enforcement boundary.
+
+The tracked regression is
+`every_registered_tool_has_conservative_standard_annotations` in
+`src/tests/mcp/tools.rs`. The unchanged regression failed on the first
+unannotated public tool and passed after the exhaustive Phase 3 classification.
+
+Later compatible phases map to RC-5 and RC-6. AD-1 through AD-3 remain
 separate approval-gated architectural decisions rather than implementation
 phases.
 

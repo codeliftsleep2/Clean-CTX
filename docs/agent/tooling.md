@@ -102,6 +102,16 @@ ordered call occurrences (`callee_written`, `explicit_argument_count`, and
 `has_spread`). It does not run hydration, publish session/WorkspaceIndex state,
 expose canonical IDs, or claim that a written callee is resolved.
 
+### 1.8 Standard Tool Annotations
+
+Every public tool declares explicit MCP `readOnlyHint`, `destructiveHint`,
+`idempotentHint`, and `openWorldHint` values. These are client hints, not
+authorization. Internal caches and session projections do not make a source or
+query tool externally mutating; source edits, durable semantic deletion/purge,
+delta application, graph reindexing, and the generic proxy retain conservative
+mutation classifications. All Clean-CTX tools operate inside the configured
+local workspace/provider boundary and declare `openWorldHint: false`.
+
 ## 2. Tool-Selection Hierarchy
 
 ### 2.1 For Code Understanding

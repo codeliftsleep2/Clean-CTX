@@ -409,7 +409,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     .into_iter()
     .chain(cbm::cbm_tool_list())
     .collect();
-    inject_supported_languages(tools)
+    super::tool_annotations::inject(inject_supported_languages(tools))
 }
 
 /// P1-4: Parse fidelity argument from request, falling back to config default.

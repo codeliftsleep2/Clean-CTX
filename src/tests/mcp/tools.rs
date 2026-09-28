@@ -172,6 +172,70 @@ fn schema_guidance_uses_current_model_workflow_terms() {
     assert!(!proxy_description.contains("Primary CBM integration point"));
 }
 
+/// Phase 3 MCP tool classification: clients should not have to apply the
+/// protocol's pessimistic mutation/open-world defaults to every local tool.
+#[test]
+fn every_registered_tool_has_conservative_standard_annotations() {
+    let tools = tool_list();
+    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+
+    for tool in &tools {
+        let name = tool["name"].as_str().expect("registered tool name");
+        let annotations = tool["annotations"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{name} must declare standard MCP annotations"));
+        for hint in [
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        ] {
+            assert!(
+                annotations.get(hint).is_some_and(serde_json::Value::is_boolean),
+                "{name}.{hint} must be an explicit boolean"
+            );
+        }
+        assert_eq!(
+            annotations["openWorldHint"],
+            serde_json::json!(false),
+            "Clean-CTX tools operate on the configured local workspace/provider boundary: {name}"
+        );
+    }
+
+    let by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+    for name in [
+        "context_history",
+        "list_sessions",
+        "inspect_legacy_fallbacks",
+        "context_stats",
+        "diff_commits",
+        "workspace_query",
+        "graph_search",
+        "graph_query",
+        "graph_trace",
+        "get_architecture",
+        "get_cbm_status",
+        "list_projects",
+    ] {
+        assert_eq!(
+            by_name[name]["annotations"]["readOnlyHint"],
+            serde_json::json!(true),
+            "{name} must advertise its read-only external effect"
+        );
+    }
+
+    for name in ["apply_edit", "delete_context", "purge_old_deltas"] {
+        assert_eq!(
+            by_name[name]["annotations"]["destructiveHint"],
+            serde_json::json!(true),
+            "{name} must retain the conservative destructive classification"
+        );
+    }
+}
+
 #[test]
 fn apply_edit_discovery_describes_only_the_structural_transaction_contract() {
     let tools = tool_list();
