@@ -29,6 +29,7 @@ pub(crate) mod sqlite_store;
 pub(crate) mod state;
 pub(crate) mod token_economics;
 pub(crate) mod tool_annotations;
+pub(crate) mod tool_dispatch;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
 pub(crate) mod tool_schemas;

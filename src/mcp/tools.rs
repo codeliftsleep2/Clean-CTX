@@ -1,16 +1,17 @@
 // src/mcp/tools.rs
 //
-// Tool definitions and dispatch for the MCP server.
-// v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
+// Public tool catalog plus compatibility re-exports for call dispatch.
 
 use crate::cbm;
-use crate::compression::Fidelity;
-use crate::mcp::McpState;
-use crate::protocol::send_response;
-use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
 use serde_json::Value;
 
-use super::tool_handlers;
+#[cfg(test)]
+pub use super::tool_dispatch::setup_handler_registry_for_tests;
+pub(crate) use super::tool_dispatch::{
+    dispatch_tools_call, parse_fidelity_arg, parse_tokenizer_arg,
+};
+#[cfg(test)]
+pub(crate) use super::tool_dispatch::{inline_tool_names, resolve_fidelity};
 
 #[cfg(test)]
 pub(crate) use super::tool_helpers::diff_code_context_handler;
@@ -35,12 +36,27 @@ fn supported_languages() -> Vec<&'static str> {
     langs
 }
 
-/// Inject the `supportedLanguages` field into each tool's schema so clients
-/// can discover which languages the current binary supports.
+/// Attach parser capability metadata only where enabled languages affect
+/// whether the tool can process its requested source input.
 fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
     let supported = supported_languages();
     for tool in &mut tools {
-        if let Some(obj) = tool.as_object_mut() {
+        let source_processing = tool
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| {
+                matches!(
+                    name,
+                    "compress_code_context"
+                        | "diff_code_context"
+                        | "delta_code_context"
+                        | "provide_code_context"
+                        | "apply_edit"
+                        | "diff_commits"
+                        | "workspace_query"
+                )
+            });
+        if source_processing && let Some(obj) = tool.as_object_mut() {
             obj.insert(
                 "supportedLanguages".to_string(),
                 serde_json::json!(supported),
@@ -411,187 +427,6 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     .chain(cbm::cbm_tool_list())
     .collect();
     super::tool_annotations::inject(inject_supported_languages(tools))
-}
-
-/// P1-4: Parse fidelity argument from request, falling back to config default.
-///
-/// Uses the user's configured `default_fidelity` instead of hardcoded "low",
-/// ensuring consistency across all tool invocations.
-pub(crate) fn parse_fidelity_arg(
-    id: &Value,
-    params: &Value,
-    config: &crate::config::CleanCtxConfig,
-) -> Result<Fidelity, ()> {
-    let fidelity_str =
-        params["arguments"]["fidelity"]
-            .as_str()
-            .unwrap_or(match config.default_fidelity {
-                Fidelity::Low => "low",
-                Fidelity::Medium => "medium",
-                Fidelity::High => "high",
-                Fidelity::Edit => "edit",
-                Fidelity::Verbatim => "verbatim",
-            });
-
-    // Log when using default
-    if params["arguments"]["fidelity"].is_null() {
-        eprintln!(
-            "[clean-ctx] fidelity not specified, using default: {} (from config)",
-            fidelity_str
-        );
-    }
-
-    match Fidelity::parse(fidelity_str) {
-        Ok(f) => Ok(f),
-        Err(e) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32602, "message": e.to_string() }
-            }));
-            Err(())
-        }
-    }
-}
-
-pub(crate) fn parse_tokenizer_arg(
-    params: &Value,
-    config: &crate::config::CleanCtxConfig,
-) -> TokenizerKind {
-    let tool_arg = params["arguments"]["tokenizer"].as_str();
-    resolve_tokenizer_kind(tool_arg, Some(&config.tokenizer.to_string()))
-}
-
-/// Resolve the effective fidelity for a (explicit_arg, file_extension) pair.
-/// Used by tests (`src/tests/mcp/tools.rs`, `src/tests/mcp/tool_handlers.rs`)
-/// and kept for potential future dispatch use. `#[allow(dead_code)]` is
-/// required because this is only consumed by external test modules.
-#[allow(dead_code)]
-pub(crate) fn resolve_fidelity(
-    explicit: Option<&str>,
-    ext: Option<&str>,
-    config: &crate::config::CleanCtxConfig,
-) -> Fidelity {
-    if let Some(s) = explicit
-        && let Ok(f) = Fidelity::parse(s)
-    {
-        return f;
-    }
-    if let Some(e) = ext
-        && let Some(f) = config.get_fidelity_for_extension(e)
-    {
-        return f;
-    }
-    config.default_fidelity
-}
-
-static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
-    std::sync::OnceLock::new();
-
-fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
-    HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
-}
-
-// P3-3: Handler registry initialization.
-//
-// The registry uses OnceLock for lazy initialization - it's created on first
-// access rather than at load time. This avoids issues with sanitizers,
-// test harnesses, and dynamic linking that #[ctor] can cause.
-//
-// For tests that need eager initialization (e.g., parallel tests on Windows),
-// call `setup_handler_registry_for_tests()` in the test module.
-
-/// P3-3: Force initialization of the handler registry for test setup.
-/// Call this in test modules to avoid OnceLock contention during parallel tests.
-#[cfg(test)]
-pub fn setup_handler_registry_for_tests() {
-    let _ = get_registry();
-}
-
-/// P1-6: Collect all inline-only tool names for verification.
-/// Returns the set of tool names handled by the inline dispatch match arms.
-/// Used by tests (`src/tests/mcp/tools.rs`) to verify no tool is registered
-/// in both inline and registry. `#[allow(dead_code)]` is required because
-/// this is only consumed by the external `src/tests/mcp/tools.rs` module,
-/// which the lib build (non-test) never references.
-#[allow(dead_code)]
-pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
-    use std::collections::HashSet;
-    let mut names = HashSet::new();
-    names.insert("graph_search");
-    names.insert("graph_query");
-    names.insert("graph_trace");
-    names.insert("get_architecture");
-    names.insert("get_cbm_status");
-    names.insert("cbm_proxy");
-    names
-}
-
-/// Dispatch a tools/call request.
-/// v0.3.0: Uses registry-based dispatch for modular handlers, fallback to legacy.
-///
-/// P1-6: All inline-handled tools have early returns. The remaining tools
-/// fall through to the registry. The `inline_tool_names()` function above
-/// enables test-time verification that no tool name appears in both paths.
-pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
-    // Inline dispatch for tools that have special handling requirements
-    // (decompress, compress_workspace, and all CBM tools).
-    // Each arm returns to prevent double-fire if a tool is also registered.
-    match tool_name {
-        // compress_workspace and decompress_code_context removed in Phase C1.
-        // CBM tools
-        "graph_search" => {
-            crate::cbm::handlers::handle_graph_search(id, params, state);
-            return;
-        }
-        "graph_query" => {
-            crate::cbm::handlers::handle_graph_query(id, params, state);
-            return;
-        }
-        "graph_trace" => {
-            crate::cbm::handlers::handle_graph_trace(id, params, state);
-            return;
-        }
-        "get_architecture" => {
-            crate::cbm::handlers::handle_get_architecture(id, params, state);
-            return;
-        }
-        "get_cbm_status" => {
-            crate::cbm::handlers::handle_get_cbm_status(id, params, state);
-            return;
-        }
-        "cbm_proxy" => {
-            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
-            return;
-        }
-        "list_projects" => {
-            // Route through cbm_proxy with no parameters
-            crate::cbm::proxy::handle_cbm_proxy(
-                id,
-                &serde_json::json!({"arguments": {
-                    "cbm_tool": "list_projects",
-                    "parameters": {}
-                }}),
-                state,
-            );
-            return;
-        }
-        // Unknown — fall through to registry
-        _ => {}
-    }
-
-    // P1-6: Registry fallback for tools not handled inline above.
-    if let Some(entry) = get_registry().get(tool_name) {
-        (entry.handler)(id, params, state);
-        return;
-    }
-
-    // Unknown tool
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": { "code": -32601, "message": format!("Tool not found: {}", tool_name) }
-    }));
 }
 
 #[cfg(test)]

@@ -1,4 +1,5 @@
 use super::*;
+use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 
 // P3-3: Initialize handler registry before running tests
@@ -303,6 +304,44 @@ fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
     );
 }
 
+/// Phase 5 MCP catalog economy: parser capability metadata belongs only on
+/// tools whose correct use depends on the enabled source-language grammars.
+#[test]
+fn supported_languages_is_limited_to_source_processing_tools() {
+    let tools = tool_list();
+    let source_processing: std::collections::HashSet<&str> = [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "provide_code_context",
+        "apply_edit",
+        "diff_commits",
+        "workspace_query",
+    ]
+    .into_iter()
+    .collect();
+
+    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    for tool in &tools {
+        let name = tool["name"].as_str().expect("registered tool name");
+        let languages = tool.get("supportedLanguages");
+        if source_processing.contains(name) {
+            let languages = languages
+                .and_then(serde_json::Value::as_array)
+                .unwrap_or_else(|| panic!("{name} must advertise supportedLanguages"));
+            assert!(
+                !languages.is_empty(),
+                "all-feature verification must expose at least one language for {name}"
+            );
+        } else {
+            assert!(
+                languages.is_none(),
+                "{name} must not repeat irrelevant supportedLanguages metadata"
+            );
+        }
+    }
+}
+
 #[test]
 fn apply_edit_discovery_describes_only_the_structural_transaction_contract() {
     let tools = tool_list();
@@ -464,19 +503,10 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
         .map(|s| s.to_string())
         .collect();
 
-    // Get inline tool names (tools dispatched directly in tools.rs)
-    let inline_names: std::collections::HashSet<String> = {
-        let mut set = std::collections::HashSet::new();
-        // Inline tools from dispatch_tools_call() in tools.rs
-        set.insert("graph_search".to_string());
-        set.insert("graph_query".to_string());
-        set.insert("graph_trace".to_string());
-        set.insert("get_architecture".to_string());
-        set.insert("get_cbm_status".to_string());
-        set.insert("cbm_proxy".to_string());
-        set.insert("list_projects".to_string());
-        set
-    };
+    let inline_names: std::collections::HashSet<String> = inline_tool_names()
+        .into_iter()
+        .map(str::to_string)
+        .collect();
 
     // Verify: every tool in tool_list is either inline or in registry (or both)
     for name in &tool_list_names {

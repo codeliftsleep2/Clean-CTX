@@ -164,7 +164,31 @@ The tracked regression is
 `apply_edit.operations.items` had no `oneOf` and passed after the discriminated
 operation schemas were installed.
 
-The remaining compatible phase maps to RC-6. AD-1 through AD-3 remain
+### Phase 5 — Relevant language metadata only
+
+**Status:** Complete; focused RED→GREEN verification confirmed
+
+Phase 5 is RC-6: `supportedLanguages` is now attached only to the seven public
+tools whose correct use depends on enabled source-language parsers. Persistence,
+history, administration, statistics, IR-delta application, and CBM tools no
+longer repeat irrelevant parser metadata.
+
+This changes catalog metadata only. Tool names, schemas, handlers, parser
+feature detection, and runtime behavior are unchanged. The tracked regression
+is `supported_languages_is_limited_to_source_processing_tools` in
+`src/tests/mcp/tools.rs`; it failed first on `apply_delta`, which consumes an
+already-formed IR delta rather than source input, and passed after language
+metadata was restricted to the source-processing boundary.
+
+As part of finalizing this phase, `src/mcp/tools.rs` was decomposed at its
+catalog/dispatch boundary: schemas and catalog assembly remain in `tools.rs`,
+while argument parsing, registry ownership, and `tools/call` routing now live
+in `src/mcp/tool_dispatch.rs`. Compatibility re-exports preserve established
+crate paths; no public MCP surface or dispatch semantics changed. Focused
+verification passed for both the tool-list/registry correspondence and the
+source-processing language-metadata boundary.
+
+AD-1 through AD-3 remain
 separate approval-gated architectural decisions rather than implementation
 phases.
 

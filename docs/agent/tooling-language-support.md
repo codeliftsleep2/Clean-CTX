@@ -9,8 +9,11 @@ Clean-CTX supports these languages (feature-gated at build time):
 | Rust | `rust` | ❌ Opt-in | ✅ Yes |
 | Java | `java` | ❌ Opt-in | ✅ Yes |
 
-The `supportedLanguages` field in every tool schema lists which languages
-the current binary supports (computed from enabled Cargo features).
+The `supportedLanguages` field on source-processing tool definitions lists
+which languages the current binary supports (computed from enabled Cargo
+features). It is intentionally omitted from persistence, history,
+administration, statistics, and CBM tools whose correct invocation does not
+depend on an enabled parser.
 
 For all supported languages, use `provide_code_context` for code understanding
 and `apply_edit` for single-unit edits. This applies to both investigation and
