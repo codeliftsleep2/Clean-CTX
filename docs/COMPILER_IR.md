@@ -1,7 +1,7 @@
 # Clean-CTX — Compiler IR: Structured State Protocol
 
 > **Owner:** Compiler IR spec + delta transport · **Status:** Living reference
-> **Version:** 1.0.0 (Implemented) · **Last updated:** 2026-06-18
+> **Version:** 0.8.0 architecture (Implemented) · **Last updated:** 2026-09-29
 > **Status:** All phases A–H implemented and deployed in production.
 >
 > **Verification:** see `docs/agent/verification.md` for the authoritative gate;
@@ -204,7 +204,7 @@ The state machine applies the sequence transactionally:
 ```
 src/ir/
 ├── mod.rs                # Module declarations + public re-exports
-├── opcodes.rs            # CoreOp enum (15 variants), flag constants, arity table
+├── opcodes.rs            # Typed CoreOp declarations, semantics, bodies, calls
 ├── compiler.rs           # IRCompiler struct, compile() method, CompileError
 ├── compiler_methods.rs   # MethodSig, parse_method_sig, emit_method_ir, emit_import_ir,
 │                         # resolve_forward_aliases
@@ -220,7 +220,7 @@ src/ir/
 │                         # ir_to_hierarchical, hierarchical_to_ir
 ├── positional.rs         # PositionalConfig, encode/decode, ir_to_positional_wire
 ├── patterns.rs           # PatternOp, CompressingPatternRecognizer, CompressionStats
-├── binary_wire.rs        # Binary encode/decode, BLOB format
+├── binary_wire.rs        # Exact physical 0x04 encode/decode and BLOB format
 └── layers/
     ├── mod.rs            # LanguageLayer, MetaLayer, PatternRecognizer traits,
     │                     # LayerContext struct
@@ -240,46 +240,27 @@ src/ir/
 
 **File:** `src/ir/opcodes.rs`
 
-15 variants (14 structural + 1 pattern):
+`CoreOp` is an evolving typed instruction enum; `src/ir/opcodes.rs` is the
+exhaustive authority. Its current semantic families are:
 
-```rust
-pub enum CoreOp {
-    // ── Structural Definitions ────────────
-    DefClass(String, String),       // DEF_C  class_id, name
-    DefMethod(String, String, String), // DEF_M  class_id, method_id, name
-    DefField(String, String, String),  // DEF_F  class_id, field_id, name
-    DefInterface(String, String),      // DEF_I  interface_id, name
+- class, method, field, interface, interface-method, and interface-field
+  declarations with stable compiler identities;
+- parameters, returns, field types, and typed declaration modifiers;
+- typed control summaries, pattern facts, side effects, execution contexts,
+  data flow, and residual legacy flags;
+- inheritance, interface inheritance/implementation, injection, imports, and
+  type aliases;
+- additive/consumptive pattern classification that retains declaration
+  identity;
+- byte-exact Edit bodies with optional absolute source spans; and
+- structural `Call` facts carrying caller identity, callee spelling, written
+  argument count, and spread qualification without claiming overload
+  resolution.
 
-    // ── Signatures & Types ───────────────
-    Param(String, String, String, String), // SIG  method_id, param_id, type, name
-    Return(String, String),                // RET  method_id, type
-    FieldType(String, String),             // FIELD_T  field_id, type
-
-    // ── Control Flow & Behavior ──────────
-    Flags(String, Vec<String>),         // FLAGS target_id, flags...
-    ClassFlags(String, Vec<String>),    // FLAGS_C class_id, flags...
-
-    // ── Relationships ────────────────────
-    Extends(String, String),            // EXT child_id, parent_id
-    Implements(String, String),         // IMPL class_id, interface_id
-    Injects(String, Vec<String>),       // INJECTS class_id, deps...
-
-    // ── Imports ──────────────────────────
-    Import(String, String, String),     // IMP alias, module, named_export
-
-    // ── Type Aliases ─────────────────────
-    TypeAlias(String, String),          // TYPE alias, original
-
-    // ── Compressed Patterns (Phase H) ────
-    Pattern(String, Vec<String>),      // PAT pattern_name, args...
-}
-```
-
-**Flag constants:** `IF`, `LOOP`, `RET`, `THROW`, `ASYNC`, `GEN`, `EXPORT`, `STATIC`, `PRIVATE`, `PROTECTED`, `ABSTRACT`, `UNSAFE`
-
-**Type opcodes:** `$s` (string), `$n` (number), `$b` (boolean), `$v` (void), `$T` (true), `$F` (false), `$nl` (null), `$ud` (undefined)
-
-**Arity table** (`arity()`): Fixed arities (3–5) + variadic (-1) for FLAGS, FLAGS_C, INJECTS, PAT.
+Named wire tuples retain explicit opcodes such as `DEF_C`, `DEF_M`, `SIG`,
+`RET`, `BODY`, and the dual-shape `CALL` tuple. Physical persistence uses the
+versioned `0x04` binary format; consumers must not infer tuple shape from this
+summary instead of using the checked encoder/decoder.
 
 ### Compiler Error Handling
 
@@ -497,17 +478,20 @@ The state machine supports:
 | `compress_code_context` | `handle_compress_code_context` | IR-first compression with encoding selection |
 | `delta_code_context` | `handle_delta_code_context` | IR-level delta computation |
 | `apply_delta` | `handle_apply_delta` | Explicit code-side acknowledgement of an exact pending delta |
-| `provide_code_context` | `handle_provide_code_context` | Heuristic model-facing entry point; always returns complete current context |
+| `provide_code_context` | `handle_provide_code_context` | Heuristic model-facing entry point for one file or an ordered failure-isolated batch; always returns complete current context |
+| `workspace_query` | registered query handler | One scoped semantic operation or an ordered heterogeneous batch over `WorkspaceIndex` and registered hydration |
 | `restore_context` | `handle_restore_context` | Restore checked binary-v04 IR, delta-v2 history, and aligned edges without recompiling source |
 | `context_history` | `handle_context_history` | Per-file delta history |
 | `context_stats` | `handle_context_stats` | Session dashboard |
 
-### Current Legacy Result-Level Response Shape
+### MCP Response Boundary
 
-Until the separately versioned R-46 migration, context tools retain legacy
-result-level fields. `content` is the model-visible SCHEMA-vNext presentation (or
-an explicitly classified alternative), while `ir` is a reduced,
-non-reversible auxiliary hierarchy. It is not the persistence authority.
+Registered tools use the canonical MCP `CallToolResult` boundary:
+model-visible `content`, declared `structuredContent`, and application-facing
+`_meta`. `content` carries SCHEMA-vNext or an explicitly classified complete
+alternative; reduced hierarchy fields are auxiliary and never persistence
+authority. Batched `provide_code_context` declares `response_mode` and places
+exact successful content according to `mirrored`, `structured`, or `indexed`.
 
 ```json
 {
@@ -516,21 +500,25 @@ non-reversible auxiliary hierarchy. It is not the persistence authority.
   "pretty": { "encoding": "named", "file": "α1", "v": 1, "ir": [...] },
   "v": 1,
   "file": "α1",
-  "content_kind": "skeleton",
-  "byte_exact": []
+  "structuredContent": { "...": "tool-specific typed payload" },
+  "_meta": { "content_kind": "skeleton", "byte_exact": [] }
 }
 ```
 
 ### Zero-Touch Workflow
 
 `provide_code_context` orchestrates:
-1. Heuristics engine → decide fidelity + strategy
-2. IR compilation (primary) or text pipeline (fallback)
-3. Session stats recording
-4. Angular detection + Meta-Layer
-5. CBM enrichment injection
-6. Cache invalidation (CBM graph version check)
-7. Persistence (SQLite, when configured)
+1. singular/batch structural validation and per-file request projection;
+2. heuristics → fidelity and presentation strategy;
+3. one canonical compilation with language/meta/pattern passes;
+4. checked hierarchy → complete SCHEMA-vNext or explicit raw alternative;
+5. transactional persistence/publication according to configured policy;
+6. per-file statistics and ordered outcome collection; and
+7. batch response projection plus a mode-scoped outer cache identity.
+
+The batch coordinator calls the same typed evaluator as the singular path; it
+does not recursively dispatch the public handler or create a second compiler
+lifecycle.
 
 ### Helper Functions
 

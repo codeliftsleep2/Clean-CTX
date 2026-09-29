@@ -3,7 +3,7 @@
 **All notable changes to this project will be documented in this file.**
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`_b` suffixes mark split sub-sections of one release); the version-history registry lives in [`CHANGELOG_VERSIONING.md`](CHANGELOG_VERSIONING.md).
+Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`_b` suffixes mark split sub-sections of one release); the version-history registry lives in [`../CHANGELOG_VERSIONING.md`](../CHANGELOG_VERSIONING.md).
 
 
 ---
@@ -89,11 +89,22 @@ hardening record.
 
 ### Changed
 
-* **Compilation and cache ownership** — framework/meta evaluation now shares a
-  compilation-scoped lexical context instead of repeating parses and scans.
-  CBM graph cache entries, disk partitions, hydration roots, and invalidation
-  are project-scoped, and unchanged context compilation reuses cached IR and
-  token counts.
+* **Single-pass framework evidence retrieval** — one immutable,
+  compilation-scoped meta context now owns the reusable lexical-region index,
+  tree-sitter capture identity, applicability evidence, and combined
+  marker/semantic evaluation. Angular extractor families reuse one lexical
+  index and collected testing-call evidence; .NET and Angular production paths
+  no longer run standalone framework-detection parses or duplicate registry
+  traversals. Final paired measurements placed Angular, .NET, and Spring
+  overhead within measurement noise; the decisive transitions reduced .NET
+  from 13.22% / 11,674.80 us to 0.66% / 498.75 us and Angular from 11.12% /
+  4,919.90 us to 0.63% / 238.10 us, with confirming runs remaining below 1%.
+* **Cache and compilation reuse** — unchanged source compilation reuses its
+  canonical IR and cached tokenizer counts instead of repeating expensive
+  work. CBM graph cache entries and disk partitions are structurally owned by
+  canonical project identity; switching projects no longer clears unrelated
+  memory entries, explicit hydration uses the registered root for that project,
+  and invalidation deletes only the affected project's partition.
 * **Model workflow guidance** — MCP initialization, portable agent policy,
   Claude integration rules, schemas, README examples, and live verification
   packages now describe single and batch request forms, explicit workspace

@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.8.0-rc · **Last updated:** 2026-09-27
+> **Version:** 0.8.0 · **Last updated:** 2026-09-29
 >
 > **Positioning:** This is the extension guide. Current architecture is owned
 > by `ARCHITECTURE_OVERVIEW.md` and `ARCHITECTURAL_INVARIANTS.md`; the exact
@@ -95,7 +95,12 @@ The core workflow is:
 5. **Index** cross-file semantic entities and provenance-bearing relationships
 6. **Measure** economics with the configured tokenizer
 
-The **recommended model-facing entry point** is `provide_code_context` — a single tool that handles compression, Angular detection, and fidelity selection while always returning complete current context. Structured delta generation and acknowledgement are explicit through `delta_code_context` and `apply_delta`.
+The **recommended model-facing entry point** is `provide_code_context`. Its
+mutually exclusive request forms read one `filePath` or an ordered,
+failure-isolated `files` batch of up to eight items through the same per-file
+evaluator. It handles language/framework detection and fidelity selection while
+always returning complete current context. Structured delta generation and
+acknowledgement are explicit through `delta_code_context` and `apply_delta`.
 
 ---
 
@@ -106,11 +111,17 @@ The system architecture is documented in detail in [`docs/ARCHITECTURE_OVERVIEW.
 - **MCP stdio Interface** — JSON-RPC 2.0 request/response loop over stdin/stdout
 - **Heuristics Engine** — selects fidelity and classification per file based on intent, size, language, and Angular detection
 - **Context compiler** — AST extraction → canonical IR → checked hierarchy → SCHEMA-vNext or explicit economic raw fallback
+- **Compilation-scoped meta context** — reuses lexical regions, capture identity,
+  applicability evidence, and collected framework calls across one evaluation;
+  it is immutable and never persisted as a global parse cache
 - **IR Subsystem** — structured intermediate representation with delta-based state transport (see [Compiler IR Subsystem](#compiler-ir-subsystem))
 - **Meta-Layer** — framework/dialect-specific annotation layers that enrich compressed output (see [Meta-Layer Architecture](#meta-layer-architecture))
 - **Persistence Layer** — built-in SQLite cross-session storage for canonical
   snapshots, checked deltas, semantic edges, and edit intents — see
   [Persistence Layer](#persistence-layer)
+- **Separated caches** — source/IR/token reuse, discovery-completion state, and
+  project-owned CBM graph caching retain distinct owners and invalidation rules;
+  none substitutes for live `WorkspaceIndex` evaluation
 
 For the full system diagram, module dependency graph, and design decisions, see
 [`docs/ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md). The core MCP
@@ -248,7 +259,9 @@ This is an ownership map, not a complete file manifest. The source tree and
 
 ## Zero-Touch Workflow
 
-The zero-touch workflow is the **recommended model-facing entry point** for file-related coding tasks. `provide_code_context` always returns complete current context.
+The zero-touch workflow is the **recommended model-facing entry point** for
+file-related coding tasks. `provide_code_context` always returns complete
+current context for either one file or an ordered batch.
 
 ### How It Works
 
@@ -263,22 +276,32 @@ The zero-touch workflow is the **recommended model-facing entry point** for file
    - Runs IR compilation and selects complete SCHEMA-vNext or raw-source content
    - Publishes the canonical session baseline and applies persistence policy
    - Never substitutes a code-side delta acknowledgement for model context
+   - Reuses this same evaluator for every accepted batch item
 
-3. **Session Stats** (`src/mcp/session_stats.rs`) records compression metrics for the dashboard
+3. **Batch Coordinator** (`src/mcp/tool_handlers/core/provide/batch.rs`), when
+   `files` is supplied:
+   - Validates shared scope, unique item IDs, and canonical-file uniqueness
+   - Preserves request order and isolates item-local failures
+   - Projects exact successful content as `mirrored` (default), `structured`,
+     or `indexed`, with a mode-scoped outer cache identity
+
+4. **Session Stats** (`src/mcp/session_stats.rs`) records per-file compression
+   metrics for the dashboard
 
 ### Tools
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Model-facing entry point** — auto-detects, selects fidelity, and returns complete current context |
+| `provide_code_context` | **Model-facing entry point** — one file or an ordered, failure-isolated batch; selects per-file fidelity and returns complete current context |
 | `delta_code_context` / `apply_delta` | Explicit code-side delta generation and acknowledgement |
-| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `restore_context` | Transactionally restore persisted canonical IR, checked delta history, and aligned semantic edges without recompiling source |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
-Structured transport strategies belong behind explicit tools or a future
-negotiated host capability. They must not be inferred inside the model-facing
-provider from the mere existence of a server baseline.
+Delta transport stays behind explicit tools and must not be inferred from the
+mere existence of a server baseline. Batch response placement is separately
+and explicitly selected with batch-only `responseMode`; omission retains safe
+`mirrored` compatibility.
 
 ---
 
@@ -905,7 +928,7 @@ Key spans are instrumented in hot paths:
 
 | Span | Location | Attributes |
 |------|----------|------------|
-| `provide_code_context` | `src/mcp/tool_handlers/core.rs` | `file_path`, `fidelity`, `strategy`, `cbm_status`, phase timings |
+| `provide_code_context` | `src/mcp/tool_handlers/core/provide.rs` + `provide/{evaluate,batch}.rs` | per-file path/fidelity/strategy/phase timings plus batch projection |
 | `compress_workspace` | `src/mcp/workspace.rs` | `dir_path`, `fidelity`, `file_count`, `total_ms` |
 | `cbm_proxy_call` | `src/cbm/bridge.rs` | `tool_name`, `latency_ms`, `output_len`, `is_ok` |
 | Dispatcher spans | `src/mcp/dispatcher.rs` | queue wait + execution time histograms |

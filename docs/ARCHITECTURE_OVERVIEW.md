@@ -1,10 +1,10 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.8.0-rc
-> **Last updated:** 2026-09-27 (SCHEMA-vNext, workspace-query boundaries,
-> fidelity-aware semantic projections, dependency-cycle witnesses, and CBM
-> trace identity resolution)
+> **Version:** 0.8.0
+> **Last updated:** 2026-09-29 (architectural-hardening certification,
+> SCHEMA-vNext, failure-isolated context/query batching, response projections,
+> project-scoped caches, and compilation-scoped meta evaluation)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -15,9 +15,11 @@
 ```text
 MCP stdio tools / prompts
         │
-        ├── provide_code_context ── heuristics + explicit request contract
+        ├── provide_code_context ── singular or ordered file batch
+        │                            + explicit response projection
         ├── delta/apply/restore  ── explicit state-transition lifecycle
-        └── workspace_query      ── scoped semantic graph reads
+        └── workspace_query      ── singular or heterogeneous batched
+                                     scoped semantic graph reads
         │
         ▼
 Trusted source + tree-sitter parsers
@@ -49,6 +51,25 @@ The canonical IR is the fan-out boundary. SCHEMA-vNext is a model-facing
 file-local projection, `WorkspaceIndex` owns cross-file semantic facts, and the
 binary/delta forms are code-side persistence and transport. None is a lossy
 replacement for another.
+
+### Compilation-scoped evidence and cache ownership
+
+One source compilation owns one immutable meta-evaluation context. It reuses
+the base capture identity, a language-neutral lexical-region index, collected
+framework call evidence, and applicability evidence across marker and semantic
+edge extraction. Angular, .NET, and Spring do not reparse the same source merely
+to decide applicability on the production path, and Angular lexical consumers
+do not rescan every prefix from byte zero. The context is borrowed and
+compilation-scoped: no syntax tree or lexical index is persisted globally.
+
+Caching remains separated by authority:
+
+- unchanged file compilation may reuse canonical IR and tokenizer counts;
+- discovery completion caches only successful search completion, never answers;
+- `WorkspaceIndex` remains the live semantic-answer authority; and
+- CBM graph memory/disk entries are keyed by canonical project ownership, so
+  project switching and invalidation cannot erase or serve another project's
+  partition.
 
 ### A-09: Production-Grade Multi-Threaded Request Dispatch
 
@@ -174,7 +195,8 @@ complete current representation:
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Model-facing entry point** — auto-detects, selects fidelity, and returns complete current context |
+| `provide_code_context` | **Model-facing entry point** — one file or an ordered, failure-isolated batch of up to eight files; selects per-file fidelity and returns complete current context through mirrored, structured, or indexed batch projection |
+| `workspace_query` | Scoped semantic graph access through one legacy operation or an ordered, failure-isolated heterogeneous batch of up to 32 operations |
 | `delta_code_context` / `apply_delta` | Explicit code-side IR transition generation and acknowledgement |
 | `restore_context` | Transactionally restore persisted canonical IR, delta history, and semantic-edge ownership without source recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
@@ -290,7 +312,7 @@ src/
 │   ├── mod.rs                    # Public module declarations
 │   ├── compiler.rs               # IRCompiler: source → CompiledIR
 │   ├── compiler_methods.rs       # Compiler method implementations
-│   ├── opcodes.rs                # CoreOp enum (DefClass, DefMethod, etc.)
+│   ├── opcodes.rs                # Typed CoreOp declarations, semantics, bodies, calls
 │   ├── wire.rs                   # ir_to_wire: CompiledIR → tuple format
 │   ├── string_table.rs           # ir_to_string_table_wire: compact index format
 │   ├── symbol_table.rs           # IR symbol table for cross-file resolution
@@ -299,11 +321,11 @@ src/
 │   ├── hierarchical.rs           # Hierarchical IR (grouped by file/class/method)
 │   ├── positional.rs             # Positional encoding for compact IR format
 │   ├── render.rs                 # IR rendering to text
-│   ├── binary_wire.rs            # Binary wire format for IR transport
+│   ├── binary_wire.rs            # Exact physical 0x04 IR storage format
 │   ├── program_graph.rs          # R-43b: Local program graph (structural edges only, no CBM)
 │   ├── inference_layer.rs        # R-43b: InferenceLayer — ephemeral, never serialized, confidence-scored
 │   ├── pipeline.rs               # R-43b: IRPass trait + PassPipeline (composable 7-pass pipeline)
-│   ├── validator.rs              # R-43b: IRValidator + DefaultValidator (10 rules, E001-E010)
+│   ├── validator.rs              # IRValidator + DefaultValidator (E001-E011)
 │   ├── query.rs                  # R-43b: IRQueryEngine — local + CBM-enriched queries with confidence
 │   ├── patterns.rs               # CompressingPatternRecognizer
 │   └── layers/
@@ -369,9 +391,12 @@ src/
 
 ---
 
-## Delta Transport: LLM vs CPU Efficiency
+## Explicit IR Delta Transport
 
-Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Both are designed to reduce **CPU load** and **local compute time** on subsequent calls, rather than reducing LLM token usage.
+Clean-CTX exposes one current delta protocol: occurrence-aware IR transitions
+through `delta_code_context` and `apply_delta`. The former text-delta MCP path
+is retired. Delta is a code-side state protocol and is never substituted for
+complete model-facing context.
 
 ### How Delta Saves Resources (Not LLM Tokens)
 
@@ -389,11 +414,11 @@ Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Bot
 
 **LLM token savings come exclusively from compression** (Low/Medium/High fidelity), not from delta transport. Delta transport is a CPU-savings layer on top of compression.
 
-### Two Delta Pipelines
+### Current Delta Pipeline
 
 | Pipeline | Granularity | CPU Savings vs Full ReCompress | Best For |
 |----------|-------------|:------------------------------:|----------|
-| IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Field-patch encoding | Structured code analysis, workspace-aware refactoring |
+| IR-level (`delta_code_context` / `apply_delta`) | Occurrence-aware instruction-sequence edits | Measured workflow-dependent savings | Explicit version-owning integrations and durable replay |
 
 ### 50-Edit Session Results
 
@@ -405,7 +430,9 @@ Simulated 50 sequential edits on a ~440-line file across all three fidelity leve
 | **Medium** | 227,310 | 37,338 | 18,287 | 83.6% | 92.0% | **−51.0%** cheaper |
 | **High** | 227,310 | 48,556 | 22,955 | 78.6% | 89.9% | **−52.7%** cheaper |
 
-Key insight: at Medium/High fidelity, delta is **51–53% cheaper** than full recompression because larger compressed outputs make line-level deltas significantly smaller than re-parsing.
+Historical key insight: the measured simulation found **51–53%** savings at
+Medium/High fidelity. Those figures predate the current protocol and remain
+historical evidence, not a current automatic-context claim.
 
 See [`docs/PERFORMANCE.md`](PERFORMANCE.md) for the full 50-edit breakdown and visualizations.
 
@@ -489,19 +516,20 @@ The `LocalStateCache` serves double duty:
 1. **Content-hash registry** — avoids re-compressing identical files in the same session
 2. **Baseline snapshot registry** — enables `diff_code_context` to produce AST-level deltas instead of full re-compressions on subsequent calls
 
-### Why path aliases are global across the session
+### Why path aliases are request-scoped
 
-Path aliases (`α1`, `α2`, …) are **session-global** — `compress_workspace` populates aliases that are immediately visible to subsequent `provide_code_context` calls, and vice versa. This means that if a workspace compression assigns `α1` to `src/user.service.ts`, a later `provide_code_context("src/user.service.ts")` will reuse the same `α1` alias, keeping the `§PATHMAP` footer stable across multiple tools. Aliases are never recycled within a session; they only reset on server restart.
+SCHEMA-vNext assigns compact aliases (`α1`, `α2`, …) inside one presentation
+and emits the exact source path once in that response's authoritative
+`§PATHMAP`. Consumers resolve an alias only against the map delivered with that
+response; no alias is a durable file identity or a cross-request authority.
 
-### Why both text-level and IR-level delta transport?
+### Why delta transport is explicit
 
-Two delta pipelines serve different scenarios:
-
-| Pipeline | Granularity | Best For | Overhead |
-|----------|-------------|----------|----------|
-| IR-level (`delta_code_context`) | Instruction-level diffs of compiled IR | Structured code analysis, workspace-aware refactoring | Field-patch encoding for maximum compactness |
-
-The text-level pipeline is faster and simpler for quick edits. The IR pipeline preserves structural semantics and enables workspace-level cross-file analysis.
+`provide_code_context` always returns complete current model context.
+`delta_code_context` produces an occurrence-aware `dv:2` instruction sequence
+only when a code-side consumer intentionally owns the prior version, and
+`apply_delta` validates and acknowledges that transition transactionally. The
+server never infers that a model or host retained an earlier presentation.
 
 ### Why SQLite for persistence?
 

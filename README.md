@@ -53,7 +53,9 @@ Task-relevant context rather than indiscriminate source dumping:
 
 * **Compiles source into LLM-optimized representations** - three fidelity levels (Low/Medium/High) plus Edit and Verbatim, each preserving the semantics appropriate to the task.
 * **Semantic compression** - reduces representation size while preserving the relationships downstream consumers depend on.
-* **IR-level delta transport** - compile once, return instruction-level deltas through code-side response fields thereafter (up to 53% CPU/latency savings on repeat calls). Delta operations are never model-visible content.
+* **Single-pass framework evaluation** - one compilation-scoped lexical/capture context is reused across applicability, markers, and semantic-edge extraction, eliminating redundant tree-sitter parses and repeated prefix scans.
+* **Layered cache reuse** - unchanged files reuse canonical IR and tokenizer counts, while CBM graph entries and disk partitions remain isolated by canonical project identity.
+* **Explicit IR-level delta transport** - `delta_code_context` computes an instruction-level transition and `apply_delta` acknowledges it through a code-side protocol (up to 53% CPU/latency savings in measured delta workflows). Ordinary context reads remain complete and never silently switch to deltas.
 * **Structural edits** - `apply_edit` performs byte-exact edits on previously-seen files using the semantic model.
 
 ### MCP integration
@@ -86,7 +88,7 @@ Plain files (no framework) are indexed through the `BuiltinMetaLayer` fallback.
 This is the key differentiator. Clean-CTX is **not** doing textual minification:
 
 * **Architectural invariant (IRPAT-001)** - consumptive IR transformations must never consume a `DefMethod` while leaving surviving operations that reference it orphaned. The compiler validates every transformation so compression does not silently destroy relationships.
-* **Deterministic, validated** - the IR validator (E001-E010) catches dangling references, orphaned methods, and inconsistent annotations before output reaches the consumer.
+* **Deterministic, validated** - the IR validator (E001-E011) catches dangling references, orphaned methods/callers, and inconsistent annotations before output reaches the consumer.
 * **Identity survives transformation** - entity identity and semantic edges persist through compression, delta transport, and edits.
 
 ### Token and context efficiency
@@ -208,7 +210,9 @@ Restart your editor. The tools `provide_code_context`, `compress_code_context`, 
 }
 ```
 
-First call performs full compression; subsequent calls automatically use delta transport.
+Every call returns complete current context. Incremental IR transport is an
+explicit `delta_code_context` / `apply_delta` workflow and is never selected
+automatically by `provide_code_context`.
 
 ### Query the workspace semantic graph
 
@@ -380,8 +384,8 @@ Standard server block (Continue.dev adapts it to its array form):
 | Languages | OK: TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
 | Semantic intelligence | OK: Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; 30+ relation types; WorkspaceIndex with forward/reverse traversal, selector/injection resolution, transitive deps, cycle detection |
 | Workspace queries | OK: single or ordered failure-isolated batch calls across `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, `has_cycle`, and `calls_in_file` |
-| Transport | OK: Stateful IR delta transport - compile once, send deltas thereafter |
-| Pass Architecture | OK: Composable IRPass pipeline (Core → Language → Meta → Pattern* → Validation), IR validator (E001–E010), query engine, semantic delta intents |
+| Transport | OK: Explicit occurrence-aware `dv:2` IR generation/application with complete ordinary context reads |
+| Pass Architecture | OK: Composable IRPass pipeline (Core → Language → Meta → Pattern* → Validation), IR validator (E001–E011), query engine, semantic delta intents |
 | CBM Integration | OK: CBM (codebase-memory-mcp) runs as a separate local server; Clean-CTX launches it as a subprocess, indexes the repo + additional roots, captures its graph output, and filters/compresses it (filter-first) before it reaches the LLM |
 | Persistence | OK: SQLite cross-session persistence with three-tier reliability |
 | Proxy | OK: Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
