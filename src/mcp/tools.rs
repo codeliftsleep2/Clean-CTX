@@ -176,18 +176,18 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "provide_code_context",
-            "description": "Provides complete current model-facing context for a file, with automatic fidelity selection and framework-aware enrichment. Structured delta transport is available separately through delta_code_context.",
+            "description": "Provides complete current model-facing context for one file, or an ordered failure-isolated batch of up to 8 files. Batch requests share workspaceRoot and tokenizer while each item chooses intent, fidelity, and focusMethods. Structured delta transport is available separately through delta_code_context.",
             "inputSchema": {
                 "type": "object",
+                "properties": super::tool_schemas::provide_code_context_properties(),
+                "oneOf": super::tool_schemas::provide_code_context_request_variants()
+            },
+            "outputSchema": {
+                "type": "object",
                 "properties": {
-                    "filePath": { "type": "string" },
-                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe apply_edit operations. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
-                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Select qualified Owner.method names, or a bare name owned by exactly one typed owner. A non-empty focus implies Edit only when both fidelity and intent are omitted; explicit non-Edit modes conflict and fail. An empty array is valid only with explicit Edit and selects no bodies. Selectors resolve to canonical method IDs before body filtering; ambiguous selectors fail. A same-owner overload family selects all overload occurrences. Omit at Edit fidelity to render every method body." },
-                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." },
-                    "tokenizer": { "type": "string" }
-                },
-                "required": ["filePath"]
+                    "batch": { "type": "boolean" },
+                    "results": super::tool_schemas::provide_code_context_batch_results()
+                }
             }
         }),
         serde_json::json!({

@@ -298,3 +298,90 @@ fn red_batch_all_item_failures_keep_a_valid_nonempty_mcp_envelope() {
         "{response}"
     );
 }
+
+#[test]
+fn batch_preserves_token_accounting_cache_reuse_and_records_envelope_sizes() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let files: Vec<_> = (0..8)
+        .map(|index| {
+            write_fixture(
+                &root,
+                &format!("economics-{index}.ts"),
+                &format!("Economics{index}"),
+                "inspect",
+            )
+        })
+        .collect();
+    let state = state(&root);
+    let tokenizer = crate::tokenizer::create_tokenizer(crate::tokenizer::TokenizerKind::O200k)
+        .expect("o200k tokenizer");
+
+    let batch_arguments = |count: usize| {
+        json!({
+            "workspaceRoot": root.path(),
+            "tokenizer": "o200k",
+            "files": files[..count]
+                .iter()
+                .enumerate()
+                .map(|(index, file)| json!({
+                    "id": format!("file-{index}"),
+                    "filePath": file,
+                    "fidelity": "high"
+                }))
+                .collect::<Vec<_>>()
+        })
+    };
+
+    let first = dispatch(&state, 1, batch_arguments(8));
+    let hits_before_repeat = state.cache_metrics_lock().hits;
+    let repeated = dispatch(&state, 1, batch_arguments(8));
+    assert_eq!(first["result"]["content"], repeated["result"]["content"]);
+    assert_eq!(
+        first["result"]["structuredContent"],
+        repeated["result"]["structuredContent"]
+    );
+    assert!(
+        state.cache_metrics_lock().hits > hits_before_repeat,
+        "the repeated outer batch breakpoint must reuse the same cache identity"
+    );
+
+    let results = result_items(&first);
+    let stats = state.session_stats_lock();
+    for (index, file) in files.iter().enumerate() {
+        let source = std::fs::read_to_string(file).expect("economics source");
+        let content_index = results[index]["content_index"]
+            .as_u64()
+            .expect("successful content index") as usize;
+        let output = content_text(&first, content_index);
+        let file_stats = stats.file_stats(file).expect("per-file token statistics");
+        assert_eq!(file_stats.raw_tokens, tokenizer.count_tokens(&source));
+        assert_eq!(file_stats.compressed_tokens, tokenizer.count_tokens(output));
+    }
+    drop(stats);
+
+    for count in [2, 4, 8] {
+        let batch = dispatch(&state, count as i64, batch_arguments(count));
+        let batch_bytes = serde_json::to_vec(&batch).expect("batch JSON").len();
+        let single_bytes: usize = files[..count]
+            .iter()
+            .enumerate()
+            .map(|(index, file)| {
+                let single = dispatch(
+                    &state,
+                    100 + index as i64,
+                    json!({
+                        "workspaceRoot": root.path(),
+                        "tokenizer": "o200k",
+                        "filePath": file,
+                        "fidelity": "high"
+                    }),
+                );
+                serde_json::to_vec(&single).expect("single JSON").len()
+            })
+            .sum();
+        println!(
+            "provide_code_context envelope measurement: items={count} batch_bytes={batch_bytes} repeated_single_bytes={single_bytes}"
+        );
+    }
+}

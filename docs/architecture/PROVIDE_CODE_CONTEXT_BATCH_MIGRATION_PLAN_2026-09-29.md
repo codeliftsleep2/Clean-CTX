@@ -1,8 +1,8 @@
 # `provide_code_context` Batch Migration Plan
 
 **Date:** 2026-09-29  
-**Status:** Phase 0 and Checkpoint A complete; Phase 1 RED regressions prepared
-and awaiting behavioral verification; production implementation has not started  
+**Status:** Phases 0–4 complete through tracked batch GREEN; legacy equivalence
+and later verification gates remain
 **Scope:** Add an ordered, failure-isolated multi-file request form to the
 existing `provide_code_context` MCP tool while preserving the complete
 single-file contract, byte-exact Edit/Verbatim authority, session lifecycle,
@@ -919,3 +919,12 @@ fail returns one text block stating `No context items succeeded; inspect
 structuredContent.results for item errors.` No item points to that block with a
 `content_index`; ordered structured errors remain authoritative. This is a
 response-contract rule, not part of the Phase 2 evaluator extraction.
+
+**Phases 3–4 implementation checkpoint (2026-09-29):** The public schema now
+declares the mutually exclusive single/batch request forms and ordered batch
+outcomes. The production coordinator evaluates at most eight items
+sequentially, isolates item failures, rejects later canonical-file duplicates,
+correlates exact successful content blocks by `content_index`, and emits one
+outer cache hint. The complete tracked `provide_code_context_batch_tests`
+regression target was reported GREEN by the maintainer. Legacy single-call
+equivalence and the remaining verification phases are still pending.

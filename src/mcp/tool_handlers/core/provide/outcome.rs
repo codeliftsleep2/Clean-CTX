@@ -74,4 +74,15 @@ impl ProvideFailure {
             self.data.clone(),
         )
     }
+
+    pub(super) fn structured(&self) -> Value {
+        let mut error = json!({
+            "code": self.code,
+            "message": self.message,
+        });
+        if let Some(data) = &self.data {
+            error["data"] = data.clone();
+        }
+        error
+    }
 }

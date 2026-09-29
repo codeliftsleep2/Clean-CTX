@@ -10,10 +10,15 @@ use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod batch;
 mod evaluate;
 pub(super) mod outcome;
 
 pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &McpState) {
+    if params["arguments"].get("files").is_some() {
+        send_response(&batch::response(id, &params["arguments"], state));
+        return;
+    }
     let response = match evaluate::evaluate(params, state) {
         Ok(context) => {
             let mut response = context.legacy_response(id);
