@@ -396,8 +396,9 @@ Clean-CTX is the primary code-intelligence layer. Follow these rules:
    send both forms together. Batch `workspaceRoot` and `tokenizer` are shared
    top-level fields, while each item owns `id`, `filePath`, and optional
    `intent`, `fidelity`, and `focusMethods`. `responseMode` is batch-only:
-   omit it for safe `mirrored`; use `structured` only when the host is verified
-   to consume structured results, or `indexed` only when it is verified to
+   prefer `structured` when the host is verified to consume structured
+   results; omit it for safe `mirrored` when capability is unknown, or use
+   `indexed` only when the host is verified to
    consume top-level content blocks. Never guess a compact mode. Inspect every
    item status and consume code from the channel selected by the response's
    `response_mode` discriminator.

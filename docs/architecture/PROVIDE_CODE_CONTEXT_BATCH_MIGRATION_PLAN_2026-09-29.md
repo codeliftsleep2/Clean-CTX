@@ -951,6 +951,13 @@ reachability takes priority over byte deduplication. No new budget, truncation
 rule, or performance-dependent behavior was introduced. Phase 5 and Checkpoint
 F remain complete with the corrected interpretation.
 
+**Later response-projection note (2026-09-29):** These figures and the
+dual-channel statement describe the backward-compatible default `mirrored`
+projection. The subsequent response-mode optimization added explicit
+`structured` and `indexed` batch projections for verified hosts while retaining
+`mirrored` when `responseMode` is omitted. See
+`PROVIDE_CODE_CONTEXT_BATCH_RESPONSE_MODE_OPTIMIZATION_PLAN_2026-09-29.md`.
+
 **Phase 6 guidance checkpoint (2026-09-29):** The authoritative tooling guide,
 Claude integration rules, and runtime initialization instructions now explain
 when to use singular versus batched `provide_code_context`, the eight-item cap,

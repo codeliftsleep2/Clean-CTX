@@ -64,11 +64,11 @@ level. Batch results preserve request order and declare the resolved
 `response_mode`. Inspect every item: a success has `status="ok"` and semantic
 `meta`; an error remains item-local and never owns content.
 
-`responseMode` is valid only on the batch form. Omit it on an unknown host to
-receive safe `mirrored`: exact code appears both in each successful item's
-`content` and in its `content_index`-identified top-level block. Use
-`structured` only for a verified structured-only host; exact code then appears
-once in each successful item and the top-level text is only a routing notice.
+`responseMode` is valid only on the batch form. Prefer `structured` for a host
+verified to consume `structuredContent`; exact code then appears once in each
+successful item and the top-level text is only a routing notice. On an unknown
+host, omit the field to receive safe `mirrored`: exact code appears both in
+each successful item's `content` and in its `content_index`-identified block.
 Use `indexed` only for a verified content-channel host; exact code then appears
 once in top-level blocks and successful items carry `content_index`. Never
 select a compact mode by guessing host behavior.

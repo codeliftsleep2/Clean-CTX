@@ -100,9 +100,9 @@ source contexts are needed, prefer one `files` batch of at most eight items:
 
 ```json
 {
-    "workspaceRoot": "C:/work/my-repo",
-    "tokenizer": "o200k",
-    "responseMode": "structured",
+  "workspaceRoot": "C:/work/my-repo",
+  "tokenizer": "o200k",
+  "responseMode": "structured",
   "files": [
     { "id": "service", "filePath": "src/services/UserService.ts", "intent": "overview" },
     { "id": "target", "filePath": "src/controllers/UserController.ts", "intent": "edit", "focusMethods": ["UserController.update"] }
@@ -110,11 +110,13 @@ source contexts are needed, prefer one `files` batch of at most eight items:
 }
 ```
 
-Claude is a verified structured-result consumer, so request
-`responseMode: "structured"`; exact code then appears once in each successful
-structured item. If integration behavior changes or is unknown, omit the field
-and use safe `mirrored`. Do not select `indexed` unless that Claude host has
-been explicitly verified to preserve and consume top-level MCP content blocks.
+Claude is a verified `structuredContent` consumer, so `structured` is the
+preferred batch mode: request `responseMode: "structured"`. Exact code then
+appears once in each successful structured item without the near-doubling of
+the compatibility mirror. If integration behavior changes or is unknown, omit
+the field and use safe `mirrored`. Do not select `indexed` unless that Claude
+host has been explicitly verified to preserve and consume top-level MCP content
+blocks.
 
 Each item requires a unique non-empty `id` and `filePath` and may choose its
 own `intent`, `fidelity`, and `focusMethods`. `workspaceRoot` and `tokenizer`

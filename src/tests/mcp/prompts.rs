@@ -107,7 +107,7 @@ fn initialize_includes_compact_workflow_instructions() {
         "1–8 items",
         "responseMode",
         "safe `mirrored`",
-        "verified structured-only host",
+        "verified structured-capable host",
         "verified content-channel host",
         "Never guess a compact mode",
         "no cross-file edit authority",

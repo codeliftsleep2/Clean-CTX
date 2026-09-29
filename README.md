@@ -228,10 +228,10 @@ one file, or top-level `files` for 1–8 files (normally two or more). A batch k
 `workspaceRoot` and `tokenizer` at the top level; each item has a unique `id`,
 its own `filePath`, and optional `intent`, `fidelity`, and `focusMethods`.
 Inspect every item status. Batch-only `responseMode` controls where exact code
-is placed: omit it for safe `mirrored`, use `structured` only for a verified
-structured-result consumer, or `indexed` only for a verified top-level content
-consumer. Never guess a compact mode; `response_mode` reports the projection
-used.
+is placed: prefer `structured` for a verified structured-result consumer, omit
+it for safe `mirrored` when host capability is unknown, or use `indexed` only
+for a verified top-level content consumer. Never guess a compact mode;
+`response_mode` reports the projection used.
 
 ```json
 {

@@ -1,7 +1,8 @@
 # `provide_code_context` Batch Response-Mode Optimization Plan
 
 **Date:** 2026-09-29
-**Status:** Phases 0–6 and Checkpoints A–G complete; Phase 7 has not started
+**Status:** Phases 0–6 and Checkpoints A–G complete; Phase 7 audit complete,
+final repository gate pending
 **Scope:** Reduce duplicate serialized code in batched `provide_code_context`
 responses when the caller knows which MCP visibility channel its host exposes,
 without reintroducing silent content loss or changing per-file evaluation.
@@ -276,7 +277,7 @@ Update:
 Guidance must say:
 
 - unknown host: omit mode and receive safe `mirrored`;
-- verified structured-only Claude host: request `structured`;
+- verified structured-capable host: prefer `structured`;
 - verified content-channel host: request `indexed`;
 - never select a compact mode merely by guessing;
 - every item status remains mandatory to inspect.
@@ -365,6 +366,29 @@ using those measurements to select a mode automatically. The maintainer
 reported the focused all-features test GREEN. Phase 4 and Checkpoint E are
 complete.
 
+Final all-features measurements from that tracked test:
+
+| Mode | Items | Batch bytes | Repeated-single bytes | Batch delta |
+|---|---:|---:|---:|---:|
+| `mirrored` | 2 | 43,517 | 22,288 | +21,229 (+95.25%) |
+| `structured` | 2 | 22,226 | 22,288 | -62 (-0.28%) |
+| `indexed` | 2 | 22,114 | 22,288 | -174 (-0.78%) |
+| `mirrored` | 4 | 87,068 | 44,286 | +42,782 (+96.60%) |
+| `structured` | 4 | 44,363 | 44,286 | +77 (+0.17%) |
+| `indexed` | 4 | 44,263 | 44,286 | -23 (-0.05%) |
+| `mirrored` | 8 | 173,860 | 88,572 | +85,288 (+96.29%) |
+| `structured` | 8 | 88,327 | 88,572 | -245 (-0.28%) |
+| `indexed` | 8 | 88,251 | 88,572 | -321 (-0.36%) |
+
+The delta is relative to the serialized sum of equivalent singular responses;
+negative values are savings. Compact modes remove the near-doubling caused by
+compatibility mirroring and remain approximately serialization-neutral versus
+singular responses. Their primary additional economy remains one tool call and
+one caller planning/orchestration step rather than repeated calls. `indexed`
+is marginally smallest in this fixture, but the differences between compact
+modes are too small to justify automatic selection; host capability remains
+the only selection authority.
+
 **Phase 5 guidance checkpoint (2026-09-29):** Portable and local agent policy,
 tooling guidance, Claude integration rules, runtime initialization guidance,
 README examples, and the durable MCP invariant now distinguish singular and
@@ -386,3 +410,15 @@ failure isolation, singular parity, and repeat cache reuse all passed. Captures
 were written under `target/provide-context-batch-verification/captures/` as
 operator evidence only, not as tracked test or CI evidence. Phase 6 and
 Checkpoint G are complete.
+
+**Phase 7 architectural audit (2026-09-29):** The production lifecycle was
+traced from registered `tools/call` dispatch through singular/batch request-form
+selection, batch structural and mode validation, the unchanged shared per-file
+evaluator, persistence/publication/statistics ownership, ordered outcome
+collection, response projection, mode-scoped outer cache identity, public
+schema exposure, runtime guidance, and live stdio consumption. Projection does
+not alter compilation results or per-file lifecycle effects. Searches found no
+active unconditional-mirroring assumption; the original batch migration's
+historical envelope measurements are now explicitly labeled as the default
+`mirrored` baseline. No obsolete production projection path remains. The
+authoritative final repository gate is the only remaining Checkpoint H work.
