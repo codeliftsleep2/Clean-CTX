@@ -52,6 +52,19 @@ pub(super) fn render(
     structured: &Value,
     additional_roots: &[String],
 ) -> String {
+    let envelope = answer_envelope(query_type, args, structured, additional_roots);
+    format!(
+        "// WORKSPACE-QUERY v{WORKSPACE_QUERY_CONTENT_VERSION}; structuredContent remains authoritative\n{}",
+        serde_json::to_string_pretty(&envelope).expect("workspace-query answer is serializable")
+    )
+}
+
+fn answer_envelope(
+    query_type: &str,
+    args: &Value,
+    structured: &Value,
+    additional_roots: &[String],
+) -> Value {
     let count = structured.get("count").and_then(Value::as_u64);
     let file_local_calls = query_type == "calls_in_file";
     let zero_result = if query_type == "has_cycle" {
@@ -91,7 +104,7 @@ pub(super) fn render(
             args.get("method").cloned().unwrap_or(Value::Null),
         );
     }
-    let envelope = json!({
+    json!({
         "schema": "clean-ctx/workspace-query-answer",
         "schema_version": WORKSPACE_QUERY_CONTENT_VERSION,
         "query": query,
@@ -108,10 +121,47 @@ pub(super) fn render(
             "discovery": structured.get("discovery"),
         },
         "result": model_result(query_type, structured),
+    })
+}
+
+pub(super) fn batch_success_item(
+    id: String,
+    query_type: &str,
+    args: &Value,
+    structured: &Value,
+    additional_roots: &[String],
+) -> Value {
+    let answer = answer_envelope(query_type, args, structured, additional_roots);
+    json!({
+        "id": id,
+        "type": query_type,
+        "status": "ok",
+        "query": answer["query"],
+        "completeness": answer["completeness"],
+        "result": answer["result"],
+    })
+}
+
+pub(super) fn render_batch(
+    args: &Value,
+    results: Vec<Value>,
+    additional_roots: &[String],
+) -> String {
+    let envelope = json!({
+        "schema": "clean-ctx/workspace-query-batch-answer",
+        "schema_version": 1,
+        "scope": {
+            "mode": if args.get("workspaceRoot").and_then(Value::as_str).is_some() { "workspace" } else { "session" },
+            "workspace_root": args.get("workspaceRoot"),
+            "additional_roots": additional_roots,
+            "within_path": args.get("withinPath"),
+        },
+        "results": results,
     });
     format!(
-        "// WORKSPACE-QUERY v{WORKSPACE_QUERY_CONTENT_VERSION}; structuredContent remains authoritative\n{}",
-        serde_json::to_string_pretty(&envelope).expect("workspace-query answer is serializable")
+        "// WORKSPACE-QUERY-BATCH v1; structuredContent remains authoritative\n{}",
+        serde_json::to_string_pretty(&envelope)
+            .expect("workspace-query batch answer is serializable")
     )
 }
 

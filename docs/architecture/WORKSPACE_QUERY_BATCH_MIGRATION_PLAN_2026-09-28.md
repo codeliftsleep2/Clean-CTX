@@ -882,7 +882,9 @@ Operator checkpoint:
 
 ### Phase 5 - Public schema and batch rendering
 
-**Status:** Pending.
+**Status:** Complete (2026-09-28). The public catalog and distinct batch
+envelope are implemented, and the unchanged Phase 1 batch regressions are
+GREEN.
 
 Deliverables:
 
@@ -903,9 +905,37 @@ Checkpoint 5 exit criteria:
 - no domain fields leak directly into the MCP result envelope;
 - schema-validation regressions are GREEN.
 
+Implementation checkpoint evidence (2026-09-28):
+
+- `workspace_query.inputSchema` now declares seven legacy single-operation
+  branches plus one mutually exclusive batch branch;
+- batch items reuse the seven operation-specific validation branches, add a
+  required non-empty correlation ID, exclude item-level scope fields, and
+  declare the approved 1..=32 size bound;
+- `outputSchema.results` declares ordered `ok` and `error` item variants while
+  retaining every legacy top-level result property;
+- successful model-facing items reuse the legacy query, completeness, and
+  result projection, while failed items carry only compact typed error data;
+- batch content uses `clean-ctx/workspace-query-batch-answer` version 1 and the
+  legacy path remains on `clean-ctx/workspace-query-answer` version 1;
+- tool guidance now explains heterogeneous batching, shared scope, hydration
+  deduplication, failure isolation, and the unchanged `has_cycle` and
+  `calls_in_file` authority boundaries;
+- standalone formatting, `git diff --check`, and the active-file size guard
+  pass; no Cargo command was agent-run.
+
+Operator checkpoint:
+
+- command: `cargo test --all-features mcp::tool_handlers::query::tests_batch -- --nocapture`;
+- result: GREEN;
+- scope: the restored batch contract, schema, failure-isolation, hydration
+  deduplication, final-snapshot, and file-local authority regressions.
+
 ### Phase 6 - Restore unchanged RED tests and integration verification
 
-**Status:** Pending.
+**Status:** In progress. The Phase 1 tests are restored byte-identically at
+Git's normalized blob boundary and the original focused batch target is GREEN;
+the post-renderer legacy compatibility run remains pending.
 
 Deliverables:
 
@@ -924,6 +954,19 @@ Checkpoint 6 exit criteria:
 - legacy single-query regressions are GREEN;
 - mixed batch production dispatch is GREEN;
 - test results are reported separately from any optional live harness.
+
+Integration checkpoint evidence (2026-09-28):
+
+- restored `workspace_query_batch.rs` blob:
+  `30d139f35234873eff353e04ac72546daeed080c`;
+- restored `workspace_query_batch_preparation.rs` blob:
+  `217aa299043251e9c4c9e8eb661d805d039c5fd5`;
+- both hashes exactly match their corresponding `stash@{0}^3` blobs; raw
+  filesystem SHA-256 differs only because checkout applies the repository's
+  CRLF worktree convention;
+- the maintainer ran the original focused batch target and reported GREEN;
+- the full registered workspace-query target must still be rerun because Phase
+  5 factored the legacy renderer while preserving its envelope.
 
 ### Phase 7 - Live client acceptance
 

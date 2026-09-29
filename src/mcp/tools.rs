@@ -356,26 +356,11 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships or inspect owner-qualified calls in one trusted source file. Name-bearing cross-file operations use WorkspaceIndex plus registered hydration; has_cycle is a bounded index-only query and never hydrates or compiles. calls_in_file compiles a read-only canonical candidate and preserves owner, overload, call order, duplicates, written argument count, and spread evidence without claiming resolved callees. Results respect workspaceRoot plus configured additional roots and optional withinPath narrowing.",
+            "description": "Run one workspace query or a heterogeneous batch of up to 32 queries with ordered, per-item outcomes. A batch shares workspaceRoot and withinPath, deduplicates equivalent hydration, and isolates item failures. Name-bearing cross-file operations use WorkspaceIndex plus registered hydration; has_cycle remains index-only, and calls_in_file remains a fresh unpublished canonical-file query.",
             "inputSchema": {
                 "type": "object",
-                "properties": {
-                    "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
-                    "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, and transitive_dependencies. With entity_type, uses the exact-identity fast path; alone, filters name resolution." },
-                    "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, and transitive_dependencies. With domain, uses the exact-identity fast path; alone, filters name resolution." },
-                    "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
-                    "file_path": { "type": "string", "description": "File path for entities_in_file query." },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file. Edit and verbatim normalize to High because this query publishes no source bodies. Defaults to the configured fidelity." },
-                    "kind": { "type": "string", "enum": ["dependency"], "description": "Optional cycle policy for has_cycle. Defaults to dependency." },
-                    "filePath": { "type": "string", "description": "Trusted source file for calls_in_file." },
-                    "owner": { "type": "object", "description": "Typed caller owner for calls_in_file.", "properties": { "kind": { "type": "string", "enum": ["class", "interface"] }, "name": { "type": "string" } }, "required": ["kind", "name"] },
-                    "method": { "type": "object", "description": "Caller method for calls_in_file. Omit signature fields for the complete overload family.", "properties": { "name": { "type": "string" }, "parameters": { "type": "array", "items": { "type": "string" }, "description": "Optional exact visible parameter-signature selector." }, "return_type": { "type": "string" } }, "required": ["name"] },
-                    "workspaceRoot": { "type": "string", "description": "Primary trusted workspace root for path resolution and filesystem hydration discovery. Required for calls_in_file; optional for existing cross-file operations, where it defaults to the detected project root." },
-                    "withinPath": { "type": "string", "description": "Optional. Narrows an ALREADY authorized workspace to one file or directory subtree: occurrences whose ASSERTING file lies under it, and traversal/cycle evidence likewise. Relative paths resolve against workspaceRoot; absolute paths are used as declared. Rejected (-32602) when the path lies outside workspaceRoot plus configured additional roots, or when no workspaceRoot is given — it never widens a workspace and never becomes a root of its own. Omit to query the whole authorized workspace." },
-                    "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
-                },
-                "oneOf": super::tool_schemas::workspace_query_variants(),
-                "required": ["type"]
+                "properties": super::tool_schemas::workspace_query_properties(),
+                "oneOf": super::tool_schemas::workspace_query_request_variants()
             },
             "outputSchema": {
                 "type": "object",
@@ -418,7 +403,9 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "method": { "type": "string", "description": "Caller method name for calls_in_file." },
                     "overloads": { "type": "array", "description": "Matching overload declarations with ordered call occurrences.", "items": { "type": "object" } },
                     "overload_count": { "type": "integer", "description": "Number of matching overload declarations." },
-                    "discovery": workspace_query_discovery_schema()
+                    "discovery": workspace_query_discovery_schema(),
+                    "batch": { "type": "boolean", "const": true, "description": "Present only for a batch response." },
+                    "results": super::tool_schemas::workspace_query_batch_results()
                 }
             }
         }),

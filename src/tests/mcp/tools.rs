@@ -254,7 +254,15 @@ fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
             let branches = branches
                 .as_array()
                 .unwrap_or_else(|| panic!("{contract} must use oneOf branches"));
-            assert_eq!(branches.len(), expected.len(), "{contract} branch count");
+            let typed_branch_count = branches
+                .iter()
+                .filter(|branch| branch["properties"]["type"]["const"].is_string())
+                .count();
+            assert_eq!(
+                typed_branch_count,
+                expected.len(),
+                "{contract} branch count"
+            );
 
             for (kind, required) in expected {
                 let branch = branches

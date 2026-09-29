@@ -12,19 +12,21 @@ const MAX_BATCH_ITEMS: usize = 32;
 struct PendingItem {
     id: String,
     query_type: String,
+    args: Value,
     prepared: PreparedQuery,
 }
 
 struct CompletedItem {
     id: String,
     query_type: String,
+    args: Value,
     result: QueryResult,
 }
 
 pub(super) fn handle(id: &Value, args: &Value, state: &McpState) {
     let result = try_execute(args, state);
     let response = match result {
-        Ok(items) => success_response(id, args, items),
+        Ok(items) => success_response(id, args, items, &state.config.additional_roots),
         Err(error) => crate::mcp::tool_helpers::jsonrpc_error(
             id.clone(),
             error.code,
@@ -81,6 +83,7 @@ fn try_execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Que
         pending.push(PendingItem {
             id: item_id.to_string(),
             query_type: query_type.to_string(),
+            args: item_args,
             prepared,
         });
     }
@@ -92,6 +95,7 @@ fn try_execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Que
         .map(|item| CompletedItem {
             id: item.id,
             query_type: item.query_type,
+            args: item.args,
             result: item.prepared.evaluate_with_index(&index),
         })
         .collect())
@@ -135,38 +139,50 @@ fn item_arguments(item: &Map<String, Value>, batch: &Value) -> Value {
     Value::Object(arguments)
 }
 
-fn success_response(id: &Value, args: &Value, items: Vec<CompletedItem>) -> Value {
-    let results: Vec<_> = items
-        .into_iter()
-        .map(|item| match item.result {
-            Ok(answer) => json!({
-                "id": item.id,
-                "type": item.query_type,
-                "status": "ok",
-                "result": answer.structured,
-            }),
-            Err(error) => json!({
-                "id": item.id,
-                "type": item.query_type,
-                "status": "error",
-                "error": error.structured(),
-            }),
-        })
-        .collect();
+fn success_response(
+    id: &Value,
+    args: &Value,
+    items: Vec<CompletedItem>,
+    additional_roots: &[String],
+) -> Value {
+    let mut results = Vec::with_capacity(items.len());
+    let mut model_results = Vec::with_capacity(items.len());
+    for item in items {
+        match item.result {
+            Ok(answer) => {
+                model_results.push(super::content::batch_success_item(
+                    item.id.clone(),
+                    &item.query_type,
+                    &item.args,
+                    &answer.structured,
+                    additional_roots,
+                ));
+                results.push(json!({
+                    "id": item.id,
+                    "type": item.query_type,
+                    "status": "ok",
+                    "result": answer.structured,
+                }));
+            }
+            Err(error) => {
+                let structured_error = error.structured();
+                model_results.push(json!({
+                    "id": item.id.clone(),
+                    "type": item.query_type.clone(),
+                    "status": "error",
+                    "error": structured_error.clone(),
+                }));
+                results.push(json!({
+                    "id": item.id,
+                    "type": item.query_type,
+                    "status": "error",
+                    "error": structured_error,
+                }));
+            }
+        }
+    }
     let structured = json!({ "batch": true, "results": results });
-    let model = json!({
-        "schema": "clean-ctx/workspace-query-batch-answer",
-        "schema_version": 1,
-        "scope": {
-            "workspaceRoot": args.get("workspaceRoot").cloned().unwrap_or(Value::Null),
-            "withinPath": args.get("withinPath").cloned().unwrap_or(Value::Null),
-        },
-        "results": structured["results"],
-    });
-    let text = format!(
-        "// WORKSPACE-QUERY-BATCH v1; structuredContent remains authoritative\n{}",
-        serde_json::to_string_pretty(&model).unwrap_or_else(|_| model.to_string())
-    );
+    let text = super::content::render_batch(args, model_results, additional_roots);
     json!({
         "jsonrpc": "2.0",
         "id": id,

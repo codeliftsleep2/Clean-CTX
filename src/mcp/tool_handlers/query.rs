@@ -271,6 +271,14 @@ mod tests_cycle_witness;
 #[path = "../../tests/mcp/workspace_query_identity_resolution.rs"]
 mod tests_identity_resolution;
 
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_batch.rs"]
+mod tests_batch;
+
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_batch_preparation.rs"]
+mod tests_batch_preparation;
+
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
