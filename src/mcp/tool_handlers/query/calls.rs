@@ -7,8 +7,7 @@
 
 use super::{
     outcome::{QueryAnswer, QueryFailure, QueryResult},
-    prepare::PreparedQuery,
-    query_scope, scope_failure,
+    prepare::{PreparationContext, PreparedQuery},
 };
 use crate::compression::Fidelity;
 use crate::ir::hierarchical::{HierarchicalCall, HierarchicalIR, MethodNode};
@@ -25,16 +24,24 @@ struct CallRequest {
     return_type: Option<String>,
 }
 
-pub(super) fn prepare_calls_in_file(args: &Value, state: &McpState) -> PreparedQuery {
-    match evaluate_calls_in_file(args, state) {
+pub(super) fn prepare_calls_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match evaluate_calls_in_file(args, state, context) {
         Ok(answer) => PreparedQuery::answer(answer),
         Err(error) => PreparedQuery::failure(error),
     }
 }
 
-fn evaluate_calls_in_file(args: &Value, state: &McpState) -> QueryResult {
+fn evaluate_calls_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> QueryResult {
     let request = parse_request(args).map_err(QueryFailure::invalid)?;
-    let scope = query_scope(state, args).map_err(scope_failure)?;
+    let scope = context.scope(state, args)?;
     let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(
         &request.file_path,
         args["workspaceRoot"].as_str(),

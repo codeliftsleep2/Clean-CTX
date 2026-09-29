@@ -54,6 +54,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod batch;
 mod calls;
 mod content;
 mod diagnostics;
@@ -70,6 +71,10 @@ pub(super) use diagnostics::discovery_field;
 /// Handle `workspace_query` — read-only cross-file and file-local queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
     let args = &params["arguments"];
+    if args.get("queries").is_some() {
+        batch::handle(id, args, state);
+        return;
+    }
     let query_type = match args["type"].as_str() {
         Some(t) => t,
         None => {
@@ -104,7 +109,10 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
             return;
         }
     };
-    let result = operation.prepare(args, state).evaluate_single(state);
+    let mut context = prepare::PreparationContext::new();
+    let result = operation
+        .prepare(args, state, &mut context)
+        .evaluate_single(state);
     outcome::send_single(id, args, state, result);
 }
 

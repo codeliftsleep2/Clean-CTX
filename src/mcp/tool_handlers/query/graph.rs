@@ -9,18 +9,26 @@
 // narrowing — may neither extend a path nor close a cycle.
 
 use super::{
-    discovery_field, identity::resolve_identity, optional_i32, outcome::QueryAnswer,
-    outcome::QueryFailure, prepare::PreparedQuery, query_scope, required_str, scope_failure,
+    discovery_field,
+    identity::IdentityRequest,
+    optional_i32,
+    outcome::QueryAnswer,
+    outcome::QueryFailure,
+    prepare::{PreparationContext, PreparedQuery},
+    required_str,
 };
 use crate::mcp::McpState;
-use crate::mcp::tool_handlers::hydration::hydrate_workspace_index;
 use serde_json::Value;
 
 /// `transitive_dependencies`: BFS dependency traversal.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn prepare_transitive_dependencies(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_transitive_dependencies(args, state) {
+pub(super) fn prepare_transitive_dependencies(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_transitive_dependencies(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
@@ -29,6 +37,7 @@ pub(super) fn prepare_transitive_dependencies(args: &Value, state: &McpState) ->
 fn try_prepare_transitive_dependencies(
     args: &Value,
     state: &McpState,
+    context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name").ok_or_else(|| {
         QueryFailure::invalid(
@@ -42,41 +51,41 @@ fn try_prepare_transitive_dependencies(
     // itself must not pass through another repository's edges (see
     // `WorkspaceIndex::transitive_dependencies_in_scope`). A `withinPath` narrows
     // it further, so an out-of-path edge cannot extend the walk either.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
-    let selection = resolve_identity(args, state, "transitive_dependencies", name, scope.as_ref())?;
-    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
-    let domain = selection.identity.domain;
-    let entity_type = selection.identity.entity_type;
-    let resolved_name = selection.identity.name;
-    let hydration = match selection.hydration {
-        Some(hydration) => hydration,
-        None => {
-            let index = state.workspace_index_read();
-            let _ = match scope.as_ref() {
-                Some(scope) => index.transitive_dependencies_in_scope(
-                    &domain,
-                    &entity_type,
-                    &resolved_name,
-                    depth,
-                    scope,
-                ),
-                None => index.transitive_dependencies(&domain, &entity_type, &resolved_name, depth),
-            };
-            drop(index);
-            hydrate_workspace_index(state, "transitive_dependencies", name, workspace_root)
-                .map_err(QueryFailure::internal)?
-        }
-    };
-    Ok(PreparedQuery::indexed(move |index| {
-        let dependencies = match scope.as_ref() {
+    let scope = context.scope(state, args)?;
+    let identity = IdentityRequest::new(args, name);
+    if let Some(exact) = identity.exact() {
+        let index = state.workspace_index_read();
+        let _ = match scope.as_ref() {
             Some(scope) => index.transitive_dependencies_in_scope(
-                &domain,
-                &entity_type,
-                &resolved_name,
+                &exact.domain,
+                &exact.entity_type,
+                &exact.name,
                 depth,
                 scope,
             ),
-            None => index.transitive_dependencies(&domain, &entity_type, &resolved_name, depth),
+            None => {
+                index.transitive_dependencies(&exact.domain, &exact.entity_type, &exact.name, depth)
+            }
+        };
+    }
+    let hydration = context.hydrate(state, "transitive_dependencies", name, workspace_root)?;
+    Ok(PreparedQuery::indexed(move |index| {
+        let resolved = identity.resolve(index, scope.as_ref())?;
+        let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
+        let dependencies = match scope.as_ref() {
+            Some(scope) => index.transitive_dependencies_in_scope(
+                &resolved.domain,
+                &resolved.entity_type,
+                &resolved.name,
+                depth,
+                scope,
+            ),
+            None => index.transitive_dependencies(
+                &resolved.domain,
+                &resolved.entity_type,
+                &resolved.name,
+                depth,
+            ),
         };
         let count = dependencies.len();
         let mut structured = serde_json::json!({
@@ -102,14 +111,22 @@ fn try_prepare_transitive_dependencies(
 /// that neither workspace actually contains. Cycle membership itself is
 /// unchanged (only the approved dependency-cycle relation set participates;
 /// see `WorkspaceIndex::has_cycle_in_scope`).
-pub(super) fn prepare_has_cycle(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_has_cycle(args, state) {
+pub(super) fn prepare_has_cycle(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_has_cycle(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
 }
 
-fn try_prepare_has_cycle(args: &Value, state: &McpState) -> Result<PreparedQuery, QueryFailure> {
+fn try_prepare_has_cycle(
+    args: &Value,
+    _state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
     if let Some(kind) = args.get("kind")
         && kind.as_str() != Some("dependency")
     {
@@ -119,7 +136,7 @@ fn try_prepare_has_cycle(args: &Value, state: &McpState) -> Result<PreparedQuery
     }
     // The effective scope is resolved BEFORE the index lock is taken, so an
     // unauthorized `withinPath` is refused without touching the index at all.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
+    let scope = context.scope(_state, args)?;
     Ok(PreparedQuery::indexed(move |index| {
         let witness = match scope.as_ref() {
             Some(scope) => index.dependency_cycle_witness_in_scope(scope),

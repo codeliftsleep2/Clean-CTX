@@ -11,18 +11,25 @@
 // declaration file.
 
 use super::{
-    discovery_field, identity::resolve_identity, outcome::QueryAnswer, outcome::QueryFailure,
-    prepare::PreparedQuery, query_scope, required_str, scope_failure,
+    discovery_field,
+    identity::IdentityRequest,
+    outcome::QueryAnswer,
+    outcome::QueryFailure,
+    prepare::{PreparationContext, PreparedQuery},
+    required_str,
 };
 use crate::mcp::McpState;
-use crate::mcp::tool_handlers::hydration::hydrate_workspace_index;
 use serde_json::Value;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn prepare_forward_edges(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_forward_edges(args, state) {
+pub(super) fn prepare_forward_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_forward_edges(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
@@ -31,6 +38,7 @@ pub(super) fn prepare_forward_edges(args: &Value, state: &McpState) -> PreparedQ
 fn try_prepare_forward_edges(
     args: &Value,
     state: &McpState,
+    context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'name' for forward_edges query.")
@@ -41,30 +49,29 @@ fn try_prepare_forward_edges(
     // additional roots). `None` when the caller declared no workspace — a
     // root-less query keeps its previous unfiltered behaviour. An unauthorized
     // `withinPath` is refused before the index is consulted.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
-    let selection = resolve_identity(args, state, "forward_edges", name, scope.as_ref())?;
-    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
-    let domain_owned = selection.identity.domain;
-    let et_owned = selection.identity.entity_type;
-    let name_owned = selection.identity.name;
-    let hydration = match selection.hydration {
-        Some(hydration) => hydration,
-        None => {
-            let index = state.workspace_index_read();
-            let _ = forward_edges(
-                &index,
-                &domain_owned,
-                &et_owned,
-                &name_owned,
-                scope.as_ref(),
-            );
-            drop(index);
-            hydrate_workspace_index(state, "forward_edges", name, workspace_root)
-                .map_err(QueryFailure::internal)?
-        }
-    };
+    let scope = context.scope(state, args)?;
+    let identity = IdentityRequest::new(args, name);
+    if let Some(exact) = identity.exact() {
+        let index = state.workspace_index_read();
+        let _ = forward_edges(
+            &index,
+            &exact.domain,
+            &exact.entity_type,
+            &exact.name,
+            scope.as_ref(),
+        );
+    }
+    let hydration = context.hydrate(state, "forward_edges", name, workspace_root)?;
     Ok(PreparedQuery::indexed(move |index| {
-        let edges = forward_edges(index, &domain_owned, &et_owned, &name_owned, scope.as_ref());
+        let resolved = identity.resolve(index, scope.as_ref())?;
+        let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
+        let edges = forward_edges(
+            index,
+            &resolved.domain,
+            &resolved.entity_type,
+            &resolved.name,
+            scope.as_ref(),
+        );
         let count = edges.len();
         let mut structured = serde_json::json!({
             "edges": serde_json::to_value(&edges).unwrap_or_default(),
@@ -81,8 +88,12 @@ fn try_prepare_forward_edges(
 /// `reverse_edges`: incoming semantic edges to an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn prepare_reverse_edges(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_reverse_edges(args, state) {
+pub(super) fn prepare_reverse_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_reverse_edges(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
@@ -91,6 +102,7 @@ pub(super) fn prepare_reverse_edges(args: &Value, state: &McpState) -> PreparedQ
 fn try_prepare_reverse_edges(
     args: &Value,
     state: &McpState,
+    context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'name' for reverse_edges query.")
@@ -101,30 +113,29 @@ fn try_prepare_reverse_edges(
     // including real call facts authored by an unrelated indexed repository.
     // Occurrence provenance (`asserting_file`) now constrains the answer, and an
     // optional `withinPath` narrows it further to one provenance subtree.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
-    let selection = resolve_identity(args, state, "reverse_edges", name, scope.as_ref())?;
-    let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
-    let domain = selection.identity.domain;
-    let entity_type = selection.identity.entity_type;
-    let resolved_name = selection.identity.name;
-    let hydration = match selection.hydration {
-        Some(hydration) => hydration,
-        None => {
-            let index = state.workspace_index_read();
-            let _ = reverse_edges(
-                &index,
-                &domain,
-                &entity_type,
-                &resolved_name,
-                scope.as_ref(),
-            );
-            drop(index);
-            hydrate_workspace_index(state, "reverse_edges", name, workspace_root)
-                .map_err(QueryFailure::internal)?
-        }
-    };
+    let scope = context.scope(state, args)?;
+    let identity = IdentityRequest::new(args, name);
+    if let Some(exact) = identity.exact() {
+        let index = state.workspace_index_read();
+        let _ = reverse_edges(
+            &index,
+            &exact.domain,
+            &exact.entity_type,
+            &exact.name,
+            scope.as_ref(),
+        );
+    }
+    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root)?;
     Ok(PreparedQuery::indexed(move |index| {
-        let edges = reverse_edges(index, &domain, &entity_type, &resolved_name, scope.as_ref());
+        let resolved = identity.resolve(index, scope.as_ref())?;
+        let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
+        let edges = reverse_edges(
+            index,
+            &resolved.domain,
+            &resolved.entity_type,
+            &resolved.name,
+            scope.as_ref(),
+        );
         let count = edges.len();
         let mut structured = serde_json::json!({
             "edges": serde_json::to_value(&edges).unwrap_or_default(),

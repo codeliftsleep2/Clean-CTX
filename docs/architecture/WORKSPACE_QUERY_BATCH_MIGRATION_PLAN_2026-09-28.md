@@ -819,7 +819,9 @@ Operator checkpoint:
 
 ### Phase 4 - Add request-local batch orchestration
 
-**Status:** Pending.
+**Status:** Implementation complete (2026-09-28); preserved Phase 1 batch
+regressions remain isolated until the public schema phase is complete, so their
+unchanged GREEN acceptance is still pending.
 
 Deliverables:
 
@@ -845,6 +847,38 @@ Checkpoint 4 exit criteria:
 - per-item errors do not suppress independent successes;
 - all index-backed outcomes use one final read snapshot;
 - no new cache, lock, worker, or background task exists.
+
+Implementation checkpoint evidence (2026-09-28):
+
+- `query/batch.rs` validates the complete batch structure before item work,
+  preserves input order and correlation IDs, and produces exactly one outcome
+  for every accepted item;
+- one request-local `PreparationContext` owns the shared scope and memoizes
+  hydration outcomes by exact name and discovery mode, including failed jobs;
+- preparation remains sequential and independent item failures become typed
+  item outcomes without suppressing sibling preparation or evaluation;
+- every deferred index-backed evaluator runs under one final post-preparation
+  WorkspaceIndex read guard;
+- incomplete identity selection is deferred into that same final view, so a
+  later preparation job cannot make an earlier item observe stale identity
+  evidence;
+- `calls_in_file` remains a ready, fresh canonical candidate result and never
+  publishes WorkspaceIndex facts;
+- the coordinator adds no persistent cache, synchronization primitive, worker,
+  task, or background execution;
+- standalone formatting, `git diff --check`, and the active-file size guard
+  pass; no Cargo command was agent-run.
+
+Operator checkpoint:
+
+- command: `cargo test --all-features mcp::tool_handlers::query -- --nocapture`;
+- result: GREEN after narrowing the obsolete hydration-eligibility helper and
+  its import to test builds;
+- scope: compilation plus the complete registered legacy workspace-query test
+  surface currently in the production worktree;
+- the Phase 1 batch RED tests remain byte-identical and isolated in
+  `stash@{0}`; their GREEN run will occur after Phase 5 exposes the final public
+  schema and rendering contract.
 
 ### Phase 5 - Public schema and batch rendering
 

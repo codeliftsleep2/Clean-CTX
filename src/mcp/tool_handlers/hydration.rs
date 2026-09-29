@@ -9,6 +9,7 @@
 use crate::mcp::McpState;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
+#[cfg(test)]
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -62,7 +63,7 @@ pub(super) const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 /// response serializes is a sparse projection of it
 /// (`crate::mcp::tool_handlers::query::diagnostics`), which omits expected state
 /// and surfaces only decision-relevant deviation.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct HydrationReport {
     pub(super) hydration_attempted: bool,
     pub(super) discovery_provider: &'static str,
@@ -83,7 +84,7 @@ pub(super) struct HydrationReport {
     pub(super) project_coverage: Vec<ProjectCoverage>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(super) struct ProjectCoverage {
     pub(super) project: String,
     pub(super) status: &'static str,
@@ -103,6 +104,7 @@ struct DiscoveryOutcome {
     fallback_reason: Option<&'static str>,
 }
 
+#[cfg(test)]
 pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
     matches!(
         query_type,

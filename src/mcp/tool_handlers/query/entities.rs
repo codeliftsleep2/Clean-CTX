@@ -16,11 +16,13 @@
 // filter is added.
 
 use super::{
-    discovery_field, outcome::QueryAnswer, outcome::QueryFailure, prepare::PreparedQuery,
-    query_scope, required_str, scope_failure,
+    discovery_field,
+    outcome::QueryAnswer,
+    outcome::QueryFailure,
+    prepare::{PreparationContext, PreparedQuery},
+    required_str,
 };
 use crate::mcp::McpState;
-use crate::mcp::tool_handlers::hydration::hydrate_workspace_index;
 use serde_json::Value;
 
 fn semantic_fidelity(
@@ -45,8 +47,12 @@ fn semantic_fidelity(
 /// `find_entities`: find entities by name (cross-domain/type).
 ///
 /// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
-pub(super) fn prepare_find_entities(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_find_entities(args, state) {
+pub(super) fn prepare_find_entities(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_find_entities(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
@@ -55,6 +61,7 @@ pub(super) fn prepare_find_entities(args: &Value, state: &McpState) -> PreparedQ
 fn try_prepare_find_entities(
     args: &Value,
     state: &McpState,
+    context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name")
         .ok_or_else(|| {
@@ -68,7 +75,7 @@ fn try_prepare_find_entities(
     // Built once per query, so the initial answer and the post-hydration rerun
     // share one root set, an optional `withinPath` narrowing included, and an
     // unauthorized `withinPath` is refused before the index is consulted.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
+    let scope = context.scope(state, args)?;
     // Preserve the established initial-read-before-hydration lifecycle.
     {
         let index = state.workspace_index_read();
@@ -77,8 +84,7 @@ fn try_prepare_find_entities(
             None => index.find_entities_by_name(&name),
         };
     }
-    let hydration = hydrate_workspace_index(state, "find_entities", &name, workspace_root)
-        .map_err(QueryFailure::internal)?;
+    let hydration = context.hydrate(state, "find_entities", &name, workspace_root)?;
     Ok(PreparedQuery::indexed(move |index| {
         let entities = match scope.as_ref() {
             Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
@@ -97,8 +103,12 @@ fn try_prepare_find_entities(
 }
 
 /// `entities_in_file`: list all entities defined in a given file.
-pub(super) fn prepare_entities_in_file(args: &Value, state: &McpState) -> PreparedQuery {
-    match try_prepare_entities_in_file(args, state) {
+pub(super) fn prepare_entities_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_entities_in_file(args, state, context) {
         Ok(prepared) => prepared,
         Err(error) => PreparedQuery::failure(error),
     }
@@ -107,6 +117,7 @@ pub(super) fn prepare_entities_in_file(args: &Value, state: &McpState) -> Prepar
 fn try_prepare_entities_in_file(
     args: &Value,
     state: &McpState,
+    context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let file_path = required_str(args, "file_path").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'file_path' for entities_in_file query.")
@@ -115,7 +126,7 @@ fn try_prepare_entities_in_file(
     // The effective scope: the WSC-004 roots are already enforced by the
     // trusted-path/root validation below (they ARE its accepted set), and an
     // invalid `withinPath` is refused before any path is resolved.
-    let scope = query_scope(state, args).map_err(scope_failure)?;
+    let scope = context.scope(state, args)?;
     let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(
         file_path,
         workspace_root,

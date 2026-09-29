@@ -19,6 +19,7 @@ impl QueryAnswer {
     }
 }
 
+#[derive(Clone)]
 pub(super) struct QueryFailure {
     pub(super) code: i64,
     pub(super) message: String,
@@ -63,6 +64,17 @@ impl QueryFailure {
                 "projection_code": error.code(),
             })),
         )
+    }
+
+    pub(super) fn structured(&self) -> Value {
+        let mut error = json!({
+            "code": self.code,
+            "message": self.message,
+        });
+        if let Some(data) = &self.data {
+            error["data"] = data.clone();
+        }
+        error
     }
 
     fn response(&self, id: &Value) -> Value {
