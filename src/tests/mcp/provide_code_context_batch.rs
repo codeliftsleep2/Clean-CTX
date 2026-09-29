@@ -1,0 +1,300 @@
+//! RED contract regressions for batched `provide_code_context` requests.
+
+use crate::mcp::tools::{dispatch_tools_call, tool_list};
+use crate::tests::assert_valid_mcp_envelope;
+use serde_json::{Value, json};
+
+fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    crate::mcp::McpState::new(config)
+}
+
+fn dispatch(state: &crate::mcp::McpState, id: i64, arguments: Value) -> Value {
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(
+        &json!(id),
+        "provide_code_context",
+        &json!({ "arguments": arguments }),
+        state,
+    );
+    crate::protocol::captured_responses()
+        .pop()
+        .expect("registered provide_code_context response")
+}
+
+fn result_items(response: &Value) -> &Vec<Value> {
+    let result = response["result"].as_object().expect("batch MCP result");
+    assert_valid_mcp_envelope(result);
+    assert_eq!(result["structuredContent"]["batch"], true, "{response}");
+    result["structuredContent"]["results"]
+        .as_array()
+        .expect("ordered batch results")
+}
+
+fn content_text(response: &Value, index: usize) -> &str {
+    response["result"]["content"][index]["text"]
+        .as_str()
+        .expect("model-visible text block")
+}
+
+fn write_fixture(root: &tempfile::TempDir, name: &str, owner: &str, method: &str) -> String {
+    let path = root.path().join(name);
+    let source = format!(
+        "export class {owner} {{\n  {method}(): number {{\n    return 41 + 1;\n  }}\n}}\n{}",
+        "// batch-economics-padding-0123456789abcdef\n".repeat(200)
+    );
+    std::fs::write(&path, source).expect("TypeScript fixture");
+    path.to_string_lossy().into_owned()
+}
+
+#[test]
+fn red_batch_schema_declares_single_or_files_contract_and_ordered_outcomes() {
+    let provide = tool_list()
+        .into_iter()
+        .find(|tool| tool["name"] == "provide_code_context")
+        .expect("provide_code_context tool");
+    let input = &provide["inputSchema"];
+    let branches = input["oneOf"].as_array().expect("request-form union");
+    assert_eq!(branches.len(), 2, "{provide}");
+
+    let batch = branches
+        .iter()
+        .find(|branch| {
+            branch["required"]
+                .as_array()
+                .is_some_and(|required| required.iter().any(|field| field == "files"))
+        })
+        .expect("batch request branch");
+    let files = &batch["properties"]["files"];
+    assert_eq!(files["type"], "array");
+    assert_eq!(files["maxItems"], 8);
+    let item = &files["items"];
+    for field in ["id", "filePath", "intent", "fidelity", "focusMethods"] {
+        assert!(item["properties"].get(field).is_some(), "missing {field}");
+    }
+    for shared in ["workspaceRoot", "tokenizer"] {
+        assert!(
+            item["properties"].get(shared).is_none(),
+            "item owns {shared}"
+        );
+    }
+
+    let output = &provide["outputSchema"]["properties"];
+    assert_eq!(output["results"]["type"], "array");
+    for field in ["id", "status", "content_index", "meta", "error"] {
+        assert!(
+            output["results"]["items"]["properties"]
+                .get(field)
+                .is_some(),
+            "missing output {field}"
+        );
+    }
+}
+
+#[test]
+fn red_batch_mixed_modes_match_equivalent_legacy_single_calls() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let high = write_fixture(&root, "overview.ts", "Overview", "inspect");
+    let edit = write_fixture(&root, "edit.ts", "Editable", "change");
+    let workspace = root.path().to_string_lossy().into_owned();
+
+    let batch = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": workspace,
+            "tokenizer": "o200k",
+            "files": [
+                { "id": "overview", "filePath": high, "fidelity": "high" },
+                {
+                    "id": "edit", "filePath": edit, "fidelity": "edit",
+                    "focusMethods": ["Editable.change"]
+                }
+            ]
+        }),
+    );
+    assert!(batch.get("error").is_none(), "{batch}");
+    let items = result_items(&batch);
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0]["id"], "overview");
+    assert_eq!(items[0]["status"], "ok");
+    assert_eq!(items[0]["content_index"], 0);
+    assert_eq!(items[1]["id"], "edit");
+    assert_eq!(items[1]["status"], "ok");
+    assert_eq!(items[1]["content_index"], 1);
+
+    let singles = state(&root);
+    let single_high = dispatch(
+        &singles,
+        2,
+        json!({
+            "workspaceRoot": root.path(), "tokenizer": "o200k",
+            "filePath": high, "fidelity": "high"
+        }),
+    );
+    let single_edit = dispatch(
+        &singles,
+        3,
+        json!({
+            "workspaceRoot": root.path(), "tokenizer": "o200k",
+            "filePath": edit, "fidelity": "edit",
+            "focusMethods": ["Editable.change"]
+        }),
+    );
+    assert_eq!(content_text(&batch, 0), content_text(&single_high, 0));
+    assert_eq!(content_text(&batch, 1), content_text(&single_edit, 0));
+    assert_eq!(
+        items[0]["meta"]["content_kind"],
+        single_high["result"]["_meta"]["content_kind"]
+    );
+    assert_eq!(
+        items[1]["meta"]["content_kind"],
+        single_edit["result"]["_meta"]["content_kind"]
+    );
+}
+
+#[test]
+fn red_batch_isolates_failure_and_preserves_exact_content_indexes() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let first = write_fixture(&root, "first.ts", "First", "one");
+    let third = write_fixture(&root, "third.ts", "Third", "three");
+    let first_source = std::fs::read_to_string(&first).expect("first source");
+    let third_source = std::fs::read_to_string(&third).expect("third source");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "files": [
+                { "id": "first", "filePath": first, "fidelity": "verbatim" },
+                { "id": "missing", "filePath": root.path().join("missing.ts"), "fidelity": "high" },
+                { "id": "third", "filePath": third, "fidelity": "verbatim" }
+            ]
+        }),
+    );
+
+    assert!(response.get("error").is_none(), "{response}");
+    let items = result_items(&response);
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0]["status"], "ok");
+    assert_eq!(items[0]["content_index"], 0);
+    assert_eq!(items[1]["status"], "error");
+    assert_eq!(items[1]["error"]["code"], -32602);
+    assert!(items[1].get("content_index").is_none(), "{response}");
+    assert_eq!(items[2]["status"], "ok");
+    assert_eq!(items[2]["content_index"], 1);
+    assert_eq!(content_text(&response, 0), first_source);
+    assert_eq!(content_text(&response, 1), third_source);
+    assert!(
+        response["result"]["_meta"]["cache_hints"].is_object(),
+        "batch must own one outer cache hint: {response}"
+    );
+}
+
+#[test]
+fn red_batch_rejects_later_duplicate_canonical_file_as_item_error() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = write_fixture(&root, "duplicate.ts", "Duplicate", "value");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "files": [
+                { "id": "first", "filePath": file, "fidelity": "edit", "focusMethods": ["value"] },
+                { "id": "duplicate", "filePath": "duplicate.ts", "fidelity": "high" }
+            ]
+        }),
+    );
+
+    let items = result_items(&response);
+    assert_eq!(items[0]["status"], "ok", "{response}");
+    assert_eq!(items[1]["status"], "error", "{response}");
+    assert_eq!(items[1]["error"]["code"], -32602);
+    let message = items[1]["error"]["message"].as_str().expect("message");
+    assert!(message.contains("duplicate"), "{response}");
+    assert!(message.contains("focusMethods"), "{response}");
+}
+
+#[test]
+fn red_batch_structure_errors_reject_before_item_execution() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let state = state(&root);
+    let nine: Vec<_> = (0..9)
+        .map(|index| json!({ "id": format!("f{index}"), "filePath": format!("f{index}.ts") }))
+        .collect();
+    let cases = [
+        (json!({ "files": [] }), "non-empty"),
+        (json!({ "files": {} }), "array"),
+        (json!({ "files": [{ "filePath": "a.ts" }] }), "id"),
+        (
+            json!({ "files": [{ "id": "same", "filePath": "a.ts" }, { "id": "same", "filePath": "b.ts" }] }),
+            "duplicate",
+        ),
+        (
+            json!({ "filePath": "a.ts", "files": [{ "id": "a", "filePath": "a.ts" }] }),
+            "mutually exclusive",
+        ),
+        (
+            json!({ "files": [{ "id": "a", "filePath": "a.ts", "workspaceRoot": root.path() }] }),
+            "workspaceRoot",
+        ),
+        (json!({ "files": nine }), "8"),
+    ];
+
+    for (arguments, reason) in cases {
+        let response = dispatch(&state, 1, arguments);
+        assert_eq!(response["error"]["code"], -32602, "{response}");
+        assert!(
+            response["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains(reason)),
+            "batch rejection must report {reason:?}: {response}"
+        );
+        assert!(response.get("result").is_none(), "{response}");
+    }
+}
+
+#[test]
+fn red_batch_all_item_failures_keep_a_valid_nonempty_mcp_envelope() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "files": [
+                { "id": "missing-a", "filePath": "missing-a.ts" },
+                { "id": "missing-b", "filePath": "missing-b.ts" }
+            ]
+        }),
+    );
+
+    let items = result_items(&response);
+    assert_eq!(items.len(), 2, "{response}");
+    assert!(items.iter().all(|item| item["status"] == "error"));
+    assert!(
+        items.iter().all(|item| item.get("content_index").is_none()),
+        "fallback content must not be attributed to an item: {response}"
+    );
+    assert_eq!(
+        content_text(&response, 0),
+        "No context items succeeded; inspect structuredContent.results for item errors."
+    );
+    assert_eq!(
+        response["result"]["content"]
+            .as_array()
+            .expect("nonempty MCP content")
+            .len(),
+        1,
+        "{response}"
+    );
+}
