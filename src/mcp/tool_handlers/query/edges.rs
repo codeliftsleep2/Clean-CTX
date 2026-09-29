@@ -12,15 +12,26 @@
 
 use super::{
     discovery_field, identity::resolve_identity, outcome::QueryAnswer, outcome::QueryFailure,
-    outcome::QueryResult, query_scope, required_str, run_query_with_hydration, scope_failure,
+    prepare::PreparedQuery, query_scope, required_str, scope_failure,
 };
 use crate::mcp::McpState;
+use crate::mcp::tool_handlers::hydration::hydrate_workspace_index;
 use serde_json::Value;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn evaluate_forward_edges(args: &Value, state: &McpState) -> QueryResult {
+pub(super) fn prepare_forward_edges(args: &Value, state: &McpState) -> PreparedQuery {
+    match try_prepare_forward_edges(args, state) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_forward_edges(
+    args: &Value,
+    state: &McpState,
+) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'name' for forward_edges query.")
     })?;
@@ -36,50 +47,51 @@ pub(super) fn evaluate_forward_edges(args: &Value, state: &McpState) -> QueryRes
     let domain_owned = selection.identity.domain;
     let et_owned = selection.identity.entity_type;
     let name_owned = selection.identity.name;
-    let query = {
-        let scope = scope.clone();
-        move |idx: &crate::workspace::index::WorkspaceIndex| {
-            let r = match scope.as_ref() {
-                Some(scope) => idx.forward_edges_by_identity_in_scope(
-                    &domain_owned,
-                    &et_owned,
-                    &name_owned,
-                    scope,
-                ),
-                None => idx.forward_edges_by_identity(&domain_owned, &et_owned, &name_owned),
-            };
-            let c = r.len();
-            (serde_json::to_value(&r).unwrap_or_default(), c)
+    let hydration = match selection.hydration {
+        Some(hydration) => hydration,
+        None => {
+            let index = state.workspace_index_read();
+            let _ = forward_edges(
+                &index,
+                &domain_owned,
+                &et_owned,
+                &name_owned,
+                scope.as_ref(),
+            );
+            drop(index);
+            hydrate_workspace_index(state, "forward_edges", name, workspace_root)
+                .map_err(QueryFailure::internal)?
         }
     };
-    let (results, count, hydration) = match selection.hydration {
-        Some(hydration) => {
-            let (results, count) = {
-                let index = state.workspace_index_read();
-                query(&index)
-            };
-            (results, count, hydration)
+    Ok(PreparedQuery::indexed(move |index| {
+        let edges = forward_edges(index, &domain_owned, &et_owned, &name_owned, scope.as_ref());
+        let count = edges.len();
+        let mut structured = serde_json::json!({
+            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "count": count,
+            "resolved_identity": resolved_identity,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
         }
-        None => run_query_with_hydration(state, "forward_edges", name, workspace_root, query)
-            .map_err(QueryFailure::internal)?,
-    };
-    // The semantic answer is `edges` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "edges": results,
-        "count": count,
-        "resolved_identity": resolved_identity,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
-    }
-    Ok(QueryAnswer::new("forward_edges", structured))
+        Ok(QueryAnswer::new("forward_edges", structured))
+    }))
 }
 
 /// `reverse_edges`: incoming semantic edges to an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn evaluate_reverse_edges(args: &Value, state: &McpState) -> QueryResult {
+pub(super) fn prepare_reverse_edges(args: &Value, state: &McpState) -> PreparedQuery {
+    match try_prepare_reverse_edges(args, state) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_reverse_edges(
+    args: &Value,
+    state: &McpState,
+) -> Result<PreparedQuery, QueryFailure> {
     let name = required_str(args, "name").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'name' for reverse_edges query.")
     })?;
@@ -95,42 +107,59 @@ pub(super) fn evaluate_reverse_edges(args: &Value, state: &McpState) -> QueryRes
     let domain = selection.identity.domain;
     let entity_type = selection.identity.entity_type;
     let resolved_name = selection.identity.name;
-    let query = {
-        let scope = scope.clone();
-        move |index: &crate::workspace::index::WorkspaceIndex| {
-            let edges = match scope.as_ref() {
-                Some(scope) => index.reverse_edges_by_identity_in_scope(
-                    &domain,
-                    &entity_type,
-                    &resolved_name,
-                    scope,
-                ),
-                None => index.reverse_edges_by_identity(&domain, &entity_type, &resolved_name),
-            };
-            let count = edges.len();
-            (serde_json::to_value(&edges).unwrap_or_default(), count)
+    let hydration = match selection.hydration {
+        Some(hydration) => hydration,
+        None => {
+            let index = state.workspace_index_read();
+            let _ = reverse_edges(
+                &index,
+                &domain,
+                &entity_type,
+                &resolved_name,
+                scope.as_ref(),
+            );
+            drop(index);
+            hydrate_workspace_index(state, "reverse_edges", name, workspace_root)
+                .map_err(QueryFailure::internal)?
         }
     };
-    let (results, count, hydration) = match selection.hydration {
-        Some(hydration) => {
-            let (results, count) = {
-                let index = state.workspace_index_read();
-                query(&index)
-            };
-            (results, count, hydration)
+    Ok(PreparedQuery::indexed(move |index| {
+        let edges = reverse_edges(index, &domain, &entity_type, &resolved_name, scope.as_ref());
+        let count = edges.len();
+        let mut structured = serde_json::json!({
+            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "count": count,
+            "resolved_identity": resolved_identity,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
         }
-        None => run_query_with_hydration(state, "reverse_edges", name, workspace_root, query)
-            .map_err(QueryFailure::internal)?,
-    };
-    // The semantic answer is `edges` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "edges": results,
-        "count": count,
-        "resolved_identity": resolved_identity,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
+        Ok(QueryAnswer::new("reverse_edges", structured))
+    }))
+}
+
+fn forward_edges<'a>(
+    index: &'a crate::workspace::index::WorkspaceIndex,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+) -> Vec<&'a crate::layers::meta::semantic::SemanticEdge> {
+    match scope {
+        Some(scope) => index.forward_edges_by_identity_in_scope(domain, entity_type, name, scope),
+        None => index.forward_edges_by_identity(domain, entity_type, name),
     }
-    Ok(QueryAnswer::new("reverse_edges", structured))
+}
+
+fn reverse_edges<'a>(
+    index: &'a crate::workspace::index::WorkspaceIndex,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+) -> Vec<&'a crate::layers::meta::semantic::SemanticEdge> {
+    match scope {
+        Some(scope) => index.reverse_edges_by_identity_in_scope(domain, entity_type, name, scope),
+        None => index.reverse_edges_by_identity(domain, entity_type, name),
+    }
 }

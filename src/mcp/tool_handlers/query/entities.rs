@@ -16,10 +16,11 @@
 // filter is added.
 
 use super::{
-    discovery_field, outcome::QueryAnswer, outcome::QueryFailure, outcome::QueryResult,
-    query_scope, required_str, run_query_with_hydration, scope_failure,
+    discovery_field, outcome::QueryAnswer, outcome::QueryFailure, prepare::PreparedQuery,
+    query_scope, required_str, scope_failure,
 };
 use crate::mcp::McpState;
+use crate::mcp::tool_handlers::hydration::hydrate_workspace_index;
 use serde_json::Value;
 
 fn semantic_fidelity(
@@ -44,10 +45,22 @@ fn semantic_fidelity(
 /// `find_entities`: find entities by name (cross-domain/type).
 ///
 /// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
-pub(super) fn evaluate_find_entities(args: &Value, state: &McpState) -> QueryResult {
-    let name = required_str(args, "name").ok_or_else(|| {
-        QueryFailure::invalid("Missing required argument: 'name' for find_entities query.")
-    })?;
+pub(super) fn prepare_find_entities(args: &Value, state: &McpState) -> PreparedQuery {
+    match try_prepare_find_entities(args, state) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_find_entities(
+    args: &Value,
+    state: &McpState,
+) -> Result<PreparedQuery, QueryFailure> {
+    let name = required_str(args, "name")
+        .ok_or_else(|| {
+            QueryFailure::invalid("Missing required argument: 'name' for find_entities query.")
+        })?
+        .to_string();
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the entity
     // occurrences that workspace's own files declare (`None` = the caller
@@ -56,30 +69,45 @@ pub(super) fn evaluate_find_entities(args: &Value, state: &McpState) -> QueryRes
     // share one root set, an optional `withinPath` narrowing included, and an
     // unauthorized `withinPath` is refused before the index is consulted.
     let scope = query_scope(state, args).map_err(scope_failure)?;
-    let (results, count, hydration) =
-        run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
-            let r = match scope.as_ref() {
-                Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
-                None => idx.find_entities_by_name(name),
-            };
-            let c = r.len();
-            (serde_json::to_value(&r).unwrap_or_default(), c)
-        })
-        .map_err(QueryFailure::internal)?;
-    // The semantic answer is `entities` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "entities": results,
-        "count": count,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
+    // Preserve the established initial-read-before-hydration lifecycle.
+    {
+        let index = state.workspace_index_read();
+        let _ = match scope.as_ref() {
+            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+            None => index.find_entities_by_name(&name),
+        };
     }
-    Ok(QueryAnswer::new("find_entities", structured))
+    let hydration = hydrate_workspace_index(state, "find_entities", &name, workspace_root)
+        .map_err(QueryFailure::internal)?;
+    Ok(PreparedQuery::indexed(move |index| {
+        let entities = match scope.as_ref() {
+            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+            None => index.find_entities_by_name(&name),
+        };
+        let count = entities.len();
+        let mut structured = serde_json::json!({
+            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+            "count": count,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
+        }
+        Ok(QueryAnswer::new("find_entities", structured))
+    }))
 }
 
 /// `entities_in_file`: list all entities defined in a given file.
-pub(super) fn evaluate_entities_in_file(args: &Value, state: &McpState) -> QueryResult {
+pub(super) fn prepare_entities_in_file(args: &Value, state: &McpState) -> PreparedQuery {
+    match try_prepare_entities_in_file(args, state) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_entities_in_file(
+    args: &Value,
+    state: &McpState,
+) -> Result<PreparedQuery, QueryFailure> {
     let file_path = required_str(args, "file_path").ok_or_else(|| {
         QueryFailure::invalid("Missing required argument: 'file_path' for entities_in_file query.")
     })?;
@@ -99,7 +127,7 @@ pub(super) fn evaluate_entities_in_file(args: &Value, state: &McpState) -> Query
             // return empty results (the user asked for a file that
             // hasn't been compiled). This matches the pre-fix behavior
             // where a non-existent path produced no entities.
-            return Ok(empty_entities_in_file());
+            return Ok(PreparedQuery::answer(empty_entities_in_file()));
         }
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
@@ -112,7 +140,7 @@ pub(super) fn evaluate_entities_in_file(args: &Value, state: &McpState) -> Query
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        return Ok(empty_entities_in_file());
+        return Ok(PreparedQuery::answer(empty_entities_in_file()));
     }
     let fidelity = semantic_fidelity(args, state)?;
     let source = state
@@ -124,7 +152,7 @@ pub(super) fn evaluate_entities_in_file(args: &Value, state: &McpState) -> Query
         .workspace_index_read()
         .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
     {
-        return Ok(entities_in_file_answer(state, &canonical_path));
+        return Ok(prepared_entities_in_file(canonical_path));
     }
     state
         .preflight_semantic_publication(&resolved_path)
@@ -146,18 +174,19 @@ pub(super) fn evaluate_entities_in_file(args: &Value, state: &McpState) -> Query
             compiled_hash,
         );
     }
-    Ok(entities_in_file_answer(state, &canonical_path))
+    Ok(prepared_entities_in_file(canonical_path))
 }
 
-fn entities_in_file_answer(state: &McpState, canonical_path: &str) -> QueryAnswer {
-    let idx = state.workspace_index_read();
-    let results = idx.entities_in_file(canonical_path);
-    let serialized = serde_json::to_value(&results).unwrap_or_default();
-    let count = results.len();
-    // The explicit path is compiled directly; name-based discovery diagnostics
-    // do not apply and query-only compilation does not publish rendered context.
-    let structured = serde_json::json!({ "entities": serialized, "count": count });
-    QueryAnswer::new("entities_in_file", structured)
+fn prepared_entities_in_file(canonical_path: String) -> PreparedQuery {
+    PreparedQuery::indexed(move |index| {
+        let entities = index.entities_in_file(&canonical_path);
+        let count = entities.len();
+        let structured = serde_json::json!({
+            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+            "count": count,
+        });
+        Ok(QueryAnswer::new("entities_in_file", structured))
+    })
 }
 
 /// The minimal zero-result shape for an `entities_in_file` request whose file is

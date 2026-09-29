@@ -758,7 +758,9 @@ Operator checkpoint:
 
 ### Phase 3 - Separate preparation from snapshot evaluation
 
-**Status:** Pending.
+**Status:** Complete (2026-09-28). The preparation/final-view boundary is
+implemented, and the maintainer reported the complete legacy workspace-query
+target GREEN.
 
 Deliverables:
 
@@ -778,6 +780,42 @@ Checkpoint 3 exit criteria:
 - no IO, compilation, or CBM call occurs while that guard is held;
 - `has_cycle` and `calls_in_file` retain their existing authority boundaries;
 - identity ambiguity/not-found behavior is unchanged.
+
+Implementation checkpoint evidence (2026-09-28):
+
+- `query/prepare.rs` owns `PreparedQuery`, which distinguishes a deferred
+  WorkspaceIndex evaluator from an already-completed file-local success/failure;
+- the legacy dispatcher now performs `operation.prepare(...)` before
+  `evaluate_single(...)`; only the latter acquires the final index read view for
+  an index-backed outcome;
+- `find_entities`, exact edge queries, and exact transitive traversal preserve
+  their established initial-read-before-hydration sequence, then defer their
+  authoritative result until the final view;
+- incomplete edge/traversal identity still hydrates once inside WSC-008
+  resolution and preserves deterministic ambiguity/not-found failures;
+- `entities_in_file` performs trusted-path, source-hash, fidelity, preflight,
+  compilation, and atomic projection replacement during preparation, then
+  defers only the final projection read;
+- `has_cycle` prepares scope only, never hydrates, and evaluates its witness and
+  ambiguity evidence from the final index view;
+- `calls_in_file` compiles and projects its fresh canonical candidate during
+  preparation and becomes a ready outcome; it never reads or publishes
+  WorkspaceIndex facts;
+- no final index guard is held across filesystem IO, source compilation, CBM
+  discovery, or hydration;
+- the former production hydration helper is now test-only because existing
+  hydration suites use it to retain their focused lifecycle assertions; the
+  production path has one preparation implementation, not two;
+- standalone formatting, `git diff --check`, and the active-file size guard
+  pass; no Cargo command was agent-run.
+
+Operator checkpoint:
+
+- command: `cargo test --all-features mcp::tool_handlers::query -- --nocapture`;
+- result: GREEN;
+- the full legacy workspace-query surface remained behaviorally compatible
+  after separating preparation from final-view evaluation;
+- the Phase 1 batch RED tests remained unchanged and isolated in `stash@{0}`.
 
 ### Phase 4 - Add request-local batch orchestration
 

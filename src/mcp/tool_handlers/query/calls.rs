@@ -7,6 +7,7 @@
 
 use super::{
     outcome::{QueryAnswer, QueryFailure, QueryResult},
+    prepare::PreparedQuery,
     query_scope, scope_failure,
 };
 use crate::compression::Fidelity;
@@ -24,7 +25,14 @@ struct CallRequest {
     return_type: Option<String>,
 }
 
-pub(super) fn evaluate_calls_in_file(args: &Value, state: &McpState) -> QueryResult {
+pub(super) fn prepare_calls_in_file(args: &Value, state: &McpState) -> PreparedQuery {
+    match evaluate_calls_in_file(args, state) {
+        Ok(answer) => PreparedQuery::answer(answer),
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn evaluate_calls_in_file(args: &Value, state: &McpState) -> QueryResult {
     let request = parse_request(args).map_err(QueryFailure::invalid)?;
     let scope = query_scope(state, args).map_err(scope_failure)?;
     let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(

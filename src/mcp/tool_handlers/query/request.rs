@@ -1,6 +1,6 @@
 //! Closed operation identity for the public `workspace_query` surface.
 
-use super::outcome::QueryResult;
+use super::prepare::PreparedQuery;
 use crate::mcp::McpState;
 use serde_json::Value;
 
@@ -29,17 +29,17 @@ impl WorkspaceQueryOperation {
         }
     }
 
-    pub(super) fn evaluate(self, args: &Value, state: &McpState) -> QueryResult {
+    pub(super) fn prepare(self, args: &Value, state: &McpState) -> PreparedQuery {
         match self {
-            Self::FindEntities => super::entities::evaluate_find_entities(args, state),
-            Self::ForwardEdges => super::edges::evaluate_forward_edges(args, state),
-            Self::ReverseEdges => super::edges::evaluate_reverse_edges(args, state),
-            Self::EntitiesInFile => super::entities::evaluate_entities_in_file(args, state),
+            Self::FindEntities => super::entities::prepare_find_entities(args, state),
+            Self::ForwardEdges => super::edges::prepare_forward_edges(args, state),
+            Self::ReverseEdges => super::edges::prepare_reverse_edges(args, state),
+            Self::EntitiesInFile => super::entities::prepare_entities_in_file(args, state),
             Self::TransitiveDependencies => {
-                super::graph::evaluate_transitive_dependencies(args, state)
+                super::graph::prepare_transitive_dependencies(args, state)
             }
-            Self::HasCycle => super::graph::evaluate_has_cycle(args, state),
-            Self::CallsInFile => super::calls::evaluate_calls_in_file(args, state),
+            Self::HasCycle => super::graph::prepare_has_cycle(args, state),
+            Self::CallsInFile => super::calls::prepare_calls_in_file(args, state),
         }
     }
 }
