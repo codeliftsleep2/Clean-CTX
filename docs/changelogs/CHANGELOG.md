@@ -8,6 +8,130 @@ Historical releases are archived per version as `CHANGELOG_<version>.md` (`_a`/`
 
 ---
 
+## [0.8.0] - 2026-09-29
+
+`0.8.0` finalizes the architectural-hardening program introduced by
+`0.8.0-rc` and includes all subsequent SCHEMA-vNext, workspace intelligence,
+performance, and batched-tool work. The major release boundaries are summarized
+here; the release-candidate section below retains the detailed initial
+hardening record.
+
+### Architectural hardening
+
+* **Typed canonical IR and identity authority** — declarations, parameters,
+  modifiers, control summaries, pattern facts, side effects, execution
+  contexts, calls, bodies, relationships, and explicit-interface facts have
+  distinct typed contracts. Stable semantic identity no longer depends on
+  compact presentation spelling, token position, or stream position, and
+  pattern classification retains the declarations it classifies.
+* **Exact wire, delta, and replay semantics** — physical `0x04` binary storage
+  and occurrence-aware `dv:2` deltas preserve order, duplicates, stable
+  identity, expected tuples, call evidence, and conflict detection. Malformed
+  or stale transitions fail transactionally rather than partially mutating
+  live state.
+* **Transactional durable lifecycle** — canonical IR, source identity, fidelity,
+  and complete semantic-edge snapshots commit as one file-scoped state before
+  live publication. Save, restore, replay, delete, accepted deltas, structural
+  edits, buffered writes, and crash recovery now share explicit ownership and
+  recovery boundaries; observational history/statistics tools remain read-only.
+* **Byte-exact structural editing** — `apply_edit` operates only on current,
+  session-owned Edit/Verbatim units, validates expected source, applies atomic
+  non-overlapping operations, verifies syntax, and publishes durable and live
+  semantic state only after the source transition succeeds.
+* **Complete model/persistence separation** — `provide_code_context` always
+  returns complete current model-facing context. Delta generation and
+  acknowledgement remain an explicit code-side protocol, visible metadata
+  describes the actual returned text, and persistence policy no longer leaks
+  into ordinary read semantics.
+* **Production integration certification** — every registered IR/MCP operation
+  and semantic family was traced through producer, compilation, validation,
+  durable/session ownership, lifecycle transitions, consumer, external
+  response, and live reachability. Incomplete historical fallback artifacts
+  remain inspectable read-only evidence rather than silently entering current
+  state.
+* **Semantic decomposition of active legacy files** — oversized production and
+  test modules touched by the migration were split along ownership boundaries,
+  with the repository's active-file ceiling and tracked-test convention made
+  enforceable without weakening the architecture.
+
+### Added
+
+* **Failure-isolated batch context reads** — `provide_code_context` now accepts
+  either one legacy `filePath` request or an ordered `files` batch of up to
+  eight independently configured items. Batch items share workspace/tokenizer
+  scope, preserve request order, isolate failures, reject duplicate canonical
+  files, and reuse the authoritative single-file evaluation and persistence
+  lifecycle.
+* **Explicit batch response projections** — batch-only `responseMode` supports
+  backward-compatible `mirrored`, structured-result `structured`, and
+  top-level-content `indexed` projections. The default remains `mirrored` for
+  unknown clients; Claude and other verified `structuredContent` consumers are
+  guided toward `structured`. Mode-scoped cache identities prevent projections
+  from colliding.
+* **Heterogeneous workspace-query batching** — one `workspace_query` call can
+  execute ordered mixtures of entity, edge, file-call, dependency, and cycle
+  operations with per-item results and isolated failures. Shared preparation
+  and discovery are reused without changing each operation's semantic authority.
+* **Expanded workspace intelligence** — deterministic dependency-cycle
+  witnesses, owner-qualified file-local calls, scoped identity resolution,
+  `withinPath` provenance narrowing, Rust call projection, and Spring semantic
+  relationships now reach the registered query surface.
+* **Language-neutral call evidence** — C#, TypeScript, Java, and Rust call
+  relationships preserve caller ownership, written argument counts, spread
+  qualification, asserting-file provenance, bound-arrow ownership, and
+  occurrence identity without pretending to perform type-based overload
+  resolution. Caller verification returns the identities and files it actually
+  verified and reuses project-scoped discovery plus request-local parse work.
+* **SCHEMA-vNext presentation** — compact model-facing context gained
+  authoritative path aliases, visible overload signatures, grouped fields,
+  slimmer method grammar, and removal of presentation-only import handles while
+  preserving canonical identities code-side.
+
+### Changed
+
+* **Compilation and cache ownership** — framework/meta evaluation now shares a
+  compilation-scoped lexical context instead of repeating parses and scans.
+  CBM graph cache entries, disk partitions, hydration roots, and invalidation
+  are project-scoped, and unchanged context compilation reuses cached IR and
+  token counts.
+* **Model workflow guidance** — MCP initialization, portable agent policy,
+  Claude integration rules, schemas, README examples, and live verification
+  packages now describe single and batch request forms, explicit workspace
+  roots, per-item status handling, and response-mode selection.
+
+### Fixed
+
+* **Generic focused methods** — bare and owner-qualified `focusMethods`
+  selectors resolve generic C# and TypeScript methods without requiring their
+  internal generic signature spelling.
+* **Strict workspace-query names** — array-valued `name` inputs now fail with
+  actionable guidance to use `queries`, rather than being stringified into a
+  misleading empty lookup.
+* **Batch content reachability** — successful batched context items carry exact
+  code in the channel promised by their declared response mode; a successful
+  status can no longer omit the requested content.
+
+### Economics and live acceptance
+
+* Compact `structured` and `indexed` batches measured approximately neutral in
+  serialized bytes versus equivalent repeated singular responses, while
+  `mirrored` retained its deliberate compatibility duplication.
+* Live Claude trials showed the end-to-end benefit comes from fewer tool calls,
+  round trips, and reasoning transitions: one three-item comparison dropped
+  cost from `$0.439` to `$0.247` (43.7%), and another dropped elapsed time from
+  41 seconds to 22 seconds (46.3%) while cost fell from `$0.356` to `$0.304`
+  (14.6%). These field observations complement, but do not replace, tracked
+  regressions.
+
+### Verification
+
+* Focused tracked regressions and live stdio acceptance for the context and
+  workspace-query batch contracts were reported green by the maintainer.
+* The maintainer reported the final `0.8.0` repository gate green after the
+  version and changelog updates: formatting, zero-warning all-target/all-feature
+  Clippy, the complete workspace test suite, file-size guard regressions and
+  active-file validation, UTF-8 validation, and the Rust encoding test.
+
 ## [0.8.0-rc] - 2026-09-21
 
 ### Architecture lockdown
