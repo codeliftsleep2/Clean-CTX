@@ -9,7 +9,7 @@
 use crate::mcp::McpState;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
