@@ -61,7 +61,7 @@ Task-relevant context rather than indiscriminate source dumping:
 Exposes code intelligence and context capabilities to AI coding agents through the Model Context Protocol:
 
 * **`provide_code_context`** - complete model-facing context: auto-detects file type, selects fidelity, and filters low-importance symbols. Structured delta transport remains explicit through `delta_code_context` / `apply_delta`.
-* **`workspace_query`** - cross-file semantic queries: entity lookup, forward/reverse edges, selector resolution, injection targets, transitive dependencies, cycle detection.
+* **`workspace_query`** - single or heterogeneous batched semantic queries: entity lookup, forward/reverse edges, file entities/calls, transitive dependencies, and cycle detection.
 * **`compress_code_context` / `restore_context`** - direct compression control with history and stats.
 * **`diff_code_context` / `diff_commits`** - AST-level change-sets, single-file and git ref-range.
 * **`delta_code_context` / `apply_delta`** - explicit, code-side IR delta generation and acknowledgement. Clean-CTX exposes both server tools; the repository does not ship an automatic host consumer.
@@ -216,13 +216,30 @@ First call performs full compression; subsequent calls automatically use delta t
 {
   "name": "workspace_query",
   "arguments": {
-    "type": "resolve_selector",
-    "name": "app-user-card"
+    "type": "find_entities",
+    "name": "UserCardComponent",
+    "workspaceRoot": "/path/to/workspace"
   }
 }
 ```
 
-Returns the component entity that exposes the `app-user-card` selector. Other query types: `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, `has_cycle`.
+Several independent questions sharing one workspace scope can be sent together:
+
+```json
+{
+  "name": "workspace_query",
+  "arguments": {
+    "workspaceRoot": "/path/to/workspace",
+    "queries": [
+      { "id": "entity", "type": "find_entities", "name": "UserCardComponent" },
+      { "id": "callers", "type": "reverse_edges", "name": "UserCardComponent" },
+      { "id": "cycles", "type": "has_cycle" }
+    ]
+  }
+}
+```
+
+Batch results preserve input order and isolate failures per item. Other query types include `forward_edges`, `entities_in_file`, `transitive_dependencies`, and `calls_in_file`.
 
 ### Compress a file (Low fidelity)
 
@@ -338,7 +355,7 @@ Standard server block (Continue.dev adapts it to its array form):
 | Tests | OK: **All tests passing** - includes live-CBM semantic probes and a self-contained multilingual fixture suite |
 | Languages | OK: TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
 | Semantic intelligence | OK: Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; 30+ relation types; WorkspaceIndex with forward/reverse traversal, selector/injection resolution, transitive deps, cycle detection |
-| Workspace queries | OK: `workspace_query` MCP tool - `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, `has_cycle` |
+| Workspace queries | OK: single or ordered failure-isolated batch calls across `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, `has_cycle`, and `calls_in_file` |
 | Transport | OK: Stateful IR delta transport - compile once, send deltas thereafter |
 | Pass Architecture | OK: Composable IRPass pipeline (Core → Language → Meta → Pattern* → Validation), IR validator (E001–E010), query engine, semantic delta intents |
 | CBM Integration | OK: CBM (codebase-memory-mcp) runs as a separate local server; Clean-CTX launches it as a subprocess, indexes the repo + additional roots, captures its graph output, and filters/compresses it (filter-first) before it reaches the LLM |

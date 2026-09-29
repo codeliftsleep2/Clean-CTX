@@ -255,6 +255,13 @@ duplicates, written callee spelling, written argument-node count, and spread
 evidence. It does not hydrate or publish WorkspaceIndex/session state, expose
 canonical IDs, resolve the callee, or change global Model-C identity.
 
+The public tool also accepts an ordered heterogeneous `queries` batch for
+several independent questions sharing one top-level `workspaceRoot` and
+optional `withinPath`. Each item has a unique caller-supplied ID and retains its
+own success or error boundary. Equivalent hydration is request-locally reused,
+all index-backed items observe one final post-preparation view, and the seven
+operation-specific authority rules above remain unchanged.
+
 ## Main improvements over the SCHEMA-v2 iteration
 
 ### Identity and information preservation
@@ -393,6 +400,8 @@ Healthy behavior should look like:
 - restart/restore retains fidelity, canonical state, and workspace semantics;
 - disabled framework meta-layers stay disabled;
 - workspace queries respect repository scope and provenance;
+- several related workspace questions use one heterogeneous batch and inspect
+  every ordered per-item outcome;
 - owner-sensitive local call questions use `calls_in_file` and do not mix
   same-named owners or overloads;
 - failures are explicit rather than silently producing partial identity.

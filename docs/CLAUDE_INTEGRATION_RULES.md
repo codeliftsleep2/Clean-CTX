@@ -159,6 +159,39 @@ evidence. Written callees are not claimed to be resolved cross-file identities.
 It never authorizes a new root and is rejected when no `workspaceRoot` is
 present or when it lies outside the authorized root set.
 
+### Batch several workspace questions
+
+Use the legacy single form when only one semantic question is needed. When two
+or more independent questions share the same workspace scope, prefer one batch
+instead of issuing repeated `workspace_query` tool calls. A batch may mix any
+of the seven operation types:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "withinPath": "src/orders",
+  "queries": [
+    { "id": "service", "type": "find_entities", "name": "OrderService" },
+    { "id": "callers", "type": "reverse_edges", "name": "OrderService" },
+    { "id": "cycles", "type": "has_cycle" }
+  ]
+}
+```
+
+Each item requires a unique non-empty string `id`. Put `workspaceRoot` and
+optional `withinPath` only at the batch top level; item-level scope overrides
+are invalid. Input order is preserved. Inspect every returned item:
+`status="ok"` carries that operation's normal structured payload under
+`result`, while `status="error"` carries an item-local error without suppressing
+independent successes. A malformed batch, duplicate ID, invalid shared scope,
+or more than 32 items rejects the whole call.
+
+Batching shares preparation work and one final WorkspaceIndex view; it does not
+merge answers, infer identity across items, or change the special authority of
+`has_cycle` and `calls_in_file`. Do not split a request merely because it mixes
+forward edges, reverse edges, entity lookup, traversal, cycle, or file-local
+operations.
+
 ---
 
 ## 4. CBM identity and project rules
@@ -217,7 +250,8 @@ or broader edits that do not fit those structural operations.
 | Locate an exact semantic name without CBM | `workspace_query(type="find_entities")` |
 | Understand a supported source file | `provide_code_context` |
 | Exact known source lines/body | Native `Read` after context, or when context fails |
-| Semantic entities/edges/dependencies | `workspace_query` |
+| One semantic entity/edge/dependency question | Single-form `workspace_query` |
+| Several semantic questions in one scope | Batched `workspace_query(queries=[...])` |
 | File-local call occurrences | `workspace_query(type: "calls_in_file")` |
 | Dependency-cycle witness | `workspace_query(type: "has_cycle")` |
 | Supported tracked structural edit | `apply_edit` |

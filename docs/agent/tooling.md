@@ -95,7 +95,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `workspace_query` | `type` | `domain`, `entity_type`, `name`, `file_path`, `fidelity`, `kind`, `depth`, `workspaceRoot`, `withinPath` | **READ-ONLY** — Query semantic relationships without publishing rendered context. Name-bearing operations use registered CBM/filesystem candidate hydration. Edge/traversal operations retain their exact `(domain, entity_type, name)` fast path, but may omit either classification field: supplied fields filter scoped exact-name resolution, one semantic identity runs automatically, and ambiguity/not-found is explicit rather than guessed or returned as an empty graph. `entities_in_file` instead owns an explicit trusted path: it compiles that file on first touch and accepts optional `fidelity` (`low|medium|high|edit|verbatim`; configured default when omitted). Edit/Verbatim requests normalize to High semantic compilation. WorkspaceIndex reuses a fresh sufficient projection, recompiles stale or lower-fidelity coverage, and atomically replaces old facts even when the new projection is empty. This query-only path creates no session alias, rendered baseline, persistence record, or compression statistics. `has_cycle` is different: it accepts optional/default `kind=dependency`, performs no discovery or compilation, and returns one deterministic closed witness from scoped retained index evidence using only `Injects` and `ImportsModule`. Its coverage is always `indexed_evidence_only`, never a source-completeness claim; identity collisions are disclosed with occurrence files. Existing workspaceRoot/additional-roots/withinPath security remains authoritative. |
+| `workspace_query` | `type` (single) or `queries` (batch) | Operation fields; shared `workspaceRoot`, `withinPath` | **READ-ONLY** — Run one legacy operation or up to 32 heterogeneous operations in one ordered batch. A batch requires unique item IDs, shares one top-level scope, deduplicates equivalent hydration, evaluates index-backed items against one final post-preparation view, and returns independent per-item success/error outcomes. The seven operation semantics and authority boundaries are unchanged. |
 
 The seventh operation, `calls_in_file`, requires `filePath`, `workspaceRoot`,
 `owner: {kind: "class"|"interface", name}`, and `method: {name}`. Optional
@@ -106,6 +106,20 @@ read-only canonical candidate and returns declaration-ordered overloads plus
 ordered call occurrences (`callee_written`, `explicit_argument_count`, and
 `has_spread`). It does not run hydration, publish session/WorkspaceIndex state,
 expose canonical IDs, or claim that a written callee is resolved.
+
+Use the single form for one question or when a client does not consume batch
+results. Use `queries` when two or more independent questions share the same
+workspace scope, especially mixed `find_entities`, edge, traversal, and cycle
+requests. Put `workspaceRoot` and optional `withinPath` only at the top level;
+each item carries a unique non-empty `id`, its own `type`, and that operation's
+normal fields. Do not split a batch merely because its operations differ.
+
+A structurally invalid batch or invalid shared scope rejects the whole call.
+Once the batch is accepted, inspect every ordered item: `status="ok"` carries
+the corresponding legacy structured payload under `result`, while
+`status="error"` carries that item's code/message without suppressing sibling
+successes. Batch execution is best-effort rather than transactional; valid
+session hydration/index warming is retained even when another item fails.
 
 ### 1.8 Standard Tool Annotations
 

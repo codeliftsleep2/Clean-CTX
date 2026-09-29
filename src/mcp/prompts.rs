@@ -9,6 +9,7 @@ pub(crate) const WORKFLOW_INSTRUCTIONS: &str = r#"# Clean-CTX Tool Workflow
 
 - Use `provide_code_context` as the default read for supported source files, and pass `workspaceRoot` explicitly whenever it is known.
 - Use `graph_search` as the normal typed symbol/file discovery entry point. Use the other structured graph wrappers when typed nodes, edges, paths, or modules are required.
+- Use one `workspace_query` call with top-level `queries` for multiple independent questions sharing a workspace scope; mixed operation types are supported, results stay ordered by unique item ID, and one item failure does not suppress its siblings.
 - Use `cbm_proxy` only when compact or explicitly fresh raw CBM output is preferable to a typed structured result. Never bypass Clean-CTX to call CBM directly.
 - Use `delta_code_context`, `apply_delta`, and persistence tools only when the caller intentionally owns their version, acknowledgement, or durable-state lifecycle.
 - Read Edit or Verbatim context before `apply_edit`, and edit only byte-exact regions supplied by the current session.

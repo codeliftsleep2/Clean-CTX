@@ -1,9 +1,10 @@
 # Workspace Query Batch Migration Plan
 
 **Date:** 2026-09-28  
-**Status:** Approved for incremental implementation on 2026-09-28. Phase 0 is
-complete and Phase 1 RED contract work is in progress. No production behavior
-has changed.  
+**Status:** Complete (2026-09-29). All implementation phases, unchanged
+RED-to-GREEN regressions, live production acceptance, architectural audit,
+Claude/runtime instruction updates, focused prompt verification, and the
+refreshed complete user-owned final verification gate are GREEN.
 **Scope:** Add an ordered, failure-isolated batch request form to the existing
 `workspace_query` MCP tool while preserving the complete legacy single-query
 contract.
@@ -819,9 +820,9 @@ Operator checkpoint:
 
 ### Phase 4 - Add request-local batch orchestration
 
-**Status:** Implementation complete (2026-09-28); preserved Phase 1 batch
-regressions remain isolated until the public schema phase is complete, so their
-unchanged GREEN acceptance is still pending.
+**Status:** Complete (2026-09-29). Implementation completed on 2026-09-28; the
+preserved Phase 1 regressions were subsequently restored unchanged and passed
+the focused batch target and complete workspace-query target.
 
 Deliverables:
 
@@ -933,9 +934,10 @@ Operator checkpoint:
 
 ### Phase 6 - Restore unchanged RED tests and integration verification
 
-**Status:** In progress. The Phase 1 tests are restored byte-identically at
-Git's normalized blob boundary and the original focused batch target is GREEN;
-the post-renderer legacy compatibility run remains pending.
+**Status:** Complete (2026-09-28). The Phase 1 tests are restored
+byte-identically at Git's normalized blob boundary, the original focused batch
+target is GREEN, and the complete registered workspace-query target remains
+GREEN after the schema and renderer changes.
 
 Deliverables:
 
@@ -965,12 +967,16 @@ Integration checkpoint evidence (2026-09-28):
   filesystem SHA-256 differs only because checkout applies the repository's
   CRLF worktree convention;
 - the maintainer ran the original focused batch target and reported GREEN;
-- the full registered workspace-query target must still be rerun because Phase
-  5 factored the legacy renderer while preserving its envelope.
+- command: `cargo test --all-features mcp::tool_handlers::query -- --nocapture`;
+- result: GREEN;
+- scope: the complete registered legacy and batch workspace-query surface after
+  the Phase 5 schema and renderer changes;
+- no optional live harness was used or reported as test evidence.
 
 ### Phase 7 - Live client acceptance
 
-**Status:** Pending.
+**Status:** Complete (2026-09-29). The reusable production-stdio verification
+script passed against a freshly built binary.
 
 Where a relevant MCP client can consume the new schema, verify one real
 workspace scenario containing:
@@ -994,9 +1000,40 @@ Checkpoint 7 exit criteria:
 - any reproducible field discovery is recorded in
   `docs/agent/DISCOVERY_REGISTRY.md` and distilled into a tracked regression.
 
+Operator verification asset (2026-09-28):
+
+- `verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1` creates an
+  isolated TypeScript workspace and drives a freshly built production binary
+  through MCP initialize, `tools/list`, and registered `tools/call` requests;
+- it verifies the published batch schema, three ordered successful items across
+  `find_entities`, `forward_edges`, and `reverse_edges`, one isolated `-32602`
+  item failure, the v1 batch content envelope, repeated discovery-completion
+  reuse, and semantic parity with equivalent legacy single calls;
+- JSON captures and a verification report are written beneath
+  `target/workspace-query-batch-verification/` and remain operator evidence,
+  never tracked-test or final-gate evidence;
+- PowerShell parser validation, `git diff --check`, and the active-file size
+  guard pass; the agent did not build or launch the binary.
+
+Operator checkpoint (2026-09-29):
+
+- command: `pwsh -NoProfile -ExecutionPolicy Bypass
+  ./verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1`;
+- result: PASS for live schema exposure, ordered heterogeneous outcomes,
+  isolated item failure, repeated discovery-completion reuse, batch/single
+  semantic parity, and the production MCP batch envelope;
+- captures:
+  `target/workspace-query-batch-verification/captures`;
+- the run produced no new reproducible field defect, so no discovery-registry
+  entry or additional regression was required;
+- this is live operator evidence and remains separate from the already-GREEN
+  tracked Rust regressions and the still-pending final repository gate.
+
 ### Phase 8 - Documentation, audit, and final gate
 
-**Status:** Pending.
+**Status:** Complete (2026-09-29). Durable documentation, live-client
+acceptance, the post-task architectural audit, and the complete user-owned
+final verification gate are GREEN.
 
 Deliverables:
 
@@ -1019,6 +1056,59 @@ Checkpoint 8 exit criteria:
 - the complete final gate is reported GREEN by the operator;
 - no unrun gate is described as passing;
 - no critical or high-severity audit gap remains.
+
+Documentation and audit evidence (2026-09-28):
+
+- `WSC-009` now records the enforced batch scope, request-local deduplication,
+  final-snapshot, authority, ordering, and failure-isolation contract in
+  `docs/ARCHITECTURAL_INVARIANTS.md`;
+- WSC-001 and WSC-008 authority references now name the production preparation
+  and caller-provided final-view implementation rather than transitional
+  pre-migration helpers;
+- `docs/agent/tooling.md` now distinguishes single and batch selection, shared
+  scope placement, ordered outcome consumption, and global-versus-item failure
+  behavior;
+- the production lifecycle was traced from registered dispatch through batch
+  validation, shared preparation, one final index guard, typed outcomes,
+  canonical MCP rendering, and the public schema;
+- query-family modules contain no response transmission; the remaining send
+  sites are the single and batch outer adapters plus legacy dispatch errors;
+- hydration has one production execution boundary (`PreparationContext`); the
+  former helper and eligibility predicate are test-only compatibility support
+  for focused pre-existing hydration suites;
+- no duplicate production query-family algorithm, persistent request cache,
+  new lock, worker, or background task remains;
+- no critical or high-severity correctness, authority, security, ownership,
+  lifecycle, or public-contract gap was found;
+- `git diff --check` and the active-file size guard pass; no Cargo command was
+  agent-run.
+
+Final operator checkpoint (2026-09-29):
+
+- the maintainer ran the complete Final Verification Gate defined solely in
+  `docs/agent/verification.md` and reported GREEN;
+- formatting, zero-warning Clippy, the complete workspace/all-target/all-feature
+  test suite, file-size validator tests, active-file size enforcement, UTF-8
+  enforcement, and the Rust encoding suite all passed;
+- the agent did not run these commands and reports them as operator-owned gate
+  evidence;
+- every migration phase and exit criterion is now complete.
+
+Post-completion instruction addendum (2026-09-29):
+
+- the Claude-facing integration rules now explain single-versus-batch
+  selection, mixed operations, shared top-level scope, unique item IDs,
+  ordered outcome handling, and global-versus-item failure behavior;
+- MCP initialization carries only a compact batch-selection rule, remaining
+  below its enforced 2,000-byte budget;
+- README and live-handoff summaries now advertise the same capability without
+  duplicating the authoritative contract;
+- command: `cargo test --all-features mcp::prompts::tests -- --nocapture`;
+- result: GREEN;
+- the maintainer subsequently reran the complete Final Verification Gate from
+  `docs/agent/verification.md` and reported GREEN, covering the instruction
+  addendum and its tracked prompt-contract changes;
+- no migration or verification checkpoint remains pending.
 
 ---
 

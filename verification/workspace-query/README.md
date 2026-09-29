@@ -35,8 +35,16 @@ exercise focused production boundaries:
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-EntitiesInFileLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-HasCycleLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-IdentityResolutionLive.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1
 ```
 
 These are repeatable operator-verification assets, not Rust regression tests or
 CI gates. The corresponding authoritative contracts remain under
 `src/tests/**`.
+
+`Verify-BatchQueriesLive.ps1` creates an isolated TypeScript workspace and
+drives the freshly built production binary over MCP stdio. It verifies the
+published batch schema, mixed ordered results, item-local failure isolation,
+discovery-completion reuse on a repeated batch, and semantic parity with the
+equivalent legacy single calls. Generated captures are written beneath
+`target/workspace-query-batch-verification/`; they are operator evidence only.
