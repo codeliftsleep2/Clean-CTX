@@ -46,6 +46,24 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-031: Generic Methods Were Unreachable Through Documented Focus Selectors
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-29 |
+| **Environment** | Claude + Clean-CTX v0.6.4-development, SCHEMA-vNext live editing workflow |
+| **Repository/context** | Independent real C# and TypeScript files containing uniquely named generic methods under unique typed owners |
+| **Symptom** | `provide_code_context.focusMethods` rejected both the documented bare selector (`SortBy`, `getRequest`) and documented owner-qualified selector (`QueryableExtensions.SortBy`, `RequestClient.getRequest`) with `focus method not found`. Unfocused Edit correctly compiled and rendered the same declarations and bodies. |
+| **Root cause** | Canonical hierarchical method names retain their generic type-parameter suffix (for example `SortBy<TSource, TKey>`), while `resolve_focus_method_ids` compared the public selector to `MethodNode.name` by exact string. The existing C# regression selected the generic method using its internal generic spelling and therefore did not cover either documented public form. |
+| **Classification** | Semantic identity / public selector contract |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/focus_generic_methods.rs` (registered production-dispatch C# and TypeScript bare + owner-qualified selector cases) |
+| **Live scenario required?** | Yes — `verification/live-acceptance/signature_live_acceptance.mjs` now repeats focused Edit for separate bare and owner-qualified requests in both C# and TypeScript. |
+| **Architectural invariant** | CTX-001 |
+| **Status** | Verified — focused tracked regression GREEN and live MCP acceptance passed for bare and owner-qualified generic selectors in C# and TypeScript |
+
+---
+
 ## DIS-2026-030: Framework Meta-Layers Reparsed and Rescanned Each Compilation
 
 | Field | Value |

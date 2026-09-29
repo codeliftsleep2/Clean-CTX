@@ -9,6 +9,7 @@
 //   src/tests/ir/method_signature_shape.rs             (RED-SIG1..RED-SIG12)
 //   src/tests/ir/signature_cross_language.rs           (TS / Java / Rust probes)
 //   src/tests/mcp/provider_code_context_signature.rs   (end-to-end dispatch)
+//   src/tests/mcp/focus_generic_methods.rs              (documented focus selectors)
 //
 // A PASS printed below is NEVER test evidence and never substitutes for those.
 //
@@ -23,7 +24,8 @@
 //   * `static(+2)` absent (no fabricated overload group),
 //   * tuple members not interpreted as the parameter list,
 //   * real formal parameters preserved (three, not four),
-//   * no fabricated `X <body expression>` / extends line.
+//   * no fabricated `X <body expression>` / extends line,
+//   * bare and owner-qualified focus selectors resolve generic C# and TS methods.
 
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
@@ -60,6 +62,7 @@ const CHANGE_MARKERS = [
   path.resolve('src', 'ir', 'pipeline.rs'),
   path.resolve('src', 'ir', 'pipeline', 'signature.rs'),
   path.resolve('src', 'ir', 'layers', 'csharp.rs'),
+  path.resolve('src', 'ir', 'focus.rs'),
 ];
 
 function binaryIsStale() {
@@ -226,6 +229,17 @@ export function filler${i}(value: number, label: string): number {
   return bounded;
 }`,
 ).join('\n')}
+`;
+
+const TS_FOCUS_FIXTURE = `export class RequestClient {
+  protected getRequest<T>(data: Partial<T>): T {
+    return data as T;
+  }
+
+  protected sibling(): number {
+    return 1;
+  }
+}
 `;
 
 const RS_FIXTURE = `pub struct Pairer;
@@ -406,41 +420,51 @@ async function caseCsharpMatrix() {
   }
 }
 
-/** The Edit + focusMethods case: symbol targeting resolves the real names. */
+/** Edit + focusMethods accepts every documented selector form for generic methods. */
 async function caseEditFocus() {
-  console.log('\n[Live case B] C# — edit fidelity + focusMethods on the corrected identities');
-  const root = makeWorkspace('cs-focus', { 'QueryablePairExtensions.cs': CS_FIXTURE });
-  const client = new McpClient(root);
-  try {
-    await initialize(client);
-    const response = await provideContext(client, root, 'QueryablePairExtensions.cs', {
-      fidelity: 'edit',
-      focusMethods: ['GetPair', 'Pair<TFirst, TSecond>'],
-    });
-    const { kind, text, error } = responseParts(response);
-    if (error) {
-      check('B', 'request succeeds', false, JSON.stringify(error));
-      return;
+  console.log('\n[Live case B] C# / TypeScript — documented generic focus selectors');
+  const cases = [
+    {
+      label: 'csharp',
+      file: 'QueryablePairExtensions.cs',
+      source: CS_FIXTURE,
+      selectors: ['Pair', 'QueryablePairExtensions.Pair'],
+      focusedBody: 'return source.OrderByDescending(keySelector);',
+      unfocusedBody: 'return (names[0], names.Length);',
+    },
+    {
+      label: 'typescript',
+      file: 'request-client.ts',
+      source: TS_FOCUS_FIXTURE,
+      selectors: ['getRequest', 'RequestClient.getRequest'],
+      focusedBody: 'return data as T;',
+      unfocusedBody: 'return 1;',
+    },
+  ];
+  for (const entry of cases) {
+    const root = makeWorkspace(`${entry.label}-focus`, { [entry.file]: entry.source });
+    const client = new McpClient(root);
+    try {
+      await initialize(client);
+      for (const selector of entry.selectors) {
+        const response = await provideContext(client, root, entry.file, {
+          fidelity: 'edit',
+          focusMethods: [selector],
+        });
+        const { kind, text, error } = responseParts(response);
+        const name = `${entry.label} selector ${selector}`;
+        if (error) {
+          check('B', `${name}: request succeeds`, false, JSON.stringify(error));
+          continue;
+        }
+        summarize('B', text, { language: entry.label, selector, content_kind: kind });
+        check('B', `${name}: compressed path`, kind !== 'raw_passthrough', kind);
+        check('B', `${name}: focused body is present`, text.includes(entry.focusedBody));
+        check('B', `${name}: sibling stays signature-only`, !text.includes(entry.unfocusedBody));
+      }
+    } finally {
+      client.close();
     }
-    summarize('B', text, { content_kind: kind });
-    check('B', 'compressed path (not raw_passthrough)', kind !== 'raw_passthrough', kind);
-    check(
-      'B',
-      'focusing GetPair yields its verbatim body',
-      text.includes('return (values[0], values[1]);'),
-    );
-    check(
-      'B',
-      'focusing the generic method yields its verbatim body',
-      text.includes('return source.OrderByDescending(keySelector);'),
-    );
-    check(
-      'B',
-      'an unfocused method stays signature-only',
-      !text.includes('return (names[0], names.Length);'),
-    );
-  } finally {
-    client.close();
   }
 }
 

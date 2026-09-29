@@ -64,3 +64,7 @@ pub(crate) mod semantic_publication_recovery_tests;
 #[cfg(all(test, feature = "csharp"))]
 #[path = "../../tests/mcp/provider_code_context_signature.rs"]
 pub(crate) mod provider_code_context_signature_tests;
+
+#[cfg(all(test, any(feature = "csharp", feature = "typescript")))]
+#[path = "../../tests/mcp/focus_generic_methods.rs"]
+pub(crate) mod focus_generic_methods_tests;

@@ -39,6 +39,20 @@ struct Owner<'a> {
     methods: &'a [MethodNode],
 }
 
+/// Match the public selector grammar without changing canonical declaration
+/// identity. Generic parameters remain part of `MethodNode.name` for
+/// signatures and rendering, but callers select the declared identifier.
+fn method_matches_selector(method_name: &str, selector: &str) -> bool {
+    method_name == selector || plain_method_name(method_name) == selector
+}
+
+fn plain_method_name(method_name: &str) -> &str {
+    match method_name.find('<') {
+        Some(generic_start) if method_name.ends_with('>') => &method_name[..generic_start],
+        _ => method_name,
+    }
+}
+
 /// Resolve bare or `Owner.method` selectors to canonical method IDs.
 ///
 /// A bare selector is valid only when one typed owner contains that method.
@@ -76,7 +90,7 @@ pub fn resolve_focus_method_ids(
             let matches = owner
                 .methods
                 .iter()
-                .filter(|method| method.name == method_name)
+                .filter(|method| method_matches_selector(&method.name, method_name))
                 .map(|method| method.id.clone())
                 .collect::<Vec<_>>();
             if matches.is_empty() {
@@ -92,7 +106,7 @@ pub fn resolve_focus_method_ids(
                 owner
                     .methods
                     .iter()
-                    .any(|method| method.name.as_str() == selector.as_str())
+                    .any(|method| method_matches_selector(&method.name, selector))
             })
             .collect::<Vec<_>>();
         let owner = match matching_owners.as_slice() {
@@ -104,7 +118,7 @@ pub fn resolve_focus_method_ids(
             owner
                 .methods
                 .iter()
-                .filter(|method| method.name.as_str() == selector.as_str())
+                .filter(|method| method_matches_selector(&method.name, selector))
                 .map(|method| method.id.clone()),
         );
     }
