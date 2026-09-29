@@ -102,6 +102,10 @@ fn initialize_includes_compact_workflow_instructions() {
 
     for required in [
         "provide_code_context",
+        "top-level `files` batch",
+        "maximum 8",
+        "content_index",
+        "no cross-file edit authority",
         "workspaceRoot",
         "graph_search",
         "top-level `queries`",

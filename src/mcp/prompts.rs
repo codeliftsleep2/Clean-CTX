@@ -8,6 +8,7 @@
 pub(crate) const WORKFLOW_INSTRUCTIONS: &str = r#"# Clean-CTX Tool Workflow
 
 - Use `provide_code_context` as the default read for supported source files, and pass `workspaceRoot` explicitly whenever it is known.
+- For two or more independent source reads, use one top-level `files` batch (maximum 8), keep `workspaceRoot` and `tokenizer` shared, and give each item a unique `id` plus its own fidelity/focus. Inspect every ordered status and map each success through `content_index`; one item failure does not suppress siblings, and batching grants no cross-file edit authority.
 - Use `graph_search` as the normal typed symbol/file discovery entry point. Use the other structured graph wrappers when typed nodes, edges, paths, or modules are required.
 - Use one `workspace_query` call with top-level `queries` for multiple independent questions sharing a workspace scope; mixed operation types are supported, results stay ordered by unique item ID, and one item failure does not suppress its siblings. Each item's `name` is one string: for several names, create one item per name; never pass `name` as an array or invent `names`.
 - Use `cbm_proxy` only when compact or explicitly fresh raw CBM output is preferable to a typed structured result. Never bypass Clean-CTX to call CBM directly.

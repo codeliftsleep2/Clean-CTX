@@ -89,6 +89,35 @@ not an automatic delta. `delta_code_context` and `apply_delta` are an explicit
 code-side protocol; use them only when a real host/consumer intentionally owns
 the prior version and acknowledgment lifecycle.
 
+### Batch several source reads
+
+Use singular `filePath` for one file. When two or more independently useful
+source contexts are needed, prefer one `files` batch of at most eight items:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "tokenizer": "o200k",
+  "files": [
+    { "id": "service", "filePath": "src/services/UserService.ts", "intent": "overview" },
+    { "id": "target", "filePath": "src/controllers/UserController.ts", "intent": "edit", "focusMethods": ["UserController.update"] }
+  ]
+}
+```
+
+Each item requires a unique non-empty `id` and `filePath` and may choose its
+own `intent`, `fidelity`, and `focusMethods`. `workspaceRoot` and `tokenizer`
+belong only at the top level. Inspect every ordered result: `status="ok"`
+carries `content_index` (the exact corresponding block in `content`) and
+semantic `meta`; `status="error"` carries an item-local error without
+suppressing successful siblings. A failed item has no content index. If every
+item fails, the text block only directs the caller to the structured errors.
+
+Do not repeat the same canonical file in a batch; combine its desired selectors
+into one `focusMethods` array. Request Edit or Verbatim only for files that need
+exact text. Batch reads retain normal successful session/cache effects but do
+not create cross-file transactional edit authority.
+
 If the response is a skeleton and statement-level source is required, use
 native `Read` for the known file/range. Native `Read` is also appropriate for
 Markdown, JSON, TOML, configuration, unsupported languages, or after the
@@ -264,6 +293,7 @@ or broader edits that do not fit those structural operations.
 | Locate text/files without CBM | Claude `Grep` / `Glob` |
 | Locate an exact semantic name without CBM | `workspace_query(type="find_entities")` |
 | Understand a supported source file | `provide_code_context` |
+| Understand several supported source files | `provide_code_context(files=[...])` |
 | Exact known source lines/body | Native `Read` after context, or when context fails |
 | One semantic entity/edge/dependency question | Single-form `workspace_query` |
 | Several semantic questions in one scope | Batched `workspace_query(queries=[...])` |

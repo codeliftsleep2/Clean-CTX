@@ -47,10 +47,28 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `provide_code_context` | `filePath` | `intent`, `fidelity`, `focusMethods`, `workspaceRoot`, `tokenizer` | **Primary model-facing entry point.** Heuristics select fidelity and classify the file; every success returns complete current context. Prefer over `compress_code_context`. |
+| `provide_code_context` | `filePath` (single) or `files` (batch) | Per-file `intent`, `fidelity`, `focusMethods`; shared `workspaceRoot`, `tokenizer` | **Primary model-facing entry point.** Reads one file or up to 8 independently useful files in one ordered, failure-isolated batch. Every success returns complete current context. Prefer over `compress_code_context`. |
 | `compress_code_context` | `filePath` | `fidelity`, `encoding`, `tokenizer`, `workspaceRoot` | Direct AST compilation without heuristics. Lower-level tool; prefer `provide_code_context`. |
 | `restore_context` | `filePath` | `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `context_stats` | — | `filePath`, `format` | Token-savings dashboard. Shows raw vs compressed tokens, delta hit rate, per-file breakdown. |
+
+Use the singular `filePath` form for one source file. For two or more
+independently useful source contexts, use top-level `files`; each item requires
+a unique non-empty `id` and `filePath` and may choose its own `intent`,
+`fidelity`, and `focusMethods`. Keep `workspaceRoot` and `tokenizer` at the top
+level. Batch results preserve request order: a successful item has
+`status="ok"`, `content_index`, and semantic `meta`; an unsuccessful item has
+`status="error"` and its own error. Inspect every status. The
+`content_index` identifies that success's exact text block in `content`; failed
+items never own a content block.
+
+Batching is best-effort context acquisition, not a cross-file transaction. One
+item failure does not suppress successful siblings, and successful reads retain
+their normal session/cache effects. A later item resolving to the same
+canonical file is rejected; combine selectors for that file into one
+`focusMethods` array. Use per-item fidelity so only actual edit targets request
+Edit or Verbatim content. If every item fails, the sole text block directs the
+caller to the authoritative structured item errors.
 
 ### 1.3 Diff/Delta Tools (Read-Only Comparisons)
 

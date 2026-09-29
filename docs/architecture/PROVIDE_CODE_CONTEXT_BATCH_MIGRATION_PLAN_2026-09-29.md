@@ -1,8 +1,8 @@
 # `provide_code_context` Batch Migration Plan
 
 **Date:** 2026-09-29  
-**Status:** Phases 0–5 complete through tracked batch, legacy-equivalence, and
-economics/cache GREEN; Phase 6 has not started
+**Status:** Phases 0–6 complete through tracked batch, legacy-equivalence,
+economics/cache, and model-guidance GREEN; Phase 7 has not started
 **Scope:** Add an ordered, failure-isolated multi-file request form to the
 existing `provide_code_context` MCP tool while preserving the complete
 single-file contract, byte-exact Edit/Verbatim authority, session lifecycle,
@@ -945,3 +945,14 @@ The deterministic response-envelope measurements were:
 These measurements demonstrate reduced protocol-envelope size for all three
 representative batch sizes without introducing a new budget, truncation rule,
 or performance-dependent behavior. Phase 5 and Checkpoint F are complete.
+
+**Phase 6 guidance checkpoint (2026-09-29):** The authoritative tooling guide,
+Claude integration rules, and runtime initialization instructions now explain
+when to use singular versus batched `provide_code_context`, the eight-item cap,
+shared versus per-item fields, ordered `status`/`content_index` correlation,
+failure isolation, duplicate canonical-file handling, selective exact
+fidelity, retained successful side effects, and the absence of cross-file
+transactional edit authority. Runtime guidance remains inside its enforced
+2,000-byte compactness budget at 1,978 bytes. The tracked
+`mcp::prompts::tests` target was reported GREEN by the maintainer. Phase 6 is
+complete; live MCP acceptance has not started.
