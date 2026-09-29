@@ -186,6 +186,21 @@ are invalid. Input order is preserved. Inspect every returned item:
 independent successes. A malformed batch, duplicate ID, invalid shared scope,
 or more than 32 items rejects the whole call.
 
+`name` is always one non-empty string. Do not pass an array to `name`, and do
+not invent a plural `names` field. To ask the same operation about several
+names, create one independently identified item per name:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "queries": [
+    { "id": "method-a", "type": "reverse_edges", "name": "MethodA" },
+    { "id": "method-b", "type": "reverse_edges", "name": "MethodB" },
+    { "id": "method-c", "type": "reverse_edges", "name": "MethodC" }
+  ]
+}
+```
+
 Batching shares preparation work and one final WorkspaceIndex view; it does not
 merge answers, infer identity across items, or change the special authority of
 `has_cycle` and `calls_in_file`. Do not split a request merely because it mixes

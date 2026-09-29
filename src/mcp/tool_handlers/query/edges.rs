@@ -16,7 +16,7 @@ use super::{
     outcome::QueryAnswer,
     outcome::QueryFailure,
     prepare::{PreparationContext, PreparedQuery},
-    required_str,
+    required_name,
 };
 use crate::mcp::McpState;
 use serde_json::Value;
@@ -40,9 +40,7 @@ fn try_prepare_forward_edges(
     state: &McpState,
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
-    let name = required_str(args, "name").ok_or_else(|| {
-        QueryFailure::invalid("Missing required argument: 'name' for forward_edges query.")
-    })?;
+    let name = required_name(args, "forward_edges")?;
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the evidence
     // asserted from inside that workspace (primary root + its configured
@@ -104,9 +102,7 @@ fn try_prepare_reverse_edges(
     state: &McpState,
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
-    let name = required_str(args, "name").ok_or_else(|| {
-        QueryFailure::invalid("Missing required argument: 'name' for reverse_edges query.")
-    })?;
+    let name = required_name(args, "reverse_edges")?;
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: the primary defect this closes — `reverse_edges` used to
     // answer with every occurrence of the identity across the WHOLE session,

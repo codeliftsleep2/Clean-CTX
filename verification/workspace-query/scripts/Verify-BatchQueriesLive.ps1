@@ -19,6 +19,7 @@ if (-not (Test-Path -LiteralPath $BinaryPath)) {
 $BinaryPath = (Resolve-Path -LiteralPath $BinaryPath).Path
 
 $changeMarkers = @(
+    (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query\batch.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query\content.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_schemas.rs")
@@ -131,6 +132,10 @@ try {
     })
     Assert-True ($batchBranch.Count -eq 1) "workspace_query inputSchema omitted the batch request branch."
     Assert-True ($tool[0].outputSchema.properties.results.type -eq "array") "workspace_query outputSchema omitted ordered batch results."
+    $nameSchema = $tool[0].inputSchema.properties.name
+    Assert-True ($nameSchema.type -eq "string") "workspace_query name schema is not singular string input."
+    Assert-True ($nameSchema.minLength -eq 1) "workspace_query name schema permits an empty string."
+    Assert-True ([string]$nameSchema.description -match "top-level queries") "workspace_query name schema does not direct multi-name callers to queries."
     Write-Host "PASS: live tools/list exposes the batch input and output contract."
 
     $first = Invoke-CleanCtxTool $session 2 "workspace_query" $batchArguments
@@ -178,6 +183,18 @@ try {
     }
     Write-Host "PASS: successful batch items match equivalent legacy single queries."
 
+    $malformed = Invoke-CleanCtxTool $session 7 "workspace_query" @{
+        type = "reverse_edges"
+        name = @("MethodA", "MethodB")
+        workspaceRoot = $workspace
+    }
+    Save-Capture "invalid-array-name" $malformed
+    Assert-True ($null -ne $malformed.PSObject.Properties["error"]) "Array-valued name was not rejected."
+    Assert-True ($malformed.error.code -eq -32602) "Array-valued name used the wrong error classification."
+    Assert-True ([string]$malformed.error.message -match "non-empty string") "Array-valued name was not reported as a type error."
+    Assert-True ([string]$malformed.error.message -match "queries") "Array-valued name error omitted the supported batch form."
+    Write-Host "PASS: array-valued name is rejected and points callers to queries."
+
     $report = [ordered]@{
         verified_at_utc = [DateTime]::UtcNow.ToString("o")
         binary = $BinaryPath
@@ -185,6 +202,7 @@ try {
         ordered_ids = @($firstResults.id)
         repeated_discovery_reused = $true
         single_query_semantics_matched = $true
+        invalid_array_name_rejected = $true
         isolated_error_code = $firstResults[3].error.code
     }
     Save-Capture "verification-report" $report

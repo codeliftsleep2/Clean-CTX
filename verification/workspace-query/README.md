@@ -46,5 +46,7 @@ CI gates. The corresponding authoritative contracts remain under
 drives the freshly built production binary over MCP stdio. It verifies the
 published batch schema, mixed ordered results, item-local failure isolation,
 discovery-completion reuse on a repeated batch, and semantic parity with the
-equivalent legacy single calls. Generated captures are written beneath
+equivalent legacy single calls. It also verifies that `name` remains a singular
+non-empty string and that an array is rejected with guidance to use top-level
+`queries`. Generated captures are written beneath
 `target/workspace-query-batch-verification/`; they are operator evidence only.

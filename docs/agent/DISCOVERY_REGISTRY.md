@@ -46,6 +46,24 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-032: Array-Valued Workspace Query Names Produced Misleading Results
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-29 |
+| **Environment** | Claude + current Clean-CTX SCHEMA-vNext workspace-query workflow |
+| **Repository/context** | Multi-method caller investigation using `reverse_edges` |
+| **Symptom** | A caller supplied an array to singular `name` and observed a misleading empty lookup, then tried unsupported `names` and concluded batching was absent. The supported top-level `queries` form was not attempted. |
+| **Root cause** | The published JSON schema typed `name` as a string and the server did not itself coerce arrays, but server-side parsing collapsed every non-string into the same “missing” error. Claude-facing guidance demonstrated `queries` without explicitly prohibiting `name: []` or `names`, leaving the singular-versus-batch boundary insufficiently explicit and allowing client-side coercion to obscure malformed input. |
+| **Classification** | Protocol / input validation and client guidance |
+| **Reproducible locally?** | Yes — direct production dispatch deterministically classified a present array as missing. |
+| **Local regression** | `src/tests/mcp/workspace_query_name_validation.rs` covers all four name-bearing single operations plus batch item failure isolation. |
+| **Live scenario required?** | Yes — `verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1` checks the published schema and raw JSON-RPC rejection independently of higher-level client coercion. |
+| **Architectural invariant** | WSC-004 scope remains unchanged; public batch authority is top-level `queries`. |
+| **Status** | Verified — focused tracked regression GREEN; live schema, heterogeneous batch, failure isolation, and array-name rejection checks passed |
+
+---
+
 ## DIS-2026-031: Generic Methods Were Unreachable Through Documented Focus Selectors
 
 | Field | Value |

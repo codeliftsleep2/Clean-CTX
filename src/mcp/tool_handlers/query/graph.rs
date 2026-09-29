@@ -15,7 +15,7 @@ use super::{
     outcome::QueryAnswer,
     outcome::QueryFailure,
     prepare::{PreparationContext, PreparedQuery},
-    required_str,
+    required_name,
 };
 use crate::mcp::McpState;
 use serde_json::Value;
@@ -39,11 +39,7 @@ fn try_prepare_transitive_dependencies(
     state: &McpState,
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
-    let name = required_str(args, "name").ok_or_else(|| {
-        QueryFailure::invalid(
-            "Missing required argument: 'name' for transitive_dependencies query.",
-        )
-    })?;
+    let name = required_name(args, "transitive_dependencies")?;
     let depth = optional_i32(args, "depth", 1);
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: reachability is computed from THIS workspace's evidence

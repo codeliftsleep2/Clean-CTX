@@ -20,7 +20,7 @@ use super::{
     outcome::QueryAnswer,
     outcome::QueryFailure,
     prepare::{PreparationContext, PreparedQuery},
-    required_str,
+    required_name, required_str,
 };
 use crate::mcp::McpState;
 use serde_json::Value;
@@ -63,11 +63,7 @@ fn try_prepare_find_entities(
     state: &McpState,
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
-    let name = required_str(args, "name")
-        .ok_or_else(|| {
-            QueryFailure::invalid("Missing required argument: 'name' for find_entities query.")
-        })?
-        .to_string();
+    let name = required_name(args, "find_entities")?.to_string();
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the entity
     // occurrences that workspace's own files declare (`None` = the caller

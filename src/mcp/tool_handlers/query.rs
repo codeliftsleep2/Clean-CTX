@@ -173,6 +173,25 @@ fn required_str<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
     args[name].as_str().filter(|s| !s.is_empty())
 }
 
+/// Extract the singular entity name used by name-bearing operations.
+///
+/// The MCP schema rejects non-strings for conforming clients, but the server
+/// boundary remains authoritative when a client bypasses or coerces schema
+/// validation. Keep absence distinct from a present value of the wrong type,
+/// and direct multi-name callers to the supported batch request form.
+fn required_name<'a>(args: &'a Value, query_type: &str) -> Result<&'a str, outcome::QueryFailure> {
+    match args.get("name") {
+        None | Some(Value::Null) => Err(outcome::QueryFailure::invalid(format!(
+            "Missing required argument: 'name' for {query_type} query."
+        ))),
+        Some(Value::String(name)) if !name.is_empty() => Ok(name),
+        Some(_) => Err(outcome::QueryFailure::invalid(
+            "Invalid argument: 'name' must be a non-empty string. For multiple names, use \
+             top-level 'queries' with one item per name.",
+        )),
+    }
+}
+
 /// Extract an optional integer argument; returns `default` if missing.
 fn optional_i32(args: &Value, name: &str, default: i32) -> i32 {
     args[name].as_i64().map(|v| v as i32).unwrap_or(default)
@@ -278,6 +297,10 @@ mod tests_batch;
 #[cfg(all(test, feature = "rust", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_batch_preparation.rs"]
 mod tests_batch_preparation;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_name_validation.rs"]
+mod tests_name_validation;
 
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
