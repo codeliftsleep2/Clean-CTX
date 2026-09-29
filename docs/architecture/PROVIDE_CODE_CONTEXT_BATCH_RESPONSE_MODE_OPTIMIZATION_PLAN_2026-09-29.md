@@ -1,7 +1,7 @@
 # `provide_code_context` Batch Response-Mode Optimization Plan
 
 **Date:** 2026-09-29
-**Status:** Phases 0–3 and Checkpoints A–D complete; Phase 4 has not started
+**Status:** Phases 0–4 and Checkpoints A–E complete; Phase 5 has not started
 **Scope:** Reduce duplicate serialized code in batched `provide_code_context`
 responses when the caller knows which MCP visibility channel its host exposes,
 without reintroducing silent content loss or changing per-file evaluation.
@@ -355,3 +355,12 @@ unknown values and singular-form mode use before evaluation, default safely to
 `mirrored`, declare the resolved `response_mode`, and project exact successful
 text as mirrored, structured-only, or indexed-only without changing the shared
 per-file evaluator. Phases 1–3 and Checkpoints B–D are complete.
+
+**Phase 4 cache and economics checkpoint (2026-09-29):** A dedicated tracked
+test now verifies that all three response modes establish distinct outer cache
+identities and that an identical request reuses each mode-specific identity.
+The same test reports serialized batch and equivalent repeated-single response
+sizes at 2, 4, and 8 items for `mirrored`, `structured`, and `indexed`, without
+using those measurements to select a mode automatically. The maintainer
+reported the focused all-features test GREEN. Phase 4 and Checkpoint E are
+complete.
