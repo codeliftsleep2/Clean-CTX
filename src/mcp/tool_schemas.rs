@@ -60,7 +60,7 @@ pub(super) fn provide_code_context_properties() -> Value {
     let object = properties
         .as_object_mut()
         .expect("provide context properties are an object");
-    object.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Shared explicit workspace root for reliable path resolution." }));
+    object.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Strongly recommended. Shared explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }));
     object.insert("tokenizer".into(), json!({ "type": "string" }));
 
     let mut item_properties = provide_code_context_item_properties();
@@ -121,7 +121,24 @@ pub(super) fn provide_code_context_batch_results() -> Value {
                     "required": ["code", "message"]
                 }
             },
-            "required": ["id", "status"]
+            "required": ["id", "status"],
+            "oneOf": [
+                {
+                    "properties": { "status": { "const": "ok" } },
+                    "required": ["content_index", "meta"],
+                    "not": { "required": ["error"] }
+                },
+                {
+                    "properties": { "status": { "const": "error" } },
+                    "required": ["error"],
+                    "not": {
+                        "anyOf": [
+                            { "required": ["content_index"] },
+                            { "required": ["meta"] }
+                        ]
+                    }
+                }
+            ]
         }
     })
 }

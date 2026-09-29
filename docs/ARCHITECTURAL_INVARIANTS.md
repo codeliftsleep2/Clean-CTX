@@ -334,10 +334,23 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 |----------|-------|
 | **Intent** | A caller that requests selected method bodies must never receive a successful structural response in which that selection was silently ignored, nor have an explicit non-Edit choice silently overridden. |
 | **Invariant** | `provide_code_context.focusMethods` is Edit-only targeting. A non-empty focus with neither `fidelity` nor `intent` implies Edit. Explicit Edit fidelity or intent accepts focus. Any explicit non-Edit fidelity or intent conflicts and returns `-32602` before file IO or session mutation. An empty focus retains its specialized “Edit structure with no bodies” meaning and therefore requires explicit Edit fidelity or intent. Focus resolution and ambiguity rules remain governed by CTX-001 after this request-boundary validation. |
-| **Enforcement** | `src/mcp/tool_handlers/core/provide.rs`; `src/tests/mcp/focus_fidelity_contract.rs` (implicit Edit, explicit-fidelity conflict, explicit-intent conflict, and empty implicit-focus rejection); existing canonical focus tests under `src/tests/ir/focus.rs` and `src/tests/mcp/control_full_content.rs`. |
-| **Authority** | `handle_provide_code_context` request validation followed by `heuristics::decide` and canonical focus resolution |
+| **Enforcement** | `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/tests/mcp/focus_fidelity_contract.rs` (implicit Edit, explicit-fidelity conflict, explicit-intent conflict, and empty implicit-focus rejection); existing canonical focus tests under `src/tests/ir/focus.rs` and `src/tests/mcp/control_full_content.rs`. |
+| **Authority** | `provide::evaluate::evaluate` request validation followed by `heuristics::decide` and canonical focus resolution |
 | **Type** | ENFORCED (request boundary + test) |
 | **Gate** | `cargo test --all-features focus_fidelity_contract_tests` |
+
+---
+
+### MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Reading several independently useful source files in one MCP call must reduce repeated envelope overhead without creating a second compilation lifecycle, hiding item failures, weakening exact-text authority, or implying a cross-file transaction. |
+| **Invariant** | `provide_code_context` accepts exactly one of singular `filePath` or batched `files`. A batch contains at most eight ordered items with unique non-empty IDs, shares top-level workspace/tokenizer scope, and evaluates items sequentially through the same typed single-file evaluator used by the legacy form. Successful items retain normal per-file persistence/publication/statistics effects and contribute unchanged text blocks; `content_index` maps each success to its exact block. Item failures remain ordered structured errors and never suppress successful siblings. Later items resolving to an already evaluated canonical file fail locally so focus-sensitive state is never order-dependent. One outer cache identity covers the ordered successful blocks. An all-failure batch emits one non-authoritative fallback text block solely to preserve the non-empty MCP envelope; no item points to it. Batching grants no rollback, aggregate truncation, concurrency, retry, or cross-file edit authority. |
+| **Enforcement** | Structural separation in `src/mcp/tool_handlers/core/provide/{evaluate,batch,outcome}.rs`; public schema in `src/mcp/tool_schemas.rs` and `src/mcp/tools.rs`; tracked dispatch regressions in `src/tests/mcp/provide_code_context_batch.rs` cover request shape, ordered mixed modes, legacy parity, exact blocks/indexes, isolated failures, duplicate canonical files, all-failure envelope validity, truthful token accounting, and repeated cache identity. |
+| **Authority** | `provide::evaluate::evaluate` owns the complete per-file lifecycle; `provide::batch` owns only structural validation, shared-field projection, ordered coordination, and the outer response/cache envelope. |
+| **Type** | STRUCTURAL and ENFORCED (test) |
+| **Gate** | `cargo test --all-features provide_code_context_batch_tests` |
 
 ---
 ### IRWIRE-001 Semantic Binary Round Trip
@@ -383,7 +396,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Intent** | The read-only statistics dashboard must describe what a successful delta-capable handler actually returned; observability must not invent, omit, or double-count transport events. |
 | **Invariant** | Every successful `delta_code_context` response records exactly one session event using its resolved fidelity, Angular classification, selected token counts, and actual strategy. Initial, cached, and no-difference complete responses are `full`; a non-empty generated sequence delta is `delta` and retains the prior full-compression token baseline for efficiency accounting. Every `provide_code_context` response is independently recorded once as `full`. `context_stats` remains a read-only projection of this already-recorded state. |
 | **Enforcement** | `src/tests/mcp/delta_stats_lifecycle.rs` crosses registered dispatch for the dedicated full-baseline → external-change → generated-delta lifecycle and repeated complete provider reads. The regressions assert strategy, fidelity, Angular status, non-zero tokens, and per-file/session delta counts. |
-| **Authority** | `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/provide.rs`, `src/mcp/session_stats.rs`, `src/mcp/tool_handlers/stats/mod.rs` |
+| **Authority** | `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/provide/evaluate.rs`, `src/mcp/session_stats.rs`, `src/mcp/tool_handlers/stats/mod.rs` |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test --all-features` |
 | **Relationship to IRDELTA-002** | IRDELTA-002 governs pending-transition authority and acknowledgement. IRDELTA-003 governs truthful observation of generation and complete-response events; recording statistics never applies or acknowledges a delta. |
@@ -554,7 +567,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 |----------|-------|
 | **Intent** | `entities_in_file` must answer an explicit authorized file in one call without confusing an uncompiled file, stale projection, or insufficient semantic fidelity with a genuine empty result. |
 | **Invariant** | WorkspaceIndex owns semantic coverage beside the file occurrences it qualifies: canonical file identity, normalized semantic fidelity, and source hash. A projection is reusable only when its hash matches current source and its fidelity is at least the requested semantic level. Query Edit/Verbatim normalize to High; an actual Edit/Verbatim compilation does not claim High completeness because extractors are not globally monotonic. Missing, stale, or insufficient coverage compiles a read-only candidate and atomically replaces the file's entities, edges, and coverage, including an empty edge set. Removal clears coverage with occurrences. Query-only compilation creates no session alias, rendered context, persistence record, or compression-statistics claim. |
-| **Enforcement** | `src/workspace/index/coverage.rs`; `src/workspace/index/remove.rs`; `src/mcp/tool_handlers/query/entities.rs`; `src/mcp/tool_handlers/core/provide.rs`; `src/tests/mcp/workspace_query_entities_auto_compile.rs` (one-call first touch, invalid fidelity, schema, High→Low reuse without recompilation, Low→Medium .NET action upgrade, source invalidation, empty replacement, no context/alias publication, and provide→query reuse). WSC-004 suites retain path/root/withinPath authority. |
+| **Enforcement** | `src/workspace/index/coverage.rs`; `src/workspace/index/remove.rs`; `src/mcp/tool_handlers/query/entities.rs`; `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/tests/mcp/workspace_query_entities_auto_compile.rs` (one-call first touch, invalid fidelity, schema, High→Low reuse without recompilation, Low→Medium .NET action upgrade, source invalidation, empty replacement, no context/alias publication, and provide→query reuse). WSC-004 suites retain path/root/withinPath authority. |
 | **Authority** | `WorkspaceIndex::has_current_semantic_projection`, `WorkspaceIndex::replace_semantic_projection`, `SemanticFidelity` |
 | **Type** | ENFORCED (state ownership + test) |
 | **Gate** | `cargo test --all-features tests_entities_auto_compile` |

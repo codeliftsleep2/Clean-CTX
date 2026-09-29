@@ -1,8 +1,8 @@
 # `provide_code_context` Batch Migration Plan
 
 **Date:** 2026-09-29  
-**Status:** Phases 0–7 complete through tracked/local verification and live MCP
-acceptance; final architectural audit and repository gate remain
+**Status:** Complete — Phases 0–8, Checkpoints A–H, tracked regressions, live
+acceptance, architectural audit, and final repository gate are GREEN
 **Scope:** Add an ordered, failure-isolated multi-file request form to the
 existing `provide_code_context` MCP tool while preserving the complete
 single-file contract, byte-exact Edit/Verbatim authority, session lifecycle,
@@ -968,3 +968,34 @@ the batch cache identity. Generated captures are stored beneath
 operator evidence, not tests; the authoritative regression contract remains
 the GREEN tracked tests under `src/tests/**`. Phase 7 and Checkpoint G are
 complete. Phase 8 has not started.
+
+**Phase 8 architectural-audit checkpoint (2026-09-29):** The production
+lifecycle was traced from registered `tools/call` dispatch through the thin
+single/batch entry point, structural batch validation, shared typed per-file
+evaluation, persistence/publication/statistics, exact content projection, and
+the one outer response/cache envelope. `provide::evaluate::evaluate` is the
+sole owner of source reading, heuristics, Angular specialization, compilation,
+focus resolution, persistence-before-publication, workspace/session
+publication, rendering, and compression statistics. `provide::batch` owns only
+batch validation, shared-field projection, canonical duplicate prevention,
+ordered coordination, and response correlation. No nested response sender,
+duplicated evaluator, obsolete execution path, hidden successful-content
+mutation, rollback claim, or cross-file edit authority remains.
+
+The audit tightened the declared output schema so successful and failed item
+shapes are mutually exclusive and required, and updated the durable invariant
+catalog to name the extracted evaluator authority and the batch contract.
+Fast guards reported valid UTF-8/no BOM, clean diff hygiene, and all active
+files below the 615-line ceiling. No critical or high-severity architectural
+issue remains. At audit time, Checkpoint H remained pending the complete
+user-run repository verification gate recorded below.
+
+**Final verification checkpoint (2026-09-29):** After restoring the established
+`workspaceRoot` schema guidance exposed by the first full-gate run, the focused
+`schema_guidance_uses_current_model_workflow_terms` regression was reported
+GREEN. The maintainer then reran the complete authoritative gate from
+`docs/agent/verification.md` against the corrected final state and reported all
+seven commands GREEN: formatting, all-target/all-feature Clippy with warnings
+denied, the complete workspace/all-target/all-feature test suite, file-size
+validator tests, active-file validation, UTF-8 validation, and the Rust encoding
+test. Phase 8 and Checkpoint H are complete; this migration is complete.

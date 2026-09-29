@@ -185,9 +185,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "outputSchema": {
                 "type": "object",
                 "properties": {
-                    "batch": { "type": "boolean" },
+                    "batch": { "const": true },
                     "results": super::tool_schemas::provide_code_context_batch_results()
-                }
+                },
+                "required": ["batch", "results"]
             }
         }),
         serde_json::json!({
