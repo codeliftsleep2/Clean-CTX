@@ -15,8 +15,8 @@ and token-accounting behavior.
 `provide_code_context` currently accepts one source file per MCP call. A caller
 that needs a service, its model, and a related repository must issue several
 tool calls even when every file belongs to the same authorized workspace.
-Those calls repeat MCP framing, workspace validation, tokenizer selection, and
-response-envelope overhead.
+Those calls repeat tool invocation, caller reasoning/orchestration, workspace
+validation, and tokenizer selection.
 
 This plan proposes a second, mutually exclusive request form:
 
@@ -934,25 +934,31 @@ equivalence was subsequently reported GREEN; later verification phases remain.
 regression was reported GREEN by the maintainer. It verified truthful per-file
 raw/compressed token accounting with the shared `o200k` tokenizer, stable
 semantics on repeated execution, and reuse of the outer batch cache identity.
-The deterministic response-envelope measurements were:
+The original pre-mirror response-envelope measurements were superseded by the
+post-field-correction measurements below. Exact content is now deliberately
+present in both MCP visibility channels, so serialized byte size increases:
 
-| Items | Batch bytes | Equivalent single-response bytes | Reduction |
+| Items | Batch bytes | Equivalent single-response bytes | Batch overhead |
 |---:|---:|---:|---:|
-| 2 | 1,687 | 1,732 | 45 bytes (2.60%) |
-| 4 | 3,125 | 3,174 | 49 bytes (1.54%) |
-| 8 | 5,846 | 6,348 | 502 bytes (7.91%) |
+| 2 | 2,557 | 1,732 | 825 bytes (47.63%) |
+| 4 | 4,865 | 3,174 | 1,691 bytes (53.28%) |
+| 8 | 9,326 | 6,348 | 2,978 bytes (46.91%) |
 
-These measurements demonstrate reduced protocol-envelope size for all three
-representative batch sizes without introducing a new budget, truncation rule,
-or performance-dependent behavior. Phase 5 and Checkpoint F are complete.
+The batch economy is therefore not raw response serialization. It is one model
+tool call, one planning/reasoning step, shared setup, ordered failure isolation,
+and no repeated caller round trip per file. Correct dual-channel content
+reachability takes priority over byte deduplication. No new budget, truncation
+rule, or performance-dependent behavior was introduced. Phase 5 and Checkpoint
+F remain complete with the corrected interpretation.
 
 **Phase 6 guidance checkpoint (2026-09-29):** The authoritative tooling guide,
 Claude integration rules, and runtime initialization instructions now explain
 when to use singular versus batched `provide_code_context`, the eight-item cap,
-shared versus per-item fields, ordered `status`/`content_index` correlation,
-failure isolation, duplicate canonical-file handling, selective exact
-fidelity, retained successful side effects, and the absence of cross-file
-transactional edit authority. Runtime guidance remains inside its enforced
+shared versus per-item fields, item-level exact `content`, ordered
+`status`/`content_index` correlation, failure isolation, duplicate
+canonical-file handling, selective exact fidelity, retained successful side
+effects, and the absence of cross-file transactional edit authority. Runtime
+guidance remains inside its enforced
 2,000-byte compactness budget at 1,978 bytes. The tracked
 `mcp::prompts::tests` target was reported GREEN by the maintainer. Phase 6 is
 complete; live MCP acceptance has not started.
@@ -999,3 +1005,14 @@ seven commands GREEN: formatting, all-target/all-feature Clippy with warnings
 denied, the complete workspace/all-target/all-feature test suite, file-size
 validator tests, active-file validation, UTF-8 validation, and the Rust encoding
 test. Phase 8 and Checkpoint H are complete; this migration is complete.
+
+**Post-completion field correction (2026-09-29):** Live use through a
+structured-only client exposed that successful code text existed in top-level
+MCP `content` but not in each `structuredContent.results` item. Fidelity and
+rendering were correct, but the client-visible projection showed plausible
+`status="ok"` metadata without code. Successful items now mirror their exact
+content block under item-level `content` while retaining `content_index` and
+the byte-identical canonical top-level block. This is intentional dual-channel
+reachability, not repeated evaluation. The primary batch economy remains one
+tool invocation, shared setup, and one caller reasoning step rather than
+separate calls per file.

@@ -110,6 +110,19 @@ pub(super) fn provide_code_context_batch_results() -> Value {
                 "id": { "type": "string" },
                 "status": { "type": "string", "enum": ["ok", "error"] },
                 "content_index": { "type": "integer", "minimum": 0, "description": "Index of the exact successful text block in result.content." },
+                "content": {
+                    "type": "array",
+                    "description": "Exact MCP content mirrored for structured-only clients; byte-identical to the block selected by content_index.",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "text" },
+                            "text": { "type": "string" }
+                        },
+                        "required": ["type", "text"]
+                    }
+                },
                 "meta": { "type": "object", "description": "The corresponding single-file semantic metadata." },
                 "error": {
                     "type": "object",
@@ -125,7 +138,7 @@ pub(super) fn provide_code_context_batch_results() -> Value {
             "oneOf": [
                 {
                     "properties": { "status": { "const": "ok" } },
-                    "required": ["content_index", "meta"],
+                    "required": ["content_index", "content", "meta"],
                     "not": { "required": ["error"] }
                 },
                 {
@@ -134,6 +147,7 @@ pub(super) fn provide_code_context_batch_results() -> Value {
                     "not": {
                         "anyOf": [
                             { "required": ["content_index"] },
+                            { "required": ["content"] },
                             { "required": ["meta"] }
                         ]
                     }

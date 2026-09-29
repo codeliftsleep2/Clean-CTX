@@ -52,15 +52,20 @@ as `filePath`.
 | `restore_context` | `filePath` | `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `context_stats` | — | `filePath`, `format` | Token-savings dashboard. Shows raw vs compressed tokens, delta hit rate, per-file breakdown. |
 
+#### Singular and batch request forms
+
+`provide_code_context` explicitly accepts either one singular `filePath`
+request or one top-level `files` batch. These forms are mutually exclusive.
 Use the singular `filePath` form for one source file. For two or more
 independently useful source contexts, use top-level `files`; each item requires
 a unique non-empty `id` and `filePath` and may choose its own `intent`,
 `fidelity`, and `focusMethods`. Keep `workspaceRoot` and `tokenizer` at the top
 level. Batch results preserve request order: a successful item has
-`status="ok"`, `content_index`, and semantic `meta`; an unsuccessful item has
-`status="error"` and its own error. Inspect every status. The
-`content_index` identifies that success's exact text block in `content`; failed
-items never own a content block.
+`status="ok"`, its exact mirrored `content`, `content_index`, and semantic
+`meta`; an unsuccessful item has `status="error"` and its own error. Inspect
+every status and consume the successful item's `content` directly. The
+`content_index` correlates that mirror with the byte-identical top-level MCP
+content block; failed items never own content.
 
 Batching is best-effort context acquisition, not a cross-file transaction. One
 item failure does not suppress successful siblings, and successful reads retain

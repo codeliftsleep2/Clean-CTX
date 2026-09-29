@@ -390,6 +390,14 @@ Clean-CTX is the primary code-intelligence layer. Follow these rules:
 1. **Clean-CTX first** — For symbol/code discovery, use `graph_search` (when
    CBM is available). For code understanding, use `provide_code_context`.
    See `docs/agent/tooling.md` for detailed tool-selection guidance.
+   `provide_code_context` accepts either one singular `filePath` request or one
+   top-level `files` batch containing 1–8 file items. Use the singular form for
+   one file and normally use the batch form for multiple files; never
+   send both forms together. Batch `workspaceRoot` and `tokenizer` are shared
+   top-level fields, while each item owns `id`, `filePath`, and optional
+   `intent`, `fidelity`, and `focusMethods`. Inspect every item status and use
+   each successful item's `content` directly; `content_index` correlates that
+   mirror with the same exact top-level MCP content block.
 2. **CBM fallback** — When `get_cbm_status` returns `unavailable` or
    `degraded`, use `search_codebase` for discovery and `read_files` for
    reading. See `docs/agent/tooling.md` §7 for the full fallback procedure.

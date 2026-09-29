@@ -84,7 +84,7 @@ fn red_batch_schema_declares_single_or_files_contract_and_ordered_outcomes() {
 
     let output = &provide["outputSchema"]["properties"];
     assert_eq!(output["results"]["type"], "array");
-    for field in ["id", "status", "content_index", "meta", "error"] {
+    for field in ["id", "status", "content_index", "content", "meta", "error"] {
         assert!(
             output["results"]["items"]["properties"]
                 .get(field)
@@ -297,6 +297,38 @@ fn red_batch_all_item_failures_keep_a_valid_nonempty_mcp_envelope() {
         1,
         "{response}"
     );
+}
+
+#[test]
+fn red_batch_successes_mirror_exact_content_in_each_structured_item() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let first = write_fixture(&root, "mirrored-first.ts", "MirroredFirst", "one");
+    let third = write_fixture(&root, "mirrored-third.ts", "MirroredThird", "three");
+    let first_source = std::fs::read_to_string(&first).expect("first source");
+    let third_source = std::fs::read_to_string(&third).expect("third source");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "files": [
+                { "id": "first", "filePath": first, "fidelity": "verbatim" },
+                { "id": "missing", "filePath": "missing.ts", "fidelity": "high" },
+                { "id": "third", "filePath": third, "fidelity": "verbatim" }
+            ]
+        }),
+    );
+
+    let items = result_items(&response);
+    assert_eq!(items[0]["content"][0]["type"], "text", "{response}");
+    assert_eq!(items[0]["content"][0]["text"], first_source, "{response}");
+    assert_eq!(items[0]["content_index"], 0, "{response}");
+    assert_eq!(items[1]["status"], "error", "{response}");
+    assert!(items[1].get("content").is_none(), "{response}");
+    assert_eq!(items[2]["content"][0]["type"], "text", "{response}");
+    assert_eq!(items[2]["content"][0]["text"], third_source, "{response}");
+    assert_eq!(items[2]["content_index"], 1, "{response}");
 }
 
 #[test]

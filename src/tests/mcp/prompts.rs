@@ -102,8 +102,9 @@ fn initialize_includes_compact_workflow_instructions() {
 
     for required in [
         "provide_code_context",
+        "singular `filePath` request",
         "top-level `files` batch",
-        "maximum 8",
+        "1–8 items",
         "content_index",
         "no cross-file edit authority",
         "workspaceRoot",

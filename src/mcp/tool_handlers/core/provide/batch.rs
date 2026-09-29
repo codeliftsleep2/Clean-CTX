@@ -130,11 +130,13 @@ fn success_response(id: &Value, items: Vec<CompletedItem>, state: &McpState) -> 
                 let content_index = content.len();
                 let _ = write!(cache_material, "{}:", context.text.len());
                 cache_material.push_str(&context.text);
-                content.push(json!({ "type": "text", "text": context.text }));
+                let content_block = json!({ "type": "text", "text": context.text });
+                content.push(content_block.clone());
                 results.push(json!({
                     "id": item.id,
                     "status": "ok",
                     "content_index": content_index,
+                    "content": [content_block],
                     "meta": context.meta,
                 }));
             }

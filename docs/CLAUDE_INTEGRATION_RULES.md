@@ -66,7 +66,11 @@ path completed, not that CBM facts became semantic authority.
 ## 2. Read source through `provide_code_context`
 
 For supported code (`.ts`, `.cs`, `.rs`, `.java` when compiled into the
-running binary), call `provide_code_context` before native `Read`:
+running binary), call `provide_code_context` before native `Read`. The tool
+explicitly accepts either one singular `filePath` request or one top-level
+`files` batch; the forms are mutually exclusive.
+
+Single-file form:
 
 ```text
 provide_code_context(
@@ -89,7 +93,7 @@ not an automatic delta. `delta_code_context` and `apply_delta` are an explicit
 code-side protocol; use them only when a real host/consumer intentionally owns
 the prior version and acknowledgment lifecycle.
 
-### Batch several source reads
+### Batched multi-file form
 
 Use singular `filePath` for one file. When two or more independently useful
 source contexts are needed, prefer one `files` batch of at most eight items:
@@ -108,10 +112,12 @@ source contexts are needed, prefer one `files` batch of at most eight items:
 Each item requires a unique non-empty `id` and `filePath` and may choose its
 own `intent`, `fidelity`, and `focusMethods`. `workspaceRoot` and `tokenizer`
 belong only at the top level. Inspect every ordered result: `status="ok"`
-carries `content_index` (the exact corresponding block in `content`) and
-semantic `meta`; `status="error"` carries an item-local error without
-suppressing successful siblings. A failed item has no content index. If every
-item fails, the text block only directs the caller to the structured errors.
+carries its exact `content`, `content_index`, and semantic `meta`. Consume the
+item's content directly; its index correlates that mirror with the
+byte-identical top-level MCP content block. `status="error"` carries an
+item-local error without suppressing successful siblings and has neither
+content nor a content index. If every item fails, the text block only directs
+the caller to the structured errors.
 
 Do not repeat the same canonical file in a batch; combine its desired selectors
 into one `focusMethods` array. Request Edit or Verbatim only for files that need

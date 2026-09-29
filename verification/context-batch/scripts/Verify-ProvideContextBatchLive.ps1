@@ -127,8 +127,14 @@ try {
     Assert-True ($firstResults[2].status -eq "ok") "Focused Edit item failed."
     Assert-True ($firstResults[2].content_index -eq 1) "Focused Edit content index did not skip the failure."
     Assert-True (@($first.result.content).Count -eq 2) "Batch content did not contain exactly the two success blocks."
+    Assert-True (
+        [string]$firstResults[0].content[0].text -ceq [string]$first.result.content[0].text
+    ) "Overview item did not mirror its exact content block."
+    Assert-True (
+        [string]$firstResults[2].content[0].text -ceq [string]$first.result.content[1].text
+    ) "Focused Edit item did not mirror its exact content block."
     Assert-True ([string]$first.result.content[1].text -match "return value \+ 1") "Focused Edit block omitted the exact target body."
-    Write-Host "PASS: mixed modes preserve order, isolate failure, and correlate exact content indexes."
+    Write-Host "PASS: mixed modes isolate failure and mirror exact content into each structured success."
 
     $single = Invoke-CleanCtxTool $session 3 "provide_code_context" @{
         workspaceRoot = $workspace

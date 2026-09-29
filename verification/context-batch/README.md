@@ -10,8 +10,8 @@ The harness checks:
   result schema;
 - mixed overview and focused Edit items succeed around one isolated missing-file
   failure;
-- successful `content_index` values identify the exact corresponding content
-  blocks;
+- every structured success mirrors its exact content block and retains the
+  corresponding top-level `content_index`;
 - the focused Edit block is byte-identical to the equivalent legacy single
   response;
 - a repeated batch preserves content and structured outcomes while increasing
