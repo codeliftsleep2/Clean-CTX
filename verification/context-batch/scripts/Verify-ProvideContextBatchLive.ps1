@@ -111,12 +111,16 @@ try {
     })
     Assert-True ($batchBranch.Count -eq 1) "provide_code_context omitted its batch request branch."
     Assert-True ($batchBranch[0].properties.files.maxItems -eq 8) "Batch schema omitted the eight-item cap."
+    Assert-True (
+        ($tool[0].inputSchema.properties.responseMode.enum -join ",") -eq "mirrored,structured,indexed"
+    ) "Batch schema omitted the response-mode contract."
     Assert-True ($tool[0].outputSchema.properties.results.type -eq "array") "Output schema omitted ordered results."
     Write-Host "PASS: live tools/list exposes the provide-code-context batch contract."
 
     $first = Invoke-CleanCtxTool $session 2 "provide_code_context" $batchArguments
     Save-Capture "batch-first" $first
     $firstResults = Structured-Results $first "first batch"
+    Assert-True ($first.result.structuredContent.response_mode -eq "mirrored") "Omitted responseMode did not resolve to mirrored."
     Assert-True ($firstResults.Count -eq 3) "First batch did not return exactly three outcomes."
     Assert-True (($firstResults.id -join ",") -eq "overview,missing,target") "Batch did not preserve IDs and order."
     Assert-True ($firstResults[0].status -eq "ok") "Overview item failed."
@@ -166,6 +170,39 @@ try {
     Assert-True ($hitsAfterRepeat -gt $hitsBeforeRepeat) "Repeated batch did not increase the prompt-cache hit count."
     Write-Host "PASS: repeated execution preserves semantics and reuses the batch cache identity."
 
+    $structuredArguments = $batchArguments.Clone()
+    $structuredArguments.responseMode = "structured"
+    $structured = Invoke-CleanCtxTool $session 7 "provide_code_context" $structuredArguments
+    Save-Capture "batch-structured" $structured
+    $structuredResults = Structured-Results $structured "structured batch"
+    Assert-True ($structured.result.structuredContent.response_mode -eq "structured") "Structured mode discriminator is wrong."
+    Assert-True (@($structured.result.content).Count -eq 1) "Structured mode must emit exactly one routing notice."
+    Assert-True (
+        [string]$structured.result.content[0].text -ceq
+        "Batch context is available in structuredContent.results; inspect every item status and content."
+    ) "Structured mode emitted the wrong routing notice."
+    Assert-True ($null -ne $structuredResults[0].PSObject.Properties["content"]) "Structured overview omitted item content."
+    Assert-True ($null -eq $structuredResults[0].PSObject.Properties["content_index"]) "Structured overview fabricated a content index."
+    Assert-True ($null -eq $structuredResults[1].PSObject.Properties["content"]) "Structured failure fabricated content."
+    Assert-True ($null -ne $structuredResults[2].PSObject.Properties["content"]) "Structured Edit item omitted content."
+    Assert-True ([string]$structuredResults[2].content[0].text -match "return value \+ 1") "Structured item content omitted the exact target body."
+    Write-Host "PASS: structured mode keeps exact code in structured successes when top-level content is discarded."
+
+    $indexedArguments = $batchArguments.Clone()
+    $indexedArguments.responseMode = "indexed"
+    $indexed = Invoke-CleanCtxTool $session 8 "provide_code_context" $indexedArguments
+    Save-Capture "batch-indexed" $indexed
+    $indexedResults = Structured-Results $indexed "indexed batch"
+    Assert-True ($indexed.result.structuredContent.response_mode -eq "indexed") "Indexed mode discriminator is wrong."
+    Assert-True (@($indexed.result.content).Count -eq 2) "Indexed mode omitted top-level success blocks."
+    Assert-True ($indexedResults[0].content_index -eq 0) "Indexed overview did not reference its content block."
+    Assert-True ($null -eq $indexedResults[0].PSObject.Properties["content"]) "Indexed overview duplicated item content."
+    Assert-True ($null -eq $indexedResults[1].PSObject.Properties["content_index"]) "Indexed failure fabricated a content index."
+    Assert-True ($indexedResults[2].content_index -eq 1) "Indexed Edit item did not reference its content block."
+    Assert-True ($null -eq $indexedResults[2].PSObject.Properties["content"]) "Indexed Edit item duplicated content."
+    Assert-True ([string]$indexed.result.content[1].text -match "return value \+ 1") "Indexed top-level content omitted the exact target body."
+    Write-Host "PASS: indexed mode keeps exact code in indexed top-level blocks when item content is discarded."
+
     $report = [ordered]@{
         verified_at_utc = [DateTime]::UtcNow.ToString("o")
         binary = $BinaryPath
@@ -175,6 +212,7 @@ try {
         edit_content_matches_single = $true
         cache_hits_before_repeat = $hitsBeforeRepeat
         cache_hits_after_repeat = $hitsAfterRepeat
+        verified_response_modes = @("mirrored", "structured", "indexed")
     }
     Save-Capture "verification-report" $report
     Write-Host "PASS: live MCP provide-code-context batch verification completed."

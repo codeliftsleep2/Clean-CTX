@@ -1,7 +1,7 @@
 # `provide_code_context` Batch Response-Mode Optimization Plan
 
 **Date:** 2026-09-29
-**Status:** Phases 0–5 and Checkpoints A–F complete; Phase 6 has not started
+**Status:** Phases 0–6 and Checkpoints A–G complete; Phase 7 has not started
 **Scope:** Reduce duplicate serialized code in batched `provide_code_context`
 responses when the caller knows which MCP visibility channel its host exposes,
 without reintroducing silent content loss or changing per-file evaluation.
@@ -375,3 +375,14 @@ Every path requires per-item status inspection and forbids guessing a compact
 mode. The tracked initialization-prompt contract was reported GREEN by the
 maintainer, with the runtime instructions still below their size ceiling.
 Phase 5 and Checkpoint F are complete.
+
+**Phase 6 live-acceptance checkpoint (2026-09-29):** The maintainer ran the
+tracked `verification/context-batch/` harness against a freshly built
+production binary. Live `tools/list` exposed the response-mode contract;
+mirrored mode preserved byte-identical code across both channels; structured
+mode retained exact code after discarding top-level content; indexed mode
+retained exact code after discarding structured item content; and ordered
+failure isolation, singular parity, and repeat cache reuse all passed. Captures
+were written under `target/provide-context-batch-verification/captures/` as
+operator evidence only, not as tracked test or CI evidence. Phase 6 and
+Checkpoint G are complete.

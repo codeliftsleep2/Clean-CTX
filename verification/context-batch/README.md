@@ -10,8 +10,12 @@ The harness checks:
   result schema;
 - mixed overview and focused Edit items succeed around one isolated missing-file
   failure;
-- every structured success mirrors its exact content block and retains the
-  corresponding top-level `content_index`;
+- omitted `responseMode` resolves to safe `mirrored`, with byte-identical code
+  in both MCP visibility channels;
+- `structured` keeps exact code in each structured success when the top-level
+  routing notice is discarded;
+- `indexed` keeps exact code in `content_index`-identified top-level blocks
+  while omitting structured item content;
 - the focused Edit block is byte-identical to the equivalent legacy single
   response;
 - a repeated batch preserves content and structured outcomes while increasing
