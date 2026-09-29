@@ -19,6 +19,15 @@ pub(crate) fn handle_provide_code_context(id: &Value, params: &Value, state: &Mc
         send_response(&batch::response(id, &params["arguments"], state));
         return;
     }
+    if params["arguments"].get("responseMode").is_some() {
+        send_response(
+            &outcome::ProvideFailure::invalid(
+                "'responseMode' is valid only with the batched 'files' request form.",
+            )
+            .response(id),
+        );
+        return;
+    }
     let response = match evaluate::evaluate(params, state) {
         Ok(context) => {
             let mut response = context.legacy_response(id);

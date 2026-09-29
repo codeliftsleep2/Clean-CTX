@@ -11,6 +11,36 @@ use std::fmt::Write;
 const MAX_BATCH_ITEMS: usize = 8;
 const NO_SUCCESS_CONTENT: &str =
     "No context items succeeded; inspect structuredContent.results for item errors.";
+const STRUCTURED_CONTENT_NOTICE: &str = "Batch context is available in structuredContent.results; inspect every item status and content.";
+
+#[derive(Clone, Copy)]
+enum ResponseMode {
+    Mirrored,
+    Structured,
+    Indexed,
+}
+
+impl ResponseMode {
+    fn parse(args: &Value) -> Result<Self, ProvideFailure> {
+        match args.get("responseMode") {
+            None => Ok(Self::Mirrored),
+            Some(Value::String(mode)) if mode == "mirrored" => Ok(Self::Mirrored),
+            Some(Value::String(mode)) if mode == "structured" => Ok(Self::Structured),
+            Some(Value::String(mode)) if mode == "indexed" => Ok(Self::Indexed),
+            Some(_) => Err(ProvideFailure::invalid(
+                "'responseMode' must be one of: mirrored, structured, indexed.",
+            )),
+        }
+    }
+
+    fn wire_name(self) -> &'static str {
+        match self {
+            Self::Mirrored => "mirrored",
+            Self::Structured => "structured",
+            Self::Indexed => "indexed",
+        }
+    }
+}
 
 struct CompletedItem {
     id: String,
@@ -18,8 +48,12 @@ struct CompletedItem {
 }
 
 pub(super) fn response(id: &Value, args: &Value, state: &McpState) -> Value {
+    let mode = match ResponseMode::parse(args) {
+        Ok(mode) => mode,
+        Err(error) => return error.response(id),
+    };
     match execute(args, state) {
-        Ok(items) => success_response(id, items, state),
+        Ok(items) => success_response(id, items, mode, state),
         Err(error) => error.response(id),
     }
 }
@@ -120,25 +154,43 @@ fn canonical_key(params: &Value, state: &McpState) -> Option<String> {
     Some(crate::dictionary::path::canonical_identity_key(&resolved))
 }
 
-fn success_response(id: &Value, items: Vec<CompletedItem>, state: &McpState) -> Value {
+fn success_response(
+    id: &Value,
+    items: Vec<CompletedItem>,
+    mode: ResponseMode,
+    state: &McpState,
+) -> Value {
     let mut content = Vec::new();
     let mut results = Vec::with_capacity(items.len());
-    let mut cache_material = String::new();
+    let mut cache_material = format!("{}|", mode.wire_name());
+    let mut success_count = 0usize;
     for item in items {
         match item.outcome {
             Ok(context) => {
-                let content_index = content.len();
+                success_count += 1;
                 let _ = write!(cache_material, "{}:", context.text.len());
                 cache_material.push_str(&context.text);
                 let content_block = json!({ "type": "text", "text": context.text });
-                content.push(content_block.clone());
-                results.push(json!({
+                let mut result = json!({
                     "id": item.id,
                     "status": "ok",
-                    "content_index": content_index,
-                    "content": [content_block],
                     "meta": context.meta,
-                }));
+                });
+                match mode {
+                    ResponseMode::Mirrored => {
+                        result["content_index"] = json!(content.len());
+                        result["content"] = json!([content_block.clone()]);
+                        content.push(content_block);
+                    }
+                    ResponseMode::Structured => {
+                        result["content"] = json!([content_block]);
+                    }
+                    ResponseMode::Indexed => {
+                        result["content_index"] = json!(content.len());
+                        content.push(content_block);
+                    }
+                }
+                results.push(result);
             }
             Err(error) => results.push(json!({
                 "id": item.id,
@@ -147,9 +199,11 @@ fn success_response(id: &Value, items: Vec<CompletedItem>, state: &McpState) -> 
             })),
         }
     }
-    if content.is_empty() {
+    if success_count == 0 {
         cache_material.push_str(NO_SUCCESS_CONTENT);
         content.push(json!({ "type": "text", "text": NO_SUCCESS_CONTENT }));
+    } else if matches!(mode, ResponseMode::Structured) {
+        content.push(json!({ "type": "text", "text": STRUCTURED_CONTENT_NOTICE }));
     }
     let mut response = json!({
         "jsonrpc": "2.0",
@@ -158,6 +212,7 @@ fn success_response(id: &Value, items: Vec<CompletedItem>, state: &McpState) -> 
             "content": content,
             "structuredContent": {
                 "batch": true,
+                "response_mode": mode.wire_name(),
                 "results": results,
             }
         }

@@ -1,7 +1,7 @@
 # `provide_code_context` Batch Response-Mode Optimization Plan
 
 **Date:** 2026-09-29
-**Status:** Phase 0 and architectural Checkpoint A complete; Phase 1 has not started
+**Status:** Phases 0–3 and Checkpoints A–D complete; Phase 4 has not started
 **Scope:** Reduce duplicate serialized code in batched `provide_code_context`
 responses when the caller knows which MCP visibility channel its host exposes,
 without reintroducing silent content loss or changing per-file evaluation.
@@ -345,3 +345,13 @@ Checkpoint A must explicitly approve:
 
 **Decision (2026-09-29):** Checkpoint A was explicitly approved as written.
 Phase 1 uses the contract above as its RED regression authority.
+
+**Phases 1–3 implementation checkpoint (2026-09-29):** The tracked
+response-mode contract was observed RED against the mirrored-only production
+path, then restored unchanged after implementation and reported GREEN by the
+maintainer. The complete `provide_code_context_batch_tests` module was also
+reported GREEN. Batch requests now parse a request-local typed mode, reject
+unknown values and singular-form mode use before evaluation, default safely to
+`mirrored`, declare the resolved `response_mode`, and project exact successful
+text as mirrored, structured-only, or indexed-only without changing the shared
+per-file evaluator. Phases 1–3 and Checkpoints B–D are complete.

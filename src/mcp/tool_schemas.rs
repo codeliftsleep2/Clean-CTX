@@ -62,6 +62,11 @@ pub(super) fn provide_code_context_properties() -> Value {
         .expect("provide context properties are an object");
     object.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Strongly recommended. Shared explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }));
     object.insert("tokenizer".into(), json!({ "type": "string" }));
+    object.insert("responseMode".into(), json!({
+        "type": "string",
+        "enum": ["mirrored", "structured", "indexed"],
+        "description": "Batch-only response projection. mirrored (default) exposes exact code in both MCP channels; structured exposes code only in structured items; indexed exposes code only in top-level content blocks."
+    }));
 
     let mut item_properties = provide_code_context_item_properties();
     item_properties
@@ -88,7 +93,12 @@ pub(super) fn provide_code_context_request_variants() -> Value {
     json!([
         {
             "required": ["filePath"],
-            "not": { "required": ["files"] }
+            "not": {
+                "anyOf": [
+                    { "required": ["files"] },
+                    { "required": ["responseMode"] }
+                ]
+            }
         },
         {
             "properties": {
@@ -138,8 +148,21 @@ pub(super) fn provide_code_context_batch_results() -> Value {
             "oneOf": [
                 {
                     "properties": { "status": { "const": "ok" } },
-                    "required": ["content_index", "content", "meta"],
-                    "not": { "required": ["error"] }
+                    "required": ["meta"],
+                    "not": { "required": ["error"] },
+                    "oneOf": [
+                        {
+                            "required": ["content_index", "content"]
+                        },
+                        {
+                            "required": ["content"],
+                            "not": { "required": ["content_index"] }
+                        },
+                        {
+                            "required": ["content_index"],
+                            "not": { "required": ["content"] }
+                        }
+                    ]
                 },
                 {
                     "properties": { "status": { "const": "error" } },

@@ -186,9 +186,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "batch": { "const": true },
+                    "response_mode": { "type": "string", "enum": ["mirrored", "structured", "indexed"] },
                     "results": super::tool_schemas::provide_code_context_batch_results()
                 },
-                "required": ["batch", "results"]
+                "required": ["batch", "response_mode", "results"]
             }
         }),
         serde_json::json!({

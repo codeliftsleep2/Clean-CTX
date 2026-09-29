@@ -417,3 +417,152 @@ fn batch_preserves_token_accounting_cache_reuse_and_records_envelope_sizes() {
         );
     }
 }
+
+#[test]
+fn red_response_mode_schema_declares_batch_only_policy_and_resolved_discriminator() {
+    let provide = tool_list()
+        .into_iter()
+        .find(|tool| tool["name"] == "provide_code_context")
+        .expect("provide_code_context tool");
+    let input = &provide["inputSchema"];
+    assert_eq!(
+        input["properties"]["responseMode"]["enum"],
+        json!(["mirrored", "structured", "indexed"]),
+        "{provide}"
+    );
+    let single = input["oneOf"]
+        .as_array()
+        .expect("request union")
+        .iter()
+        .find(|branch| {
+            branch["required"]
+                .as_array()
+                .is_some_and(|required| required.iter().any(|field| field == "filePath"))
+        })
+        .expect("single branch");
+    let forbidden = single["not"]["anyOf"]
+        .as_array()
+        .expect("single-form forbidden fields");
+    assert!(
+        forbidden.iter().any(|rule| {
+            rule["required"]
+                .as_array()
+                .is_some_and(|required| required.iter().any(|field| field == "responseMode"))
+        }),
+        "single request must forbid responseMode: {single}"
+    );
+    assert_eq!(
+        provide["outputSchema"]["properties"]["response_mode"]["enum"],
+        json!(["mirrored", "structured", "indexed"]),
+        "{provide}"
+    );
+}
+
+#[test]
+fn red_omitted_response_mode_resolves_to_safe_mirrored_shape() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = write_fixture(&root, "default-mode.ts", "DefaultMode", "read");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "files": [{ "id": "default", "filePath": file, "fidelity": "verbatim" }]
+        }),
+    );
+    let items = result_items(&response);
+    assert_eq!(
+        response["result"]["structuredContent"]["response_mode"], "mirrored",
+        "{response}"
+    );
+    assert_eq!(items[0]["content_index"], 0, "{response}");
+    assert_eq!(
+        items[0]["content"], response["result"]["content"],
+        "{response}"
+    );
+}
+
+#[test]
+fn red_structured_response_mode_emits_code_once_in_structured_items() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = write_fixture(&root, "structured-mode.ts", "StructuredMode", "read");
+    let source = std::fs::read_to_string(&file).expect("source");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "responseMode": "structured",
+            "files": [{ "id": "structured", "filePath": file, "fidelity": "verbatim" }]
+        }),
+    );
+    let items = result_items(&response);
+    assert_eq!(
+        response["result"]["structuredContent"]["response_mode"], "structured",
+        "{response}"
+    );
+    assert_eq!(
+        content_text(&response, 0),
+        "Batch context is available in structuredContent.results; inspect every item status and content."
+    );
+    assert_eq!(response["result"]["content"].as_array().unwrap().len(), 1);
+    assert_eq!(items[0]["content"][0]["text"], source, "{response}");
+    assert!(items[0].get("content_index").is_none(), "{response}");
+}
+
+#[test]
+fn red_indexed_response_mode_emits_code_once_in_top_level_content() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = write_fixture(&root, "indexed-mode.ts", "IndexedMode", "read");
+    let source = std::fs::read_to_string(&file).expect("source");
+    let response = dispatch(
+        &state(&root),
+        1,
+        json!({
+            "workspaceRoot": root.path(),
+            "responseMode": "indexed",
+            "files": [{ "id": "indexed", "filePath": file, "fidelity": "verbatim" }]
+        }),
+    );
+    let items = result_items(&response);
+    assert_eq!(
+        response["result"]["structuredContent"]["response_mode"], "indexed",
+        "{response}"
+    );
+    assert_eq!(content_text(&response, 0), source);
+    assert_eq!(items[0]["content_index"], 0, "{response}");
+    assert!(items[0].get("content").is_none(), "{response}");
+}
+
+#[test]
+fn red_response_mode_rejects_unknown_values_and_singular_requests() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = write_fixture(&root, "invalid-mode.ts", "InvalidMode", "read");
+    let state = state(&root);
+    let cases = [
+        json!({
+            "workspaceRoot": root.path(),
+            "responseMode": "unknown",
+            "files": [{ "id": "invalid", "filePath": file }]
+        }),
+        json!({
+            "workspaceRoot": root.path(),
+            "responseMode": "structured",
+            "filePath": file
+        }),
+    ];
+    for arguments in cases {
+        let response = dispatch(&state, 1, arguments);
+        assert_eq!(response["error"]["code"], -32602, "{response}");
+        assert!(
+            response["error"]["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("responseMode")),
+            "{response}"
+        );
+    }
+}
