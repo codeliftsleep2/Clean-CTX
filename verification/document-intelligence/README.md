@@ -119,6 +119,9 @@ Remove `-ValidateOnly` only in a fresh oracle-clean operator session. The full
 policy. The runner starts one ephemeral Codex process per task in an isolated
 temporary working directory, disables repository/user configuration, records
 JSONL traces and final answers, and checkpoints the capture after every task.
+If infrastructure failures leave terminal `error` tasks, rerun only those
+tasks by adding `-RetryErrors`; completed answers are preserved and each retry
+increments the task's recorded retry count.
 
 The template is deliberately `planned` and contains no model answers. For each
 task, the control supplies the complete documents named by `sources`, or the

@@ -4,6 +4,7 @@ param(
     [ValidateSet("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra")]
     [string]$ReasoningEffort = "low",
     [string]$CodexPath,
+    [switch]$RetryErrors,
     [switch]$ValidateOnly
 )
 
@@ -28,6 +29,16 @@ if ([string]::IsNullOrWhiteSpace($Model)) {
 if (-not $CodexPath) {
     $command = Get-Command codex -ErrorAction SilentlyContinue
     if ($command) { $CodexPath = $command.Source }
+    else {
+        $extensionRoot = Join-Path $env:USERPROFILE ".vscode\extensions"
+        $candidates = @(
+            Get-ChildItem $extensionRoot -Directory -Filter "openai.chatgpt-*-win32-x64" -ErrorAction SilentlyContinue |
+                Sort-Object LastWriteTime -Descending |
+                ForEach-Object { Join-Path $_.FullName "bin\windows-x86_64\codex.exe" } |
+                Where-Object { Test-Path -LiteralPath $_ -PathType Leaf }
+        )
+        if ($candidates.Count) { $CodexPath = $candidates[0] }
+    }
 }
 if (-not $CodexPath -or -not (Test-Path -LiteralPath $CodexPath -PathType Leaf)) {
     throw "Codex CLI was not found. Pass its full path with -CodexPath."
@@ -41,8 +52,9 @@ if (-not ($captureText | Test-Json -Schema $schemaText -ErrorAction Stop)) {
     throw "Prepared run does not satisfy its JSON Schema"
 }
 $capture = $captureText | ConvertFrom-Json -Depth 100
-if ($capture.status -notin @("prepared", "in_progress")) {
-    throw "Codex execution requires a prepared or in-progress run; found $($capture.status)"
+if ($capture.status -notin @("prepared", "in_progress") -and
+    -not ($RetryErrors -and $capture.status -eq "captured")) {
+    throw "Codex execution requires a prepared/in-progress run, or -RetryErrors for a captured run; found $($capture.status)"
 }
 if ($capture.protocol.transport -cne "concatenated") {
     throw "Codex execution requires concatenated transport"
@@ -71,14 +83,16 @@ $artifactRoot = Join-Path $captureRoot $runId
 $isolationRoot = Join-Path ([IO.Path]::GetTempPath()) "clean-ctx-document-control\$runId"
 if ($ValidateOnly) {
     $pending = @($capture.tasks | Where-Object status -eq "pending").Count
+    $retryable = @($capture.tasks | Where-Object status -eq "error").Count
     Write-Host "Codex control validation passed: $resolvedRunPath"
-    Write-Host "Model: $Model; reasoning: $ReasoningEffort; client: $clientVersion; pending tasks: $pending"
+    Write-Host "Model: $Model; reasoning: $ReasoningEffort; client: $clientVersion; pending tasks: $pending; retryable errors: $retryable"
     exit 0
 }
 
-if (Test-Path -LiteralPath $isolationRoot) {
-    throw "Isolation directory already exists; remove it or use a new run ID: $isolationRoot"
+if ($RetryErrors -and @($capture.tasks | Where-Object status -eq "error").Count -eq 0) {
+    throw "Run has no error tasks to retry"
 }
+
 New-Item -ItemType Directory -Force -Path $artifactRoot, $isolationRoot | Out-Null
 
 $utf8 = [Text.UTF8Encoding]::new($false)
@@ -114,6 +128,9 @@ function Invoke-CodexTask([object]$Task, [string]$TaskDirectory) {
     $startInfo.RedirectStandardInput = $true
     $startInfo.RedirectStandardOutput = $true
     $startInfo.RedirectStandardError = $true
+    $startInfo.StandardInputEncoding = $utf8
+    $startInfo.StandardOutputEncoding = $utf8
+    $startInfo.StandardErrorEncoding = $utf8
     foreach ($argument in @(
         "exec", "-", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules",
         "--config", "mcp_servers={}", "--config", "plugins={}",
@@ -167,7 +184,23 @@ function Invoke-CodexTask([object]$Task, [string]$TaskDirectory) {
     }
 }
 
+if ($RetryErrors) {
+    foreach ($task in $capture.tasks | Where-Object status -eq "error") {
+        $task.status = "pending"
+        $task.output.answer = $null
+        $task.output.latencyMs = $null
+        $task.output.finishReason = $null
+        $task.output.truncated = $null
+        $task.output.retryCount = [int]$task.output.retryCount + 1
+        $task.output.usage.source = "unavailable"
+        $task.output.usage.inputTokens = $null
+        $task.output.usage.outputTokens = $null
+        $task.output.usage.totalTokens = $null
+        $task.output.error = $null
+    }
+}
 $capture.status = "in_progress"
+$capture.run.completedAt = $null
 $capture.run.provider = "OpenAI"
 $capture.run.model = $Model
 $capture.run.reportedModelVersion = $Model
@@ -197,7 +230,7 @@ for ($index = 0; $index -lt $capture.tasks.Count; $index++) {
     $task.output.latencyMs = $result.latencyMs
     $task.output.finishReason = if ($result.exitCode -eq 0) { "process_exit_0" } else { "process_error" }
     $task.output.truncated = $false
-    $task.output.usage.source = if ($null -ne $result.totalTokens) { "provider_reported" } else { "unavailable" }
+    $task.output.usage.source = if ($null -ne $result.inputTokens -or $null -ne $result.outputTokens) { "provider_reported" } else { "unavailable" }
     $task.output.usage.inputTokens = $result.inputTokens
     $task.output.usage.outputTokens = $result.outputTokens
     $task.output.usage.totalTokens = $result.totalTokens

@@ -152,6 +152,10 @@ allowlisted task input and resolved source documents.
    pins `gpt-5.6-sol` with `low` reasoning effort rather than inheriting the
    operator's local default.
 
+   Infrastructure errors may be retried with `-RetryErrors`. The runner retains
+   completed task captures, resets only error tasks, increments their retry
+   counts, and checkpoints the same run artifact after each retry.
+
 2. Fill run metadata and verify pinned inputs.
 3. Resolve and record each task's source bundle.
 4. Assemble and hash the exact prompt.
