@@ -36,6 +36,7 @@
     "schema": "verification/document-intelligence/full-document-control-capture.schema.json",
     "template": "verification/document-intelligence/full-document-control-capture.template.json",
     "preparer": "verification/document-intelligence/scripts/Prepare-FullDocumentControlRun.ps1",
+    "codex_runner": "verification/document-intelligence/scripts/Run-FullDocumentControlCodex.ps1",
     "oracles": "verification/document-intelligence/full-document-control-oracles.json",
     "generated_artifact_pattern": "target/document-intelligence/control-runs/<run-id>.json",
     "rule": "Capture model outputs before oracle review; generated run artifacts are observational evidence, not tracked-test results."

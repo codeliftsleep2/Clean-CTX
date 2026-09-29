@@ -99,6 +99,9 @@ artifact path plus SHA-256 for each message. Hash the exact UTF-8 bytes actually
 sent, after any provider-specific serialization has been assembled. Do not
 claim prompt reproducibility from a template hash alone.
 
+For `concatenated` transport, the preparer records the exact transport text and
+hash. It consists of the system text, one LF separator, and the user text.
+
 ## Run controls
 
 Record enough configuration to distinguish runs:
@@ -133,12 +136,21 @@ allowlisted task input and resolved source documents.
      -RunId <run-id> `
      -Provider <provider> `
      -Model <model> `
-     -Transport role_messages
+     -ReasoningEffort <effort> `
+     -Transport concatenated
    ```
 
    The preparer reads the manifest, token baseline, template, schema, and
    source documents, then records the run as `prepared`. It deliberately does
    not read the oracle file.
+
+   A Codex run uses `codex exec --json` with one ephemeral process per task,
+   an isolated temporary working directory, read-only sandboxing, ignored user
+   configuration/rules, and no configured MCP servers or plugins. JSONL traces
+   and final messages are retained beside the run artifact. Any observed tool
+   invocation invalidates that task's control capture. The initial Codex lane
+   pins `gpt-5.6-sol` with `low` reasoning effort rather than inheriting the
+   operator's local default.
 
 2. Fill run metadata and verify pinned inputs.
 3. Resolve and record each task's source bundle.

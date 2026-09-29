@@ -26,6 +26,8 @@ The governing investigation is
   neutral run template;
 - `scripts/Prepare-FullDocumentControlRun.ps1` - oracle-blind source
   verification and exact prompt assembly;
+- `scripts/Run-FullDocumentControlCodex.ps1` - isolated, resumable Codex CLI
+  execution and JSONL/answer capture;
 - `token-baseline.schema.json` - generated token-capture output contract;
 - `scripts/Capture-TokenBaselines.ps1` - exact `cl100k`/`o200k` capture using
   the repository's existing measurement helper;
@@ -90,7 +92,8 @@ pwsh -NoProfile -File verification/document-intelligence/scripts/Prepare-FullDoc
   -RunId <run-id> `
   -Provider <provider> `
   -Model <model> `
-  -Transport role_messages
+  -ReasoningEffort <effort> `
+  -Transport concatenated
 ```
 
 Provider and model may be omitted during a preparation-only smoke check, but
@@ -98,6 +101,24 @@ must be recorded before execution. The preparer refuses hash or byte-count
 drift, validates the generated artifact against its schema, and refuses to
 overwrite an existing run ID. It changes the copied lifecycle state from
 `planned` to `prepared`; it does not read the oracle file or call a model.
+
+For a Codex control, use `OpenAI` as the provider, the exact Codex model ID,
+`low` reasoning for the initial light-reasoning lane, and `concatenated`
+transport. Validate the prepared run without model calls:
+
+```powershell
+pwsh -NoProfile -File verification/document-intelligence/scripts/Run-FullDocumentControlCodex.ps1 `
+  -RunPath target/document-intelligence/control-runs/<run-id>.json `
+  -Model <exact-model-id> `
+  -ReasoningEffort <effort> `
+  -ValidateOnly
+```
+
+Remove `-ValidateOnly` only in a fresh oracle-clean operator session. The full
+16-task command is long-running and must be run by the operator under repository
+policy. The runner starts one ephemeral Codex process per task in an isolated
+temporary working directory, disables repository/user configuration, records
+JSONL traces and final answers, and checkpoints the capture after every task.
 
 The template is deliberately `planned` and contains no model answers. For each
 task, the control supplies the complete documents named by `sources`, or the

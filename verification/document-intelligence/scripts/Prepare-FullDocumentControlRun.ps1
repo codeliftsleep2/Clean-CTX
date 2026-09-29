@@ -15,6 +15,7 @@ param(
     [Nullable[double]]$TopP,
     [Nullable[int]]$Seed,
     [Nullable[int]]$MaxOutputTokens,
+    [string]$ReasoningEffort,
     [hashtable]$OtherParameters = @{}
 )
 
@@ -260,6 +261,12 @@ foreach ($task in $manifest.tasks) {
     }
     [void]$userBuilder.Append("Return only the answer text.`n")
     $userText = $userBuilder.ToString()
+    $transportText = if ($Transport -eq "concatenated") {
+        "$systemText`n$userText"
+    }
+    else {
+        $null
+    }
 
     $taskCaptures.Add([ordered]@{
         task = $taskId
@@ -270,6 +277,8 @@ foreach ($task in $manifest.tasks) {
             userText = $userText
             systemSha256 = Get-TextSha256 -Text $systemText
             userSha256 = Get-TextSha256 -Text $userText
+            transportText = $transportText
+            transportSha256 = if ($null -eq $transportText) { $null } else { Get-TextSha256 -Text $transportText }
         }
         output = [ordered]@{
             answer = $null
@@ -319,6 +328,7 @@ $payload = [ordered]@{
             topP = $TopP
             seed = $Seed
             maxOutputTokens = $MaxOutputTokens
+            reasoningEffort = if ([string]::IsNullOrWhiteSpace($ReasoningEffort)) { $null } else { $ReasoningEffort }
             other = $OtherParameters
         }
     }

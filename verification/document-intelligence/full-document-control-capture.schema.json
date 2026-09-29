@@ -10,7 +10,7 @@
     "version": { "const": 1 },
     "manifestVersion": { "type": "integer", "minimum": 1 },
     "oracleVersion": { "type": "integer", "minimum": 1 },
-    "status": { "enum": ["planned", "prepared", "in_progress", "complete"] },
+    "status": { "enum": ["planned", "prepared", "in_progress", "captured", "complete"] },
     "run": { "$ref": "#/$defs/run" },
     "protocol": { "$ref": "#/$defs/protocol" },
     "tasks": {
@@ -42,13 +42,14 @@
         "clientVersion": { "$ref": "#/$defs/nullableString" },
         "parameters": {
           "type": "object",
-          "required": ["temperature", "topP", "seed", "maxOutputTokens", "other"],
+          "required": ["temperature", "topP", "seed", "maxOutputTokens", "reasoningEffort", "other"],
           "additionalProperties": false,
           "properties": {
             "temperature": { "type": ["number", "null"] },
             "topP": { "type": ["number", "null"] },
             "seed": { "type": ["integer", "null"] },
             "maxOutputTokens": { "type": ["integer", "null"], "minimum": 1 },
+            "reasoningEffort": { "$ref": "#/$defs/nullableString" },
             "other": { "type": "object" }
           }
         }
@@ -89,13 +90,15 @@
     },
     "prompt": {
       "type": "object",
-      "required": ["systemText", "userText", "systemSha256", "userSha256"],
+      "required": ["systemText", "userText", "systemSha256", "userSha256", "transportText", "transportSha256"],
       "additionalProperties": false,
       "properties": {
         "systemText": { "$ref": "#/$defs/nullableString" },
         "userText": { "$ref": "#/$defs/nullableString" },
         "systemSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
-        "userSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+        "userSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "transportText": { "$ref": "#/$defs/nullableString" },
+        "transportSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
       }
     },
     "usage": {

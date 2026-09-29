@@ -22,6 +22,7 @@
       "topP": null,
       "seed": null,
       "maxOutputTokens": null,
+      "reasoningEffort": null,
       "other": {}
     }
   },
