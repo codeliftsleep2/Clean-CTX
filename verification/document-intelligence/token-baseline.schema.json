@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clean-ctx.local/schemas/document-intelligence-token-baseline-v1.json",
+  "title": "Clean-CTX document-intelligence full-document token baseline",
+  "type": "object",
+  "required": ["schema", "version", "manifestVersion", "capturedAt", "tokenizers", "documents", "totals"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "const": "clean-ctx/document-intelligence-token-baseline"
+    },
+    "version": {
+      "const": 1
+    },
+    "manifestVersion": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tokenizers": {
+      "const": ["cl100k", "o200k"]
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "path", "sha256", "bytes", "tokens"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 },
+          "tokens": {
+            "type": "object",
+            "required": ["cl100k", "o200k"],
+            "additionalProperties": false,
+            "properties": {
+              "cl100k": { "type": "integer", "minimum": 0 },
+              "o200k": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "required": ["documents", "bytes", "cl100k", "o200k"],
+      "additionalProperties": false,
+      "properties": {
+        "documents": { "type": "integer", "minimum": 1 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "cl100k": { "type": "integer", "minimum": 0 },
+        "o200k": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

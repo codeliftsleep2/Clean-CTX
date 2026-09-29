@@ -12,6 +12,8 @@ authoritative.
 
 Current packages:
 
+- `document-intelligence/` — Phase 0 Markdown corpus, task/evidence manifest,
+  and adversarial structural/edit fixtures;
 - `context-compression/` — CONTROL-PROD/CONTROL-FULL capture, measurement, and
   reasoning-verification definitions;
 - `workspace-query/` — registered workspace graph-query capture and model-

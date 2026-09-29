@@ -1,0 +1,123 @@
+{
+  "schema": "clean-ctx/document-intelligence-token-baseline",
+  "version": 1,
+  "manifestVersion": 1,
+  "capturedAt": "2026-09-29T20:49:38.6511169+00:00",
+  "tokenizers": [
+    "cl100k",
+    "o200k"
+  ],
+  "documents": [
+    {
+      "id": "portable-agent-policy",
+      "path": "AGENTS.md",
+      "sha256": "db07b99d4909af40a11ba511c168a20505a13083d159fc35113927c3f29c7a49",
+      "bytes": 23915,
+      "tokens": { "cl100k": 4949, "o200k": 4956 }
+    },
+    {
+      "id": "project-readme",
+      "path": "README.md",
+      "sha256": "bc73a37df5b781c7614f428401848c1a53272d2b478e848b729986696978ce79",
+      "bytes": 21460,
+      "tokens": { "cl100k": 5018, "o200k": 5028 }
+    },
+    {
+      "id": "architecture-overview",
+      "path": "docs/ARCHITECTURE_OVERVIEW.md",
+      "sha256": "693b4b27710b049771113ccb0fc77e882c07f89ffca3d2681bb94528807a4ec5",
+      "bytes": 56313,
+      "tokens": { "cl100k": 12458, "o200k": 12520 }
+    },
+    {
+      "id": "architectural-invariants",
+      "path": "docs/ARCHITECTURAL_INVARIANTS.md",
+      "sha256": "8648e32d574f8a65b963987de3c149fbd19b92b71777abba78604c8eaa4586bf",
+      "bytes": 108907,
+      "tokens": { "cl100k": 23537, "o200k": 23675 }
+    },
+    {
+      "id": "discovery-registry",
+      "path": "docs/agent/DISCOVERY_REGISTRY.md",
+      "sha256": "7115c389fcf373bc4f887c08b776c2312460f475037c0a14da26d19fb9a9238c",
+      "bytes": 91541,
+      "tokens": { "cl100k": 19715, "o200k": 19848 }
+    },
+    {
+      "id": "agent-tooling",
+      "path": "docs/agent/tooling.md",
+      "sha256": "924488383bba783b1f4456873f0051faf8bf860b2466aafab69ba59cde7099c2",
+      "bytes": 38260,
+      "tokens": { "cl100k": 8684, "o200k": 8723 }
+    },
+    {
+      "id": "current-changelog",
+      "path": "docs/changelogs/CHANGELOG.md",
+      "sha256": "63fa461af171d8b060961b5f40273a2f3dbb52fe9e71fe1a20ad6b7898cba921",
+      "bytes": 17816,
+      "tokens": { "cl100k": 3737, "o200k": 3742 }
+    },
+    {
+      "id": "workspace-query-batch-plan",
+      "path": "docs/architecture/WORKSPACE_QUERY_BATCH_MIGRATION_PLAN_2026-09-28.md",
+      "sha256": "4f2758b28e5af3f99a3b3a52bcb427d01f74467b928c2ab93f67b11d2364d9d7",
+      "bytes": 60242,
+      "tokens": { "cl100k": 12147, "o200k": 12201 }
+    },
+    {
+      "id": "document-intelligence-investigation",
+      "path": "docs/architecture/SEMANTIC_DOCUMENT_INTELLIGENCE_INVESTIGATION.md",
+      "sha256": "379f4453c9d02d253af8d49afa68ce413f60f100200a7ef91fb5dde96dc950c4",
+      "bytes": 35239,
+      "tokens": { "cl100k": 6732, "o200k": 6721 }
+    },
+    {
+      "id": "fixture-structural-edge-cases",
+      "path": "verification/document-intelligence/fixtures/structural-edge-cases.md",
+      "sha256": "982f9f321613386574af6c49aa6ffedcb5b2160a3c68c19ef10c29ab13f77b9a",
+      "bytes": 1804,
+      "tokens": { "cl100k": 365, "o200k": 366 }
+    },
+    {
+      "id": "fixture-linked-overview",
+      "path": "verification/document-intelligence/fixtures/linked-overview.md",
+      "sha256": "c2d290b51d476e4f0de14fa51c3ab2bbb5d1c9719cf46f22eec6cad7fc43d9ba",
+      "bytes": 813,
+      "tokens": { "cl100k": 154, "o200k": 154 }
+    },
+    {
+      "id": "fixture-linked-decision",
+      "path": "verification/document-intelligence/fixtures/linked-decision.md",
+      "sha256": "e5aa74e76efdab05acdaa4c34635a0d14da5f3ee309467703b1410c25d1abef6",
+      "bytes": 817,
+      "tokens": { "cl100k": 153, "o200k": 153 }
+    },
+    {
+      "id": "fixture-preservation-before",
+      "path": "verification/document-intelligence/fixtures/preservation-before.md",
+      "sha256": "e0e800d9237d55bf6a2f0a95d244613128e31e3e56f4b777f7e0ffc9ee013ac3",
+      "bytes": 534,
+      "tokens": { "cl100k": 88, "o200k": 88 }
+    },
+    {
+      "id": "fixture-preservation-safe-after",
+      "path": "verification/document-intelligence/fixtures/preservation-safe-after.md",
+      "sha256": "1401ac03b6cedc643b20c25010d65d805e0cec26a9662c993f94aa5be1482e30",
+      "bytes": 574,
+      "tokens": { "cl100k": 97, "o200k": 97 }
+    },
+    {
+      "id": "fixture-preservation-unsafe-after",
+      "path": "verification/document-intelligence/fixtures/preservation-unsafe-after.md",
+      "sha256": "6335054a1d46239ac00455a4f8d92081bf7e125d6e2bbf8c09953fbcec3b09b6",
+      "bytes": 588,
+      "tokens": { "cl100k": 95, "o200k": 95 }
+    }
+  ],
+  "totals": {
+    "documents": 15,
+    "bytes": 458823,
+    "cl100k": 97929,
+    "o200k": 98367
+  }
+}

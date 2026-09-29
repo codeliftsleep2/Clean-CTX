@@ -252,7 +252,7 @@ checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
 name = "clean-ctx"
-version = "0.8.0-rc"
+version = "0.8.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",

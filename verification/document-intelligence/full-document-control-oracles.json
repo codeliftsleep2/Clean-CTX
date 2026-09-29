@@ -1,0 +1,73 @@
+{
+  "schema": "clean-ctx/document-intelligence-control-oracles",
+  "version": 1,
+  "recorded": "2026-09-29",
+  "status": "human_reviewed_oracles",
+  "note": "These are evaluation authorities, not claims that a model control run passed.",
+  "oracles": [
+    {
+      "task": "read-document-authority-boundary",
+      "answer": "Deterministic syntax, exact source identity, spans, hierarchy, explicit links, and approved explicit metadata are authoritative. Embeddings, inferred roles or status, drift scores, and LLM interpretations are advisory and cannot create repository authority."
+    },
+    {
+      "task": "read-canonical-versus-presentation",
+      "answer": "Canonical IR retains explicit typed identity, ownership, order, duplicates, provenance, and exact edit evidence. Model-facing text is a compact projection and cannot become storage, validation, persistence, or edit authority."
+    },
+    {
+      "task": "read-sqlite-rationale",
+      "answer": "SQLite is embedded and zero-configuration, supports concurrent safety through WAL, stores compact IR in BLOBs, supports versioned schema migration, and remains portable as one database file."
+    },
+    {
+      "task": "read-first-touch-file-semantics",
+      "answer": "The old handler queried a demand-populated index directly, so an uncompiled file looked identical to a genuinely empty file and stale low-fidelity facts could look sufficient. WSC-006 now requires source-hash-current, fidelity-sufficient file coverage and replacement compilation when coverage is absent, stale, or insufficient."
+    },
+    {
+      "task": "navigate-long-running-policy",
+      "answer": "No. In a local interactive session the agent must hand cargo test to the user unless that specific run is explicitly authorized. The automated runner has a separate workflow authorization and does not grant ordinary local permission."
+    },
+    {
+      "task": "cross-document-cbm-identity",
+      "answer": "CBM derives one canonical project slug from each canonical root. Clean-CTX stores the root-to-project mapping, tracks readiness per project, shares one subprocess without merging project identities, and requires additional roots to be resolved or selected explicitly."
+    },
+    {
+      "task": "cross-document-batch-scope",
+      "answer": "The design established one top-level authorized workspace scope and item-local failure isolation. Shipped WSC-009 requires shared preparation, one final index evidence view for index-backed items, ordered per-item outcomes, and no suppression of valid siblings by an unrelated failure."
+    },
+    {
+      "task": "parse-structural-edge-cases",
+      "answer": "The fixture contains one front-matter block, root preamble, one Setext H1, two distinct Recovery headings, a skipped heading level, container-owned blockquote and list headings, two real local link uses, and one reference definition. Heading-like content inside the fence and raw HTML h2 are not Markdown sections."
+    },
+    {
+      "task": "cross-document-explicit-authority",
+      "answer": "The explicitly linked accepted decision controls the fixture: deterministic structure and approved metadata are authoritative while inferred semantics remain advisory. Contradictory unlinked overview prose is a decoy, the missing roadmap link is unresolved, and the CommonMark link is external."
+    },
+    {
+      "task": "write-context-architecture-update",
+      "answer": "The generation brief must preserve deterministic structural authority, require separately approved explicit authority mechanisms, retain advisory status for semantic inference, keep embeddings optional, avoid premature RAG/vector infrastructure, and identify model/runtime/cache policy as an unapproved decision."
+    },
+    {
+      "task": "edit-resolve-duplicate-recovery",
+      "answer": "Reject the bare Recovery selector as ambiguous. Resolve the operator section through Setext Document Section > Operations > Recovery, not the Lifecycle > Recovery occurrence."
+    },
+    {
+      "task": "verify-authority-preservation-safe",
+      "answer": "Accept. Current Capability changed as authorized, while Authority Model is byte-identical and no unrelated section changed."
+    },
+    {
+      "task": "verify-authority-preservation-unsafe",
+      "answer": "Reject deterministically because Authority Model changed outside the authorized Current Capability target. Semantic interpretation is unnecessary to establish the scope violation."
+    },
+    {
+      "task": "detect-authority-semantic-drift",
+      "answer": "Flag or escalate. The edited authority text reverses advisory semantics into classifier authority. That evidence warrants review but does not establish a general automatic-rejection policy."
+    },
+    {
+      "task": "read-apply-edit-boundaries",
+      "answer": "The current session must own a prior Edit or Verbatim read, and expectedOldText must byte-match the current on-disk body. apply_edit is not the tool for new files or one cross-file mutation."
+    },
+    {
+      "task": "read-release-batch-capabilities",
+      "answer": "Version 0.8.0 shipped failure-isolated ordered provide_code_context file batches and heterogeneous workspace_query batches with shared preparation. Live trials reported round-trip, cost, and elapsed-time improvements, while the changelog explicitly treats field observations as complementary to tracked regressions and reports maintainer-confirmed focused, live stdio, and final-gate verification."
+    }
+  ]
+}

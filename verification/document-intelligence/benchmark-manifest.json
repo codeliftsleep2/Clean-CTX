@@ -1,0 +1,487 @@
+{
+  "schema": "clean-ctx/document-intelligence-benchmark",
+  "version": 1,
+  "recorded": "2026-09-29",
+  "status": "baseline_pending",
+  "purpose": "Evaluate general Markdown discovery, reading, writing, editing, and verification; Clean-CTX documents are controlled subjects, not the product boundary.",
+  "authority": {
+    "structural_labels": "human_reviewed",
+    "semantic_labels": "human_reviewed_evaluation_only",
+    "production_contract": false,
+    "tracked_test_suite": false
+  },
+  "corpus_summary": {
+    "docs_markdown_files": 105,
+    "docs_total_lines": 28861,
+    "docs_total_headings": 2020,
+    "summary_scope": "docs/**/*.md as observed on 2026-09-29",
+    "external_repository_cases": "pending_field_selection"
+  },
+  "token_baseline": {
+    "status": "captured",
+    "required_tokenizers": ["cl100k", "o200k"],
+    "rule": "Do not substitute character estimates for supported tokenizer measurements.",
+    "artifact": "verification/document-intelligence/baselines/full-document-tokens.json",
+    "capturedAt": "2026-09-29T20:49:38.6511169+00:00",
+    "totals": {
+      "documents": 15,
+      "bytes": 458823,
+      "cl100k": 97929,
+      "o200k": 98367
+    }
+  },
+  "documents": [
+    {
+      "id": "portable-agent-policy",
+      "path": "AGENTS.md",
+      "kind": "governing_instruction",
+      "bytes": 23915,
+      "lines": 487,
+      "headings": 27,
+      "sha256": "db07b99d4909af40a11ba511c168a20505a13083d159fc35113927c3f29c7a49"
+    },
+    {
+      "id": "project-readme",
+      "path": "README.md",
+      "kind": "product_documentation",
+      "bytes": 21460,
+      "lines": 425,
+      "headings": 32,
+      "sha256": "bc73a37df5b781c7614f428401848c1a53272d2b478e848b729986696978ce79"
+    },
+    {
+      "id": "architecture-overview",
+      "path": "docs/ARCHITECTURE_OVERVIEW.md",
+      "kind": "architecture",
+      "bytes": 56313,
+      "lines": 921,
+      "headings": 50,
+      "sha256": "693b4b27710b049771113ccb0fc77e882c07f89ffca3d2681bb94528807a4ec5"
+    },
+    {
+      "id": "architectural-invariants",
+      "path": "docs/ARCHITECTURAL_INVARIANTS.md",
+      "kind": "invariant_catalog",
+      "bytes": 108907,
+      "lines": 688,
+      "headings": 56,
+      "sha256": "8648e32d574f8a65b963987de3c149fbd19b92b71777abba78604c8eaa4586bf"
+    },
+    {
+      "id": "discovery-registry",
+      "path": "docs/agent/DISCOVERY_REGISTRY.md",
+      "kind": "append_only_discovery_ledger",
+      "bytes": 91541,
+      "lines": 918,
+      "headings": 35,
+      "sha256": "7115c389fcf373bc4f887c08b776c2312460f475037c0a14da26d19fb9a9238c"
+    },
+    {
+      "id": "agent-tooling",
+      "path": "docs/agent/tooling.md",
+      "kind": "procedure",
+      "bytes": 38260,
+      "lines": 714,
+      "headings": 60,
+      "sha256": "924488383bba783b1f4456873f0051faf8bf860b2466aafab69ba59cde7099c2"
+    },
+    {
+      "id": "current-changelog",
+      "path": "docs/changelogs/CHANGELOG.md",
+      "kind": "changelog",
+      "bytes": 17816,
+      "lines": 214,
+      "headings": 15,
+      "sha256": "63fa461af171d8b060961b5f40273a2f3dbb52fe9e71fe1a20ad6b7898cba921"
+    },
+    {
+      "id": "workspace-query-batch-plan",
+      "path": "docs/architecture/WORKSPACE_QUERY_BATCH_MIGRATION_PLAN_2026-09-28.md",
+      "kind": "migration_plan",
+      "bytes": 60242,
+      "lines": 1268,
+      "headings": 52,
+      "sha256": "4f2758b28e5af3f99a3b3a52bcb427d01f74467b928c2ab93f67b11d2364d9d7"
+    },
+    {
+      "id": "document-intelligence-investigation",
+      "path": "docs/architecture/SEMANTIC_DOCUMENT_INTELLIGENCE_INVESTIGATION.md",
+      "kind": "investigation_roadmap",
+      "bytes": 35239,
+      "lines": 1071,
+      "headings": 67,
+      "sha256": "379f4453c9d02d253af8d49afa68ce413f60f100200a7ef91fb5dde96dc950c4"
+    },
+    {
+      "id": "fixture-structural-edge-cases",
+      "path": "verification/document-intelligence/fixtures/structural-edge-cases.md",
+      "kind": "synthetic_structure_fixture"
+    },
+    {
+      "id": "fixture-linked-overview",
+      "path": "verification/document-intelligence/fixtures/linked-overview.md",
+      "kind": "synthetic_cross_document_fixture"
+    },
+    {
+      "id": "fixture-linked-decision",
+      "path": "verification/document-intelligence/fixtures/linked-decision.md",
+      "kind": "synthetic_decision_fixture"
+    },
+    {
+      "id": "fixture-preservation-before",
+      "path": "verification/document-intelligence/fixtures/preservation-before.md",
+      "kind": "synthetic_edit_fixture"
+    },
+    {
+      "id": "fixture-preservation-safe-after",
+      "path": "verification/document-intelligence/fixtures/preservation-safe-after.md",
+      "kind": "synthetic_edit_fixture"
+    },
+    {
+      "id": "fixture-preservation-unsafe-after",
+      "path": "verification/document-intelligence/fixtures/preservation-unsafe-after.md",
+      "kind": "synthetic_edit_fixture"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "read-document-authority-boundary",
+      "operation": "read",
+      "question": "What is authoritative versus advisory in semantic document intelligence?",
+      "sources": ["document-intelligence-investigation"],
+      "required_evidence": [
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.1 Authoritative structural facts"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.2 Explicit repository authority"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.3 Advisory semantic interpretation"]
+        }
+      ],
+      "required_claims": [
+        "Deterministic structure is authoritative.",
+        "Only an approved explicit repository mechanism can establish stronger document authority.",
+        "Embeddings, classifiers, inferred status, drift scores, and LLM interpretation remain advisory."
+      ]
+    },
+    {
+      "id": "read-canonical-versus-presentation",
+      "operation": "read",
+      "question": "Why must canonical semantics remain separate from model-facing presentation?",
+      "sources": ["architectural-invariants"],
+      "required_evidence": [
+        {
+          "document": "architectural-invariants",
+          "heading_path": ["Clean-CTX Architectural Invariants", "Invariant Catalog", "ARCH-003 Canonical IR and LLM Projection Are Separate Contracts"]
+        },
+        {
+          "document": "architectural-invariants",
+          "heading_path": ["Clean-CTX Architectural Invariants", "Invariant Catalog", "CTX-001 Canonical Semantics and Representation Authorities Stay Distinct"]
+        }
+      ],
+      "required_claims": [
+        "A presentation is a projection rather than canonical storage.",
+        "Compression or representation changes must not erase canonical identity, occurrence, provenance, or exact edit authority."
+      ]
+    },
+    {
+      "id": "read-sqlite-rationale",
+      "operation": "read",
+      "question": "Why does Clean-CTX use SQLite for persistence?",
+      "sources": ["architecture-overview"],
+      "required_evidence": [
+        {
+          "document": "architecture-overview",
+          "heading_path": ["Clean-CTX — Architecture Overview", "Design Decisions", "Why SQLite for persistence?"]
+        }
+      ],
+      "required_claims": [
+        "SQLite is embedded and requires no server configuration.",
+        "WAL mode supports concurrent read/write safety without external locking.",
+        "BLOB support stores compact binary IR.",
+        "The schema-version table supports forward-compatible migrations.",
+        "A single database file is portable for backup or movement."
+      ]
+    },
+    {
+      "id": "read-first-touch-file-semantics",
+      "operation": "cross_document_read",
+      "question": "What defect made entities_in_file return a misleading empty result, and what invariant now governs first-touch behavior?",
+      "sources": ["discovery-registry", "architectural-invariants"],
+      "required_evidence": [
+        {
+          "document": "discovery-registry",
+          "heading_path": ["Live Discovery Registry (`docs/agent/DISCOVERY_REGISTRY.md`)", "DIS-2026-024: `entities_in_file` Returned Ambiguous Empty Results Before Prior Compilation"]
+        },
+        {
+          "document": "architectural-invariants",
+          "heading_path": ["Clean-CTX Architectural Invariants", "Invariant Catalog", "WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware"]
+        }
+      ],
+      "required_claims": [
+        "An uncompiled file was indistinguishable from a genuinely empty semantic result.",
+        "Coverage must be current for the source hash and sufficient for requested semantic fidelity before reuse."
+      ]
+    },
+    {
+      "id": "navigate-long-running-policy",
+      "operation": "governing_instruction_navigation",
+      "question": "In a local interactive repository session, may an agent start cargo test without a specific per-run authorization?",
+      "sources": ["portable-agent-policy"],
+      "required_evidence": [
+        {
+          "document": "portable-agent-policy",
+          "heading_path": ["AGENTS.md — Clean-CTX Portable Agent Policy", "Core policy (derived from `.clinerules/engineering.md`)", "1. Long-running process boundary (highest-priority operating rule)"]
+        }
+      ],
+      "required_claims": [
+        "No. The agent hands long-running commands to the user unless that specific run is explicitly authorized.",
+        "The automated-runner authorization described by AGENTS.md is a separate workflow contract, not permission for an ordinary local agent run."
+      ],
+      "safety_note": "This task evaluates navigation only. Host instruction injection remains authoritative and must not be replaced by semantic retrieval."
+    },
+    {
+      "id": "cross-document-cbm-identity",
+      "operation": "cross_document_read",
+      "question": "How is CBM project identity established and used across multiple roots?",
+      "sources": ["architecture-overview", "architectural-invariants"],
+      "required_evidence": [
+        {
+          "document": "architecture-overview",
+          "heading_path": ["Clean-CTX — Architecture Overview", "CBM Filter-First Architecture (v0.2.0)", "Project Identity & Multi-Root Lifecycle"]
+        },
+        {
+          "document": "architectural-invariants",
+          "heading_path": ["Clean-CTX Architectural Invariants", "Invariant Catalog", "CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle"]
+        }
+      ],
+      "required_claims": [
+        "CBM derives the canonical project slug from the canonical root.",
+        "Clean-CTX preserves a root-to-project mapping rather than inventing project IDs from basenames.",
+        "Each configured root has its own canonical CBM project and per-project readiness state.",
+        "One CBM subprocess is shared without merging the identities of its projects.",
+        "Additional roots must be explicitly resolved or selected before querying them."
+      ]
+    },
+    {
+      "id": "cross-document-batch-scope",
+      "operation": "cross_document_read",
+      "question": "How did the batch design define scope and failure isolation, and what shipped invariant now governs that behavior?",
+      "sources": ["workspace-query-batch-plan", "architectural-invariants"],
+      "required_evidence": [
+        {
+          "document": "workspace-query-batch-plan",
+          "heading_path": ["Workspace Query Batch Migration Plan", "3. Current production architecture", "3.3 Scope authority"],
+          "evidence_role": "design_rationale"
+        },
+        {
+          "document": "workspace-query-batch-plan",
+          "heading_path": ["Workspace Query Batch Migration Plan", "5. Proposed public contract", "5.5 Failure isolation and side effects"],
+          "evidence_role": "design_rationale"
+        },
+        {
+          "document": "architectural-invariants",
+          "heading_path": ["Clean-CTX Architectural Invariants", "Invariant Catalog", "WSC-009 Workspace Query Batches Isolate Outcomes and Share Final Evidence"],
+          "evidence_role": "shipped_authority"
+        }
+      ],
+      "required_claims": [
+        "Items share one authorized top-level workspace scope.",
+        "Independent item failures do not erase valid siblings.",
+        "Index-backed evaluations share one final prepared evidence view."
+      ]
+    },
+    {
+      "id": "parse-structural-edge-cases",
+      "operation": "structural_parse",
+      "question": "What deterministic structures and ownership relationships exist in the adversarial Markdown fixture?",
+      "sources": ["fixture-structural-edge-cases"],
+      "required_structural_facts": {
+        "front_matter": 1,
+        "root_preamble": true,
+        "setext_headings": 1,
+        "duplicate_heading_titles": ["Recovery"],
+        "fenced_fake_heading_is_section": false,
+        "raw_html_h2_is_markdown_section": false,
+        "quoted_heading_retains_container": true,
+        "list_heading_retains_container": true,
+        "explicit_local_links": 2,
+        "reference_definitions": 1
+      }
+    },
+    {
+      "id": "cross-document-explicit-authority",
+      "operation": "cross_document_read",
+      "question": "Which statement controls the semantic authority model in the linked fixtures?",
+      "sources": ["fixture-linked-overview", "fixture-linked-decision"],
+      "required_evidence": [
+        {
+          "document": "fixture-linked-decision",
+          "heading_path": ["Semantic Authority Decision", "Authority Boundary"]
+        },
+        {
+          "document": "fixture-linked-decision",
+          "heading_path": ["Semantic Authority Decision", "Rationale"]
+        }
+      ],
+      "required_claims": [
+        "The accepted explicitly linked decision is controlling evidence for the fixture.",
+        "The contradictory unlinked overview prose is a decoy and does not outrank the decision."
+      ],
+      "required_diagnostics": ["missing-roadmap.md is unresolved", "The CommonMark link is external"]
+    },
+    {
+      "id": "write-context-architecture-update",
+      "operation": "write_context_selection",
+      "question": "Prepare the evidence needed to draft a document-intelligence architecture update without changing the authority model or prematurely selecting an embedding runtime.",
+      "sources": ["document-intelligence-investigation"],
+      "required_evidence": [
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.1 Authoritative structural facts"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.2 Explicit repository authority"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "4. Authority model", "4.3 Advisory semantic interpretation"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "8. Library candidates", "8.3 Embeddings and reranking"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "19. Explicit non-goals for the initial investigation"]
+        },
+        {
+          "document": "document-intelligence-investigation",
+          "heading_path": ["Semantic Document Intelligence for Markdown Workflows", "20. Architectural decisions requiring approval"]
+        }
+      ],
+      "required_claims": [
+        "Preserve deterministic authority and advisory inference.",
+        "Treat embedding adoption as unapproved pending measured evidence and explicit policy decisions."
+      ]
+    },
+    {
+      "id": "edit-resolve-duplicate-recovery",
+      "operation": "edit_target_resolution",
+      "question": "Target the operator recovery section, not lifecycle recovery.",
+      "sources": ["fixture-structural-edge-cases"],
+      "ambiguous_selector": "Recovery",
+      "required_heading_path": ["Setext Document Section", "Operations", "Recovery"],
+      "required_behavior": "Reject the bare duplicate title as ambiguous and resolve the structurally qualified occurrence."
+    },
+    {
+      "id": "verify-authority-preservation-safe",
+      "operation": "edit_verification",
+      "question": "Verify an edit authorized only for Current Capability while preserving Authority Model.",
+      "before": "fixture-preservation-before",
+      "after": "fixture-preservation-safe-after",
+      "authorized_change": ["Current Capability"],
+      "preserve": ["Authority Model"],
+      "expected": "accept",
+      "required_claims": [
+        "The capability statement changed.",
+        "The authority model is byte-identical."
+      ]
+    },
+    {
+      "id": "verify-authority-preservation-unsafe",
+      "operation": "edit_verification",
+      "question": "Verify an edit authorized only for Current Capability while preserving Authority Model when unrelated authority text also changed.",
+      "before": "fixture-preservation-before",
+      "after": "fixture-preservation-unsafe-after",
+      "authorized_change": ["Current Capability"],
+      "preserve": ["Authority Model"],
+      "expected": "reject",
+      "required_claims": [
+        "The Authority Model section changed outside the authorized target.",
+        "The deterministic edit-scope violation is sufficient to reject the mutation without relying on semantic inference."
+      ]
+    },
+    {
+      "id": "detect-authority-semantic-drift",
+      "operation": "semantic_drift_review",
+      "question": "Review an edit that may clarify Current Capability and Authority Model wording but must preserve the advisory authority boundary.",
+      "before": "fixture-preservation-before",
+      "after": "fixture-preservation-unsafe-after",
+      "authorized_change": ["Current Capability", "Authority Model"],
+      "semantic_preservation": ["Semantic classification remains advisory and cannot override deterministic document structure."],
+      "expected": "flag_or_escalate",
+      "required_claims": [
+        "The edited wording reverses advisory-versus-authoritative meaning.",
+        "Semantic evidence should flag the change for review but must not become an automatic rejection policy without separate approval."
+      ]
+    },
+    {
+      "id": "read-apply-edit-boundaries",
+      "operation": "read",
+      "question": "What prerequisites govern apply_edit, and when must it not be used?",
+      "sources": ["agent-tooling"],
+      "required_evidence": [
+        {
+          "document": "agent-tooling",
+          "heading_path": ["Tooling: MCP / Code-Context Tool Selection & Workflow", "6. `apply_edit` Safety", "Prerequisites"]
+        },
+        {
+          "document": "agent-tooling",
+          "heading_path": ["Tooling: MCP / Code-Context Tool Selection & Workflow", "6. `apply_edit` Safety", "When NOT to use `apply_edit`"]
+        }
+      ],
+      "required_claims": [
+        "The current session must own a prior Edit or Verbatim read of the file.",
+        "expectedOldText must byte-match the current on-disk body.",
+        "apply_edit must not be used for new files or as one cross-file edit operation."
+      ]
+    },
+    {
+      "id": "read-release-batch-capabilities",
+      "operation": "read",
+      "question": "Which batch capabilities shipped in Clean-CTX 0.8.0, and what verification and live evidence were reported?",
+      "sources": ["current-changelog"],
+      "required_evidence": [
+        {
+          "document": "current-changelog",
+          "heading_path": ["Clean-CTX — Changelog", "[0.8.0] - 2026-09-29", "Added"]
+        },
+        {
+          "document": "current-changelog",
+          "heading_path": ["Clean-CTX — Changelog", "[0.8.0] - 2026-09-29", "Economics and live acceptance"]
+        },
+        {
+          "document": "current-changelog",
+          "heading_path": ["Clean-CTX — Changelog", "[0.8.0] - 2026-09-29", "Verification"]
+        }
+      ],
+      "required_claims": [
+        "provide_code_context shipped ordered failure-isolated file batching with shared scope and per-item configuration.",
+        "workspace_query shipped heterogeneous ordered batching with isolated per-item outcomes and shared preparation.",
+        "Live trials reported fewer round trips and lower cost or elapsed time, but those observations do not replace tracked regressions.",
+        "The changelog reports maintainer-confirmed focused regressions, live stdio acceptance, and a green final repository gate."
+      ]
+    }
+  ],
+  "evaluation_dimensions": [
+    "relevant_section_recall",
+    "irrelevant_section_exclusion",
+    "answer_or_task_equivalence_to_full_document",
+    "token_reduction_by_supported_tokenizer",
+    "path_and_heading_provenance_accuracy",
+    "partial_context_disclosure",
+    "cross_document_link_resolution",
+    "ambiguous_edit_target_rejection",
+    "untouched_byte_preservation",
+    "semantic_preservation_precision_and_recall",
+    "latency",
+    "fallback_rate"
+  ]
+}
