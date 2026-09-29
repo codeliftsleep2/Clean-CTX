@@ -61,6 +61,8 @@ mod edges;
 mod entities;
 mod graph;
 mod identity;
+mod outcome;
+mod request;
 
 pub(super) use diagnostics::discovery_field;
 
@@ -83,16 +85,9 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
         }
     };
 
-    match query_type {
-        "find_entities" => entities::handle_find_entities(id, args, state),
-        "forward_edges" => edges::handle_forward_edges(id, args, state),
-        "reverse_edges" => edges::handle_reverse_edges(id, args, state),
-        "entities_in_file" => entities::handle_entities_in_file(id, args, state),
-        "transitive_dependencies" => graph::handle_transitive_dependencies(id, args, state),
-        "has_cycle" => graph::handle_has_cycle(id, args, state),
-        "calls_in_file" => calls::handle_calls_in_file(id, args, state),
-        _ => {
-            // ... error handling unchanged
+    let operation = match request::WorkspaceQueryOperation::parse(query_type) {
+        Some(operation) => operation,
+        None => {
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "error": {
@@ -105,8 +100,11 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     )
                 }
             }));
+            return;
         }
-    }
+    };
+    let result = operation.evaluate(args, state);
+    outcome::send_single(id, args, state, result);
 }
 
 /// Run a WorkspaceIndex query with optional one-cycle semantic hydration.
@@ -160,15 +158,6 @@ where
     Ok((final_results, final_count, hydration))
 }
 
-fn send_hydration_failure(id: &Value, error: String) {
-    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-        id.clone(),
-        -32603,
-        error,
-        None,
-    ));
-}
-
 /// Extract a required string argument from the arguments object.
 fn required_str<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
     args[name].as_str().filter(|s| !s.is_empty())
@@ -220,14 +209,8 @@ fn query_scope(
 /// `-32602` (invalid params) with the reason `WorkspaceScope` produced: the
 /// argument is a parameter of the request that cannot be satisfied, not an empty
 /// answer about the workspace.
-fn send_scope_rejection(id: &Value, message: String) {
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "error": {
-            "code": -32602,
-            "message": format!("Invalid 'withinPath' argument: {message}")
-        }
-    }));
+fn scope_failure(message: String) -> outcome::QueryFailure {
+    outcome::QueryFailure::invalid(format!("Invalid 'withinPath' argument: {message}"))
 }
 
 #[cfg(all(test, feature = "rust"))]

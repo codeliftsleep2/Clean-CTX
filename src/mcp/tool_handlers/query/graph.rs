@@ -9,30 +9,22 @@
 // narrowing — may neither extend a path nor close a cycle.
 
 use super::{
-    discovery_field, identity::resolve_identity_or_respond, optional_i32, query_scope,
-    required_str, run_query_with_hydration, send_hydration_failure, send_scope_rejection,
+    discovery_field, identity::resolve_identity, optional_i32, outcome::QueryAnswer,
+    outcome::QueryFailure, outcome::QueryResult, query_scope, required_str,
+    run_query_with_hydration, scope_failure,
 };
 use crate::mcp::McpState;
-use crate::protocol::send_response;
 use serde_json::Value;
 
 /// `transitive_dependencies`: BFS dependency traversal.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &McpState) {
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for transitive_dependencies query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
+pub(super) fn evaluate_transitive_dependencies(args: &Value, state: &McpState) -> QueryResult {
+    let name = required_str(args, "name").ok_or_else(|| {
+        QueryFailure::invalid(
+            "Missing required argument: 'name' for transitive_dependencies query.",
+        )
+    })?;
     let depth = optional_i32(args, "depth", 1);
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: reachability is computed from THIS workspace's evidence
@@ -40,24 +32,8 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
     // itself must not pass through another repository's edges (see
     // `WorkspaceIndex::transitive_dependencies_in_scope`). A `withinPath` narrows
     // it further, so an out-of-path edge cannot extend the walk either.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
-    let selection = match resolve_identity_or_respond(
-        id,
-        args,
-        state,
-        "transitive_dependencies",
-        name,
-        scope.as_ref(),
-    ) {
-        Some(selection) => selection,
-        None => return,
-    };
+    let scope = query_scope(state, args).map_err(scope_failure)?;
+    let selection = resolve_identity(args, state, "transitive_dependencies", name, scope.as_ref())?;
     let resolved_identity = serde_json::to_value(&selection.identity).unwrap_or_default();
     let domain = selection.identity.domain;
     let entity_type = selection.identity.entity_type;
@@ -90,16 +66,14 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
             };
             (results, count, hydration)
         }
-        None => match run_query_with_hydration(
+        None => run_query_with_hydration(
             state,
             "transitive_dependencies",
             name,
             workspace_root,
             query,
-        ) {
-            Ok(result) => result,
-            Err(error) => return send_hydration_failure(id, error),
-        },
+        )
+        .map_err(QueryFailure::internal)?,
     };
     // The semantic answer is `dependencies` + `count` (+ `depth_used`); discovery
     // diagnostics are attached only when discovery deviated from its expected path.
@@ -112,19 +86,7 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
     if let Some(discovery) = discovery_field(&hydration) {
         structured["discovery"] = discovery;
     }
-    let content = super::content::render(
-        "transitive_dependencies",
-        args,
-        &structured,
-        &state.config.additional_roots,
-    );
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": content }],
-            "structuredContent": structured,
-        }
-    }));
+    Ok(QueryAnswer::new("transitive_dependencies", structured))
 }
 
 /// `has_cycle`: detect cycles in the entity graph.
@@ -137,28 +99,17 @@ pub(super) fn handle_transitive_dependencies(id: &Value, args: &Value, state: &M
 /// that neither workspace actually contains. Cycle membership itself is
 /// unchanged (only the approved dependency-cycle relation set participates;
 /// see `WorkspaceIndex::has_cycle_in_scope`).
-pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
+pub(super) fn evaluate_has_cycle(args: &Value, state: &McpState) -> QueryResult {
     if let Some(kind) = args.get("kind")
         && kind.as_str() != Some("dependency")
     {
-        send_response(&serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "error": {
-                "code": -32602,
-                "message": "Invalid 'kind' for has_cycle: expected 'dependency'."
-            }
-        }));
-        return;
+        return Err(QueryFailure::invalid(
+            "Invalid 'kind' for has_cycle: expected 'dependency'.",
+        ));
     }
     // The effective scope is resolved BEFORE the index lock is taken, so an
     // unauthorized `withinPath` is refused without touching the index at all.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
+    let scope = query_scope(state, args).map_err(scope_failure)?;
     let idx = state.workspace_index_read();
     let witness = match scope.as_ref() {
         Some(scope) => idx.dependency_cycle_witness_in_scope(scope),
@@ -180,19 +131,6 @@ pub(super) fn handle_has_cycle(id: &Value, args: &Value, state: &McpState) {
         "identity_ambiguous": !identity_ambiguities.is_empty(),
         "identity_ambiguities": identity_ambiguities,
     });
-    let content = super::content::render(
-        "has_cycle",
-        args,
-        &structured,
-        &state.config.additional_roots,
-    );
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": content }],
-            // NOT hydration-eligible, so the response carries no discovery
-            // diagnostics at all — absence means "nothing noteworthy happened".
-            "structuredContent": structured,
-        }
-    }));
+    // NOT hydration-eligible, so the response carries no discovery diagnostics.
+    Ok(QueryAnswer::new("has_cycle", structured))
 }

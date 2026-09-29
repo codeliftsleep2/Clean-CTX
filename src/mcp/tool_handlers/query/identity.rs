@@ -1,7 +1,6 @@
-use super::send_hydration_failure;
+use super::outcome::QueryFailure;
 use crate::mcp::McpState;
 use crate::mcp::tool_handlers::hydration::{HydrationReport, hydrate_workspace_index};
-use crate::protocol::send_response;
 use crate::workspace::scope::WorkspaceScope;
 use serde::Serialize;
 use serde_json::Value;
@@ -19,20 +18,19 @@ pub(super) struct IdentitySelection {
     pub(super) hydration: Option<HydrationReport>,
 }
 
-pub(super) fn resolve_identity_or_respond(
-    id: &Value,
+pub(super) fn resolve_identity(
     args: &Value,
     state: &McpState,
     query_type: &str,
     name: &str,
     scope: Option<&WorkspaceScope>,
-) -> Option<IdentitySelection> {
+) -> Result<IdentitySelection, QueryFailure> {
     let domain = args["domain"].as_str().filter(|value| !value.is_empty());
     let entity_type = args["entity_type"]
         .as_str()
         .filter(|value| !value.is_empty());
     if let (Some(domain), Some(entity_type)) = (domain, entity_type) {
-        return Some(IdentitySelection {
+        return Ok(IdentitySelection {
             identity: ResolvedIdentity {
                 domain: domain.to_string(),
                 entity_type: entity_type.to_string(),
@@ -43,13 +41,8 @@ pub(super) fn resolve_identity_or_respond(
     }
 
     let hydration =
-        match hydrate_workspace_index(state, query_type, name, args["workspaceRoot"].as_str()) {
-            Ok(report) => report,
-            Err(error) => {
-                send_hydration_failure(id, error);
-                return None;
-            }
-        };
+        hydrate_workspace_index(state, query_type, name, args["workspaceRoot"].as_str())
+            .map_err(QueryFailure::internal)?;
     let identities = {
         let index = state.workspace_index_read();
         let occurrences = match scope {
@@ -75,16 +68,14 @@ pub(super) fn resolve_identity_or_respond(
         } else {
             format!("Entity name '{name}' is ambiguous; supply domain and entity_type.")
         };
-        send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-            id.clone(),
+        return Err(QueryFailure::new(
             -32602,
             message,
             Some(serde_json::json!({ "candidates": candidates })),
         ));
-        return None;
     }
 
-    Some(IdentitySelection {
+    Ok(IdentitySelection {
         identity: identities.into_iter().next().expect("one identity"),
         hydration: Some(hydration),
     })

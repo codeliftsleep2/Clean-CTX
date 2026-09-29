@@ -5,11 +5,13 @@
 //! owner or overload identity. `calls_in_file` stays at the file/canonical-IR
 //! boundary and never invents resolved callee identity.
 
-use super::{query_scope, send_scope_rejection};
+use super::{
+    outcome::{QueryAnswer, QueryFailure, QueryResult},
+    query_scope, scope_failure,
+};
 use crate::compression::Fidelity;
 use crate::ir::hierarchical::{HierarchicalCall, HierarchicalIR, MethodNode};
 use crate::mcp::McpState;
-use crate::protocol::send_response;
 use serde_json::{Value, json};
 
 #[derive(Debug)]
@@ -22,29 +24,23 @@ struct CallRequest {
     return_type: Option<String>,
 }
 
-pub(super) fn handle_calls_in_file(id: &Value, args: &Value, state: &McpState) {
-    let request = match parse_request(args) {
-        Ok(request) => request,
-        Err(message) => return send_invalid_params(id, message),
-    };
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => return send_scope_rejection(id, message),
-    };
+pub(super) fn evaluate_calls_in_file(args: &Value, state: &McpState) -> QueryResult {
+    let request = parse_request(args).map_err(QueryFailure::invalid)?;
+    let scope = query_scope(state, args).map_err(scope_failure)?;
     let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(
         &request.file_path,
         args["workspaceRoot"].as_str(),
         &state.config.additional_roots,
     ) {
         Ok(path) => path,
-        Err(message) => return send_invalid_params(id, message),
+        Err(message) => return Err(QueryFailure::invalid(message)),
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
     if scope
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        return send_answer(id, args, state, &request, &resolved_path, Vec::new());
+        return Ok(answer(&request, &resolved_path, Vec::new()));
     }
 
     // Candidate compilation reads current source and produces canonical facts
@@ -55,25 +51,17 @@ pub(super) fn handle_calls_in_file(id: &Value, args: &Value, state: &McpState) {
         state,
     ) {
         Ok(candidate) => candidate,
-        Err(error) => {
-            send_response(&crate::error::to_jsonrpc_error(id, &error));
-            return;
-        }
+        Err(error) => return Err(QueryFailure::from_clean_ctx(&error)),
     };
     let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&compiled) {
         Ok(hierarchy) => hierarchy,
-        Err(error) => {
-            send_response(&crate::mcp::tool_handlers::core::projection_error_response(
-                id, &error,
-            ));
-            return;
-        }
+        Err(error) => return Err(QueryFailure::from_projection(&error)),
     };
     let overloads = match matching_overloads(&hierarchy, &request) {
         Ok(overloads) => overloads,
-        Err(message) => return send_invalid_params(id, message),
+        Err(message) => return Err(QueryFailure::invalid(message)),
     };
-    send_answer(id, args, state, &request, &resolved_path, overloads);
+    Ok(answer(&request, &resolved_path, overloads))
 }
 
 fn parse_request(args: &Value) -> Result<CallRequest, String> {
@@ -233,14 +221,7 @@ fn calls_for_method(calls: &[HierarchicalCall], method_id: &str) -> Vec<Value> {
         .collect()
 }
 
-fn send_answer(
-    id: &Value,
-    args: &Value,
-    state: &McpState,
-    request: &CallRequest,
-    resolved_path: &str,
-    overloads: Vec<Value>,
-) {
+fn answer(request: &CallRequest, resolved_path: &str, overloads: Vec<Value>) -> QueryAnswer {
     let count = overloads
         .iter()
         .filter_map(|overload| overload["calls"].as_array())
@@ -254,26 +235,5 @@ fn send_answer(
         "overloads": overloads,
         "count": count,
     });
-    let content = super::content::render(
-        "calls_in_file",
-        args,
-        &structured,
-        &state.config.additional_roots,
-    );
-    send_response(&json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": content }],
-            "structuredContent": structured,
-        }
-    }));
-}
-
-fn send_invalid_params(id: &Value, message: String) {
-    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-        id.clone(),
-        -32602,
-        message,
-        None,
-    ));
+    QueryAnswer::new("calls_in_file", structured)
 }
