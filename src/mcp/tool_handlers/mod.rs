@@ -68,3 +68,11 @@ pub(crate) mod provider_code_context_signature_tests;
 #[cfg(all(test, any(feature = "csharp", feature = "typescript")))]
 #[path = "../../tests/mcp/focus_generic_methods.rs"]
 pub(crate) mod focus_generic_methods_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/provide_code_context_batch.rs"]
+pub(crate) mod provide_code_context_batch_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/provide_code_context_response_mode_economics.rs"]
+pub(crate) mod provide_code_context_response_mode_economics_tests;

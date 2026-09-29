@@ -1,21 +1,19 @@
 // Angular template specialization for provide_code_context.
 
 use super::common::ContentKind;
+use super::provide::outcome::ProvidedContext;
 use crate::mcp::McpState;
-use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::mcp::tools::parse_tokenizer_arg;
-use crate::protocol::send_response;
 use serde_json::Value;
 
-pub(super) fn try_handle_angular_template(
-    id: &Value,
+pub(super) fn try_evaluate_angular_template(
     params: &Value,
     state: &McpState,
     resolved_path: &str,
     source: &str,
-) -> bool {
+) -> Option<ProvidedContext> {
     if !resolved_path.to_lowercase().ends_with(".component.html") {
-        return false;
+        return None;
     }
 
     let explicit_fidelity = params["arguments"]["fidelity"].as_str();
@@ -47,20 +45,15 @@ pub(super) fn try_handle_angular_template(
     // produce a compressed skeleton while `contract_fields` reports
     // `verbatim_document`/`["document"]` (self-reporting contract leak).
     if fidelity == crate::compression::Fidelity::Verbatim {
-        let mut response = serde_json::json!({
-            "jsonrpc": "2.0", "id": id, "result": {
-                "content": [{ "type": "text", "text": source }],
-                "_meta": {
-                    "strategy": "full", "fidelity": "verbatim",
-                    "is_angular": true, "template_compressed": false,
-                    "content_kind": ContentKind::VerbatimDocument, "byte_exact": ["document"],
-                    "degradation": null
-                }
-            }
-        });
-        inject_baseline_breakpoint(&mut response, state, source);
-        send_response(&response);
-        return true;
+        return Some(ProvidedContext::new(
+            source.to_string(),
+            serde_json::json!({
+                "strategy": "full", "fidelity": "verbatim",
+                "is_angular": true, "template_compressed": false,
+                "content_kind": ContentKind::VerbatimDocument, "byte_exact": ["document"],
+                "degradation": null
+            }),
+        ));
     }
     let lines =
         crate::angular_meta::template_compress::compress_template_with_prime_ng(source, fidelity);
@@ -107,19 +100,14 @@ pub(super) fn try_handle_angular_template(
     // Gap 5/3/6 contract leak: the LLM would attempt replace_in_file
     // SEARCH against bodies that don't exist in template output).
     let (content_kind, byte_exact) = (ContentKind::Skeleton, Vec::<&'static str>::new());
-    let mut response = serde_json::json!({
-        "jsonrpc": "2.0", "id": id, "result": {
-            "content": [{ "type": "text", "text": body }],
-            "_meta": {
-                "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
-                "is_angular": true, "template_compressed": !raw_passthrough,
-                "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
-                "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
-                "degradation": null
-            }
-        }
-    });
-    inject_baseline_breakpoint(&mut response, state, &body);
-    send_response(&response);
-    true
+    Some(ProvidedContext::new(
+        body,
+        serde_json::json!({
+            "strategy": "full", "fidelity": format!("{:?}", fidelity).to_lowercase(),
+            "is_angular": true, "template_compressed": !raw_passthrough,
+            "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
+            "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
+            "degradation": null
+        }),
+    ))
 }

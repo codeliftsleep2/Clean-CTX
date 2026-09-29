@@ -54,33 +54,6 @@ pub(super) fn checked_hierarchy_or_respond(id: &Value, ir: &CompiledIR) -> Optio
     }
 }
 
-/// Resolve `focusMethods` through typed ownership, then retain exact body
-/// opcodes only for the resulting canonical method IDs.
-pub(super) fn resolve_focus_or_respond(
-    id: &Value,
-    ir: &mut CompiledIR,
-    focus: Option<&HashSet<String>>,
-) -> Option<HierarchicalIR> {
-    let hierarchy = checked_hierarchy_or_respond(id, ir)?;
-    let Some(selectors) = focus else {
-        return Some(hierarchy);
-    };
-    let method_ids = match crate::ir::focus::resolve_focus_method_ids(&hierarchy, selectors) {
-        Ok(ids) => ids,
-        Err(error) => {
-            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                id.clone(),
-                -32602,
-                error.to_string(),
-                None,
-            ));
-            return None;
-        }
-    };
-    crate::ir::focus::retain_focused_bodies(ir, &method_ids);
-    checked_hierarchy_or_respond(id, ir)
-}
-
 pub(crate) fn projection_error_response(
     id: &Value,
     error: &crate::ir::hierarchical::HierarchicalProjectionError,

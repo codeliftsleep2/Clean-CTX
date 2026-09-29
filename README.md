@@ -60,7 +60,7 @@ Task-relevant context rather than indiscriminate source dumping:
 
 Exposes code intelligence and context capabilities to AI coding agents through the Model Context Protocol:
 
-* **`provide_code_context`** - complete model-facing context: auto-detects file type, selects fidelity, and filters low-importance symbols. Structured delta transport remains explicit through `delta_code_context` / `apply_delta`.
+* **`provide_code_context`** - complete model-facing context for either one `filePath` or a failure-isolated `files` batch of 1–8 items; batch callers may choose safe mirrored, structured-only, or indexed content placement. The tool auto-detects file type, selects per-item fidelity, and filters low-importance symbols. Structured delta transport remains explicit through `delta_code_context` / `apply_delta`.
 * **`workspace_query`** - single or heterogeneous batched semantic queries: entity lookup, forward/reverse edges, file entities/calls, transitive dependencies, and cycle detection.
 * **`compress_code_context` / `restore_context`** - direct compression control with history and stats.
 * **`diff_code_context` / `diff_commits`** - AST-level change-sets, single-file and git ref-range.
@@ -219,6 +219,30 @@ First call performs full compression; subsequent calls automatically use delta t
     "type": "find_entities",
     "name": "UserCardComponent",
     "workspaceRoot": "/path/to/workspace"
+  }
+}
+```
+
+The tool accepts two mutually exclusive request forms: singular `filePath` for
+one file, or top-level `files` for 1–8 files (normally two or more). A batch keeps
+`workspaceRoot` and `tokenizer` at the top level; each item has a unique `id`,
+its own `filePath`, and optional `intent`, `fidelity`, and `focusMethods`.
+Inspect every item status. Batch-only `responseMode` controls where exact code
+is placed: prefer `structured` for a verified structured-result consumer, omit
+it for safe `mirrored` when host capability is unknown, or use `indexed` only
+for a verified top-level content consumer. Never guess a compact mode;
+`response_mode` reports the projection used.
+
+```json
+{
+  "name": "provide_code_context",
+  "arguments": {
+    "workspaceRoot": "/path/to/repo",
+    "responseMode": "structured",
+    "files": [
+      { "id": "overview", "filePath": "src/service.ts", "intent": "overview" },
+      { "id": "target", "filePath": "src/controller.ts", "intent": "edit", "focusMethods": ["Controller.update"] }
+    ]
   }
 }
 ```

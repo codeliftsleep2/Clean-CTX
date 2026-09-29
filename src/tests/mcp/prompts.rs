@@ -102,6 +102,15 @@ fn initialize_includes_compact_workflow_instructions() {
 
     for required in [
         "provide_code_context",
+        "singular `filePath` request",
+        "top-level `files` batch",
+        "1–8 items",
+        "responseMode",
+        "safe `mirrored`",
+        "verified structured-capable host",
+        "verified content-channel host",
+        "Never guess a compact mode",
+        "no cross-file edit authority",
         "workspaceRoot",
         "graph_search",
         "top-level `queries`",

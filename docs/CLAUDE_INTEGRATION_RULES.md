@@ -66,7 +66,11 @@ path completed, not that CBM facts became semantic authority.
 ## 2. Read source through `provide_code_context`
 
 For supported code (`.ts`, `.cs`, `.rs`, `.java` when compiled into the
-running binary), call `provide_code_context` before native `Read`:
+running binary), call `provide_code_context` before native `Read`. The tool
+explicitly accepts either one singular `filePath` request or one top-level
+`files` batch; the forms are mutually exclusive.
+
+Single-file form:
 
 ```text
 provide_code_context(
@@ -88,6 +92,45 @@ Every successful `provide_code_context` response is complete current context,
 not an automatic delta. `delta_code_context` and `apply_delta` are an explicit
 code-side protocol; use them only when a real host/consumer intentionally owns
 the prior version and acknowledgment lifecycle.
+
+### Batched multi-file form
+
+Use singular `filePath` for one file. When two or more independently useful
+source contexts are needed, prefer one `files` batch of at most eight items:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "tokenizer": "o200k",
+  "responseMode": "structured",
+  "files": [
+    { "id": "service", "filePath": "src/services/UserService.ts", "intent": "overview" },
+    { "id": "target", "filePath": "src/controllers/UserController.ts", "intent": "edit", "focusMethods": ["UserController.update"] }
+  ]
+}
+```
+
+Claude is a verified `structuredContent` consumer, so `structured` is the
+preferred batch mode: request `responseMode: "structured"`. Exact code then
+appears once in each successful structured item without the near-doubling of
+the compatibility mirror. If integration behavior changes or is unknown, omit
+the field and use safe `mirrored`. Do not select `indexed` unless that Claude
+host has been explicitly verified to preserve and consume top-level MCP content
+blocks.
+
+Each item requires a unique non-empty `id` and `filePath` and may choose its
+own `intent`, `fidelity`, and `focusMethods`. `workspaceRoot` and `tokenizer`
+belong only at the top level. Inspect every ordered result: `status="ok"`
+carries exact `content` and semantic `meta` in structured mode.
+`status="error"` carries an item-local error without suppressing successful
+siblings. The response's `response_mode` confirms the projection actually
+used. If every item fails, the text block only directs the caller to the
+structured errors.
+
+Do not repeat the same canonical file in a batch; combine its desired selectors
+into one `focusMethods` array. Request Edit or Verbatim only for files that need
+exact text. Batch reads retain normal successful session/cache effects but do
+not create cross-file transactional edit authority.
 
 If the response is a skeleton and statement-level source is required, use
 native `Read` for the known file/range. Native `Read` is also appropriate for
@@ -264,6 +307,7 @@ or broader edits that do not fit those structural operations.
 | Locate text/files without CBM | Claude `Grep` / `Glob` |
 | Locate an exact semantic name without CBM | `workspace_query(type="find_entities")` |
 | Understand a supported source file | `provide_code_context` |
+| Understand several supported source files | `provide_code_context(files=[...])` |
 | Exact known source lines/body | Native `Read` after context, or when context fails |
 | One semantic entity/edge/dependency question | Single-form `workspace_query` |
 | Several semantic questions in one scope | Batched `workspace_query(queries=[...])` |

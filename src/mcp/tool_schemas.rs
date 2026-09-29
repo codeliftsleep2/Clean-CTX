@@ -46,6 +46,140 @@ pub(super) fn apply_edit_operations() -> Value {
     })
 }
 
+fn provide_code_context_item_properties() -> Value {
+    json!({
+        "filePath": { "type": "string" },
+        "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe apply_edit operations. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
+        "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: low, medium, high, edit, or verbatim." },
+        "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Select qualified Owner.method names, or an unambiguous bare method name. Focused requests use Edit fidelity unless an explicit compatible mode is supplied." }
+    })
+}
+
+pub(super) fn provide_code_context_properties() -> Value {
+    let mut properties = provide_code_context_item_properties();
+    let object = properties
+        .as_object_mut()
+        .expect("provide context properties are an object");
+    object.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Strongly recommended. Shared explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }));
+    object.insert("tokenizer".into(), json!({ "type": "string" }));
+    object.insert("responseMode".into(), json!({
+        "type": "string",
+        "enum": ["mirrored", "structured", "indexed"],
+        "description": "Batch-only response projection. mirrored (default) exposes exact code in both MCP channels; structured exposes code only in structured items; indexed exposes code only in top-level content blocks."
+    }));
+
+    let mut item_properties = provide_code_context_item_properties();
+    item_properties
+        .as_object_mut()
+        .expect("provide context item properties are an object")
+        .insert("id".into(), json!({ "type": "string", "minLength": 1 }));
+    object.insert(
+        "files".into(),
+        json!({
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+                "type": "object",
+                "properties": item_properties,
+                "required": ["id", "filePath"]
+            }
+        }),
+    );
+    Value::Object(object.clone())
+}
+
+pub(super) fn provide_code_context_request_variants() -> Value {
+    json!([
+        {
+            "required": ["filePath"],
+            "not": {
+                "anyOf": [
+                    { "required": ["files"] },
+                    { "required": ["responseMode"] }
+                ]
+            }
+        },
+        {
+            "properties": {
+                "files": provide_code_context_properties()["files"].clone()
+            },
+            "required": ["files"],
+            "not": { "required": ["filePath"] }
+        }
+    ])
+}
+
+pub(super) fn provide_code_context_batch_results() -> Value {
+    json!({
+        "type": "array",
+        "description": "Ordered outcomes, exactly one per accepted batch item.",
+        "items": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "string" },
+                "status": { "type": "string", "enum": ["ok", "error"] },
+                "content_index": { "type": "integer", "minimum": 0, "description": "Index of the exact successful text block in result.content." },
+                "content": {
+                    "type": "array",
+                    "description": "Exact MCP content mirrored for structured-only clients; byte-identical to the block selected by content_index.",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": { "const": "text" },
+                            "text": { "type": "string" }
+                        },
+                        "required": ["type", "text"]
+                    }
+                },
+                "meta": { "type": "object", "description": "The corresponding single-file semantic metadata." },
+                "error": {
+                    "type": "object",
+                    "properties": {
+                        "code": { "type": "integer" },
+                        "message": { "type": "string" },
+                        "data": {}
+                    },
+                    "required": ["code", "message"]
+                }
+            },
+            "required": ["id", "status"],
+            "oneOf": [
+                {
+                    "properties": { "status": { "const": "ok" } },
+                    "required": ["meta"],
+                    "not": { "required": ["error"] },
+                    "oneOf": [
+                        {
+                            "required": ["content_index", "content"]
+                        },
+                        {
+                            "required": ["content"],
+                            "not": { "required": ["content_index"] }
+                        },
+                        {
+                            "required": ["content_index"],
+                            "not": { "required": ["content"] }
+                        }
+                    ]
+                },
+                {
+                    "properties": { "status": { "const": "error" } },
+                    "required": ["error"],
+                    "not": {
+                        "anyOf": [
+                            { "required": ["content_index"] },
+                            { "required": ["content"] },
+                            { "required": ["meta"] }
+                        ]
+                    }
+                }
+            ]
+        }
+    })
+}
+
 pub(super) fn workspace_query_properties() -> Value {
     let mut properties = workspace_query_operation_properties();
     let properties = properties
