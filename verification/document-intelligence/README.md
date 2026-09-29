@@ -18,6 +18,14 @@ The governing investigation is
   definitions;
 - `full-document-control-oracles.json` - human-reviewed expected answers for
   the full-document control lane;
+- `FULL_DOCUMENT_CONTROL_PROTOCOL.md` - model-neutral capture, isolation, and
+  human-review procedure;
+- `full-document-control-capture.schema.json` - machine-readable run artifact
+  contract;
+- `full-document-control-capture.template.json` - planned task inventory and
+  neutral run template;
+- `scripts/Prepare-FullDocumentControlRun.ps1` - oracle-blind source
+  verification and exact prompt assembly;
 - `token-baseline.schema.json` - generated token-capture output contract;
 - `scripts/Capture-TokenBaselines.ps1` - exact `cl100k`/`o200k` capture using
   the repository's existing measurement helper;
@@ -65,6 +73,44 @@ tokenizer measurements.
 Human-reviewed control oracles are defined separately from model-produced
 control captures. An oracle states what a correct answer must preserve; it is
 not evidence that a model run succeeded.
+
+## Full-document control capture
+
+Follow `FULL_DOCUMENT_CONTROL_PROTOCOL.md`. Start from the tracked capture
+template and write each generated run beneath:
+
+```text
+target/document-intelligence/control-runs/<run-id>.json
+```
+
+Prepare a run without invoking a model:
+
+```powershell
+pwsh -NoProfile -File verification/document-intelligence/scripts/Prepare-FullDocumentControlRun.ps1 `
+  -RunId <run-id> `
+  -Provider <provider> `
+  -Model <model> `
+  -Transport role_messages
+```
+
+Provider and model may be omitted during a preparation-only smoke check, but
+must be recorded before execution. The preparer refuses hash or byte-count
+drift, validates the generated artifact against its schema, and refuses to
+overwrite an existing run ID. It changes the copied lifecycle state from
+`planned` to `prepared`; it does not read the oracle file or call a model.
+
+The template is deliberately `planned` and contains no model answers. For each
+task, the control supplies the complete documents named by `sources`, or the
+complete `before` and `after` documents for edit comparisons. It supplies only
+the protocol's allowlisted task-input fields. Operational constraints such as
+authorized edit scope are retained, while required claims, evidence labels,
+expected outcomes, and other grading data remain hidden.
+
+Capture every model response before opening the oracle file for review. Record
+provider/model identity, request parameters, exact prompt text and hashes,
+source hashes, latency, usage provenance, retries, errors, and the later human
+verdict. Do not commit generated runs merely because they contain a passing
+self-reported result; review and promotion are separate actions.
 
 ## Token baseline capture
 

@@ -1,0 +1,65 @@
+{
+  "schema": "clean-ctx/document-intelligence-control-capture",
+  "version": 1,
+  "manifestVersion": 1,
+  "oracleVersion": 1,
+  "status": "planned",
+  "run": {
+    "id": null,
+    "repositoryRevision": null,
+    "worktreeState": "unknown",
+    "preparedAt": null,
+    "startedAt": null,
+    "completedAt": null,
+    "executor": null,
+    "provider": null,
+    "model": null,
+    "reportedModelVersion": null,
+    "client": null,
+    "clientVersion": null,
+    "parameters": {
+      "temperature": null,
+      "topP": null,
+      "seed": null,
+      "maxOutputTokens": null,
+      "other": {}
+    }
+  },
+  "protocol": {
+    "id": "full-document-control-v1",
+    "promptVersion": 1,
+    "taskInputPolicy": "allowlisted_non_evaluation_fields_v1",
+    "transport": "unknown",
+    "freshConversationPerTask": true,
+    "oracleHiddenDuringCapture": true
+  },
+  "tasks": [
+    { "task": "read-document-authority-boundary", "status": "pending" },
+    { "task": "read-canonical-versus-presentation", "status": "pending" },
+    { "task": "read-sqlite-rationale", "status": "pending" },
+    { "task": "read-first-touch-file-semantics", "status": "pending" },
+    { "task": "navigate-long-running-policy", "status": "pending" },
+    { "task": "cross-document-cbm-identity", "status": "pending" },
+    { "task": "cross-document-batch-scope", "status": "pending" },
+    { "task": "parse-structural-edge-cases", "status": "pending" },
+    { "task": "cross-document-explicit-authority", "status": "pending" },
+    { "task": "write-context-architecture-update", "status": "pending" },
+    { "task": "edit-resolve-duplicate-recovery", "status": "pending" },
+    { "task": "verify-authority-preservation-safe", "status": "pending" },
+    { "task": "verify-authority-preservation-unsafe", "status": "pending" },
+    { "task": "detect-authority-semantic-drift", "status": "pending" },
+    { "task": "read-apply-edit-boundaries", "status": "pending" },
+    { "task": "read-release-batch-capabilities", "status": "pending" }
+  ],
+  "summary": {
+    "total": 16,
+    "pending": 16,
+    "completed": 0,
+    "skipped": 0,
+    "error": 0,
+    "pass": 0,
+    "partial": 0,
+    "fail": 0,
+    "ambiguous": 0
+  }
+}

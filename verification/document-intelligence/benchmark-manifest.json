@@ -30,6 +30,16 @@
       "o200k": 98367
     }
   },
+  "full_document_control": {
+    "status": "planned",
+    "protocol": "verification/document-intelligence/FULL_DOCUMENT_CONTROL_PROTOCOL.md",
+    "schema": "verification/document-intelligence/full-document-control-capture.schema.json",
+    "template": "verification/document-intelligence/full-document-control-capture.template.json",
+    "preparer": "verification/document-intelligence/scripts/Prepare-FullDocumentControlRun.ps1",
+    "oracles": "verification/document-intelligence/full-document-control-oracles.json",
+    "generated_artifact_pattern": "target/document-intelligence/control-runs/<run-id>.json",
+    "rule": "Capture model outputs before oracle review; generated run artifacts are observational evidence, not tracked-test results."
+  },
   "documents": [
     {
       "id": "portable-agent-policy",
