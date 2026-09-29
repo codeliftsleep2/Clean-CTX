@@ -12,7 +12,7 @@
 // │ Instructions: [count(varint), instruction*]             │
 // │                                                         │
 // │ Instruction:                                            │
-// │   opcode_idx: u8 (0-14 for 15 core opcodes + patterns)  │
+// │   opcode_idx: u8 (0-29)                                 │
 // │   operands: [varint]* (string table indices)            │
 // │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
@@ -22,15 +22,17 @@
 //   - Continuation bit = 1 means more bytes follow
 //   - Continuation bit = 0 means last byte
 //
-// Magic bytes: 0xCC, 0x01 ("Clean CTX binary v1")
-// Version byte: 0x01
+// Magic bytes: 0xCC, 0x02
+// Version byte: 0x04
 //
 // Trade-off: Not human-readable. Best used as an optional transport
 // encoding. The JSON wire format remains the default for debugging
 // and mixed streams.
 
 use super::compiler::CompiledIR;
-use super::opcodes::CoreOp;
+use super::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
+};
 use super::string_table::StringTable;
 
 mod decode;
@@ -44,19 +46,10 @@ pub use decode::decode;
 /// Magic bytes for the binary wire format: "CC" + version marker
 const MAGIC: [u8; 2] = [0xCC, 0x02];
 /// Binary wire format version:
-/// 0x01 = Original (long TYPE op names like "NG_COMPONENT_Foo")
-/// 0x02 = Abbreviated (@-prefixed TYPE ops like "@cmp")
-/// 0x03 = Body spans (apply_edit plan Phase 1): OP_BODY gains a presence
-///        flag varint plus two raw byte-offset varints when a body span is
-///        present. All other opcodes are encoded identically to 0x02.
-const VERSION: u8 = 0x03;
-/// Version 0x02 (pre-span bodies) — still supported for decode; OP_BODY
-/// carries exactly two string-table operands and decodes span-less.
-const VERSION_PRE_SPAN: u8 = 0x02;
-/// Legacy version 0x01 (long TYPE op names) — still supported for decode.
-const VERSION_LEGACY: u8 = 0x01;
+/// 0x04 = complete CompiledIR identity and semantic operands.
+const VERSION: u8 = 0x04;
 
-/// Opcode index assignment (0-19)
+/// Opcode index assignment (0-25)
 const OP_DEF_C: u8 = 0;
 const OP_DEF_M: u8 = 1;
 const OP_DEF_F: u8 = 2;
@@ -79,11 +72,8 @@ const OP_EFFECT: u8 = 17;
 const OP_CTX: u8 = 18;
 // Edit Mode: Verbatim Method Bodies
 const OP_BODY: u8 = 19;
-// Structural invocations (native call graph). Additive opcode under the
-// existing 0x03 scheme: a reader that predates it fails loudly with
-// `UnknownOpcode(20)` rather than mis-decoding an invocation fact, so no
-// version-byte change is required and previously persisted 0x03 streams
-// keep their established interpretation.
+// Structural invocations (native call graph). Exact and spread calls retain
+// distinct opcodes in the corrected format.
 const OP_CALL: u8 = 20;
 // Structural invocation whose written argument count is NOT exact: at least
 // one written argument expands at run time (`foo(...args)`). It carries the
@@ -98,6 +88,15 @@ const OP_CALL: u8 = 20;
 // references that entry, which is why the two opcodes still decouple cleanly
 // even though a qualified stream is not length-identical to an exact one.
 const OP_CALL_SPREAD: u8 = 21;
+// Typed semantic families retain their established opcode assignments.
+const OP_MOD_M: u8 = 22;
+const OP_MOD_C: u8 = 23;
+const OP_CTRL_SUM: u8 = 24;
+const OP_PAT_FACT: u8 = 25;
+const OP_DEF_IM: u8 = 26;
+const OP_DEF_IF: u8 = 27;
+const OP_MOD_I: u8 = 28;
+const OP_EXT_I: u8 = 29;
 
 /// Highest defined opcode index.
 ///
@@ -106,11 +105,22 @@ const OP_CALL_SPREAD: u8 = 21;
 /// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
 /// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
 /// make CALL facts unrepresentable over the binary wire.
-const OP_MAX: u8 = OP_CALL_SPREAD;
+const OP_MAX: u8 = OP_EXT_I;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
-    matches!(op_idx, OP_FLAGS | OP_FLAGS_C | OP_INJECTS | OP_PAT)
+    matches!(
+        op_idx,
+        OP_FLAGS
+            | OP_FLAGS_C
+            | OP_INJECTS
+            | OP_PAT
+            | OP_MOD_M
+            | OP_MOD_C
+            | OP_MOD_I
+            | OP_CTRL_SUM
+            | OP_PAT_FACT
+    )
 }
 
 /// Convert a CoreOp to its u8 opcode index.
@@ -120,12 +130,20 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::DefMethod(..) => OP_DEF_M,
         CoreOp::DefField(..) => OP_DEF_F,
         CoreOp::DefInterface(..) => OP_DEF_I,
+        CoreOp::DefInterfaceMethod(..) => OP_DEF_IM,
+        CoreOp::DefInterfaceField(..) => OP_DEF_IF,
         CoreOp::Param(..) => OP_SIG,
         CoreOp::Return(..) => OP_RET,
         CoreOp::FieldType(..) => OP_FIELD_T,
+        CoreOp::MethodModifiers(..) => OP_MOD_M,
+        CoreOp::ClassModifiers(..) => OP_MOD_C,
+        CoreOp::InterfaceModifiers(..) => OP_MOD_I,
+        CoreOp::ControlSummary(..) => OP_CTRL_SUM,
+        CoreOp::PatternFacts(..) => OP_PAT_FACT,
         CoreOp::Flags(..) => OP_FLAGS,
         CoreOp::ClassFlags(..) => OP_FLAGS_C,
         CoreOp::Extends(..) => OP_EXT,
+        CoreOp::InterfaceExtends(..) => OP_EXT_I,
         CoreOp::Implements(..) => OP_IMPL,
         CoreOp::Injects(..) => OP_INJECTS,
         CoreOp::Import(..) => OP_IMP,
@@ -173,17 +191,16 @@ fn read_varint(data: &[u8]) -> Option<(u64, usize)> {
     let mut shift: u64 = 0;
     let mut consumed = 0;
 
-    for &byte in data {
+    for (index, &byte) in data.iter().enumerate() {
+        if index >= 10 || (index == 9 && byte & 0xFE != 0) {
+            return None;
+        }
         consumed += 1;
         value |= ((byte & 0x7F) as u64) << shift;
         if byte & 0x80 == 0 {
             return Some((value, consumed));
         }
         shift += 7;
-        // Prevent overflow for very large varints
-        if shift > 63 {
-            return None;
-        }
     }
     // Reached end of data with continuation bit still set
     None
@@ -195,20 +212,6 @@ fn write_string(buf: &mut Vec<u8>, s: &str) {
     buf.extend_from_slice(s.as_bytes());
 }
 
-/// Decode a string from a byte slice, returning (string, bytes_consumed).
-/// Returns None if the slice is too short or the length is invalid.
-fn read_string(data: &[u8]) -> Option<(String, usize)> {
-    let (len, consumed) = read_varint(data)?;
-    let len = len as usize;
-    let start = consumed;
-    let end = start + len;
-    if end > data.len() {
-        return None;
-    }
-    let s = std::str::from_utf8(&data[start..end]).ok()?.to_string();
-    Some((s, end))
-}
-
 // ── Binary Encoding ───────────────────────────────────────────────
 
 /// Encode a CompiledIR into binary wire format bytes.
@@ -216,22 +219,25 @@ fn read_string(data: &[u8]) -> Option<(String, usize)> {
 /// # Encoding Layout
 ///
 /// 1. **Header** (3 bytes):
-///    - `[0xCC, 0x01]` — magic bytes
-///    - `0x01` — schema version
+///    - `[0xCC, 0x02]` — magic bytes
+///    - `0x04` — schema version
 ///
 /// 2. **String table**:
 ///    - count: varint — number of unique strings
 ///    - for each string: (length: varint, bytes: UTF-8)
 ///
-/// 3. **Instructions**:
+/// 3. **File identity**: string-table index varint
+///
+/// 4. **Instructions**:
 ///    - count: varint — number of instructions
 ///    - for each instruction:
-///      - opcode: u8 — index into opcode table (0-14)
+///      - opcode: u8 — index into opcode table (0-25)
 ///      - [variadic count: varint — only if opcode is variadic]
 ///      - operands: [varint]* — string table indices
 pub fn encode(ir: &CompiledIR) -> Vec<u8> {
     // Build string table from instructions
-    let table = StringTable::from_instructions(&ir.instructions);
+    let mut table = StringTable::from_instructions(&ir.instructions);
+    table.intern(&ir.file_id);
     // Map each string to its string-table index for fast lookup
     let strings: Vec<String> = table.strings().to_vec();
 
@@ -250,9 +256,6 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
         write_string(&mut buf, s);
     }
 
-    // 3. Instructions
-    write_varint(&mut buf, ir.instructions.len() as u64);
-
     // Build a lookup: string → table index
     use std::collections::HashMap;
     let mut str_to_idx: HashMap<&str, u64> = HashMap::new();
@@ -262,27 +265,48 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
 
     // Helper to encode an operand string as its table index varint
     let encode_operand = |buf: &mut Vec<u8>, s: &str| {
-        let idx = str_to_idx.get(s).copied().unwrap_or(0);
+        let idx = str_to_idx
+            .get(s)
+            .copied()
+            .expect("canonical binary operand missing from string table");
         write_varint(buf, idx);
     };
+
+    // 4. File identity and instructions
+    encode_operand(&mut buf, &ir.file_id);
+    write_varint(&mut buf, ir.instructions.len() as u64);
 
     for op in &ir.instructions {
         let op_idx = op_to_index(op);
         buf.push(op_idx);
 
         match op {
-            CoreOp::DefClass(_, name) => {
+            CoreOp::DefClass(cid, name) => {
+                encode_operand(&mut buf, cid);
                 encode_operand(&mut buf, name);
             }
-            CoreOp::DefMethod(_, mid, name) => {
+            CoreOp::DefMethod(cid, mid, name) => {
+                encode_operand(&mut buf, cid);
                 encode_operand(&mut buf, mid);
                 encode_operand(&mut buf, name);
             }
-            CoreOp::DefField(_, fid, name) => {
+            CoreOp::DefField(cid, fid, name) => {
+                encode_operand(&mut buf, cid);
                 encode_operand(&mut buf, fid);
                 encode_operand(&mut buf, name);
             }
-            CoreOp::DefInterface(_, name) => {
+            CoreOp::DefInterface(iid, name) => {
+                encode_operand(&mut buf, iid);
+                encode_operand(&mut buf, name);
+            }
+            CoreOp::DefInterfaceMethod(iid, mid, name) => {
+                encode_operand(&mut buf, iid);
+                encode_operand(&mut buf, mid);
+                encode_operand(&mut buf, name);
+            }
+            CoreOp::DefInterfaceField(iid, fid, name) => {
+                encode_operand(&mut buf, iid);
+                encode_operand(&mut buf, fid);
                 encode_operand(&mut buf, name);
             }
             CoreOp::Param(mid, pid, ty, name) => {
@@ -299,6 +323,45 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 encode_operand(&mut buf, fid);
                 encode_operand(&mut buf, ty);
             }
+            CoreOp::MethodModifiers(mid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, mid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
+            }
+            CoreOp::ClassModifiers(cid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, cid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
+            }
+            CoreOp::InterfaceModifiers(iid, modifiers) => {
+                write_varint(&mut buf, (1 + modifiers.len()) as u64);
+                encode_operand(&mut buf, iid);
+                for modifier in modifiers {
+                    encode_operand(&mut buf, modifier.as_str());
+                }
+            }
+            CoreOp::ControlSummary(mid, summaries) => {
+                write_varint(&mut buf, (1 + summaries.len()) as u64);
+                encode_operand(&mut buf, mid);
+                for summary in summaries {
+                    encode_operand(&mut buf, summary.as_str());
+                }
+            }
+            CoreOp::PatternFacts(mid, facts) => {
+                let mut operands = Vec::new();
+                for fact in facts {
+                    fact.append_serialized(&mut operands);
+                }
+                write_varint(&mut buf, (1 + operands.len()) as u64);
+                encode_operand(&mut buf, mid);
+                for operand in operands {
+                    encode_operand(&mut buf, &operand);
+                }
+            }
             CoreOp::Flags(tid, flags) => {
                 // Variadic: write count prefix, then operands
                 write_varint(&mut buf, (1 + flags.len()) as u64); // tid + flags
@@ -314,10 +377,16 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                     encode_operand(&mut buf, f);
                 }
             }
-            CoreOp::Extends(_, parent) => {
+            CoreOp::Extends(child, parent) => {
+                encode_operand(&mut buf, child);
                 encode_operand(&mut buf, parent);
             }
-            CoreOp::Implements(_, iid) => {
+            CoreOp::InterfaceExtends(child, parent) => {
+                encode_operand(&mut buf, child);
+                encode_operand(&mut buf, parent);
+            }
+            CoreOp::Implements(cid, iid) => {
+                encode_operand(&mut buf, cid);
                 encode_operand(&mut buf, iid);
             }
             CoreOp::Injects(cid, deps) => {
@@ -327,11 +396,13 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                     encode_operand(&mut buf, d);
                 }
             }
-            CoreOp::Import(_, module, named) => {
+            CoreOp::Import(alias, module, named) => {
+                encode_operand(&mut buf, alias);
                 encode_operand(&mut buf, module);
                 encode_operand(&mut buf, named);
             }
-            CoreOp::TypeAlias(_, original) => {
+            CoreOp::TypeAlias(alias, original) => {
+                encode_operand(&mut buf, alias);
                 encode_operand(&mut buf, original);
             }
             CoreOp::Pattern(name, args) => {
@@ -342,11 +413,10 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
                 }
             }
             // Edit Mode: Verbatim Method Bodies
-            // v0x03+: [mid_idx, text_idx, has_span_flag, start?, end?].
+            // v0x04: [mid_idx, text_idx, has_span_flag, start?, end?].
             // Spans are raw varints (not string-table entries) so repeated
-            // offsets don't pollute the table. Span-less bodies (legacy
-            // decoded state) write flag=0 and no offsets, keeping the
-            // encoding self-describing without a schema change elsewhere.
+            // offsets don't pollute the table. Span-less bodies write flag=0
+            // and no offsets.
             CoreOp::Body(mid, text, start, end) => {
                 encode_operand(&mut buf, mid);
                 encode_operand(&mut buf, text);
@@ -374,11 +444,11 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             }
             CoreOp::SideEffect(mid, effect_type) => {
                 encode_operand(&mut buf, mid);
-                encode_operand(&mut buf, effect_type);
+                encode_operand(&mut buf, effect_type.as_str());
             }
             CoreOp::ExecutionContext(mid, context_type) => {
                 encode_operand(&mut buf, mid);
-                encode_operand(&mut buf, context_type);
+                encode_operand(&mut buf, context_type.as_str());
             }
             // Structural invocations (native call graph).
             // [caller_idx, callee_idx, argc_varint] — the explicit argument
@@ -443,9 +513,12 @@ pub fn ir_to_binary_wire_json(ir: &CompiledIR) -> serde_json::Value {
 /// - Base64 decoding fails
 /// - Binary decoding fails
 pub fn binary_wire_json_to_ir(value: &serde_json::Value) -> Option<CompiledIR> {
+    let file_id = value.get("file")?.as_str()?;
+    let version = value.get("v")?.as_u64()?;
     let data_str = value.get("data")?.as_str()?;
     let bytes = base64_decode(data_str)?;
-    decode(&bytes).ok()
+    let ir = decode(&bytes).ok()?;
+    (ir.file_id == file_id && ir.version == version).then_some(ir)
 }
 
 /// Minimal base64 encoder (RFC 4648). Avoids pulling in a dependency
@@ -514,3 +587,7 @@ fn base64_decode(data: &str) -> Option<Vec<u8>> {
 #[cfg(test)]
 #[path = "../tests/ir/binary_wire.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/binary_wire_v04.rs"]
+mod v04_tests;

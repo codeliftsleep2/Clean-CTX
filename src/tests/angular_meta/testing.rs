@@ -4,6 +4,42 @@ use crate::angular_meta::run_meta_layer_with_config_and_path;
 use crate::angular_meta::testing::{
     extract_testing_semantic_edges, extract_testing_shape, is_testing_source,
 };
+
+#[test]
+fn testing_shape_has_no_count_only_rescan_path() {
+    let implementation = include_str!("../../angular_meta/testing.rs");
+    let literal_call_section = implementation
+        .split_once("fn collect_literal_calls(")
+        .and_then(|(_, tail)| tail.split_once("fn call_positions("))
+        .map(|(section, _)| section)
+        .expect("testing literal-call helper boundaries");
+
+    assert!(
+        !literal_call_section.contains("fn count_calls("),
+        "testing extraction must derive counts from the calls it already collected"
+    );
+    assert_eq!(
+        literal_call_section
+            .matches("call_positions(source")
+            .count(),
+        1,
+        "literal-call collection must not add a second count-only position scan"
+    );
+}
+
+#[test]
+fn testing_extraction_does_not_use_legacy_prefix_membership_scans() {
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_testing_shape(BASIC_SPEC, Fidelity::High).expect("testing shape");
+
+    assert!(!shape.is_empty());
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "testing extraction must query a reusable lexical index"
+    );
+}
 use crate::compression::Fidelity;
 use crate::config::MetaLayerConfig;
 use crate::layers::meta::semantic::SemanticRelation;

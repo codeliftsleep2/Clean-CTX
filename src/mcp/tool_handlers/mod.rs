@@ -29,6 +29,10 @@ pub use registry::HandlerRegistry;
 #[allow(unused_imports)]
 pub use traits::BoxedHandlerFn;
 
+#[cfg(test)]
+#[path = "../../tests/mcp/control_full_test_support.rs"]
+pub(crate) mod control_full_test_support;
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/tool_handlers.rs"]
 pub(crate) mod tool_handlers_tests;
@@ -49,6 +53,10 @@ pub(crate) mod phase3_contract_tests;
 #[path = "../../tests/mcp/envelope_contract.rs"]
 pub(crate) mod envelope_contract_tests;
 
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/semantic_publication_recovery.rs"]
+pub(crate) mod semantic_publication_recovery_tests;
+
 // End-to-end `provide_code_context` regressions for method-declaration
 // identity: the rendered skeleton must carry the structural method name, and
 // the request must have taken the COMPRESSED path (never `raw_passthrough`,
@@ -56,3 +64,7 @@ pub(crate) mod envelope_contract_tests;
 #[cfg(all(test, feature = "csharp"))]
 #[path = "../../tests/mcp/provider_code_context_signature.rs"]
 pub(crate) mod provider_code_context_signature_tests;
+
+#[cfg(all(test, any(feature = "csharp", feature = "typescript")))]
+#[path = "../../tests/mcp/focus_generic_methods.rs"]
+pub(crate) mod focus_generic_methods_tests;

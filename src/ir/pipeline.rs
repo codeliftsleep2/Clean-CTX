@@ -75,11 +75,16 @@ impl std::error::Error for PassError {}
 /// type declaration that owns it.
 #[derive(Debug, Clone)]
 pub struct TypeScope {
-    /// Class alias id allocated for this type declaration.
-    pub class_id: String,
+    pub owner: TypeOwner,
     /// Byte offset one past the end of the type declaration node.
     /// Scopes are pruned once the walk passes this offset.
     pub end_byte: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum TypeOwner {
+    Class(String),
+    Interface(String),
 }
 
 /// A single pass in the IR compilation pipeline.
@@ -114,6 +119,8 @@ pub struct PassContext {
     /// Set by compile_inner; distinct from file_id (which is αN alias).
     pub canonical_path: Option<String>,
     pub fidelity: Fidelity,
+    /// Runtime configuration consulted by framework meta-layers.
+    pub config: Option<crate::config::CleanCtxConfig>,
     /// Monotonic instruction ID counter.
     pub id_counter: u64,
     /// Language layers (Layer 2) — mutable per-compilation state.
@@ -124,11 +131,12 @@ pub struct PassContext {
     pub captures: Vec<CapEntry>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
-    /// Current method's accumulated flags (F-28).
-    pub current_method_flags: Vec<String>,
+    /// Current method's accumulated typed control summaries (F-28).
+    pub current_control_summaries: Vec<ControlSummary>,
     /// Current class ID (set when processing a class capture).
     /// Nested-type aware: mirrors the innermost entry of `type_scopes`.
     pub current_class: Option<String>,
+    pub current_interface: Option<String>,
     /// Open type-declaration scopes keyed by source span.
     /// A declaration is owned by the innermost scope whose
     /// `[start_byte, end_byte)` window contains it.
@@ -165,13 +173,15 @@ impl PassContext {
             file_id,
             canonical_path: None,
             fidelity,
+            config: None,
             id_counter: 0,
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
             current_method: None,
-            current_method_flags: Vec::new(),
+            current_control_summaries: Vec::new(),
             current_class: None,
+            current_interface: None,
             type_scopes: Vec::new(),
             callable_scopes: Vec::new(),
             current_callable: None,
@@ -199,15 +209,16 @@ impl PassContext {
         self.pattern_recognizers = recognizers;
     }
 
-    /// Flush accumulated method flags into a FLAGS instruction (F-28).
-    pub(super) fn flush_method_flags(&mut self) {
+    /// Flush accumulated method summaries into a typed instruction (F-28).
+    pub(super) fn flush_control_summaries(&mut self) {
         if let Some(method_id) = self.current_method.take() {
-            if !self.current_method_flags.is_empty() {
-                let flags = std::mem::take(&mut self.current_method_flags);
-                self.instructions.push(CoreOp::Flags(method_id, flags));
+            if !self.current_control_summaries.is_empty() {
+                let summaries = std::mem::take(&mut self.current_control_summaries);
+                self.instructions
+                    .push(CoreOp::ControlSummary(method_id, summaries));
             }
         }
-        self.current_method_flags.clear();
+        self.current_control_summaries.clear();
     }
 
     /// Push a type-declaration scope. Closed scopes are pruned lazily by
@@ -215,11 +226,24 @@ impl PassContext {
     /// enclosing type's later members.
     pub(super) fn push_type_scope(&mut self, class_id: String, end_byte: usize) {
         self.type_scopes.push(TypeScope {
-            class_id: class_id.clone(),
+            owner: TypeOwner::Class(class_id.clone()),
             end_byte,
         });
         self.current_class = Some(class_id.clone());
+        self.current_interface = None;
         self.layer_context.current_class = Some(class_id);
+        self.layer_context.current_interface = None;
+    }
+
+    pub(super) fn push_interface_scope(&mut self, interface_id: String, end_byte: usize) {
+        self.type_scopes.push(TypeScope {
+            owner: TypeOwner::Interface(interface_id.clone()),
+            end_byte,
+        });
+        self.current_class = None;
+        self.current_interface = Some(interface_id.clone());
+        self.layer_context.current_class = None;
+        self.layer_context.current_interface = Some(interface_id);
     }
 
     /// Resolve the innermost type scope whose `[start_byte, end_byte)`
@@ -234,9 +258,21 @@ impl PassContext {
                 break;
             }
         }
-        let owner = self.type_scopes.last().map(|s| s.class_id.clone());
-        self.current_class = owner.clone();
-        self.layer_context.current_class = owner;
+        let owner = self.type_scopes.last().map(|scope| scope.owner.clone());
+        self.current_class = match &owner {
+            Some(TypeOwner::Class(id)) => Some(id.clone()),
+            _ => None,
+        };
+        self.current_interface = match &owner {
+            Some(TypeOwner::Interface(id)) => Some(id.clone()),
+            _ => None,
+        };
+        self.layer_context
+            .current_class
+            .clone_from(&self.current_class);
+        self.layer_context
+            .current_interface
+            .clone_from(&self.current_interface);
     }
 
     /// Push the file-wide synthetic scope for top-level functions
@@ -245,11 +281,13 @@ impl PassContext {
     /// file, so it sits ABOVE any other scope and is never pruned.
     pub(super) fn push_file_scope(&mut self, class_id: String) {
         self.type_scopes.push(TypeScope {
-            class_id: class_id.clone(),
+            owner: TypeOwner::Class(class_id.clone()),
             end_byte: usize::MAX,
         });
         self.current_class = Some(class_id.clone());
+        self.current_interface = None;
         self.layer_context.current_class = Some(class_id);
+        self.layer_context.current_interface = None;
     }
 
     /// Push the callable-declaration scope for `method_id`.
@@ -337,7 +375,7 @@ impl PassContext {
     /// Emit a method's IR (DefMethod + Param + Return) and return the method name.
     pub(super) fn emit_method_ir(
         &mut self,
-        class_id: &str,
+        owner: &TypeOwner,
         method_id: &str,
         raw_sig: &str,
     ) -> String {
@@ -357,11 +395,20 @@ impl PassContext {
         let params_str = sig.params_str;
         let return_type = sig.return_type;
 
-        self.instructions.push(CoreOp::DefMethod(
-            class_id.to_string(),
-            method_id.to_string(),
-            name.clone(),
-        ));
+        match owner {
+            TypeOwner::Class(class_id) => self.instructions.push(CoreOp::DefMethod(
+                class_id.clone(),
+                method_id.to_string(),
+                name.clone(),
+            )),
+            TypeOwner::Interface(interface_id) => {
+                self.instructions.push(CoreOp::DefInterfaceMethod(
+                    interface_id.clone(),
+                    method_id.to_string(),
+                    name.clone(),
+                ))
+            }
+        }
 
         if !params_str.is_empty() {
             // The formal parameters are the ones the declaration wrote: a
@@ -410,6 +457,8 @@ impl PassContext {
         if let Some(from_pos) = trimmed.find(" from ") {
             let named_part = trimmed[..from_pos].trim();
             let module_part = trimmed[from_pos + 6..]
+                .trim()
+                .trim_end_matches(';')
                 .trim()
                 .trim_matches('\'')
                 .trim_matches('"');
@@ -501,3 +550,7 @@ mod tests;
 #[cfg(all(test, feature = "csharp"))]
 #[path = "../tests/ir/method_signature_shape.rs"]
 mod signature_shape_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/ir/typescript_export_ownership.rs"]
+mod typescript_export_ownership_tests;

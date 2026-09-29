@@ -1,0 +1,38 @@
+[
+  {
+    "id": "edit-createuser-message",
+    "type": "edit",
+    "fixture": "src/test_files/LargeService.ts",
+    "fidelity": "edit",
+    "capture": "edit-largeservice-createuser",
+    "focus": ["UserService.createUser"],
+    "target": "UserService.createUser",
+    "instruction": "Change the duplicate-email error message in UserService.createUser from 'User with this email already exists' to 'Email already registered'. Emit ONLY a JSON object with exactly these fields: {\"target\": \"<Class.method>\", \"expectedOldText\": \"<the byte-exact current body>\", \"newText\": \"<the body with the change>\"}.",
+    "find": "User with this email already exists",
+    "replace": "Email already registered"
+  },
+  {
+    "id": "edit-getuserstats-nullish",
+    "type": "edit",
+    "fixture": "src/test_files/LargeService.ts",
+    "fidelity": "edit",
+    "capture": "edit-largeservice-getuserstats",
+    "focus": ["UserService.getUserStats"],
+    "target": "UserService.getUserStats",
+    "instruction": "In UserService.getUserStats, change `totalSpent?.total || 0` to `totalSpent?.total ?? 0`. Emit ONLY a JSON object with exactly these fields: {\"target\": \"<Class.method>\", \"expectedOldText\": \"<the byte-exact current body>\", \"newText\": \"<the body with the change>\"}.",
+    "find": "totalSpent?.total || 0",
+    "replace": "totalSpent?.total ?? 0"
+  },
+  {
+    "id": "edit-isvalidemail-length",
+    "type": "edit",
+    "fixture": "src/test_files/UserManagementService.ts",
+    "fidelity": "edit",
+    "capture": "edit-usermanagement-isvalidemail",
+    "focus": ["UserManagementService.isValidEmail"],
+    "target": "UserManagementService.isValidEmail",
+    "instruction": "In UserManagementService.isValidEmail, change the length guard from `email.length > 254` to `email.length >= 254`. Emit ONLY a JSON object with exactly these fields: {\"target\": \"<Class.method>\", \"expectedOldText\": \"<the byte-exact current body>\", \"newText\": \"<the body with the change>\"}.",
+    "find": "email.length > 254",
+    "replace": "email.length >= 254"
+  }
+]

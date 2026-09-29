@@ -10,16 +10,21 @@
 //
 // Key design decisions:
 //   - Uses class/method **names** only, never internal alias IDs (C1, M1)
-//   - Overloaded methods disambiguated with `+N` (parameter count)
-//   - Fidelity controls field layout (Low = space-separated, Medium/High = one-per-line)
+//   - Overloaded methods disambiguated by their visible parameter signatures
+//   - Fidelity controls field layout (structural = grouped, Edit = one-per-line)
 //   - Meta-layer `@` annotations always shown regardless of fidelity
-//   - The `// SCHEMA v2` header opens every output with the legend table
+//   - The `// SCHEMA vNext` header opens every output with the legend table
 //
-// Notation reference (also in the SCHEMA v2 header):
-//   @=meta  X=extends  I=implements  F=field  M=method
-//   $=import  →=scope  fl:=flags  cl:=class-flags  P=pattern  T=type-alias
+// Notation reference (also in the SCHEMA vNext header):
+//   @=meta  C=class  X=extends  I=implements  F=field  M=method
+//   $=import  p:=params  →=return  mod:=method-modifiers cmod:=class-modifiers
+//   ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias
 
-use super::hierarchical::{ClassNode, HierarchicalIR, PatternEntry};
+use super::hierarchical::{
+    ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
+};
+use super::patterns::is_observable_return_type;
+use super::{DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind};
 use crate::compression::Fidelity;
 use std::collections::{HashMap, HashSet};
 
@@ -40,10 +45,8 @@ use std::collections::{HashMap, HashSet};
 /// | Imports | Always | Always | Always | Always | Always |
 /// | Type aliases | Always | Always | Always | Always | Always |
 ///
-/// # Overloaded method disambiguation
-///
-/// When a class has multiple methods with the same name, `+N` is appended
-/// where N is the parameter count (e.g., `M find(+1)`, `M find(+3)`).
+/// Overloaded methods retain visible parameter signatures at every structural
+/// fidelity so their declarations remain distinct without decorating names.
 pub fn render_hierarchical_for_llm(hir: &HierarchicalIR, fidelity: Fidelity) -> String {
     render_hierarchical_for_llm_focused(hir, fidelity, None)
 }
@@ -66,25 +69,33 @@ pub fn render_hierarchical_for_llm_focused(
 ) -> String {
     let mut output = String::new();
 
-    // ── SCHEMA v2 header ──
-    output.push_str("// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias\n");
+    // ── SCHEMA vNext header ──
+    output.push_str("// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n");
 
     // ── Classes ──
     for class in &hir.classes {
         render_class(&mut output, class, fidelity, focus);
     }
 
+    if !hir.interfaces.is_empty() {
+        output.push_str("// Q=interface\n");
+        for interface in &hir.interfaces {
+            render_interface(&mut output, interface, fidelity, focus);
+        }
+    }
+
     // ── Imports ──
     for imp in &hir.imports {
         if imp.len() >= 3 {
-            // Format: $ alias module [named]
-            let alias = &imp[0];
+            // The generated import identity remains canonical code-side but is
+            // presentation-only noise: no visible record references it.
             let module = &imp[1];
             let named = &imp[2];
-            if named == "*" || named.is_empty() {
-                output.push_str(&format!("$ {} {}\n", alias, module));
-            } else {
-                output.push_str(&format!("$ {} {} [{}]\n", alias, module, named));
+            match (module.is_empty(), named == "*" || named.is_empty()) {
+                (true, true) => output.push_str("$\n"),
+                (false, true) => output.push_str(&format!("$ {module}\n")),
+                (true, false) => output.push_str(&format!("$ [{named}]\n")),
+                (false, false) => output.push_str(&format!("$ {module} [{named}]\n")),
             }
         }
     }
@@ -108,19 +119,33 @@ fn render_class(
     fidelity: Fidelity,
     focus: Option<&HashSet<String>>,
 ) {
-    // Class boundary
-    output.push_str(&format!("// ── {} ──\n", class.name));
+    // Typed class boundary
+    output.push_str(&format!("C {}\n", class.name));
 
     // Class-level patterns (e.g., EMPTY_CTOR)
     for pat in &class.patterns {
         render_pattern(output, pat);
     }
 
+    if !class.modifiers.is_empty() {
+        let modifiers = class
+            .modifiers
+            .iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        output.push_str(&format!("cmod: {}\n", modifiers.join(" ")));
+    }
+
     // Class-level flags
-    if let Some(flags) = &class.class_flags {
-        if !flags.is_empty() {
-            output.push_str(&format!("cl: {}\n", flags.join(" ")));
-        }
+    if !class.class_flags.is_empty() {
+        let flags = class
+            .class_flags
+            .iter()
+            .flatten()
+            .cloned()
+            .collect::<Vec<_>>();
+        output.push_str(&format!("cl: {}\n", flags.join(" ")));
     }
 
     // Extends
@@ -134,26 +159,48 @@ fn render_class(
     }
 
     // Fields — layout depends on fidelity
-    render_fields(output, class, fidelity);
+    render_fields(output, &class.fields, fidelity);
 
     // Methods — with overload disambiguation
-    render_methods(output, class, fidelity, focus);
+    render_methods(output, &class.methods, fidelity, focus);
+}
+
+fn render_interface(
+    output: &mut String,
+    interface: &InterfaceNode,
+    fidelity: Fidelity,
+    focus: Option<&HashSet<String>>,
+) {
+    output.push_str(&format!("Q {}\n", interface.name));
+    if !interface.modifiers.is_empty() {
+        let modifiers = interface
+            .modifiers
+            .iter()
+            .flatten()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        output.push_str(&format!("imod: {}\n", modifiers.join(" ")));
+    }
+    if !interface.extends.is_empty() {
+        output.push_str(&format!("X {}\n", interface.extends.join(" ")));
+    }
+    render_fields(output, &interface.fields, fidelity);
+    render_methods(output, &interface.methods, fidelity, focus);
 }
 
 /// Render fields for a class.
 ///
-/// Low fidelity: space-separated on one line.
-/// Medium/High: one per line.
-fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
-    if class.fields.is_empty() {
+/// Structural fidelities group fields on one owner-local row. Edit and
+/// Verbatim retain one row per field alongside their body-bearing output.
+fn render_fields(output: &mut String, fields: &[FieldNode], fidelity: Fidelity) {
+    if fields.is_empty() {
         return;
     }
 
     match fidelity {
-        Fidelity::Low => {
-            // Space-separated on one line
-            let field_strs: Vec<String> = class
-                .fields
+        Fidelity::Low | Fidelity::Medium | Fidelity::High => {
+            // Space-separated on one owner-local line.
+            let field_strs: Vec<String> = fields
                 .iter()
                 .map(|f| {
                     if let Some(ft) = &f.field_type {
@@ -165,9 +212,9 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
                 .collect();
             output.push_str(&format!("F {}\n", field_strs.join(" ")));
         }
-        Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
+        Fidelity::Edit | Fidelity::Verbatim => {
             // One per line
-            for field in &class.fields {
+            for field in fields {
                 if let Some(ft) = &field.field_type {
                     output.push_str(&format!("F {}:{}\n", field.name, ft));
                 } else {
@@ -178,59 +225,71 @@ fn render_fields(output: &mut String, class: &ClassNode, fidelity: Fidelity) {
     }
 }
 
-/// Render methods for a class with overload disambiguation.
-///
-/// First pass: count occurrences of each method name.
-/// Second pass: emit with `+N` for duplicates.
+/// Render methods for a class, retaining parameters for overloaded names even
+/// at Low fidelity so their signatures remain distinct.
 ///
 /// At `Fidelity::Edit`, a method's full verbatim body is appended only when
 /// `focus` is `None` (every method) or the method's name is in the focus set.
 /// Non-focused methods fall through to the signature-only rendering path.
 fn render_methods(
     output: &mut String,
-    class: &ClassNode,
+    methods: &[MethodNode],
     fidelity: Fidelity,
     focus: Option<&HashSet<String>>,
 ) {
-    if class.methods.is_empty() {
+    if methods.is_empty() {
         return;
     }
 
     // First pass: count method name occurrences
     let mut name_counts: HashMap<&str, usize> = HashMap::new();
-    for method in &class.methods {
+    for method in methods {
         *name_counts.entry(&method.name).or_insert(0) += 1;
     }
 
     // Second pass: emit methods
-    let mut name_indices: HashMap<&str, usize> = HashMap::new();
-    for method in &class.methods {
+    for method in methods {
+        let return_declares_observable = method
+            .return_type
+            .as_deref()
+            .is_some_and(is_observable_return_type);
+
         let count = name_counts[&method.name.as_str()];
-        let idx = name_indices.entry(&method.name).or_insert(0);
-        *idx += 1;
 
         // Method-level patterns first
         for pat in &method.patterns {
+            if return_declares_observable && pat.name == "OBSERVABLE" {
+                continue;
+            }
             render_pattern(output, pat);
         }
 
-        // Method declaration
-        if count > 1 {
-            // Overloaded: disambiguate with +N (parameter count)
-            let param_count = method.params.len();
-            output.push_str(&format!("M {}(+{})", method.name, param_count));
-        } else {
-            output.push_str(&format!("M {}", method.name));
-        }
+        // Method declaration. Parameter signatures below distinguish overloads.
+        output.push_str(&format!("M {}", method.name));
 
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();
         let has_return = method.return_type.is_some();
-        let has_flags = method.flags.as_ref().is_some_and(|f| !f.is_empty());
+        let has_modifiers = !method.modifiers.is_empty();
+        let has_control_summaries = !method.control_summaries.is_empty();
+        let visible_pattern_facts = method
+            .pattern_facts
+            .iter()
+            .flatten()
+            .filter(|fact| {
+                !(return_declares_observable && fact.kind() == PatternFact::Observable.kind())
+            })
+            .collect::<Vec<_>>();
+        let has_pattern_facts = !visible_pattern_facts.is_empty();
+        let has_flags = !method.flags.is_empty();
 
-        if has_params || has_return || has_flags {
-            output.push_str("  →");
-
+        if has_params
+            || has_return
+            || has_modifiers
+            || has_control_summaries
+            || has_pattern_facts
+            || has_flags
+        {
             // Params (shown in Medium/High, hidden in Low unless overloaded)
             if has_params && (fidelity != Fidelity::Low || count > 1) {
                 let param_strs: Vec<String> = method
@@ -254,11 +313,38 @@ fn render_methods(
                 output.push_str(&format!(" → {}", rt));
             }
 
-            // Flags
-            if let Some(flags) = &method.flags {
-                if !flags.is_empty() {
-                    output.push_str(&format!(" fl:{}", flags.join(",")));
-                }
+            if has_modifiers {
+                let modifiers = method
+                    .modifiers
+                    .iter()
+                    .flatten()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                output.push_str(&format!(" mod:{}", modifiers.join(",")));
+            }
+
+            if has_control_summaries {
+                let summaries = method
+                    .control_summaries
+                    .iter()
+                    .flatten()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                output.push_str(&format!(" ctl:{}", summaries.join(",")));
+            }
+
+            if has_pattern_facts {
+                let facts = visible_pattern_facts
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>();
+                output.push_str(&format!(" pf:{}", facts.join(",")));
+            }
+
+            // Unknown legacy method metadata
+            if has_flags {
+                let flags = method.flags.iter().flatten().cloned().collect::<Vec<_>>();
+                output.push_str(&format!(" fl:{}", flags.join(",")));
             }
         }
 
@@ -296,21 +382,51 @@ fn render_methods(
             output.push_str(&format!(" df:{}", df_strs.join(",")));
         }
 
+        // Annotation-redundancy collapse: the `async` fact (co-derived from
+        // the `async` keyword) was reported up to three times — mod:ASYNC +
+        // se:async + ec:async. Report it once, at the most structural level
+        // available: mod:ASYNC (declaration modifier) is authoritative and
+        // drops se:async/ec:async; otherwise se:async (side effect) is
+        // authoritative and drops ec:async. Presentation-only — the codec
+        // still stores all three. se:async/ec:async still render when no
+        // more-structural async fact exists.
+        let is_async_declared = method
+            .modifiers
+            .iter()
+            .flatten()
+            .any(|m| *m == DeclarationModifier::Async);
+        let has_async_side_effect = method.side_effect.contains(&SideEffectKind::Async);
+
         // Side-effect annotation at High fidelity (Gap 1 fix).
         // e.g. `se:mutation` — quickly tells the LLM whether a method is
         // pure, performs I/O, mutates state, is async, or is transactional.
-        if fidelity == Fidelity::High {
-            if let Some(se) = &method.side_effect {
-                output.push_str(&format!(" se:{}", se));
+        if fidelity == Fidelity::High && !method.side_effect.is_empty() {
+            let effects: Vec<String> = method
+                .side_effect
+                .iter()
+                .filter(|&&e| !(is_async_declared && e == SideEffectKind::Async))
+                .map(ToString::to_string)
+                .collect();
+            if !effects.is_empty() {
+                output.push_str(&format!(" se:{}", effects.join(",")));
             }
         }
 
         // Execution-context annotation at High fidelity (Gap 1 fix).
         // e.g. `ec:async` — tells the agent the runtime context without
         // a full body read.
-        if fidelity == Fidelity::High {
-            if let Some(ec) = &method.execution_context {
-                output.push_str(&format!(" ec:{}", ec));
+        if fidelity == Fidelity::High && !method.execution_context.is_empty() {
+            let contexts: Vec<String> = method
+                .execution_context
+                .iter()
+                .filter(|&&c| {
+                    !((is_async_declared || has_async_side_effect)
+                        && c == ExecutionContextKind::Async)
+                })
+                .map(ToString::to_string)
+                .collect();
+            if !contexts.is_empty() {
+                output.push_str(&format!(" ec:{}", contexts.join(",")));
             }
         }
 

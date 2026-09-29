@@ -5,13 +5,13 @@
 //
 // Patterns detected:
 //   - Constructor injection (DEF_M + SIG for injectable params + INJECTS)
-//   - Observable stream (DEF_M + RET(Promise) + FLAGS(ASYNC))
+//   - Observable stream (DEF_M + RET(Observable/IObservable))
 //   - Getter/Setter pattern (DEF_M("get/set X"))
-//   - Override pattern (DEF_M + FLAGS(OVERRIDE))
+//   - Override pattern (DEF_M + PatternFacts(OVERRIDE))
 
 use super::PatternRecognizer;
-use crate::ir::opcodes::CoreOp;
-use crate::ir::patterns::is_constructor_name;
+use crate::ir::opcodes::{CoreOp, PatternFact};
+use crate::ir::patterns::{is_constructor_name, is_observable_return_type};
 
 /// Pattern recognizer (Layer 4).
 /// Analyzes the instruction stream and compresses recognized patterns.
@@ -70,8 +70,7 @@ fn try_recognize_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         return Some(result);
     }
 
-    // Pattern: Observable/async method
-    // DEF_M + RET($P|$s) + FLAGS(ASYNC)
+    // Pattern: Observable-returning method
     if let Some(result) = try_observable_pattern(slice) {
         return Some(result);
     }
@@ -86,7 +85,7 @@ fn try_recognize_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
 }
 
 /// Pattern: Constructor injection
-/// Matches: DEF_M with name "constructor" or "new" — emits a CTOR flag
+/// Matches: DEF_M with name "constructor" or "new" — emits a CTOR fact
 /// but does NOT consume the instructions (they still need to be emitted).
 fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     if slice.is_empty() {
@@ -102,17 +101,17 @@ fn try_ctor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         _ => return None,
     };
 
-    // Emit a CTOR flag but do NOT consume instructions — the original
+    // Emit a CTOR fact but do NOT consume instructions — the original
     // DefMethod, Param, and Return instructions must all be preserved.
     Some((
-        CoreOp::Flags(method_id.clone(), vec!["CTOR".to_string()]),
+        CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Constructor]),
         0, // consumed = 0 means no instructions are consumed
     ))
 }
 
-/// Pattern: Observable/async method
-/// Matches: DEF_M + RET(Promise/Observable) + FLAGS(ASYNC)
-/// Emits an OBSERVABLE flag but does NOT consume instructions.
+/// Pattern: Observable-returning method
+/// Matches: DEF_M + owner-matched RET(Observable/IObservable)
+/// Emits an OBSERVABLE fact but does NOT consume instructions.
 fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
     if slice.is_empty() {
         return None;
@@ -123,35 +122,21 @@ fn try_observable_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
         _ => return None,
     };
 
-    // Look ahead for RET with Promise/Observable type
-    let mut has_observable_return = false;
-    let mut has_async_flag = false;
-
-    for op in slice.iter().skip(1).take(5) {
+    for op in slice.iter().skip(1) {
         match op {
-            CoreOp::Return(_, ty) => {
-                if ty == "$P" || ty.contains("Promise") || ty.contains("Observable") {
-                    has_observable_return = true;
-                }
+            CoreOp::DefMethod(..) => break,
+            CoreOp::Return(tid, ty) if *tid == method_id && is_observable_return_type(ty) => {
+                return Some((
+                    CoreOp::PatternFacts(method_id, vec![PatternFact::Observable]),
+                    0, // additive — do not consume any instructions
+                ));
             }
-            CoreOp::Flags(tid, flags)
-                if *tid == method_id && flags.contains(&"ASYNC".to_string()) =>
-            {
-                has_async_flag = true;
-            }
-            CoreOp::Flags(..) => {}
+            CoreOp::Return(..) => {}
             _ => {}
         }
     }
 
-    if has_observable_return || has_async_flag {
-        Some((
-            CoreOp::Flags(method_id, vec!["OBSERVABLE".to_string()]),
-            0, // additive — do not consume any instructions
-        ))
-    } else {
-        None
-    }
+    None
 }
 
 /// Pattern: Getter/Setter accessor
@@ -167,14 +152,14 @@ fn try_accessor_pattern(slice: &[CoreOp]) -> Option<(CoreOp, usize)> {
             if name_lower.starts_with("get ") {
                 let property = name[4..].trim().to_string();
                 Some((
-                    CoreOp::Flags(method_id.clone(), vec!["GETTER".to_string(), property]),
-                    1,
+                    CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Getter(property)]),
+                    0,
                 ))
             } else if name_lower.starts_with("set ") {
                 let property = name[4..].trim().to_string();
                 Some((
-                    CoreOp::Flags(method_id.clone(), vec!["SETTER".to_string(), property]),
-                    1,
+                    CoreOp::PatternFacts(method_id.clone(), vec![PatternFact::Setter(property)]),
+                    0,
                 ))
             } else {
                 None

@@ -93,11 +93,44 @@ impl PathDictionary {
         if let Some(alias) = self.reverse.get(&key).cloned() {
             alias
         } else {
-            let alias = format!("α{}", self.forward.len() + 1);
+            let next = self
+                .forward
+                .keys()
+                .filter_map(|alias| alias.strip_prefix('α')?.parse::<usize>().ok())
+                .max()
+                .unwrap_or(0)
+                + 1;
+            let alias = format!("α{next}");
             self.reverse.insert(key.clone(), alias.clone());
             self.forward.insert(alias.clone(), key);
             alias
         }
+    }
+
+    /// Resolve a session-local alias back to its durable canonical path.
+    pub fn path_for_alias(&self, alias: &str) -> Option<&str> {
+        self.forward.get(alias).map(String::as_str)
+    }
+
+    /// Resolve an already-registered durable path without creating session
+    /// identity as a side effect.
+    pub fn alias_for_path(&self, absolute_path: &str) -> Option<&str> {
+        self.reverse
+            .get(absolute_path)
+            .or_else(|| self.reverse.get(&canonical_identity_key(absolute_path)))
+            .map(String::as_str)
+    }
+
+    /// Remove one exact path/alias ownership pair without affecting any other
+    /// dictionary entry.
+    pub fn remove_path_alias(&mut self, alias: &str, absolute_path: &str) -> bool {
+        let expected = canonical_identity_key(absolute_path);
+        if self.forward.get(alias) != Some(&expected) {
+            return false;
+        }
+        self.forward.remove(alias);
+        self.reverse.retain(|_, mapped_alias| mapped_alias != alias);
+        true
     }
 
     /// Format the full session-global PATHMAP as a footer.

@@ -330,6 +330,63 @@ export class UserService {
     );
 }
 
+// ── Live regression: method-return pipes keep method-local identity ──
+
+fn multi_method_return_pipe_source() -> &'static str {
+    r#"
+import { Observable, of } from 'rxjs';
+import { map, filter } from 'rxjs/operators';
+
+export class BigProbe {
+  method1(x: number, y: string, z: boolean = false): Observable<number> {
+    return of(x).pipe(map(v => v + 1), filter(v => v > 0));
+  }
+
+  method2(x: number, y: string, z: boolean = false): Observable<number> {
+    return of(x).pipe(map(v => v + 2), filter(v => v > 1));
+  }
+}
+"#
+}
+
+#[test]
+fn method_return_pipes_do_not_collapse_to_the_first_method() {
+    let shape = extract_rx_shape(multi_method_return_pipe_source(), Fidelity::High)
+        .expect("should detect RxJS");
+
+    assert_eq!(shape.pipes.len(), 2, "pipes: {:?}", shape.pipes);
+    assert!(
+        shape.pipes[0].owner.contains("method1"),
+        "first pipe must retain method1 identity: {:?}",
+        shape.pipes
+    );
+    assert!(
+        shape.pipes[1].owner.contains("method2"),
+        "second pipe must retain method2 identity instead of collapsing to method1: {:?}",
+        shape.pipes
+    );
+}
+
+#[test]
+fn method_return_types_do_not_create_parameter_fragment_observables() {
+    let shape = extract_rx_shape(multi_method_return_pipe_source(), Fidelity::High)
+        .expect("should detect RxJS");
+    let names: Vec<&str> = shape
+        .observables
+        .iter()
+        .map(|observable| observable.name.as_str())
+        .collect();
+
+    assert!(
+        names.iter().all(|name| !name.ends_with(')')),
+        "method parameters and defaults are not observable declarations: {names:?}"
+    );
+    assert!(
+        names.iter().all(|name| !name.contains("false")),
+        "default parameter values must not become observable names: {names:?}"
+    );
+}
+
 #[test]
 fn low_fidelity_emits_names_only() {
     let src = r#"

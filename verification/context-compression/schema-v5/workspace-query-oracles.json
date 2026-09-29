@@ -1,0 +1,8 @@
+[
+  {"id":"provenance","type":"find_entities","arguments":{"name":"SharedName"}},
+  {"id":"framework-edge-provenance","type":"forward_edges","arguments":{"domain":"angular","entity_type":"Service","name":"Alpha"}},
+  {"id":"cross-file-calls","type":"reverse_edges","arguments":{"domain":"builtin","entity_type":"Method","name":"audit"}},
+  {"id":"entities-in-file","type":"entities_in_file","arguments":{"file_path":"semantic-rich.ts"}},
+  {"id":"transitive-dependencies","type":"transitive_dependencies","arguments":{"domain":"angular","entity_type":"Service","name":"Alpha"}},
+  {"id":"has-cycle","type":"has_cycle","arguments":{}}
+]

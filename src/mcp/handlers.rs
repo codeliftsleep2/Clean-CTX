@@ -19,7 +19,8 @@ pub(crate) fn handle_initialize(id: &Value) {
         "result": {
             "protocolVersion": "2025-11-25",
             "capabilities": { "tools": {}, "prompts": {} },
-            "serverInfo": { "name": "clean-ctx", "version": "1.0.0" }
+            "serverInfo": { "name": "clean-ctx", "version": "1.0.0" },
+            "instructions": prompts::WORKFLOW_INSTRUCTIONS
         }
     }));
 }
@@ -159,7 +160,7 @@ pub(crate) fn handle_prompts_get(id: &Value, prompt_name: &str, state: &McpState
             "jsonrpc": "2.0",
             "id": id,
             "result": {
-                "description": "Clean-CTX SCHEMA v2 response vocabulary: structure letters, fl:/cl: flags, High-fidelity cf:/df:/se:/ec: metadata, α path aliases and current Φ framework-meta markers.",
+                "description": "Clean-CTX SCHEMA-vNext presentation vocabulary: structural context, exact Edit bodies, workspace-query graph retrieval, local economic raw fallback, code-side delta acknowledgement, and α path aliases.",
                 "messages": [
                     {
                         "role": "user",

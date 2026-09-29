@@ -2,7 +2,28 @@
 //
 // Tests for the Angular detection heuristic.
 
-use crate::angular_meta::detect::is_angular_file;
+use crate::angular_meta::detect::{is_angular_file, is_angular_file_with_regions};
+use crate::meta_util::LexicalRegions;
+
+#[test]
+fn compilation_scoped_detection_matches_standalone_detection_contract() {
+    let sources = [
+        "@Component({ selector: 'app-root' }) export class AppComponent {}",
+        "import { Input } from '@angular/core'; class Form { @Input() value = ''; }",
+        "class Host { @ViewChild('button') button: unknown; }",
+        "import React from 'react'; export class App extends React.Component {}",
+        "export class Utility { format(value: string) { return value.trim(); } }",
+    ];
+
+    for source in sources {
+        let regions = LexicalRegions::new(source);
+        assert_eq!(
+            is_angular_file_with_regions(source, &regions),
+            is_angular_file(source),
+            "compilation detector differs for {source:?}"
+        );
+    }
+}
 
 #[test]
 fn detects_component_decorator() {

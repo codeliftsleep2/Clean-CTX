@@ -136,9 +136,25 @@ pub fn create_default_registry() -> HandlerRegistry {
     );
     register_tool!(
         reg,
+        "delete_context",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::persistence::handle_delete_context(id, params, state);
+        })
+    );
+    register_tool!(
+        reg,
         "list_sessions",
         Box::new(|id, params, state| {
             crate::mcp::tool_handlers::persistence::handle_list_sessions(id, params, state);
+        })
+    );
+    register_tool!(
+        reg,
+        "inspect_legacy_fallbacks",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::persistence::handle_inspect_legacy_fallbacks(
+                id, params, state,
+            );
         })
     );
     register_tool!(

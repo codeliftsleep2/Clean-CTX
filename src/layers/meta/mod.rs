@@ -17,8 +17,13 @@
 // in this file for historical reasons. New meta-layers should NOT follow
 // this pattern.
 
+#[cfg(feature = "angular")]
+mod angular_semantic;
 pub mod builtin;
+mod context;
 pub mod semantic;
+
+pub use context::{MetaLayerContext, MetaLayerEvaluation};
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
@@ -164,6 +169,35 @@ pub trait MetaLayer: Send + Sync {
     ) -> Vec<SemanticEdge> {
         self.extract_semantic_edges_paired(source, class_captures, fidelity, config)
     }
+
+    /// Evaluate one applicable layer through one compilation boundary.
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        MetaLayerEvaluation {
+            output: self.enrich_with_path(
+                context.source,
+                context.path,
+                context.class_captures,
+                context.fidelity,
+                context.config,
+            ),
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
+        }
+    }
+
+    /// Decide applicability and evaluate without discarding detection evidence.
+    fn evaluate_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerEvaluation> {
+        self.is_applicable(context.source, context.path, context.config)
+            .then(|| self.evaluate_context(context))
+    }
 }
 
 // ── Angular Meta-Layer ────────────────────────────────────────────────
@@ -284,74 +318,13 @@ impl MetaLayer for AngularMetaLayer {
         config: Option<&CleanCtxConfig>,
     ) -> Vec<SemanticEdge> {
         let meta_config = config.and_then(|c| c.meta_layers.get("angular"));
-        let mut edges: Vec<SemanticEdge> = Vec::new();
-
-        // 1. Decorator-based edges from class captures
-        let is_angular = crate::angular_meta::detect::is_angular_file(source);
-        if is_angular {
-            // Build a name→entity_type map from all class captures to support
-            // precise DeclaresInModule/ExportsFromModule entity types.
-            let mut decl_types: std::collections::HashMap<String, &'static str> =
-                std::collections::HashMap::new();
-            for raw_class in class_captures {
-                if let Some((class_name, kind, _, _, _)) =
-                    crate::angular_meta::decorators::extract_graph_entries(raw_class)
-                {
-                    let entity_type = match kind {
-                        crate::angular_meta::decorators::ClassKind::Component => "Component",
-                        crate::angular_meta::decorators::ClassKind::Service => "Service",
-                        crate::angular_meta::decorators::ClassKind::Directive => "Directive",
-                        crate::angular_meta::decorators::ClassKind::Pipe => "Pipe",
-                        crate::angular_meta::decorators::ClassKind::Module => "Module",
-                    };
-                    decl_types.insert(class_name, entity_type);
-                }
-            }
-
-            for raw_class in class_captures {
-                // extract_graph_entries gives structured class metadata
-                // (kind, selector, injects, pipe_name) — no re-parsing of the source.
-                if let Some((class_name, kind, selector, injects, pipe_name)) =
-                    crate::angular_meta::decorators::extract_graph_entries(raw_class)
-                {
-                    edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
-                        &class_name,
-                        kind,
-                        selector.as_deref(),
-                        &injects,
-                        pipe_name.as_deref(),
-                        raw_class,
-                        fidelity,
-                        &decl_types,
-                    ));
-                }
-            }
-        }
-
-        // 2. NgRx semantic edges — the shape extraction already parses the
-        //    file for NgRx artifacts; reuse its structured output.
-        let ngrx_enabled = meta_config.map(|c| c.ngrx.enabled).unwrap_or(true);
-        if ngrx_enabled {
-            if let Some(shape) = crate::angular_meta::ngrx::extract_ngrx_shape(source, fidelity) {
-                edges.extend(shape.to_ngrx_semantic_edges());
-            }
-        }
-
-        // 3. Routing semantic edges — same reuse of existing shape extraction.
-        let routing_enabled = meta_config.map(|c| c.routing.enabled).unwrap_or(true);
-        if routing_enabled {
-            if let Some(shape) = crate::angular_meta::routing::extract_route_shape(source, fidelity)
-            {
-                edges.extend(shape.to_semantic_edges());
-            }
-        }
-
-        // 4. RxJS: observables and subjects describe data-flow wiring, not
-        //    cross-entity semantic relationships. The NgRx effect extraction
-        //    already covers the action→effect→service pipeline, which is the
-        //    primary semantic chain. RxJS entries are retained as structural
-        //    metadata (Φ markers); semantic-edge projection of observables
-        //    is deferred to Phase 4 (WorkspaceIndex) if needed.
+        let mut edges = angular_semantic::extract_non_testing_edges(
+            source,
+            class_captures,
+            fidelity,
+            config,
+            Default::default(),
+        );
 
         let testing_enabled = meta_config.map(|c| c.testing.enabled).unwrap_or(true);
         if testing_enabled {
@@ -375,9 +348,13 @@ impl MetaLayer for AngularMetaLayer {
             .iter()
             .map(|(_, text)| text.clone())
             .collect();
-        let mut edges = self.extract_semantic_edges(source, &captures, fidelity, config);
-        edges
-            .retain(|edge| edge.relation != crate::layers::meta::semantic::SemanticRelation::Tests);
+        let mut edges = angular_semantic::extract_non_testing_edges(
+            source,
+            &captures,
+            fidelity,
+            config,
+            Default::default(),
+        );
         let testing_enabled = config
             .and_then(|value| value.meta_layers.get("angular"))
             .map(|value| value.testing.enabled)
@@ -387,6 +364,17 @@ impl MetaLayer for AngularMetaLayer {
                 .extend(crate::angular_meta::testing::extract_testing_semantic_edges(source, path));
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        angular_semantic::evaluate(self.name(), context, None)
+    }
+
+    fn evaluate_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerEvaluation> {
+        angular_semantic::evaluate_if_applicable(self.name(), context)
     }
 }
 
@@ -493,6 +481,33 @@ impl MetaLayer for SpringBootMetaLayer {
             ));
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        #[cfg(test)]
+        crate::spring_meta::record_evaluation();
+
+        let output = crate::spring_meta::run_meta_layer_for_applicable_source(
+            context.class_captures,
+            context.fidelity,
+        )
+        .filter(|block| !block.is_empty())
+        .map(|block| MetaLayerOutput {
+            layer_name: self.name(),
+            rendered: block.render(),
+            spring_block: Some(block),
+            ..Default::default()
+        });
+        MetaLayerEvaluation {
+            output,
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
+        }
     }
 }
 

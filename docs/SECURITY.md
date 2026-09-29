@@ -1,13 +1,18 @@
 # Clean-CTX — Security Guide
 
 > **Owner:** Security model + hardening + compliance · **Status:** Living reference
-> **Last updated:** 2026-08-24
+> **Last updated:** 2026-09-27
 
 ---
 
 ## Security Posture
 
-Clean-CTX is designed for **air-gapped environments** with restrictive firewall and DLP (Data Loss Prevention) requirements. The binary has zero network dependencies and zero runtime dependencies, making it suitable for deployment in classified, regulated, or sandboxed environments.
+The core `clean-ctx` MCP transport is local stdio and can run without network
+access. The complete workspace is not categorically network-free: CBM can be
+launched as a subprocess, and the separately built `clean-ctx-proxy` is an HTTP
+service that forwards requests to a configured upstream. Air-gapped deployment
+therefore requires disabling those optional integrations and provisioning Cargo
+dependencies offline.
 
 ---
 
@@ -17,46 +22,45 @@ Clean-CTX is designed for **air-gapped environments** with restrictive firewall 
 
 | Requirement | Status | Detail |
 |-------------|--------|--------|
-| Zero network transport | ✅ | stdio-only via MCP — no HTTP, WebSocket, or TCP |
-| No egress callouts | ✅ | Binary makes no network connections whatsoever |
-| No DNS lookups | ✅ | No hostname resolution required |
-| No listening ports | ✅ | No server sockets created |
+| Core MCP transport | Local | `clean-ctx` serves JSON-RPC over stdin/stdout. |
+| CBM integration | Optional subprocess | May launch and exchange JSON-RPC with a configured local CBM process. |
+| HTTP proxy | Optional network service | `clean-ctx-proxy` listens locally and forwards to its configured upstream. |
+| Air-gapped mode | Supported by configuration | Do not enable/use CBM or the proxy; vendor dependencies for offline builds. |
 
 ### Supply Chain
 
 | Requirement | Status | Detail |
 |-------------|--------|--------|
-| Statically linked binary | ✅ | Single binary — no system library dependencies |
-| No runtime downloads | ✅ | BPE data embedded via `include_bytes!` at compile time |
-| Dependency audit | ✅ | `cargo audit` clean — zero known vulnerabilities |
-| License compliance | ✅ | `deny.toml` allows MIT/Apache-2.0 only; `cargo deny check` clean |
+| Runtime tokenizer downloads | None | BPE data is embedded at compile time. |
+| Dependency audit | CI-owned | Consult the current CI run; this guide does not freeze a passing audit claim. |
+| License policy | Repository-owned | `deny.toml` and the current CI workflow are authoritative. |
 
 ### Code Quality
 
 | Requirement | Status | Detail |
 |-------------|--------|--------|
-| Unsafe code | ✅ **ZERO** | `#![forbid(unsafe_code)]` would pass |
-| Clippy warnings | ✅ 0 | `cargo clippy --all-targets -- -D warnings` passes |
-| Test coverage | ✅ 2,513 tests across all workspace targets (2,184 clean-ctx: 2,173 library + 11 CLI binary; 329 proxy crate: 155 lib + 155 bin harness + 18 audit regression + 1 e2e integration) | All pass under `cargo test --workspace --all-targets --all-features`; includes live-CBM regression probes and fuzz-style edge cases |
+| Warning policy | Zero warnings | The authoritative command and ownership boundary live in `docs/agent/verification.md`. |
+| Test status | CI-owned | Consult the current CI run; volatile counts and pass claims are intentionally not duplicated here. |
 
 ### Data Handling
 
 | Requirement | Status | Detail |
 |-------------|--------|--------|
-| Data at rest | ✅ No on-disk state | Cache is in-memory only — no files written outside stdin/stdout |
-| Data in transit | ✅ N/A | Data never leaves the process boundary |
-| Memory safety | ✅ Safe Rust | All memory operations are bounds-checked at compile time |
+| Data at rest | Configurable | Persistence defaults to SQLite at `.clean-ctx/persistence.db`; CBM and proxy caches/logs may also write under configured locations. |
+| Source mutation | Explicit | `apply_edit` is an authorized write surface with exact-source and transactional guards. |
+| Data in transit | Boundary-dependent | MCP is local stdio; the optional proxy forwards prompts/tool data to its configured upstream. |
+| Secret scrubbing | Proxy feature | Scrubbing reduces accidental disclosure but is not a substitute for upstream trust or least privilege. |
 
-### Angular Meta-Layer
+### Source and workspace boundaries
 
-| Requirement | Status | Detail |
-|-------------|--------|--------|
-| No code mutation | ✅ Purely additive | Meta-Layer never modifies TS compaction output; only appends Φ blocks |
-| Zero overhead for non-Angular | ✅ Byte-identical | Non-Angular files produce identical output to builds without Meta-Layer |
-| No file system access | ✅ In-memory only | Graph, bundler, and footer state are ephemeral; discarded after workspace emit |
-| No external data leakage | ✅ No network | Graph resolution stays in-process; no external lookups |
-| tree-sitter-html sandboxed | ✅ Parse-only | Template parser receives raw HTML and returns structural shape; no eval, no code execution |
-| Detection heuristic safe | ✅ String scanning | Angular detection uses `source.contains()` — no regex, no complex parsing |
+| Boundary | Contract |
+|----------|----------|
+| `workspaceRoot` | Establishes the primary trusted filesystem root for resolution, hydration, and file-local compilation. Pass it explicitly. |
+| `additional_roots` | Expands the authorized root set only through configuration; a request cannot invent a new trusted root. |
+| `withinPath` | Narrows an already authorized workspace. It never becomes a root and is rejected when outside the authorized root set or when `workspaceRoot` is absent. |
+| Hydration | Name-bearing workspace queries may discover and compile candidates only inside authorized roots; `has_cycle` is index-only and never hydrates. |
+| `entities_in_file` | Compiles the explicit trusted file when needed and replaces stale semantic facts, including replacing them with an empty projection. |
+| Returned paths | Paths returned by Clean-CTX are authoritative; callers must not derive filesystem paths from namespaces or CBM project slugs. |
 
 ---
 
@@ -109,7 +113,10 @@ COPY --from=builder /build/target/release/clean-ctx /clean-ctx
 ENTRYPOINT ["/clean-ctx"]
 ```
 
-The binary works on `--read-only` filesystems because BPE data is embedded at compile time (F-22).
+The core can run with persistence disabled on a read-only filesystem. Default
+persistence, proxy logs/cache, CBM state, and `apply_edit` require writable
+locations and are incompatible with this example unless explicitly disabled or
+redirected.
 
 ### Docker Compose
 
@@ -129,10 +136,9 @@ services:
 
 ### Deployment Recommendations
 
-1. **Run with minimal OS privileges** — the binary needs only:
-   - Read access to the source code directory
-   - Write access to stdout (already granted by the parent process)
-   - No file system writes for its own operation
+1. **Run with minimal OS privileges** — grant source read access, stdout/stderr,
+   and only the specific write locations required by enabled persistence,
+   logging, cache, or edit features.
 
 2. **Pin the binary version** — use `cargo build --release --locked` with the committed `Cargo.lock` to ensure deterministic builds
 
@@ -187,12 +193,11 @@ This project has no external vulnerability reporting process yet. For security i
 |----------|-----------|
 | No `unsafe` blocks | Eliminates memory-safety vulnerabilities by construction |
 | `tokio` not used | Avoids async runtime complexity; stdio transport does not benefit from async I/O |
-| No file-write operations | Prevents unintentional data leakage through temporary files |
-| No logging to disk | Prevents sensitive source code from appearing in log files (errors go to stderr only) |
+| Explicit write ownership | Persistence, proxy logging/cache, and `apply_edit` write only through their documented owners and configured paths. |
 | Config is cached at startup | Prevents TOCTOU (time-of-check-time-of-use) attacks on `.clean-ctx.json` |
 | BPE data embedded in binary | Prevents man-in-the-middle attacks on BPE model data at startup |
 | Meta-Layer is purely additive | Non-Angular files produce byte-identical output; no risk of silent data corruption |
-| AngularGraph is in-memory only | Cross-file dependency graph is discarded after each workspace call; no persistence, no disk writes |
+| WorkspaceIndex is session-owned | Cross-file semantic occurrences are scoped and replaced by asserting file; persisted snapshots restore through the registered lifecycle. |
 | No regex in Meta-Layer | Detection and template extraction use string scanning and word-boundary heuristics; avoids ReDoS-class vulnerabilities |
 | tree-sitter-html parse-only | Template parser receives HTML and returns structural metadata; no code execution, no network calls |
 | Fidelity controls Meta-Layer depth | Low fidelity emits minimal markers; reduces attack surface by limiting the amount of framework metadata exposed |

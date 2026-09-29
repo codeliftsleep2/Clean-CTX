@@ -11,10 +11,9 @@
 //   - Method-level flags (async, static, abstract, visibility)
 //   - Constructor injection patterns
 
+use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
-use crate::ir::opcodes::{
-    CoreOp, FLAG_ABSTRACT, FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
-};
+use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
 /// Java language layer (Layer 2).
 /// Processes Java-specific captures and emits additional CoreOp instructions.
@@ -28,6 +27,7 @@ impl JavaLayer {
     /// Extract extends/implements from a Java class/interface/enum head.
     /// Parses: "public class MyService extends BaseService implements Serializable"
     fn extract_class_relationships(class_head: &str) -> (Option<String>, Vec<String>) {
+        let class_head = declaration_head(class_head);
         let mut base: Option<String> = None;
         let mut interfaces: Vec<String> = Vec::new();
 
@@ -93,37 +93,39 @@ impl JavaLayer {
     }
 
     /// Extract class-level flags (public/abstract/static).
-    fn extract_class_flags(class_head: &str) -> Vec<String> {
+    fn extract_class_modifiers(class_head: &str) -> Vec<DeclarationModifier> {
+        let head = declaration_head(class_head);
         let mut flags = Vec::new();
-        if class_head.starts_with("public ") || class_head.contains(" public ") {
-            flags.push(FLAG_EXPORT.to_string());
+        if has_modifier(head, "public") {
+            flags.push(DeclarationModifier::Export);
         }
-        if class_head.contains("abstract ") {
-            flags.push(FLAG_ABSTRACT.to_string());
+        if has_modifier(head, "abstract") {
+            flags.push(DeclarationModifier::Abstract);
         }
-        if class_head.contains("static ") {
-            flags.push(FLAG_STATIC.to_string());
+        if has_modifier(head, "static") {
+            flags.push(DeclarationModifier::Static);
         }
         flags
     }
 
     /// Extract method-level flags (static, abstract, visibility).
-    fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+    fn extract_method_modifiers(raw_sig: &str) -> Vec<DeclarationModifier> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("public") && !raw_sig.contains("native") {
-            flags.push(FLAG_EXPORT.to_string());
+        if has_modifier(head, "public") && !has_modifier(head, "native") {
+            flags.push(DeclarationModifier::Export);
         }
-        if raw_sig.contains("private") {
-            flags.push(FLAG_PRIVATE.to_string());
+        if has_modifier(head, "private") {
+            flags.push(DeclarationModifier::Private);
         }
-        if raw_sig.contains("protected") {
-            flags.push(FLAG_PROTECTED.to_string());
+        if has_modifier(head, "protected") {
+            flags.push(DeclarationModifier::Protected);
         }
-        if raw_sig.contains("static") {
-            flags.push(FLAG_STATIC.to_string());
+        if has_modifier(head, "static") {
+            flags.push(DeclarationModifier::Static);
         }
-        if raw_sig.contains("abstract") {
-            flags.push(FLAG_ABSTRACT.to_string());
+        if has_modifier(head, "abstract") {
+            flags.push(DeclarationModifier::Abstract);
         }
         flags
     }
@@ -149,7 +151,7 @@ impl LanguageLayer for JavaLayer {
         let mut ops = Vec::new();
 
         match capture_name {
-            "class.root" | "interface.root" | "enum.root" | "record.root" => {
+            "class.root" | "enum.root" | "record.root" => {
                 // Extract extends/implements from raw text
                 let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
@@ -173,18 +175,29 @@ impl LanguageLayer for JavaLayer {
                     }
 
                     // Emit class-level flags
-                    let class_flags = Self::extract_class_flags(raw_text);
-                    if !class_flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), class_flags));
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
+                    }
+                }
+            }
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    for parent in interface_parents(raw_text, "extends") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
                     }
                 }
             }
             "method.root" | "constructor.root" => {
                 // Extract method-level flags
-                let method_flags = Self::extract_method_flags(raw_text);
+                let modifiers = Self::extract_method_modifiers(raw_text);
                 if let Some(method_id) = &context.current_method {
-                    if !method_flags.is_empty() {
-                        ops.push(CoreOp::Flags(method_id.clone(), method_flags));
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::MethodModifiers(method_id.clone(), modifiers));
                     }
                 }
             }

@@ -1,0 +1,16 @@
+{
+  "original_run": {
+    "results": "target/context-compression-verification/captures/reasoning-results-codex.json",
+    "summary": "target/context-compression-verification/captures/reasoning-summary-codex.json",
+    "executed": 36,
+    "raw_passed": 19,
+    "raw_failed": 17,
+    "status": "INVALID FOR ARCHITECTURAL CONCLUSION — benchmark defects discovered"
+  },
+  "repair": {
+    "definitions": "verification/context-compression/reasoning/repairs-v2.json",
+    "corrected_results": "target/context-compression-verification/captures/reasoning-results-codex-corrected.json",
+    "corrected_summary": "target/context-compression-verification/captures/reasoning-summary-codex-corrected.json",
+    "aggregation": "14 unchanged valid original results plus 22 corrected rerun results"
+  }
+}

@@ -5,7 +5,7 @@
 resolution, so field findings become institutional engineering knowledge rather
 than disappearing into a development conversation.
 
-This is NOT a changelog (see `docs/CHANGELOG.md`) and NOT release accounting
+This is NOT a changelog (see `docs/changelogs/CHANGELOG.md`) and NOT release accounting
 (see `docs/agent/releases.md`). It exists to close the two-environment gap:
 
 ```text
@@ -45,6 +45,335 @@ behavior is superseded.
 | **Status** | Open / Fixed / Verified |
 
 ---
+
+## DIS-2026-032: Array-Valued Workspace Query Names Produced Misleading Results
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-29 |
+| **Environment** | Claude + current Clean-CTX SCHEMA-vNext workspace-query workflow |
+| **Repository/context** | Multi-method caller investigation using `reverse_edges` |
+| **Symptom** | A caller supplied an array to singular `name` and observed a misleading empty lookup, then tried unsupported `names` and concluded batching was absent. The supported top-level `queries` form was not attempted. |
+| **Root cause** | The published JSON schema typed `name` as a string and the server did not itself coerce arrays, but server-side parsing collapsed every non-string into the same “missing” error. Claude-facing guidance demonstrated `queries` without explicitly prohibiting `name: []` or `names`, leaving the singular-versus-batch boundary insufficiently explicit and allowing client-side coercion to obscure malformed input. |
+| **Classification** | Protocol / input validation and client guidance |
+| **Reproducible locally?** | Yes — direct production dispatch deterministically classified a present array as missing. |
+| **Local regression** | `src/tests/mcp/workspace_query_name_validation.rs` covers all four name-bearing single operations plus batch item failure isolation. |
+| **Live scenario required?** | Yes — `verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1` checks the published schema and raw JSON-RPC rejection independently of higher-level client coercion. |
+| **Architectural invariant** | WSC-004 scope remains unchanged; public batch authority is top-level `queries`. |
+| **Status** | Verified — focused tracked regression GREEN; live schema, heterogeneous batch, failure isolation, and array-name rejection checks passed |
+
+---
+
+## DIS-2026-031: Generic Methods Were Unreachable Through Documented Focus Selectors
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-29 |
+| **Environment** | Claude + Clean-CTX v0.6.4-development, SCHEMA-vNext live editing workflow |
+| **Repository/context** | Independent real C# and TypeScript files containing uniquely named generic methods under unique typed owners |
+| **Symptom** | `provide_code_context.focusMethods` rejected both the documented bare selector (`SortBy`, `getRequest`) and documented owner-qualified selector (`QueryableExtensions.SortBy`, `RequestClient.getRequest`) with `focus method not found`. Unfocused Edit correctly compiled and rendered the same declarations and bodies. |
+| **Root cause** | Canonical hierarchical method names retain their generic type-parameter suffix (for example `SortBy<TSource, TKey>`), while `resolve_focus_method_ids` compared the public selector to `MethodNode.name` by exact string. The existing C# regression selected the generic method using its internal generic spelling and therefore did not cover either documented public form. |
+| **Classification** | Semantic identity / public selector contract |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/focus_generic_methods.rs` (registered production-dispatch C# and TypeScript bare + owner-qualified selector cases) |
+| **Live scenario required?** | Yes — `verification/live-acceptance/signature_live_acceptance.mjs` now repeats focused Edit for separate bare and owner-qualified requests in both C# and TypeScript. |
+| **Architectural invariant** | CTX-001 |
+| **Status** | Verified — focused tracked regression GREEN and live MCP acceptance passed for bare and owner-qualified generic selectors in C# and TypeScript |
+
+---
+
+## DIS-2026-030: Framework Meta-Layers Reparsed and Rescanned Each Compilation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-28 |
+| **Environment** | Clean-CTX release-candidate audit with representative Angular, .NET, and Spring sources |
+| **Repository/context** | Production `MetaLayerPass` and framework extractors; the finding generalized an Angular testing rescan report to the shared meta-layer lifecycle |
+| **Symptom** | One compilation repeatedly scanned source prefixes for lexical membership, traversed the registry separately for markers and semantic edges, and reparsed TypeScript/C# during framework applicability even though the compilation already owned equivalent evidence. Initial corrected paired measurements showed stable overhead around 9.26% for Angular and 13.18% for .NET; Spring was within noise. |
+| **Root cause** | The meta-layer boundary exposed independent marker and semantic routes without a compilation-scoped evidence owner. Angular extractors called a byte-zero lexical predicate at many match positions, and Angular/.NET applicability delegated to standalone AST-based detectors instead of consuming evidence already created by the production compilation. |
+| **Classification** | Emergent performance and architectural ownership |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/meta_util.rs`; `src/tests/angular_meta/{testing,signals,routing,rx_lexical,ngrx,reactive_forms,formly}.rs`; `src/tests/layers/registry.rs`; `src/tests/ir/pipeline_meta_layer.rs` |
+| **Live scenario required?** | No — the bounded production-path benchmark supplies directional measurement evidence; correctness and work ownership are enforced by deterministic tracked regressions. |
+| **Architectural invariant** | META-002 |
+| **Status** | Fixed; focused Phase 8 verification green |
+
+**Resolution:** `MetaLayerPass` now creates one borrowed `MetaLayerContext` with
+one reusable `LexicalRegions` index and performs one combined registry
+evaluation. Applicable layers return markers and semantic edges together.
+Angular lexical consumers reuse the index, while Angular and .NET production
+applicability reuse compilation evidence without a detection-only parse.
+Repeated paired-median confirmation runs measured Angular at 0.52% then 0.31%,
+.NET at 0.61% then -0.01%, and Spring at 0.46% then 0.36%; broader scan fusion
+was therefore rejected as unnecessary complexity.
+
+---
+
+## DIS-2026-029: `cbm_proxy` Gated a Canonical Project but Forwarded Its Short Alias
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-28 |
+| **Environment** | Claude + freshly built Clean-CTX release candidate with installed CBM |
+| **Repository/context** | One real indexed repository queried twice through `cbm_proxy`: once with its canonical path-derived slug and once with the configured root's directory basename |
+| **Symptom** | The canonical slug returned three real raw candidates and a complete three-hop call chain. The basename returned zero candidates and no callers, then appended `project not found or indexed` after success-looking fields. The failure was easy for an LLM to overlook because it appeared to be a partially successful graph result. |
+| **Root cause** | `resolve_proxy_target_project` canonicalized the supplied basename for Clean-CTX's indexing/readiness gate, but the proxy forwarded the original uncanonicalized `arguments.project` to CBM. CBM correctly returned a tool-level `result.isError` envelope. Because `cbm_proxy` uses the raw transport path, that envelope bypassed the parsed client's `check_soft_error` gate and was verified/compressed as ordinary result data. |
+| **Classification** | Protocol and project-identity routing |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/cbm/proxy_errors.rs` — `cbm_proxy_rewrites_configured_root_basename_to_canonical_slug` and `cbm_proxy_rejects_soft_project_error_before_compressing_partial_data` |
+| **Live scenario required?** | Yes — repeat the canonical-slug/basename comparison through the freshly built MCP server and confirm equivalent successful graph data; also submit an unknown partial slug and confirm one clean `isError` result with no candidate/caller fields. |
+| **Architectural invariant** | CBM project identity invariant and CBM-E-001 in `docs/ARCHITECTURAL_INVARIANTS.md` |
+| **Status** | Fixed locally; post-fix live rerun pending |
+
+**Resolution:** `resolve_and_apply_proxy_target_project` now writes the resolved
+canonical slug into the exact argument object sent to CBM. `proxy_tool_error`
+checks raw proxy responses before caller verification or compression and turns
+CBM tool failures into one explicit MCP `isError` result with recovery guidance.
+Unknown or partial names remain strict failures; only exact configured-root
+basenames receive alias resolution.
+
+---
+
+## DIS-2026-028: CBM Trace Silently Selected One Duplicate Bare-Name Identity
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Freshly built Clean-CTX server over MCP stdio with installed CBM; controlled temporary Rust repository |
+| **Repository/context** | Two functions named `duplicate_probe`, in `alpha.rs` and `beta.rs`, each calling a distinct leaf |
+| **Symptom** | Bare `graph_trace` found the Alpha path but returned a successful empty result for the valid Beta path. CBM-native bare `trace_path` also returned only `alpha_leaf`. Both canonical identities traced correctly to their respective leaves. |
+| **Root cause** | CBM accepts an ambiguous bare `function_name` and deterministically selects one qualified identity without returning ambiguity metadata. Clean-CTX forwards the bare name on both trace surfaces and therefore exposes that selection as an apparently authoritative result. |
+| **Classification** | Silent incorrect/incomplete graph answer; externally visible identity-resolution gap |
+| **Reproducible locally?** | Yes, through the tracked live investigation harness and two consecutive wrapper observations in the same run. |
+| **Local regression** | `src/tests/cbm/trace_identity_resolution.rs` protects identical ambiguity behavior across `graph_trace` and `cbm_proxy(trace_path)`, plus the canonical fast path. |
+| **Live scenario required?** | Completed. Pre-fix evidence: `target/cbm-duplicate-trace-verification/20260927-145507.json`. Post-fix evidence: `target/cbm-duplicate-trace-verification/20260927-195506.json`; both public trace surfaces rejected ambiguity with the same candidates and retained canonical fast paths. Generated evidence is not a test gate. |
+| **Architectural invariant** | CBM-IDENTITY-001 |
+| **Status** | Fixed and verified through tracked regression plus live MCP stdio field scenario |
+
+**Resolution:** canonical inputs retain the no-search fast path. A bare source
+name is searched within the selected project, filtered by exact symbol name,
+and grouped by canonical identity. One identity traces automatically, zero is
+explicit not-found, and multiple identities return `-32602` with deterministic
+canonical candidates. `graph_trace` and `cbm_proxy(trace_path)` share this
+resolver; proxy lookup remains call-scoped and does not mutate active project.
+
+---
+
+## DIS-2026-027: Workspace Edge Queries Required a Discovery-Only Preliminary Call
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Broader workspace-query boundary and tool-call economics audit |
+| **Repository/context** | `forward_edges`, `reverse_edges`, and `transitive_dependencies` over scoped `WorkspaceIndex` evidence |
+| **Symptom** | A caller holding only an entity name had to call `find_entities` to learn domain/type and then issue the actual query. Omitting either classification field produced `-32602`, even though the same tool already owned scoped exact-name discovery and hydration. |
+| **Root cause** | Each handler validated the complete Model C tuple before hydration and had no shared boundary for converting exact-name occurrences into distinct candidate identities. |
+| **Classification** | Additive MCP contract and redundant-tool-call elimination |
+| **Reproducible locally?** | Yes; the new additive contract initially reached the existing required-field errors, then all seven unchanged tests passed after implementation. |
+| **Local regression** | `src/tests/mcp/workspace_query_identity_resolution.rs` |
+| **Live scenario required?** | Completed through the actual MCP stdio boundary: unique bare names matched fully qualified results; reverse and transitive queries resolved correctly; repeated occurrences remained one identity; distinct identities produced bounded candidates; partial filters disambiguated; missing names failed explicitly; and `withinPath` constrained resolution and returned occurrences. |
+| **Architectural invariant** | WSC-008 |
+| **Status** | Verified locally and through live MCP stdio |
+
+**Resolution:** One shared resolver now hydrates once, applies scope and any
+partial filters, groups occurrences by semantic identity, and proceeds only for
+one unique identity. Not-found and ambiguity are explicit, deterministic
+errors; fully specified callers retain the existing fast path.
+
+The tracked operator harness at
+`verification/workspace-query/scripts/Verify-IdentityResolutionLive.ps1`
+supplied the live field evidence. It is not a regression test or CI gate; the
+authoritative local contract remains
+`src/tests/mcp/workspace_query_identity_resolution.rs`.
+
+---
+
+## DIS-2026-026: `focusMethods` Was Silently Ignored Outside Edit Fidelity
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Broader query/tool-boundary streamlining audit on `(feat)Architectural-Hardening` |
+| **Repository/context** | `provide_code_context` request validation and heuristic fidelity selection |
+| **Symptom** | Supplying `focusMethods` with Low, Medium, High, Verbatim, or a non-Edit intent returned success while producing the same structural output as an unfocused request. Supplying focus without a mode could likewise select a heuristic non-Edit fidelity and silently discard the requested targeting. |
+| **Root cause** | The handler parsed focus independently of fidelity selection, passed it to body filtering only when the eventual fidelity happened to be Edit, and exposed no incompatible-argument validation or inference rule. |
+| **Classification** | MCP request-contract correctness and tool-call economics |
+| **Reproducible locally?** | Yes; all four unchanged tracked assertions observed RED before the fix and GREEN afterward. |
+| **Local regression** | `src/tests/mcp/focus_fidelity_contract.rs` |
+| **Live scenario required?** | No for closure; the behavior is deterministic at registered production dispatch. A later pilot call may provide optional field evidence. |
+| **Architectural invariant** | MCP-002 |
+| **Status** | Verified locally |
+
+**Resolution:** A non-empty otherwise-unspecified focus now implies Edit in one
+call. Explicit non-Edit fidelity or intent returns `-32602` rather than being
+ignored or overridden. Empty focus remains meaningful only with explicit Edit.
+Validation occurs before file IO or state mutation.
+
+---
+
+## DIS-2026-025: `has_cycle` Mixed Unrelated Relations and Returned No Actionable Evidence
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-27 |
+| **Environment** | Query-boundary source audit following the live `entities_in_file` completeness investigation, then controlled tracked RED/GREEN reproduction |
+| **Repository/context** | Session- and workspace-scoped `WorkspaceIndex` evidence across Angular, Spring, .NET, and generic semantic relation families |
+| **Symptom** | `workspace_query(type="has_cycle")` returned only a boolean. Any non-`Calls` relation could close the graph loop, so containment, routing, mapping, testing, or unreliable `Autowired` identity could be reported as an architectural cycle. A negative result looked authoritative even though the query inspected retained index evidence only, and a positive result gave no path, relation, or asserting-file evidence. |
+| **Root cause** | The old handler delegated to a generic three-color boolean over every indexed relation except `Calls`. Relation eligibility had no cycle-specific semantic policy, the DFS discarded parent edges, the MCP response had no witness or coverage contract, and semantic tuple collisions across physical files were not disclosed. |
+| **Classification** | Semantic policy + protocol evidence/completeness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/workspace/index_cycle_policy.rs`; `src/tests/mcp/workspace_query_cycle_witness.rs`; existing WSC-004 scope/`withinPath` traversal suites |
+| **Live scenario required?** | Completed 2026-09-27 — the operator-run stdio harness passed schema, no-implicit-compilation, excluded-`Calls`, and positive witnessed-`Injects` scenarios. Field evidence remains separate from tracked test authority. |
+| **Architectural invariant** | WSC-007 |
+| **Status** | Verified |
+
+**Resolution:** `has_cycle` is now an explicitly typed dependency-cycle query.
+It admits exactly `Injects` and `ImportsModule`, returns one deterministic closed
+witness with asserting-file provenance, exposes admitted semantic-identity
+collisions, and labels both positive and negative answers as index-only rather
+than source-complete. The boolean remains for compatibility and delegates to
+the same index-owned witness primitive. Scope is applied during traversal, and
+the operation performs no discovery, hydration, or compilation.
+
+---
+
+## DIS-2026-024: `entities_in_file` Returned Ambiguous Empty Results Before Prior Compilation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-26 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by source audit and controlled RED/GREEN reproduction |
+| **Repository/context** | Real large workspace workflow plus TypeScript and .NET local fixtures |
+| **Symptom** | `workspace_query(type="entities_in_file")` returned the same empty result for an uncompiled file and a genuinely entity-free file, forcing `provide_code_context` plus retry. It also had no fidelity contract, so stale Low semantic facts could not be distinguished from sufficient coverage. |
+| **Root cause** | The handler validated the explicit path and queried WorkspaceIndex directly. WorkspaceIndex owned occurrences but no file-local source-hash/fidelity coverage, and `provide_code_context` published facts without recording reusable semantic completeness. |
+| **Classification** | Semantic lifecycle and tool-boundary completeness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_entities_auto_compile.rs` (eight production-dispatch regressions, including independently observed RED/GREEN first-touch, reuse, and provide→query boundaries) |
+| **Live scenario required?** | Yes — verify a no-prior-provide call against the pilot workspace and confirm fidelity upgrade behavior on a real .NET controller. |
+| **Architectural invariant** | WSC-006 |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Resolution:** `entities_in_file` now accepts optional fidelity, normalizes
+Edit/Verbatim semantic requests to High, and compiles its already-authorized
+explicit file without publishing rendered/session state. WorkspaceIndex owns
+source-hash and semantic-fidelity coverage with atomic file replacement;
+fresh sufficient projections are reused, while stale/lower projections and
+empty recompilations replace prior facts. `provide_code_context` publishes
+coverage only for actual Low/Medium/High compilations, never falsely treating
+Edit/Verbatim as High-complete.
+
+---
+
+## DIS-2026-023: Delta Trigger Expectations Masked Incomplete and False Session Statistics
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by production-path source audit and controlled local reproduction |
+| **Repository/context** | Repeated context reads and genuine `apply_edit` cycles across small and approximately 500-line TypeScript/Angular fixtures plus a real production file. |
+| **Symptom** | No `Δ delta for ...` response appeared after repeated explicit-High reads or after `apply_edit`; `context_stats` remained empty after successful `delta_code_context` output and populated only after `provide_code_context`. Audit also found that an unchanged automatic-delta attempt returned a full response while recording its statistics as a delta. |
+| **Root cause** | The missing post-edit delta was not a transport failure: explicit `fidelity`/`intent` deliberately selects full `provide_code_context`, while `apply_edit` atomically installs its edited IR as the new canonical baseline, leaving no unapplied transition for a reread. Two independent observability defects were real. `delta_code_context` never called `record_compression` on its initial-full, cached-full, or generated-delta paths. Separately, the automatic-delta `None` fallback correctly recorded a full response inside its match arm and then executed a second trailing statistics write mislabeled `delta`. |
+| **Classification** | Emergent lifecycle diagnosis + observability correctness |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/delta_stats_lifecycle.rs` covers the dedicated full-baseline → external-change → generated-delta statistics lifecycle and repeated complete provider reads. `src/tests/mcp/provide_complete_context.rs` proves a changed implicit follow-up remains complete even when the compatibility `auto_delta` field is true. The statistics regressions were observed RED/GREEN first; the provider-boundary regression was separately observed RED before the architectural correction. |
+| **Live scenario required?** | Yes — after rebuilding, confirm dedicated `delta_code_context` statistics and verify repeated changed `provide_code_context` calls always return complete current context. |
+| **Architectural invariant** | IRDELTA-003 (delta statistics mirror the successful response lifecycle) |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** Every successful `delta_code_context` content path now
+records the selected representation's token counts, resolved fidelity, Angular
+classification, and actual `full`/`delta` strategy. Generated deltas retain the
+preceding full-compression token baseline for efficiency accounting. The stale
+trailing write in `provide_code_context` was removed, so an unchanged delta
+attempt that falls back to complete content remains a single full event.
+
+**Boundary decision (2026-09-25):** `apply_edit` still publishes its verified
+target as the canonical live baseline and clears obsolete pending transitions.
+An unchanged reread does not fabricate an empty delta. Automatic delta was
+removed from `provide_code_context`: a stateless model cannot consume the
+structured operation list, prompt caching does not apply code-side state, and
+the repository ships no host consumer that reconstructs a complete context.
+`delta_code_context` / `apply_delta` remain the explicit code-side protocol.
+The `auto_delta` configuration field remains parseable but inactive for
+compatibility; future automation requires explicit host capability plus proof
+of the exact retained baseline.
+
+---
+
+## DIS-2026-022: RxJS Meta Annotations Lost Method Identity and Emitted Parameter Fragments
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by controlled local reproduction |
+| **Repository/context** | A generated 40-method Angular/RxJS probe and an independent real approximately 700-line Angular service. Methods returned multi-operator `of(...).pipe(...)` expressions and included typed/defaulted parameters. |
+| **Symptom** | Every SCHEMA-v5 `T @pipeRx` annotation named the first method in the class, even when the pipe occurred in later methods. `T @obs` also emitted context-free fragments such as `false)` from method parameter defaults. The output was deterministic but misleading and visually confusable with valid framework facts. |
+| **Root cause** | Two whole-prefix string scans in the RxJS meta-layer crossed declaration boundaries. Pipe ownership used `rfind('=')` over all source preceding a `.pipe(` call, then split that entire prefix at its first `:`, so later pipes collapsed onto the first method signature. Observable extraction treated `): Observable<T>` method return annotations as field declarations and selected the final parameter token as the field name. SCHEMA-v5 rendering faithfully projected these malformed `CoreOp::TypeAlias` inputs. |
+| **Classification** | Semantic presentation |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/angular_meta/rx.rs` independently pins method-local pipe ownership and rejects method-parameter/default fragments as observable names. `src/tests/mcp/rxjs_meta_presentation.rs` crosses registered `provide_code_context`, the production meta-layer pipeline, `CoreOp::TypeAlias`, hierarchical projection, and SCHEMA-v5 rendering. Both tracked regressions were observed RED before the fix, restored from the test-only stash, and reported GREEN with the same focused commands. |
+| **Live scenario required?** | Yes — re-run the original 40-method probe and real Angular service; every `@pipeRx` annotation must identify its containing method and no `@obs` annotation may be a parameter/default fragment. |
+| **Architectural invariant** | META-001 (framework annotations retain declaration-local ownership and intelligible values) |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** RxJS declaration extraction now excludes method return
+annotations from observable-field detection. Pipe ownership is resolved from
+the current assignment statement or, for returned/unassigned pipes, from the
+actual enclosing TypeScript method; earlier declarations are never candidates.
+The activated oversized `rx.rs` was decomposed by responsibility into
+`rx/extract.rs` and `rx/pipes.rs`, leaving every modified/new Rust file within
+the active-file ceiling. The SCHEMA-v5 renderer was unchanged because it was
+not the source of either defect.
+
+---
+
+## DIS-2026-021: Observable Pattern Fact Borrowed Evidence from Neighboring Methods
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-25 |
+| **Environment** | Claude + Clean-CTX on `(feat)Architectural-Hardening`, followed by controlled local reproduction |
+| **Repository/context** | TypeScript/Angular service code; reproduced deterministically with adjacent plain and async Promise-returning methods and observed on a real approximately 700-line service. |
+| **Symptom** | SCHEMA-v5 rendered `pf:OBSERVABLE` on plain methods with no Observable or RxJS usage, including a `void` method whose body only performed ordinary work. The false compiler-derived fact was exposed by both `provide_code_context` and the full-response path of `delta_code_context`. |
+| **Root cause** | The additive `CodePatternRecognizer` inspected up to five following operations but accepted a qualifying `Return` without checking its owning method ID. A plain method could therefore borrow a neighboring method's Promise/Observable return. The recognizer also used `has_observable_return || has_async_flag`, although its established contract requires both pieces of evidence on the same method. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/ir/layers/patterns.rs` (foreign-owner evidence and incomplete-evidence regressions); `src/tests/mcp/pattern_fact_ownership.rs` (registered `provide_code_context` and initial-full `delta_code_context` production paths). The tracked tests were observed RED before the implementation change, stashed, restored byte-identically, and then reported GREEN with the same focused commands. |
+| **Live scenario required?** | Yes — re-run the original real Angular service through `provide_code_context` and confirm plain methods no longer carry `pf:OBSERVABLE` while legitimately classified methods retain it. |
+| **Architectural invariant** | IRFACT-001 (derived facts use declaration-local evidence) |
+| **Status** | Fixed locally; live re-verification pending |
+
+**Fix (2026-09-25):** `try_observable_pattern` now stops at the next method
+declaration, accepts return evidence only when its method ID matches the method
+being classified, and emits `PatternFact::Observable` only when both the
+qualifying return and owner-matched async modifier are present. The renderer was
+unchanged because it correctly projected the false canonical input it received.
+
+---
+
+## DIS-2026-020: Model-Visible Content Is Assembled from the Codec, Not a Presentation
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-09-24 |
+| **Environment** | Controlled laboratory (this repository): source audit + measurement harness |
+| **Repository/context** | Clean-CTX itself — `src/mcp/tool_handlers/core/content.rs` and its 17 caller sites |
+| **Symptom** | Every content-producing handler (`compress_code_context`, `provide_code_context`, `control_full_delta`, `apply_delta`, `restore_context`, `replay_history`, persistence) assembles the model-visible `content` from the CONTROL-FULL codec (`compact_a::render_file_context`, A2), shipping the codec's preamble, grammar legend, envelope schema id and `§BODIES` framing into the model's context. `render_hierarchical_for_llm` (SCHEMA v5), the LLM-facing presentation renderer, has zero production callers. |
+| **Root cause** | The feature branch replaced the presentation renderer with the codec, conflating the reversible wire (CTX-001) with the model-visible presentation (ARCH-003). The codec's decode side has no production caller (`decode_cold` / `decode_declarations` / `decode_facts` reference only one another), so its legend is required by nothing in the protocol while being paid in every prompt. |
+| **Classification** | Semantic |
+| **Reproducible locally?** | Yes — dispatch any content handler and read `result.content[0].text`. |
+| **Local regression** | `src/tests/mcp/presentation_boundary.rs` (content is not the codec document; carries no decoder legend / envelope schema id / body framing; typed owner + method identity survive). |
+| **Live scenario required?** | No — the defect is the production assembly path, not scale-dependent. |
+| **Architectural invariant** | ARCH-003 (presentation) vs CTX-001 (reversible codec), now mechanically enforced. |
+| **Status** | Fixed — `content` is the SCHEMA-v5 presentation on all paths; the reversible codec stays code-side (`result.ir` + persistence) |
+
+**Decision (2026-09-24):** `content` becomes the presentation renderer
+(`render_hierarchical_for_llm`, SCHEMA v5) on every path; the codec stays
+code-side (`result.ir` + persistence). Option A now, Option C (a purpose-built
+presentation) follows; Option B (codec minus its legend) was rejected because a
+positional grammar without its interpretive key is undecodable, not presentable.
+See `verification/context-compression/compact-a/PRESENTATION_BOUNDARY_PLAN.md` §6.
+
 
 ## DIS-2026-019: `provide_code_context` Fabricated Method Identities for C# Generic and Tuple-Returning Declarations
 

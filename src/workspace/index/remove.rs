@@ -22,6 +22,7 @@ impl WorkspaceIndex {
     /// are inserted) or when a file is deleted from the workspace. Preserves all
     /// other files' edges and entities.
     pub fn remove_file(&mut self, file_path: &str) {
+        self.semantic_coverage.remove(file_path);
         #[cfg(test)]
         self.name_cleanup_buckets_examined.clear();
 

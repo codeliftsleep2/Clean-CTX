@@ -3,7 +3,12 @@
 > **Owner:** RxJS / NgRx / Signals / Routing meta-layer design · **Status:** Living per-layer reference (shipped)
 > **Version:** 0.3.0 (shipped 2026-08-11, R-23/R-24/R-25)
 >
-> **Ship status:** see `docs/ROADMAP.md` (R-23/R-24/R-25 ✅). **Test counts / audit rounds:** see `docs/CHANGELOG.md` `[0.3.0]` — this document does not duplicate them.
+> **Ship status:** see `docs/ROADMAP.md` (R-23/R-24/R-25 ✅). **Release record:** see `docs/changelogs/CHANGELOG.md` `[0.3.0]` — this document does not duplicate volatile test counts.
+>
+> **Current boundary:** extraction produces both presentation metadata and
+> typed semantic edges. Cross-file ownership, replacement, scope, hydration,
+> and query behavior belong to `WorkspaceIndex`; historical CBM/graph design
+> passages below do not override that production boundary.
 
 ---
 

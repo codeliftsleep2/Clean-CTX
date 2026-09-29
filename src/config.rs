@@ -151,7 +151,7 @@ fn default_tool_version() -> String {
     "v1".to_string()
 }
 
-// ── Persistence configuration (placeholder) ────────────────────────
+// ── Persistence configuration ──────────────────────────────────────
 
 /// Persistence configuration for SQLite-backed cross-session storage.
 ///
@@ -163,7 +163,9 @@ pub struct PersistenceConfig {
     /// are purely in-memory (current behaviour).
     #[serde(default)]
     pub enabled: bool,
-    /// Automatically save context after each compression/delta operation.
+    /// Automatically checkpoint canonical context produced by read-only
+    /// compression and delta-generation operations. Required edit/delta
+    /// transactions and explicit persistence tools are unaffected.
     #[serde(default = "default_true")]
     pub auto_save: bool,
     /// Maximum days to retain history before pruning.
@@ -274,7 +276,7 @@ pub struct CleanCtxConfig {
     #[serde(default)]
     pub heuristics: HeuristicsConfig,
 
-    /// Persistence configuration (placeholder for future SQLite layer).
+    /// SQLite-backed persistence configuration.
     #[serde(default)]
     pub persistence: PersistenceConfig,
 
@@ -282,7 +284,11 @@ pub struct CleanCtxConfig {
     #[serde(default = "default_true")]
     pub auto_angular: bool,
 
-    /// Automatically use deltas for follow-up edits in `provide_code_context`.
+    /// Compatibility setting retained for existing configuration files.
+    ///
+    /// `provide_code_context` always returns complete model-facing content.
+    /// Structured delta transport is explicitly requested through
+    /// `delta_code_context`; this field is currently inactive.
     #[serde(default = "default_true")]
     pub auto_delta: bool,
 

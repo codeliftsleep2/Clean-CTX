@@ -1,16 +1,17 @@
 // src/mcp/tools.rs
 //
-// Tool definitions and dispatch for the MCP server.
-// v0.3.0: Registry-based dispatch for modular handlers, fallback to legacy.
+// Public tool catalog plus compatibility re-exports for call dispatch.
 
 use crate::cbm;
-use crate::compression::Fidelity;
-use crate::mcp::McpState;
-use crate::protocol::send_response;
-use crate::tokenizer::{TokenizerKind, resolve_tokenizer_kind};
 use serde_json::Value;
 
-use super::tool_handlers;
+#[cfg(test)]
+pub use super::tool_dispatch::setup_handler_registry_for_tests;
+pub(crate) use super::tool_dispatch::{
+    dispatch_tools_call, parse_fidelity_arg, parse_tokenizer_arg,
+};
+#[cfg(test)]
+pub(crate) use super::tool_dispatch::{inline_tool_names, resolve_fidelity};
 
 #[cfg(test)]
 pub(crate) use super::tool_helpers::diff_code_context_handler;
@@ -35,12 +36,27 @@ fn supported_languages() -> Vec<&'static str> {
     langs
 }
 
-/// Inject the `supportedLanguages` field into each tool's schema so clients
-/// can discover which languages the current binary supports.
+/// Attach parser capability metadata only where enabled languages affect
+/// whether the tool can process its requested source input.
 fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_json::Value> {
     let supported = supported_languages();
     for tool in &mut tools {
-        if let Some(obj) = tool.as_object_mut() {
+        let source_processing = tool
+            .get("name")
+            .and_then(Value::as_str)
+            .is_some_and(|name| {
+                matches!(
+                    name,
+                    "compress_code_context"
+                        | "diff_code_context"
+                        | "delta_code_context"
+                        | "provide_code_context"
+                        | "apply_edit"
+                        | "diff_commits"
+                        | "workspace_query"
+                )
+            });
+        if source_processing && let Some(obj) = tool.as_object_mut() {
             obj.insert(
                 "supportedLanguages".to_string(),
                 serde_json::json!(supported),
@@ -48,6 +64,59 @@ fn inject_supported_languages(mut tools: Vec<serde_json::Value>) -> Vec<serde_js
         }
     }
     tools
+}
+
+/// Build the nested discovery contract separately so the broad
+/// `workspace_query` definition remains a shallow macro expansion.
+fn workspace_query_discovery_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "description": "Optional. Present ONLY when discovery deviated from its expected path (healthy CBM, completed across every configured root, ready projects, no candidates); absent when nothing noteworthy happened. Every field is omitted while it holds its expected value, and no field restates another.",
+        "properties": {
+            "provider": {
+                "type": "string",
+                "enum": ["filesystem", "cbm_and_filesystem", "none"],
+                "description": "Present only when a provider other than CBM supplied this query's coverage."
+            },
+            "status": {
+                "type": "string",
+                "enum": ["partial", "unavailable"],
+                "description": "Present only when discovery was not complete: 'partial' = it ran but did not cover every configured root; 'unavailable' = nothing could run, so the answer rests only on what the index already held."
+            },
+            "fallback_reason": {
+                "type": "string",
+                "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
+                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
+            },
+            "discovered": { "type": "integer", "description": "Present only when > 0 - candidate file paths discovered by this query." },
+            "compiled": { "type": "integer", "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query." },
+            "projects": {
+                "type": "array",
+                "description": "Present only when a configured project's coverage was exceptional; healthy searched/ready projects are omitted and do not consume the diagnostic bound.",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "project": { "type": "string" },
+                        "status": { "type": "string", "enum": ["searched", "search_failed", "skipped"] },
+                        "readiness": { "type": "string", "enum": ["still_indexing", "failed"], "description": "Only for an exceptional 'searched' entry: the project was not ready, so its contribution may be incomplete." },
+                        "reason": { "type": "string", "enum": ["cbm_unavailable", "additional_root_not_registered"], "description": "Only when it adds a distinction the status does not already carry." }
+                    },
+                    "required": ["project", "status"]
+                }
+            },
+            "projects_truncated": { "type": "integer", "description": "Present only when > 0 - exceptional project entries dropped by the diagnostic bound." }
+        }
+    })
+}
+
+/// Build cycle output fields separately so `workspace_query` remains below
+/// `serde_json::json!`'s default macro-recursion limit.
+fn workspace_query_cycle_schema() -> Value {
+    serde_json::json!({
+        "type": "array",
+        "description": "One deterministic ordered dependency-cycle witness (has_cycle).",
+        "items": { "type": "object" }
+    })
 }
 
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
@@ -59,10 +128,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, .rs, or .java file." },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe replace_in_file), 'verbatim' (full raw source, zero compression). Default: 'low'." },
+                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low' (max compression, ~85% reduction), 'medium' (balanced, preserves fields/async/markers, ~70-80%), 'high' (minimal compression, preserves most semantic depth, ~50-60%), 'edit' (structural skeleton + verbatim method bodies for safe apply_edit operations), 'verbatim' (full raw source, zero compression). Default: 'low'." },
                     "encoding": { "type": "string", "description": "IR encoding format: 'named' (standard tuple with opcode strings), 'positional' (stripped opcode ~30% savings), or 'tagged' (positional with opcode preserved). Default: 'named'." },
                     "tokenizer": { "type": "string", "description": "Tokenizer backend for token counting: 'o200k' (GPT-4o, default), 'cl100k' (GPT-4), 'claude' (Anthropic), 'llama3' (Meta). Overrides config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -75,27 +144,27 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "filePath": { "type": "string", "description": "Absolute path to .ts, .cs, or .rs file." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: 'low'." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "delta_code_context",
-            "description": "IR-level delta compression.",
+            "description": "IR-level delta compression using versioned positional sequence edits.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "apply_delta",
-            "description": "Applies an IR delta envelope to the in-session state machine.",
+            "description": "Applies an IR delta. With durable persistence enabled, corrected positional deltas must match a server-generated pending semantic transition.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -107,15 +176,15 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "provide_code_context",
-            "description": "Automatically provides the best possible compressed context for a file.",
+            "description": "Provides complete current model-facing context for a file, with automatic fidelity selection and framework-aware enrichment. Structured delta transport is available separately through delta_code_context.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe replace_in_file. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
+                    "intent": { "type": "string", "enum": ["edit", "refactor", "overview", "debug", "implement"], "description": "edit: byte-exact method bodies for safe apply_edit operations. refactor: full structural detail. overview: max compression. debug: balanced. implement: moderate detail." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit' (structural skeleton + verbatim method bodies), 'verbatim' (full raw source). Default: config default." },
-                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Optional. When set alongside fidelity: \"edit\", only these method/function names get full verbatim bodies; all other methods in the file are rendered signature-only. Omit to render every method's body (current default behavior)." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." },
+                    "focusMethods": { "type": "array", "items": { "type": "string" }, "description": "Select qualified Owner.method names, or a bare name owned by exactly one typed owner. A non-empty focus implies Edit only when both fidelity and intent are omitted; explicit non-Edit modes conflict and fail. An empty array is valid only with explicit Edit and selects no bodies. Selectors resolve to canonical method IDs before body filtering; ambiguous selectors fail. A same-owner overload family selects all overload occurrences. Omit at Edit fidelity to render every method body." },
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." },
                     "tokenizer": { "type": "string" }
                 },
                 "required": ["filePath"]
@@ -123,20 +192,19 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "restore_context",
-            "description": "Explicitly restores compressed context for a file.",
+            "description": "Restores a file's persisted canonical IR, delta history, fidelity, source hash, and complete semantic-edge state.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "apply_edit",
-            "description": "Editor for controlled filesystem edits on the text file at the provided path. Provide `insert_line` to insert `new_text` at a specific line number. Otherwise, the tool replaces `old_text` with `new_text`, or creates the file with `new_text` if file does not exist. Preferred write path for SINGLE-UNIT edits (one method body / insertion anchored to one unit) once this session has seen byte-exact content via provide_code_context(fidelity=\"edit\"|\"verbatim\"): verified against Clean-CTX's tracked unit spans, gated by an in-memory tree-sitter parse before any byte hits disk. Multi-unit batches targeting different units are supported. Cross-file renames/signature changes still belong in the host's native edit tool.",
+            "description": "Applies an atomic batch of structural edits to a previously tracked and owned source file; it never creates arbitrary files. Supported operations are `replace_body`, `delete`, `insert_after`, and `insert_before`. Edits resolve known structural units rather than generic text coordinates, validate expected unit text where required, preserve byte-exact source behavior, and return operation-specific absolute byte spans. Current source bytes must match the live and durable owned source identity; stale or externally diverged source fails structurally. Successful edits use the staged durable transaction before publishing live semantic state. Request edit/verbatim fidelity and a full method body when compact representation is insufficient for safe editing.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -144,10 +212,10 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "operations": {
                         "type": "array",
                         "description": "Structural operations applied atomically (all-or-nothing). Each: {\"type\":\"replace_body\",\"target\":\"Class.method\",\"expectedOldText\":\"{...}\",\"newText\":\"{...}\"} | {\"type\":\"delete\",\"target\":..., \"expectedOldText\":...} | {\"type\":\"insert_after\",\"anchor\":\"Class.method\",\"unitText\":...} | {\"type\":\"insert_before\",...}. expectedOldText must byte-match the text this session last delivered for that unit.",
-                        "items": { "type": "object" }
+                        "items": super::tool_schemas::apply_edit_operations()
                     },
                     "verify": { "type": "boolean", "description": "Optional. When true, echoes each replacement's new verbatim text back as a receipt. Default false." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Workspace root for path resolution. Defaults to CWD." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath", "operations"]
             },
@@ -197,7 +265,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "context_history",
-            "description": "View compression history and savings for tracked files.",
+            "description": "Read compression history and savings for tracked files without creating, restoring, or mutating context ownership.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -212,12 +280,29 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" }
-                }
+                },
+                "required": ["filePath"]
+            }
+        }),
+        serde_json::json!({
+            "name": "delete_context",
+            "description": "Delete one file's persisted and session semantic context without modifying the source file.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "filePath": { "type": "string" }
+                },
+                "required": ["filePath"]
             }
         }),
         serde_json::json!({
             "name": "list_sessions",
-            "description": "List all persisted contexts stored in the DB — per-file rows with fidelity, token counts, delta count and last-update time.",
+            "description": "Read committed persisted contexts from the DB without flushing pending lifecycle work — per-file rows with fidelity, token counts, delta count and last-update time.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        serde_json::json!({
+            "name": "inspect_legacy_fallbacks",
+            "description": "Read quarantined legacy fallback artifacts and report why they are incomplete; never recover, import, delete, rewrite, or mutate semantic/session/durable state.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         serde_json::json!({
@@ -246,7 +331,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "context_stats",
-            "description": "View the Clean-CTX dashboard: token savings, compression stats, and session metrics.",
+            "description": "Read the Clean-CTX dashboard without flushing persistence or mutating lifecycle state: token savings, compression stats, and session metrics.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -261,7 +346,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "workspaceRoot": { "type": "string", "description": "Optional. Defaults to CWD. Resolved against trusted root." },
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root resolved against the trusted root; defaults to CWD for backward compatibility." },
                     "fromRef": { "type": "string", "description": "Required. e.g. HEAD~1, main, abc123, v1.0. Strictly validated." },
                     "toRef": { "type": "string", "description": "Optional. Defaults to working tree (uncommitted changes)." },
                     "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Compression fidelity: 'low', 'medium', 'high', 'edit', 'verbatim'. Default: config default." }
@@ -271,20 +356,11 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "workspace_query",
-            "description": "Query cross-file semantic relationships accumulated from compiled files. Supports: find_entities (by name), forward_edges (outgoing semantic edges from entity), reverse_edges (incoming semantic edges to entity), entities_in_file (entity occurrences by file), transitive_dependencies (BFS dependency traversal), has_cycle (cycle detection). Candidate discovery is query-semantic aware: healthy CBM is preferred, while unavailable or failed CBM discovery falls back to literal source occurrence scanning. Both providers contribute paths only; Clean-CTX compilation determines authoritative semantic edges. Occurrence-bearing results are scoped to the declared workspaceRoot plus configured additional roots, and optionally narrowed to one file/directory subtree with withinPath (a narrowing can only ever shrink an authorized workspace; task-level workspace scope must be resolved first).",
+            "description": "Run one workspace query or a heterogeneous batch of up to 32 queries with ordered, per-item outcomes. A batch shares workspaceRoot and withinPath, deduplicates equivalent hydration, and isolates item failures. Name-bearing cross-file operations use WorkspaceIndex plus registered hydration; has_cycle remains index-only, and calls_in_file remains a fresh unpublished canonical-file query.",
             "inputSchema": {
                 "type": "object",
-                "properties": {
-                    "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle"], "description": "Type of workspace query." },
-                    "domain": { "type": "string", "description": "Framework domain for entity queries (e.g. 'angular', 'spring', 'ngrx'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
-                    "entity_type": { "type": "string", "description": "Entity type for entity queries (e.g. 'Component', 'Service', 'Controller'). Required for: forward_edges, reverse_edges, transitive_dependencies." },
-                    "name": { "type": "string", "description": "Entity name for entity queries. Required for: find_entities, forward_edges, reverse_edges, transitive_dependencies." },
-                    "file_path": { "type": "string", "description": "File path for entities_in_file query." },
-                    "workspaceRoot": { "type": "string", "description": "Optional. Primary trusted workspace root for path resolution and filesystem hydration discovery. Defaults to the detected project root." },
-                    "withinPath": { "type": "string", "description": "Optional. Narrows an ALREADY authorized workspace to one file or directory subtree: occurrences whose ASSERTING file lies under it, and traversal/cycle evidence likewise. Relative paths resolve against workspaceRoot; absolute paths are used as declared. Rejected (-32602) when the path lies outside workspaceRoot plus configured additional roots, or when no workspaceRoot is given — it never widens a workspace and never becomes a root of its own. Omit to query the whole authorized workspace." },
-                    "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." }
-                },
-                "required": ["type"]
+                "properties": super::tool_schemas::workspace_query_properties(),
+                "oneOf": super::tool_schemas::workspace_query_request_variants()
             },
             "outputSchema": {
                 "type": "object",
@@ -312,68 +388,24 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "type": "boolean",
                         "description": "Cycle detection result (has_cycle)."
                     },
+                    "cycle": workspace_query_cycle_schema(),
+                    "coverage": { "type": "object", "description": "Index-evidence coverage limits for has_cycle." },
+                    "identity_model": { "type": "string", "description": "Semantic identity model used by has_cycle." },
+                    "identity_ambiguous": { "type": "boolean", "description": "Whether a has_cycle witness identity has multiple admitted physical occurrences." },
+                    "identity_ambiguities": { "type": "array", "description": "Ambiguous witness identities and their admitted occurrence files.", "items": { "type": "object" } },
                     "depth_used": {
                         "type": "integer",
                         "description": "Actual traversal depth used (transitive_dependencies)."
                     },
-                    "discovery": {
-                        "type": "object",
-                        "description": "Optional. Present ONLY when discovery deviated from its expected path (healthy CBM, completed across every configured root, ready projects, no candidates); absent when nothing noteworthy happened. Every field is omitted while it holds its expected value, and no field restates another.",
-                        "properties": {
-                            "provider": {
-                                "type": "string",
-                                "enum": ["filesystem", "cbm_and_filesystem", "none"],
-                                "description": "Present only when a provider other than CBM supplied this query's coverage."
-                            },
-                            "status": {
-                                "type": "string",
-                                "enum": ["partial", "unavailable"],
-                                "description": "Present only when discovery was not complete: 'partial' = it ran but did not cover every configured root; 'unavailable' = nothing could run, so the answer rests only on what the index already held."
-                            },
-                            "fallback_reason": {
-                                "type": "string",
-                                "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
-                                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
-                            },
-                            "discovered": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - candidate file paths discovered by this query."
-                            },
-                            "compiled": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query."
-                            },
-                            "projects": {
-                                "type": "array",
-                                "description": "Present only when a configured project's coverage was exceptional; healthy searched/ready projects are omitted and do not consume the diagnostic bound.",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "project": { "type": "string" },
-                                        "status": {
-                                            "type": "string",
-                                            "enum": ["searched", "search_failed", "skipped"]
-                                        },
-                                        "readiness": {
-                                            "type": "string",
-                                            "enum": ["still_indexing", "failed"],
-                                            "description": "Only for an exceptional 'searched' entry: the project was not ready, so its contribution may be incomplete."
-                                        },
-                                        "reason": {
-                                            "type": "string",
-                                            "enum": ["cbm_unavailable", "additional_root_not_registered"],
-                                            "description": "Only when it adds a distinction the status does not already carry."
-                                        }
-                                    },
-                                    "required": ["project", "status"]
-                                }
-                            },
-                            "projects_truncated": {
-                                "type": "integer",
-                                "description": "Present only when > 0 - exceptional project entries dropped by the diagnostic bound."
-                            }
-                        }
-                    }
+                    "resolved_identity": { "type": "object", "description": "Exact semantic identity used by forward_edges, reverse_edges, or transitive_dependencies." },
+                    "file": { "type": "string", "description": "Resolved source file for calls_in_file." },
+                    "owner": { "type": "object", "description": "Resolved typed owner for calls_in_file." },
+                    "method": { "type": "string", "description": "Caller method name for calls_in_file." },
+                    "overloads": { "type": "array", "description": "Matching overload declarations with ordered call occurrences.", "items": { "type": "object" } },
+                    "overload_count": { "type": "integer", "description": "Number of matching overload declarations." },
+                    "discovery": workspace_query_discovery_schema(),
+                    "batch": { "type": "boolean", "const": true, "description": "Present only for a batch response." },
+                    "results": super::tool_schemas::workspace_query_batch_results()
                 }
             }
         }),
@@ -381,188 +413,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     .into_iter()
     .chain(cbm::cbm_tool_list())
     .collect();
-    inject_supported_languages(tools)
-}
-
-/// P1-4: Parse fidelity argument from request, falling back to config default.
-///
-/// Uses the user's configured `default_fidelity` instead of hardcoded "low",
-/// ensuring consistency across all tool invocations.
-pub(crate) fn parse_fidelity_arg(
-    id: &Value,
-    params: &Value,
-    config: &crate::config::CleanCtxConfig,
-) -> Result<Fidelity, ()> {
-    let fidelity_str =
-        params["arguments"]["fidelity"]
-            .as_str()
-            .unwrap_or(match config.default_fidelity {
-                Fidelity::Low => "low",
-                Fidelity::Medium => "medium",
-                Fidelity::High => "high",
-                Fidelity::Edit => "edit",
-                Fidelity::Verbatim => "verbatim",
-            });
-
-    // Log when using default
-    if params["arguments"]["fidelity"].is_null() {
-        eprintln!(
-            "[clean-ctx] fidelity not specified, using default: {} (from config)",
-            fidelity_str
-        );
-    }
-
-    match Fidelity::parse(fidelity_str) {
-        Ok(f) => Ok(f),
-        Err(e) => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id,
-                "error": { "code": -32602, "message": e.to_string() }
-            }));
-            Err(())
-        }
-    }
-}
-
-pub(crate) fn parse_tokenizer_arg(
-    params: &Value,
-    config: &crate::config::CleanCtxConfig,
-) -> TokenizerKind {
-    let tool_arg = params["arguments"]["tokenizer"].as_str();
-    resolve_tokenizer_kind(tool_arg, Some(&config.tokenizer.to_string()))
-}
-
-/// Resolve the effective fidelity for a (explicit_arg, file_extension) pair.
-/// Used by tests (`src/tests/mcp/tools.rs`, `src/tests/mcp/tool_handlers.rs`)
-/// and kept for potential future dispatch use. `#[allow(dead_code)]` is
-/// required because this is only consumed by external test modules.
-#[allow(dead_code)]
-pub(crate) fn resolve_fidelity(
-    explicit: Option<&str>,
-    ext: Option<&str>,
-    config: &crate::config::CleanCtxConfig,
-) -> Fidelity {
-    if let Some(s) = explicit
-        && let Ok(f) = Fidelity::parse(s)
-    {
-        return f;
-    }
-    if let Some(e) = ext
-        && let Some(f) = config.get_fidelity_for_extension(e)
-    {
-        return f;
-    }
-    config.default_fidelity
-}
-
-static HANDLER_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
-    std::sync::OnceLock::new();
-
-fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
-    HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
-}
-
-// P3-3: Handler registry initialization.
-//
-// The registry uses OnceLock for lazy initialization - it's created on first
-// access rather than at load time. This avoids issues with sanitizers,
-// test harnesses, and dynamic linking that #[ctor] can cause.
-//
-// For tests that need eager initialization (e.g., parallel tests on Windows),
-// call `setup_handler_registry_for_tests()` in the test module.
-
-/// P3-3: Force initialization of the handler registry for test setup.
-/// Call this in test modules to avoid OnceLock contention during parallel tests.
-#[cfg(test)]
-pub fn setup_handler_registry_for_tests() {
-    let _ = get_registry();
-}
-
-/// P1-6: Collect all inline-only tool names for verification.
-/// Returns the set of tool names handled by the inline dispatch match arms.
-/// Used by tests (`src/tests/mcp/tools.rs`) to verify no tool is registered
-/// in both inline and registry. `#[allow(dead_code)]` is required because
-/// this is only consumed by the external `src/tests/mcp/tools.rs` module,
-/// which the lib build (non-test) never references.
-#[allow(dead_code)]
-pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
-    use std::collections::HashSet;
-    let mut names = HashSet::new();
-    names.insert("graph_search");
-    names.insert("graph_query");
-    names.insert("graph_trace");
-    names.insert("get_architecture");
-    names.insert("get_cbm_status");
-    names.insert("cbm_proxy");
-    names
-}
-
-/// Dispatch a tools/call request.
-/// v0.3.0: Uses registry-based dispatch for modular handlers, fallback to legacy.
-///
-/// P1-6: All inline-handled tools have early returns. The remaining tools
-/// fall through to the registry. The `inline_tool_names()` function above
-/// enables test-time verification that no tool name appears in both paths.
-pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
-    // Inline dispatch for tools that have special handling requirements
-    // (decompress, compress_workspace, and all CBM tools).
-    // Each arm returns to prevent double-fire if a tool is also registered.
-    match tool_name {
-        // compress_workspace and decompress_code_context removed in Phase C1.
-        // CBM tools
-        "graph_search" => {
-            crate::cbm::handlers::handle_graph_search(id, params, state);
-            return;
-        }
-        "graph_query" => {
-            crate::cbm::handlers::handle_graph_query(id, params, state);
-            return;
-        }
-        "graph_trace" => {
-            crate::cbm::handlers::handle_graph_trace(id, params, state);
-            return;
-        }
-        "get_architecture" => {
-            crate::cbm::handlers::handle_get_architecture(id, params, state);
-            return;
-        }
-        "get_cbm_status" => {
-            crate::cbm::handlers::handle_get_cbm_status(id, params, state);
-            return;
-        }
-        "cbm_proxy" => {
-            crate::cbm::proxy::handle_cbm_proxy(id, params, state);
-            return;
-        }
-        "list_projects" => {
-            // Route through cbm_proxy with no parameters
-            crate::cbm::proxy::handle_cbm_proxy(
-                id,
-                &serde_json::json!({"arguments": {
-                    "cbm_tool": "list_projects",
-                    "parameters": {}
-                }}),
-                state,
-            );
-            return;
-        }
-        // Unknown — fall through to registry
-        _ => {}
-    }
-
-    // P1-6: Registry fallback for tools not handled inline above.
-    if let Some(entry) = get_registry().get(tool_name) {
-        (entry.handler)(id, params, state);
-        return;
-    }
-
-    // Unknown tool
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0",
-        "id": id,
-        "error": { "code": -32601, "message": format!("Tool not found: {}", tool_name) }
-    }));
+    super::tool_annotations::inject(inject_supported_languages(tools))
 }
 
 #[cfg(test)]

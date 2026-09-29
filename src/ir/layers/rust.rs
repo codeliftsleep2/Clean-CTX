@@ -16,11 +16,12 @@
 //   - references to fields → DataFlow("reads"/"writes", field_name)
 //   - match/loop/if/return patterns → ControlFlow
 
+use super::declaration::{declaration_head, has_modifier};
 use super::{LanguageLayer, LayerContext};
 use crate::compression::Fidelity;
 use crate::ir::opcodes::{
-    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CTX_ASYNC, CoreOp, EFFECT_ASYNC, EFFECT_IO,
-    EFFECT_MUTATION, FLAG_ASYNC, FLAG_EXPORT, FLAG_PRIVATE, FLAG_UNSAFE,
+    CTRL_IF, CTRL_LOOP, CTRL_MATCH, CTRL_RETURN, CoreOp, DeclarationModifier, ExecutionContextKind,
+    SideEffectKind,
 };
 
 /// Rust visibility enum
@@ -90,11 +91,12 @@ impl RustLayer {
 
     /// Extract visibility from a Rust declaration.
     fn extract_visibility(decl: &str) -> RustVisibility {
-        if decl.contains("pub(crate)") {
+        let head = declaration_head(decl);
+        if head.contains("pub(crate)") {
             RustVisibility::Crate
-        } else if decl.contains("pub(super)") {
+        } else if head.contains("pub(super)") {
             RustVisibility::Super
-        } else if decl.contains("pub ") || decl.starts_with("pub ") {
+        } else if has_modifier(head, "pub") {
             RustVisibility::Public
         } else {
             RustVisibility::Private
@@ -163,16 +165,17 @@ impl RustLayer {
     }
 
     /// Extract method-level flags (unsafe, async, visibility).
-    fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+    fn extract_declaration_modifiers(raw_sig: &str) -> Vec<DeclarationModifier> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("unsafe") {
-            flags.push(FLAG_UNSAFE.to_string());
+        if has_modifier(head, "unsafe") {
+            flags.push(DeclarationModifier::Unsafe);
         }
-        if raw_sig.contains("async") {
-            flags.push(FLAG_ASYNC.to_string());
+        if has_modifier(head, "async") {
+            flags.push(DeclarationModifier::Async);
         }
-        if raw_sig.contains("pub ") || raw_sig.starts_with("pub ") {
-            flags.push(FLAG_EXPORT.to_string());
+        if has_modifier(head, "pub") {
+            flags.push(DeclarationModifier::Export);
         }
         flags
     }
@@ -186,7 +189,7 @@ impl RustLayer {
         if body.contains("unsafe ") || body.contains("unsafe{") || body.contains("unsafe\n") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_MUTATION.to_string(),
+                SideEffectKind::Mutation,
             ));
         }
 
@@ -201,7 +204,7 @@ impl RustLayer {
         {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
         }
 
@@ -349,63 +352,71 @@ impl LanguageLayer for RustLayer {
             "struct.root" | "enum.root" | "trait.root" => {
                 if let Some(class_id) = &context.current_class {
                     // Emit class-level flags (visibility, safety)
-                    let mut flags = Self::extract_method_flags(raw_text);
+                    let mut modifiers = Self::extract_declaration_modifiers(raw_text);
 
                     // Wire P2: Use extract_visibility for precise visibility flags.
                     let vis = Self::extract_visibility(raw_text);
                     match vis {
                         RustVisibility::Public => {
-                            if !flags.contains(&FLAG_EXPORT.to_string()) {
-                                flags.push(FLAG_EXPORT.to_string());
+                            if !modifiers.contains(&DeclarationModifier::Export) {
+                                modifiers.push(DeclarationModifier::Export);
                             }
                         }
                         RustVisibility::Crate | RustVisibility::Super => {
-                            if !flags.contains(&FLAG_EXPORT.to_string()) {
-                                flags.push(FLAG_EXPORT.to_string());
+                            if !modifiers.contains(&DeclarationModifier::Export) {
+                                modifiers.push(DeclarationModifier::Export);
                             }
                         }
                         RustVisibility::Private => {
-                            if !flags.contains(&FLAG_PRIVATE.to_string()) {
-                                flags.push(FLAG_PRIVATE.to_string());
+                            if !modifiers.contains(&DeclarationModifier::Private) {
+                                modifiers.push(DeclarationModifier::Private);
                             }
                         }
                     }
 
                     // Check for unsafe trait specifically
-                    if raw_text.contains("unsafe trait")
-                        && !flags.contains(&FLAG_UNSAFE.to_string())
+                    let head = declaration_head(raw_text);
+                    if head.contains("unsafe trait")
+                        && !modifiers.contains(&DeclarationModifier::Unsafe)
                     {
-                        flags.push(FLAG_UNSAFE.to_string());
+                        modifiers.push(DeclarationModifier::Unsafe);
                     }
+
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
+                    }
+
+                    let mut metadata = Vec::new();
 
                     // ── Phase B (P3): Wire extract_cfg ────────────────────
                     if let Some(pos) = context.source.find(raw_text) {
                         if let Some(cfg_str) = Self::extract_cfg(&context.source, pos) {
                             let cfg_flag = format!("CFG({})", cfg_str);
-                            if !flags.contains(&cfg_flag) {
-                                flags.push(cfg_flag);
+                            if !metadata.contains(&cfg_flag) {
+                                metadata.push(cfg_flag);
                             }
                         }
                     }
 
                     // ── Phase B (P4): Wire extract_generic_params ─────────
                     if context.fidelity != Fidelity::Low {
-                        if let Some(generic_params) = Self::extract_generic_params(raw_text) {
+                        if let Some(generic_params) = Self::extract_generic_params(head) {
                             let gp_flag = format!("GP{}", generic_params);
-                            if !flags.contains(&gp_flag) {
-                                flags.push(gp_flag);
+                            if !metadata.contains(&gp_flag) {
+                                metadata.push(gp_flag);
                             }
                         }
                     }
 
-                    if !flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), flags));
+                    if !metadata.is_empty() {
+                        ops.push(CoreOp::ClassFlags(class_id.clone(), metadata));
                     }
                 }
             }
             "impl.root" => {
                 // Distinguish trait impls from inherent impls
-                let (_self_type, traits) = Self::extract_impl_relationships(raw_text);
+                let head = declaration_head(raw_text);
+                let (_self_type, traits) = Self::extract_impl_relationships(head);
                 if let Some(class_id) = &context.current_class {
                     // Emit Implements for trait implementations
                     for trait_name in &traits {
@@ -418,36 +429,34 @@ impl LanguageLayer for RustLayer {
                     }
 
                     // Emit class-level flags for unsafe impl
-                    let mut flags = Self::extract_method_flags(raw_text);
-                    if raw_text.contains("unsafe impl") && !flags.contains(&FLAG_UNSAFE.to_string())
+                    let mut modifiers = Self::extract_declaration_modifiers(raw_text);
+                    if head.contains("unsafe impl")
+                        && !modifiers.contains(&DeclarationModifier::Unsafe)
                     {
-                        flags.push(FLAG_UNSAFE.to_string());
+                        modifiers.push(DeclarationModifier::Unsafe);
                     }
-                    if !flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), flags));
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
                     }
                 }
             }
             "method.root" => {
                 // Extract method-level flags
-                let method_flags = Self::extract_method_flags(raw_text);
+                let modifiers = Self::extract_declaration_modifiers(raw_text);
                 if let Some(method_id) = &context.current_method {
-                    let is_async = method_flags.contains(&FLAG_ASYNC.to_string());
-                    if !method_flags.is_empty() {
-                        ops.push(CoreOp::Flags(method_id.clone(), method_flags));
+                    let is_async = modifiers.contains(&DeclarationModifier::Async);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::MethodModifiers(method_id.clone(), modifiers));
                     }
 
                     // R-43a: Extract execution semantics from method body
                     // The raw_text here is the method signature + body.
                     // We detect async to emit SideEffect + ExecutionContext.
                     if is_async {
-                        ops.push(CoreOp::SideEffect(
-                            method_id.clone(),
-                            EFFECT_ASYNC.to_string(),
-                        ));
+                        ops.push(CoreOp::SideEffect(method_id.clone(), SideEffectKind::Async));
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),
-                            CTX_ASYNC.to_string(),
+                            ExecutionContextKind::Async,
                         ));
                     }
 

@@ -16,29 +16,54 @@
 // filter is added.
 
 use super::{
-    discovery_field, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+    discovery_field,
+    outcome::QueryAnswer,
+    outcome::QueryFailure,
+    prepare::{PreparationContext, PreparedQuery},
+    required_name, required_str,
 };
 use crate::mcp::McpState;
-use crate::protocol::send_response;
 use serde_json::Value;
+
+fn semantic_fidelity(
+    args: &Value,
+    state: &McpState,
+) -> Result<crate::compression::Fidelity, QueryFailure> {
+    use crate::compression::Fidelity;
+
+    let requested = match args["fidelity"].as_str() {
+        Some(value) => match Fidelity::parse(value) {
+            Ok(fidelity) => fidelity,
+            Err(error) => return Err(QueryFailure::invalid(error.to_string())),
+        },
+        None => state.config.default_fidelity,
+    };
+    Ok(match requested {
+        Fidelity::Edit | Fidelity::Verbatim => Fidelity::High,
+        fidelity => fidelity,
+    })
+}
 
 /// `find_entities`: find entities by name (cross-domain/type).
 ///
 /// Eligible for one-cycle hydration: has a name for CBM candidate discovery.
-pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for find_entities query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
+pub(super) fn prepare_find_entities(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_find_entities(args, state, context) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_find_entities(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
+    let name = required_name(args, "find_entities")?.to_string();
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the entity
     // occurrences that workspace's own files declare (`None` = the caller
@@ -46,66 +71,58 @@ pub(super) fn handle_find_entities(id: &Value, args: &Value, state: &McpState) {
     // Built once per query, so the initial answer and the post-hydration rerun
     // share one root set, an optional `withinPath` narrowing included, and an
     // unauthorized `withinPath` is refused before the index is consulted.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
-    let (results, count, hydration) =
-        run_query_with_hydration(state, "find_entities", name, workspace_root, move |idx| {
-            let r = match scope.as_ref() {
-                Some(scope) => idx.find_entities_by_name_in_scope(name, scope),
-                None => idx.find_entities_by_name(name),
-            };
-            let c = r.len();
-            (serde_json::to_value(&r).unwrap_or_default(), c)
-        });
-    // The semantic answer is `entities` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "entities": results,
-        "count": count,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
+    let scope = context.scope(state, args)?;
+    // Preserve the established initial-read-before-hydration lifecycle.
+    {
+        let index = state.workspace_index_read();
+        let _ = match scope.as_ref() {
+            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+            None => index.find_entities_by_name(&name),
+        };
     }
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities.") }],
-            "structuredContent": structured,
+    let hydration = context.hydrate(state, "find_entities", &name, workspace_root)?;
+    Ok(PreparedQuery::indexed(move |index| {
+        let entities = match scope.as_ref() {
+            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+            None => index.find_entities_by_name(&name),
+        };
+        let count = entities.len();
+        let mut structured = serde_json::json!({
+            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+            "count": count,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
         }
-    }));
+        Ok(QueryAnswer::new("find_entities", structured))
+    }))
 }
 
 /// `entities_in_file`: list all entities defined in a given file.
-pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState) {
-    let file_path = match required_str(args, "file_path") {
-        Some(p) => p,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'file_path' for entities_in_file query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
+pub(super) fn prepare_entities_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_entities_in_file(args, state, context) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_entities_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
+    let file_path = required_str(args, "file_path").ok_or_else(|| {
+        QueryFailure::invalid("Missing required argument: 'file_path' for entities_in_file query.")
+    })?;
     let workspace_root = args["workspaceRoot"].as_str();
     // The effective scope: the WSC-004 roots are already enforced by the
     // trusted-path/root validation below (they ARE its accepted set), and an
     // invalid `withinPath` is refused before any path is resolved.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
+    let scope = context.scope(state, args)?;
     let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(
         file_path,
         workspace_root,
@@ -117,8 +134,7 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
             // return empty results (the user asked for a file that
             // hasn't been compiled). This matches the pre-fix behavior
             // where a non-existent path produced no entities.
-            send_empty_entities_in_file(id);
-            return;
+            return Ok(PreparedQuery::answer(empty_entities_in_file()));
         }
     };
     let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
@@ -131,27 +147,53 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        send_empty_entities_in_file(id);
-        return;
+        return Ok(PreparedQuery::answer(empty_entities_in_file()));
     }
-    let idx = state.workspace_index_read();
-    let results = idx.entities_in_file(&canonical_path);
-    let serialized = serde_json::to_value(&results).unwrap_or_default();
-    let count = results.len();
-    // entities_in_file is NOT hydration-eligible (no entity name for CBM search),
-    // so its response carries no discovery diagnostics at all: a constant
-    // "attempted: false" says nothing a caller can act on, and absence is the
-    // documented meaning of "nothing noteworthy happened".
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} entities in file.") }],
-            "structuredContent": {
-                "entities": serialized,
-                "count": count,
-            }
-        }
-    }));
+    let fidelity = semantic_fidelity(args, state)?;
+    let source = state
+        .read_source(&resolved_path)
+        .map_err(|error| QueryFailure::internal(error.to_string()))?;
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
+    if state
+        .workspace_index_read()
+        .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
+    {
+        return Ok(prepared_entities_in_file(canonical_path));
+    }
+    state
+        .preflight_semantic_publication(&resolved_path)
+        .map_err(QueryFailure::internal)?;
+    let (semantic_edges, compiled_hash) = match crate::mcp::tool_helpers::compile_file_ir_candidate(
+        &resolved_path,
+        fidelity,
+        state,
+    ) {
+        Ok((_, edges, hash)) => (edges, hash),
+        Err(error) => return Err(QueryFailure::internal(error.to_string())),
+    };
+    {
+        let mut idx = state.workspace_index_lock();
+        idx.replace_semantic_projection(
+            &canonical_path,
+            semantic_edges,
+            workspace_fidelity,
+            compiled_hash,
+        );
+    }
+    Ok(prepared_entities_in_file(canonical_path))
+}
+
+fn prepared_entities_in_file(canonical_path: String) -> PreparedQuery {
+    PreparedQuery::indexed(move |index| {
+        let entities = index.entities_in_file(&canonical_path);
+        let count = entities.len();
+        let structured = serde_json::json!({
+            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+            "count": count,
+        });
+        Ok(QueryAnswer::new("entities_in_file", structured))
+    })
 }
 
 /// The minimal zero-result shape for an `entities_in_file` request whose file is
@@ -159,12 +201,7 @@ pub(super) fn handle_entities_in_file(id: &Value, args: &Value, state: &McpState
 /// the workspace roots, or it lies outside the `withinPath` narrowing. The shape
 /// is exactly the pre-`withinPath` one (no hydration metadata at all), so an
 /// out-of-scope path is answered as it always was.
-fn send_empty_entities_in_file(id: &Value) {
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": "Found 0 entities in file." }],
-            "structuredContent": { "entities": [], "count": 0 }
-        }
-    }));
+fn empty_entities_in_file() -> QueryAnswer {
+    let structured = serde_json::json!({ "entities": [], "count": 0 });
+    QueryAnswer::new("entities_in_file", structured)
 }

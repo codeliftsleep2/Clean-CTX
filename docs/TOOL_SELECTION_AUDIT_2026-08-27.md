@@ -1,5 +1,8 @@
 # Tool Selection Audit Report (Full Detail)
 
+**Status:** Historical field-audit evidence. Current tool selection and public
+contracts are owned by `docs/agent/tooling.md` and the registered tool schemas.
+
 **Date:** 2026-08-27
 **Auditor:** Clean-CTX Code Audit
 **Scope:**

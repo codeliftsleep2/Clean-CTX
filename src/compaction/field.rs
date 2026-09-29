@@ -108,6 +108,44 @@ fn normalize_csharp_type(line: &str) -> String {
     format!("{}:{}", name, ty)
 }
 
+/// Extract only the bare declared field/property identifier, excluding
+/// modifiers, type annotation, initializer, accessor blocks, attributes,
+/// and fidelity-specific formatting. Canonical IR identity must remain
+/// `label`, never `private label: string` or `label:string`.
+pub fn extract_bare_field_name(text: &str) -> String {
+    let stripped = strip_csharp_attributes(text);
+    let stripped = strip_property_accessors(stripped);
+    let line = stripped.lines().next().unwrap_or(stripped).trim();
+    let without_initializer = line.split('=').next().unwrap_or(line).trim();
+    let without_initializer = without_initializer.trim_end_matches(';').trim();
+    let modifiers_stripped = strip_modifiers(without_initializer, MODIFIERS_FIELD);
+
+    // TypeScript/Java name-first syntax: `label: string` or `label?: string`.
+    if let Some((name_part, _)) = modifiers_stripped.split_once(':') {
+        return name_part
+            .trim()
+            .trim_end_matches(['?', '!'])
+            .trim()
+            .to_string();
+    }
+
+    // C# type-first syntax: `IRepository repository` or `string Name`.
+    if let Some((_, name_part)) = modifiers_stripped.rsplit_once(char::is_whitespace) {
+        let name = name_part.trim().trim_end_matches(['?', '!']).trim();
+        if !name.is_empty()
+            && name
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '_' || c == '$')
+        {
+            return name.to_string();
+        }
+    }
+
+    // A single untyped token is already a bare identifier (or safely retained
+    // when extraction cannot be proven).
+    without_initializer.trim().to_string()
+}
+
 /// High-fidelity field: preserve modifiers, strip only the initialiser.
 fn compact_field_high(text: &str) -> String {
     // Strip leading C# attribute lines before taking the declaration line.

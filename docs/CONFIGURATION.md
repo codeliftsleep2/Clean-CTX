@@ -19,7 +19,24 @@ Example: If `fidelity` is passed as a tool argument, it overrides both the env v
 
 Location: Project root (walks up from current directory to find it)
 
-### Complete Example
+### Representative Example
+
+This example covers the most commonly changed settings; it is not a serialized
+dump of every `CleanCtxConfig` field. The typed configuration structs in
+`src/config.rs` and their defaults are authoritative for accepted keys. Focused
+sections below document proxy, observability, additional-root, and other
+specialized settings.
+
+The accepted top-level keys are exactly: `type_aliases`,
+`fidelity_overrides`, `exclude_patterns`, `additional_roots`,
+`custom_markers`, `default_fidelity`, `diff_compression`,
+`workspace_type_detection`, `meta_layers`, `smart_defaults`, `heuristics`,
+`persistence`, `auto_angular`, `auto_delta`, `tokenizer`, `cache`,
+`resource_limits`, `cbm`, `intelligence`, `observability`, and `proxy`.
+Nested keys are owned by the typed structs in `src/config.rs`,
+`src/config_defaults.rs`, `src/config_meta_layers.rs`, and
+`src/cbm/config.rs`. There is no public dispatcher configuration block;
+dispatcher sizing and queues use internal production defaults.
 
 ```json
 {
@@ -103,6 +120,11 @@ Location: Project root (walks up from current directory to find it)
   }
 }
 ```
+
+`auto_delta` is retained as an inactive compatibility field so existing
+configuration files continue to parse. `provide_code_context` always returns
+complete model-facing content. Code-side delta transport is explicitly invoked
+through `delta_code_context` and acknowledged through `apply_delta`.
 
 ## Environment Variables
 
@@ -196,14 +218,36 @@ Controls SQLite-backed cross-session storage:
 {
   "persistence": {
     "enabled": true,            // Master switch (default: true)
-    "auto_save": true,          // Auto-save after each operation
+    "auto_save": true,          // Auto-checkpoint canonical read results
     "max_history_days": 30,     // Prune history older than this
     "db_path": ".clean-ctx/persistence.db"
   }
 }
 ```
 
-**Note**: Persistence is **enabled by default** — cross-session compression history is a core feature. It is automatically disabled in CI environments (A-14) to prevent stale `persistence.db` from leaking between builds and to avoid SQLite file lock contention in parallel test runs. Set `"enabled": false` to opt out.
+**Lifecycle contract:**
+
+- `enabled: false` creates no durable store; all context remains session-only.
+- `enabled: true, auto_save: true` automatically checkpoints canonical IR and
+  its aligned semantic edges after `provide_code_context`,
+  `compress_code_context`, and read-only delta baseline generation.
+- `enabled: true, auto_save: false` keeps those ordinary read results
+  session-only until `save_context` is called explicitly.
+- Edit-fidelity baselines remain durable because they establish safe edit
+  authority. Accepted `apply_edit` and `apply_delta` transactions, explicit
+  saves, and explicit deletions also remain durable regardless of
+  `auto_save`.
+- Verbatim responses and Angular template compression do not produce
+  canonical IR and therefore are not automatic-checkpoint candidates.
+
+Required checkpoints commit before the corresponding live state is
+published. A failed durable write therefore cannot publish a partial live
+candidate.
+
+Persistence is **enabled by default** — cross-session compression history is
+a core feature. It is automatically disabled in CI environments (A-14) to
+prevent stale `persistence.db` from leaking between builds and to avoid SQLite
+file lock contention in parallel test runs. Set `"enabled": false` to opt out.
 
 ## Smart Defaults
 
@@ -262,6 +306,12 @@ Per-framework meta-layer settings:
 ```
 
 Currently supported: `angular`, `spring_boot`, `dotnet`. Each meta-layer can be toggled at compile time via Cargo feature flags (see `Cargo.toml` for the full dependency tree). Future: `react`, `vue`, `svelte`.
+
+Layer-specific current references are
+[`ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md),
+[`ANGULAR_ECOSYSTEM_DEEPENING.md`](ANGULAR_ECOSYSTEM_DEEPENING.md),
+[`DOTNET_META_LAYER.md`](DOTNET_META_LAYER.md), and
+[`SPRING_META_LAYER.md`](SPRING_META_LAYER.md).
 
 **Compile-time feature flags vs runtime config:**
 
@@ -393,8 +443,7 @@ into JSON-RPC responses. This is the **consumer contract** for LLM clients
 | `prompts/get` (cleanctx-notation) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
 | `prompts/get` (clean-ctx-vocabulary) | `system_prompt` | `vocab-<version>` | `system_prompt_ttl` |
 | `compress_code_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
-| `provide_code_context` (full) | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
-| `provide_code_context` (delta) | `tail` | `rolling` | `tail_ttl` |
+| `provide_code_context` | `baseline` | `bl_<sha256 of compressed output>` | `baseline_ttl` |
 | `delta_code_context` | `tail` | `rolling` | `tail_ttl` |
 | `apply_delta` | `tail` | `rolling` | `tail_ttl` |
 | `diff_code_context` | `tail` | `rolling` | `tail_ttl` |

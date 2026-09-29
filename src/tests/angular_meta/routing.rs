@@ -26,6 +26,29 @@ fn rejects_non_router_imports() {
 // ── Route extraction ───────────────────────────────────────────────
 
 #[test]
+fn routing_extraction_does_not_use_legacy_prefix_membership_scans() {
+    let source = r#"
+import { Routes } from '@angular/router';
+export const routes: Routes = [{
+  path: 'users',
+  component: UserComponent,
+  canActivate: [AuthGuard],
+  resolve: { user: UserResolver },
+}];
+"#;
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_route_shape(source, Fidelity::High).expect("route shape");
+
+    assert_eq!(shape.routes.len(), 1);
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "routing extraction must query a reusable lexical index"
+    );
+}
+
+#[test]
 fn extracts_route_with_component_and_guard() {
     let src = r#"
 import { Routes } from '@angular/router';

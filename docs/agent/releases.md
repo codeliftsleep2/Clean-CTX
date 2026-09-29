@@ -9,7 +9,7 @@ The CI pipeline releases on every build: every behavior-affecting commit that
 passes the gates is a real release, not merely an entry pending under
 "Unreleased". Any task constituting such a gated release MUST additionally:
 
-- Add or update its dated, versioned section in `docs/CHANGELOG.md`. An
+- Add or update its dated, versioned section in `docs/changelogs/CHANGELOG.md`. An
   "Unreleased" label must not survive past its release.
 - Map versions chronologically onto the last released package version: the
   oldest shipped-but-unlabeled commit cluster takes the next patch increment,
@@ -24,7 +24,7 @@ passes the gates is a real release, not merely an entry pending under
 ## Changelog requirements
 
 - Every behavior-affecting build gets its own dated, versioned `## [x.y.z]`
-  section in `docs/CHANGELOG.md` describing what changed.
+  section in `docs/changelogs/CHANGELOG.md` describing what changed.
 - An "Unreleased" label must not survive past a release; the changelog must
   finish with zero `Unreleased` occurrences.
 
@@ -33,7 +33,7 @@ passes the gates is a real release, not merely an entry pending under
 - Bump `version` in `Cargo.toml`, sync `Cargo.lock`, and confirm the result
   with `cargo pkgid -p clean-ctx`.
 - Append one row per release to the Version-history registry under the
-  `## Versioning` heading in `docs/CHANGELOG.md` (newest-first). Highlights
+  `## Versioning` heading in `docs/changelogs/CHANGELOG.md` (newest-first). Highlights
   must quote actually shipped changelog content, never invented claims.
 - Registry gaps discovered retroactively may be filled only with explicit user
   approval.

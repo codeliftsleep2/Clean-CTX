@@ -143,28 +143,23 @@ impl GraphBridge {
         self.disk_cache = Some(store);
     }
 
-    /// Switch the active project by name. Also clears the in-memory cache
-    /// so cached results from the previous project are never served to the
-    /// new project (the disk cache is project-partitioned and remains).
+    /// Switch the active project by name.
+    ///
+    /// Cache entries retain their canonical project owner, so switching does
+    /// not discard unrelated reusable results.
     pub fn set_project(&mut self, project: &str) {
         // Resolve the requested identity to CBM's canonical slug (path, known
         // root basename, or literal slug). A raw dirname must never become a
         // divergent CBM project ID.
         let resolved = self.resolve_project_id(project);
-        let changed = self.project.as_deref() != Some(resolved.as_str());
         self.project = Some(resolved.clone());
-        if changed {
-            self.cache.clear();
-        }
         self.ensure_tracked(&resolved);
     }
 
     /// Switch the active workspace (multi-repo support).
     ///
-    /// Updates both the canonicalized `project_root` (the disk-cache
-    /// partition key) and the derived project name, then clears the
-    /// in-memory cache. This ensures memory AND disk caches are scoped
-    /// to the correct repo when a handler passes `workspaceRoot`.
+    /// Updates both the canonicalized `project_root` and the canonical project
+    /// identity. Cache entries remain isolated by their structural owner.
     ///
     /// Only the switched-to project's indexing state is reset (so it
     /// re-indexes on first query). Other projects' states are preserved,
@@ -183,7 +178,6 @@ impl GraphBridge {
         };
         self.project_root = root_canon;
         self.project = Some(slug.clone());
-        self.cache.clear();
         // A root introduced at runtime starts indexing immediately when usable.
         self.ensure_tracked(&slug);
     }

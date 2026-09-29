@@ -20,6 +20,10 @@ are tracked and versioned.
 `docs/ARCHITECTURAL_INVARIANTS.md` remains authoritative for durable
 architectural facts and is NOT duplicated here.
 
+The repository-wide documentation taxonomy and current entry points live in
+[`docs/README.md`](../README.md). This directory contains agent procedures, not
+the product architecture overview.
+
 ## Why this separation exists
 
 - Always-loaded context is paid for on every task, so it must stay small and
@@ -35,7 +39,7 @@ architectural facts and is NOT duplicated here.
 | File | Purpose | Read it when ... |
 |-----------|------------------------------------------------------|------------------------------|
 | `verification.md` | Single authoritative final verification gate | declaring any task complete |
-| `architecture.md` | Architectural audit checklist, invariant hierarchy, test-file convention | ending a multi-step architectural task |
+| `architecture.md` | RED/GREEN regression procedure, architectural audit checklist, invariant hierarchy, test-file convention | fixing a reproducible bug or ending a multi-step architectural task |
 | `incremental-migration.md` | Incremental architectural migration procedure | performing a designated migration |
 | `releases.md` | Gated release, changelog & versioning accounting | a behavior-affecting build ships |
 | `tooling.md` | Comprehensive MCP/code-context tool selection, workflow, and antipatterns guide | choosing how to read, understand, edit, or verify code |

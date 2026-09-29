@@ -30,6 +30,17 @@ depend on `.clinerules/` being present.
 
 ## Core policy (derived from `.clinerules/engineering.md`)
 
+### Rule 2 — Minimize tool calls
+
+Use the fewest tool calls reasonably necessary to complete the request correctly.
+
+- Batch related searches, reads, and checks when practical.
+- Do not repeat a tool call unless relevant state changed or the previous result was incomplete.
+- Do not perform optional audits, speculative improvements, broad repository scans, or unrelated validation.
+- Use targeted verification appropriate to the change.
+- The user's implementation request authorizes necessary inspection, editing, and proportionate verification.
+- Ask before materially expanding the requested scope, not before routine task completion.
+
 ### Architectural Approval Gate
 
 Do not make any architectural decision with **global, cross-cutting,
@@ -154,7 +165,8 @@ task type applies:
 
 - Final verification / gates -> `docs/agent/verification.md`
 - Incremental architectural migration -> `docs/agent/incremental-migration.md`
-- Architectural audit / invariant / test-file details -> `docs/agent/architecture.md`
+- Bug fixes / RED-GREEN regressions / architectural audit / invariant /
+  test-file details -> `docs/agent/architecture.md`
 - Gated release / changelog / versioning -> `docs/agent/releases.md`
 - MCP / code-context tooling -> `docs/agent/tooling.md` (local sessions; MCP
   tools are unavailable in the GitHub Actions runner)
@@ -234,6 +246,11 @@ file**.
   `package-lock.json`) are exempt because their structure is tool-owned and
   cannot be semantically decomposed. The exemption is filename-specific and
   does not apply to ordinary hand-maintained `*.lock` files.
+- Markdown documentation files (`*.md`, `*.markdown`) are exempt from the line
+  ceiling by extension. The ceiling is a code-readability policy; documentation
+  is prose whose length tracks the content it records, so it cannot be
+  decomposed to meet a line budget without fragmenting the record. Exempted by
+  explicit maintainer decision (2026-09-24).
 - One path is additionally exempt by explicit maintainer decision:
   `docs/agent/DISCOVERY_REGISTRY.md`, the live discovery registry — an
   append-only chronological ledger whose growth tracks how many discoveries are

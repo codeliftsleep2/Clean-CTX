@@ -3,7 +3,7 @@
 // Tests for R-43b Phase 5: IR Validation Engine
 
 use crate::ir::compiler::CompiledIR;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, ExecutionContextKind, SideEffectKind};
 use crate::ir::validator::{DefaultValidator, IRValidator, ValidationError};
 
 fn valid_ir() -> CompiledIR {
@@ -14,14 +14,14 @@ fn valid_ir() -> CompiledIR {
             CoreOp::DefMethod("C1".into(), "M1".into(), "getUser".into()),
             CoreOp::Param("M1".into(), "P1".into(), "$s".into(), "id".into()),
             CoreOp::Return("M1".into(), "$v".into()),
-            CoreOp::Flags("M1".into(), vec!["ASYNC".into()]),
+            CoreOp::MethodModifiers("M1".into(), vec![DeclarationModifier::Async]),
             CoreOp::Extends("C1".into(), "BaseService".into()),
             CoreOp::Implements("C1".into(), "IUserService".into()),
             CoreOp::Injects("C1".into(), vec!["IUserRepo".into()]),
             CoreOp::DataFlow("M1".into(), "reads".into(), "userRepo".into()),
             CoreOp::ControlFlow("M1".into(), "if".into(), "condition".into()),
-            CoreOp::SideEffect("M1".into(), "async".into()),
-            CoreOp::ExecutionContext("M1".into(), "async".into()),
+            CoreOp::SideEffect("M1".into(), SideEffectKind::Async),
+            CoreOp::ExecutionContext("M1".into(), ExecutionContextKind::Async),
         ],
         version: 1,
     }
@@ -77,14 +77,18 @@ fn test_flags_unknown_method() {
         file_id: "test.ts".to_string(),
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Test".into()),
-            CoreOp::Flags("M99".into(), vec!["ASYNC".into()]),
+            CoreOp::MethodModifiers("M99".into(), vec![DeclarationModifier::Async]),
         ],
         version: 1,
     };
     let validator = DefaultValidator::new();
     let errors = validator.validate(&ir);
     assert!(!errors.is_empty());
-    assert!(errors.iter().any(|e| e.code == "E003"));
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.code == "ir_projection_unresolved_identity")
+    );
 }
 
 #[test]
@@ -164,7 +168,7 @@ fn test_side_effect_unknown_method() {
         file_id: "test.ts".to_string(),
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Test".into()),
-            CoreOp::SideEffect("M99".into(), "io".into()),
+            CoreOp::SideEffect("M99".into(), SideEffectKind::Io),
         ],
         version: 1,
     };
@@ -180,7 +184,7 @@ fn test_ctx_unknown_method() {
         file_id: "test.ts".to_string(),
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Test".into()),
-            CoreOp::ExecutionContext("M99".into(), "async".into()),
+            CoreOp::ExecutionContext("M99".into(), ExecutionContextKind::Async),
         ],
         version: 1,
     };

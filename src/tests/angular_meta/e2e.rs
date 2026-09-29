@@ -553,7 +553,7 @@ fn build_output_lines_assigns_structured_meta_blocks() {
         start_byte: 0,
         end_byte: source.len(),
     }];
-    let built = crate::compression::pipeline::build_output_lines(
+    let built = crate::compression::output::build_output_lines(
         &all_captures,
         source,
         Fidelity::Medium,

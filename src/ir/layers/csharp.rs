@@ -19,12 +19,12 @@
 //   - TransactionScope → ExecutionContext("transaction_scope")
 //   - IDisposable → SideEffect("io")
 
+use super::declaration::interface_parents;
 use super::{LanguageLayer, LayerContext};
 use crate::compaction::modifiers::strip_csharp_attributes;
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CTX_REALTIME, CTX_TRANSACTION_SCOPE, CoreOp, DATAFLOW_READ,
-    DATAFLOW_WRITE, EFFECT_ASYNC, EFFECT_IO, EFFECT_TRANSACTION, FLAG_ABSTRACT, FLAG_ASYNC,
-    FLAG_EXPORT, FLAG_PRIVATE, FLAG_PROTECTED, FLAG_STATIC,
+    CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
+    ExecutionContextKind, SideEffectKind,
 };
 
 /// True when `head` (a declaration head, never a full body) carries `word`
@@ -150,19 +150,19 @@ impl CSharpLayer {
     /// receives the full declaration node (head + body), so scanning the
     /// whole node would let a `static` token inside a method body, comment,
     /// string, or nested declaration leak onto the enclosing class.
-    fn extract_class_flags(class_head: &str) -> Vec<String> {
+    fn extract_class_modifiers(class_head: &str) -> Vec<DeclarationModifier> {
         let head = strip_csharp_attributes(class_head);
         let head = head.split('{').next().unwrap_or(head);
         let head = head.lines().next().unwrap_or(head);
         let mut flags = Vec::new();
         if has_head_modifier(head, "public") {
-            flags.push(FLAG_EXPORT.to_string());
+            flags.push(DeclarationModifier::Export);
         }
         if has_head_modifier(head, "abstract") {
-            flags.push(FLAG_ABSTRACT.to_string());
+            flags.push(DeclarationModifier::Abstract);
         }
         if has_head_modifier(head, "static") {
-            flags.push(FLAG_STATIC.to_string());
+            flags.push(DeclarationModifier::Static);
         }
         flags
     }
@@ -172,7 +172,7 @@ impl CSharpLayer {
     /// or trailing `;`) is inspected with word-boundary token matching, so a
     /// `static` call, comment, or string inside the method body can never
     /// mark the method itself as static.
-    fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+    fn extract_method_modifiers(raw_sig: &str) -> Vec<DeclarationModifier> {
         let head = strip_csharp_attributes(raw_sig);
         let head = head.split('{').next().unwrap_or(head);
         let head = head.split(';').next().unwrap_or(head);
@@ -181,19 +181,19 @@ impl CSharpLayer {
         let head = split_depth_zero_arrow(head);
         let mut flags = Vec::new();
         if has_head_modifier(head, "async") {
-            flags.push(FLAG_ASYNC.to_string());
+            flags.push(DeclarationModifier::Async);
         }
         if has_head_modifier(head, "private") {
-            flags.push(FLAG_PRIVATE.to_string());
+            flags.push(DeclarationModifier::Private);
         }
         if has_head_modifier(head, "protected") {
-            flags.push(FLAG_PROTECTED.to_string());
+            flags.push(DeclarationModifier::Protected);
         }
         if has_head_modifier(head, "static") {
-            flags.push(FLAG_STATIC.to_string());
+            flags.push(DeclarationModifier::Static);
         }
         if has_head_modifier(head, "abstract") {
-            flags.push(FLAG_ABSTRACT.to_string());
+            flags.push(DeclarationModifier::Abstract);
         }
         flags
     }
@@ -219,11 +219,11 @@ impl CSharpLayer {
         if is_async {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_ASYNC.to_string(),
+                SideEffectKind::Async,
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_ASYNC.to_string(),
+                ExecutionContextKind::Async,
             ));
 
             // Detect IAsyncEnumerable (streaming)
@@ -240,12 +240,12 @@ impl CSharpLayer {
         if raw_sig.contains("SaveChangesAsync") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
             if !is_async {
                 ops.push(CoreOp::ExecutionContext(
                     method_id.to_string(),
-                    CTX_ASYNC.to_string(),
+                    ExecutionContextKind::Async,
                 ));
             }
         }
@@ -254,11 +254,11 @@ impl CSharpLayer {
         if raw_sig.contains("TransactionScope") {
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_TRANSACTION_SCOPE.to_string(),
+                ExecutionContextKind::TransactionScope,
             ));
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_TRANSACTION.to_string(),
+                SideEffectKind::Transaction,
             ));
         }
 
@@ -365,9 +365,9 @@ impl LanguageLayer for CSharpLayer {
                     }
 
                     // Emit class-level flags
-                    let class_flags = Self::extract_class_flags(raw_text);
-                    if !class_flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), class_flags));
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
                     }
 
                     // R-43a: Detect IDisposable/IAsyncDisposable class
@@ -383,13 +383,25 @@ impl LanguageLayer for CSharpLayer {
             // flags through this layer: only `class.root` carries EXPORT/etc.
             // Routing them through the class arm would reset per-class R-43a
             // state and misattribute the enclosing class's flags.
-            "interface.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {}
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    let declaration = strip_csharp_attributes(raw_text);
+                    for parent in interface_parents(declaration, ":") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
+                    }
+                }
+            }
+            "struct.root" | "enum.root" | "trait.root" | "record.root" => {}
             "method.root" => {
                 // Extract method-level flags
-                let method_flags = Self::extract_method_flags(raw_text);
+                let modifiers = Self::extract_method_modifiers(raw_text);
                 if let Some(method_id) = &context.current_method {
-                    if !method_flags.is_empty() {
-                        ops.push(CoreOp::Flags(method_id.clone(), method_flags));
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::MethodModifiers(method_id.clone(), modifiers));
                     }
 
                     // R-43a: Extract execution semantics
@@ -400,13 +412,13 @@ impl LanguageLayer for CSharpLayer {
                     if context.is_signalr_hub {
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),
-                            CTX_REALTIME.to_string(),
+                            ExecutionContextKind::Realtime,
                         ));
                     }
 
                     // R-43a: Per-method IDisposable side-effect
                     if context.is_disposable_class {
-                        ops.push(CoreOp::SideEffect(method_id.clone(), EFFECT_IO.to_string()));
+                        ops.push(CoreOp::SideEffect(method_id.clone(), SideEffectKind::Io));
                     }
                 }
             }

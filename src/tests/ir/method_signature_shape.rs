@@ -239,6 +239,16 @@ fn methods(ir: &CompiledIR) -> Vec<MethodFacts> {
                     }
                 }
             }
+            CoreOp::MethodModifiers(mid, modifiers) => {
+                if let Some(facts) = facts.get_mut(mid) {
+                    for modifier in modifiers {
+                        let name = modifier.as_str().to_string();
+                        if !facts.flags.contains(&name) {
+                            facts.flags.push(name);
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }

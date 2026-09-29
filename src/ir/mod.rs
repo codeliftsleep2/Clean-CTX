@@ -20,10 +20,16 @@
 pub mod binary_wire;
 /// Generic native call facts (`CoreOp::Call`): grammar boundary + producer.
 pub mod calls;
+pub mod compact_a;
+/// Research-only sparse positional file-context codec. Not production-wired.
+pub mod compact_a3;
 pub mod compiler;
 pub(crate) mod compiler_methods;
+pub mod control_full;
 pub mod delta;
+pub mod focus;
 pub mod hierarchical;
+pub mod identity;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;
@@ -51,17 +57,25 @@ pub use binary_wire::{
     ir_to_binary_wire_json, is_binary_wire,
 };
 pub use compiler::{CompileError, CompiledIR, IRCompiler};
+pub use control_full::{
+    CONTROL_FULL_NAVIGATION_SCHEMA, CONTROL_FULL_NAVIGATION_VERSION, CONTROL_FULL_VERSION,
+    normalize_control_full, render_control_full, semantic_edge_navigation,
+};
 pub use delta::{
-    CompactDelta, CompactOps, DeltaComputer, DeltaOps, FieldPatch, IRDelta, ModOp, SemanticIntent,
-    compact_decode, compact_encode, compute_field_patches, key_tuple_from_tuple,
+    CompactDelta, CompactOps, CompactSequenceDelta, DeltaComputer, DeltaIdentity, DeltaOpcode,
+    DeltaOps, FieldPatch, IRDelta, ModOp, OccurrenceKey, SEQUENCE_DELTA_VERSION, SemanticIntent,
+    SequenceDelta, SequenceDeltaComputer, SequenceEdit, compact_decode, compact_encode,
+    compact_sequence_decode, compact_sequence_encode, compute_field_patches, key_tuple_from_tuple,
     primary_key_from_tuple,
 };
 pub use hierarchical::{
-    ClassNode, FieldNode, HierarchicalIR, MethodNode, PatternEntry,
+    ClassNode, FieldNode, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
     estimate_savings as hierarchical_savings, hierarchical_to_ir, ir_to_hierarchical,
     ir_to_hierarchical_wire, wire_to_ir as hierarchical_wire_to_ir,
 };
-pub use opcodes::CoreOp;
+pub use opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
+};
 pub use patterns::{CompressingPatternRecognizer, CompressionStats, MergeItem, PatternOp};
 pub use positional::{
     PositionalConfig, decode_op, encode_op, encode_stream, estimate_savings, ir_to_positional_wire,

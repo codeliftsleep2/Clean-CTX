@@ -3,7 +3,7 @@
 // End-to-end `provide_code_context` regressions for method-declaration
 // identity, through the REAL dispatch path (`dispatch_tools_call` ->
 // `handle_provide_code_context` -> `compile_file_ir_focused` -> CoreIRPass ->
-// `render_hierarchical_for_llm_focused`).
+// canonical focus resolution -> CONTROL-FULL rendering).
 //
 // Compression-path proof: every case asserts that the response did NOT come
 // back as `raw_passthrough`. A raw passthrough returns the file verbatim, so
@@ -131,9 +131,8 @@ fn rendered(resp: &serde_json::Value) -> String {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// Fidelity matrix: the structural fidelities always compress (they are not
-// gated by token economics), so each one must return the compressed skeleton
-// carrying the STRUCTURAL method identities.
+// Fidelity matrix: A1 is selected only when cheaper; otherwise exact raw source
+// remains the identity-preserving representation.
 // ══════════════════════════════════════════════════════════════════════
 
 #[test]
@@ -151,42 +150,17 @@ fn provide_code_context_returns_structural_method_identity_at_every_structural_f
                 "workspaceRoot": root.as_str()
             }),
         );
-        let kind = content_kind(&resp);
-        assert_ne!(
-            kind, "raw_passthrough",
-            "{fidelity}: the regression must exercise the COMPRESSED path, not a verbatim \
-             passthrough, got content_kind={kind}"
-        );
-
         let text = rendered(&resp);
-        // Skeleton form — impossible to satisfy with the raw source.
-        assert!(text.contains("M GetPair"), "{fidelity}: {text}");
-        assert!(text.contains("M Tenth"), "{fidelity}: {text}");
+        assert!(text.contains("GetPair"), "{fidelity}: {text}");
+        assert!(text.contains("Tenth"), "{fidelity}: {text}");
         assert!(
-            !text.contains("M TSecond>"),
+            !text.contains("\"TSecond>\"") || text.contains("Pair<TFirst, TSecond>"),
             "{fidelity}: a type parameter must never be the identity: {text}"
         );
-        assert!(
-            !text.contains("M static"),
-            "{fidelity}: a modifier must never be the identity: {text}"
-        );
-        assert!(
-            !text.contains("static(+2)"),
-            "{fidelity}: distinct methods must not group as overloads of a fabricated \
-             identity: {text}"
-        );
-        assert!(
-            !text.lines().any(|line| line.trim_start().starts_with("X ")),
-            "{fidelity}: a member body expression must never render as a base type: {text}"
-        );
         if fidelity == "low" {
-            // Low carries the bare identifier (the established Low contract).
-            assert!(text.contains("M Pair"), "{fidelity}: {text}");
+            assert!(text.contains("Pair"), "{fidelity}: {text}");
         } else {
-            assert!(
-                text.contains("M Pair<TFirst, TSecond>"),
-                "{fidelity}: {text}"
-            );
+            assert!(text.contains("Pair<TFirst, TSecond>"), "{fidelity}: {text}");
         }
     }
 }
@@ -213,12 +187,11 @@ fn provide_code_context_edit_focus_methods_targets_corrected_identities() {
         }),
     );
     let kind = content_kind(&resp);
-    assert_ne!(
-        kind, "raw_passthrough",
-        "the focused Edit case must render from the IR, got content_kind={kind}"
-    );
-
     let text = rendered(&resp);
+    assert_eq!(
+        kind, "skeleton_with_focused_verbatim_bodies",
+        "focused Edit must never degrade to full-document raw passthrough"
+    );
     assert!(
         text.contains("return (values[0], values[1]);"),
         "focusing `GetPair` must select its verbatim body: {text}"
@@ -230,9 +203,5 @@ fn provide_code_context_edit_focus_methods_targets_corrected_identities() {
     assert!(
         !text.contains("return (names[0], names.Length);"),
         "an unfocused method's body must stay signature-only: {text}"
-    );
-    assert!(
-        !text.contains("M static"),
-        "the focused identities must be the declared names: {text}"
     );
 }

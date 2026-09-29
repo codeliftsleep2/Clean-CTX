@@ -201,7 +201,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
         // ── Phase 2: Pipe-Level Interception Proxy ───────────────────
         serde_json::json!({
             "name": "cbm_proxy",
-            "description": "**Primary CBM integration point.** Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and returns the compressed result. `cbm_tool` must be a real CBM tool name: 'search_graph', 'query_graph', 'trace_path', 'get_architecture', 'list_projects', or 'index_repository'. Use this instead of calling CBM directly. Only available when codebase-memory-mcp is installed.",
+            "description": "Use this compact raw CBM integration point when compressed raw output is preferable; use the structured wrappers when a typed structured result is needed. Forwards a query to CBM, intercepts the raw ~5000-token structural response at the pipe level, compresses it down to ~1100 tokens, and never requires calling CBM directly. `cbm_tool` must be a real CBM tool name: 'search_graph', 'query_graph', 'trace_path', 'get_architecture', 'list_projects', or 'index_repository'. Only available when codebase-memory-mcp is installed.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

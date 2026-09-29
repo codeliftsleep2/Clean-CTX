@@ -85,6 +85,29 @@ pub fn extract_class_name(text: &str) -> String {
     }
 }
 
+/// Extract only the bare declared class/interface/record name, excluding
+/// modifiers, generics, inheritance clauses, primary-constructor lists, and
+/// keyword suffixes. Canonical IR identity must remain `Foo`, never
+/// `Foo:Base`, `Foo<T>`, or `Foo(params)`.
+pub fn extract_bare_class_name(text: &str) -> String {
+    let stripped = strip_csharp_attributes(text);
+    let decl = stripped.lines().next().unwrap_or(stripped);
+    let decl = decl.split('{').next().unwrap_or(decl).trim();
+    let rest = strip_modifiers(decl, MODIFIERS_CLASS);
+    let rest = rest
+        .strip_prefix("class ")
+        .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record "))
+        .or_else(|| rest.strip_prefix("enum "))
+        .or_else(|| rest.strip_prefix("struct "))
+        .unwrap_or(rest.as_str())
+        .trim();
+    let rest = strip_trailing_param_list(rest);
+    let name_token = rest.split_whitespace().next().unwrap_or(rest);
+    let bare_name = name_token.split('<').next().unwrap_or(name_token);
+    bare_name.trim_end_matches(['{', '}', ':']).to_string()
+}
+
 /// Extract just the base class / interface list from a class declaration.
 ///
 /// Input:  "public class FooService : BaseService, IFoo { ... }"

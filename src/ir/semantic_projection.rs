@@ -44,7 +44,10 @@ fn declared_method_names(instructions: &[CoreOp]) -> HashMap<&str, &str> {
     instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::DefMethod(_class_id, method_id, name) if !name.is_empty() => {
+            CoreOp::DefMethod(_class_id, method_id, name)
+            | CoreOp::DefInterfaceMethod(_class_id, method_id, name)
+                if !name.is_empty() =>
+            {
                 Some((method_id.as_str(), name.as_str()))
             }
             _ => None,
@@ -65,7 +68,10 @@ pub fn project_method_declarations(instructions: &[CoreOp], file: &str) -> Vec<S
     instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::DefMethod(_class_id, _method_id, name) if !name.is_empty() => {
+            CoreOp::DefMethod(_class_id, _method_id, name)
+            | CoreOp::DefInterfaceMethod(_class_id, _method_id, name)
+                if !name.is_empty() =>
+            {
                 Some(SemanticEdge {
                     relation: SemanticRelation::Defines,
                     subject: method_entity(name, file),

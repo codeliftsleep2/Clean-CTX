@@ -14,8 +14,8 @@
 // Everything downstream — the normalized `CoreOp::Call` fact, explicit
 // argument-count semantics, callable-span ownership, and the semantic
 // projection — is shared, so a language producer adds a query plus a
-// `call_capture_query` mapping entry and nothing else. C#, TypeScript, and Java
-// are wired that way today; Rust has no arm and compiles exactly as before.
+// `call_capture_query` mapping entry and nothing else. C#, TypeScript, Java,
+// and Rust are wired through that boundary.
 //
 // Truthfulness of the fact (established by the approved investigation):
 //   * caller  = the `DefMethod` id of the innermost callable whose source span
@@ -71,13 +71,13 @@ pub const ARROW_ROOT_CAPTURE: &str = "arrow.root";
 /// `base_query` so this producer runs.
 ///
 /// This is the ONLY language-specific thing a producer supplies. C#,
-/// TypeScript, and Java each map their base query to their own invocation
+/// TypeScript, Java, and Rust each map their base query to their own invocation
 /// capture query; the normalized `CoreOp::Call` fact, argument-count semantics,
 /// callable-span ownership, the semantic projection, the graph edge, and every
 /// workspace consumer are shared and untouched.
 ///
-/// Returns `None` for every language without a native call producer (Rust
-/// today), so those languages compile exactly as before.
+/// Returns `None` for every language without a native call producer, so those
+/// languages compile exactly as before.
 pub fn call_capture_query(base_query: &str) -> Option<&'static str> {
     if base_query == crate::queries::CS_QUERY {
         Some(crate::queries::CS_CALL_QUERY)
@@ -85,6 +85,8 @@ pub fn call_capture_query(base_query: &str) -> Option<&'static str> {
         Some(crate::queries::TS_CALL_QUERY)
     } else if base_query == crate::queries::JAVA_QUERY {
         Some(crate::queries::JAVA_CALL_QUERY)
+    } else if base_query == crate::queries::RS_QUERY {
+        Some(crate::queries::RS_CALL_QUERY)
     } else {
         None
     }
@@ -322,3 +324,9 @@ mod arrow_callback_tests;
 #[cfg(all(test, feature = "java"))]
 #[path = "../tests/ir/calls_java.rs"]
 mod java_tests;
+
+// The Rust production capture path must share the same normalized call fact,
+// ownership, arity, and semantic projection used by the other languages.
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/ir/calls_rust.rs"]
+mod rust_tests;

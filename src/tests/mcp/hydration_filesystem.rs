@@ -347,7 +347,8 @@ fn red_r5_no_cbm_reverse_edges_remain_authoritative() {
         "reverse_edges",
         "ServiceA",
         Some(&primary.path().to_string_lossy()),
-    );
+    )
+    .expect("semantic hydration");
     let index = hydration_state.workspace_index_read();
 
     assert_eq!(report.discovery_provider, "filesystem");

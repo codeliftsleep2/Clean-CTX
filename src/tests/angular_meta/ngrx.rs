@@ -12,6 +12,25 @@ use crate::compression::Fidelity;
 // ── Import gate ────────────────────────────────────────────────────
 
 #[test]
+fn ngrx_extraction_does_not_use_legacy_prefix_membership_scans() {
+    let source = r#"
+import { createAction, createSelector, props } from '@ngrx/store';
+export const loadUsers = createAction('[Users] Load');
+export const selectUsers = createSelector(selectState, state => state.users);
+"#;
+    crate::meta_util::reset_legacy_membership_call_count();
+
+    let shape = extract_ngrx_shape(source, Fidelity::High).expect("NgRx shape");
+
+    assert!(!shape.is_empty());
+    assert_eq!(
+        crate::meta_util::legacy_membership_call_count(),
+        0,
+        "NgRx extraction must query a reusable lexical index"
+    );
+}
+
+#[test]
 fn detects_ngrx_store_import() {
     let src = "import { Store } from '@ngrx/store';";
     assert!(has_ngrx_imports(src));

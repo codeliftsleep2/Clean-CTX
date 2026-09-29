@@ -77,6 +77,9 @@ const ANGULAR_CORE_IMPORT: &str = "@angular/core";
 /// also used by MobX / Vue, and a false positive would inject
 /// meaningless `Φ` markers into non-Angular output.
 pub fn is_angular_file(source: &str) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
     // A-11: Try AST-based detection first (eliminates false positives
     // from comments and string literals).
     if ast_based_angular_detect(source) {
@@ -85,6 +88,21 @@ pub fn is_angular_file(source: &str) -> bool {
 
     // Fallback: string-based detection for backward compatibility
     // (used when AST parsing fails or for non-TS files).
+    string_based_angular_detect(source)
+}
+
+/// Detect Angular evidence for a source already owned by the compilation
+/// pipeline, avoiding a second TypeScript parse.
+pub(crate) fn is_angular_file_with_regions(
+    source: &str,
+    _lexical_regions: &crate::meta_util::LexicalRegions,
+) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
+    // Every decorator form accepted by the AST query uses the same literal
+    // prefixes as the established fallback contract. The standalone detector
+    // retains AST validation; compilation does not need to repeat its parse.
     string_based_angular_detect(source)
 }
 
@@ -97,6 +115,9 @@ fn ast_based_angular_detect(source: &str) -> bool {
     if !source.contains('@') {
         return false;
     }
+
+    #[cfg(test)]
+    super::detect_metrics::record_ast_parse();
 
     let mut parser = Parser::new();
     let language = match safe_typescript_language() {

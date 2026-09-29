@@ -25,11 +25,11 @@ pub(crate) mod modifiers;
 pub(crate) mod signature;
 
 pub use class::{
-    extract_class_meta, extract_class_name, extract_rust_struct_name, format_class_entry,
-    format_rust_type_entry,
+    extract_bare_class_name, extract_class_meta, extract_class_name, extract_rust_struct_name,
+    format_class_entry, format_rust_type_entry,
 };
 pub use expression::{compact_expression, simple_compact};
-pub use field::extract_field;
+pub use field::{extract_bare_field_name, extract_field};
 pub use import::{compact_import, extract_import_names};
 pub use java::{
     compact_java_package, extract_java_constructor_sig, extract_java_type_name,

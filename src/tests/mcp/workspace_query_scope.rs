@@ -45,13 +45,10 @@ pub(super) const DOMAIN: &str = "builtin";
 
 /// The captured-response sink is process-global, so this module dispatches one
 /// query at a time: the sink is cleared, one query is dispatched, one response is
-/// popped. Serializing the module's own tests keeps them from consuming each
-/// other's response.
+/// popped. The shared protocol gate prevents this module and other handler
+/// suites from consuming each other's responses.
 pub(super) fn serialize() -> std::sync::MutexGuard<'static, ()> {
-    static TEST_SERIALIZE: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    TEST_SERIALIZE
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
+    crate::protocol::handler_response_serial()
 }
 
 /// A repository fixture on disk — real directories, so canonical root identity
@@ -148,14 +145,43 @@ pub(super) fn seed_generic(
     insert(
         state,
         asserting_file,
-        SemanticEdge {
-            relation,
-            subject: EntityRef::new(DOMAIN, "Class", subject).with_file(asserting_file.to_string()),
-            object: EntityRef::new(DOMAIN, "Class", object).with_file(asserting_file.to_string()),
-            layer: DOMAIN,
-            call_evidence: None,
-        },
+        generic_edge(asserting_file, relation, subject, object),
     );
+}
+
+/// Seed the same synthetic relationship as a current, fidelity-qualified file
+/// projection. `entities_in_file` may then reuse it instead of correctly
+/// replacing untracked evidence through first-touch compilation.
+pub(super) fn seed_current_generic(
+    state: &McpState,
+    asserting_file: &str,
+    relation: SemanticRelation,
+    subject: &str,
+    object: &str,
+) {
+    let source = state.read_source(asserting_file).expect("fixture source");
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    state.workspace_index_lock().replace_semantic_projection(
+        asserting_file,
+        vec![generic_edge(asserting_file, relation, subject, object)],
+        crate::workspace::index::SemanticFidelity::High,
+        source_hash,
+    );
+}
+
+fn generic_edge(
+    asserting_file: &str,
+    relation: SemanticRelation,
+    subject: &str,
+    object: &str,
+) -> SemanticEdge {
+    SemanticEdge {
+        relation,
+        subject: EntityRef::new(DOMAIN, "Class", subject).with_file(asserting_file.to_string()),
+        object: EntityRef::new(DOMAIN, "Class", object).with_file(asserting_file.to_string()),
+        layer: DOMAIN,
+        call_evidence: None,
+    }
 }
 
 /// Run an edge query through the REAL MCP dispatch path and return its edges.

@@ -5,7 +5,9 @@
 // pinned in `src/tests/cbm/caller_verify_search.rs`.
 
 use crate::cbm::bridge::test_helpers::new_mock_empty;
-use crate::cbm::bridge::{CachedGraphData, QUERY_CACHE_KEY_NAMESPACE, convert_query_rows};
+use crate::cbm::bridge::{
+    CachedGraphData, GraphCacheKey, QUERY_CACHE_KEY_NAMESPACE, convert_query_rows,
+};
 use crate::cbm::caller_verify::{
     CallerVerificationStatus, CallerVerificationSummary, CandidateSource, CsharpTargetSelector,
     annotate_caller_evidence, verify_csharp_callers,
@@ -142,9 +144,9 @@ fn verification_gap_reasons_are_stable() {
 // ── RED-CV5..CV12: cached discovery, retained identity, authority ────────────
 /// Locate the cache key the bridge uses for project-explicit candidate
 /// discovery — the same key shape production builds.
-fn scoped_key(project: &str, target: &str) -> String {
+fn scoped_key(target: &str) -> String {
     format!(
-        "{QUERY_CACHE_KEY_NAMESPACE}:{project}:{}",
+        "{QUERY_CACHE_KEY_NAMESPACE}:{}",
         candidate_path_query(target)
     )
 }
@@ -170,8 +172,10 @@ fn seed_discovery(
         })
         .collect();
     let result = convert_query_rows(&columns, &rows);
-    bridge.cache.insert(
-        scoped_key(project, target),
+    crate::cbm::bridge::test_helpers::seed_cache(
+        bridge,
+        project,
+        scoped_key(target),
         CachedGraphData {
             data: serde_json::to_value(&result).expect("candidate view serializes"),
             expires_at: Instant::now() + Duration::from_secs(3600),
@@ -216,16 +220,17 @@ fn red_cv7_candidate_discovery_reuses_the_graph_cache() {
         "a miss is the only case that reaches the provider"
     );
 }
-/// RED-CV8 — the cache key carries the workspace, so two repositories that share
-/// a symbol name can never read each other's candidates.
+/// RED-CV8 — structural cache ownership isolates two repositories that share a
+/// symbol name even though their query strings are identical.
 #[test]
 fn red_cv8_scoped_keys_isolate_workspaces() {
     let mut bridge = new_mock_empty();
     let active = bridge.project_str();
+    let query_key = scoped_key("OrderBy");
     assert_ne!(
-        scoped_key(&active, "OrderBy"),
-        scoped_key("repo-b", "OrderBy"),
-        "the same Cypher under two projects must not share one key"
+        GraphCacheKey::new(active.clone(), query_key.clone()),
+        GraphCacheKey::new("repo-b", query_key),
+        "the same Cypher under two projects must have distinct owners"
     );
 
     seed_discovery(
@@ -267,11 +272,15 @@ fn red_cv9_cache_is_owned_by_one_provider_instance() {
 
     let mut second = new_mock_empty();
     assert!(
-        first.cache.contains_key(&scoped_key(&project, "A.Foo")),
+        first
+            .cache
+            .contains_key(&GraphCacheKey::new(project.clone(), scoped_key("A.Foo"))),
         "the first provider holds its seeded entry"
     );
     assert!(
-        !second.cache.contains_key(&scoped_key(&project, "A.Foo")),
+        !second
+            .cache
+            .contains_key(&GraphCacheKey::new(project.clone(), scoped_key("A.Foo"))),
         "a distinct provider instance holds none of the first provider's entries"
     );
     assert!(candidate_paths(&mut second, "A.Foo", Some(&project)).is_none());

@@ -13,11 +13,13 @@
 
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
+pub(crate) mod content_economics;
 pub(crate) mod context_store;
 pub(crate) mod discovery_cache;
 pub mod dispatcher;
 mod handlers;
 pub(crate) mod heuristics;
+pub(crate) mod persistence_ir;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
 mod router;
@@ -26,8 +28,11 @@ pub(crate) mod session_stats;
 pub(crate) mod sqlite_store;
 pub(crate) mod state;
 pub(crate) mod token_economics;
+pub(crate) mod tool_annotations;
+pub(crate) mod tool_dispatch;
 pub(crate) mod tool_handlers;
 pub(crate) mod tool_helpers;
+pub(crate) mod tool_schemas;
 pub(crate) mod tools;
 
 pub use state::McpState;
@@ -59,3 +64,9 @@ mod e2e_server;
 #[cfg(test)]
 #[path = "../tests/mcp/apply_edit.rs"]
 mod apply_edit_tests;
+
+// Persistent-process scenarios are isolated from the in-process/schema
+// contract suite and remain ignored unless the binary has been built first.
+#[cfg(test)]
+#[path = "../tests/mcp/apply_edit_e2e.rs"]
+mod apply_edit_e2e_tests;

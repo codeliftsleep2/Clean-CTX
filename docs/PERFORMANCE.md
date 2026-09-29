@@ -1,7 +1,17 @@
 # Clean-CTX — Performance Guide
 
-> **Owner:** Compression/benchmark data (**50-edit simulation summary is the canonical cross-fidelity table; per-edit detail lives in `docs/EDIT_TYPE.md`**) · **Status:** Living reference
-> **Last updated:** 2026-06-12
+> **Owner:** Historical compression/benchmark evidence
+> **Status:** Superseded baseline — retained for renderer and delta history;
+> do not use the figures below as current SCHEMA-vNext claims
+> **Measured:** 2026-06-12
+>
+> Current SCHEMA-vNext measurements, tokenizer comparisons, anatomy records,
+> and reasoning gates live under
+> `verification/context-compression/schema-v5/` and are interpreted by
+> the shipped contract in `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` (the
+> historical filename is retained for link stability). Re-run those artifacts after
+> presentation-affecting RED/GREEN changes instead of editing historical
+> numbers here.
 
 ---
 
@@ -156,10 +166,10 @@ The delta overhead vs full recompression is fidelity-dependent:
 | **Medium** | ~747 tokens | **−51% cheaper** | Delta lines < re-compressed lines |
 | **High** | ~971 tokens | **−52.7% cheaper** | Delta lines < re-compressed lines |
 
-**Practical guidance:**
-- If you use **Low fidelity** and the compressed output is already tiny, full recompression's overhead is negligible — delta doesn't hurt but doesn't help much either
-- If you use **Medium or High fidelity**, delta transport provides a significant additional savings on top of the base compression
-- For maximum edit-session efficiency, the pipeline could auto-detect fidelity and choose the optimal transport strategy
+**Practical guidance:** These measurements apply to the explicit code-side
+`delta_code_context` / `apply_delta` protocol. `provide_code_context` always
+returns complete current model-facing content; prompt caching can reuse its
+stable prefix without requiring the model to consume a structured IR delta.
 
 ---
 

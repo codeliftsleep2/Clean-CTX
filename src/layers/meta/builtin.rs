@@ -9,8 +9,8 @@
 // meta layer (Angular/.NET/Spring) emitted semantic edges. For plain files
 // the pipeline was:
 //
-//   source → CoreIRPass captures → MetaLayerPass → collect_semantic_edges()
-//     → no applicable framework layer → semantic_edges = []
+//   source → CoreIRPass captures → MetaLayerPass → combined meta evaluation
+//     → no applicable framework output → semantic_edges = []
 //     → WorkspaceIndex.add_edges([]) → no entities
 //
 // This layer consumes the SAME capture pairs MetaLayerPass already builds
@@ -34,8 +34,28 @@
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
-use crate::layers::meta::{MetaLayer, MetaLayerOutput};
+use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerEvaluation, MetaLayerOutput};
 use std::path::Path;
+
+#[cfg(test)]
+thread_local! {
+    static EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn record_evaluation() {
+    EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
+}
+
+#[cfg(test)]
+pub(crate) fn reset_evaluation_count() {
+    EVALUATION_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn evaluation_count() -> usize {
+    EVALUATION_COUNT.with(std::cell::Cell::get)
+}
 
 /// Fallback meta layer that indexes ordinary type declarations (classes,
 /// interfaces, structs, enums, traits, records) as `builtin` entities.
@@ -112,6 +132,22 @@ impl MetaLayer for BuiltinMetaLayer {
             });
         }
         edges
+    }
+
+    fn evaluate_context(&self, context: &MetaLayerContext<'_>) -> MetaLayerEvaluation {
+        #[cfg(test)]
+        record_evaluation();
+
+        MetaLayerEvaluation {
+            output: None,
+            semantic_edges: self.extract_semantic_edges_paired_with_path(
+                context.source,
+                context.path,
+                context.paired_class_captures,
+                context.fidelity,
+                context.config,
+            ),
+        }
     }
 }
 

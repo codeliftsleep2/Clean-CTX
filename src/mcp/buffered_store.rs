@@ -2,31 +2,24 @@
 //
 // Buffered persistence layer with three-tier defense:
 //
-//   Tier 1: Batched writes — ops accumulate in memory, flushed as a
-//           single SQLite transaction when the buffer hits the threshold.
+//   Tier 1: Batched writes — ops accumulate in memory and are flushed as a
+//           single SQLite transaction by their explicit lifecycle owner.
 //   Tier 2: Retry with exponential backoff — transient DB failures
 //           (file lock, WAL contention) are retried up to MAX_RETRIES.
-//   Tier 3: JSON file fallback — if all retries fail, ops are written
-//           as standalone JSON files in .clean-ctx/fallback/.
-//           On next successful flush, fallback files are re-imported.
+//   Tier 3: Failed legacy batches remain pending for their explicit owner.
+//           Incomplete historical fallback artifacts are inspection-only.
 //
-// Flush boundaries:
-//   - Auto-flush when pending.len() >= BATCH_THRESHOLD (5)
-//   - Explicit flush via `context_stats` handler
-//   - Server shutdown (future: flush on drop)
+// Flush boundaries are owned explicitly by the lifecycle operation that
+// produced the pending work. Reads and maintenance operations never flush.
 
 use crate::compression::Fidelity;
 use crate::ir::compiler::CompiledIR;
 use crate::mcp::context_store::{ContextStore, StoredContextMeta};
 use crate::mcp::sqlite_store::SqliteStore;
-use base64::Engine;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::Duration;
-
-/// Auto-flush when the buffer reaches this many pending ops.
-const BATCH_THRESHOLD: usize = 5;
 
 /// Maximum retry attempts for flush (exponential backoff).
 const MAX_RETRIES: u32 = 3;
@@ -55,12 +48,22 @@ enum WriteOp {
     },
 }
 
-/// Buffered SQLite persistence store with retry and fallback.
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)] // Quarantine inspection is an explicit maintenance boundary.
+pub(crate) struct LegacyFallbackArtifact {
+    pub path: PathBuf,
+    pub operation: Option<String>,
+    pub identity: Option<String>,
+    pub available_metadata: serde_json::Value,
+    pub reason: &'static str,
+}
+
+/// Legacy buffered SQLite adapter retained for explicitly owned asynchronous
+/// work and tests. Registered semantic lifecycle handlers use scoped SQLite
+/// transactions directly.
 ///
-/// Three-tier defense:
-///   1. Batched writes in SQLite transactions
-///   2. Retry with exponential backoff on transient failures
-///   3. JSON file fallback for total DB failure
+/// Failed batches remain pending; they never create or import incomplete
+/// fallback semantic artifacts.
 #[derive(Clone)]
 pub struct BufferedStore {
     /// Inner SQLite store (shared across clones).
@@ -86,9 +89,6 @@ impl BufferedStore {
     /// Falls back to JSON files if all retries fail.
     /// Returns the number of operations flushed.
     pub fn flush(&self) -> usize {
-        // Tier 3: check for fallback files to re-import first
-        self.reimport_fallback_files();
-
         // Drain pending queue
         // P1-2: Recover from poisoned lock instead of discarding pending writes
         let ops = match self.pending.lock() {
@@ -137,15 +137,52 @@ impl BufferedStore {
         }
 
         if !succeeded {
-            // Tier 3: write ops to fallback JSON files
-            eprintln!(
-                "[clean-ctx] All flush attempts failed. Writing {} ops to fallback files.",
-                ops.len()
-            );
-            self.write_fallback_files(&ops);
+            eprintln!("[clean-ctx] All flush attempts failed; retaining pending operations.");
+            if let Ok(mut pending) = self.pending.lock() {
+                pending.splice(0..0, ops);
+            }
+            return 0;
         }
 
         count
+    }
+
+    /// Inspect incomplete historical fallback artifacts without importing,
+    /// rewriting, deleting, or publishing any semantic state.
+    pub(crate) fn inspect_legacy_fallbacks(&self) -> Vec<LegacyFallbackArtifact> {
+        let directory = self.project_root.join(".clean-ctx").join("fallback");
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return Vec::new();
+        };
+        let mut artifacts = entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("json"))
+            .map(|entry| {
+                let path = entry.path();
+                let parsed = std::fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
+                let operation = parsed
+                    .as_ref()
+                    .and_then(|value| value["type"].as_str())
+                    .map(str::to_owned);
+                let identity = parsed.as_ref().and_then(|value| {
+                    value["file_path"]
+                        .as_str()
+                        .or_else(|| value["context_id"].as_str())
+                        .map(str::to_owned)
+                });
+                LegacyFallbackArtifact {
+                    path,
+                    operation,
+                    identity,
+                    available_metadata: parsed.unwrap_or(serde_json::Value::Null),
+                    reason: "legacy artifact lacks complete aligned semantic authority",
+                }
+            })
+            .collect::<Vec<_>>();
+        artifacts.sort_by(|left, right| left.path.cmp(&right.path));
+        artifacts
     }
 
     /// Try to flush ops in a single SQLite transaction.
@@ -212,182 +249,6 @@ impl BufferedStore {
         Ok(flushed)
     }
 
-    /// Write failed ops to JSON fallback files.
-    ///
-    /// LOW-03: Timestamp collision is a non-issue because the index prefix
-    /// (`op_{i}_{ts}.json`) uniquely identifies each operation even if
-    /// multiple ops share the same nanosecond timestamp.
-    fn write_fallback_files(&self, ops: &[WriteOp]) {
-        let fallback_dir = self.project_root.join(".clean-ctx").join("fallback");
-        let _ = std::fs::create_dir_all(&fallback_dir);
-
-        for (i, op) in ops.iter().enumerate() {
-            let filename = format!(
-                "op_{}_{:016x}.json",
-                i,
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_nanos()
-            );
-            let path = fallback_dir.join(&filename);
-
-            let json = match op {
-                WriteOp::SaveContext {
-                    file_path,
-                    fidelity,
-                    compressed_output,
-                    ir_binary,
-                    source_hash,
-                    raw_tokens,
-                    compressed_tokens,
-                } => {
-                    serde_json::json!({
-                        "type": "save_context",
-                        "file_path": file_path,
-                        "fidelity": format!("{:?}", fidelity),
-                        "compressed_output": compressed_output,
-                        "ir_binary": base64::engine::general_purpose::STANDARD.encode(ir_binary),
-                        "source_hash": source_hash,
-                        "raw_tokens": raw_tokens,
-                        "compressed_tokens": compressed_tokens,
-                    })
-                }
-                WriteOp::AppendDelta {
-                    context_id,
-                    delta_payload,
-                    edit_type,
-                } => {
-                    serde_json::json!({
-                        "type": "append_delta",
-                        "context_id": context_id,
-                        "delta_payload": base64::engine::general_purpose::STANDARD.encode(delta_payload),
-                        "edit_type": edit_type,
-                    })
-                }
-                WriteOp::ClearFile { file_path } => {
-                    serde_json::json!({
-                        "type": "clear_file",
-                        "file_path": file_path,
-                    })
-                }
-            };
-
-            if let Err(e) = std::fs::write(
-                &path,
-                serde_json::to_string_pretty(&json).unwrap_or_default(),
-            ) {
-                eprintln!("[clean-ctx] Fallback write FAILED: {e}");
-            }
-        }
-    }
-
-    /// Re-import any fallback files into SQLite on next successful flush.
-    fn reimport_fallback_files(&self) {
-        let fallback_dir = self.project_root.join(".clean-ctx").join("fallback");
-        if !fallback_dir.exists() {
-            return;
-        }
-
-        let entries: Vec<_> = match std::fs::read_dir(&fallback_dir) {
-            Ok(rd) => rd.filter_map(|e| e.ok()).collect(),
-            Err(_) => return,
-        };
-
-        if entries.is_empty() {
-            return;
-        }
-
-        let mut conn = match self.inner.lock() {
-            Ok(c) => c,
-            Err(_) => return,
-        };
-
-        // Disable foreign key constraints during reimport to allow
-        // append_delta operations to be processed before their
-        // corresponding save_context (fallback files may be out of order).
-        let _ = conn.execute_batch("PRAGMA foreign_keys=OFF;");
-
-        let mut reimported = 0;
-        for entry in entries {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("json") {
-                continue;
-            }
-
-            let content = match std::fs::read_to_string(&path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
-
-            let json: serde_json::Value = match serde_json::from_str(&content) {
-                Ok(v) => v,
-                Err(_) => continue,
-            };
-
-            let op_type = json["type"].as_str().unwrap_or("");
-            match op_type {
-                "save_context" => {
-                    let file_path = json["file_path"].as_str().unwrap_or("");
-                    let fidelity_str = json["fidelity"].as_str().unwrap_or("low");
-                    let fidelity = Fidelity::parse(fidelity_str).unwrap_or(Fidelity::Low);
-                    let compressed = json["compressed_output"].as_str().unwrap_or("");
-                    let source_hash = json["source_hash"].as_str().unwrap_or("");
-                    let ir_b64 = json["ir_binary"].as_str().unwrap_or("");
-                    let ir_binary = base64::engine::general_purpose::STANDARD
-                        .decode(ir_b64)
-                        .unwrap_or_default();
-                    let raw_tokens = json["raw_tokens"].as_u64().unwrap_or(0);
-                    let compressed_tokens = json["compressed_tokens"].as_u64().unwrap_or(0);
-
-                    if let Err(e) = conn.save_context(
-                        file_path,
-                        fidelity,
-                        compressed,
-                        Some(&ir_binary),
-                        source_hash,
-                        raw_tokens,
-                        compressed_tokens,
-                    ) {
-                        eprintln!("[clean-ctx] Fallback reimport save_context failed: {e}");
-                        continue;
-                    }
-                    reimported += 1;
-                }
-                "append_delta" => {
-                    let context_id = json["context_id"].as_str().unwrap_or("");
-                    let payload_b64 = json["delta_payload"].as_str().unwrap_or("");
-                    let payload = base64::engine::general_purpose::STANDARD
-                        .decode(payload_b64)
-                        .unwrap_or_default();
-                    let edit_type = json["edit_type"].as_str();
-
-                    if let Err(e) = conn.append_delta(context_id, &payload, edit_type) {
-                        eprintln!("[clean-ctx] Fallback reimport append_delta failed: {e}");
-                        continue;
-                    }
-                    reimported += 1;
-                }
-                "clear_file" => {
-                    let file_path = json["file_path"].as_str().unwrap_or("");
-                    conn.clear_file(file_path);
-                    reimported += 1;
-                }
-                _ => continue,
-            }
-
-            // Delete the fallback file after successful reimport
-            let _ = std::fs::remove_file(&path);
-        }
-
-        // Re-enable foreign key constraints
-        let _ = conn.execute_batch("PRAGMA foreign_keys=ON;");
-
-        if reimported > 0 {
-            eprintln!("[clean-ctx] Reimported {reimported} ops from fallback files.");
-        }
-    }
-
     /// Get a reference to the inner SQLite store for read-only operations.
     pub fn sqlite(&self) -> Option<std::sync::MutexGuard<'_, SqliteStore>> {
         self.inner.lock().ok()
@@ -397,7 +258,7 @@ impl BufferedStore {
         self.pending.lock().map(|p| p.len()).unwrap_or(0)
     }
 
-    /// Queue a save_context operation. Auto-flushes if threshold reached.
+    /// Queue a save operation for its producing lifecycle to commit explicitly.
     #[allow(clippy::too_many_arguments)]
     pub fn queue_save_context(
         &self,
@@ -419,15 +280,10 @@ impl BufferedStore {
                 raw_tokens,
                 compressed_tokens,
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 
-    /// Queue an append_delta operation. Auto-flushes if threshold reached.
+    /// Queue a delta operation for its producing lifecycle to commit explicitly.
     pub fn queue_append_delta(
         &self,
         context_id: &str,
@@ -440,29 +296,21 @@ impl BufferedStore {
                 delta_payload: delta_payload.to_vec(),
                 edit_type: edit_type.map(String::from),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 
-    /// Queue a clear_file operation. Auto-flushes if threshold reached (MED-01 fix).
+    /// Queue a clear operation for its producing lifecycle to commit explicitly.
     pub fn queue_clear_file(&self, file_path: &str) {
         if let Ok(mut pending) = self.pending.lock() {
             pending.push(WriteOp::ClearFile {
                 file_path: file_path.to_string(),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
     }
 }
 
+/// Non-authoritative legacy adapter. Queueing never establishes durable state;
+/// its caller must own and invoke the explicit commit boundary.
 impl ContextStore for BufferedStore {
     fn save_context(
         &mut self,
@@ -485,11 +333,6 @@ impl ContextStore for BufferedStore {
                 raw_tokens,
                 compressed_tokens,
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
         Ok(id)
     }
@@ -498,105 +341,10 @@ impl ContextStore for BufferedStore {
         &self,
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
-        // MED-02: Flush pending ops and read in a single lock scope to avoid
-        // the double-lock that occurs when flush() acquires the inner lock
-        // then releases it before sqlite() acquires it again.
-        // P1-2: Recover from poisoned lock instead of discarding pending writes
-        let ops = match self.pending.lock() {
-            Ok(mut p) => std::mem::take(&mut *p),
-            Err(e) => {
-                eprintln!("[clean-ctx] WARNING: pending mutex poisoned, recovering: {e}");
-                let mut p = e.into_inner();
-                std::mem::take(&mut *p)
-            }
-        };
-        let mut conn = match self.inner.lock() {
-            Ok(c) => c,
-            Err(_) => return Ok(None),
-        };
-        if !ops.is_empty() {
-            // Best-effort flush inside the same lock scope
-            if let Err(e) = conn.begin_transaction() {
-                eprintln!("[clean-ctx] BEGIN failed during load_latest flush: {e}");
-                // Re-queue all ops so they're not lost
-                if let Ok(mut pending) = self.pending.lock() {
-                    pending.splice(0..0, ops);
-                }
-            } else {
-                let mut flushed = false;
-                let mut failed_at = None;
-                for (idx, op) in ops.iter().enumerate() {
-                    match op {
-                        WriteOp::SaveContext {
-                            file_path,
-                            fidelity,
-                            compressed_output,
-                            ir_binary,
-                            source_hash,
-                            raw_tokens,
-                            compressed_tokens,
-                        } => {
-                            if let Err(e) = crate::mcp::context_store::ContextStore::save_context(
-                                &mut *conn,
-                                file_path,
-                                *fidelity,
-                                compressed_output,
-                                Some(ir_binary),
-                                source_hash,
-                                *raw_tokens,
-                                *compressed_tokens,
-                            ) {
-                                let _ = conn.rollback();
-                                eprintln!(
-                                    "[clean-ctx] save_context during load_latest flush failed: {e}"
-                                );
-                                failed_at = Some(idx);
-                                break;
-                            }
-                        }
-                        WriteOp::AppendDelta {
-                            context_id,
-                            delta_payload,
-                            edit_type,
-                        } => {
-                            if let Err(e) = crate::mcp::context_store::ContextStore::append_delta(
-                                &mut *conn,
-                                context_id,
-                                delta_payload,
-                                edit_type.as_deref(),
-                            ) {
-                                let _ = conn.rollback();
-                                eprintln!(
-                                    "[clean-ctx] append_delta during load_latest flush failed: {e}"
-                                );
-                                failed_at = Some(idx);
-                                break;
-                            }
-                        }
-                        WriteOp::ClearFile { file_path } => {
-                            conn.clear_file(file_path);
-                        }
-                    }
-                    flushed = true;
-                }
-                if flushed {
-                    let _ = conn.commit();
-                    conn.wal_checkpoint();
-                }
-                // If any op failed, re-queue the un-flushed remainder so
-                // they're not permanently lost (they were dequeued but
-                // never written to the DB or fallback JSON files).
-                if let Some(failed_idx) = failed_at {
-                    let remaining: Vec<WriteOp> = ops.into_iter().skip(failed_idx).collect();
-                    if !remaining.is_empty() {
-                        if let Ok(mut pending) = self.pending.lock() {
-                            pending.splice(0..0, remaining);
-                        }
-                    }
-                }
-            }
+        match self.sqlite() {
+            Some(guard) => guard.load_latest(file_path),
+            None => Ok(None),
         }
-        conn.load_latest(file_path)
     }
 
     fn has_context(&self, file_path: &str) -> bool {
@@ -619,17 +367,11 @@ impl ContextStore for BufferedStore {
                 delta_payload: delta_payload.to_vec(),
                 edit_type: edit_type.map(String::from),
             });
-            let len = pending.len();
-            if len >= BATCH_THRESHOLD {
-                drop(pending);
-                self.flush();
-            }
         }
         Ok(())
     }
 
     fn delta_count(&self, context_id: &str) -> usize {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.delta_count(context_id)
         } else {
@@ -638,14 +380,31 @@ impl ContextStore for BufferedStore {
     }
 
     fn clear_file(&mut self, file_path: &str) {
+        let committed_context_id = self
+            .sqlite()
+            .and_then(|guard| guard.load_latest(file_path).ok().flatten())
+            .map(|meta| format!("ctx-{}", meta.source_hash));
         if let Ok(mut pending) = self.pending.lock() {
+            let mut owned_context_ids = pending
+                .iter()
+                .filter_map(|op| match op {
+                    WriteOp::SaveContext {
+                        file_path: pending_file,
+                        source_hash,
+                        ..
+                    } if pending_file == file_path => Some(format!("ctx-{source_hash}")),
+                    _ => None,
+                })
+                .collect::<Vec<_>>();
+            if let Some(context_id) = committed_context_id {
+                owned_context_ids.push(context_id);
+            }
             pending.retain(|op| match op {
                 WriteOp::SaveContext { file_path: fp, .. } => fp != file_path,
                 WriteOp::ClearFile { file_path: fp } => fp != file_path,
-                _ => true,
+                WriteOp::AppendDelta { context_id, .. } => !owned_context_ids.contains(context_id),
             });
         }
-        self.flush();
         if let Ok(mut guard) = self.inner.lock() {
             guard.clear_file(file_path);
         }
@@ -660,7 +419,6 @@ impl BufferedStore {
         file_path: &str,
         target_seq: Option<u32>,
     ) -> Result<Option<(CompiledIR, u32)>, Box<dyn std::error::Error>> {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.load_context_with_deltas(file_path, target_seq)
         } else {
@@ -669,7 +427,6 @@ impl BufferedStore {
     }
 
     pub fn purge_old_deltas(&self, days: u32) -> Result<usize, Box<dyn std::error::Error>> {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.purge_old_deltas(days)
         } else {
@@ -684,7 +441,6 @@ impl BufferedStore {
         limit: usize,
     ) -> Result<Vec<crate::mcp::sqlite_store::PersistedContextSummary>, Box<dyn std::error::Error>>
     {
-        self.flush();
         if let Some(guard) = self.sqlite() {
             guard.list_contexts(limit)
         } else {
@@ -696,3 +452,11 @@ impl BufferedStore {
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/buffered_store.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/buffered_store_integration.rs"]
+mod integration_tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/buffered_store_authority.rs"]
+mod authority_tests;

@@ -63,8 +63,11 @@ impl RateLimiter {
     /// Invalid client keys (empty or containing whitespace) are mapped to "invalid"
     /// to prevent hash map poisoning attacks.
     pub async fn check(&self, client_key: &str) -> bool {
+        self.check_at(client_key, Instant::now()).await
+    }
+
+    async fn check_at(&self, client_key: &str, now: Instant) -> bool {
         let mut inner = self.inner.lock().await;
-        let now = Instant::now();
 
         // Periodic GC
         if now.duration_since(inner.last_gc) >= GC_INTERVAL {
@@ -122,91 +125,5 @@ impl RateLimiter {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::thread;
-
-    #[tokio::test]
-    async fn test_burst_allows_initial_requests() {
-        let limiter = RateLimiter::new(10.0, 5.0);
-        // Should allow 5 requests (full burst)
-        for _ in 0..5 {
-            assert!(limiter.check("127.0.0.1").await);
-        }
-        // 6th should be denied (burst exhausted, no time elapsed)
-        assert!(!limiter.check("127.0.0.1").await);
-    }
-
-    #[tokio::test]
-    async fn test_refills_over_time() {
-        let limiter = RateLimiter::new(10.0, 5.0);
-        // Exhaust burst
-        for _ in 0..5 {
-            limiter.check("127.0.0.1").await;
-        }
-        assert!(!limiter.check("127.0.0.1").await);
-
-        // Wait ~200ms, should get ~2 more tokens (10 rps * 0.2s)
-        thread::sleep(Duration::from_millis(200));
-        assert!(limiter.check("127.0.0.1").await); // token 1
-        assert!(limiter.check("127.0.0.1").await); // token 2
-        assert!(!limiter.check("127.0.0.1").await); // still exhausted
-    }
-
-    #[tokio::test]
-    async fn test_different_ips_independent() {
-        let limiter = RateLimiter::new(10.0, 3.0);
-        assert!(limiter.check("10.0.0.1").await);
-        assert!(limiter.check("10.0.0.2").await);
-        // Different IPs should each have their own burst
-        assert!(limiter.check("10.0.0.1").await);
-        assert!(limiter.check("10.0.0.2").await);
-    }
-
-    #[tokio::test]
-    async fn test_gc_culls_stale_entries() {
-        let limiter = RateLimiter::new(10.0, 5.0);
-        limiter.check("stale-client").await;
-        assert_eq!(limiter.active_clients().await, 1);
-        // Note: we can't easily test GC timing without sleeping 60s.
-        // This test just verifies active_clients works.
-    }
-
-    #[tokio::test]
-    async fn test_no_tokens_no_burst() {
-        // 0 rps, 0 burst — should deny everything immediately
-        let limiter = RateLimiter::new(0.0, 0.0);
-        assert!(!limiter.check("127.0.0.1").await);
-        assert!(!limiter.check("127.0.0.1").await);
-    }
-
-    #[tokio::test]
-    async fn test_high_rps_with_low_burst() {
-        // 100 rps, but only 2 burst — initial burst exhausted quickly,
-        // but refills happen fast
-        let limiter = RateLimiter::new(100.0, 2.0);
-        assert!(limiter.check("127.0.0.1").await);
-        assert!(limiter.check("127.0.0.1").await);
-        assert!(!limiter.check("127.0.0.1").await); // burst exhausted
-                                                    // 10ms later ~1 token available
-        thread::sleep(Duration::from_millis(10));
-        assert!(limiter.check("127.0.0.1").await);
-    }
-
-    #[tokio::test]
-    async fn test_invalid_ip_validation() {
-        let limiter = RateLimiter::new(10.0, 5.0);
-        // Empty string should be treated as "invalid"
-        assert!(limiter.check("").await);
-        // Whitespace-only should be treated as "invalid"
-        assert!(limiter.check("   ").await);
-        // Both should share the same bucket (rate limited together)
-        // Bucket has 5 tokens total, 2 already used, so 3 more requests will succeed
-        assert!(limiter.check("").await); // 3rd token
-        assert!(limiter.check("").await); // 4th token
-        assert!(limiter.check("").await); // 5th token (exhausted)
-                                          // Bucket is now exhausted (5 tokens used)
-        assert!(!limiter.check("").await);
-        assert!(!limiter.check("   ").await);
-    }
-}
+#[path = "tests/rate_limiter.rs"]
+mod tests;

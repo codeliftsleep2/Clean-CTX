@@ -198,12 +198,9 @@ fn red_call23_binary_wire_round_trips_the_call_stream() {
     let bytes = binary_encode(&ir);
     let decoded = binary_decode(&bytes).expect("binary wire must decode");
 
-    // The ultra-compact binary format deliberately does NOT transport class ids:
-    // `decode` documents emitting an empty class id for `DEF_C`/`DEF_M` because
-    // the id is derived structurally on the reader side. That pre-existing
-    // property is out of scope here, so identity is asserted for the exact
-    // surface this fact owns — the opcode sequence plus every call fact's
-    // caller, callee, and explicit argument count (all three ARE transported).
+    assert_eq!(decoded.file_id, ir.file_id);
+    assert_eq!(decoded.version, ir.version);
+    assert_eq!(decoded.instructions, ir.instructions);
     assert_eq!(
         opcode_sequence(&decoded.instructions),
         opcode_sequence(&ir.instructions),

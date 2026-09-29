@@ -9,6 +9,7 @@
 use crate::mcp::McpState;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
+#[cfg(all(test, feature = "rust"))]
 use serde_json::Value;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -62,7 +63,7 @@ pub(super) const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
 /// response serializes is a sparse projection of it
 /// (`crate::mcp::tool_handlers::query::diagnostics`), which omits expected state
 /// and surfaces only decision-relevant deviation.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(super) struct HydrationReport {
     pub(super) hydration_attempted: bool,
     pub(super) discovery_provider: &'static str,
@@ -83,7 +84,7 @@ pub(super) struct HydrationReport {
     pub(super) project_coverage: Vec<ProjectCoverage>,
 }
 
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub(super) struct ProjectCoverage {
     pub(super) project: String,
     pub(super) status: &'static str,
@@ -103,6 +104,7 @@ struct DiscoveryOutcome {
     fallback_reason: Option<&'static str>,
 }
 
+#[cfg(all(test, feature = "rust"))]
 pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
     matches!(
         query_type,
@@ -115,22 +117,24 @@ pub(super) fn hydrate_workspace_index(
     query_type: &str,
     query_name: &str,
     workspace_root: Option<&str>,
-) -> HydrationReport {
+) -> Result<HydrationReport, String> {
     let discovery = discovery_kind(query_type);
     let outcome = discover_candidate_paths(state, discovery, query_name, workspace_root);
     let candidate_paths = outcome.candidates;
     let mut project_coverage = outcome.project_coverage;
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths);
-    let compiled = selected
-        .iter()
-        .filter(|path| compile_candidate(state, path, workspace_root))
-        .count();
+    let mut compiled = 0;
+    for path in &selected {
+        if try_compile_candidate(state, path, workspace_root)? {
+            compiled += 1;
+        }
+    }
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
     // The complete coverage set is retained here; the diagnostic bound is applied
     // by the LLM-facing projection (`query::diagnostics`), which also drops the
     // healthy entries so they cannot consume the bound.
-    HydrationReport {
+    Ok(HydrationReport {
         hydration_attempted: outcome.attempted,
         discovery_provider: outcome.provider,
         discovery_status: outcome.status,
@@ -138,7 +142,7 @@ pub(super) fn hydrate_workspace_index(
         candidates_discovered: discovered,
         candidates_compiled: compiled,
         project_coverage,
-    }
+    })
 }
 
 /// Map a `workspace_query` type to the discovery operation hydration must run.
@@ -530,19 +534,30 @@ fn select_candidates(state: &McpState, candidates: Vec<String>) -> Vec<String> {
     selected
 }
 
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn compile_candidate(
     state: &McpState,
     resolved_path: &str,
     workspace_root: Option<&str>,
 ) -> bool {
+    try_compile_candidate(state, resolved_path, workspace_root).unwrap_or(false)
+}
+
+fn try_compile_candidate(
+    state: &McpState,
+    resolved_path: &str,
+    workspace_root: Option<&str>,
+) -> Result<bool, String> {
     let validated = match super::super::tool_helpers::resolve_file_path_checked(
         resolved_path,
         workspace_root,
         &state.config.additional_roots,
     ) {
         Ok(path) => path,
-        Err(_) => return false,
+        Err(_) => return Ok(false),
     };
+
+    state.preflight_semantic_publication(&validated)?;
 
     match super::super::tool_helpers::compile_file_ir_focused(
         &validated,
@@ -557,9 +572,9 @@ pub(crate) fn compile_candidate(
                 index.remove_file(&canonical);
                 index.add_edges(&canonical, semantic_edges);
             }
-            true
+            Ok(true)
         }
-        Err(_) => false,
+        Err(_) => Ok(false),
     }
 }
 

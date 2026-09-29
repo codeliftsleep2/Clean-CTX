@@ -21,9 +21,19 @@
 
 pub(crate) mod annotations;
 pub(crate) mod detect;
+#[cfg(test)]
+mod evaluation_metrics;
 pub(crate) mod markers;
 pub mod properties;
 pub mod semantic;
+
+#[cfg(all(test, feature = "spring_boot"))]
+pub(crate) use evaluation_metrics::record_evaluation;
+#[cfg(test)]
+pub(crate) use evaluation_metrics::{
+    detection_count, evaluation_count, record_detection, reset_detection_count,
+    reset_evaluation_count,
+};
 
 use crate::compression::Fidelity;
 
@@ -103,6 +113,13 @@ pub fn run_meta_layer(
         return None;
     }
 
+    run_meta_layer_for_applicable_source(class_captures, fidelity)
+}
+
+pub(crate) fn run_meta_layer_for_applicable_source(
+    class_captures: &[String],
+    fidelity: Fidelity,
+) -> Option<MetaBlock> {
     // Tier 1 (extraction): walk each class capture and emit Φ lines.
     let mut block = MetaBlock::default();
     for raw_class in class_captures {

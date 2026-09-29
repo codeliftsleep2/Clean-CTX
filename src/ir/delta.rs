@@ -6,7 +6,7 @@
 // Instead of computing text diffs between CapturedStructure snapshots, the
 // delta engine computes instruction-level deltas between CompiledIR states.
 //
-// Delta Wire Format:
+// Legacy Delta Wire Format (decode/apply compatibility only):
 // ```json
 // {
 //   "file": "<path_alias>",
@@ -19,6 +19,9 @@
 //   }
 // }
 // ```
+// Production emission uses corrected protocol `dv: 2`, implemented in
+// `delta::sequence`, with positional edits, expected tuples, typed semantic
+// identities, and occurrence ordinals.
 
 use super::compiler::CompiledIR;
 use super::opcodes::CoreOp;
@@ -26,6 +29,7 @@ use super::wire::op_to_tuple;
 use std::collections::BTreeMap;
 
 mod compact;
+mod sequence;
 mod tuples;
 
 // Glob re-exports keep the established public paths unchanged by the split
@@ -33,12 +37,13 @@ mod tuples;
 // `::primary_key_from_tuple`, `::key_tuple_from_tuple`). Only `pub` items are
 // re-exported, so the private abbreviation helpers stay module-local.
 pub use compact::*;
+pub use sequence::*;
 pub use tuples::*;
 
 /// R-43a: High-level semantic intent of a delta operation.
 /// Provides human-readable context for what changed, beyond the structural diff.
 /// Empty (None) by default — wire format ready for Phase 4 enrichment.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SemanticIntent {
     RenameSymbol {
@@ -407,12 +412,20 @@ fn primary_key(op: &CoreOp) -> String {
         CoreOp::DefMethod(cid, mid, _) => format!("DEF_M:{}:{}", cid, mid),
         CoreOp::DefField(cid, fid, _) => format!("DEF_F:{}:{}", cid, fid),
         CoreOp::DefInterface(id, _) => format!("DEF_I:{}", id),
+        CoreOp::DefInterfaceMethod(iid, mid, _) => format!("DEF_IM:{}:{}", iid, mid),
+        CoreOp::DefInterfaceField(iid, fid, _) => format!("DEF_IF:{}:{}", iid, fid),
         CoreOp::Param(mid, pid, _, _) => format!("SIG:{}:{}", mid, pid),
         CoreOp::Return(mid, _) => format!("RET:{}", mid),
         CoreOp::FieldType(fid, _) => format!("FIELD_T:{}", fid),
+        CoreOp::MethodModifiers(mid, _) => format!("MOD_M:{}", mid),
+        CoreOp::ClassModifiers(cid, _) => format!("MOD_C:{}", cid),
+        CoreOp::InterfaceModifiers(iid, _) => format!("MOD_I:{}", iid),
+        CoreOp::ControlSummary(mid, _) => format!("CTRL_SUM:{}", mid),
+        CoreOp::PatternFacts(mid, _) => format!("PAT_FACT:{}", mid),
         CoreOp::Flags(tid, _) => format!("FLAGS:{}", tid),
         CoreOp::ClassFlags(cid, _) => format!("FLAGS_C:{}", cid),
         CoreOp::Extends(child, _) => format!("EXT:{}", child),
+        CoreOp::InterfaceExtends(child, _) => format!("EXT_I:{}", child),
         CoreOp::Implements(cid, iid) => format!("IMPL:{}:{}", cid, iid),
         CoreOp::Injects(cid, _) => format!("INJECTS:{}", cid),
         CoreOp::Import(alias, _, _) => format!("IMP:{}", alias),
@@ -456,12 +469,24 @@ fn key_tuple(op: &CoreOp) -> Vec<String> {
         CoreOp::DefMethod(cid, mid, _) => vec!["DEF_M".into(), cid.clone(), mid.clone()],
         CoreOp::DefField(cid, fid, _) => vec!["DEF_F".into(), cid.clone(), fid.clone()],
         CoreOp::DefInterface(id, _) => vec!["DEF_I".into(), id.clone()],
+        CoreOp::DefInterfaceMethod(iid, mid, _) => {
+            vec!["DEF_IM".into(), iid.clone(), mid.clone()]
+        }
+        CoreOp::DefInterfaceField(iid, fid, _) => {
+            vec!["DEF_IF".into(), iid.clone(), fid.clone()]
+        }
         CoreOp::Param(mid, pid, _, _) => vec!["SIG".into(), mid.clone(), pid.clone()],
         CoreOp::Return(mid, _) => vec!["RET".into(), mid.clone()],
         CoreOp::FieldType(fid, _) => vec!["FIELD_T".into(), fid.clone()],
+        CoreOp::MethodModifiers(mid, _) => vec!["MOD_M".into(), mid.clone()],
+        CoreOp::ClassModifiers(cid, _) => vec!["MOD_C".into(), cid.clone()],
+        CoreOp::InterfaceModifiers(iid, _) => vec!["MOD_I".into(), iid.clone()],
+        CoreOp::ControlSummary(mid, _) => vec!["CTRL_SUM".into(), mid.clone()],
+        CoreOp::PatternFacts(mid, _) => vec!["PAT_FACT".into(), mid.clone()],
         CoreOp::Flags(tid, _) => vec!["FLAGS".into(), tid.clone()],
         CoreOp::ClassFlags(cid, _) => vec!["FLAGS_C".into(), cid.clone()],
         CoreOp::Extends(child, _) => vec!["EXT".into(), child.clone()],
+        CoreOp::InterfaceExtends(child, _) => vec!["EXT_I".into(), child.clone()],
         CoreOp::Implements(cid, iid) => vec!["IMPL".into(), cid.clone(), iid.clone()],
         CoreOp::Injects(cid, _) => vec!["INJECTS".into(), cid.clone()],
         CoreOp::Import(alias, _, _) => vec!["IMP".into(), alias.clone()],
@@ -539,3 +564,7 @@ pub fn compute_field_patches(
 #[cfg(test)]
 #[path = "../tests/ir/delta.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/delta_sequence.rs"]
+mod sequence_tests;

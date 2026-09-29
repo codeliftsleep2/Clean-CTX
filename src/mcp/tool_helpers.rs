@@ -12,6 +12,10 @@ use crate::compression::Fidelity;
 #[cfg(test)]
 pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
     std::sync::Mutex::new(None);
+
+#[cfg(test)]
+pub(crate) static TEST_INJECTED_SOURCE_FAILURE: std::sync::Mutex<Option<String>> =
+    std::sync::Mutex::new(None);
 use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
 use std::path::PathBuf;
@@ -251,13 +255,54 @@ pub(crate) fn arg_str_or_empty<'a>(params: &'a serde_json::Value, key: &str) -> 
 ///
 /// A-08: Returns the source hash along with the compiled IR to enable
 /// source change detection in the delta path.
-pub(super) fn compile_file_ir(
+/// Compile a persistence candidate without creating session alias ownership.
+/// Existing aliases and versions are retained; a previously unseen file uses
+/// its durable path as a temporary compiler identity until durable commit.
+pub(super) fn compile_file_ir_candidate(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
-    compile_file_ir_focused(file_path, fidelity, state, None)
+    let existing_alias = state.alias_for_path(file_path);
+    let candidate_id = existing_alias
+        .clone()
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = existing_alias
+        .as_deref()
+        .and_then(|alias| state.file_version(alias))
+        .unwrap_or(0);
+    compile_file_ir_focused_with_identity(
+        file_path,
+        fidelity,
+        state,
+        None,
+        &candidate_id,
+        previous_version,
+    )
+}
+
+/// Compile exact in-memory source bytes without reading or publishing them.
+pub(super) fn compile_source_ir_candidate(
+    file_path: &str,
+    source: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    let alias = state
+        .alias_for_path(file_path)
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = state.file_version(&alias).unwrap_or(0);
+    compile_source_ir_focused_with_identity(
+        file_path,
+        source,
+        fidelity,
+        state,
+        None,
+        &alias,
+        previous_version,
+    )
 }
 
 /// Compile a file to IR with symbol targeting (`focus`).
@@ -277,19 +322,68 @@ pub(super) fn compile_file_ir_focused(
     focus: Option<&std::collections::HashSet<String>>,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
-    // Phase A retirement tests: cfg(test)-only fault injection. The
-    // natural CompileError paths (Capture/Layer) are unreachable with
-    // valid grammars, so the legacy-fallback branches cannot be exercised
-    // end-to-end without this hook. Release builds never compile it.
+    let path_alias = state.get_or_create_alias(file_path.to_string());
+    let previous_version = state.file_version(&path_alias).unwrap_or(0);
+    compile_file_ir_focused_with_identity(
+        file_path,
+        fidelity,
+        state,
+        focus,
+        &path_alias,
+        previous_version,
+    )
+}
+
+fn compile_file_ir_focused_with_identity(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    focus: Option<&std::collections::HashSet<String>>,
+    path_alias: &str,
+    previous_version: u64,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    let source_arc = state.read_source(file_path)?;
+    compile_source_ir_focused_with_identity(
+        file_path,
+        source_arc.as_str(),
+        fidelity,
+        state,
+        focus,
+        path_alias,
+        previous_version,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compile_source_ir_focused_with_identity(
+    file_path: &str,
+    source: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    focus: Option<&std::collections::HashSet<String>>,
+    path_alias: &str,
+    previous_version: u64,
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    // Test-only production-compiler failure injection applies equally to
+    // on-disk and exact in-memory candidate compilation.
     #[cfg(test)]
+    if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock()
+        && let Some(reason) = injected.as_ref()
     {
-        if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock() {
-            if let Some(reason) = injected.as_ref() {
-                return Err(crate::error::CleanCtxError::Ir(format!(
-                    "injected IR failure: {reason}"
-                )));
-            }
-        }
+        return Err(crate::error::CleanCtxError::Ir(format!(
+            "injected IR failure: {reason}"
+        )));
+    }
+    #[cfg(test)]
+    if let Ok(injected) = TEST_INJECTED_SOURCE_FAILURE.lock()
+        && let Some(marker) = injected.as_ref()
+        && source.contains(marker)
+    {
+        return Err(crate::error::CleanCtxError::Ir(format!(
+            "injected candidate IR failure: {marker}"
+        )));
     }
 
     use crate::ir::compiler::IRCompiler;
@@ -301,20 +395,12 @@ pub(super) fn compile_file_ir_focused(
     // The old ir::layers::angular/spring/dotnet modules have been removed.
     use crate::compression::language::language_for_extension;
 
-    // Use source_cache via state.read_source() — Finding 1
-    let source_arc = state.read_source(file_path)?;
-    let source = source_arc.as_str();
     let path_buf = PathBuf::from(file_path);
     let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
 
     let (language, query_string) = language_for_extension(extension).ok_or_else(|| {
         crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension))
     })?;
-
-    // F-FULL-10: Use raw path for alias key for deterministic results.
-    // Canonicalize is still performed for the `α alias: <path>` footer
-    // display, but the alias key itself uses the raw path.
-    let path_alias = state.get_or_create_alias(file_path.to_string());
 
     // File Identity Correction: compute the durable canonical identity
     // for EntityRef.file provenance. This is the authoritative file
@@ -323,8 +409,6 @@ pub(super) fn compile_file_ir_focused(
     let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
 
     // NF-02: Determine the next version based on the previous context state
-    let prev_version = state.file_version(&path_alias).unwrap_or(0);
-
     // A-08: Compute source hash for change detection
     let source_hash = {
         let cache = state.cache_read();
@@ -332,6 +416,7 @@ pub(super) fn compile_file_ir_focused(
     };
 
     let mut compiler = IRCompiler::new();
+    compiler.set_config(state.config.clone());
 
     // Add language-specific layers (Layer 2)
     match extension {
@@ -350,9 +435,9 @@ pub(super) fn compile_file_ir_focused(
         _ => {}
     }
 
-    // P0-4: Framework meta-layers (Layer 3) are now handled by LayerRegistry::global()
-    // inside IRCompiler::compile(). Meta-layers are registered in src/layers/meta/
-    // and wired via McpState -> LayerRegistry. No manual add_meta_layer() needed.
+    // P0-4: Framework meta-layers (Layer 3) are handled by LayerRegistry::global()
+    // inside IRCompiler::compile(). The active McpState configuration is passed
+    // through the compiler so framework and sub-layer opt-outs are honored.
 
     // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
     // the compile path. This is the Layer 4 additive recognizer that
@@ -378,7 +463,7 @@ pub(super) fn compile_file_ir_focused(
     let skip_set = state.get_skip_set(file_path);
     let mut compiled = compiler.compile_focused(
         source,
-        &path_alias,
+        path_alias,
         Some(&canonical_path),
         language,
         query_string,
@@ -402,7 +487,7 @@ pub(super) fn compile_file_ir_focused(
 
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.
-    compiled.version = prev_version.saturating_add(1);
+    compiled.version = previous_version.saturating_add(1);
 
     // A-08: Return source hash along with compiled IR and semantic edges
     Ok((compiled, semantic_edges, source_hash))
@@ -449,7 +534,6 @@ pub(crate) fn diff_code_context_handler(
             &source_hash[..12],
         ));
     }
-
     let current = build_snapshot(source, fidelity)?;
 
     let baseline = cache.get_baseline(&cache_key).cloned();

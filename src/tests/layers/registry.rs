@@ -1,11 +1,21 @@
 // src/tests/layers/registry.rs
 //
-// Tests for LayerRegistry::collect_semantic_edges() (semantic plan Phase 0).
+// Tests for text-oriented and compilation-context LayerRegistry dispatch.
 
 use crate::compression::Fidelity;
 use crate::layers::LayerRegistry;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 struct PathIndependentLayer;
+
+struct ApplicabilityCountingLayer {
+    calls: Arc<AtomicUsize>,
+}
+
+struct EvaluationCountingLayer {
+    calls: Arc<AtomicUsize>,
+}
 
 impl crate::layers::meta::MetaLayer for PathIndependentLayer {
     fn name(&self) -> &'static str {
@@ -36,6 +46,65 @@ impl crate::layers::meta::MetaLayer for PathIndependentLayer {
     }
 }
 
+impl crate::layers::meta::MetaLayer for ApplicabilityCountingLayer {
+    fn name(&self) -> &'static str {
+        "applicability_counting_test"
+    }
+
+    fn is_applicable(
+        &self,
+        _source: &str,
+        _path: &std::path::Path,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> bool {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        true
+    }
+
+    fn enrich(
+        &self,
+        _source: &str,
+        _class_captures: &[String],
+        _fidelity: Fidelity,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> Option<crate::layers::meta::MetaLayerOutput> {
+        None
+    }
+}
+
+impl crate::layers::meta::MetaLayer for EvaluationCountingLayer {
+    fn name(&self) -> &'static str {
+        "evaluation_counting_test"
+    }
+
+    fn is_applicable(
+        &self,
+        _source: &str,
+        _path: &std::path::Path,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> bool {
+        true
+    }
+
+    fn enrich(
+        &self,
+        _source: &str,
+        _class_captures: &[String],
+        _fidelity: Fidelity,
+        _config: Option<&crate::config::CleanCtxConfig>,
+    ) -> Option<crate::layers::meta::MetaLayerOutput> {
+        None
+    }
+
+    fn evaluate_context(
+        &self,
+        _context: &crate::layers::meta::MetaLayerContext<'_>,
+    ) -> crate::layers::meta::MetaLayerEvaluation {
+        self.calls.fetch_add(1, Ordering::Relaxed);
+        crate::layers::meta::MetaLayerEvaluation::default()
+    }
+}
+
 #[test]
 fn path_aware_hook_default_forwards_legacy_layer_behavior() {
     use crate::layers::meta::MetaLayer;
@@ -63,6 +132,68 @@ fn path_aware_hook_default_forwards_legacy_layer_behavior() {
             )
             .is_empty()
     );
+}
+
+#[test]
+fn combined_registry_evaluation_checks_applicability_once_per_layer() {
+    use crate::layers::meta::MetaLayerContext;
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = LayerRegistry {
+        languages: Vec::new(),
+        meta_layers: vec![Box::new(ApplicabilityCountingLayer {
+            calls: Arc::clone(&calls),
+        })],
+    };
+    let source = "source";
+    let path = std::path::Path::new("actual/path.ts");
+    let captures = Vec::new();
+    let paired_captures = Vec::new();
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    let context = MetaLayerContext::new(
+        source,
+        path,
+        &captures,
+        &paired_captures,
+        Fidelity::Low,
+        None,
+        &lexical_regions,
+    );
+
+    let _ = registry.evaluate_meta_layers_context(&context);
+
+    assert_eq!(calls.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn combined_registry_dispatch_invokes_one_layer_evaluation_hook() {
+    use crate::layers::meta::MetaLayerContext;
+
+    let calls = Arc::new(AtomicUsize::new(0));
+    let registry = LayerRegistry {
+        languages: Vec::new(),
+        meta_layers: vec![Box::new(EvaluationCountingLayer {
+            calls: Arc::clone(&calls),
+        })],
+    };
+    let source = "source";
+    let path = std::path::Path::new("actual/path.ts");
+    let captures = Vec::new();
+    let paired_captures = Vec::new();
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    let context = MetaLayerContext::new(
+        source,
+        path,
+        &captures,
+        &paired_captures,
+        Fidelity::Low,
+        None,
+        &lexical_regions,
+    );
+
+    let _ = registry.evaluate_meta_layers_context(&context);
+
+    assert_eq!(calls.load(Ordering::Relaxed), 1);
 }
 
 #[test]

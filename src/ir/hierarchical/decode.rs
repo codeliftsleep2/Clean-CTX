@@ -35,8 +35,12 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
         if !class.synthetic {
             instructions.push(CoreOp::DefClass(class.id.clone(), class.name.clone()));
 
-            // Class-level flags
-            if let Some(flags) = &class.class_flags {
+            for modifiers in &class.modifiers {
+                instructions.push(CoreOp::ClassModifiers(class.id.clone(), modifiers.clone()));
+            }
+
+            // Class-level flag occurrences
+            for flags in &class.class_flags {
                 instructions.push(CoreOp::ClassFlags(class.id.clone(), flags.clone()));
             }
 
@@ -50,9 +54,9 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 instructions.push(CoreOp::Implements(class.id.clone(), iid.clone()));
             }
 
-            // Injects
-            if !class.injects.is_empty() {
-                instructions.push(CoreOp::Injects(class.id.clone(), class.injects.clone()));
+            // Injection occurrences
+            for dependencies in &class.injects {
+                instructions.push(CoreOp::Injects(class.id.clone(), dependencies.clone()));
             }
         }
 
@@ -93,8 +97,23 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 instructions.push(CoreOp::Return(method.id.clone(), rt.clone()));
             }
 
-            // Method flags
-            if let Some(flags) = &method.flags {
+            for modifiers in &method.modifiers {
+                instructions.push(CoreOp::MethodModifiers(
+                    method.id.clone(),
+                    modifiers.clone(),
+                ));
+            }
+
+            for summaries in &method.control_summaries {
+                instructions.push(CoreOp::ControlSummary(method.id.clone(), summaries.clone()));
+            }
+
+            for facts in &method.pattern_facts {
+                instructions.push(CoreOp::PatternFacts(method.id.clone(), facts.clone()));
+            }
+
+            // Unknown legacy method metadata retained for compatibility.
+            for flags in &method.flags {
                 instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
             }
 
@@ -130,14 +149,14 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
                 }
             }
 
-            // Side-effect annotation
-            if let Some(se) = &method.side_effect {
-                instructions.push(CoreOp::SideEffect(method.id.clone(), se.clone()));
+            // Side-effect annotations
+            for se in &method.side_effect {
+                instructions.push(CoreOp::SideEffect(method.id.clone(), *se));
             }
 
-            // Execution context annotation
-            if let Some(ec) = &method.execution_context {
-                instructions.push(CoreOp::ExecutionContext(method.id.clone(), ec.clone()));
+            // Execution context annotations
+            for ec in &method.execution_context {
+                instructions.push(CoreOp::ExecutionContext(method.id.clone(), *ec));
             }
 
             // Method-level patterns (args stored as-is)
@@ -151,6 +170,43 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
             for pat in &class.patterns {
                 instructions.push(CoreOp::Pattern(pat.name.clone(), pat.args.clone()));
             }
+        }
+    }
+
+    for interface in &hir.interfaces {
+        instructions.push(CoreOp::DefInterface(
+            interface.id.clone(),
+            interface.name.clone(),
+        ));
+        for modifiers in &interface.modifiers {
+            instructions.push(CoreOp::InterfaceModifiers(
+                interface.id.clone(),
+                modifiers.clone(),
+            ));
+        }
+        for parent in &interface.extends {
+            instructions.push(CoreOp::InterfaceExtends(
+                interface.id.clone(),
+                parent.clone(),
+            ));
+        }
+        for field in &interface.fields {
+            instructions.push(CoreOp::DefInterfaceField(
+                interface.id.clone(),
+                field.id.clone(),
+                field.name.clone(),
+            ));
+            if let Some(field_type) = &field.field_type {
+                instructions.push(CoreOp::FieldType(field.id.clone(), field_type.clone()));
+            }
+        }
+        for method in &interface.methods {
+            instructions.push(CoreOp::DefInterfaceMethod(
+                interface.id.clone(),
+                method.id.clone(),
+                method.name.clone(),
+            ));
+            emit_method_facts(&mut instructions, method);
         }
     }
 
@@ -185,4 +241,70 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
     }
 
     instructions
+}
+
+fn emit_method_facts(instructions: &mut Vec<CoreOp>, method: &MethodNode) {
+    for param in &method.params {
+        if param.len() >= 3 {
+            instructions.push(CoreOp::Param(
+                method.id.clone(),
+                param[0].clone(),
+                param[1].clone(),
+                param[2].clone(),
+            ));
+        }
+    }
+    if let Some(return_type) = &method.return_type {
+        instructions.push(CoreOp::Return(method.id.clone(), return_type.clone()));
+    }
+    for modifiers in &method.modifiers {
+        instructions.push(CoreOp::MethodModifiers(
+            method.id.clone(),
+            modifiers.clone(),
+        ));
+    }
+    for summaries in &method.control_summaries {
+        instructions.push(CoreOp::ControlSummary(method.id.clone(), summaries.clone()));
+    }
+    for facts in &method.pattern_facts {
+        instructions.push(CoreOp::PatternFacts(method.id.clone(), facts.clone()));
+    }
+    for flags in &method.flags {
+        instructions.push(CoreOp::Flags(method.id.clone(), flags.clone()));
+    }
+    if let Some(body) = &method.body {
+        instructions.push(CoreOp::Body(
+            method.id.clone(),
+            body.clone(),
+            method.body_start,
+            method.body_end,
+        ));
+    }
+    for control in &method.control_flow {
+        if control.len() >= 2 {
+            instructions.push(CoreOp::ControlFlow(
+                method.id.clone(),
+                control[0].clone(),
+                control[1].clone(),
+            ));
+        }
+    }
+    for flow in &method.data_flow {
+        if flow.len() >= 2 {
+            instructions.push(CoreOp::DataFlow(
+                method.id.clone(),
+                flow[0].clone(),
+                flow[1].clone(),
+            ));
+        }
+    }
+    for effect in &method.side_effect {
+        instructions.push(CoreOp::SideEffect(method.id.clone(), *effect));
+    }
+    for context in &method.execution_context {
+        instructions.push(CoreOp::ExecutionContext(method.id.clone(), *context));
+    }
+    for pattern in &method.patterns {
+        instructions.push(CoreOp::Pattern(pattern.name.clone(), pattern.args.clone()));
+    }
 }

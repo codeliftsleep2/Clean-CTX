@@ -1,8 +1,10 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.6.0
-> **Last updated:** 2026-08-31 (0.5.2–0.6.0: semantic edge model, WorkspaceIndex, legacy graph removal, token-economics gate)
+> **Version:** 0.8.0-rc
+> **Last updated:** 2026-09-27 (SCHEMA-vNext, workspace-query boundaries,
+> fidelity-aware semantic projections, dependency-cycle witnesses, and CBM
+> trace identity resolution)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -10,82 +12,43 @@
 
 ## System Architecture
 
+```text
+MCP stdio tools / prompts
+        │
+        ├── provide_code_context ── heuristics + explicit request contract
+        ├── delta/apply/restore  ── explicit state-transition lifecycle
+        └── workspace_query      ── scoped semantic graph reads
+        │
+        ▼
+Trusted source + tree-sitter parsers
+(TypeScript, C#, Rust, Java; feature-gated)
+        │
+        ▼
+Canonical compiler IR (`CompiledIR` / `CoreOp`)
+        │
+        ├── language + framework passes
+        │     Angular/RxJS/NgRx │ .NET │ Spring Boot
+        │
+        ├── checked hierarchy ── fidelity ── SCHEMA-vNext
+        │                                  or explicit economic raw fallback
+        │
+        ├── semantic edges + provenance ── WorkspaceIndex
+        │                                  identity, scope, traversal, witnesses
+        │
+        ├── physical `0x04` + `dv:2` ── BufferedStore / SqliteStore
+        │                               transactional replay + semantic snapshot
+        │
+        └── explicit delta_code_context / apply_delta acknowledgement
+
+Supporting boundaries:
+PathDictionary + source cache │ configured tokenizer economics │ CBM advisory
+candidate discovery and graph tools │ dispatcher + response writer
 ```
-┌─────────────────────────────────────────────────────────┐
-│  MCP stdio Interface (JSON-RPC 2.0)                     │
-│                                                         │
-│  ┌──────────────────────┐  ┌──────────────────────────┐ │
-│  │ Zero-Touch Workflow  │  │ Heuristics Engine        │ │
-│  │ provide_code_context │  │  fidelity + strategy     │ │
-│  │  restore_context     │  │  selection per file      │ │
-│  │  context_history     │  └──────────┬───────────────┘ │
-│  │  context_stats       │             │                 │
-│  └──────────┬───────────┘             │                 │
-│             │                         │                 │
-│  ┌──────────▼─────────────────────────▼──────────────┐  │
-│  │              Compressor Engine                    │  │
-│  │  AST Extraction → Fidelity Filter → Opcode Encode │  │
-│  │  + Text Delta Snapshots + IR Source Cache         │  │
-│  └──────────┬────────────────────────────────────────┘  │
-│             │                                           │
-│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ SymbolDictionary      │  │ Decompressor           │  │
-│  │ PathDictionary        │  │ Opcode → Readable      │  │
-│  └──────────┬────────────┘  └────────────────────────┘  │
-│             │                                           │
-│  ┌──────────▼────────────┐  ┌────────────────────────┐  │
-│  │ Tree-sitter AST       │  │ LocalStateCache        │  │
-│  │ Parser (TS + C#)      │  │ Hash + baseline snaps  │  │
-│  └───────────────────────┘  └────────────────────────┘  │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ TokenAnalytics (cl100k tiktoken estimator)       │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ IR Subsystem (Compiler IR + Delta Transport)     │   │
-│  │  compile → wire → string_table → delta → replay  │   │
-│  │  exec_semantics → program_graph → inference →    │   │
-│  │  validation → query                              │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ ContextStore (ContextStore trait)                │   │
-│  │InMemoryContextStore | BufferedStore → SqliteStore│   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ Angular Meta-Layer (Φ markers + semantic edges)  │   │
-│  │   detect → decorators → markers → bundler →      │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ SpringBoot Meta-Layer (Φ markers +semantic edges)│   │
-│  │   detect → annotations → markers →               │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ .NET Meta-Layer (Φ markers + semantic edges)     │   │
-│  │   detect → attributes → markers →                │   │
-│  │   extract_semantic_edges() → InferenceLayer      │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  All meta-layers dispatched via LayerRegistry:          │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ LayerRegistry (singleton)                        │   │
-│  │   MetaLayer::is_applicable() → detect framework  │   │
-│  │   MetaLayer::enrich(source, class_captures, ...) │   │
-│  │     → class_captures derived per C-22 from       │   │
-│  │       PassContext.captures, NOT DefClass.name    │   │
-│  └──────────────────────────────────────────────────┘   │
-│                                                         │
-│  ┌──────────────────────────────────────────────────┐   │
-│  │ MCP Prompts (cleanctx-notation + dashboard)      │   │
-│  └──────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────┘
-```
+
+The canonical IR is the fan-out boundary. SCHEMA-vNext is a model-facing
+file-local projection, `WorkspaceIndex` owns cross-file semantic facts, and the
+binary/delta forms are code-side persistence and transport. None is a lossy
+replacement for another.
 
 ### A-09: Production-Grade Multi-Threaded Request Dispatch
 
@@ -101,35 +64,30 @@ stdin reader thread           Dispatcher thread pool (N workers)
 └──────────────────┘           └───────────────────────────────────┘
                                                │
                                    ┌───────────▼─────────────┐
-                                   │     RwLock<McpState>    │  
-                                   │     Parallel reads,     │  
-                                   │     Serial writes       │ 
+                                   │     Arc<McpState>       │
+                                   │ interior Mutex/RwLock   │
+                                   │ at owned state boundaries│
                                    └────────────┬────────────┘
                                                 │
-                                   ┌────────────▼────────┐
-                                   │  Stdout writer      │ 
-                                   │  Dedicated thread,  │
-                                   │ no interleaving     │  
-                                   └─────────────────────┘
+                                   protocol::send_response()
+                                   serializes stdout via mutex
 ```
 
 **How it works:**
 
 1. **Stdin reader thread** — reads one JSON-RPC line at a time, parses it, and enqueues via `dispatcher.spawn()`. Never waits for completion.
-2. **Worker threads** — bounded crossbeam_channel queue with configurable depth (default: 1000). Workers acquire `RwLock` write access for compression, read access for stats/queries.
-3. **Panic recovery** — `catch_unwind` wraps every handler. Poisoned RwLock locks are reclaimed via `poisoned.into_inner()`.
-4. **Dedicated stdout writer** — a separate thread serializes JSON responses, preventing interleaving.
+2. **Worker threads** — per-worker bounded channels (default depth: 1000) receive requests round-robin. Workers share `Arc<McpState>`; state owners provide their own interior synchronization, so there is no outer lock serializing every request.
+3. **Panic recovery** — `catch_unwind` wraps every handler; dispatcher-owned poisoned locks are recovered explicitly.
+4. **Response serialization** — `protocol::send_response()` protects stdout with its own global mutex; there is no dedicated writer thread.
 
-**Configuration:**
-```json
-{
-  "dispatcher": { "worker_count": 8, "max_queue_depth": 2000 }
-}
-```
+`DispatcherConfig` is currently an internal construction API used by the
+server/tests, not a `.clean-ctx.json` field. Production uses its defaults:
+auto-detected worker count, per-worker queue depth 1000, one-second send
+timeout, five-second slow-request threshold, and 1000 retained traces.
 
 **Why this matters:** Before A-09, a slow CBM query or large file compression blocked ALL subsequent requests. The dispatcher also includes request tracing with IDs, timestamps, slow-request logging (5s threshold), and graceful shutdown with configurable timeout.
 
-**See:** `src/mcp/dispatcher.rs` (312 lines, 6+ unit tests)
+**See:** `src/mcp/dispatcher.rs` and `src/tests/mcp/dispatcher*.rs`.
 
 ---
 
@@ -166,7 +124,10 @@ stdin reader thread           Dispatcher thread pool (N workers)
 └─────────────────────────┘
 ```
 
-The **IR Subsystem** provides an alternative transport path. Instead of sending compressed text, the source is compiled to an instruction-level Intermediate Representation (IR), and deltas are computed between successive IR states. This enables:
+The **IR Subsystem** provides canonical structured state plus an explicit
+code-side transport path. Source is compiled to an instruction-level
+Intermediate Representation (IR); `delta_code_context` computes transitions
+between acknowledged states and `apply_delta` installs them. This enables:
 
 - **Named format**: JSON arrays with opcode strings (human-readable IR)
 - **String table format**: Integer-indexed arrays for ~30% additional savings
@@ -176,25 +137,24 @@ The **IR Subsystem** provides an alternative transport path. Instead of sending 
 
 ## Zero-Touch Workflow
 
-The zero-touch workflow is the **recommended entry point** for any file-related coding task. It orchestrates all subsystems automatically:
+The zero-touch workflow is the **recommended model-facing entry point** for
+file-related coding tasks. It selects a presentation but always returns a
+complete current representation:
 
 ```
      provide_code_context(file)
           │
           ▼
 ┌─────────────────────┐
-│   Heuristics Engine │  Decide fidelity + strategy based on:
+│   Heuristics Engine │  Decide fidelity + classification based on:
 │   (heuristics.rs)   │  - file characteristics (size, language)
 └─────────┬───────────┘  - explicit intent ("edit", "debug", etc.)
-          │              - existing baselines (text delta, IR delta)
+          │              - persisted/session fidelity evidence
           ▼              - Angular detection
 ┌─────────────────────┐
-│ Strategy Dispatch   │
-│                     │
-│  FullCompress ──────┤──→ Full compression + IR compilation
-│                     │    + persistence save
-│  DeltaTransport ────┤──→ Delta computation (text + IR)
-│                     │    + persistence save + delta append
+│ Complete Provider   │──→ Full SCHEMA-vNext presentation
+│                     │    or economics-selected raw source
+│                     │    + canonical IR publication/persistence
 └─────────┬───────────┘
           │
           ▼
@@ -214,8 +174,9 @@ The zero-touch workflow is the **recommended entry point** for any file-related 
 
 | Tool | Purpose |
 |------|---------|
-| `provide_code_context` | **Single entry point** — auto-detects, selects fidelity, uses delta transport on subsequent calls |
-| `restore_context` | Force full re-compression, clearing all baselines and DB entries |
+| `provide_code_context` | **Model-facing entry point** — auto-detects, selects fidelity, and returns complete current context |
+| `delta_code_context` / `apply_delta` | Explicit code-side IR transition generation and acknowledgement |
+| `restore_context` | Transactionally restore persisted canonical IR, delta history, and semantic-edge ownership without source recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
@@ -235,11 +196,13 @@ The persistence layer provides **cross-session persistence** for compression con
           │
           ▼
 ┌─────────────────────┐
-│ SqliteStore         │  Non-fatal persistence (fire-and-forget)
+│ SqliteStore         │  File-scoped transactional semantic persistence
 │ (sqlite_store.rs)   │
 │                     │
-│  contexts table     │  Baseline IR BLOB + compressed text
-│  deltas table       │  Sequential delta payloads
+│  contexts table     │  Physical 0x04 baseline + source identity
+│  deltas table       │  Checked dv:2 sequence history
+│  semantic snapshots │  Complete aligned semantic-edge ownership
+│  edit intents       │  Crash-recoverable byte-exact edit staging
 │  symbols table      │  Symbol table entries
 │  sessions table     │  Workspace session tracking
 └─────────┬───────────┘
@@ -253,20 +216,24 @@ The persistence layer provides **cross-session persistence** for compression con
 
 ### Design Decisions
 
-- **Non-fatal persistence**: All DB writes are fire-and-forget with `eprintln!` warnings — compression never fails due to DB issues.
+- **Durable publication boundary**: persistence-enabled semantic operations commit the requested file's canonical IR and complete edge snapshot before publishing live state; failure is structural and mutation-free.
+- **File-scoped authority**: reads never flush pending work, and one file's save, restore, replay, delta, edit, or deletion cannot commit another file's lifecycle state.
+- **Shared edit recovery**: pending byte-exact edit intents resolve before any durable semantic load, compilation, checkpoint, or index hydration becomes authoritative.
 - **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
 - **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
 - **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
-- **`binary_wire::encode/decode`**: IR is serialized/deserialized as BLOBs; `file_id` and `version` are restored from DB columns on load.
+- **Physical `0x04` authority**: canonical identity, version, operations, order, duplicates, bodies, and spans round-trip in the BLOB itself; DB metadata must agree rather than repair it.
 
 ### Tools
 
 | Tool | Purpose |
 |------|---------|
 | `save_context` | Explicit manual checkpoint to DB |
+| `delete_context` | Transactionally remove one file's durable and session semantic context without modifying source |
 | `list_sessions` | Show tracked sessions/files |
 | `replay_history` | Replay deltas from DB up to target sequence |
 | `purge_old_deltas` | Trim old delta history by age |
+| `inspect_legacy_fallbacks` | Read-only report over quarantined incomplete legacy artifacts; never imports or mutates them |
 
 ---
 
@@ -408,6 +375,12 @@ Clean-CTX offers two delta transport mechanisms — text-level and IR-level. Bot
 
 ### How Delta Saves Resources (Not LLM Tokens)
 
+> **Historical measurement note:** the numeric comparisons in this subsection
+> predate the current `dv:2` lifecycle and SCHEMA-vNext renderer. The durable
+> architectural point is that delta is explicit code-side transport, not
+> automatically substituted model context. Current economics are measured by
+> the verification package linked from `docs/PERFORMANCE.md`.
+
 | What delta **does** save | What delta does **not** save |
 |--------------------------|------------------------------|
 | ✅ CPU cycles — avoids re-parsing and re-compressing the full source file | ❌ LLM prompt tokens — the LLM receives the same compressed output either way |
@@ -539,12 +512,15 @@ SQLite provides:
 - **Schema versioning** — forward-compatible migrations via `_schema_version` table
 - **Portability** — single file can be backed up or moved
 
-### Why non-fatal persistence?
+### Why transactional semantic persistence?
 
-All DB writes are fire-and-forget with `eprintln!` warnings. This ensures:
-- Compression **never fails** due to DB issues (disk full, permissions, etc.)
-- The MCP server remains **always available** even if persistence is misconfigured
-- Users can **opt-in** to persistence without breaking existing workflows
+Canonical IR, source identity, semantic version, fidelity, and complete
+framework/meta semantic edges describe one program state. Persistence-enabled
+operations therefore commit that state atomically before live publication.
+SQLite failure returns a structured operation failure; it never produces a
+successful response backed by split live/durable authority. Read-only tools
+remain available and observational, and persistence can still be disabled for
+explicitly session-only operation.
 
 ### Why string-based Meta-Layer extraction?
 
@@ -833,6 +809,14 @@ emitted through the existing meta-layer pipeline.
 ---
 
 ## Measured Compression Performance
+
+> **Historical baseline:** the tables below describe the retired presentation
+> measured in June 2026. They remain useful comparative evidence but are not
+> current SCHEMA-vNext claims. Current reproducible token records live under
+> `verification/context-compression/schema-v5/`; see
+> `docs/architecture/SCHEMA_VNEXT_PROPOSAL.md` for the shipped production
+> contract and measurement interpretation (the historical filename is retained
+> for link stability).
 
 All numbers below were produced by the `compress_code_context` tool on the in-repo TypeScript fixtures, using the **cl100k BPE** estimator (`tiktoken-rs`). "Raw tokens" is the encoded length of the source file as-is; "Retained tokens" is the encoded length of the compressed output (including the report header, the `§PATHMAP` footer, and all behavior markers).
 

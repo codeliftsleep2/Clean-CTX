@@ -274,35 +274,28 @@ pub fn render_cache_json(metrics: &CacheMetrics, enabled: bool) -> serde_json::V
 }
 
 /// Generate the response-vocabulary text for the `clean-ctx-vocabulary`
-/// prompt resource. Phase A retirement (2026-08-25): teaches ONLY the
-/// current SCHEMA v2 notation plus the live α / Φ systems — the retired
-/// `$`-primitive / `⊕`-marker / `§`-micro-code tables are gone.
+/// prompt resource. Teaches the portable SCHEMA-vNext presentation contract.
 ///
 /// This function is used by the `prompts/get` MCP handler.
 pub fn generate_vocabulary_text() -> String {
     let lines = vec![
-        "Clean-CTX Response Vocabulary (SCHEMA v2)",
+        "Clean-CTX Response Vocabulary (SCHEMA vNext)",
         "==========================================",
         "",
-        "// SCHEMA v2  @=meta X=extends I=implements F=field M=method $=import →=scope fl:=flags cl:=class-flags P=pattern T=type-alias",
-        "// ── Name ──   opens a class scope",
-        "X Parent      extends          I Iface…   implements",
-        "F name:type   field            M name(+N) method (+N = overload param count)",
-        "→ p:name:type … / → ret       parameters / return type",
-        "fl: IF LOOP RET THROW ASYNC GEN EXPORT STATIC PRIVATE PROTECTED ABSTRACT UNSAFE",
-        "$ alias module [names]        import",
-        "T alias = Type                type alias",
-        "P NAME [args]                 structural pattern (CTOR, OBSERVABLE, GETTER, SETTER…)",
+        "// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias",
+        "C ClassName opens a class; Q Name opens an interface",
+        "X: extends   I: implements   F: field",
+        "M: method; visible parameter signatures distinguish overloads",
+        "$: import   T: type alias   P: pattern",
+        "p:name:type params, → return, then mod:/ctl:/pf:/fl:/cf:/df:/se:/ec:",
+        "workspace_query: forward/reverse/multi-hop/framework graph facts and provenance",
         "",
-        "High fidelity adds:  cf: control-flow · df: reads/writes · se: side effect · ec: context",
-        "Edit fidelity appends VERBATIM source bodies (byte-exact)",
+        "Member order, duplicates, and overload groups preserve source order.",
+        "Edit appends byte-exact bodies; focusMethods resolve typed ownership before filtering.",
+        "Delta content is the summary `Δ delta for …: +N ~N -N ops`; ops ride in result.delta.",
+        "When the presentation is not safely cheaper under local counting, content is raw source.",
         "",
         "α/β/γ   path aliases — see §PATHMAP footer",
-        "Φcmp/Φdir/Φpipe/Φsvc/Φmod/Φin/Φout …  Angular meta-layer markers (current)",
-        "Φctrl/Φef/Φhub/Φmap …  .NET meta-layer markers (current)",
-        "",
-        "Note: compress_workspace manifests emit a legacy compressed-text",
-        "format — decode via decompress_code_context.",
     ];
     lines.join("\n")
 }

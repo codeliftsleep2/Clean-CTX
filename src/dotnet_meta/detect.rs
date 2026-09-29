@@ -158,6 +158,9 @@ const CS_BASE_CLASS_QUERY: &str = r#"
 /// Plain C# files (utility classes, POCOs, enums, etc.) return `false`
 /// — they should not get any Φ markers.
 pub fn is_dotnet_file(source: &str) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
     // A-11: Try AST-based detection first (eliminates false positives
     // from comments and string literals).
     if ast_based_dotnet_detect(source) {
@@ -169,6 +172,34 @@ pub fn is_dotnet_file(source: &str) -> bool {
     string_based_dotnet_detect(source)
 }
 
+/// Detect .NET framework evidence without reparsing a source file that is
+/// already inside the compilation pipeline.
+pub(crate) fn is_dotnet_file_with_regions(
+    source: &str,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> bool {
+    #[cfg(test)]
+    super::detect_metrics::record_detection();
+
+    // Preserve the established fallback contract exactly, including signals
+    // that do not correspond to an attribute or base-class AST node.
+    if string_based_dotnet_detect(source) {
+        return true;
+    }
+
+    // The AST detector additionally recognizes parameterless attributes such
+    // as `[HttpGet]`; the fallback table contains only their argument forms.
+    STRONG_C_SHARP_ATTRIBUTES.iter().any(|attribute| {
+        [format!("[{attribute}]"), format!("[{attribute}(")]
+            .iter()
+            .any(|signal| {
+                source
+                    .match_indices(signal)
+                    .any(|(position, _)| !lexical_regions.contains(position))
+            })
+    })
+}
+
 /// AST-based .NET detection using tree-sitter.
 /// Parses the source as C# and queries for attribute and base class nodes.
 /// Only actual AST nodes are considered — comments and string literals
@@ -178,6 +209,9 @@ fn ast_based_dotnet_detect(source: &str) -> bool {
     if !source.contains('[') && !source.contains(": ") {
         return false;
     }
+
+    #[cfg(test)]
+    super::detect_metrics::record_ast_parse();
 
     let mut parser = Parser::new();
     let language = match safe_csharp_language() {

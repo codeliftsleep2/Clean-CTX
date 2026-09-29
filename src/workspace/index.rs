@@ -44,11 +44,14 @@
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
 
+mod coverage;
 mod edges;
 mod remove;
 mod traversal;
 
 use super::scope::WorkspaceScope;
+use coverage::SemanticCoverage;
+pub use coverage::SemanticFidelity;
 use edges::{EdgeKey, StoredEdge};
 
 // ── Key types ─────────────────────────────────────────────────────────
@@ -208,6 +211,10 @@ pub struct WorkspaceIndex {
     /// Entity name → entity keys (for name-based lookup across domains/types).
     /// Populated alongside the entities map during registration.
     name_index: HashMap<String, Vec<EntityKey>>,
+    /// File-local semantic projection authority. This is deliberately owned
+    /// beside the occurrences it qualifies so removal and replacement cannot
+    /// leave an independent fidelity/freshness map behind.
+    semantic_coverage: HashMap<String, SemanticCoverage>,
     /// Total edge count before dedup (for diagnostic purposes).
     total_edges_inserted: usize,
     /// Active edge count after dedup.
@@ -227,6 +234,7 @@ impl WorkspaceIndex {
             file_map: HashMap::new(),
             file_edges: HashMap::new(),
             name_index: HashMap::new(),
+            semantic_coverage: HashMap::new(),
             total_edges_inserted: 0,
             edge_count: 0,
             #[cfg(test)]
@@ -558,6 +566,10 @@ mod query_tests;
 #[cfg(test)]
 #[path = "../tests/workspace/index_graph.rs"]
 mod graph_tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_cycle_policy.rs"]
+mod cycle_policy_tests;
 
 #[cfg(test)]
 #[path = "../tests/workspace/index_edge_occurrence.rs"]

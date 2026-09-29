@@ -16,7 +16,14 @@
 
 pub const TS_QUERY: &str = r#"
     ; --- TypeScript/JavaScript structural captures ---
+    ; Export ownership is represented by the export_statement wrapper while
+    ; the declaration capture remains the canonical declaration node. The IR
+    ; producer joins these captures by the child's exact source span.
+    (export_statement (class_declaration) @export.class)
+    (export_statement (abstract_class_declaration) @export.class)
+    (export_statement (interface_declaration) @export.interface)
     (class_declaration) @class.root
+    (abstract_class_declaration) @class.root
     (method_definition) @method.root
     (function_declaration) @func.root
     (property_signature) @field.root
@@ -349,8 +356,34 @@ pub const RS_QUERY: &str = r#"
     (macro_invocation) @macro.root
 "#;
 
+// Generic invocation captures (native call facts) for Rust.
+//
+// Rust represents both free-function calls and method calls as
+// `call_expression`; a method call's function is a `field_expression`, whose
+// final `field_identifier` is the written callee name. Each named child of the
+// `arguments` node is one explicitly written argument. Macro invocations are a
+// different node type and deliberately remain outside this contract.
+pub const RS_CALL_QUERY: &str = r#"
+    ; --- Generic invocation captures (native call facts) ---
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments))
+    (call_expression
+        function: (identifier) @call.callee
+        arguments: (arguments (_) @call.argument))
+    (call_expression
+        function: (field_expression
+            field: (field_identifier) @call.callee)
+        arguments: (arguments))
+    (call_expression
+        function: (field_expression
+            field: (field_identifier) @call.callee)
+        arguments: (arguments (_) @call.argument))
+"#;
+
 // Java AST node types: class_declaration, interface_declaration,
 //   method_declaration, constructor_declaration, field_declaration,
+//   constant_declaration,
 //   enum_declaration, record_declaration, import_declaration,
 //   package_declaration, if_statement, for_statement, while_statement,
 //   do_statement, return_statement, throw_statement, try_statement,
@@ -364,6 +397,7 @@ pub const JAVA_QUERY: &str = r#"
     (method_declaration) @method.root
     (constructor_declaration) @constructor.root
     (field_declaration) @field.root
+    (constant_declaration) @field.root
     ; Import and package
     (import_declaration) @import.root
     (package_declaration) @package.root

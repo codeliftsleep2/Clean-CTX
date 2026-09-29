@@ -304,28 +304,28 @@ fn test_cache_dashboard_json() {
     );
 }
 
-/// Verify that generate_vocabulary_text serves ONLY current vocabulary:
-/// SCHEMA v2 response symbols plus the live α / Φ systems — never the
-/// retired `$`-opcode / `⊕`-marker tables (Phase A retirement).
+/// Verify that generated vocabulary teaches the current SCHEMA-vNext presentation.
 #[test]
 fn test_generate_vocabulary_text() {
     let text = generate_vocabulary_text();
     assert!(
-        text.contains("SCHEMA v2"),
-        "vocabulary prompt must teach the SCHEMA v2 legend"
+        text.contains("SCHEMA vNext"),
+        "vocabulary prompt must teach SCHEMA vNext"
     );
-    assert!(text.contains("Φcmp"), "Φ Angular markers remain current");
+    assert!(text.contains("M: method"));
+    assert!(text.contains("workspace_query:"));
     assert!(text.contains("α"), "path aliases remain current");
-    assert!(
-        text.contains("fl:") || text.contains("fl:"),
-        "behavior-flag key should be documented"
-    );
     for banned in [
         "$c   → class",
         "⊕guard",
         "⊕Input",
         "Opcode/Marker Vocabulary",
         "compress_code_context and provide_code_context tools",
+        "COMPACT-A A2",
+        "FILE-CONTEXT-DELTA v1",
+        "g.K:",
+        "d.c/d.i",
+        "name(+N)",
     ] {
         assert!(
             !text.contains(banned),

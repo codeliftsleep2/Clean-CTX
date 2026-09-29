@@ -4,7 +4,7 @@ resolver = "2"
 
 [package]
 name = "clean-ctx"
-version = "0.7.0"
+version = "0.8.0-rc"
 edition = "2024"
 rust-version = "1.85"
 license = "CC0-1.0"
@@ -40,6 +40,36 @@ path = "src/lib.rs"
 [[bin]]
 name = "clean-ctx"
 path = "src/main.rs"
+
+# Fast local development profile: retain source locations for panic
+# backtraces without paying the compile/link/PDB cost of full debugger data.
+# Use `--profile debugging` when an interactive debugger needs complete
+# variables and type information.
+[profile.dev]
+debug = "line-tables-only"
+
+# Dependencies rarely need debugger metadata during Clean-CTX development.
+# Build dependencies and proc macros are already unoptimized by Cargo's fast
+# defaults; this override removes their remaining runtime dependency debuginfo.
+[profile.dev.package."*"]
+debug = false
+
+# Cargo's test profile is separate from `dev`; mirror the fast metadata policy
+# so changes to the monolithic all-features test crate do not regenerate full
+# dependency PDBs. Incremental compilation remains explicit for local tests.
+[profile.test]
+debug = "line-tables-only"
+incremental = true
+
+[profile.test.package."*"]
+debug = false
+
+[profile.debugging]
+inherits = "dev"
+debug = "full"
+
+[profile.debugging.package."*"]
+debug = "full"
 
 [profile.release]
 strip = true
@@ -111,8 +141,8 @@ ctor = "0.2"
 
 # Ctrl+C handler for the `clean-ctx proxy` standalone subcommand
 ctrlc = "3.4"
+tempfile = "3.27.0"
 
 [dev-dependencies]
-tempfile = "3.27.0"
 serial_test = "3.2"
 proptest = "1.6"

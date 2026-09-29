@@ -1,5 +1,10 @@
 # Auto-Start Proxy on Clean-CTX Startup — Implementation Plan
 
+**Status:** Implemented historical design record. Current configuration and
+lifecycle behavior are documented in [`docs/CONFIGURATION.md`](../CONFIGURATION.md)
+and [`docs/PROXY.md`](../PROXY.md); the design below records the path taken and
+must not override those living references.
+
 ## Goal
 Add a configurable option to `.clean-ctx.json` that automatically starts the `clean-ctx-proxy` binary as a child process when the `clean-ctx` MCP server starts, and gracefully shuts it down when the MCP server exits.
 

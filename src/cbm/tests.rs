@@ -17,11 +17,22 @@ mod e2e;
 #[path = "../tests/cbm/graph_intel.rs"]
 mod graph_intel;
 
+// Canonical project ownership for memory/disk graph-query cache entries and
+// target-project invalidation across active/non-active project boundaries.
+#[path = "../tests/cbm/cache_ownership.rs"]
+mod cache_ownership;
+
 // CBM 0.8.1 trace_path wire contract (typed graph_trace parsing +
 // direction determination), pinned by verbatim live captures and
 // fresh-process probes over a synthetic fixture repo.
 #[path = "../tests/cbm/trace_wire.rs"]
 mod trace_wire;
+
+// Duplicate bare-name trace resolution contract shared by the structured
+// wrapper and the preferred proxy path.
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/cbm/trace_identity_resolution.rs"]
+mod trace_identity_resolution;
 // CBM handler MCP contract tests (structuredContent, outputSchema conformance).
 // Gated behind `feature = "rust"` because these tests share the global
 // protocol::CAPTURED_RESPONSES sink with the Phase A/B retirement suites
@@ -31,6 +42,14 @@ mod trace_wire;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/cbm/handlers.rs"]
 mod handlers;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/cbm/handler_unavailable.rs"]
+mod handler_unavailable;
+
+// Raw-proxy failures must remain failures rather than compressed partial data.
+#[path = "../tests/cbm/proxy_errors.rs"]
+mod proxy_errors;
 
 // CBM 0.8.1 query_graph wire contract (typed graph_query edge extraction,
 // strict positional [from, type, to] convention), pinned by verbatim live

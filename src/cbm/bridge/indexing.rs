@@ -157,8 +157,9 @@ impl GraphBridge {
             }
         }
 
-        // Invalidate in-memory graph cache so pre-edit entries are not served.
-        self.invalidate_cache();
+        // Invalidate only this project's graph cache so pre-edit entries are
+        // not served and unrelated projects retain their reusable results.
+        self.invalidate_project_cache(&project);
 
         eprintln!("[clean-ctx-cbm] Lazy reindex complete for: {project}");
         Ok(())
@@ -170,11 +171,9 @@ impl GraphBridge {
     /// matching prefix when roots are nested) and invokes CBM's native
     /// `index_repository` tool synchronously.
     ///
-    /// **Does not change the active project** — the bridge's `project_root`,
-    /// `project`, and `cache` (project-scoped) are left as-is. Only the
-    /// in-memory result cache is invalidated after a successful index, so
-    /// subsequent queries fetch fresh data from CBM rather than returning
-    /// pre-edit cached entries.
+    /// **Does not change the active project** — the bridge's `project_root`
+    /// and `project` remain as-is. Only the resolved project's memory and disk
+    /// cache entries are invalidated after a successful index.
     ///
     /// When `file_path` does not belong to any configured root, the active
     /// project is reindexed as a fallback.
@@ -205,9 +204,7 @@ impl GraphBridge {
         // Release the lock before cache invalidation (no borrow conflict).
         drop(cg);
 
-        // Invalidate the in-memory graph cache so pre-edit entries are
-        // not served to subsequent queries as if they were still current.
-        self.invalidate_cache();
+        self.invalidate_project_cache(&project);
 
         eprintln!("[clean-ctx-cbm] Reindex complete for: {project}");
         Ok(())
@@ -451,7 +448,7 @@ impl GraphBridge {
                         }
                     }
 
-                    self.invalidate_cache();
+                    self.invalidate_project_cache(project);
 
                     eprintln!("[clean-ctx-cbm] Lazy reindex complete for: {project}");
                 }

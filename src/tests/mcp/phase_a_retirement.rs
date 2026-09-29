@@ -66,10 +66,9 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
     let id = json!(77);
 
     let mk = |root: &str, p: &str| json!({ "arguments": { "filePath": p, "fidelity": "medium", "workspaceRoot": root } });
-    let cases: [(&str, serde_json::Value); 3] = [
+    let cases: [(&str, serde_json::Value); 2] = [
         ("compress_code_context", mk(&fx.root, &fx.path)),
         ("provide_code_context", mk(&fx.root, &fx.path)),
-        ("restore_context", mk(&fx.root, &fx.path)),
     ];
 
     for (tool, params) in cases {
@@ -96,6 +95,11 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
             message.contains("IR compilation unavailable"),
             "[{tool}] message must name ir_unavailable: {message}"
         );
+        assert!(
+            message.contains("SCHEMA-vNext structural output"),
+            "[{tool}] message must name the current presentation boundary: {message}"
+        );
+        assert!(!message.contains("CONTROL-FULL"), "[{tool}] {message}");
         assert!(
             message.contains(fx.path.as_str()),
             "[{tool}] message must identify the file: {message}"
@@ -124,16 +128,15 @@ fn phase_a_fallbacks_return_structured_ir_unavailable_not_legacy_text() {
 }
 
 #[test]
-fn phase_a_success_paths_still_render_schema_v2() {
+fn phase_a_success_paths_use_current_content_boundary() {
     let _serial = crate::protocol::handler_response_serial();
     let fx = phase_a_temp_fixture();
     let id = json!(78);
 
     let mk = |root: &str, p: &str| json!({ "arguments": { "filePath": p, "fidelity": "medium", "workspaceRoot": root } });
-    let cases: [(&str, serde_json::Value); 3] = [
+    let cases: [(&str, serde_json::Value); 2] = [
         ("compress_code_context", mk(&fx.root, &fx.path)),
         ("provide_code_context", mk(&fx.root, &fx.path)),
-        ("restore_context", mk(&fx.root, &fx.path)),
     ];
 
     for (tool, params) in cases {
@@ -152,30 +155,14 @@ fn phase_a_success_paths_still_render_schema_v2() {
             .pointer("/result/content/0/text")
             .and_then(|t| t.as_str())
             .unwrap_or_else(|| panic!("[{tool}] missing result.content[0].text: {resp}"));
-        // Token-economics gate may select raw_passthrough when the
-        // compressed representation costs more tokens than the raw
-        // source (tiny files at structural fidelities). Both outcomes
-        // are valid — SCHEMA v2 when compression is economical,
-        // raw_passthrough when it is not.
-        let content_kind = resp
-            .pointer("/result/_meta/content_kind")
-            .and_then(|k| k.as_str());
-        if content_kind == Some("raw_passthrough") {
-            // raw source returned verbatim — no SCHEMA v2 expected
-            assert!(
-                text.contains("class Greeter") || text.contains("export class"),
-                "[{tool}] raw_passthrough must contain the class definition: {text}"
-            );
-        } else {
-            assert!(
-                text.contains("// SCHEMA v2"),
-                "[{tool}] successful output must be SCHEMA v2"
-            );
-            assert!(
-                text.contains("Greeter"),
-                "[{tool}] successful output must contain the compiled class"
-            );
-        }
+        assert!(
+            text.starts_with("// SCHEMA vNext") || text == TS_FIXTURE,
+            "[{tool}] output must be SCHEMA-vNext or exact raw source"
+        );
+        assert!(
+            text.contains("Greeter"),
+            "[{tool}] successful output must contain the compiled class"
+        );
         assert!(
             !text.contains("Compacted Layout"),
             "[{tool}] successful output must never be legacy text"

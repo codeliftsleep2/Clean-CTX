@@ -17,13 +17,12 @@
 //   - .pipe() with map/filter → DataFlow("reads", "observable")
 //   - async keyword → SideEffect("async") + ExecutionContext("async")
 //   - new Observable() → DataFlow("writes", "observable")
-//   - @Injectable() → ExecutionContext("di_scope")
 
+use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{
-    CTRL_AWAIT, CTRL_TRY, CTX_ASYNC, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, EFFECT_ASYNC,
-    EFFECT_IO, FLAG_ABSTRACT, FLAG_ASYNC, FLAG_EXPORT, FLAG_GEN, FLAG_PRIVATE, FLAG_PROTECTED,
-    FLAG_STATIC,
+    CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
+    ExecutionContextKind, SideEffectKind,
 };
 
 /// TypeScript language layer (Layer 2).
@@ -38,6 +37,7 @@ impl TypeScriptLayer {
     /// Extract extends/implements from a class head string.
     /// Processes text like "class Foo extends Bar implements Baz, Qux"
     fn extract_class_relationships(class_head: &str) -> (Option<String>, Vec<String>) {
+        let class_head = declaration_head(class_head);
         let mut base: Option<String> = None;
         let mut interfaces: Vec<String> = Vec::new();
 
@@ -95,34 +95,36 @@ impl TypeScriptLayer {
     }
 
     /// Extract class-level flags (export, abstract) from class head.
-    fn extract_class_flags(class_head: &str) -> Vec<String> {
+    fn extract_class_modifiers(class_head: &str) -> Vec<DeclarationModifier> {
+        let head = declaration_head(class_head);
         let mut flags = Vec::new();
-        if class_head.contains("export ") || class_head.starts_with("export") {
-            flags.push(FLAG_EXPORT.to_string());
+        if has_modifier(head, "export") {
+            flags.push(DeclarationModifier::Export);
         }
-        if class_head.contains("abstract ") || class_head.starts_with("abstract") {
-            flags.push(FLAG_ABSTRACT.to_string());
+        if has_modifier(head, "abstract") {
+            flags.push(DeclarationModifier::Abstract);
         }
         flags
     }
 
     /// Extract method-level flags (async, generator, visibility) from method signature.
-    fn extract_method_flags(raw_sig: &str) -> Vec<String> {
+    fn extract_method_modifiers(raw_sig: &str) -> Vec<DeclarationModifier> {
+        let head = declaration_head(raw_sig);
         let mut flags = Vec::new();
-        if raw_sig.contains("async") {
-            flags.push(FLAG_ASYNC.to_string());
+        if has_modifier(head, "async") {
+            flags.push(DeclarationModifier::Async);
         }
-        if raw_sig.contains('*') && raw_sig.contains("function") {
-            flags.push(FLAG_GEN.to_string());
+        if head.contains('*') && has_modifier(head, "function") {
+            flags.push(DeclarationModifier::Generator);
         }
-        if raw_sig.contains("private") {
-            flags.push(FLAG_PRIVATE.to_string());
+        if has_modifier(head, "private") {
+            flags.push(DeclarationModifier::Private);
         }
-        if raw_sig.contains("protected") {
-            flags.push(FLAG_PROTECTED.to_string());
+        if has_modifier(head, "protected") {
+            flags.push(DeclarationModifier::Protected);
         }
-        if raw_sig.contains("static") {
-            flags.push(FLAG_STATIC.to_string());
+        if has_modifier(head, "static") {
+            flags.push(DeclarationModifier::Static);
         }
         flags
     }
@@ -135,11 +137,11 @@ impl TypeScriptLayer {
         if raw_sig.contains("async") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_ASYNC.to_string(),
+                SideEffectKind::Async,
             ));
             ops.push(CoreOp::ExecutionContext(
                 method_id.to_string(),
-                CTX_ASYNC.to_string(),
+                ExecutionContextKind::Async,
             ));
         }
 
@@ -156,7 +158,7 @@ impl TypeScriptLayer {
         if raw_sig.contains(".pipe(") && raw_sig.contains("tap(") {
             ops.push(CoreOp::SideEffect(
                 method_id.to_string(),
-                EFFECT_IO.to_string(),
+                SideEffectKind::Io,
             ));
         }
 
@@ -175,14 +177,6 @@ impl TypeScriptLayer {
                 method_id.to_string(),
                 DATAFLOW_WRITE.to_string(),
                 "observable".to_string(),
-            ));
-        }
-
-        // Angular: detect @Injectable() → ExecutionContext("di_scope")
-        if raw_sig.contains("@Injectable") {
-            ops.push(CoreOp::ExecutionContext(
-                method_id.to_string(),
-                "di_scope".to_string(),
             ));
         }
 
@@ -253,26 +247,29 @@ impl LanguageLayer for TypeScriptLayer {
                     }
 
                     // Emit class-level flags
-                    let class_flags = Self::extract_class_flags(raw_text);
-                    if !class_flags.is_empty() {
-                        ops.push(CoreOp::ClassFlags(class_id.clone(), class_flags));
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
                     }
-
-                    // R-43a: Detect @Injectable() on class → ExecutionContext("di_scope")
-                    if raw_text.contains("@Injectable") {
-                        ops.push(CoreOp::ExecutionContext(
-                            class_id.clone(),
-                            "di_scope".to_string(),
-                        ));
+                }
+            }
+            "interface.root" => {
+                if let Some(interface_id) = &context.current_interface {
+                    for parent in interface_parents(raw_text, "extends") {
+                        ops.push(CoreOp::InterfaceExtends(interface_id.clone(), parent));
+                    }
+                    let modifiers = Self::extract_class_modifiers(raw_text);
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::InterfaceModifiers(interface_id.clone(), modifiers));
                     }
                 }
             }
             "method.root" => {
                 // Extract method-level flags (async, generator, visibility)
-                let method_flags = Self::extract_method_flags(raw_text);
+                let modifiers = Self::extract_method_modifiers(raw_text);
                 if let Some(method_id) = &context.current_method {
-                    if !method_flags.is_empty() {
-                        ops.push(CoreOp::Flags(method_id.clone(), method_flags));
+                    if !modifiers.is_empty() {
+                        ops.push(CoreOp::MethodModifiers(method_id.clone(), modifiers));
                     }
 
                     // R-43a: Extract execution semantics

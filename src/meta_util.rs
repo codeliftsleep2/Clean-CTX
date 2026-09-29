@@ -13,12 +13,20 @@
 
 mod class_source;
 mod declaration;
+mod lexical_regions;
+#[cfg(test)]
+mod scan_metrics;
 mod scanner;
 
 pub use class_source::{
     class_source_from_capture, find_class_source_start, find_decorator_inclusive_start,
 };
 pub use declaration::{extract_decl_name, extract_entity_type, extract_first_quoted};
+pub use lexical_regions::LexicalRegions;
+#[cfg(test)]
+pub(crate) use lexical_regions::{construction_count, reset_construction_count};
+#[cfg(test)]
+pub(crate) use scan_metrics::{legacy_membership_call_count, reset_legacy_membership_call_count};
 pub use scanner::{
     collect_call_body, consume_call_expression, extract_quoted_value, find_enclosing_brace,
     find_first_top_level, find_matching_brace, is_inside_comment_or_string, skip_string,

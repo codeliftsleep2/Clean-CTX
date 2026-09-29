@@ -75,7 +75,7 @@ impl std::hash::Hash for EntityRef {
 }
 
 /// The typed relationship between two entities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub enum SemanticRelation {
     // ---- Angular ----
     /// Component injects a Service via constructor/DI.
@@ -175,7 +175,7 @@ pub enum SemanticRelation {
 /// runtime/declaration arity compatibility on its own, and no consumer may
 /// classify an arity resolution as uniquely resolved from this count alone.
 /// Exact-arity reasoning requires `has_spread == false`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct CallEvidence {
     /// Number of explicitly written argument nodes at the call site. A spread
     /// argument (`foo(...args)`) counts once; its expanded count is unknown.
@@ -188,7 +188,7 @@ pub struct CallEvidence {
     /// `false` means every written argument is exactly one argument. Skipped
     /// when `false`, so an exact call edge keeps its byte-identical serialized
     /// shape and the qualifier appears only where it actually matters.
-    #[serde(skip_serializing_if = "spread_is_absent")]
+    #[serde(default, skip_serializing_if = "spread_is_absent")]
     pub has_spread: bool,
 }
 

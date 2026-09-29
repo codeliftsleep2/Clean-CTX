@@ -201,16 +201,16 @@ fn compile_sample_has_def_methods() {
 }
 
 #[test]
-fn compile_sample_has_flags() {
+fn compile_sample_has_control_summaries() {
     let ir = compile_sample();
     let flags: Vec<_> = ir
         .instructions
         .iter()
-        .filter(|op| matches!(op, CoreOp::Flags(..)))
+        .filter(|op| matches!(op, CoreOp::ControlSummary(..)))
         .collect();
     assert!(
         !flags.is_empty(),
-        "sample_service.ts has if/for/return/throw -> should produce FLAGS"
+        "sample_service.ts has control constructs -> should produce CTRL_SUM"
     );
 }
 

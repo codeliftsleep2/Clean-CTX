@@ -1,0 +1,21 @@
+{
+  "status": "diagnostic only; not a codec or production format",
+  "invariant": "The original CONTROL-FULL semantic object remains exactly equal after removing the added _organization navigation metadata.",
+  "trials_per_variant": 3,
+  "experiments": [
+    {
+      "id": "di-provenance-index",
+      "case_id": "dependency-injection--high-refactor",
+      "capture": "high-refactor",
+      "hypothesis": "An explicit navigation index locating relation, layer, typed endpoints, and endpoint provenance improves reliable use of facts already present in semantic_edges.",
+      "semantic_information_change": "none"
+    },
+    {
+      "id": "occurrence-group-index",
+      "case_id": "behavior-facts--high-refactor",
+      "capture": "high-refactor",
+      "hypothesis": "An explicit navigation index locating nested occurrence-group arrays improves preservation of group boundaries, duplicates, and order.",
+      "semantic_information_change": "none"
+    }
+  ]
+}

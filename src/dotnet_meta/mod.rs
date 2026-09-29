@@ -24,8 +24,16 @@
 
 pub mod aspnet;
 pub mod automapper;
+#[cfg(test)]
+mod class_analysis_metrics;
 pub(crate) mod detect;
+#[cfg(test)]
+mod detect_metrics;
 pub mod efcore;
+#[cfg(test)]
+mod efcore_analysis_metrics;
+#[cfg(test)]
+mod evaluation_metrics;
 pub mod general;
 mod marker_builders;
 pub(crate) mod markers;
@@ -33,6 +41,19 @@ pub mod semantic;
 pub mod serialization;
 pub mod signalr;
 pub mod testing;
+
+#[cfg(test)]
+pub(crate) use class_analysis_metrics::{analysis_count, reset_analysis_count};
+#[cfg(test)]
+pub(crate) use detect_metrics::{
+    ast_parse_count, detection_count, reset_ast_parse_count, reset_detection_count,
+};
+#[cfg(test)]
+pub(crate) use efcore_analysis_metrics::{
+    analysis_count as efcore_analysis_count, reset_analysis_count as reset_efcore_analysis_count,
+};
+#[cfg(test)]
+pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
 
 use crate::compression::Fidelity;
 
@@ -110,6 +131,14 @@ pub fn run_meta_layer_with_config(
         return None;
     }
 
+    run_meta_layer_for_applicable_source(class_captures, fidelity, config)
+}
+
+fn run_meta_layer_for_applicable_source(
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+) -> Option<MetaBlock> {
     // Tier 1 (extraction): walk each class capture and emit Φ lines.
     let mut block = MetaBlock::default();
     for raw_class in class_captures {
@@ -160,6 +189,58 @@ pub fn run_meta_layer_with_config(
     Some(block)
 }
 
+fn evaluate_applicable_source(
+    class_captures: &[String],
+    fidelity: Fidelity,
+    config: Option<&crate::config::MetaLayerConfig>,
+) -> (
+    Option<MetaBlock>,
+    Vec<crate::layers::meta::semantic::SemanticEdge>,
+) {
+    let mut block = MetaBlock::default();
+    let mut semantic_edges = Vec::new();
+    let testing_enabled = config.map(|value| value.testing.enabled).unwrap_or(true);
+
+    for raw_class in class_captures {
+        if let Some(analysis) = aspnet::analyze_aspnet(raw_class, fidelity) {
+            block.lines.extend(analysis.block.lines);
+            semantic_edges.extend(analysis.semantic_edges);
+        }
+        if let Some(analysis) = efcore::analyze_efcore(raw_class, fidelity) {
+            block.lines.extend(analysis.block.lines);
+            semantic_edges.extend(analysis.semantic_edges);
+        }
+        if let Some(result) = signalr::extract_signalr(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+        if let Some(result) = automapper::extract_automapper(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+        if let Some(result) = serialization::extract_serialization(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+        if let Some(result) = general::extract_general(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+        if testing_enabled && let Some(result) = testing::extract_testing(raw_class, fidelity) {
+            block.lines.extend(result.lines);
+        }
+
+        if let Some(class_name) = semantic::extract_class_name_from_class(raw_class) {
+            semantic_edges.extend(semantic::extract_non_aspnet_efcore_semantic_edges(
+                raw_class,
+                &class_name,
+                fidelity,
+            ));
+        }
+        if testing_enabled && let Some(edge) = testing::extract_testing_semantic_edge(raw_class) {
+            semantic_edges.push(edge);
+        }
+    }
+
+    ((!block.is_empty()).then_some(block), semantic_edges)
+}
+
 #[cfg(all(test, feature = "dotnet"))]
 #[path = "../tests/dotnet_meta/mod.rs"]
 mod tests;
@@ -193,9 +274,13 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         &self,
         source: &str,
         _path: &std::path::Path,
-        _config: Option<&crate::config::CleanCtxConfig>,
+        config: Option<&crate::config::CleanCtxConfig>,
     ) -> bool {
-        detect::is_dotnet_file(source)
+        let enabled = config
+            .and_then(|value| value.meta_layers.get("dotnet"))
+            .map(|value| value.enabled)
+            .unwrap_or(true);
+        enabled && detect::is_dotnet_file(source)
     }
 
     fn enrich(
@@ -253,6 +338,43 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         }
 
         edges
+    }
+
+    fn evaluate_context(
+        &self,
+        context: &crate::layers::meta::MetaLayerContext<'_>,
+    ) -> crate::layers::meta::MetaLayerEvaluation {
+        #[cfg(test)]
+        evaluation_metrics::record_evaluation();
+
+        let meta_config = context
+            .config
+            .and_then(|value| value.meta_layers.get("dotnet"));
+        let (block, semantic_edges) =
+            evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
+        let output = block.map(|block| crate::layers::meta::MetaLayerOutput {
+            layer_name: self.name(),
+            rendered: block.render(),
+            dotnet_block: Some(block),
+            ..Default::default()
+        });
+        crate::layers::meta::MetaLayerEvaluation {
+            output,
+            semantic_edges,
+        }
+    }
+
+    fn evaluate_if_applicable(
+        &self,
+        context: &crate::layers::meta::MetaLayerContext<'_>,
+    ) -> Option<crate::layers::meta::MetaLayerEvaluation> {
+        let enabled = context
+            .config
+            .and_then(|value| value.meta_layers.get("dotnet"))
+            .map(|value| value.enabled)
+            .unwrap_or(true);
+        (enabled && detect::is_dotnet_file_with_regions(context.source, context.lexical_regions))
+            .then(|| self.evaluate_context(context))
     }
 }
 

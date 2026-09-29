@@ -1,6 +1,9 @@
 # Clean-CTX — Intelligence Layer Plan
-**Version:** 0.1.0 (proposed)
-**Status:** 📋 Proposed · Last updated: 2026-06-10
+**Version:** 0.1.0 (original proposal)
+**Status:** Implemented and partially superseded historical design record ·
+Last updated: 2026-09-27. Current behavior is owned by
+`src/intelligence/**`, `src/config.rs`, and the CBM/tooling invariants; code
+sketches and proposed APIs below are not current contracts.
 
 ---
 

@@ -11,194 +11,162 @@
 // declaration file.
 
 use super::{
-    discovery_field, query_scope, required_str, run_query_with_hydration, send_scope_rejection,
+    discovery_field,
+    identity::IdentityRequest,
+    outcome::QueryAnswer,
+    outcome::QueryFailure,
+    prepare::{PreparationContext, PreparedQuery},
+    required_name,
 };
 use crate::mcp::McpState;
-use crate::protocol::send_response;
 use serde_json::Value;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn handle_forward_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for forward_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
+pub(super) fn prepare_forward_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_forward_edges(args, state, context) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_forward_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
+    let name = required_name(args, "forward_edges")?;
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the evidence
     // asserted from inside that workspace (primary root + its configured
     // additional roots). `None` when the caller declared no workspace — a
     // root-less query keeps its previous unfiltered behaviour. An unauthorized
     // `withinPath` is refused before the index is consulted.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration) =
-        run_query_with_hydration(state, "forward_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.forward_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.forward_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        });
-    // The semantic answer is `edges` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "edges": results,
-        "count": count,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
+    let scope = context.scope(state, args)?;
+    let identity = IdentityRequest::new(args, name);
+    if let Some(exact) = identity.exact() {
+        let index = state.workspace_index_read();
+        let _ = forward_edges(
+            &index,
+            &exact.domain,
+            &exact.entity_type,
+            &exact.name,
+            scope.as_ref(),
+        );
     }
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} outgoing edges.") }],
-            "structuredContent": structured,
+    let hydration = context.hydrate(state, "forward_edges", name, workspace_root)?;
+    Ok(PreparedQuery::indexed(move |index| {
+        let resolved = identity.resolve(index, scope.as_ref())?;
+        let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
+        let edges = forward_edges(
+            index,
+            &resolved.domain,
+            &resolved.entity_type,
+            &resolved.name,
+            scope.as_ref(),
+        );
+        let count = edges.len();
+        let mut structured = serde_json::json!({
+            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "count": count,
+            "resolved_identity": resolved_identity,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
         }
-    }));
+        Ok(QueryAnswer::new("forward_edges", structured))
+    }))
 }
 
 /// `reverse_edges`: incoming semantic edges to an entity.
 ///
 /// Eligible for one-cycle hydration: has (domain, entity_type, name) identity.
-pub(super) fn handle_reverse_edges(id: &Value, args: &Value, state: &McpState) {
-    let domain = match required_str(args, "domain") {
-        Some(d) => d,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'domain' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let entity_type = match required_str(args, "entity_type") {
-        Some(t) => t,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'entity_type' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
-    let name = match required_str(args, "name") {
-        Some(n) => n,
-        None => {
-            send_response(&serde_json::json!({
-                "jsonrpc": "2.0", "id": id,
-                "error": {
-                    "code": -32602,
-                    "message": "Missing required argument: 'name' for reverse_edges query.".to_string()
-                }
-            }));
-            return;
-        }
-    };
+pub(super) fn prepare_reverse_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_reverse_edges(args, state, context) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_reverse_edges(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
+    let name = required_name(args, "reverse_edges")?;
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: the primary defect this closes — `reverse_edges` used to
     // answer with every occurrence of the identity across the WHOLE session,
     // including real call facts authored by an unrelated indexed repository.
     // Occurrence provenance (`asserting_file`) now constrains the answer, and an
     // optional `withinPath` narrows it further to one provenance subtree.
-    let scope = match query_scope(state, args) {
-        Ok(scope) => scope,
-        Err(message) => {
-            send_scope_rejection(id, message);
-            return;
-        }
-    };
-    let domain_owned = domain.to_string();
-    let et_owned = entity_type.to_string();
-    let name_owned = name.to_string();
-    let (results, count, hydration) =
-        run_query_with_hydration(state, "reverse_edges", name, workspace_root, {
-            let domain = domain_owned.clone();
-            let et = et_owned.clone();
-            let name = name_owned.clone();
-            move |idx| {
-                let r = match scope.as_ref() {
-                    Some(scope) => {
-                        idx.reverse_edges_by_identity_in_scope(&domain, &et, &name, scope)
-                    }
-                    None => idx.reverse_edges_by_identity(&domain, &et, &name),
-                };
-                let c = r.len();
-                (serde_json::to_value(&r).unwrap_or_default(), c)
-            }
-        });
-    // The semantic answer is `edges` + `count`; discovery diagnostics are
-    // attached only when discovery deviated from its expected path.
-    let mut structured = serde_json::json!({
-        "edges": results,
-        "count": count,
-    });
-    if let Some(discovery) = discovery_field(&hydration) {
-        structured["discovery"] = discovery;
+    let scope = context.scope(state, args)?;
+    let identity = IdentityRequest::new(args, name);
+    if let Some(exact) = identity.exact() {
+        let index = state.workspace_index_read();
+        let _ = reverse_edges(
+            &index,
+            &exact.domain,
+            &exact.entity_type,
+            &exact.name,
+            scope.as_ref(),
+        );
     }
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Found {count} incoming edges.") }],
-            "structuredContent": structured,
+    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root)?;
+    Ok(PreparedQuery::indexed(move |index| {
+        let resolved = identity.resolve(index, scope.as_ref())?;
+        let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
+        let edges = reverse_edges(
+            index,
+            &resolved.domain,
+            &resolved.entity_type,
+            &resolved.name,
+            scope.as_ref(),
+        );
+        let count = edges.len();
+        let mut structured = serde_json::json!({
+            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "count": count,
+            "resolved_identity": resolved_identity,
+        });
+        if let Some(discovery) = discovery_field(&hydration) {
+            structured["discovery"] = discovery;
         }
-    }));
+        Ok(QueryAnswer::new("reverse_edges", structured))
+    }))
+}
+
+fn forward_edges<'a>(
+    index: &'a crate::workspace::index::WorkspaceIndex,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+) -> Vec<&'a crate::layers::meta::semantic::SemanticEdge> {
+    match scope {
+        Some(scope) => index.forward_edges_by_identity_in_scope(domain, entity_type, name, scope),
+        None => index.forward_edges_by_identity(domain, entity_type, name),
+    }
+}
+
+fn reverse_edges<'a>(
+    index: &'a crate::workspace::index::WorkspaceIndex,
+    domain: &str,
+    entity_type: &str,
+    name: &str,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+) -> Vec<&'a crate::layers::meta::semantic::SemanticEdge> {
+    match scope {
+        Some(scope) => index.reverse_edges_by_identity_in_scope(domain, entity_type, name, scope),
+        None => index.reverse_edges_by_identity(domain, entity_type, name),
+    }
 }

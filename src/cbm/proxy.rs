@@ -102,6 +102,39 @@ pub(crate) fn enhance_project_not_found_error(raw: &str) -> String {
     serde_json::to_string(&enhanced).unwrap_or_else(|_| raw.to_string())
 }
 
+fn project_error_with_hint(message: &str) -> String {
+    let lower = message.to_lowercase();
+    let is_project_error = lower.contains("project")
+        && (lower.contains("not found")
+            || lower.contains("does not exist")
+            || lower.contains("unknown")
+            || lower.contains("invalid"));
+    if !is_project_error {
+        return message.to_string();
+    }
+    format!(
+        "{}. Use list_projects to discover available projects and retry with a valid project name.",
+        message.trim_end_matches('.')
+    )
+}
+
+/// Extract a CBM tool failure from a raw JSON-RPC response before the proxy
+/// verifies or compresses any result-shaped data around it.
+pub(crate) fn proxy_tool_error(tool_name: &str, raw: &str) -> Option<String> {
+    let enhanced = enhance_project_not_found_error(raw);
+    let parsed: Value = serde_json::from_str(enhanced.trim()).ok()?;
+    if let Some(message) = parsed.pointer("/error/message").and_then(Value::as_str) {
+        return Some(message.to_string());
+    }
+    let result = parsed.get("result")?;
+    match crate::cbm::client::check_soft_error(tool_name, result) {
+        Err(crate::cbm::client::CbmError::ToolError { message, .. }) => {
+            Some(project_error_with_hint(&message))
+        }
+        _ => None,
+    }
+}
+
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
 /// The proxy accepts any CBM tool call, forwards it, catches CBM's
@@ -235,7 +268,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         }
     };
 
-    let args = tool_params;
+    let mut args = tool_params;
 
     // Explicit reindex of a repository refreshes CBM's graph for it, so any
     // hydration discovery previously recorded against the pre-refresh graph is
@@ -253,19 +286,35 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
     // The indexing gate must resolve against the project actually being queried
     // (never a stale active-project entry), and project-independent calls such
     // as `list_projects` must NOT be gated at all.
-    if let Some(target_project) = resolve_proxy_target_project(bridge, params, &args) {
-        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, &target_project) {
+    let target_project = resolve_and_apply_proxy_target_project(bridge, params, &mut args);
+    if let Some(target_project) = target_project.as_deref() {
+        if !crate::cbm::handlers::ensure_indexed_or_error_for(id, bridge, target_project) {
             return;
         }
     }
-    let raw_response = match bridge.proxy_call(cbm_tool, args.clone()) {
-        Ok(text) => {
-            // Intercept before compression: check for project-not-found CBM
-            // errors and enhance them with a recovery hint. CBM-level errors
-            // arrive as Ok(raw_json) because the pipe I/O succeeded — the
-            // error is in the JSON content, not the transport status.
-            enhance_project_not_found_error(&text)
+    if cbm_tool == "trace_path" {
+        let source = args
+            .get("function_name")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if !source.is_empty() {
+            match crate::cbm::trace_identity::resolve_trace_source(
+                bridge,
+                source,
+                target_project.as_deref(),
+            ) {
+                Ok(resolved) => {
+                    args["function_name"] = Value::String(resolved);
+                }
+                Err(error) => {
+                    send_response(&error.response(id));
+                    return;
+                }
+            }
         }
+    }
+    let raw_response = match bridge.proxy_call(cbm_tool, args.clone()) {
+        Ok(text) => text,
         Err(e) => {
             // RM-2: Log compression errors for diagnostics
             state.push_warning(format!("CBM proxy call failed: {e}"));
@@ -276,6 +325,20 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             return;
         }
     };
+    if let Some(error) = proxy_tool_error(cbm_tool, &raw_response) {
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": error }],
+                "isError": true,
+                "structuredContent": {
+                    "error": error,
+                    "cbm_tool": cbm_tool
+                }
+            }
+        }));
+        return;
+    }
     let raw_response = crate::cbm::caller_verify_proxy::verify_proxy_response(
         bridge,
         state,
@@ -381,6 +444,20 @@ pub(crate) fn resolve_proxy_target_project(
         return Some(bridge.resolve_project_id(root));
     }
     None
+}
+
+/// Resolve the proxy target and apply that canonical identity to the exact
+/// argument object forwarded to CBM.
+pub(crate) fn resolve_and_apply_proxy_target_project(
+    bridge: &crate::cbm::GraphBridge,
+    params: &Value,
+    tool_params: &mut Value,
+) -> Option<String> {
+    let target = resolve_proxy_target_project(bridge, params, tool_params)?;
+    if let Some(arguments) = tool_params.as_object_mut() {
+        arguments.insert("project".into(), Value::String(target.clone()));
+    }
+    Some(target)
 }
 
 /// RC-2 fallback: minimum compression when JSON compressor fails.

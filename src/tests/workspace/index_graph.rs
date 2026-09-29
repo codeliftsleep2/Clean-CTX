@@ -78,10 +78,10 @@ fn has_cycle_no_cycle() {
 }
 
 #[test]
-fn has_cycle_structural_cycle() {
+fn has_cycle_ignores_structural_cycle() {
     let mut idx = WorkspaceIndex::new();
-    // Use RouteMapsTo and DeclaresInModule to form a cycle through
-    // structural relations — all relations are traversed for cycle detection.
+    // These relationships form a generic graph loop, but routing and
+    // containment metadata are not dependency-cycle edges.
     let edge1 = SemanticEdge {
         relation: SemanticRelation::RouteMapsTo,
         subject: EntityRef::new("angular", "Route", "/home"),
@@ -105,8 +105,8 @@ fn has_cycle_structural_cycle() {
     };
     idx.add_edges("a.ts", vec![edge1, edge2, edge3]);
     assert!(
-        idx.has_cycle(),
-        "cycle through mixed relation types must be detected"
+        !idx.has_cycle(),
+        "a mixed structural loop must not be reported as a dependency cycle"
     );
 }
 
@@ -231,8 +231,8 @@ fn framework_defines_edges_still_traversed() {
         layer: "angular",
         call_evidence: None,
     };
-    // Closing the loop with a dependency edge proves the Defines edge is
-    // traversed by graph algorithms.
+    // Closing the generic graph loop with a dependency edge must not make the
+    // declaration edge eligible for dependency-cycle traversal.
     let injects = SemanticEdge {
         relation: SemanticRelation::Injects,
         subject: EntityRef::new("angular", "Guard", "CanActivate"),
@@ -272,8 +272,8 @@ fn framework_defines_edges_still_traversed() {
     assert_eq!(incoming[0].relation, SemanticRelation::Defines);
 
     assert!(
-        idx.has_cycle(),
-        "Defines(A, B) + Injects(B, A) must be traversed as a cycle"
+        !idx.has_cycle(),
+        "Defines(A, B) + Injects(B, A) is not a dependency cycle"
     );
 }
 

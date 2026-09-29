@@ -14,7 +14,8 @@ Thank you for your interest in contributing! Clean-CTX is an open-source project
 - [Security Guide](docs/SECURITY.md) — compliance and hardening
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) — common issues
 - [Configuration Guide](docs/CONFIGURATION.md) — config precedence, env vars, resource limits
-- [Changelog](docs/CHANGELOG.md) — version history
+- [Documentation Map](docs/README.md) — current references versus historical records
+- [Changelog](docs/changelogs/CHANGELOG.md) — version history
 - [Roadmap](docs/ROADMAP.md) — future plans and priorities
 
 ---
@@ -30,14 +31,14 @@ cd Clean-CTX
 # This wires core.hooksPath to the versioned .githooks/ directory.
 pwsh -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1
 
-# Build
-cargo build
+# Build all supported language and framework layers for development
+cargo build --all-features
 
-# Run tests
-cargo test
+# Run a focused test during development
+cargo test --all-features <test-filter>
 
 # Run linter (must pass before PR)
-cargo clippy --all-targets -- -D warnings
+cargo clippy --all-targets --all-features -- -D warnings
 ```
 
 **Prerequisites:** Rust 1.85+ (edition 2024). No external runtimes or dependencies.
@@ -50,7 +51,7 @@ Every pull request **must** pass these checks. The full checklist is in [`PULL_R
 
 1. **`cargo check`** — compiles without errors
 2. **`cargo clippy --all-targets -- -D warnings`** — zero warnings (treated as errors)
-3. **`cargo test --workspace --all-targets --all-features`** — all 2,513 workspace tests pass
+3. **`cargo test --workspace --all-targets --all-features`** — repository suite passes in CI
 4. **`cargo audit`** — no known security vulnerabilities
 5. **`scripts/check-tree-sitter-versions.ps1`** — all tree-sitter crates share the same `tree-sitter-language` ABI version
 6. **`scripts/check-utf8.ps1`** — all tracked text files are valid BOM-less UTF-8 with no mojibake signatures ([policy & rationale](docs/ENCODING_POLICY.md))
@@ -218,7 +219,7 @@ See [Developer Documentation → Testing Conventions](docs/DEVELOPER_DOCUMENTATI
 | `docs/PERFORMANCE.md` | Architects | Benchmarks, caching, optimization |
 | `docs/SECURITY.md` | Enterprise admins | Compliance, hardening, deployment |
 | `docs/TROUBLESHOOTING.md` | Users | Common issues and resolutions |
-| `docs/CHANGELOG.md` | All | Version history |
+| `docs/changelogs/CHANGELOG.md` | All | Version history |
 | `docs/ROADMAP.md` | Contributors | Future plans and priorities |
 
 ---

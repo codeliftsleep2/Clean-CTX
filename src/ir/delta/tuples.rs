@@ -31,6 +31,16 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
             tuple.get(2).unwrap_or(&String::new())
         ),
         "DEF_I" => format!("DEF_I:{}", tuple.get(1).unwrap_or(&String::new())),
+        "DEF_IM" => format!(
+            "DEF_IM:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
+        "DEF_IF" => format!(
+            "DEF_IF:{}:{}",
+            tuple.get(1).unwrap_or(&String::new()),
+            tuple.get(2).unwrap_or(&String::new())
+        ),
         "SIG" => format!(
             "SIG:{}:{}",
             tuple.get(1).unwrap_or(&String::new()),
@@ -38,9 +48,15 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         ),
         "RET" => format!("RET:{}", tuple.get(1).unwrap_or(&String::new())),
         "FIELD_T" => format!("FIELD_T:{}", tuple.get(1).unwrap_or(&String::new())),
+        "MOD_M" => format!("MOD_M:{}", tuple.get(1).unwrap_or(&String::new())),
+        "MOD_C" => format!("MOD_C:{}", tuple.get(1).unwrap_or(&String::new())),
+        "MOD_I" => format!("MOD_I:{}", tuple.get(1).unwrap_or(&String::new())),
+        "CTRL_SUM" => format!("CTRL_SUM:{}", tuple.get(1).unwrap_or(&String::new())),
+        "PAT_FACT" => format!("PAT_FACT:{}", tuple.get(1).unwrap_or(&String::new())),
         "FLAGS" => format!("FLAGS:{}", tuple.get(1).unwrap_or(&String::new())),
         "FLAGS_C" => format!("FLAGS_C:{}", tuple.get(1).unwrap_or(&String::new())),
         "EXT" => format!("EXT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "EXT_I" => format!("EXT_I:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMPL" => format!(
             "IMPL:{}:{}",
             tuple.get(1).unwrap_or(&String::new()),
@@ -49,6 +65,11 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "INJECTS" => format!("INJECTS:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMP" => format!("IMP:{}", tuple.get(1).unwrap_or(&String::new())),
         "TYPE" => format!("TYPE:{}", tuple.get(1).unwrap_or(&String::new())),
+        "PAT" => format!(
+            "PAT:{}:{}",
+            tuple.get(1).map(String::as_str).unwrap_or("?"),
+            tuple.get(2).map(String::as_str).unwrap_or("?")
+        ),
         // Edit Mode: Verbatim Method Bodies
         "BODY" => format!("BODY:{}", tuple.get(1).unwrap_or(&String::new())),
         // R-43a: Execution Semantics
@@ -106,6 +127,11 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
             tuple.get(2).cloned().unwrap_or_default(),
         ],
         "DEF_I" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "DEF_IM" | "DEF_IF" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
         "SIG" => vec![
             tuple[0].clone(),
             tuple.get(1).cloned().unwrap_or_default(),
@@ -113,9 +139,15 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         ],
         "RET" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "FIELD_T" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "MOD_M" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "MOD_C" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "MOD_I" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "CTRL_SUM" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "PAT_FACT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "FLAGS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "FLAGS_C" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "EXT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "EXT_I" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMPL" => vec![
             tuple[0].clone(),
             tuple.get(1).cloned().unwrap_or_default(),
@@ -124,6 +156,11 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "INJECTS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMP" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "TYPE" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "PAT" => vec![
+            tuple[0].clone(),
+            tuple.get(1).cloned().unwrap_or_default(),
+            tuple.get(2).cloned().unwrap_or_default(),
+        ],
         // Edit Mode: Verbatim Method Bodies
         "BODY" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         // R-43a: Execution Semantics

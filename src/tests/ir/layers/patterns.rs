@@ -5,7 +5,7 @@
 
 use crate::ir::layers::PatternRecognizer;
 use crate::ir::layers::patterns::CodePatternRecognizer;
-use crate::ir::opcodes::CoreOp;
+use crate::ir::opcodes::{CoreOp, DeclarationModifier, PatternFact};
 
 fn make_defmethod(cid: &str, mid: &str, name: &str) -> CoreOp {
     CoreOp::DefMethod(cid.into(), mid.into(), name.into())
@@ -19,8 +19,8 @@ fn make_ret(mid: &str, ty: &str) -> CoreOp {
     CoreOp::Return(mid.into(), ty.into())
 }
 
-fn make_flags(tid: &str, flags: Vec<&str>) -> CoreOp {
-    CoreOp::Flags(tid.into(), flags.iter().map(|s| s.to_string()).collect())
+fn make_modifiers(tid: &str, modifiers: Vec<DeclarationModifier>) -> CoreOp {
+    CoreOp::MethodModifiers(tid.into(), modifiers)
 }
 
 // ── Constructor Pattern Tests ─────────────────────────
@@ -39,7 +39,7 @@ fn recognize_constructor_injection() {
 
     // Constructor should get a CTOR flag
     let has_ctor = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"CTOR".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Constructor))
     });
     assert!(
         has_ctor,
@@ -50,7 +50,7 @@ fn recognize_constructor_injection() {
     // Original instructions should be preserved too
     assert!(
         result.len() >= instructions.len(),
-        "Pattern should not remove instructions, only add flags. result={}, expected>={}",
+        "Pattern should not remove instructions, only add facts. result={}, expected>={}",
         result.len(),
         instructions.len()
     );
@@ -59,24 +59,73 @@ fn recognize_constructor_injection() {
 // ── Observable Pattern Tests ──────────────────────────
 
 #[test]
-fn recognize_observable_return() {
+fn observable_semantics_additive_recognizes_declared_observable() {
     let instructions = vec![
         make_defmethod("C1", "M1", "fetchData"),
-        make_ret("M1", "$P"),
-        make_flags("M1", vec!["ASYNC"]),
+        make_ret("M1", "Observable<User>"),
     ];
 
     let recognizer = CodePatternRecognizer::new();
     let result = recognizer.recognize(&instructions);
 
     let has_observable = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"OBSERVABLE".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Observable))
     });
     assert!(
         has_observable,
         "Observable pattern should produce OBSERVABLE flag: {:?}",
         result
     );
+}
+
+#[test]
+fn observable_semantics_additive_never_borrows_evidence_from_another_method() {
+    let instructions = vec![
+        make_defmethod("C1", "M1", "methodB"),
+        make_ret("M1", "$v"),
+        make_defmethod("C1", "M2", "methodA"),
+        make_ret("M2", "Observable<number>"),
+    ];
+
+    let result = CodePatternRecognizer::new().recognize(&instructions);
+
+    assert!(
+        !result.iter().any(|op| {
+            matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && facts.contains(&PatternFact::Observable))
+        }),
+        "a plain method must not borrow Observable evidence from a neighboring method: {result:?}"
+    );
+    assert!(
+        result.iter().any(|op| {
+            matches!(op, CoreOp::PatternFacts(m, facts) if m == "M2" && facts.contains(&PatternFact::Observable))
+        }),
+        "the method that owns both pieces of evidence should retain its Observable fact: {result:?}"
+    );
+}
+
+#[test]
+fn observable_semantics_additive_rejects_non_observable_evidence() {
+    let async_promise = vec![
+        make_defmethod("C1", "M1", "asyncPromise"),
+        make_ret("M1", "$P"),
+        make_modifiers("M1", vec![DeclarationModifier::Async]),
+    ];
+    let async_only = vec![
+        make_defmethod("C1", "M2", "asyncOnly"),
+        make_ret("M2", "$v"),
+        make_modifiers("M2", vec![DeclarationModifier::Async]),
+    ];
+    let recognizer = CodePatternRecognizer::new();
+
+    for instructions in [&async_promise, &async_only] {
+        let result = recognizer.recognize(instructions);
+        assert!(
+            !result
+                .iter()
+                .any(|op| matches!(op, CoreOp::PatternFacts(_, facts) if facts.contains(&PatternFact::Observable))),
+            "Promise or async evidence must not produce an Observable fact: {result:?}"
+        );
+    }
 }
 
 // ── Getter/Setter Pattern Tests ───────────────────────
@@ -89,7 +138,7 @@ fn recognize_getter() {
     let result = recognizer.recognize(&instructions);
 
     let has_getter = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"GETTER".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && matches!(facts.as_slice(), [PatternFact::Getter(_)]))
     });
     assert!(
         has_getter,
@@ -106,7 +155,7 @@ fn recognize_setter() {
     let result = recognizer.recognize(&instructions);
 
     let has_setter = result.iter().any(|op| {
-        matches!(op, CoreOp::Flags(m, flags) if m == "M1" && flags.contains(&"SETTER".to_string()))
+        matches!(op, CoreOp::PatternFacts(m, facts) if m == "M1" && matches!(facts.as_slice(), [PatternFact::Setter(_)]))
     });
     assert!(
         has_setter,

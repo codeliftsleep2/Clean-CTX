@@ -1,7 +1,7 @@
 // src/tests/mcp/workspace_query_calls_languages.rs
 //
-// End-to-end `workspace_query` behaviour for the TypeScript and Java native
-// call producers.
+// End-to-end `workspace_query` behaviour for the TypeScript, Java, and Rust
+// native call producers.
 //
 // This is the local analogue of `workspace_query_calls.rs` (which proves the
 // same path for C#): the acceptance criterion for a native `Calls` producer is
@@ -49,7 +49,8 @@ fn reverse_edges(
             let count = value.as_array().map_or(0, Vec::len);
             (value, count)
         },
-    );
+    )
+    .expect("hydration succeeds");
     (result, report)
 }
 
@@ -147,6 +148,20 @@ fn write_java_caller(root: &Path) {
     .unwrap();
 }
 
+fn write_rust_caller(root: &Path) {
+    std::fs::write(
+        root.join("caller_service.rs"),
+        concat!(
+            "struct CallerService;\n",
+            "impl CallerService {\n",
+            "    fn process(&self) { self.order_by(1); }\n",
+            "    fn project(&self) { self.order_by(1, 2); }\n",
+            "}\n",
+        ),
+    )
+    .unwrap();
+}
+
 // ── TypeScript: cross-file reverse_edges ────────────────────────────
 
 #[test]
@@ -210,6 +225,37 @@ fn java_cross_file_reverse_edges_returns_the_native_caller() {
         ],
         "the Java caller's method-level identity and arity must come from \
          Clean-CTX compilation: {result}"
+    );
+}
+
+// ── Rust: workspace-query hydration ─────────────────────────────────
+
+#[test]
+fn rust_reverse_edges_returns_the_native_callers() {
+    let root = tempfile::TempDir::new().unwrap();
+    write_rust_caller(root.path());
+    let state = state(&[]);
+
+    let (result, report) = reverse_edges(&state, "order_by", root.path());
+
+    assert!(report.hydration_attempted);
+    assert_eq!(report.discovery_status, "completed");
+    assert_eq!(report.discovery_provider, "filesystem");
+    assert_eq!(
+        call_facts(&result),
+        vec![
+            (
+                "process".to_string(),
+                "caller_service.rs".to_string(),
+                Some(1)
+            ),
+            (
+                "project".to_string(),
+                "caller_service.rs".to_string(),
+                Some(2)
+            ),
+        ],
+        "Rust calls must survive discovery, compilation, semantic projection, and query: {result}"
     );
 }
 

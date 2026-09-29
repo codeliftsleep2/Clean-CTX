@@ -12,11 +12,24 @@
 use super::markers::{build_config_line, build_dbset_line, build_ef_line, build_entity_line};
 use crate::compression::Fidelity;
 use crate::dotnet_meta::MetaBlock;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+
+pub(crate) struct EfCoreAnalysis {
+    pub block: MetaBlock,
+    pub semantic_edges: Vec<SemanticEdge>,
+}
 
 /// Extract EF Core markers from a single class capture.
 ///
 /// Returns `None` when the class is not an EF Core construct.
 pub fn extract_efcore(class_source: &str, fidelity: Fidelity) -> Option<MetaBlock> {
+    analyze_efcore(class_source, fidelity).map(|analysis| analysis.block)
+}
+
+pub(crate) fn analyze_efcore(class_source: &str, fidelity: Fidelity) -> Option<EfCoreAnalysis> {
+    #[cfg(test)]
+    super::efcore_analysis_metrics::record_analysis();
+
     let mut lines = Vec::new();
 
     // Detect DbContext class
@@ -32,12 +45,23 @@ pub fn extract_efcore(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     // Emit DbContext marker
     lines.push(build_ef_line(&class_name));
 
-    // Extract DbSet properties
-    lines.extend(extract_dbsets(class_source));
+    let dbsets = extract_dbsets(class_source);
+    lines.extend(
+        dbsets
+            .iter()
+            .map(|(_, property)| build_dbset_line(property)),
+    );
 
     // Extract entity configurations
     if fidelity != Fidelity::Low {
-        lines.extend(extract_entities(class_source, fidelity));
+        lines.extend(dbsets.iter().map(|(entity, _)| {
+            let fields = if fidelity == Fidelity::High {
+                extract_entity_fields(class_source, entity)
+            } else {
+                Vec::new()
+            };
+            build_entity_line(entity, &fields)
+        }));
     }
 
     // Extract Fluent API configuration
@@ -48,7 +72,29 @@ pub fn extract_efcore(class_source: &str, fidelity: Fidelity) -> Option<MetaBloc
     if lines.is_empty() {
         None
     } else {
-        Some(MetaBlock { lines })
+        let dbcontext = EntityRef::new("dotnet", "DbContext", &class_name);
+        let mut entities = Vec::new();
+        let semantic_edges = dbsets
+            .into_iter()
+            .filter_map(|(entity, _)| {
+                if entities.contains(&entity) {
+                    None
+                } else {
+                    entities.push(entity.clone());
+                    Some(SemanticEdge {
+                        relation: SemanticRelation::HasEntity,
+                        subject: dbcontext.clone(),
+                        object: EntityRef::new("dotnet", "Entity", &entity),
+                        layer: "dotnet",
+                        call_evidence: None,
+                    })
+                }
+            })
+            .collect();
+        Some(EfCoreAnalysis {
+            block: MetaBlock { lines },
+            semantic_edges,
+        })
     }
 }
 
@@ -80,7 +126,7 @@ fn extract_class_name(source: &str) -> Option<String> {
 }
 
 /// Extract DbSet<T> properties.
-fn extract_dbsets(class_source: &str) -> Vec<String> {
+fn extract_dbsets(class_source: &str) -> Vec<(String, String)> {
     let mut dbsets = Vec::new();
 
     // Look for "public DbSet<...>"
@@ -91,6 +137,7 @@ fn extract_dbsets(class_source: &str) -> Vec<String> {
 
         // Extract type name until '>'
         if let Some(generic_end) = rest.find('>') {
+            let entity_name = rest[..generic_end].trim();
             // After the closing '>', look for the property name
             let after_generic = &rest[generic_end + 1..];
             // Property name is the first word after '>', e.g. "Users { get; set; }"
@@ -101,7 +148,7 @@ fn extract_dbsets(class_source: &str) -> Vec<String> {
                 .trim_end_matches('{')
                 .trim();
             if !prop_name.is_empty() {
-                dbsets.push(build_dbset_line(prop_name));
+                dbsets.push((entity_name.to_string(), prop_name.to_string()));
             }
         }
 
@@ -109,38 +156,6 @@ fn extract_dbsets(class_source: &str) -> Vec<String> {
     }
 
     dbsets
-}
-
-/// Extract entity classes referenced in the DbContext.
-fn extract_entities(class_source: &str, fidelity: Fidelity) -> Vec<String> {
-    let mut entities = Vec::new();
-
-    // Look for DbSet<EntityName> patterns
-    let mut search_start = 0;
-    while let Some(pos) = class_source[search_start..].find("DbSet<") {
-        let actual_pos = search_start + pos;
-        let rest = &class_source[actual_pos + "DbSet<".len()..];
-
-        if let Some(generic_end) = rest.find('>') {
-            let entity_name = rest[..generic_end].trim().to_string();
-
-            // Skip if already added
-            if !entities.contains(&entity_name) {
-                // Extract key fields if high fidelity
-                let fields = if fidelity == Fidelity::High {
-                    extract_entity_fields(class_source, &entity_name)
-                } else {
-                    Vec::new()
-                };
-
-                entities.push(build_entity_line(&entity_name, &fields));
-            }
-        }
-
-        search_start = actual_pos + 1;
-    }
-
-    entities
 }
 
 /// Extract key fields for an entity (simplified).

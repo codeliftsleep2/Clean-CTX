@@ -1,10 +1,11 @@
 // src/mcp/tool_handlers/query.rs
 //
-// workspace_query handler — read-only MCP API over WorkspaceIndex.
+// workspace_query handler — read-only MCP query API.
 //
-// This handler exposes the existing WorkspaceIndex query methods as an MCP
-// tool. It is a thin read boundary over the already-wired write lifecycle
-// established in Phases A/B.
+// Cross-file operations expose the existing WorkspaceIndex query methods over
+// the already-wired write lifecycle established in Phases A/B. The narrow
+// `calls_in_file` operation instead inspects a fresh, unpublished canonical IR
+// candidate so typed owner and overload identity survive the query boundary.
 //
 // Semantic hydration: for eligible query types, after the initial WorkspaceIndex
 // query, one exhaustive candidate-file discovery pass runs across the primary
@@ -37,6 +38,7 @@
 // Module layout (handler groups are separate files, mirroring how the index
 // splits its query families):
 //   query.rs             — dispatch, the hydration cycle, the shared scope rule.
+//   query/calls.rs       — owner-aware calls from one canonical file candidate.
 //   query/diagnostics.rs — the sparse LLM-facing discovery-diagnostic projection.
 //   query/entities.rs    — find_entities, entities_in_file.
 //   query/edges.rs       — forward_edges, reverse_edges.
@@ -52,16 +54,27 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod batch;
+mod calls;
+mod content;
 mod diagnostics;
 mod edges;
 mod entities;
 mod graph;
+mod identity;
+mod outcome;
+mod prepare;
+mod request;
 
 pub(super) use diagnostics::discovery_field;
 
-/// Handle `workspace_query` — read-only cross-file semantic queries.
+/// Handle `workspace_query` — read-only cross-file and file-local queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
     let args = &params["arguments"];
+    if args.get("queries").is_some() {
+        batch::handle(id, args, state);
+        return;
+    }
     let query_type = match args["type"].as_str() {
         Some(t) => t,
         None => {
@@ -71,22 +84,16 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "code": -32602,
                     "message": "Missing required argument: 'type'. Supported values: \
                      find_entities, forward_edges, reverse_edges, entities_in_file, \
-                     transitive_dependencies, has_cycle.".to_string()
+                     transitive_dependencies, has_cycle, calls_in_file.".to_string()
                 }
             }));
             return;
         }
     };
 
-    match query_type {
-        "find_entities" => entities::handle_find_entities(id, args, state),
-        "forward_edges" => edges::handle_forward_edges(id, args, state),
-        "reverse_edges" => edges::handle_reverse_edges(id, args, state),
-        "entities_in_file" => entities::handle_entities_in_file(id, args, state),
-        "transitive_dependencies" => graph::handle_transitive_dependencies(id, args, state),
-        "has_cycle" => graph::handle_has_cycle(id, args, state),
-        _ => {
-            // ... error handling unchanged
+    let operation = match request::WorkspaceQueryOperation::parse(query_type) {
+        Some(operation) => operation,
+        None => {
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "error": {
@@ -94,13 +101,19 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "message": format!(
                         "Unknown query type: '{}'. Supported values: find_entities, \
                          forward_edges, reverse_edges, entities_in_file, \
-                         transitive_dependencies, has_cycle.",
+                         transitive_dependencies, has_cycle, calls_in_file.",
                         query_type
                     )
                 }
             }));
+            return;
         }
-    }
+    };
+    let mut context = prepare::PreparationContext::new();
+    let result = operation
+        .prepare(args, state, &mut context)
+        .evaluate_single(state);
+    outcome::send_single(id, args, state, result);
 }
 
 /// Run a WorkspaceIndex query with optional one-cycle semantic hydration.
@@ -112,13 +125,14 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
 /// 4. Return final results + the complete internal hydration report. The
 ///    LLM-facing projection of that report is `diagnostics::discovery_field`,
 ///    applied by the handler that serializes the response.
+#[cfg(all(test, feature = "rust"))]
 fn run_query_with_hydration<F>(
     state: &McpState,
     query_type: &str,
     query_name: &str,
     workspace_root: Option<&str>,
     query_fn: F,
-) -> (Value, usize, super::hydration::HydrationReport)
+) -> Result<(Value, usize, super::hydration::HydrationReport), String>
 where
     F: Fn(&crate::workspace::index::WorkspaceIndex) -> (Value, usize),
 {
@@ -134,16 +148,16 @@ where
         &serde_json::json!({ "name": query_name }),
     );
     if !eligible {
-        return (
+        return Ok((
             initial_results,
             initial_count,
             super::hydration::HydrationReport::default(),
-        );
+        ));
     }
 
     // Step 3: One exhaustive discovery hydration pass.
     let hydration =
-        super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root);
+        super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root)?;
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -151,12 +165,31 @@ where
         query_fn(&idx)
     };
 
-    (final_results, final_count, hydration)
+    Ok((final_results, final_count, hydration))
 }
 
 /// Extract a required string argument from the arguments object.
 fn required_str<'a>(args: &'a Value, name: &str) -> Option<&'a str> {
     args[name].as_str().filter(|s| !s.is_empty())
+}
+
+/// Extract the singular entity name used by name-bearing operations.
+///
+/// The MCP schema rejects non-strings for conforming clients, but the server
+/// boundary remains authoritative when a client bypasses or coerces schema
+/// validation. Keep absence distinct from a present value of the wrong type,
+/// and direct multi-name callers to the supported batch request form.
+fn required_name<'a>(args: &'a Value, query_type: &str) -> Result<&'a str, outcome::QueryFailure> {
+    match args.get("name") {
+        None | Some(Value::Null) => Err(outcome::QueryFailure::invalid(format!(
+            "Missing required argument: 'name' for {query_type} query."
+        ))),
+        Some(Value::String(name)) if !name.is_empty() => Ok(name),
+        Some(_) => Err(outcome::QueryFailure::invalid(
+            "Invalid argument: 'name' must be a non-empty string. For multiple names, use \
+             top-level 'queries' with one item per name.",
+        )),
+    }
 }
 
 /// Extract an optional integer argument; returns `default` if missing.
@@ -205,14 +238,8 @@ fn query_scope(
 /// `-32602` (invalid params) with the reason `WorkspaceScope` produced: the
 /// argument is a parameter of the request that cannot be satisfied, not an empty
 /// answer about the workspace.
-fn send_scope_rejection(id: &Value, message: String) {
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "error": {
-            "code": -32602,
-            "message": format!("Invalid 'withinPath' argument: {message}")
-        }
-    }));
+fn scope_failure(message: String) -> outcome::QueryFailure {
+    outcome::QueryFailure::invalid(format!("Invalid 'withinPath' argument: {message}"))
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -251,21 +278,58 @@ mod tests_hydration_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_9.rs"]
 mod tests_filesystem_discovery_cache;
 
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_entities_auto_compile.rs"]
+mod tests_entities_auto_compile;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_cycle_witness.rs"]
+mod tests_cycle_witness;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_identity_resolution.rs"]
+mod tests_identity_resolution;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_batch.rs"]
+mod tests_batch;
+
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_batch_preparation.rs"]
+mod tests_batch_preparation;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_name_validation.rs"]
+mod tests_name_validation;
+
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_calls.rs"]
 mod tests_native_calls;
 
-// Native call facts for the additional language producers (TypeScript, Java)
+// Native call facts for the additional language producers (TypeScript, Java,
+// Rust)
 // end-to-end: cross-file `reverse_edges` returns Clean-CTX-authored callers for
 // either language, without any CBM-supplied call relationship.
 #[cfg(all(test, feature = "rust", feature = "typescript", feature = "java"))]
 #[path = "../../tests/mcp/workspace_query_calls_languages.rs"]
 mod tests_native_calls_languages;
 
+// Spring Boot semantic edges through the real provide/query MCP lifecycle.
+#[cfg(all(test, feature = "rust", feature = "spring_boot"))]
+#[path = "../../tests/mcp/workspace_query_spring.rs"]
+mod tests_spring_lifecycle;
+
 // BOUND-ARROW callers (TypeScript) end-to-end: the arrow's binding name is the
 // caller, the CALLER's file asserts the fact, and WSC-004 scope holds.
 #[cfg(all(test, feature = "rust", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_calls_arrows.rs"]
 mod tests_native_calls_arrows;
+
+// Owner-aware file-local call inspection: canonical IR remains the authority,
+// while global WorkspaceIndex identity and cross-file query behavior stay
+// unchanged.
+#[cfg(all(test, feature = "rust", feature = "csharp", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_calls_in_file.rs"]
+mod tests_calls_in_file;

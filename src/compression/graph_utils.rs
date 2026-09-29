@@ -2,62 +2,11 @@
 //
 // Shared graph algorithms for meta-layer graphs.
 //
-// This module provides common graph algorithms (cycle detection, transitive
-// dependencies) that are used across Angular, Spring, and .NET meta-layer
-// graphs. Extracting these to a shared location eliminates code duplication
-// and ensures consistent behavior across frameworks.
+// This module provides shared graph algorithms used across Angular, Spring,
+// and .NET meta-layer graphs. Extracting these to a shared location eliminates
+// code duplication and ensures consistent behavior across frameworks.
 
 use std::collections::{HashMap, VecDeque};
-
-/// Check if a directed graph contains a cycle using three-color DFS.
-///
-/// # Arguments
-/// * `node_count` - Total number of nodes in the graph
-/// * `adjacency_fn` - Function that returns neighbors for a given node ID
-///
-/// # Returns
-/// `true` if at least one cycle is detected, `false` otherwise.
-///
-/// # Complexity
-/// O(V + E) time, O(V) space
-pub fn has_cycle<F>(node_count: usize, adjacency_fn: F) -> bool
-where
-    F: Fn(usize) -> Vec<usize>,
-{
-    if node_count == 0 {
-        return false;
-    }
-
-    let mut color: HashMap<usize, u8> = HashMap::with_capacity(node_count);
-    for i in 0..node_count {
-        color.insert(i, 0);
-    }
-
-    fn dfs<F>(node: usize, adj_fn: &F, color: &mut HashMap<usize, u8>) -> bool
-    where
-        F: Fn(usize) -> Vec<usize>,
-    {
-        color.insert(node, 1);
-        let neighbors = adj_fn(node);
-        for next in neighbors {
-            match color.get(&next).copied().unwrap_or(0) {
-                1 => return true,
-                0 if dfs(next, adj_fn, color) => return true,
-                _ => {}
-            }
-        }
-        color.insert(node, 2);
-        false
-    }
-
-    for node in 0..node_count {
-        if color.get(&node).copied().unwrap_or(0) == 0 && dfs(node, &adjacency_fn, &mut color) {
-            return true;
-        }
-    }
-
-    false
-}
 
 /// Find all cycles in a directed graph using DFS.
 ///
@@ -192,46 +141,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn has_cycle_empty_graph() {
-        assert!(!has_cycle(0, |_| vec![]));
-    }
-
-    #[test]
-    fn has_cycle_single_node() {
-        assert!(!has_cycle(1, |_| vec![]));
-    }
-
-    #[test]
-    fn has_cycle_two_nodes_no_cycle() {
-        let adj = |i: usize| match i {
-            0 => vec![1],
-            _ => vec![],
-        };
-        assert!(!has_cycle(2, adj));
-    }
-
-    #[test]
-    fn has_cycle_two_nodes_with_cycle() {
-        let adj = |i: usize| match i {
-            0 => vec![1],
-            1 => vec![0],
-            _ => vec![],
-        };
-        assert!(has_cycle(2, adj));
-    }
-
-    #[test]
-    fn has_cycle_three_node_cycle() {
-        let adj = |i: usize| match i {
-            0 => vec![1],
-            1 => vec![2],
-            2 => vec![0],
-            _ => vec![],
-        };
-        assert!(has_cycle(3, adj));
-    }
 
     #[test]
     fn find_cycles_empty_graph() {

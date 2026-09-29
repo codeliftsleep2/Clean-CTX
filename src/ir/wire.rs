@@ -13,7 +13,9 @@
 //    └── opcode (always first element)
 
 use super::compiler::CompiledIR;
-use super::opcodes::CoreOp;
+use super::opcodes::{
+    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
+};
 use serde_json::{Value, json};
 
 /// Errors during wire format decoding.
@@ -56,6 +58,12 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             vec!["DEF_F".into(), cid.clone(), fid.clone(), name.clone()]
         }
         CoreOp::DefInterface(id, name) => vec!["DEF_I".into(), id.clone(), name.clone()],
+        CoreOp::DefInterfaceMethod(iid, mid, name) => {
+            vec!["DEF_IM".into(), iid.clone(), mid.clone(), name.clone()]
+        }
+        CoreOp::DefInterfaceField(iid, fid, name) => {
+            vec!["DEF_IF".into(), iid.clone(), fid.clone(), name.clone()]
+        }
         CoreOp::Param(mid, pid, ty, name) => {
             vec![
                 "SIG".into(),
@@ -67,6 +75,33 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
         }
         CoreOp::Return(mid, ty) => vec!["RET".into(), mid.clone(), ty.clone()],
         CoreOp::FieldType(fid, ty) => vec!["FIELD_T".into(), fid.clone(), ty.clone()],
+        CoreOp::MethodModifiers(mid, modifiers) => {
+            let mut tuple = vec!["MOD_M".into(), mid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::ClassModifiers(cid, modifiers) => {
+            let mut tuple = vec!["MOD_C".into(), cid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::InterfaceModifiers(iid, modifiers) => {
+            let mut tuple = vec!["MOD_I".into(), iid.clone()];
+            tuple.extend(modifiers.iter().map(|modifier| modifier.as_str().into()));
+            tuple
+        }
+        CoreOp::ControlSummary(mid, summaries) => {
+            let mut tuple = vec!["CTRL_SUM".into(), mid.clone()];
+            tuple.extend(summaries.iter().map(|summary| summary.as_str().into()));
+            tuple
+        }
+        CoreOp::PatternFacts(mid, facts) => {
+            let mut tuple = vec!["PAT_FACT".into(), mid.clone()];
+            for fact in facts {
+                fact.append_serialized(&mut tuple);
+            }
+            tuple
+        }
         CoreOp::Flags(tid, flags) => {
             let mut v = vec!["FLAGS".into(), tid.clone()];
             v.extend(flags.iter().cloned());
@@ -78,6 +113,9 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         CoreOp::Extends(child, parent) => vec!["EXT".into(), child.clone(), parent.clone()],
+        CoreOp::InterfaceExtends(child, parent) => {
+            vec!["EXT_I".into(), child.clone(), parent.clone()]
+        }
         CoreOp::Implements(cid, iid) => vec!["IMPL".into(), cid.clone(), iid.clone()],
         CoreOp::Injects(cid, deps) => {
             let mut v = vec!["INJECTS".into(), cid.clone()];
@@ -123,10 +161,10 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             vec!["CTRL".into(), mid.clone(), kind.clone(), target.clone()]
         }
         CoreOp::SideEffect(mid, effect_type) => {
-            vec!["EFFECT".into(), mid.clone(), effect_type.clone()]
+            vec!["EFFECT".into(), mid.clone(), effect_type.as_str().into()]
         }
         CoreOp::ExecutionContext(mid, context_type) => {
-            vec!["CTX".into(), mid.clone(), context_type.clone()]
+            vec!["CTX".into(), mid.clone(), context_type.as_str().into()]
         }
         // Structural invocation. Dual shape: the exact form keeps the
         // established 4-tuple byte-for-byte, and the spread qualifier is an
@@ -191,6 +229,12 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 None
             }
         }
+        "DEF_IM" => (tuple.len() >= 4).then(|| {
+            CoreOp::DefInterfaceMethod(tuple[1].clone(), tuple[2].clone(), tuple[3].clone())
+        }),
+        "DEF_IF" => (tuple.len() >= 4).then(|| {
+            CoreOp::DefInterfaceField(tuple[1].clone(), tuple[2].clone(), tuple[3].clone())
+        }),
         "SIG" => {
             if tuple.len() >= 5 {
                 Some(CoreOp::Param(
@@ -217,6 +261,60 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
                 None
             }
         }
+        "MOD_M" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::MethodModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
+        "MOD_C" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::ClassModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
+        "MOD_I" => {
+            if tuple.len() >= 3 {
+                let modifiers = tuple[2..]
+                    .iter()
+                    .map(|value| DeclarationModifier::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::InterfaceModifiers(tuple[1].clone(), modifiers))
+            } else {
+                None
+            }
+        }
+        "CTRL_SUM" => {
+            if tuple.len() >= 3 {
+                let summaries = tuple[2..]
+                    .iter()
+                    .map(|value| ControlSummary::from_serialized(value))
+                    .collect::<Option<Vec<_>>>()?;
+                Some(CoreOp::ControlSummary(tuple[1].clone(), summaries))
+            } else {
+                None
+            }
+        }
+        "PAT_FACT" => {
+            if tuple.len() >= 3 {
+                Some(CoreOp::PatternFacts(
+                    tuple[1].clone(),
+                    PatternFact::parse_all(&tuple[2..])?,
+                ))
+            } else {
+                None
+            }
+        }
         "FLAGS" => {
             if tuple.len() >= 3 {
                 Some(CoreOp::Flags(tuple[1].clone(), tuple[2..].to_vec()))
@@ -237,6 +335,9 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
             } else {
                 None
             }
+        }
+        "EXT_I" => {
+            (tuple.len() >= 3).then(|| CoreOp::InterfaceExtends(tuple[1].clone(), tuple[2].clone()))
         }
         "IMPL" => {
             if tuple.len() >= 3 {
@@ -323,14 +424,20 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
         }
         "EFFECT" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::SideEffect(tuple[1].clone(), tuple[2].clone()))
+                Some(CoreOp::SideEffect(
+                    tuple[1].clone(),
+                    SideEffectKind::from_serialized(&tuple[2])?,
+                ))
             } else {
                 None
             }
         }
         "CTX" => {
             if tuple.len() >= 3 {
-                Some(CoreOp::ExecutionContext(tuple[1].clone(), tuple[2].clone()))
+                Some(CoreOp::ExecutionContext(
+                    tuple[1].clone(),
+                    ExecutionContextKind::from_serialized(&tuple[2])?,
+                ))
             } else {
                 None
             }

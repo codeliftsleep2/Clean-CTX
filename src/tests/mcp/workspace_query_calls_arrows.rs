@@ -83,7 +83,8 @@ fn reverse_edges(
             let count = value.as_array().map_or(0, Vec::len);
             (value, count)
         },
-    );
+    )
+    .expect("hydration succeeds");
     (result, report)
 }
 

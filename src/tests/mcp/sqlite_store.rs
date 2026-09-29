@@ -33,6 +33,54 @@ fn test_sqlite_store_open_and_migrate() {
 }
 
 #[test]
+fn persisted_replay_rejects_a_malformed_sequence_tuple() {
+    use crate::ir::delta::{SequenceDeltaComputer, SequenceEdit};
+
+    let mut store = in_memory_store();
+    let file = "/test/malformed.ts";
+    let baseline = test_ir(file, 1);
+    let binary = crate::ir::binary_wire::encode(&baseline);
+    let context_id = store
+        .save_context(
+            file,
+            Fidelity::Low,
+            "baseline",
+            Some(&binary),
+            "malformed-hash",
+            0,
+            0,
+        )
+        .expect("save baseline");
+    let mut target = baseline.clone();
+    target.version = 2;
+    target
+        .instructions
+        .push(CoreOp::Return("m1".into(), "void".into()));
+    let mut delta = SequenceDeltaComputer::new()
+        .compute(&baseline, &target)
+        .expect("insert delta");
+    let SequenceEdit::Insert { instruction, .. } = &mut delta.edits[0] else {
+        panic!("expected insert");
+    };
+    instruction.pop();
+    store
+        .append_delta(
+            &context_id,
+            &serde_json::to_vec(&delta).expect("delta JSON"),
+            Some("sequence_v2"),
+        )
+        .expect("append malformed delta fixture");
+
+    let error = store
+        .load_context_with_deltas(file, None)
+        .expect_err("malformed replay must fail");
+    assert!(
+        error.to_string().contains("invalid canonical tuple"),
+        "{error}"
+    );
+}
+
+#[test]
 fn test_sqlite_save_and_load_round_trip() {
     let mut store = in_memory_store();
 
@@ -79,6 +127,33 @@ fn test_sqlite_save_with_ir_blob() {
         .expect("save_context with IR should succeed");
     assert!(!id.is_empty());
     assert!(store.has_context("/test/file.ts"));
+}
+
+#[test]
+fn sqlite_replay_rejects_mismatched_binary_file_identity() {
+    let mut store = in_memory_store();
+    let ir_binary = crate::ir::binary_wire::encode(&test_ir("/other/file.ts", 1));
+    store
+        .save_context(
+            "/test/file.ts",
+            Fidelity::Medium,
+            "compressed",
+            Some(&ir_binary),
+            "mismatched_identity",
+            0,
+            0,
+        )
+        .expect("store mismatched fixture");
+
+    let error = store
+        .load_context_with_deltas("/test/file.ts", None)
+        .expect_err("persisted owner and binary file identity must agree");
+    assert!(
+        error
+            .to_string()
+            .contains("persisted binary file identity mismatch"),
+        "{error}"
+    );
 }
 
 #[test]

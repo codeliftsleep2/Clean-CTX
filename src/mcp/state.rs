@@ -18,10 +18,10 @@
 // is single-threaded by design) and the config is shared immutably.
 
 use crate::cache::LocalStateCache;
+use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::dictionary::PathDictionary;
 use crate::ir::replay::ContextState;
-use crate::layers::LayerRegistry;
 use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
@@ -72,6 +72,9 @@ macro_rules! lock_or_recover {
         }
     };
 }
+
+#[path = "durable_semantics.rs"]
+pub(crate) mod durable_semantics;
 
 /// Per-file CBM filter state: symbols to skip during compression.
 ///
@@ -153,6 +156,17 @@ pub struct McpState {
     /// Initialized from `config.persistence` — `None` if disabled or
     /// if DB open fails.
     pub persistence_store: Mutex<Option<BufferedStore>>,
+    /// Exact durable persistence path owned by each session-local IR alias.
+    persisted_paths: Mutex<HashMap<String, String>>,
+    context_fidelities: Mutex<HashMap<String, Fidelity>>,
+    semantic_edge_snapshots:
+        Mutex<HashMap<String, Vec<crate::layers::meta::semantic::SemanticEdge>>>,
+    pending_semantic_transitions: Mutex<
+        HashMap<
+            durable_semantics::PendingTransitionKey,
+            durable_semantics::PendingSemanticTransition,
+        >,
+    >,
 
     /// Tracks which cache breakpoints have already been emitted this session.
     /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
@@ -175,42 +189,18 @@ pub struct McpState {
     /// it is added here and the capture pipeline drops it during compression.
     pub cbm_filter: Mutex<CbmFilterState>,
 
-    /// Phase 1 (Fix D): Cache of rendered LLM-optimized hierarchical IR text,
-    /// keyed by path alias (e.g., "α1").
-    ///
-    /// Cached on first render after a compile; invalidated when a delta is
-    /// applied to the file or when `restore_context` is called for the file.
-    /// This avoids re-rendering the full HIR on every delta-mode call,
-    /// saving ~O(n) where n is the file size in HIR nodes.
+    /// Rendered LLM hierarchy cache keyed by path alias.
     pub llm_text_cache: Mutex<HashMap<String, String>>,
 
-    /// WorkspaceIndex — cross-file semantic index populated from per-file
-    /// compilation. Updated on every file compilation (provide_code_context,
-    /// compress_code_context, delta_code_context, apply_edit) by draining
-    /// stale edges for that file and inserting fresh ones from the latest
-    /// MetaLayerPass extraction.
+    /// Cross-file semantic index populated by production compilation.
     pub workspace_index: RwLock<crate::workspace::index::WorkspaceIndex>,
 
-    /// Session-scoped hydration discovery completion cache.
-    ///
-    /// Records which `workspace_query` hydration discovery targets have
-    /// already been searched for a project/root under the current workspace
-    /// generation, so a repeated query does not re-run the CBM project search
-    /// or the filesystem fallback scan. It stores no candidates, entities,
-    /// edges, or query answers — the WorkspaceIndex above remains the single
-    /// authority for query evaluation. See `crate::mcp::discovery_cache`.
-    ///
-    /// Crate-visible with its type: this is session-internal state, not part of
-    /// the crate's public API surface.
+    /// Session-scoped record of completed hydration discovery.
     pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
 
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
-
-    /// Layer registry for language/meta-layer dispatch.
-    /// Initialized once at startup from the enabled Cargo features.
-    pub registry: LayerRegistry,
 
     /// A-04: Metrics registry for operational signals.
     /// Provides counters, histograms, and gauges for key metrics.
@@ -257,8 +247,7 @@ impl McpState {
         // Rehydrate session stats from DB if available
         let mut session_stats = SessionStats::new();
         if let Some(ref store) = persistence_store {
-            // Flush any pending writes, then rebuild stats from DB
-            store.flush();
+            // Rebuild only from already committed durable state.
             if let Some(guard) = store.sqlite() {
                 match guard.rebuild_stats() {
                     Ok(stats) => {
@@ -290,6 +279,10 @@ impl McpState {
             session_stats: Mutex::new(session_stats),
             context_store: InMemoryContextStore::new(),
             persistence_store: Mutex::new(persistence_store),
+            persisted_paths: Mutex::new(HashMap::new()),
+            context_fidelities: Mutex::new(HashMap::new()),
+            semantic_edge_snapshots: Mutex::new(HashMap::new()),
+            pending_semantic_transitions: Mutex::new(HashMap::new()),
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),
@@ -299,7 +292,6 @@ impl McpState {
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
             proxy_port,
-            registry: LayerRegistry::new(),
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
             proxy_child: Mutex::new(None),
             proxy_cache: None,
@@ -460,6 +452,26 @@ impl McpState {
         self.dict_lock().get_or_create_alias(path)
     }
 
+    /// Resolve a session-local file alias to its durable canonical path.
+    pub fn path_for_alias(&self, alias: &str) -> Option<String> {
+        self.dict_lock().path_for_alias(alias).map(str::to_owned)
+    }
+
+    pub fn alias_for_path(&self, path: &str) -> Option<String> {
+        self.dict_lock().alias_for_path(path).map(str::to_owned)
+    }
+
+    pub fn remember_context_fidelity(&self, alias: &str, fidelity: Fidelity) {
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities")
+            .insert(alias.to_string(), fidelity);
+    }
+
+    pub fn context_fidelity(&self, alias: &str) -> Option<Fidelity> {
+        lock_or_recover!(self.context_fidelities.lock(), "context_fidelities")
+            .get(alias)
+            .copied()
+    }
+
     /// Get or create a bundle alias (thread-safe convenience method).
     pub fn get_or_create_bundle_alias(&self, component_name: String) -> String {
         self.dict_lock().get_or_create_bundle_alias(component_name)
@@ -546,6 +558,7 @@ impl McpState {
         self.cbm_filter_lock().skip_sets.get(file_path).cloned()
     }
 
+    #[cfg(test)]
     pub fn flush_persistence(&self) -> usize {
         let guard = self.persistence_store_lock();
         if let Some(ref store) = *guard {

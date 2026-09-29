@@ -29,6 +29,18 @@ use super::*;
 /// Returns `Some(NgRxShape)` with detected actions, reducers, effects,
 /// selectors, entity adapters, and store usage.
 pub fn extract_ngrx_shape(source: &str, _fidelity: Fidelity) -> Option<NgRxShape> {
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    extract_ngrx_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_ngrx_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<NgRxShape> {
+    #[cfg(test)]
+    super::extraction_metrics::record_extraction();
+
     // Import gate: skip non-NgRx files
     if !has_ngrx_imports(source) {
         return None;
@@ -37,33 +49,33 @@ pub fn extract_ngrx_shape(source: &str, _fidelity: Fidelity) -> Option<NgRxShape
     let mut shape = NgRxShape::default();
 
     // Extract feature name from createFeature or StoreModule.forFeature
-    extract_feature_name(source, &mut shape);
+    extract_feature_name(source, &mut shape, lexical_regions);
 
     // Extract action creators
-    extract_actions(source, &mut shape);
+    extract_actions(source, &mut shape, lexical_regions);
 
     // Extract reducer
-    extract_reducer(source, &mut shape);
+    extract_reducer(source, &mut shape, lexical_regions);
 
     // Extract effects
-    extract_effects(source, &mut shape);
+    extract_effects(source, &mut shape, lexical_regions);
 
     // Extract selectors
-    extract_selectors(source, &mut shape);
+    extract_selectors(source, &mut shape, lexical_regions);
 
     // Extract entity adapter
-    extract_entity_adapter(source, &mut shape);
+    extract_entity_adapter(source, &mut shape, lexical_regions);
 
     // Extract the enclosing component class name (for Component -> Store
     // graph edges). Must run before `extract_store_injections` so the
     // component name is available when wiring the edge.
-    extract_component_name(source, &mut shape);
+    extract_component_name(source, &mut shape, lexical_regions);
 
     // Extract store injections
-    extract_store_injections(source, &mut shape);
+    extract_store_injections(source, &mut shape, lexical_regions);
 
     // Extract dispatch/select call sites
-    extract_call_sites(source, &mut shape);
+    extract_call_sites(source, &mut shape, lexical_regions);
 
     if shape.is_empty() {
         return None;
@@ -74,12 +86,16 @@ pub fn extract_ngrx_shape(source: &str, _fidelity: Fidelity) -> Option<NgRxShape
 
 /// Extract the feature name from `createFeature({name: '...'})` or
 /// `StoreModule.forFeature('...', ...)`.
-fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
+fn extract_feature_name(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Pattern: `createFeature({ name: 'featureName', ... })`
     if let Some(idx) = source.find("createFeature({") {
         // Round-11 audit: reject when the match is inside a comment/string
         // (e.g. a `// createFeature({ name: 'x' })` trailing comment).
-        if crate::angular_meta::util::is_inside_comment_or_string(source, idx) {
+        if lexical_regions.contains(idx) {
             return;
         }
         let rest = &source[idx + "createFeature({".len()..];
@@ -107,7 +123,7 @@ fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
     // Pattern: `StoreModule.forFeature('featureName', ...)`
     if let Some(idx) = source.find("StoreModule.forFeature(") {
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, idx) {
+        if lexical_regions.contains(idx) {
             return;
         }
         let rest = &source[idx + "StoreModule.forFeature(".len()..];
@@ -135,14 +151,18 @@ fn extract_feature_name(source: &str, shape: &mut NgRxShape) {
 /// - `const load = createAction('[X] Event')`
 /// - `const load = createAction('[X] Event', (u: any) => ({ u }))`
 /// - `const load = createAction<{id: string}>('[X] Event')` (generic form)
-fn extract_actions(source: &str, shape: &mut NgRxShape) {
+fn extract_actions(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Multi-line aware: find each ` = createAction(` or
     // ` = createAction<` (generic form) and collect the full call body.
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createAction") {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + " = createAction".len();
             continue;
         }
@@ -217,7 +237,11 @@ fn extract_actions(source: &str, shape: &mut NgRxShape) {
 ///   reducer: createReducer(...) })` — per the plan's Gotchas section,
 ///   the inline `: createReducer(` form must also be recognized, not
 ///   just the ` = createReducer(` assignment form.
-fn extract_reducer(source: &str, shape: &mut NgRxShape) {
+fn extract_reducer(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Multi-line aware: find each ` = createReducer(` or the inline
     // `: createReducer(` (inside createFeature) and collect the full
     // call body (which may span multiple lines).
@@ -226,7 +250,7 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the match is inside a comment/string
         // (e.g. a `// createReducer(...)` trailing comment).
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "createReducer(".len();
             continue;
         }
@@ -301,13 +325,14 @@ fn extract_reducer(source: &str, shape: &mut NgRxShape) {
         // Extract transitions from `on(action, ...)` calls
         let mut transitions = Vec::new();
         let mut on_search = 0;
+        let body_regions = crate::meta_util::LexicalRegions::new(&body);
         while let Some(on_idx) = body[on_search..].find("on(") {
             let abs_on = on_search + on_idx;
             // Round-11 audit: reject `on(` matches inside comments or
             // string literals within the reducer body (e.g. a
             // `// on(someAction)` comment inside the reducer, or an
             // `onPress(` string) — they are not real transitions.
-            if crate::angular_meta::util::is_inside_comment_or_string(&body, abs_on) {
+            if body_regions.contains(abs_on) {
                 on_search = abs_on + "on(".len() + 1;
                 continue;
             }
@@ -386,14 +411,18 @@ fn extract_state_summary(after_on: &str) -> String {
 }
 
 /// Extract effects from `createEffect(() => ...)` calls.
-fn extract_effects(source: &str, shape: &mut NgRxShape) {
+fn extract_effects(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Multi-line aware: find each ` = createEffect(` and collect the
     // full call body (which may span multiple lines).
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createEffect(") {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + " = createEffect(".len();
             continue;
         }

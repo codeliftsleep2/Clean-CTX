@@ -16,7 +16,7 @@
 //   - F-02: MetaLayer::extract is called after the main compile loop.
 //   - F-03: PatternRecognizer::recognize is called after meta extraction.
 //   - F-27: `current_method` is tracked directly (O(1) instead of O(n) via find_last_method).
-//   - F-28: Flags are accumulated in a `current_method_flags` Vec (O(1) per capture).
+//   - F-28: Control summaries accumulate in a typed per-method Vec.
 //   - F-29: Methods/fields without a current_class are skipped (not silently emitted with "").
 //   - F-30: `compile` returns `CompileError` (a typed enum) instead of `Box<dyn Error>`.
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
@@ -29,7 +29,7 @@ use crate::compression::Fidelity;
 use crate::layers::meta::semantic::SemanticEdge;
 
 /// The compiled IR for a single file.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompiledIR {
     /// File identifier (path alias)
     pub file_id: String,
@@ -80,6 +80,8 @@ pub struct IRCompiler {
     language_layers: Vec<Box<dyn LanguageLayer>>,
     /// Pattern recognizers (Layer 4)
     pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
+    /// Active runtime configuration for framework meta-layer opt-outs.
+    config: Option<crate::config::CleanCtxConfig>,
     /// Semantic edges captured from the most recent compile_inner() call.
     /// Populated by draining PassContext.semantic_edges after pipeline.run().
     /// Reset to empty at the start of each new compilation.
@@ -94,8 +96,14 @@ impl IRCompiler {
             id_counter: 0,
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
+            config: None,
             semantic_edges: Vec::new(),
         }
+    }
+
+    /// Set the runtime configuration used by framework meta-layers.
+    pub fn set_config(&mut self, config: crate::config::CleanCtxConfig) {
+        self.config = Some(config);
     }
 
     /// Add a language layer (Layer 2).
@@ -211,6 +219,7 @@ impl IRCompiler {
     ) -> Result<CompiledIR, CompileError> {
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
+        ctx.config = self.config.clone();
         ctx.canonical_path = canonical_path.map(|p| p.to_string());
         ctx.language = Some(language);
         ctx.query_string = query_string.to_string();

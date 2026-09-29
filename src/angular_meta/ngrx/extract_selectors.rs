@@ -18,14 +18,18 @@
 use super::*;
 
 /// Extract selectors from `createSelector(...)` calls.
-pub(super) fn extract_selectors(source: &str, shape: &mut NgRxShape) {
+pub(super) fn extract_selectors(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Multi-line aware: find each ` = createSelector(` and collect the
     // full call body (which may span multiple lines).
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createSelector(") {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + " = createSelector(".len();
             continue;
         }
@@ -65,14 +69,18 @@ pub(super) fn extract_selectors(source: &str, shape: &mut NgRxShape) {
 }
 
 /// Extract entity adapter from `createEntityAdapter<T>({...})` calls.
-pub(super) fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
+pub(super) fn extract_entity_adapter(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Multi-line aware: find each ` = createEntityAdapter<` and collect
     // the full call body (which may span multiple lines).
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find(" = createEntityAdapter<") {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + " = createEntityAdapter<".len();
             continue;
         }
@@ -149,7 +157,7 @@ pub(super) fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
     while let Some(idx) = source[data_search..].find("EntityCollectionServiceBase<") {
         let abs_idx = data_search + idx;
         // Round-11 audit: reject when the match is inside a comment/string.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             data_search = abs_idx + "EntityCollectionServiceBase<".len();
             continue;
         }
@@ -173,14 +181,18 @@ pub(super) fn extract_entity_adapter(source: &str, shape: &mut NgRxShape) {
 /// Extract the enclosing component class name from a `@Component`
 /// decorator. The class name is the identifier after `export class`
 /// (or `class`) that follows the decorator.
-pub(super) fn extract_component_name(source: &str, shape: &mut NgRxShape) {
+pub(super) fn extract_component_name(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Find `@Component(` decorator, then the class declaration after it.
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("@Component(") {
         let abs_idx = search_from + idx;
         // Round-11 audit: reject when the decorator match is inside a
         // comment/string (e.g. a `// @Component({...})` trailing comment).
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "@Component(".len() + 1;
             continue;
         }
@@ -219,7 +231,11 @@ pub(super) fn extract_component_name(source: &str, shape: &mut NgRxShape) {
 }
 
 /// Extract store injections from constructor parameters.
-pub(super) fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
+pub(super) fn extract_store_injections(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Track absolute byte offsets so matches inside trailing comments or
     // string literals are rejected (Round-11 audit).
     let mut line_start = 0usize;
@@ -236,7 +252,7 @@ pub(super) fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
         // Pattern: `private store: Store<AppState>` or `store: Store<AppState>`
         if let Some(idx) = trimmed.find(": Store<") {
             // Round-11 audit: reject when the match is inside a comment/string.
-            if crate::angular_meta::util::is_inside_comment_or_string(source, trimmed_abs + idx) {
+            if lexical_regions.contains(trimmed_abs + idx) {
                 line_start += line.len() + 1;
                 continue;
             }
@@ -268,7 +284,11 @@ pub(super) fn extract_store_injections(source: &str, shape: &mut NgRxShape) {
 /// (`store.select(selectUser({ id }))`). We now scan the whole source and
 /// use `collect_call_body` so string-aware paren matching handles nested
 /// args and multi-line bodies.
-pub(super) fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
+pub(super) fn extract_call_sites(
+    source: &str,
+    shape: &mut NgRxShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     for (pattern, kind) in [
         ("this.store.dispatch(", SiteKind::Dispatch),
         ("store.dispatch(", SiteKind::Dispatch),
@@ -299,7 +319,7 @@ pub(super) fn extract_call_sites(source: &str, shape: &mut NgRxShape) {
 
             // Round-11 audit: reject matches inside trailing comments, block
             // comments, or string literals.
-            if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+            if lexical_regions.contains(abs_idx) {
                 search_from = abs_idx + pattern.len();
                 continue;
             }

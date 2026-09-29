@@ -2,7 +2,8 @@
 
 use super::{IRPass, PassContext, PassError, locate_method_body};
 use crate::compaction::{
-    extract_class_name, extract_field, extract_method_sig, extract_rust_struct_name,
+    extract_bare_class_name, extract_bare_field_name, extract_field, extract_method_sig,
+    extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
@@ -10,8 +11,9 @@ use crate::ir::calls::{
     ARROW_NAME_CAPTURE, ARROW_ROOT_CAPTURE, CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE,
     CALL_SPREAD_CAPTURE, capture_query,
 };
-use crate::ir::opcodes::{CoreOp, FLAG_IF, FLAG_LOOP, FLAG_RET, FLAG_THROW};
+use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::symbol_table::SymbolKind;
+use std::collections::HashSet;
 
 /// Pass 1: Core IR emission from tree-sitter captures.
 pub struct CoreIRPass;
@@ -60,11 +62,12 @@ impl IRPass for CoreIRPass {
             &source,
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
-                "class.root" => Some(extract_class_name(raw)),
+                "class.root" => Some(extract_bare_class_name(raw)),
+                "interface.root" => Some(extract_bare_class_name(raw)),
                 "struct.root" | "trait.root" | "impl.root" => Some(extract_rust_struct_name(raw)),
                 "enum.root" => {
                     if query_string == crate::queries::CS_QUERY {
-                        Some(extract_class_name(raw))
+                        Some(extract_bare_class_name(raw))
                     } else {
                         Some(extract_rust_struct_name(raw))
                     }
@@ -78,6 +81,22 @@ impl IRPass for CoreIRPass {
             pass_name: self.name().to_string(),
             message: format!("capture pipeline error: {error}"),
         })?;
+
+        // TypeScript places `export` on an `export_statement` wrapper rather
+        // than inside the declaration node captured as `class.root` or
+        // `interface.root`. Join the structural wrapper capture to its exact
+        // declaration child by source span. This deliberately does not inspect
+        // descendant or surrounding source text.
+        let exported_classes: HashSet<(usize, usize)> = captures
+            .iter()
+            .filter(|cap| cap.name == "export.class")
+            .map(|cap| (cap.start_byte, cap.end_byte))
+            .collect();
+        let exported_interfaces: HashSet<(usize, usize)> = captures
+            .iter()
+            .filter(|cap| cap.name == "export.interface")
+            .map(|cap| (cap.start_byte, cap.end_byte))
+            .collect();
 
         for cap in &captures {
             // Callable-scope maintenance is independent of filtering: the walk
@@ -117,12 +136,18 @@ impl IRPass for CoreIRPass {
                     .call_producer
                     .record_arrow_name(cap.match_index, &cap.text),
                 ARROW_ROOT_CAPTURE => register_arrow_capture(state, cap, &file_id),
-                "class.root" | "interface.root" | "struct.root" | "enum.root" | "trait.root"
-                | "record.root" => {
+                "export.class" | "export.interface" => {}
+                "class.root" | "struct.root" | "enum.root" | "trait.root" | "record.root" => {
                     let class_id = state.next_id("C");
                     state
                         .instructions
                         .push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
+                    if exported_classes.contains(&(cap.start_byte, cap.end_byte)) {
+                        state.instructions.push(CoreOp::ClassModifiers(
+                            class_id.clone(),
+                            vec![DeclarationModifier::Export],
+                        ));
+                    }
                     state.push_type_scope(class_id.clone(), cap.end_byte);
                     state.layer_context.current_class_name = Some(cap.raw_text.clone());
                     state.layer_context.current_class_bare_name = Some(cap.text.clone());
@@ -140,19 +165,60 @@ impl IRPass for CoreIRPass {
                         ));
                     }
                 }
+                "interface.root" => {
+                    let interface_id = state.next_id("I");
+                    state
+                        .instructions
+                        .push(CoreOp::DefInterface(interface_id.clone(), cap.text.clone()));
+                    if exported_interfaces.contains(&(cap.start_byte, cap.end_byte)) {
+                        state.instructions.push(CoreOp::InterfaceModifiers(
+                            interface_id.clone(),
+                            vec![DeclarationModifier::Export],
+                        ));
+                    }
+                    state.push_interface_scope(interface_id.clone(), cap.end_byte);
+                    state.layer_context.current_class_name = Some(cap.raw_text.clone());
+                    state.layer_context.current_class_bare_name = Some(cap.text.clone());
+                    state.layer_context.symbol_table_mut().register(
+                        interface_id,
+                        cap.text.clone(),
+                        SymbolKind::Interface,
+                        &file_id,
+                    );
+                    for layer in state.language_layers.iter_mut() {
+                        state.instructions.extend(layer.process_capture(
+                            &cap.name,
+                            &cap.raw_text,
+                            &mut state.layer_context,
+                        ));
+                    }
+                }
                 "impl.root" => process_impl_capture(state, cap),
                 "method.root" | "constructor.root" | "func.root" => {
                     process_method_capture(state, cap, &file_id, fidelity, focus.as_ref());
                 }
                 "field.root" => {
                     state.refresh_type_owner(cap.start_byte);
-                    let Some(class_id) = state.current_class.clone() else {
+                    let field_name = extract_bare_field_name(&cap.raw_text);
+                    if field_name.is_empty() {
                         continue;
-                    };
+                    }
                     let field_id = state.next_id("F");
-                    state
-                        .instructions
-                        .push(CoreOp::DefField(class_id, field_id, cap.text.clone()));
+                    if let Some(class_id) = state.current_class.clone() {
+                        state.instructions.push(CoreOp::DefField(
+                            class_id,
+                            field_id.clone(),
+                            field_name.clone(),
+                        ));
+                    } else if let Some(interface_id) = state.current_interface.clone() {
+                        state.instructions.push(CoreOp::DefInterfaceField(
+                            interface_id,
+                            field_id.clone(),
+                            field_name.clone(),
+                        ));
+                    } else {
+                        continue;
+                    }
                     for layer in state.language_layers.iter_mut() {
                         state.instructions.extend(layer.process_capture(
                             &cap.name,
@@ -162,7 +228,7 @@ impl IRPass for CoreIRPass {
                     }
                 }
                 "import.root" | "package.root" => {
-                    state.emit_import_ir(&cap.text);
+                    state.emit_import_ir(&cap.raw_text);
                     for layer in state.language_layers.iter_mut() {
                         state.instructions.extend(layer.process_capture(
                             &cap.name,
@@ -173,28 +239,29 @@ impl IRPass for CoreIRPass {
                 }
                 "type.root" => {
                     let alias_id = state.next_id("T");
-                    state
-                        .instructions
-                        .push(CoreOp::TypeAlias(alias_id, cap.text.clone()));
+                    state.instructions.push(CoreOp::TypeAlias(
+                        alias_id,
+                        canonical_type_alias_target(&cap.raw_text),
+                    ));
                     dispatch_capture(state, cap, false);
                 }
                 "mod.root" => dispatch_capture(state, cap, false),
-                "if.root" => push_flag(state, FLAG_IF),
-                "for.root" | "while.root" | "loop.root" => push_flag(state, FLAG_LOOP),
-                "return.root" => push_flag(state, FLAG_RET),
-                "throw.root" => push_flag(state, FLAG_THROW),
+                "if.root" => push_control_summary(state, ControlSummary::Branch),
+                "for.root" | "while.root" | "loop.root" => {
+                    push_control_summary(state, ControlSummary::Loop);
+                }
+                "return.root" => push_control_summary(state, ControlSummary::Return),
+                "throw.root" => push_control_summary(state, ControlSummary::Throw),
                 "do.root" | "try.root" | "switch.root" | "match.root" => {
-                    push_flag(state, FLAG_IF);
+                    push_control_summary(state, ControlSummary::Branch);
                 }
                 _ => dispatch_capture(state, cap, false),
             }
         }
 
-        // Settle the last callable's call facts BEFORE flushing its method
-        // flags, so a caller's `CALL` ops stay adjacent to the caller's own
-        // instruction region (the established trailing-Flags contract).
+        // Settle the last callable's call facts before flushing its summaries.
         state.flush_callable_calls();
-        state.flush_method_flags();
+        state.flush_control_summaries();
         state.captures = captures.iter().map(CapturedNode::to_entry).collect();
         Ok(())
     }
@@ -232,11 +299,11 @@ fn process_method_capture(
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
 ) {
-    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+    let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
     };
 
-    state.flush_method_flags();
+    state.flush_control_summaries();
     let method_id = state.next_id("M");
     state.current_method = Some(method_id.clone());
     // Native call facts: this declaration's source span owns every invocation
@@ -244,7 +311,7 @@ fn process_method_capture(
     state.push_callable_scope(method_id.clone(), cap.start_byte, cap.end_byte);
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
-    let method_name = state.emit_method_ir(&class_id, &method_id, &cap.text);
+    let method_name = state.emit_method_ir(&owner, &method_id, &cap.text);
 
     if fidelity == Fidelity::Edit
         && focus.is_none_or(|focused| focused.contains(&method_name))
@@ -266,15 +333,16 @@ fn process_method_capture(
 ///
 /// `None` means the declaration has no home in this compilation (a member
 /// declaration outside every type), and the caller must register nothing.
-fn resolve_callable_class(
+fn resolve_callable_owner(
     state: &mut PassContext,
     cap: &CapturedNode,
     file_id: &str,
-) -> Option<String> {
+) -> Option<super::TypeOwner> {
     state.refresh_type_owner(cap.start_byte);
-    match state.current_class.clone() {
-        Some(class_id) => Some(class_id),
-        None if cap.name == "func.root" || cap.name == ARROW_ROOT_CAPTURE => {
+    match (state.current_class.clone(), state.current_interface.clone()) {
+        (Some(class_id), None) => Some(super::TypeOwner::Class(class_id)),
+        (None, Some(interface_id)) => Some(super::TypeOwner::Interface(interface_id)),
+        (None, None) if cap.name == "func.root" || cap.name == ARROW_ROOT_CAPTURE => {
             let class_id = state.next_id("C");
             let file_class = format!("__file_{file_id}");
             state
@@ -283,9 +351,9 @@ fn resolve_callable_class(
             state.push_file_scope(class_id.clone());
             state.layer_context.current_class_name = Some(file_class.clone());
             state.layer_context.current_class_bare_name = Some(file_class);
-            Some(class_id)
+            Some(super::TypeOwner::Class(class_id))
         }
-        None => None,
+        _ => None,
     }
 }
 
@@ -316,14 +384,35 @@ fn register_arrow_capture(state: &mut PassContext, cap: &CapturedNode, file_id: 
     let Some(name) = state.call_producer.take_arrow_name(cap.match_index) else {
         return;
     };
-    let Some(class_id) = resolve_callable_class(state, cap, file_id) else {
+    let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
     };
     let method_id = state.next_id("M");
-    state
-        .instructions
-        .push(CoreOp::DefMethod(class_id, method_id.clone(), name));
+    match owner {
+        super::TypeOwner::Class(class_id) => {
+            state
+                .instructions
+                .push(CoreOp::DefMethod(class_id, method_id.clone(), name))
+        }
+        super::TypeOwner::Interface(interface_id) => state.instructions.push(
+            CoreOp::DefInterfaceMethod(interface_id, method_id.clone(), name),
+        ),
+    }
     state.push_callable_scope(method_id, cap.start_byte, cap.end_byte);
+}
+
+/// Extract a canonical TypeScript type-alias target (`Identifier = string`
+/// yields `string`) without trusting the presentation-normalized capture text.
+/// A root with no explicit assignment falls back to that capture text.
+fn canonical_type_alias_target(raw: &str) -> String {
+    let line = raw.lines().next().unwrap_or(raw).trim();
+    if let Some((_, target)) = line.split_once('=') {
+        let target = target.trim().trim_end_matches(';').trim();
+        if !target.is_empty() {
+            return target.to_string();
+        }
+    }
+    line.to_string()
 }
 
 fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: bool) {
@@ -339,10 +428,9 @@ fn dispatch_capture(state: &mut PassContext, cap: &CapturedNode, use_raw_text: b
     }
 }
 
-fn push_flag(state: &mut PassContext, flag: &str) {
-    if state.current_method.is_some() && !state.current_method_flags.iter().any(|item| item == flag)
-    {
-        state.current_method_flags.push(flag.to_string());
+fn push_control_summary(state: &mut PassContext, summary: ControlSummary) {
+    if state.current_method.is_some() {
+        state.current_control_summaries.push(summary);
     }
 }
 

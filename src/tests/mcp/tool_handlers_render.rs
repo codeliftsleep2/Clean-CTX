@@ -26,7 +26,8 @@ fn render_hierarchical_for_llm_typescript_class() {
             name: "users".into(),
             field_type: Some("$s[]".into()),
         }],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: Some("BaseListComponent".into()),
         implements: vec!["OnInit".into()],
         injects: vec![],
@@ -38,32 +39,36 @@ fn render_hierarchical_for_llm_typescript_class() {
         name: "ngOnInit".into(),
         params: vec![],
         return_type: None,
-        flags: Some(vec!["IF".into()]),
+        modifiers: vec![],
+        control_summaries: vec![vec![ControlSummary::Branch]],
+        pattern_facts: vec![],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
         body_end: None,
         control_flow: vec![],
         data_flow: vec![],
-        side_effect: None,
-        execution_context: None,
+        side_effect: Vec::new(),
+        execution_context: Vec::new(),
     });
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![vec!["IM1".into(), "./core".into(), "OnInit".into()]],
         type_aliases: vec![],
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    // Phase 6 IR-first format: SCHEMA v2 header with structural markers
-    assert!(result.contains("SCHEMA v2"));
-    assert!(result.contains("// ── UserListComponent ──"));
+    // Phase 6 IR-first format: compact LLM schema with typed semantic families.
+    assert!(result.contains("SCHEMA vNext"));
+    assert!(result.contains("C UserListComponent\n"));
     assert!(result.contains("X BaseListComponent"));
     assert!(result.contains("I OnInit"));
     assert!(result.contains("F users:$s[]"));
     assert!(result.contains("M ngOnInit"));
-    assert!(result.contains("fl:IF"));
-    assert!(result.contains("$ IM1 ./core [OnInit]"));
+    assert!(result.contains("ctl:IF"));
+    assert!(result.contains("$ ./core [OnInit]"));
 }
 
 #[test]
@@ -78,7 +83,8 @@ fn render_hierarchical_for_llm_spring_boot_class() {
             name: "userService".into(),
             field_type: Some("UserService".into()),
         }],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: Some("BaseController".into()),
         implements: vec![],
         injects: vec![],
@@ -91,15 +97,18 @@ fn render_hierarchical_for_llm_spring_boot_class() {
         name: "find".into(),
         params: vec![vec!["P1".into(), "$n".into(), "id".into()]],
         return_type: None,
-        flags: Some(vec!["RET".into()]),
+        modifiers: vec![],
+        control_summaries: vec![vec![ControlSummary::Return]],
+        pattern_facts: vec![],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
         body_end: None,
         control_flow: vec![],
         data_flow: vec![],
-        side_effect: None,
-        execution_context: None,
+        side_effect: Vec::new(),
+        execution_context: Vec::new(),
     };
     let m2 = MethodNode {
         id: "M2".into(),
@@ -109,20 +118,24 @@ fn render_hierarchical_for_llm_spring_boot_class() {
             vec!["P2".into(), "$n".into(), "age".into()],
         ],
         return_type: None,
-        flags: Some(vec!["RET".into(), "IF".into()]),
+        modifiers: vec![],
+        control_summaries: vec![vec![ControlSummary::Return, ControlSummary::Branch]],
+        pattern_facts: vec![],
+        flags: vec![],
         patterns: vec![],
         body: None,
         body_start: None,
         body_end: None,
         control_flow: vec![],
         data_flow: vec![],
-        side_effect: None,
-        execution_context: None,
+        side_effect: Vec::new(),
+        execution_context: Vec::new(),
     };
     class.methods.push(m1);
     class.methods.push(m2);
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![vec![
             "IM1".into(),
             "org.springframework.web".into(),
@@ -138,12 +151,10 @@ fn render_hierarchical_for_llm_spring_boot_class() {
     // Abbreviated meta-layer ops (Phase 2-4)
     assert!(result.contains("@rest"));
     assert!(result.contains("@map"));
-    // Overloaded method disambiguation (Fix B)
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+2)"));
-    // Params shown in Medium fidelity
-    assert!(result.contains("p:id:$n"));
-    assert!(result.contains("p:name:$n age:$n"));
+    // Visible signatures disambiguate overloads without decorating names.
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n"));
+    assert!(!result.contains("find(+"));
 }
 
 #[test]
@@ -154,7 +165,8 @@ fn render_hierarchical_for_llm_angular_class() {
         name: "AppComponent".into(),
         methods: vec![],
         fields: vec![],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: None,
         implements: vec![],
         injects: vec![],
@@ -163,6 +175,7 @@ fn render_hierarchical_for_llm_angular_class() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![
             vec!["@cmp".into(), "AppComponent".into()],
@@ -181,13 +194,14 @@ fn render_hierarchical_for_llm_empty_hir_produces_header() {
     use crate::ir::*;
     let hir = HierarchicalIR {
         classes: vec![],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
     // Always has schema header even with empty HIR
-    assert!(result.starts_with("// SCHEMA v2"));
+    assert!(result.starts_with("// SCHEMA vNext"));
 }
 
 #[test]
@@ -214,7 +228,8 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
                 field_type: Some("$s".into()),
             },
         ],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: None,
         implements: vec![],
         injects: vec![],
@@ -223,6 +238,7 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
@@ -234,7 +250,7 @@ fn render_hierarchical_for_llm_fidelity_low_compact_fields() {
 }
 
 #[test]
-fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
+fn render_hierarchical_for_llm_fidelity_medium_groups_owner_fields() {
     use crate::ir::*;
     let class = ClassNode {
         id: "C1".into(),
@@ -252,7 +268,8 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
                 field_type: Some("$n".into()),
             },
         ],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: None,
         implements: vec![],
         injects: vec![],
@@ -261,41 +278,43 @@ fn render_hierarchical_for_llm_fidelity_medium_one_field_per_line() {
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
     };
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    // Medium fidelity: one field per line
-    assert!(result.contains("F x:$n\n"));
-    assert!(result.contains("F y:$n\n"));
-    assert_eq!(result.matches("\nF ").count(), 2);
+    // Medium fidelity: owner-local fields share one row.
+    assert!(result.contains("F x:$n y:$n\n"));
+    assert_eq!(result.matches("\nF ").count(), 1);
 }
 
 #[test]
-fn render_hierarchical_for_llm_injects_do_not_panic() {
+fn control_full_renders_injection_occurrences() {
     use crate::ir::*;
     let class = ClassNode {
         id: "C1".into(),
         name: "Service".into(),
         methods: vec![],
         fields: vec![],
-        class_flags: None,
+        modifiers: vec![],
+        class_flags: vec![],
         extends: None,
         implements: vec![],
-        injects: vec!["DepA".into(), "DepB".into()],
+        injects: vec![vec!["DepA".into(), "DepB".into()]],
         patterns: vec![],
         synthetic: false,
     };
     let hir = HierarchicalIR {
         classes: vec![class],
+        interfaces: vec![],
         imports: vec![],
         type_aliases: vec![],
         calls: vec![],
     };
-    // Should not panic — injects are structural (pattern-level), not rendered
-    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── Service ──"));
+    let result = crate::ir::render_control_full("alpha", "fixture.ts", 1, Fidelity::Low, &hir, &[]);
+    assert!(result.contains("\"injection_occurrences\""));
+    assert!(result.contains("\"DepA\""));
 }
 
 // ── LLM text cache integration tests ──
@@ -306,12 +325,12 @@ fn mcp_state_llm_text_cache_insert_and_read() {
     // Insert into cache
     state
         .llm_text_cache_lock()
-        .insert("α1".to_string(), "// SCHEMA v2\n// ── Foo ──\n".to_string());
+        .insert("α1".to_string(), "// SCHEMA vNext\nC Foo\n".to_string());
     // Read from cache
     let cache_guard = state.llm_text_cache_lock();
     let cached = cache_guard.get("α1");
     assert!(cached.is_some());
-    assert!(cached.unwrap().contains("SCHEMA v2"));
+    assert!(cached.unwrap().contains("SCHEMA vNext"));
     assert!(cached.unwrap().contains("Foo"));
 }
 

@@ -20,6 +20,7 @@
 // Run: cargo test --release --all-features --lib -- ctor_pattern_orphan --nocapture 2>&1
 
 use crate::compression::Fidelity;
+use crate::edit::locate::UnitTable;
 use crate::ir::compiler::IRCompiler;
 use crate::ir::layers::patterns::CodePatternRecognizer;
 use crate::ir::layers::typescript::TypeScriptLayer;
@@ -121,6 +122,7 @@ fn orphaned_refs(instructions: &[CoreOp]) -> Vec<String> {
     for op in instructions {
         let mid = match op {
             CoreOp::Flags(mid, _)
+            | CoreOp::PatternFacts(mid, _)
             | CoreOp::DataFlow(mid, _, _)
             | CoreOp::SideEffect(mid, _)
             | CoreOp::ExecutionContext(mid, _)
@@ -303,14 +305,14 @@ fn empty_ctor_subscribe_references_only_registered_methods() {
 //   DefMethod(M, constructor)
 //   Param(M, ...)
 //   Return(M, ...)
-//   Body(M, "{}", ...)              ← Edit-only: sits between Return and Flags
-//   Flags(M, ["PRIVATE"])           ← parameter-property modifier
+//   Body(M, "{}", ...)              ← Edit-only: exact source bytes and span
+//   MethodModifiers(M, [PRIVATE])    ← parameter-property modifier
 //
-// The CTOR compression window (`[leading Flags] + [DEF_M + Param* + Return]
-// + [trailing Flags(M)]`) is broken by the Body op: the trailing `Flags(M)`
+// The CTOR compression window (`[leading annotations] + [DEF_M + Param* + Return]
+// + [trailing annotations(M)]`) is broken by the Body op: the trailing fact
 // is no longer adjacent to the consumed span, so the wrapper cannot consume
 // it. Pre-fix, the orphan guard did not consider `Body(M)` an unrepresentable
-// M-reference, so compression proceeded and orphaned `Flags(M)` (E003).
+// M-reference, so compression could orphan a method-targeted fact.
 // The fix adds `Body` to `op_is_unrepresentable_method_ref`, making the
 // guard decline compression and preserve the full valid sequence.
 //
@@ -345,10 +347,9 @@ fn compile_with_fidelity(source: &str, file_id: &str, fidelity: Fidelity) -> Vec
 
 #[test]
 fn edit_fidelity_param_property_ctor_does_not_orphan_flags() {
-    // Full production pipeline at Fidelity::Edit — the fidelity that emits
-    // `Body(M)` ops. Compilation itself must succeed (pre-fix it failed with
-    // `[E003] FLAGS references unknown method 'M…'` inside the pipeline's
-    // ValidationPass).
+    // Production-shaped compiler chain at Fidelity::Edit — the fidelity that
+    // emits `Body(M)` ops. Final external-entry-point certification remains a
+    // Phase 9 production-integration gate rather than an inference from this test.
     let instructions =
         compile_with_fidelity(EDIT_FIDELITY_PARAM_PROPERTY, "edit-ctor.ts", Fidelity::Edit);
     println!("=== EDIT-FIDELITY PARAM-PROPERTY STREAM (full pipeline) ===");
@@ -357,7 +358,7 @@ fn edit_fidelity_param_property_ctor_does_not_orphan_flags() {
     }
 
     // The constructor's DefMethod must still be present (the pattern must
-    // have declined compression, preserving the identity for its Flags).
+    // have declined compression, preserving its identity and edit body).
     assert!(
         instructions
             .iter()
@@ -372,6 +373,41 @@ fn edit_fidelity_param_property_ctor_does_not_orphan_flags() {
     assert!(
         orphans.is_empty(),
         "Edit-fidelity param-property ctor must not orphan method refs; got: {orphans:?}"
+    );
+
+    let constructor_id = instructions
+        .iter()
+        .find_map(|op| match op {
+            CoreOp::DefMethod(_, method, name) if name == "constructor" => Some(method),
+            _ => None,
+        })
+        .expect("constructor identity");
+    let expected_start = EDIT_FIDELITY_PARAM_PROPERTY
+        .find("{}")
+        .expect("constructor body");
+    let expected_end = expected_start + 2;
+    let body = instructions
+        .iter()
+        .find_map(|op| match op {
+            CoreOp::Body(method, text, start, end) if method == constructor_id => {
+                Some((text, start, end))
+            }
+            _ => None,
+        })
+        .expect("byte-exact constructor body");
+    assert_eq!(body.0, "{}");
+    assert_eq!(
+        (*body.1, *body.2),
+        (Some(expected_start as u64), Some(expected_end as u64))
+    );
+    let units = UnitTable::from_instructions(&instructions);
+    let unit = units
+        .resolve("Example.constructor")
+        .expect("apply_edit addressability");
+    assert_eq!(unit.text, "{}");
+    assert_eq!(
+        (unit.start_byte, unit.end_byte),
+        (expected_start as u64, expected_end as u64)
     );
 
     // Validator must be clean — no E003 (orphaned Flags), no E007 (orphaned

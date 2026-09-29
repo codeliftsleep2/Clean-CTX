@@ -4,9 +4,7 @@
 //! evaluating TypeScript or reproducing user-facing configuration text.
 
 use crate::angular_meta::phi::PhiMarker;
-use crate::angular_meta::util::{
-    find_matching_brace, is_inside_comment_or_string, split_top_level,
-};
+use crate::angular_meta::util::{find_matching_brace, split_top_level};
 use crate::compression::Fidelity;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -156,7 +154,16 @@ pub fn has_formly(source: &str) -> bool {
 }
 
 pub fn extract_formly_shape(source: &str, _fidelity: Fidelity) -> Option<FormlyShape> {
-    let import_gated = has_formly_import(source);
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    extract_formly_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_formly_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<FormlyShape> {
+    let import_gated = has_formly_import(source, lexical_regions);
     if !import_gated && !source.contains("FormlyFieldConfig") {
         return None;
     }
@@ -164,7 +171,7 @@ pub fn extract_formly_shape(source: &str, _fidelity: Fidelity) -> Option<FormlyS
     let mut fields = Vec::new();
     let mut consumed_until = 0usize;
     for (equals, _) in source.match_indices('=') {
-        if equals < consumed_until || is_inside_comment_or_string(source, equals) {
+        if equals < consumed_until || lexical_regions.contains(equals) {
             continue;
         }
         let value_start = skip_whitespace(source, equals + 1);
@@ -189,9 +196,9 @@ pub fn extract_formly_shape(source: &str, _fidelity: Fidelity) -> Option<FormlyS
     (!fields.is_empty()).then_some(FormlyShape { fields })
 }
 
-fn has_formly_import(source: &str) -> bool {
+fn has_formly_import(source: &str, lexical_regions: &crate::meta_util::LexicalRegions) -> bool {
     for (start, _) in source.match_indices("import") {
-        if is_inside_comment_or_string(source, start) || !word_boundary(source, start, "import") {
+        if lexical_regions.contains(start) || !word_boundary(source, start, "import") {
             continue;
         }
         let end = source[start..]

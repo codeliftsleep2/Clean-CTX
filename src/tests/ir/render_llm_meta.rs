@@ -27,12 +27,12 @@ fn test_spring_boot_class_with_meta() {
         .push(make_field("userService", Some("UserService")));
 
     let mut m1 = make_method("getAll");
-    m1.flags = Some(vec!["RET".into()]);
+    m1.control_summaries = vec![vec![ControlSummary::Return]];
     class.methods.push(m1);
 
     let mut m2 = make_method("find");
     m2.params.push(vec!["P1".into(), "$n".into(), "id".into()]);
-    m2.flags = Some(vec!["RET".into()]);
+    m2.control_summaries = vec![vec![ControlSummary::Return]];
     class.methods.push(m2);
 
     let mut m3 = make_method("find");
@@ -41,7 +41,7 @@ fn test_spring_boot_class_with_meta() {
     m3.params.push(vec!["P2".into(), "$n".into(), "age".into()]);
     m3.params
         .push(vec!["P3".into(), "$s".into(), "role".into()]);
-    m3.flags = Some(vec!["RET".into(), "IF".into()]);
+    m3.control_summaries = vec![vec![ControlSummary::Return, ControlSummary::Branch]];
     class.methods.push(m3);
 
     hir.classes.push(class);
@@ -58,16 +58,17 @@ fn test_spring_boot_class_with_meta() {
     ));
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Medium);
-    assert!(result.contains("// ── UserController ──"));
+    assert!(result.contains("C UserController\n"));
     assert!(result.contains("X BaseController"));
     assert!(result.contains("F userService:UserService"));
     assert!(result.contains("M getAll"));
-    assert!(result.contains("M find(+1)"));
-    assert!(result.contains("M find(+3)"));
-    assert!(result.contains("fl:RET,IF"));
+    assert!(result.contains("M find p:id:$n"));
+    assert!(result.contains("M find p:name:$n age:$n role:$s"));
+    assert!(!result.contains("find(+"));
+    assert!(result.contains("ctl:RET,IF"));
     assert!(result.contains("T @rest = UserController"));
     assert!(result.contains("T @map = GET /users POST /users"));
-    assert!(result.contains("$ IM1 org.springframework.web.bind.annotation"));
+    assert!(result.contains("$ org.springframework.web.bind.annotation"));
 }
 
 #[test]
@@ -90,9 +91,10 @@ fn test_triple_overloaded_methods() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("M process(+1)"));
-    assert!(result.contains("M process(+2)"));
-    assert!(result.contains("M process(+3)"));
+    assert!(result.contains("M process p:arg1:$n"));
+    assert!(result.contains("M process p:arg1:$n arg2:$n"));
+    assert!(result.contains("M process p:arg1:$n arg2:$n arg3:$n"));
+    assert!(!result.contains("process(+"));
 }
 
 #[test]
@@ -107,13 +109,9 @@ fn test_no_name_collision_with_unique_methods() {
     hir.classes.push(class);
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    // None should have +N
     assert!(result.contains("M init\n"));
     assert!(result.contains("M start\n"));
     assert!(result.contains("M stop\n"));
-    assert!(!result.contains("init(+0)"));
-    assert!(!result.contains("start(+0)"));
-    assert!(!result.contains("stop(+0)"));
 }
 
 #[test]
@@ -134,9 +132,9 @@ fn test_multiple_classes_with_imports_and_type_aliases() {
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
 
     // Order should be: classes first, then imports, then type aliases
-    let alpha_pos = result.find("// ── Alpha ──").unwrap();
-    let beta_pos = result.find("// ── Beta ──").unwrap();
-    let import_pos = result.find("$ IM1").unwrap();
+    let alpha_pos = result.find("C Alpha\n").unwrap();
+    let beta_pos = result.find("C Beta\n").unwrap();
+    let import_pos = result.find("$ lib [A, B]").unwrap();
     let alias_pos = result.find("T TypeA").unwrap();
 
     assert!(alpha_pos < beta_pos, "Alpha should appear before Beta");
@@ -155,7 +153,7 @@ fn test_empty_class_name_still_renders() {
     let mut hir = empty_hir();
     hir.classes.push(make_class(""));
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ──  ──"));
+    assert!(result.contains("C \n"));
 }
 
 #[test]
@@ -204,24 +202,23 @@ fn test_renderer_no_panic_on_large_hir() {
     }
 
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── Class0 ──"));
-    assert!(result.contains("// ── Class49 ──"));
-    assert_eq!(result.matches("// ── ").count(), 50);
+    assert!(result.contains("C Class0\n"));
+    assert!(result.contains("C Class49\n"));
+    assert_eq!(
+        result.lines().filter(|line| line.starts_with("C ")).count(),
+        50
+    );
 }
 
 #[test]
-fn test_injects_field_not_rendered_as_separate_line() {
-    // Injects are part of the class node but not directly rendered as a
-    // marker line in the current renderer (they flow through IR pipeline).
-    // This test verifies they don't cause panics.
+fn test_injects_are_explicit_in_control_full() {
     let mut hir = empty_hir();
     let mut class = make_class("InjectedService");
-    class.injects.push("Dep1".into());
-    class.injects.push("Dep2".into());
+    class.injects.push(vec!["Dep1".into(), "Dep2".into()]);
     hir.classes.push(class);
 
-    // Should render without error, injects are structural (pattern-level)
-    // not directly rendered as standalone markers
-    let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── InjectedService ──"));
+    let result = crate::ir::render_control_full("alpha", "fixture.ts", 1, Fidelity::Low, &hir, &[]);
+    assert!(result.contains("\"injection_occurrences\""));
+    assert!(result.contains("\"Dep1\""));
+    assert!(result.contains("\"Dep2\""));
 }

@@ -16,7 +16,11 @@ use super::*;
 
 /// Extract standalone guard declarations (classes implementing
 /// `CanActivate`/`CanLoad`/`CanDeactivate` or functions typed as such).
-pub(super) fn extract_guards(source: &str, shape: &mut RouteShape) {
+pub(super) fn extract_guards(
+    source: &str,
+    shape: &mut RouteShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Class-based guards: `class AuthGuard implements CanActivate {`
     let mut search_from = 0;
     while let Some(idx) = source[search_from..].find("implements") {
@@ -33,7 +37,7 @@ pub(super) fn extract_guards(source: &str, shape: &mut RouteShape) {
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "implements".len();
             continue;
         }
@@ -80,7 +84,7 @@ pub(super) fn extract_guards(source: &str, shape: &mut RouteShape) {
         }
 
         // Round-11 audit: reject matches inside comments or strings.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "CanActivateFn".len() + 1;
             continue;
         }
@@ -103,7 +107,11 @@ pub(super) fn extract_guards(source: &str, shape: &mut RouteShape) {
 }
 
 /// Extract standalone resolver declarations.
-pub(super) fn extract_resolvers(source: &str, shape: &mut RouteShape) {
+pub(super) fn extract_resolvers(
+    source: &str,
+    shape: &mut RouteShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Class-based resolvers: `class UserResolver implements Resolve<User> {`
     // Detect before `ResolveFn` so `Resolve<` doesn't match `ResolveFn<`.
     let mut search_from = 0;
@@ -121,7 +129,7 @@ pub(super) fn extract_resolvers(source: &str, shape: &mut RouteShape) {
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "Resolve<".len();
             continue;
         }
@@ -152,7 +160,7 @@ pub(super) fn extract_resolvers(source: &str, shape: &mut RouteShape) {
         }
 
         // Round-11 audit: reject matches inside comments or strings.
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "ResolveFn".len() + 1;
             continue;
         }

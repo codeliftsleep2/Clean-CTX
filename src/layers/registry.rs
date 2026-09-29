@@ -10,12 +10,27 @@ use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 use crate::layers::language::LanguageLayer;
 use crate::layers::meta::semantic::SemanticEdge;
-use crate::layers::meta::{MetaLayer, MetaLayerOutput};
+use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerOutput};
 use std::path::Path;
 use std::sync::OnceLock;
 
 /// Global registry, initialized once per process.
 static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
+
+#[cfg(test)]
+thread_local! {
+    static CONTEXT_EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn reset_context_evaluation_count() {
+    CONTEXT_EVALUATION_COUNT.with(|count| count.set(0));
+}
+
+#[cfg(test)]
+pub(crate) fn context_route_count() -> usize {
+    CONTEXT_EVALUATION_COUNT.with(std::cell::Cell::get)
+}
 
 /// Registry of all enabled language and meta layers.
 ///
@@ -177,7 +192,7 @@ impl LayerRegistry {
         results
     }
 
-    /// Collect semantic edges from all applicable meta-layers (phase 0).
+    /// Collect semantic edges through the text-oriented compatibility path.
     ///
     /// Mirrors `run_meta_layers_pipeline` dispatch: each layer checks
     /// `is_applicable` and, if true, calls `extract_semantic_edges`. Edges
@@ -226,6 +241,27 @@ impl LayerRegistry {
             }
         }
         edges
+    }
+
+    /// Combined marker and semantic dispatch for one compilation context.
+    pub fn evaluate_meta_layers_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> (Vec<MetaLayerOutput>, Vec<SemanticEdge>) {
+        #[cfg(test)]
+        CONTEXT_EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
+        let mut outputs = Vec::new();
+        let mut edges = Vec::new();
+        for layer in &self.meta_layers {
+            let Some(evaluation) = layer.evaluate_if_applicable(context) else {
+                continue;
+            };
+            if let Some(output) = evaluation.output {
+                outputs.push(output);
+            }
+            edges.extend(evaluation.semantic_edges);
+        }
+        (outputs, edges)
     }
 
     /// Check if a specific meta-layer is enabled.

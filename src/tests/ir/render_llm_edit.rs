@@ -11,6 +11,7 @@
 // implementations.
 
 use super::*;
+use crate::ir::ExecutionContextKind;
 
 // ── Edit Mode & High-Fidelity Rendering Tests (Phase 4) ───────────
 
@@ -116,7 +117,7 @@ fn test_high_fidelity_renders_side_effect() {
     let mut hir = empty_hir();
     let mut class = make_class("MyService");
     let mut method = make_method("save");
-    method.side_effect = Some("mutation".to_string());
+    method.side_effect = vec![SideEffectKind::Mutation];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -134,7 +135,7 @@ fn test_high_fidelity_renders_execution_context() {
     let mut hir = empty_hir();
     let mut class = make_class("MyService");
     let mut method = make_method("poll");
-    method.execution_context = Some("async".to_string());
+    method.execution_context = vec![ExecutionContextKind::Async];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -146,6 +147,45 @@ fn test_high_fidelity_renders_execution_context() {
     );
 }
 
+/// High Fidelity: the `async` fact is reported once (mod:ASYNC), not three
+/// times. When a method declares `mod:ASYNC`, the redundant `se:async` and
+/// `ec:async` values are suppressed; non-async side effects are preserved.
+#[test]
+fn test_high_fidelity_collapses_redundant_async() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("poll");
+    method.modifiers = vec![vec![DeclarationModifier::Async]];
+    method.side_effect = vec![SideEffectKind::Async, SideEffectKind::Io];
+    method.execution_context = vec![ExecutionContextKind::Async];
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains("mod:ASYNC"), "{result}");
+    assert!(result.contains("se:io"), "{result}");
+    assert!(!result.contains("se:async"), "{result}");
+    assert!(!result.contains("ec:async"), "{result}");
+}
+
+/// High Fidelity: with no mod:ASYNC, se:async is the async authority and the
+/// redundant ec:async is suppressed (annotation-redundancy collapse #2).
+#[test]
+fn test_high_fidelity_se_async_authoritative_without_modifier() {
+    let mut hir = empty_hir();
+    let mut class = make_class("MyService");
+    let mut method = make_method("poll");
+    method.side_effect = vec![SideEffectKind::Async];
+    method.execution_context = vec![ExecutionContextKind::Async];
+    class.methods.push(method);
+    hir.classes.push(class);
+
+    let result = render_hierarchical_for_llm(&hir, Fidelity::High);
+    assert!(result.contains("se:async"), "{result}");
+    assert!(!result.contains("ec:async"), "{result}");
+    assert!(!result.contains("mod:ASYNC"), "{result}");
+}
+
 /// Low fidelity: data-flow / side-effect / execution-context must not render.
 #[test]
 fn test_low_fidelity_no_execution_metadata() {
@@ -153,8 +193,8 @@ fn test_low_fidelity_no_execution_metadata() {
     let mut class = make_class("MyService");
     let mut method = make_method("process");
     method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
-    method.side_effect = Some("io".to_string());
-    method.execution_context = Some("sync".to_string());
+    method.side_effect = vec![SideEffectKind::Io];
+    method.execution_context = vec![ExecutionContextKind::Sync];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -181,7 +221,7 @@ fn test_edit_fidelity_no_execution_metadata() {
     let mut method = make_method("doWork");
     method.body = Some("{\n  let x = 1;\n}".to_string());
     method.data_flow = vec![vec!["reads".to_string(), "config".to_string()]];
-    method.side_effect = Some("io".to_string());
+    method.side_effect = vec![SideEffectKind::Io];
     class.methods.push(method);
     hir.classes.push(class);
 
@@ -204,7 +244,7 @@ fn test_synthetic_class_is_rendered() {
 
     // Synthetic classes are still rendered (they show as regular classes)
     let result = render_hierarchical_for_llm(&hir, Fidelity::Low);
-    assert!(result.contains("// ── __synthetic_C1 ──"));
+    assert!(result.contains("C __synthetic_C1\n"));
     assert!(result.contains("F orphan:$n"));
 }
 

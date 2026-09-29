@@ -15,6 +15,10 @@ use super::*;
 #[serial(cbm_live)]
 #[test]
 fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
+    use crate::cbm::bridge::CachedGraphData;
+    use crate::cbm::bridge::test_helpers::{cache_contains, seed_cache};
+    use std::time::{Duration, Instant};
+
     if !cbm_binary_exists() {
         eprintln!("Skipping - CBM not installed");
         return;
@@ -41,11 +45,34 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         indexed_before_edit,
         "doSomething must be indexed before edit"
     );
+    {
+        let guard = state.graph_bridge_lock();
+        let bridge = guard.as_ref().expect("live bridge");
+        seed_cache(
+            bridge,
+            "unrelated-project",
+            "search:sentinel",
+            CachedGraphData {
+                data: serde_json::json!([]),
+                expires_at: Instant::now() + Duration::from_secs(300),
+            },
+        );
+    }
+    let _responses = crate::protocol::handler_response_serial();
+    crate::protocol::captured_responses().clear();
     crate::mcp::tool_handlers::core::handle_provide_code_context(
         &serde_json::json!(1),
         &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "fidelity": "edit"}}),
         &state,
     );
+    let provided = crate::protocol::captured_responses()
+        .pop()
+        .expect("provide_code_context response");
+    assert!(
+        provided.get("error").is_none(),
+        "edit baseline must succeed: {provided}"
+    );
+    crate::protocol::captured_responses().clear();
     crate::mcp::tool_handlers::edit::handle_apply_edit(
         &serde_json::json!(2),
         &serde_json::json!({"arguments": {"filePath": file_path_str.clone(), "operations": [{
@@ -55,6 +82,13 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
             "newText": "{\n    return 99;\n  }"
         }]}}),
         &state,
+    );
+    let edited = crate::protocol::captured_responses()
+        .pop()
+        .expect("apply_edit response");
+    assert!(
+        edited.get("error").is_none(),
+        "registered edit must succeed before reindex: {edited}"
     );
     let on_disk = std::fs::read_to_string(&fixture_path).expect("fixture must exist after edit");
     assert!(
@@ -79,22 +113,35 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         );
     }
 
-    // First graph search: explicitly ensure freshness (as the production
-    // MCP handler does via ensure_indexed_or_error), then search.
+    // The real MCP handler performs the lazy freshness gate, invalidates only
+    // the edited project, executes the query, and exposes the fresh result.
+    crate::protocol::captured_responses().clear();
+    crate::cbm::handlers::handle_graph_search(
+        &serde_json::json!(3),
+        &serde_json::json!({
+            "arguments": { "query": "doSomething", "project": fx_slug.clone() }
+        }),
+        &state,
+    );
+    let searched = crate::protocol::captured_responses()
+        .pop()
+        .expect("graph_search response");
+    assert!(
+        searched.get("error").is_none(),
+        "graph_search must succeed after lazy reindex: {searched}"
+    );
+    assert!(
+        searched["result"]["structuredContent"]["count"]
+            .as_u64()
+            .is_some_and(|count| count > 0),
+        "doSomething must be externally visible after lazy reindex: {searched}"
+    );
     {
-        let mut guard = state.graph_bridge_lock();
-        let b = guard.as_mut().expect("live bridge");
-        b.set_project(&fx_slug);
-        b.invalidate_cache();
-        let idx_status = b.ensure_indexed();
-        match idx_status {
-            Ok(crate::cbm::bridge::IndexingStatus::Ready) => {}
-            _ => panic!("ensure_indexed must return Ready after lazy reindex: {idx_status:?}"),
-        }
-        let result = b.search("doSomething");
+        let guard = state.graph_bridge_lock();
+        let bridge = guard.as_ref().expect("live bridge");
         assert!(
-            !result.is_empty(),
-            "doSomething must be in graph after lazy reindex"
+            cache_contains(bridge, "unrelated-project", "search:sentinel"),
+            "refreshing the edited project must preserve unrelated cache ownership"
         );
     }
 
@@ -113,25 +160,25 @@ fn e2e_apply_edit_triggers_reindex_and_graph_is_fresh() {
         );
     }
 
-    // Second graph search: explicitly ensure freshness, then search.
-    // The project is already clean (ensure_indexed in the first block
-    // advanced indexed_generation), so ensure_indexed is a fast no-op.
-    {
-        let mut guard = state.graph_bridge_lock();
-        let b = guard.as_mut().expect("live bridge");
-        b.set_project(&fx_slug);
-        b.invalidate_cache();
-        let idx_status = b.ensure_indexed();
-        match idx_status {
-            Ok(crate::cbm::bridge::IndexingStatus::Ready) => {}
-            _ => panic!("ensure_indexed must return Ready on clean project: {idx_status:?}"),
-        }
-        let result = b.search("doSomething");
-        assert!(
-            !result.is_empty(),
-            "doSomething must still be in graph on second search"
-        );
-    }
+    // The repeated external request crosses the same readiness gate and then
+    // reuses the freshly populated project-owned memory entry.
+    crate::protocol::captured_responses().clear();
+    crate::cbm::handlers::handle_graph_search(
+        &serde_json::json!(4),
+        &serde_json::json!({
+            "arguments": { "query": "doSomething", "project": fx_slug.clone() }
+        }),
+        &state,
+    );
+    let repeated = crate::protocol::captured_responses()
+        .pop()
+        .expect("repeated graph_search response");
+    assert!(
+        repeated["result"]["structuredContent"]["count"]
+            .as_u64()
+            .is_some_and(|count| count > 0),
+        "the repeated graph_search must reuse the fresh project entry: {repeated}"
+    );
 
     // After the second search, the project must still be clean.
     {

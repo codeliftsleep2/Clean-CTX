@@ -16,6 +16,11 @@
 
 use std::fmt;
 
+mod semantic;
+pub use semantic::{
+    ControlSummary, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
+};
+
 /// Core IR opcodes — the universal instruction set.
 /// Every language compiles down to these operations.
 /// Serialized as positional JSON arrays: [opcode, ...operands]
@@ -34,6 +39,12 @@ pub enum CoreOp {
     /// ["DEF_I", interface_id, original_name]
     DefInterface(String, String),
 
+    /// ["DEF_IM", interface_id, method_id, original_name]
+    DefInterfaceMethod(String, String, String),
+
+    /// ["DEF_IF", interface_id, field_id, original_name]
+    DefInterfaceField(String, String, String),
+
     // ── Signatures & Types ──────────────────────────────
     /// ["SIG", method_id, param_id, type_opcode, param_name]
     Param(String, String, String, String),
@@ -44,18 +55,36 @@ pub enum CoreOp {
     /// ["FIELD_T", field_id, type_opcode]
     FieldType(String, String),
 
+    /// ["MOD_M", method_id, modifier1, modifier2, ...]
+    MethodModifiers(String, Vec<DeclarationModifier>),
+
+    /// ["MOD_C", class_id, modifier1, modifier2, ...]
+    ClassModifiers(String, Vec<DeclarationModifier>),
+
+    /// ["MOD_I", interface_id, modifier1, modifier2, ...]
+    InterfaceModifiers(String, Vec<DeclarationModifier>),
+
     // ── Control Flow & Behavior ─────────────────────────
+    /// ["CTRL_SUM", method_id, summary1, summary2, ...]
+    ControlSummary(String, Vec<ControlSummary>),
+
+    /// ["PAT_FACT", method_id, fact1, ...]
+    PatternFacts(String, Vec<PatternFact>),
+
     /// ["FLAGS", target_id, flag1, flag2, ...]
-    /// Replaces ⊕guard, ⊕loop, ⊕⇒, ⊕! markers
+    /// Unknown legacy method metadata; known semantic families are typed.
     Flags(String, Vec<String>),
 
     /// ["FLAGS_C", class_id, flag1, flag2, ...]
-    /// Class-level flags: EXPORT, ABSTRACT, etc.
+    /// Residual class metadata such as Rust CFG and generic-parameter summaries.
     ClassFlags(String, Vec<String>),
 
     // ── Relationships ───────────────────────────────────
     /// ["EXT", child_id, parent_id]
     Extends(String, String),
+
+    /// ["EXT_I", interface_id, parent_interface]
+    InterfaceExtends(String, String),
 
     /// ["IMPL", class_id, interface_id]
     Implements(String, String),
@@ -115,13 +144,13 @@ pub enum CoreOp {
     /// Side-effect annotation: ["EFFECT", method_id, effect_type]
     /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
     /// Extracted from tree-sitter captures (confidence = 1.0).
-    SideEffect(String, String),
+    SideEffect(String, SideEffectKind),
 
     ///
     /// Execution context: ["CTX", method_id, context_type]
     /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
     /// Extracted from tree-sitter captures (confidence = 1.0).
-    ExecutionContext(String, String),
+    ExecutionContext(String, ExecutionContextKind),
 
     // ── Structural Invocations (native call graph) ──────
     ///
@@ -169,12 +198,69 @@ impl fmt::Display for CoreOp {
             CoreOp::DefMethod(cid, mid, name) => write!(f, "DEF_M {} {} {}", cid, mid, name),
             CoreOp::DefField(cid, fid, name) => write!(f, "DEF_F {} {} {}", cid, fid, name),
             CoreOp::DefInterface(id, name) => write!(f, "DEF_I {} {}", id, name),
+            CoreOp::DefInterfaceMethod(iid, mid, name) => {
+                write!(f, "DEF_IM {} {} {}", iid, mid, name)
+            }
+            CoreOp::DefInterfaceField(iid, fid, name) => {
+                write!(f, "DEF_IF {} {} {}", iid, fid, name)
+            }
             CoreOp::Param(mid, pid, ty, name) => write!(f, "SIG {} {} {} {}", mid, pid, ty, name),
             CoreOp::Return(mid, ty) => write!(f, "RET {} {}", mid, ty),
             CoreOp::FieldType(fid, ty) => write!(f, "FIELD_T {} {}", fid, ty),
+            CoreOp::MethodModifiers(mid, modifiers) => write!(
+                f,
+                "MOD_M {} {}",
+                mid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::ClassModifiers(cid, modifiers) => write!(
+                f,
+                "MOD_C {} {}",
+                cid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::InterfaceModifiers(iid, modifiers) => write!(
+                f,
+                "MOD_I {} {}",
+                iid,
+                modifiers
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::ControlSummary(mid, summaries) => write!(
+                f,
+                "CTRL_SUM {} {}",
+                mid,
+                summaries
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
+            CoreOp::PatternFacts(mid, facts) => write!(
+                f,
+                "PAT_FACT {} {}",
+                mid,
+                facts
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
+            CoreOp::InterfaceExtends(child, parent) => write!(f, "EXT_I {} {}", child, parent),
             CoreOp::Implements(cid, iid) => write!(f, "IMPL {} {}", cid, iid),
             CoreOp::Injects(cid, deps) => write!(f, "INJECTS {} {}", cid, deps.join(" ")),
             CoreOp::Import(alias, module, named) => {
@@ -270,21 +356,29 @@ pub const TYPE_UNDEFINED: &str = "$ud";
 /// Used for schema validation and positional decoding.
 pub fn arity(opcode: &str) -> Option<i32> {
     match opcode {
-        "DEF_C" => Some(3),    // id, name
-        "DEF_M" => Some(4),    // class_id, id, name
-        "DEF_F" => Some(4),    // class_id, id, name
-        "DEF_I" => Some(3),    // id, name
-        "SIG" => Some(5),      // method_id, param_id, type, name
-        "RET" => Some(3),      // method_id, type
-        "FIELD_T" => Some(3),  // field_id, type
-        "FLAGS" => Some(-1),   // target_id, flags...
-        "FLAGS_C" => Some(-1), // class_id, flags...
-        "EXT" => Some(3),      // child_id, parent_id
-        "IMPL" => Some(3),     // class_id, iface_id
-        "INJECTS" => Some(-1), // class_id, deps...
-        "IMP" => Some(4),      // alias, module, named
-        "TYPE" => Some(3),     // alias, original
-        "PAT" => Some(-1),     // pattern_name, args...
+        "DEF_C" => Some(3),     // id, name
+        "DEF_M" => Some(4),     // class_id, id, name
+        "DEF_F" => Some(4),     // class_id, id, name
+        "DEF_I" => Some(3),     // id, name
+        "DEF_IM" => Some(4),    // interface_id, id, name
+        "DEF_IF" => Some(4),    // interface_id, id, name
+        "SIG" => Some(5),       // method_id, param_id, type, name
+        "RET" => Some(3),       // method_id, type
+        "FIELD_T" => Some(3),   // field_id, type
+        "MOD_M" => Some(-1),    // method_id, declaration modifiers...
+        "MOD_C" => Some(-1),    // class_id, declaration modifiers...
+        "MOD_I" => Some(-1),    // interface_id, declaration modifiers...
+        "CTRL_SUM" => Some(-1), // method_id, control summaries...
+        "PAT_FACT" => Some(-1), // method_id, typed pattern facts...
+        "FLAGS" => Some(-1),    // target_id, flags...
+        "FLAGS_C" => Some(-1),  // class_id, flags...
+        "EXT" => Some(3),       // child_id, parent_id
+        "EXT_I" => Some(3),     // interface_id, parent_interface
+        "IMPL" => Some(3),      // class_id, iface_id
+        "INJECTS" => Some(-1),  // class_id, deps...
+        "IMP" => Some(4),       // alias, module, named
+        "TYPE" => Some(3),      // alias, original
+        "PAT" => Some(-1),      // pattern_name, args...
         // Edit Mode: Verbatim Method Bodies
         // Dual shape: legacy 3-tuple when span-less, 5-tuple when spanned.
         "BODY" => Some(-1), // method_id, text [, start_byte, end_byte]
@@ -308,12 +402,20 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::DefMethod(..) => "DEF_M",
         CoreOp::DefField(..) => "DEF_F",
         CoreOp::DefInterface(..) => "DEF_I",
+        CoreOp::DefInterfaceMethod(..) => "DEF_IM",
+        CoreOp::DefInterfaceField(..) => "DEF_IF",
         CoreOp::Param(..) => "SIG",
         CoreOp::Return(..) => "RET",
         CoreOp::FieldType(..) => "FIELD_T",
+        CoreOp::MethodModifiers(..) => "MOD_M",
+        CoreOp::ClassModifiers(..) => "MOD_C",
+        CoreOp::InterfaceModifiers(..) => "MOD_I",
+        CoreOp::ControlSummary(..) => "CTRL_SUM",
+        CoreOp::PatternFacts(..) => "PAT_FACT",
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
+        CoreOp::InterfaceExtends(..) => "EXT_I",
         CoreOp::Implements(..) => "IMPL",
         CoreOp::Injects(..) => "INJECTS",
         CoreOp::Import(..) => "IMP",
@@ -406,3 +508,23 @@ pub const CTX_REALTIME: &str = "realtime";
 #[cfg(test)]
 #[path = "../tests/ir/opcodes.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/declaration_modifiers.rs"]
+mod declaration_modifier_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/control_summaries.rs"]
+mod control_summary_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/pattern_facts.rs"]
+mod pattern_fact_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/side_effects.rs"]
+mod side_effect_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/execution_contexts.rs"]
+mod execution_context_tests;

@@ -2,7 +2,7 @@
 
 > **Owner:** Problem-solving + error codes + diagnostic commands · **Status:** Living reference
 
-**Last updated:** 2026-08-24
+**Last updated:** 2026-09-27
 
 ---
 
@@ -42,7 +42,8 @@
 
 **Fix:**
 - Pass file paths, not file contents, to `compress_code_context`
-- For very large files (>=10 MB), the server will also return a `FileTooLarge` error — split the file or use `compress_workspace` instead
+- For files above `resource_limits.max_file_size_bytes`, narrow or split the
+  source; do not rely on a removed workspace-compression tool.
 
 ---
 
@@ -90,7 +91,10 @@
 
 ---
 
-### Workspace compression is slow on large repos
+### Historical internal workspace compression is slow on large repos
+
+This section applies only to internal/legacy workspace-compression code. There
+is no public `compress_workspace` MCP tool in the current surface.
 
 **Symptom:** `compress_workspace` takes >30 seconds on a repository with 5,000+ files.
 
@@ -101,7 +105,8 @@
 2. Compress only the subdirectories you need (pass a more specific `directoryPath`)
 3. Avoid symlink loops — the walker handles them, but extra canonicalization adds overhead
 
-**Planned improvement:** Streaming workspace walk (F-19) and rayon parallelization (F-20) will address this in a future release.
+For current broad discovery, use CBM graph tools; request file context only for
+the returned authoritative paths.
 
 ---
 
@@ -168,12 +173,17 @@ C:/Users/MNasty/Desktop/RustContextLayerAI  →  C-Users-MNasty-Desktop-RustCont
 ```
 
 **Fix:**
-1. Call `list_projects` to list the exact IDs CBM knows (it is project-independent and always works)
-2. Pass that exact slug via `parameters.project`, or pass the repository path via `arguments.workspaceRoot` / `arguments.project` and let Clean-CTX resolve it to the canonical slug
+1. Call `list_projects` when you need to inspect the exact IDs CBM knows.
+2. For structured wrappers, pass the repository path or canonical project ID;
+   their resolver normalizes the target. For `cbm_proxy`, `project` resolution
+   is scoped to that call and does not change the bridge's active project.
 
 **Note — two kinds of proxy calls:**
 - **Project-independent** (`list_projects`, `get_cbm_status`): need no project, never gated on indexing state.
-- **Project-targeted** (`search_graph`, `query_graph`, `trace_path`, `get_architecture`): need a project. The built-in wrappers resolve the active workspace root automatically; raw `cbm_proxy` calls without an explicit project are forwarded unchanged and CBM rejects them with the error above.
+- **Project-targeted** (`search_graph`, `query_graph`, `trace_path`,
+  `get_architecture`): need a project. Structured wrappers may select the
+  bridge's active project. `cbm_proxy` resolves an explicit path/slug for one
+  call only and does not mutate that active selection.
 
 ---
 
@@ -181,9 +191,13 @@ C:/Users/MNasty/Desktop/RustContextLayerAI  →  C-Users-MNasty-Desktop-RustCont
 
 **Symptom:** Error like "address in use" or "port already bound".
 
-**Cause:** Clean-CTX uses stdio only — there is no port, no HTTP server, and no network listener. If you see a port-related error, another process is interfering.
+**Cause:** The core MCP server uses stdio, but the optional
+`clean-ctx-proxy` is an HTTP listener (port 8787 by default). A port conflict
+usually means a proxy instance already owns the configured port.
 
-**Fix:** Ensure you are running `clean-ctx.exe` directly (not through a wrapper that adds a network layer). The binary should receive JSON-RPC on stdin and write responses to stdout only.
+**Fix:** If you need only MCP, run `clean-ctx` with proxy auto-start disabled.
+If you need the proxy, inspect the configured `proxy.port`; Clean-CTX may adopt
+an already healthy proxy rather than spawn a second child.
 
 ---
 
@@ -225,7 +239,7 @@ cargo test parse_typo_rejected
 If none of the above resolves your issue:
 
 1. Check the [Architecture Overview](ARCHITECTURE_OVERVIEW.md) for system design context
-2. Check the [Changelog](CHANGELOG.md) for known edge cases and their fixes
+2. Check the [Changelog](changelogs/CHANGELOG.md) for known edge cases and their fixes
 3. Check the [Developer Documentation](DEVELOPER_DOCUMENTATION.md) for build and test instructions
 4. Open an issue with:
    - Binary version (build date or commit hash)

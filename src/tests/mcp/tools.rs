@@ -1,4 +1,5 @@
 use super::*;
+use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
 
 // P3-3: Initialize handler registry before running tests
@@ -108,6 +109,281 @@ fn schema_provide_code_context_includes_focus_methods() {
         focus_methods["items"]["type"], "string",
         "focusMethods items should be strings"
     );
+}
+
+/// Phase 0 MCP-to-LLM contract cleanup: model-facing schemas must use the
+/// current structural edit tool and must steer path-bearing calls toward an
+/// explicit workspace root without removing the compatibility fallback.
+#[test]
+fn schema_guidance_uses_current_model_workflow_terms() {
+    let tools = tool_list();
+    let tools_by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+
+    let compress_fidelity = tools_by_name["compress_code_context"]["inputSchema"]
+        ["properties"]["fidelity"]["description"]
+        .as_str()
+        .expect("compress fidelity description");
+    let provide_intent =
+        tools_by_name["provide_code_context"]["inputSchema"]["properties"]["intent"]["description"]
+            .as_str()
+            .expect("provide intent description");
+
+    for description in [compress_fidelity, provide_intent] {
+        assert!(
+            description.contains("apply_edit"),
+            "Edit guidance must name the registered structural edit tool: {description}"
+        );
+        assert!(
+            !description.contains("replace_in_file"),
+            "Edit guidance must not name the obsolete host operation: {description}"
+        );
+    }
+
+    for name in [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "restore_context",
+        "provide_code_context",
+        "apply_edit",
+        "diff_commits",
+    ] {
+        let description =
+            tools_by_name[name]["inputSchema"]["properties"]["workspaceRoot"]["description"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{name} workspaceRoot description"));
+        assert!(
+            description.contains("Strongly recommended"),
+            "{name} must steer the model toward explicit workspaceRoot: {description}"
+        );
+        assert!(
+            description.contains("backward compatibility"),
+            "{name} must explain why the CWD fallback remains: {description}"
+        );
+    }
+
+    let proxy_description = tools_by_name["cbm_proxy"]["description"]
+        .as_str()
+        .expect("cbm_proxy description");
+    assert!(proxy_description.contains("compact raw CBM"));
+    assert!(proxy_description.contains("typed structured result"));
+    assert!(!proxy_description.contains("Primary CBM integration point"));
+}
+
+/// Phase 3 MCP tool classification: clients should not have to apply the
+/// protocol's pessimistic mutation/open-world defaults to every local tool.
+#[test]
+fn every_registered_tool_has_conservative_standard_annotations() {
+    let tools = tool_list();
+    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+
+    for tool in &tools {
+        let name = tool["name"].as_str().expect("registered tool name");
+        let annotations = tool["annotations"]
+            .as_object()
+            .unwrap_or_else(|| panic!("{name} must declare standard MCP annotations"));
+        for hint in [
+            "readOnlyHint",
+            "destructiveHint",
+            "idempotentHint",
+            "openWorldHint",
+        ] {
+            assert!(
+                annotations
+                    .get(hint)
+                    .is_some_and(serde_json::Value::is_boolean),
+                "{name}.{hint} must be an explicit boolean"
+            );
+        }
+        assert_eq!(
+            annotations["openWorldHint"],
+            serde_json::json!(false),
+            "Clean-CTX tools operate on the configured local workspace/provider boundary: {name}"
+        );
+    }
+
+    let by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+    for name in [
+        "context_history",
+        "list_sessions",
+        "inspect_legacy_fallbacks",
+        "context_stats",
+        "diff_commits",
+        "workspace_query",
+        "graph_search",
+        "graph_query",
+        "graph_trace",
+        "get_architecture",
+        "get_cbm_status",
+        "list_projects",
+    ] {
+        assert_eq!(
+            by_name[name]["annotations"]["readOnlyHint"],
+            serde_json::json!(true),
+            "{name} must advertise its read-only external effect"
+        );
+    }
+
+    for name in ["apply_edit", "delete_context", "purge_old_deltas"] {
+        assert_eq!(
+            by_name[name]["annotations"]["destructiveHint"],
+            serde_json::json!(true),
+            "{name} must retain the conservative destructive classification"
+        );
+    }
+}
+
+/// Phase 4 MCP schema precision: polymorphic tools must expose each supported
+/// operation as a discriminated branch with its operation-specific inputs.
+#[test]
+fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
+    let tools = tool_list();
+    let by_name: std::collections::HashMap<&str, &serde_json::Value> = tools
+        .iter()
+        .map(|tool| (tool["name"].as_str().unwrap_or(""), tool))
+        .collect();
+
+    let assert_branches =
+        |branches: &serde_json::Value, expected: &[(&str, &[&str])], contract: &str| {
+            let branches = branches
+                .as_array()
+                .unwrap_or_else(|| panic!("{contract} must use oneOf branches"));
+            let typed_branch_count = branches
+                .iter()
+                .filter(|branch| branch["properties"]["type"]["const"].is_string())
+                .count();
+            assert_eq!(
+                typed_branch_count,
+                expected.len(),
+                "{contract} branch count"
+            );
+
+            for (kind, required) in expected {
+                let branch = branches
+                    .iter()
+                    .find(|branch| branch["properties"]["type"]["const"] == *kind)
+                    .unwrap_or_else(|| panic!("{contract} is missing the '{kind}' branch"));
+                let actual: std::collections::HashSet<&str> = branch["required"]
+                    .as_array()
+                    .unwrap_or_else(|| panic!("{contract}.{kind} must declare required fields"))
+                    .iter()
+                    .map(|field| field.as_str().expect("required field name"))
+                    .collect();
+                let expected: std::collections::HashSet<&str> = required.iter().copied().collect();
+                assert_eq!(actual, expected, "{contract}.{kind} required fields");
+            }
+        };
+
+    assert_branches(
+        &by_name["apply_edit"]["inputSchema"]["properties"]["operations"]["items"]["oneOf"],
+        &[
+            (
+                "replace_body",
+                &["type", "target", "expectedOldText", "newText"],
+            ),
+            ("delete", &["type", "target", "expectedOldText"]),
+            ("insert_after", &["type", "anchor", "unitText"]),
+            ("insert_before", &["type", "anchor", "unitText"]),
+        ],
+        "apply_edit.operations",
+    );
+
+    assert_branches(
+        &by_name["workspace_query"]["inputSchema"]["oneOf"],
+        &[
+            ("find_entities", &["type", "name"]),
+            ("forward_edges", &["type", "name"]),
+            ("reverse_edges", &["type", "name"]),
+            ("entities_in_file", &["type", "file_path"]),
+            ("transitive_dependencies", &["type", "name"]),
+            ("has_cycle", &["type"]),
+            (
+                "calls_in_file",
+                &["type", "filePath", "workspaceRoot", "owner", "method"],
+            ),
+        ],
+        "workspace_query",
+    );
+}
+
+/// Phase 5 MCP catalog economy: parser capability metadata belongs only on
+/// tools whose correct use depends on the enabled source-language grammars.
+#[test]
+fn supported_languages_is_limited_to_source_processing_tools() {
+    let tools = tool_list();
+    let source_processing: std::collections::HashSet<&str> = [
+        "compress_code_context",
+        "diff_code_context",
+        "delta_code_context",
+        "provide_code_context",
+        "apply_edit",
+        "diff_commits",
+        "workspace_query",
+    ]
+    .into_iter()
+    .collect();
+
+    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    for tool in &tools {
+        let name = tool["name"].as_str().expect("registered tool name");
+        let languages = tool.get("supportedLanguages");
+        if source_processing.contains(name) {
+            let languages = languages
+                .and_then(serde_json::Value::as_array)
+                .unwrap_or_else(|| panic!("{name} must advertise supportedLanguages"));
+            assert!(
+                !languages.is_empty(),
+                "all-feature verification must expose at least one language for {name}"
+            );
+        } else {
+            assert!(
+                languages.is_none(),
+                "{name} must not repeat irrelevant supportedLanguages metadata"
+            );
+        }
+    }
+}
+
+#[test]
+fn apply_edit_discovery_describes_only_the_structural_transaction_contract() {
+    let tools = tool_list();
+    let description = tools
+        .iter()
+        .find(|tool| tool["name"] == "apply_edit")
+        .and_then(|tool| tool["description"].as_str())
+        .expect("apply_edit registered description");
+
+    for obsolete in ["insert_line", "new_text", "old_text", "creates the file"] {
+        assert!(
+            !description.contains(obsolete),
+            "obsolete contract: {obsolete}"
+        );
+    }
+    for required in [
+        "previously tracked and owned",
+        "replace_body",
+        "delete",
+        "insert_after",
+        "insert_before",
+        "structural units",
+        "expected unit text",
+        "byte-exact",
+        "stale or externally diverged",
+        "staged durable transaction",
+        "absolute byte spans",
+        "full method body",
+    ] {
+        assert!(
+            description.contains(required),
+            "missing contract: {required}"
+        );
+    }
 }
 
 /// Gap 4 fix: fidelity enums include edit/verbatim where applicable.
@@ -235,19 +511,10 @@ fn p3_21_tool_names_match_tool_list_and_registry() {
         .map(|s| s.to_string())
         .collect();
 
-    // Get inline tool names (tools dispatched directly in tools.rs)
-    let inline_names: std::collections::HashSet<String> = {
-        let mut set = std::collections::HashSet::new();
-        // Inline tools from dispatch_tools_call() in tools.rs
-        set.insert("graph_search".to_string());
-        set.insert("graph_query".to_string());
-        set.insert("graph_trace".to_string());
-        set.insert("get_architecture".to_string());
-        set.insert("get_cbm_status".to_string());
-        set.insert("cbm_proxy".to_string());
-        set.insert("list_projects".to_string());
-        set
-    };
+    let inline_names: std::collections::HashSet<String> = inline_tool_names()
+        .into_iter()
+        .map(str::to_string)
+        .collect();
 
     // Verify: every tool in tool_list is either inline or in registry (or both)
     for name in &tool_list_names {

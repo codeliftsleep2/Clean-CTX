@@ -17,6 +17,8 @@ use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
 mod extract_guards;
+#[cfg(test)]
+mod extraction_metrics;
 
 // Guard/resolver extraction moved to `routing/extract_guards.rs`; the entry
 // helpers stay module-internal (`pub(super)`) and are used here.
@@ -283,6 +285,18 @@ pub fn has_router_imports(source: &str) -> bool {
 
 /// Extract the Routing shape from a source file.
 pub fn extract_route_shape(source: &str, _fidelity: Fidelity) -> Option<RouteShape> {
+    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
+    extract_route_shape_with_regions(source, _fidelity, &lexical_regions)
+}
+
+pub(crate) fn extract_route_shape_with_regions(
+    source: &str,
+    _fidelity: Fidelity,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<RouteShape> {
+    #[cfg(test)]
+    extraction_metrics::record_extraction();
+
     if !has_router_imports(source) {
         return None;
     }
@@ -290,13 +304,13 @@ pub fn extract_route_shape(source: &str, _fidelity: Fidelity) -> Option<RouteSha
 
     // Extract route declarations from `Routes` arrays and
     // `RouterModule.forRoot(...)` / `forChild(...)` calls.
-    extract_routes(source, &mut shape);
+    extract_routes(source, &mut shape, lexical_regions);
 
     // Extract standalone guard declarations.
-    extract_guards(source, &mut shape);
+    extract_guards(source, &mut shape, lexical_regions);
 
     // Extract standalone resolver declarations.
-    extract_resolvers(source, &mut shape);
+    extract_resolvers(source, &mut shape, lexical_regions);
 
     if shape.is_empty() {
         return None;
@@ -304,8 +318,15 @@ pub fn extract_route_shape(source: &str, _fidelity: Fidelity) -> Option<RouteSha
     Some(shape)
 }
 
+#[cfg(test)]
+pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
+
 /// Extract route objects from `Routes` arrays and `RouterModule` calls.
-fn extract_routes(source: &str, shape: &mut RouteShape) {
+fn extract_routes(
+    source: &str,
+    shape: &mut RouteShape,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) {
     // Strategy: find `{ path: '...', ... }` objects that appear within
     // a `Routes` context. We scan for `path:` keys and parse the
     // enclosing object.
@@ -326,7 +347,7 @@ fn extract_routes(source: &str, shape: &mut RouteShape) {
 
         // Round-11 audit: reject matches inside trailing comments, block
         // comments, or string literals (e.g. `{ path: 'x' }, // path: 'y'`).
-        if crate::angular_meta::util::is_inside_comment_or_string(source, abs_idx) {
+        if lexical_regions.contains(abs_idx) {
             search_from = abs_idx + "path:".len();
             continue;
         }

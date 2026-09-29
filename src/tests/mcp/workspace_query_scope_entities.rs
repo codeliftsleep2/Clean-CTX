@@ -26,7 +26,9 @@
 // Every assertion goes through the REAL production path: MCP dispatch →
 // `handle_workspace_query` → hydration → scoped WorkspaceIndex lookup.
 
-use super::workspace_query_scope::{DOMAIN, Repo, seed_generic, serialize, state};
+use super::workspace_query_scope::{
+    DOMAIN, Repo, seed_current_generic, seed_generic, serialize, state,
+};
 use super::*;
 use crate::layers::meta::semantic::SemanticRelation;
 use crate::mcp::McpState;
@@ -317,8 +319,8 @@ fn red_wsc4_4_entities_in_file_is_already_bounded_by_its_explicit_path() {
     let file_a = repo_a.file("A.cs");
     let file_b = repo_b.file("B.cs");
     let state = state(&[]);
-    seed_generic(&state, &file_a, SemanticRelation::Injects, "InA", "TargetA");
-    seed_generic(&state, &file_b, SemanticRelation::Injects, "InB", "TargetB");
+    seed_current_generic(&state, &file_a, SemanticRelation::Injects, "InA", "TargetA");
+    seed_current_generic(&state, &file_b, SemanticRelation::Injects, "InB", "TargetB");
 
     // (a) The workspace's own declared file answers normally.
     assert_eq!(
@@ -345,7 +347,7 @@ fn red_wsc4_4_entities_in_file_is_already_bounded_by_its_explicit_path() {
     // primary root plus configured additional roots, the same set `WorkspaceScope`
     // uses for occurrence provenance.
     let configured = super::workspace_query_scope::state(&[&repo_b]);
-    seed_generic(
+    seed_current_generic(
         &configured,
         &file_b,
         SemanticRelation::Injects,

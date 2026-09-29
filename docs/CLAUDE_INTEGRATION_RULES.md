@@ -1,100 +1,278 @@
-# Clean-CTX Tool Enforcement
+# Claude rules for using Clean-CTX
 
-These rules are **mandatory**. They prevent Claude from bypassing Clean-CTX's compression pipeline, which wastes 4-5× more tokens and leaves the dashboard empty.
+**Status:** Portable Claude-facing projection of the current tool workflow
+**Detailed authority:** [`agent/tooling.md`](agent/tooling.md)
 
----
+Use Clean-CTX as the primary code-intelligence layer. These rules distinguish
+three jobs that must not be conflated:
 
-## RULE 1 — Code Files: Use `provide_code_context`, NOT `Read`
+1. CBM discovers symbols and graph candidates when available.
+2. Clean-CTX compiles source into canonical semantic context.
+3. Native file tools handle non-code files and exact source inspection when a
+   compressed/structured answer is insufficient.
 
-**NEVER use your native `Read` tool on code files** (`.ts`, `.js`, `.cs`, `.rs`, `.java`).
-
-**ALWAYS use `provide_code_context` FIRST** — it compresses code, uses delta transport on repeat calls, and records savings.
-
-`Read` is allowed ONLY for:
-- Non-code files (markdown, JSON, TOML, config)
-- After `provide_code_context` fails
-- Exact line-by-line byte analysis
-
-Always pass an `intent`: `"overview"` | `"edit"` | `"refactor"` | `"debug"` | `"implement"`
-
-```
-mcp__clean-ctx__provide_code_context(filePath: "src/services/UserService.ts", intent: "edit")
-```
+Always pass `workspaceRoot` explicitly. A returned repository-relative `file`
+path is authoritative only when paired with that root. Never derive a
+filesystem path from a namespace, module name, filename convention, or CBM
+project slug.
 
 ---
 
-## RULE 1b — Single-Unit Edits: Use `apply_edit`, NOT the Host Write Tool
+## 1. Start with the useful graph operation
 
-**For a SINGLE-UNIT edit** (replace one method body, insert one method after an anchor, delete one method) on a file you have already read at `fidelity: "edit"` or `fidelity: "verbatim"` **in this same session**, use `apply_edit` instead of the host's native write/edit tool.
+For repository discovery, call the useful graph operation directly. The graph
+handlers consult CBM's live status themselves, so a separate `get_cbm_status`
+preflight adds no authority. Reserve `get_cbm_status` for setup diagnostics,
+recovery checks, or explicit indexing-progress inspection.
 
-**NEVER use the host write tool immediately after `provide_code_context` when the edit targets a single structural unit.** The host tool forces a full raw re-read of the *entire* file (thousands of wasted tokens) purely to satisfy its own staleness precondition. `apply_edit` verifies only the bytes actually being changed — against the unit's current span — then runs an in-memory tree-sitter gate before any byte hits disk.
+### CBM is `available`
 
-```
-mcp__clean-ctx__apply_edit(filePath: "src/services/UserService.ts",
-  operations: [{
-    type: "replace_body",
-    target: "UserService.processOrder",       # qualified name "Class.method" (or "M3" / unambiguous bare name)
-    expectedOldText: "{ ...byte-exact current body from provide_code_context... }",
-    newText: "{ ...replacement body... }"
-  }])
-```
+Use the structured Clean-CTX graph wrappers when their typed result matches the
+job. `graph_search` is the normal symbol/file discovery entry point:
 
-**When NOT to use `apply_edit`** (still use the host write tool):
-- Cross-file edits, renames, or signature changes (effects at other call sites).
-- Brand-new files that were never read via `provide_code_context` (v1 policy: `apply_edit` requires prior tracked state).
-- Multi-unit edits that span whole classes or multiple unrelated regions in ways the operation shapes don't cover.
+- `graph_search` — locate symbols and authoritative repository-relative files;
+- `graph_query` — obtain typed nodes and edges;
+- `graph_trace` — trace between symbol identities; and
+- `get_architecture` — inspect modules and dependencies.
 
-`apply_edit` forms: `{type: "replace_body", target, expectedOldText, newText}`, `{type: "delete", target, expectedOldText}`, `{type: "insert_after", anchor, unitText}`, `{type: "insert_before", anchor, unitText}`. Add `"verify": true` to echo the new text back as a receipt. A rejected edit means the unit changed underneath you — re-read with `provide_code_context` and retry; never retry blindly.
+Use `cbm_proxy` when a compact or explicitly fresh rendering of a raw CBM
+operation is more useful than typed wrapper output. Both paths are registered
+Clean-CTX tools; do not bypass Clean-CTX to invoke the underlying CBM server
+directly.
 
----
+### CBM is `degraded` or `unavailable`
 
-## RULE 2 — CBM Queries: Use `cbm_proxy`, NOT Direct Calls
+The failed graph call reports the direct fallback. Do not add a status probe,
+retry equivalent CBM calls in a loop, or treat provider failure as an
+authoritative empty graph. Fall back to:
 
-**NEVER call `search_graph`, `query_graph`, `trace_path`, `get_architecture`, `list_projects`, or `index_repository` directly.** They return raw, uncompressed responses that bypass compression.
+1. Claude's native `Grep`/`Glob` tools for text or file discovery;
+2. `workspace_query(type="find_entities")` when an exact semantic name is
+   known and filesystem-backed semantic discovery is preferable;
+3. `provide_code_context` for supported source files; and
+4. native `Read` only for exact source ranges or unsupported/non-code files.
 
-**ALWAYS use `cbm_proxy`** — it intercepts the response at the pipe level and compresses it before it reaches you.
+`search_codebase` is a Cline host-tool name, not a registered Clean-CTX MCP
+tool and not a Claude Code tool. Never attempt to call it from Claude merely
+because older fallback text names it.
 
-**`cbm_tool` must be a REAL CBM tool name:** `search_graph`, `query_graph`, `trace_path`, `get_architecture`, `list_projects`, `index_repository`. `get_symbol_importance` and `get_dead_code` are NOT CBM tools — they are implemented internally via `query_graph` Cypher, so never pass them as `cbm_tool`.
-
-| FORBIDDEN direct call | Use `cbm_proxy` with |
-|-----------------------|----------------------|
-| `search_graph` | `cbm_tool: "search_graph"`, `name_pattern` |
-| `query_graph` | `cbm_tool: "query_graph"`, `query` |
-| `trace_path` | `cbm_tool: "trace_path"`, `function_name`, `direction` |
-| `get_architecture` | `cbm_tool: "get_architecture"`, `project` |
-| `list_projects` | `cbm_tool: "list_projects"`, `parameters: {}` |
-| `index_repository` | `cbm_tool: "index_repository"`, `parameters: { repo_path, mode? }` |
-
-**Only direct CBM call allowed:** `get_cbm_status` (tiny status object).
-
-Search:
-```
-mcp__clean-ctx__cbm_proxy(cbm_tool: "search_graph", parameters: { name_pattern: "UserService", project: "my-project" })
-```
-
-Trace:
-```
-mcp__clean-ctx__cbm_proxy(cbm_tool: "trace_path", parameters: { function_name: "processPayment", direction: "outbound", project: "my-project" })
-```
+`workspace_query` may also use its registered filesystem discovery path for
+eligible name-bearing semantic queries. Its sparse `discovery` metadata reports
+only exceptional coverage; absence of that field means the expected discovery
+path completed, not that CBM facts became semantic authority.
 
 ---
 
-## Quick Reference
+## 2. Read source through `provide_code_context`
 
-| Need | Use |
-|------|-----|
-| Code file context | `provide_code_context` |
-| Non-code file | `Read` |
-| CBM graph query | `cbm_proxy` |
-| CBM availability | `get_cbm_status` |
-| CBM project list | `cbm_proxy` with `cbm_tool: "list_projects"` |
-| CBM reindex | `cbm_proxy` with `cbm_tool: "index_repository"` (only needed for external edits) |
-| Token savings | `context_stats` |
+For supported code (`.ts`, `.cs`, `.rs`, `.java` when compiled into the
+running binary), call `provide_code_context` before native `Read`:
 
-**After `apply_edit`:** Automatic synchronous CBM `fast` reindex runs when CBM is available — no manual `index_repository` needed.
+```text
+provide_code_context(
+  filePath: "src/services/UserService.ts",
+  workspaceRoot: "C:/work/my-repo",
+  intent: "debug"
+)
+```
 
-**After external edits** (host write tool, shell, git operation): Clean-CTX cannot observe the mutation. Use `cbm_proxy(cbm_tool: "index_repository", parameters: { repo_path, mode: "fast" })` explicitly if graph freshness is required.
+Choose the intent that matches the task:
 
-**Repeated identical `workspace_query` calls** (same query type, entity name, workspace root, and unchanged workspace) are answered from the live `WorkspaceIndex` without re-running CBM or filesystem discovery: discovery completion is remembered per project/root for the current workspace generation. Only the *discovery* step is skipped — every answer is still evaluated against the live index. `apply_edit`, an external modification the session re-reads, and an explicit `index_repository` refresh each invalidate the affected root, so the next query rediscovers. This is why `index_repository` is the supported way to force rediscovery after an external edit.
+- `overview` — compact structural orientation;
+- `debug` — balanced diagnostic context;
+- `refactor` — high structural detail;
+- `implement` — implementation-oriented detail; or
+- `edit` — byte-exact bodies needed for safe structural editing.
 
-**Before completing any task, verify:** every code file used `provide_code_context`, every CBM query used `cbm_proxy`, and `Read` was only used for non-code files or after `provide_code_context` failed.
+Every successful `provide_code_context` response is complete current context,
+not an automatic delta. `delta_code_context` and `apply_delta` are an explicit
+code-side protocol; use them only when a real host/consumer intentionally owns
+the prior version and acknowledgment lifecycle.
+
+If the response is a skeleton and statement-level source is required, use
+native `Read` for the known file/range. Native `Read` is also appropriate for
+Markdown, JSON, TOML, configuration, unsupported languages, or after the
+Clean-CTX read fails. Do not invent an alternate path when a returned path
+fails—report or resolve the actual boundary.
+
+### `focusMethods`
+
+- A non-empty `focusMethods` with neither explicit `fidelity` nor `intent`
+  implies Edit.
+- An explicit non-Edit fidelity or intent conflicts with non-empty focus and
+  returns `-32602`; focus is never silently ignored.
+- An empty array is valid only with explicit Edit and intentionally selects no
+  bodies.
+- Selectors are owner-aware. Use `Owner.method` when a bare method name could be
+  ambiguous; one same-owner overload family selects all matching overloads.
+
+---
+
+## 3. Use `workspace_query` for Clean-CTX semantic facts
+
+Use `workspace_query` when the desired answer is an entity, relationship,
+dependency traversal, cycle witness, or owner-qualified call list rather than
+rendered file context.
+
+### Name-bearing workspace queries
+
+`find_entities`, `forward_edges`, `reverse_edges`, and
+`transitive_dependencies` use Clean-CTX semantic facts. For edge/traversal
+queries, `domain` and `entity_type` are optional identity filters:
+
+- one matching semantic identity resolves automatically;
+- repeated physical occurrences of the same semantic identity are not treated
+  as identity ambiguity;
+- multiple distinct identities return an explicit candidate list; and
+- no match returns an explicit not-found error rather than a plausible empty
+  answer.
+
+CBM/filesystem discovery supplies candidate files only. Clean-CTX alone compiles
+those files and determines `WorkspaceIndex` relationships.
+
+### `entities_in_file`
+
+Pass `file_path`, `workspaceRoot`, and optional `fidelity`. It compiles an
+untracked trusted file on first touch, reuses fresh sufficient projections,
+upgrades lower-fidelity projections when required, and replaces stale facts
+even when recompilation yields an empty projection. Edit/Verbatim normalize to
+High semantic compilation because this query returns no source bodies.
+
+### `has_cycle`
+
+`has_cycle` is intentionally index-only. It never discovers or compiles a
+workspace. The default/only current `kind` is `dependency`; it returns one
+deterministic closed witness using the approved dependency relations and states
+`indexed_evidence_only` coverage. A false result is not proof that every source
+file in the workspace has been compiled.
+
+### `calls_in_file`
+
+Use `type: "calls_in_file"` with `filePath`, `workspaceRoot`, typed `owner`,
+and `method`. It compiles a read-only High-fidelity candidate and preserves
+overloads, source order, duplicate calls, written argument count, and spread
+evidence. Written callees are not claimed to be resolved cross-file identities.
+
+### Scope
+
+`withinPath` only narrows `workspaceRoot` plus configured `additional_roots`.
+It never authorizes a new root and is rejected when no `workspaceRoot` is
+present or when it lies outside the authorized root set.
+
+### Batch several workspace questions
+
+Use the legacy single form when only one semantic question is needed. When two
+or more independent questions share the same workspace scope, prefer one batch
+instead of issuing repeated `workspace_query` tool calls. A batch may mix any
+of the seven operation types:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "withinPath": "src/orders",
+  "queries": [
+    { "id": "service", "type": "find_entities", "name": "OrderService" },
+    { "id": "callers", "type": "reverse_edges", "name": "OrderService" },
+    { "id": "cycles", "type": "has_cycle" }
+  ]
+}
+```
+
+Each item requires a unique non-empty string `id`. Put `workspaceRoot` and
+optional `withinPath` only at the batch top level; item-level scope overrides
+are invalid. Input order is preserved. Inspect every returned item:
+`status="ok"` carries that operation's normal structured payload under
+`result`, while `status="error"` carries an item-local error without suppressing
+independent successes. A malformed batch, duplicate ID, invalid shared scope,
+or more than 32 items rejects the whole call.
+
+`name` is always one non-empty string. Do not pass an array to `name`, and do
+not invent a plural `names` field. To ask the same operation about several
+names, create one independently identified item per name:
+
+```json
+{
+  "workspaceRoot": "C:/work/my-repo",
+  "queries": [
+    { "id": "method-a", "type": "reverse_edges", "name": "MethodA" },
+    { "id": "method-b", "type": "reverse_edges", "name": "MethodB" },
+    { "id": "method-c", "type": "reverse_edges", "name": "MethodC" }
+  ]
+}
+```
+
+Batching shares preparation work and one final WorkspaceIndex view; it does not
+merge answers, infer identity across items, or change the special authority of
+`has_cycle` and `calls_in_file`. Do not split a request merely because it mixes
+forward edges, reverse edges, entity lookup, traversal, cycle, or file-local
+operations.
+
+---
+
+## 4. CBM identity and project rules
+
+A CBM project slug and a filesystem path are different namespaces. Only
+`index_repository` establishes their relationship.
+
+- Structured wrappers accept an optional project and may update the bridge's
+  active project for later structured-wrapper calls.
+- `cbm_proxy` project resolution is scoped to that one call and does not change
+  the active project.
+- An exact configured-root basename may be used as a project alias; Clean-CTX
+  rewrites it to the canonical slug before dispatch. Do not abbreviate or
+  partially copy a slug—unknown names fail explicitly and return no partial
+  candidate or caller data.
+- A bare trace source is accepted only when it resolves to one canonical
+  identity. Ambiguity returns all canonical candidates; never select the first
+  match silently.
+- Use `list_projects` when the authoritative registered identities are needed.
+- Use `index_repository(repo_path, mode: "fast")` after external edits when
+  graph freshness is required. `full` is for explicit rebuild/recovery.
+
+After a successful Clean-CTX `apply_edit`, the affected project is marked stale
+and the next graph operation performs the supported lazy fast refresh. A manual
+reindex is normally unnecessary for Clean-CTX-owned edits.
+
+---
+
+## 5. Prefer `apply_edit` for supported single-file structural edits
+
+After Edit/Verbatim context has supplied the exact tracked unit, use
+`apply_edit` for operations it represents:
+
+- `replace_body`;
+- `delete`;
+- `insert_after`; and
+- `insert_before`.
+
+Pass `workspaceRoot` and byte-exact `expectedOldText` where required. A stale
+rejection means the source changed: re-read, reassess, and retry with current
+evidence—never retry blindly.
+
+Use the host write tool for new files, signatures/renames, cross-file changes,
+or broader edits that do not fit those structural operations.
+
+---
+
+## 6. Compact decision table
+
+| Need | Preferred action |
+|------|------------------|
+| Locate a symbol with CBM available | `graph_search` |
+| Typed graph nodes/edges | `graph_query` / `graph_trace` |
+| Compact raw CBM operation | `cbm_proxy` |
+| Locate text/files without CBM | Claude `Grep` / `Glob` |
+| Locate an exact semantic name without CBM | `workspace_query(type="find_entities")` |
+| Understand a supported source file | `provide_code_context` |
+| Exact known source lines/body | Native `Read` after context, or when context fails |
+| One semantic entity/edge/dependency question | Single-form `workspace_query` |
+| Several semantic questions in one scope | Batched `workspace_query(queries=[...])` |
+| File-local call occurrences | `workspace_query(type: "calls_in_file")` |
+| Dependency-cycle witness | `workspace_query(type: "has_cycle")` |
+| Supported tracked structural edit | `apply_edit` |
+| New/cross-file/signature edit | Host write tool |
+| Savings/session dashboard | `context_stats` |
+
+Before finishing a task, confirm that paths came from an authoritative result,
+`workspaceRoot` was explicit, CBM absence was not reported as semantic absence,
+and any completeness claim matches the response's actual coverage.

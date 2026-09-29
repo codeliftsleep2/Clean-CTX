@@ -3,26 +3,58 @@
 // Phase H: Positional Encoding & Advanced Compression — Pattern Compression.
 //
 // The Phase F `layers/patterns::CodePatternRecognizer` is **additive** —
-// it emits a `FLAGS` op (CTOR / OBSERVABLE / GETTER / SETTER) alongside
+// it emits a typed `PatternFacts` op alongside
 // the original instructions. That's useful for context but it does not
 // actually reduce wire size.
 //
 // The `CompressingPatternRecognizer` here is **consumptive**: when it
-// recognises a pattern, it replaces N source instructions with a single
-// compact `PAT_*` op. This is the Layer 4 "advanced compression" pass
-// called for in §11 of the spec.
+// recognises a pattern, it replaces the redundant source instructions with a
+// single compact `PAT_*` classification op. This is the Layer 4 "advanced
+// compression" pass called for in §11 of the spec.
+//
+// F2 — IDENTITY PRESERVATION: a pattern classifies a declaration; it never
+// deletes it. `DefMethod`, its `Param*`, and its `Return` are identity-bearing
+// facts every downstream consumer depends on (hierarchical `MethodNode`,
+// rendered `M <name>`, `UnitTable`/`apply_edit` targeting, semantic method
+// registration, caller-side `Calls` identity), so they are re-emitted
+// unchanged and the `PAT` op is added alongside them. Only genuinely
+// redundant, non-identity ops are summarized away (`Injects` for CTOR and
+// typed pattern annotations represented by the resulting classification).
+// Authoritative declaration modifiers are retained. For PROMISE,
+// EMPTY_CTOR, GETTER and SETTER nothing but identity is matched, so those
+// classifications are purely additive.
 //
 // Recognised patterns:
-//   - **PAT_CTOR**   — `DEF_M(constructor) + SIG*(P:ServiceType) + RET + INJECTS` → 1 op
-//   - **PAT_OBSERVABLE** — `DEF_M + RET($P) + FLAGS(ASYNC)` → 1 op
-//   - **PAT_GETTER** / **PAT_SETTER** — `DEF_M(get X)` / `DEF_M(set X)` → 1 op
-//   - **PAT_OVERRIDE** — `DEF_M + FLAGS(OVERRIDE)` → 1 op
-//   - **PAT_PROMISE** — `DEF_M + RET($P)` (without ASYNC) → 1 op
+//   - **PAT_CTOR**   — `DEF_M(constructor) + SIG*(P:ServiceType) + RET + INJECTS`
+//   - **PAT_OBSERVABLE** — `DEF_M + RET(Observable/IObservable)`
+//   - **PAT_GETTER** / **PAT_SETTER** — `DEF_M(get X)` / `DEF_M(set X)`
+//   - **PAT_OVERRIDE** — `DEF_M + PatternFacts(OVERRIDE)`
+//   - **PAT_PROMISE** — `DEF_M + RET($P/Promise)`
 //
 // A pattern that doesn't match falls through unchanged (zero regression).
 
 use super::layers::PatternRecognizer;
 use super::opcodes::CoreOp;
+
+fn has_type_identifier(return_type: &str, expected: &str) -> bool {
+    return_type
+        .split(|ch: char| !(ch.is_alphanumeric() || matches!(ch, '_' | '$')))
+        .any(|identifier| identifier == expected)
+}
+
+/// Return whether a declared return type denotes an Observable contract.
+///
+/// Identifier matching deliberately avoids substring classifications such as
+/// `NonObservableResult`, while supporting qualified and generic spellings.
+pub(crate) fn is_observable_return_type(return_type: &str) -> bool {
+    has_type_identifier(return_type, "Observable")
+        || has_type_identifier(return_type, "IObservable")
+}
+
+/// Return whether a declared return type denotes a Promise contract.
+pub(crate) fn is_promise_return_type(return_type: &str) -> bool {
+    has_type_identifier(return_type, "$P") || has_type_identifier(return_type, "Promise")
+}
 
 /// A compressed pattern op.
 ///
@@ -45,14 +77,14 @@ pub enum PatternOp {
         method_id: String,
         deps: Vec<String>,
     },
-    /// `DEF_M + RET($P/$O) + FLAGS(ASYNC)` → single op.
+    /// `DEF_M + RET(Observable/IObservable)` → single op.
     /// Wire: `["PAT", "OBSERVABLE", class_id, method_id, return_type]`
     Observable {
         class_id: String,
         method_id: String,
         return_type: String,
     },
-    /// `DEF_M + RET($P)` (no ASYNC flag) → single op.
+    /// `DEF_M + RET($P/Promise)` → single op.
     /// Wire: `["PAT", "PROMISE", class_id, method_id, return_type]`
     Promise {
         class_id: String,
@@ -257,22 +289,24 @@ impl PatternOp {
         }
     }
 
-    /// Number of source `CoreOp`s this pattern consumed (useful for
-    /// reporting compression statistics).
+    /// The source span this classification recognises, as a statistic.
     ///
-    /// F-33/F-34: The `consumed` count is now stored on the `PatternOp`
-    /// at construction time (via `try_compress_pattern`), so it is exact
-    /// rather than a heuristic. For backward compatibility, the `consumed()`
-    /// method still returns a value, but callers should prefer the
-    /// `actual_consumed` field if available.
+    /// This is the historical span shape of each pattern family (`DEF_M` +
+    /// signature ops + `RET` [+ `INJECTS`] and so on). It is NOT how many ops
+    /// the merged stream loses: since F2 the identity-bearing ops
+    /// (`DefMethod`, `Param*`, `Return`) are retained, and the authoritative
+    /// retained/consumed split for a match is reported by
+    /// `recognize::PatternMatch`. Kept unchanged for callers that report
+    /// pattern-recognition statistics.
     pub fn consumed(&self) -> usize {
         match self {
             // CTOR: DEF_M + Param* + Return + INJECTS
             // Conservative: assume at least 3 (DEF_M + SIG + RET) + optional INJECTS
             PatternOp::Constructor { deps, .. } => 3 + deps.len().min(1),
             PatternOp::EmptyConstructor { .. } => 2, // DEF_M + RET
-            // Observable: DEF_M + RET + FLAGS
-            PatternOp::Observable { .. } | PatternOp::Override { .. } => 3,
+            // Observable: DEF_M + RET
+            PatternOp::Observable { .. } => 2,
+            PatternOp::Override { .. } => 3,
             // Promise: DEF_M + RET
             PatternOp::Promise { .. } => 2,
             // Accessor: DEF_M + RET (or just DEF_M)
@@ -284,8 +318,13 @@ impl PatternOp {
 /// Layer 4 advanced pattern recognizer.
 ///
 /// Unlike `layers::patterns::CodePatternRecognizer`, this recognizer
-/// **consumes** the matched instructions and emits a single compact
-/// `PatternOp` per match. This is the wire-size-reducing pass.
+/// **classifies** the matched region and emits a single compact `PatternOp`
+/// per match. The declaration's identity-bearing ops (`DefMethod`, `Param*`,
+/// `Return`) are never part of what the classification replaces; they are
+/// reported by `PatternMatch::retained` and re-emitted by `compress_merged`
+/// (see `F2` in the module header). Because `compress` is a *pattern-only*
+/// extraction view, it emits classifications alone — it is `compress_merged`
+/// that produces the merged stream every production consumer sees.
 #[derive(Debug, Clone, Default)]
 pub struct CompressingPatternRecognizer;
 
@@ -294,10 +333,13 @@ impl CompressingPatternRecognizer {
         Self
     }
 
-    /// Compress an instruction stream by recognising and merging patterns.
+    /// Extract the pattern stream by recognising patterns.
     ///
-    /// Returns `(compressed_ops, stats)` where `stats` reports how many
-    /// source ops were consumed and how many compressed ops were emitted.
+    /// Returns `(patterns, stats)` where `stats.source_ops` counts the source
+    /// ops the scan covered (including the identity-bearing ops each match
+    /// retains, which are still part of the matched span) and `stats.output_ops`
+    /// counts the classifications emitted. This API does not produce a merged
+    /// stream: use `compress_merged` for that.
     pub fn compress(&self, instructions: &[CoreOp]) -> (Vec<PatternOp>, CompressionStats) {
         let mut output: Vec<PatternOp> = Vec::new();
         let mut source_count = 0usize;
@@ -305,11 +347,11 @@ impl CompressingPatternRecognizer {
         let mut i = 0;
 
         while i < instructions.len() {
-            if let Some((pat, consumed)) = try_compress_pattern(&instructions[i..]) {
-                source_count += consumed;
+            if let Some(matched) = try_compress_pattern(&instructions[i..]) {
+                source_count += matched.consumed;
                 output_count += 1;
-                output.push(pat);
-                i += consumed;
+                output.push(matched.pattern);
+                i += matched.consumed;
             } else {
                 // Pass-through: the source op is not part of any recognised
                 // pattern. We do NOT emit anything for it — the recognizer
@@ -340,6 +382,15 @@ impl CompressingPatternRecognizer {
     /// `CoreOp` or a recognised `PatternOp`. The caller can decide how
     /// to serialise the merged stream.
     ///
+    /// F2 (identity preservation): a match's identity-bearing ops —
+    /// `DefMethod`, then its `Param*`, then its `Return` — are re-emitted as
+    /// passthrough items, in their original order, BEFORE the classification
+    /// op. A pattern therefore ANNOTATES the declaration instead of replacing
+    /// it, so every downstream consumer (hierarchical projection, renderer,
+    /// `UnitTable`, semantic projection, `Calls` attribution) still receives a
+    /// method it can attach the classification to. Only the redundant
+    /// non-identity ops the recognizer summarized are dropped.
+    ///
     /// F-32: Renamed from `CompressedItem` to `MergeItem` to clarify
     /// that this is a merge-result enum, not a compressed instruction.
     pub fn compress_merged(&self, instructions: &[CoreOp]) -> Vec<MergeItem> {
@@ -347,9 +398,20 @@ impl CompressingPatternRecognizer {
         let mut i = 0;
 
         while i < instructions.len() {
-            if let Some((pat, consumed)) = try_compress_pattern(&instructions[i..]) {
-                output.push(MergeItem::Pattern(pat));
-                i += consumed;
+            if let Some(matched) = try_compress_pattern(&instructions[i..]) {
+                let retained_start = i + matched.retained_start;
+                let retained_end = retained_start + matched.retained;
+                for op in &instructions[retained_start..retained_end] {
+                    output.push(MergeItem::Passthrough(op.clone()));
+                }
+                let consumed_end = i + matched.consumed;
+                for op in &instructions[i..consumed_end] {
+                    if matches!(op, CoreOp::MethodModifiers(..) | CoreOp::ControlSummary(..)) {
+                        output.push(MergeItem::Passthrough(op.clone()));
+                    }
+                }
+                output.push(MergeItem::Pattern(matched.pattern));
+                i += matched.consumed;
             } else {
                 output.push(MergeItem::Passthrough(instructions[i].clone()));
                 i += 1;
@@ -371,7 +433,9 @@ impl CompressingPatternRecognizer {
 ///     tuple payload exluding the "PAT" prefix.
 ///
 /// This replaces the additive `CodePatternRecognizer`'s flag-based approach
-/// with actual consumptive compression: N source instructions become 1 PAT op.
+/// with real compression: the pattern's redundant source ops become one `PAT`
+/// op, while the declaration's identity-bearing ops (`DefMethod`, `Param*`,
+/// `Return`) are forwarded unchanged and simply precede that op (F2).
 impl PatternRecognizer for CompressingPatternRecognizer {
     fn recognize(&self, instructions: &[CoreOp]) -> Vec<CoreOp> {
         let merged = self.compress_merged(instructions);
@@ -431,6 +495,10 @@ pub use recognize::is_constructor_name;
 #[cfg(test)]
 #[path = "../tests/ir/patterns.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/observable_pattern_semantics.rs"]
+mod observable_pattern_semantics_tests;
 
 // IRPAT-001 for native call facts (RED-CALL21): a consumptive pattern must not
 // orphan a surviving `CoreOp::Call`.

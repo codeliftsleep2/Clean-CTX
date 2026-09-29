@@ -85,13 +85,13 @@ fn audit2_dispatch_returns_after_inline_arm() {
 // ══════════════════════════════════════════════════════════════════
 
 #[test]
-fn audit3_restore_clears_persistence_db() {
-    // FAANG audit P1 #4: restore_context should call clear_file on the
-    // persistence store. We verify by:
+fn audit3_restore_retains_persistence_db() {
+    // Durable restore loads the persisted owner; it must not delete the
+    // baseline that made restoration possible. We verify by:
     // 1. Compress (adds to persistence)
     // 2. Flush
-    // 3. Restore (should clear)
-    // 4. Check persistence store no longer has the file
+    // 3. Restore
+    // 4. Check persistence still owns the file
     let (state, _tmp) = make_state("audit3.db");
 
     let rs_file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -115,13 +115,13 @@ fn audit3_restore_clears_persistence_db() {
     crate::mcp::tools::dispatch_tools_call(&id2, "restore_context", &params2, &state);
     state.flush_persistence();
 
-    // Verify persistence store cleared
+    // Verify persistence store retained
     let guard = state.persistence_store_lock();
     if let Some(ref store) = *guard {
         let has = store.has_context(&rs_path);
         assert!(
-            !has,
-            "AUDIT-3: persistence store should NOT have context after restore"
+            has,
+            "AUDIT-3: persistence store should retain context after restore"
         );
     }
 }
