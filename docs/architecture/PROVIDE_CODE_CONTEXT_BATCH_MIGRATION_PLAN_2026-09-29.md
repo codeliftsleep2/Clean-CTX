@@ -1,8 +1,8 @@
 # `provide_code_context` Batch Migration Plan
 
 **Date:** 2026-09-29  
-**Status:** Phases 0–4 complete through tracked batch GREEN; legacy equivalence
-and later verification gates remain
+**Status:** Phases 0–5 complete through tracked batch, legacy-equivalence, and
+economics/cache GREEN; Phase 6 has not started
 **Scope:** Add an ordered, failure-isolated multi-file request form to the
 existing `provide_code_context` MCP tool while preserving the complete
 single-file contract, byte-exact Edit/Verbatim authority, session lifecycle,
@@ -927,4 +927,21 @@ sequentially, isolates item failures, rejects later canonical-file duplicates,
 correlates exact successful content blocks by `content_index`, and emits one
 outer cache hint. The complete tracked `provide_code_context_batch_tests`
 regression target was reported GREEN by the maintainer. Legacy single-call
-equivalence and the remaining verification phases are still pending.
+equivalence was subsequently reported GREEN; later verification phases remain.
+
+**Phase 5 verification checkpoint (2026-09-29):** The tracked
+`batch_preserves_token_accounting_cache_reuse_and_records_envelope_sizes`
+regression was reported GREEN by the maintainer. It verified truthful per-file
+raw/compressed token accounting with the shared `o200k` tokenizer, stable
+semantics on repeated execution, and reuse of the outer batch cache identity.
+The deterministic response-envelope measurements were:
+
+| Items | Batch bytes | Equivalent single-response bytes | Reduction |
+|---:|---:|---:|---:|
+| 2 | 1,687 | 1,732 | 45 bytes (2.60%) |
+| 4 | 3,125 | 3,174 | 49 bytes (1.54%) |
+| 8 | 5,846 | 6,348 | 502 bytes (7.91%) |
+
+These measurements demonstrate reduced protocol-envelope size for all three
+representative batch sizes without introducing a new budget, truncation rule,
+or performance-dependent behavior. Phase 5 and Checkpoint F are complete.
