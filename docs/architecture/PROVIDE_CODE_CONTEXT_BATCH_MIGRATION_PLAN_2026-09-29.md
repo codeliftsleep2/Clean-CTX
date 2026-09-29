@@ -1,8 +1,8 @@
 # `provide_code_context` Batch Migration Plan
 
 **Date:** 2026-09-29  
-**Status:** Phases 0–6 complete through tracked batch, legacy-equivalence,
-economics/cache, and model-guidance GREEN; Phase 7 has not started
+**Status:** Phases 0–7 complete through tracked/local verification and live MCP
+acceptance; final architectural audit and repository gate remain
 **Scope:** Add an ordered, failure-isolated multi-file request form to the
 existing `provide_code_context` MCP tool while preserving the complete
 single-file contract, byte-exact Edit/Verbatim authority, session lifecycle,
@@ -956,3 +956,15 @@ transactional edit authority. Runtime guidance remains inside its enforced
 2,000-byte compactness budget at 1,978 bytes. The tracked
 `mcp::prompts::tests` target was reported GREEN by the maintainer. Phase 6 is
 complete; live MCP acceptance has not started.
+
+**Phase 7 live-acceptance checkpoint (2026-09-29):** The tracked operator
+package under `verification/context-batch/` drove a freshly built production
+binary over MCP stdio and was reported fully passing by the maintainer. It
+confirmed the published schema, ordered mixed-mode outcomes, item-local failure
+isolation, exact `content_index` correlation, byte-identical focused Edit
+parity with the legacy single form, and stable repeated semantics with reuse of
+the batch cache identity. Generated captures are stored beneath
+`target/provide-context-batch-verification/captures/`. Those captures are
+operator evidence, not tests; the authoritative regression contract remains
+the GREEN tracked tests under `src/tests/**`. Phase 7 and Checkpoint G are
+complete. Phase 8 has not started.
