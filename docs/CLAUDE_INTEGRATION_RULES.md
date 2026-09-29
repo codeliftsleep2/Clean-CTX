@@ -100,8 +100,9 @@ source contexts are needed, prefer one `files` batch of at most eight items:
 
 ```json
 {
-  "workspaceRoot": "C:/work/my-repo",
-  "tokenizer": "o200k",
+    "workspaceRoot": "C:/work/my-repo",
+    "tokenizer": "o200k",
+    "responseMode": "structured",
   "files": [
     { "id": "service", "filePath": "src/services/UserService.ts", "intent": "overview" },
     { "id": "target", "filePath": "src/controllers/UserController.ts", "intent": "edit", "focusMethods": ["UserController.update"] }
@@ -109,15 +110,20 @@ source contexts are needed, prefer one `files` batch of at most eight items:
 }
 ```
 
+Claude is a verified structured-result consumer, so request
+`responseMode: "structured"`; exact code then appears once in each successful
+structured item. If integration behavior changes or is unknown, omit the field
+and use safe `mirrored`. Do not select `indexed` unless that Claude host has
+been explicitly verified to preserve and consume top-level MCP content blocks.
+
 Each item requires a unique non-empty `id` and `filePath` and may choose its
 own `intent`, `fidelity`, and `focusMethods`. `workspaceRoot` and `tokenizer`
 belong only at the top level. Inspect every ordered result: `status="ok"`
-carries its exact `content`, `content_index`, and semantic `meta`. Consume the
-item's content directly; its index correlates that mirror with the
-byte-identical top-level MCP content block. `status="error"` carries an
-item-local error without suppressing successful siblings and has neither
-content nor a content index. If every item fails, the text block only directs
-the caller to the structured errors.
+carries exact `content` and semantic `meta` in structured mode.
+`status="error"` carries an item-local error without suppressing successful
+siblings. The response's `response_mode` confirms the projection actually
+used. If every item fails, the text block only directs the caller to the
+structured errors.
 
 Do not repeat the same canonical file in a batch; combine its desired selectors
 into one `focusMethods` array. Request Edit or Verbatim only for files that need

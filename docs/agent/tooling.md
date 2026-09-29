@@ -47,7 +47,7 @@ as `filePath`.
 
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
-| `provide_code_context` | `filePath` (single) or `files` (batch) | Per-file `intent`, `fidelity`, `focusMethods`; shared `workspaceRoot`, `tokenizer` | **Primary model-facing entry point.** Reads one file or up to 8 independently useful files in one ordered, failure-isolated batch. Every success returns complete current context. Prefer over `compress_code_context`. |
+| `provide_code_context` | `filePath` (single) or `files` (batch) | Per-file `intent`, `fidelity`, `focusMethods`; shared `workspaceRoot`, `tokenizer`; batch-only `responseMode` | **Primary model-facing entry point.** Reads one file or up to 8 independently useful files in one ordered, failure-isolated batch. Every success returns complete current context. Prefer over `compress_code_context`. |
 | `compress_code_context` | `filePath` | `fidelity`, `encoding`, `tokenizer`, `workspaceRoot` | Direct AST compilation without heuristics. Lower-level tool; prefer `provide_code_context`. |
 | `restore_context` | `filePath` | `workspaceRoot` | Transactionally restore physical `0x04`, checked `dv:2` history, and the aligned semantic-edge snapshot. Never recompiles source as fallback. |
 | `context_stats` | — | `filePath`, `format` | Token-savings dashboard. Shows raw vs compressed tokens, delta hit rate, per-file breakdown. |
@@ -60,12 +60,18 @@ Use the singular `filePath` form for one source file. For two or more
 independently useful source contexts, use top-level `files`; each item requires
 a unique non-empty `id` and `filePath` and may choose its own `intent`,
 `fidelity`, and `focusMethods`. Keep `workspaceRoot` and `tokenizer` at the top
-level. Batch results preserve request order: a successful item has
-`status="ok"`, its exact mirrored `content`, `content_index`, and semantic
-`meta`; an unsuccessful item has `status="error"` and its own error. Inspect
-every status and consume the successful item's `content` directly. The
-`content_index` correlates that mirror with the byte-identical top-level MCP
-content block; failed items never own content.
+level. Batch results preserve request order and declare the resolved
+`response_mode`. Inspect every item: a success has `status="ok"` and semantic
+`meta`; an error remains item-local and never owns content.
+
+`responseMode` is valid only on the batch form. Omit it on an unknown host to
+receive safe `mirrored`: exact code appears both in each successful item's
+`content` and in its `content_index`-identified top-level block. Use
+`structured` only for a verified structured-only host; exact code then appears
+once in each successful item and the top-level text is only a routing notice.
+Use `indexed` only for a verified content-channel host; exact code then appears
+once in top-level blocks and successful items carry `content_index`. Never
+select a compact mode by guessing host behavior.
 
 Batching is best-effort context acquisition, not a cross-file transaction. One
 item failure does not suppress successful siblings, and successful reads retain

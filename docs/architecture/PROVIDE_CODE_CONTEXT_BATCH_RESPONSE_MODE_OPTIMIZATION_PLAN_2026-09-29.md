@@ -1,7 +1,7 @@
 # `provide_code_context` Batch Response-Mode Optimization Plan
 
 **Date:** 2026-09-29
-**Status:** Phases 0–4 and Checkpoints A–E complete; Phase 5 has not started
+**Status:** Phases 0–5 and Checkpoints A–F complete; Phase 6 has not started
 **Scope:** Reduce duplicate serialized code in batched `provide_code_context`
 responses when the caller knows which MCP visibility channel its host exposes,
 without reintroducing silent content loss or changing per-file evaluation.
@@ -364,3 +364,14 @@ sizes at 2, 4, and 8 items for `mirrored`, `structured`, and `indexed`, without
 using those measurements to select a mode automatically. The maintainer
 reported the focused all-features test GREEN. Phase 4 and Checkpoint E are
 complete.
+
+**Phase 5 guidance checkpoint (2026-09-29):** Portable and local agent policy,
+tooling guidance, Claude integration rules, runtime initialization guidance,
+README examples, and the durable MCP invariant now distinguish singular and
+batch requests and explain the three explicit batch projections. Unknown hosts
+omit the mode for safe `mirrored`; verified structured-result consumers request
+`structured`; verified top-level content consumers may request `indexed`.
+Every path requires per-item status inspection and forbids guessing a compact
+mode. The tracked initialization-prompt contract was reported GREEN by the
+maintainer, with the runtime instructions still below their size ceiling.
+Phase 5 and Checkpoint F are complete.

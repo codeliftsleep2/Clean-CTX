@@ -395,9 +395,12 @@ Clean-CTX is the primary code-intelligence layer. Follow these rules:
    one file and normally use the batch form for multiple files; never
    send both forms together. Batch `workspaceRoot` and `tokenizer` are shared
    top-level fields, while each item owns `id`, `filePath`, and optional
-   `intent`, `fidelity`, and `focusMethods`. Inspect every item status and use
-   each successful item's `content` directly; `content_index` correlates that
-   mirror with the same exact top-level MCP content block.
+   `intent`, `fidelity`, and `focusMethods`. `responseMode` is batch-only:
+   omit it for safe `mirrored`; use `structured` only when the host is verified
+   to consume structured results, or `indexed` only when it is verified to
+   consume top-level content blocks. Never guess a compact mode. Inspect every
+   item status and consume code from the channel selected by the response's
+   `response_mode` discriminator.
 2. **CBM fallback** — When `get_cbm_status` returns `unavailable` or
    `degraded`, use `search_codebase` for discovery and `read_files` for
    reading. See `docs/agent/tooling.md` §7 for the full fallback procedure.
