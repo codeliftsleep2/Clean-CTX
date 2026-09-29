@@ -5,6 +5,7 @@ thread_local! {
     static DETECTION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+#[cfg(feature = "spring_boot")]
 pub(crate) fn record_evaluation() {
     EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
 }

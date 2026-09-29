@@ -27,9 +27,11 @@ pub(crate) mod markers;
 pub mod properties;
 pub mod semantic;
 
+#[cfg(all(test, feature = "spring_boot"))]
+pub(crate) use evaluation_metrics::record_evaluation;
 #[cfg(test)]
 pub(crate) use evaluation_metrics::{
-    detection_count, evaluation_count, record_detection, record_evaluation, reset_detection_count,
+    detection_count, evaluation_count, record_detection, reset_detection_count,
     reset_evaluation_count,
 };
 

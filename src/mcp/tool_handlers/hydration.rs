@@ -104,7 +104,7 @@ struct DiscoveryOutcome {
     fallback_reason: Option<&'static str>,
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
     matches!(
         query_type,
@@ -534,7 +534,7 @@ fn select_candidates(state: &McpState, candidates: Vec<String>) -> Vec<String> {
     selected
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) fn compile_candidate(
     state: &McpState,
     resolved_path: &str,

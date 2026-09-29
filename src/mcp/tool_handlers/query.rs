@@ -125,7 +125,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
 /// 4. Return final results + the complete internal hydration report. The
 ///    LLM-facing projection of that report is `diagnostics::discovery_field`,
 ///    applied by the handler that serializes the response.
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 fn run_query_with_hydration<F>(
     state: &McpState,
     query_type: &str,
