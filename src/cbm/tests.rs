@@ -17,6 +17,11 @@ mod e2e;
 #[path = "../tests/cbm/graph_intel.rs"]
 mod graph_intel;
 
+// Canonical project ownership for memory/disk graph-query cache entries and
+// target-project invalidation across active/non-active project boundaries.
+#[path = "../tests/cbm/cache_ownership.rs"]
+mod cache_ownership;
+
 // CBM 0.8.1 trace_path wire contract (typed graph_trace parsing +
 // direction determination), pinned by verbatim live captures and
 // fresh-process probes over a synthetic fixture repo.

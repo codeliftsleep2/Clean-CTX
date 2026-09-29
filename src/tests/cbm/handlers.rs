@@ -327,7 +327,8 @@ fn graph_query_dispatch_surfaces_projected_file_path() {
     );
 
     let bridge = new_mock_empty();
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         format!(
             "{QUERY_CACHE_KEY_NAMESPACE}:MATCH (f:Function) RETURN f.name, f.file_path LIMIT 5"
         ),

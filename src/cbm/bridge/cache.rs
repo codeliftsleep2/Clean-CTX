@@ -73,7 +73,9 @@ impl GraphBridge {
     }
 
     pub fn invalidate_symbol(&mut self, symbol: &str) {
-        self.cache.retain(|k, _| !k.contains(symbol));
+        let project = self.project_str();
+        self.cache
+            .retain(|key, _| !key.belongs_to(&project) || !key.query_contains(symbol));
     }
 
     /// Invalidate both the in-memory AND disk caches for the current project.
@@ -82,10 +84,23 @@ impl GraphBridge {
     /// from disk on the next lookup within the TTL window (e.g. after a graph
     /// version change). This must purge the current project's disk partition.
     pub fn invalidate_cache(&mut self) {
-        self.cache.clear();
+        let project = self.project_str();
+        self.invalidate_project_cache(&project);
+    }
+
+    /// Invalidate all and only the cache entries owned by `project`.
+    ///
+    /// The project identity determines both memory ownership and the registered
+    /// SQLite partition. Active bridge state is deliberately not consulted.
+    pub(crate) fn invalidate_project_cache(&mut self, project: &str) {
+        let project = self.resolve_project_id(project);
+        self.cache.retain(|key, _| !key.belongs_to(&project));
+
+        let Some(project_root) = self.project_paths.get(&project) else {
+            return;
+        };
         if let Some(ref disk) = self.disk_cache {
-            let project_root = self.project_root.to_string_lossy().into_owned();
-            disk.invalidate_project(&project_root);
+            disk.invalidate_project(&project_root.to_string_lossy());
         }
     }
 
@@ -181,56 +196,69 @@ impl GraphBridge {
 
     // â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    /// Disk key scope: `{project_name}:{key}` so the effective disk
-    /// partition is `(project_root, project_name)`. This prevents a
-    /// cross-project data leak when `set_project("repo-b")` is called
-    /// while `project_root` is still pinned to repo-a — repo-b queries
-    /// would otherwise hydrate repo-a's cached results.
-    pub(super) fn disk_key(&self, key: &str) -> String {
-        format!("{}:{key}", self.project_str())
+    /// Disk key scope: `{project_name}:{key}` so the existing SQLite schema's
+    /// effective owner is `(registered project_root, canonical project)`.
+    pub(super) fn disk_key(project: &str, key: &str) -> String {
+        format!("{project}:{key}")
     }
 
-    /// Check cache for a valid (non-expired) entry. Also evicts any
-    /// expired entries found during lookup (H-3 fix: lazy GC).
+    /// Return a valid active-project entry, lazily hydrating it from disk.
+    pub(super) fn cached_value(&self, key: &str) -> Option<Value> {
+        self.cached_value_for(&self.project_str(), key)
+    }
+
+    /// Return a valid entry owned by `project`, lazily hydrating it from that
+    /// project's registered disk partition. Expired memory entries are evicted
+    /// during lookup (H-3 lazy GC).
     ///
     /// **Disk hydration:** On a memory miss, checks the disk cache first.
     /// If a valid entry exists on disk, it is hydrated into the in-memory
-    /// `DashMap` (zero CBM round-trips) and `true` is returned. This avoids
+    /// `DashMap` (zero CBM round-trips) and returned. This avoids
     /// re-indexing CBM on process restart or when switching projects.
-    pub(super) fn check_cache(&self, key: &str) -> bool {
-        if let Some(cached) = self.cache.get(key) {
+    pub(super) fn cached_value_for(&self, project: &str, key: &str) -> Option<Value> {
+        let cache_key = GraphCacheKey::new(project, key);
+        if let Some(cached) = self.cache.get(&cache_key) {
             if cached.value().expires_at > Instant::now() {
-                return true;
+                return Some(cached.value().data.clone());
             }
-            // Expired — clone key then drop guard before remove (avoids borrow conflict)
-            let owned_key = key.to_string();
             drop(cached);
-            self.cache.remove(&owned_key);
+            self.cache.remove(&cache_key);
         }
 
         // Memory miss — try disk cache (lazy hydration on first touch).
-        if let Some(ref disk) = self.disk_cache {
-            let project_root = self.project_root.to_string_lossy().into_owned();
-            let disk_key = self.disk_key(key);
-            if let Some(data_json) = disk.get(&project_root, &disk_key) {
+        if let (Some(disk), Some(project_root)) =
+            (&self.disk_cache, self.project_paths.get(project))
+        {
+            let disk_key = Self::disk_key(project, key);
+            if let Some(data_json) = disk.get(&project_root.to_string_lossy(), &disk_key) {
                 if let Ok(data) = serde_json::from_str::<Value>(&data_json) {
                     let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
-                    self.cache
-                        .insert(key.to_string(), CachedGraphData { data, expires_at });
-                    return true;
+                    self.cache.insert(
+                        cache_key,
+                        CachedGraphData {
+                            data: data.clone(),
+                            expires_at,
+                        },
+                    );
+                    return Some(data);
                 }
             }
         }
-        false
+        None
     }
 
-    /// Insert into cache with TTL expiry. Write-through to disk when a
-    /// disk cache is attached, so memory and disk stay in sync.
+    /// Insert an active-project entry with TTL expiry and disk write-through.
     pub(super) fn cache_insert<T: Serialize>(&self, key: &str, value: &T) {
+        self.cache_insert_for(&self.project_str(), key, value);
+    }
+
+    /// Insert an entry owned by `project`. Unknown projects remain memory-only
+    /// because no filesystem root may be inferred from a project slug.
+    pub(super) fn cache_insert_for<T: Serialize>(&self, project: &str, key: &str, value: &T) {
         let data = serde_json::to_value(value).unwrap_or_default();
         let expires_at = Instant::now() + Duration::from_secs(self.cache_ttl);
         self.cache.insert(
-            key.to_string(),
+            GraphCacheKey::new(project, key),
             CachedGraphData {
                 data: data.clone(),
                 expires_at,
@@ -238,16 +266,22 @@ impl GraphBridge {
         );
 
         // Write-through to disk cache (scoped by project name).
-        if let Some(ref disk) = self.disk_cache {
-            let project_root = self.project_root.to_string_lossy().into_owned();
-            let disk_key = self.disk_key(key);
+        if let (Some(disk), Some(project_root)) =
+            (&self.disk_cache, self.project_paths.get(project))
+        {
+            let disk_key = Self::disk_key(project, key);
             let data_json = data.to_string();
             let expires_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0)
                 + (self.cache_ttl as i64 * 1000);
-            disk.put(&project_root, &disk_key, &data_json, expires_ms);
+            disk.put(
+                &project_root.to_string_lossy(),
+                &disk_key,
+                &data_json,
+                expires_ms,
+            );
         }
     }
 

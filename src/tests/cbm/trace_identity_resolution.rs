@@ -30,7 +30,8 @@ fn edge(from: &str, to: &str) -> GraphEdge {
 fn state() -> crate::mcp::McpState {
     let bridge = new_mock_empty();
     let expires_at = Instant::now() + Duration::from_secs(600);
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         format!("search:{BARE}"),
         CachedGraphData {
             data: serde_json::to_value([node(ALPHA, "src/alpha.rs"), node(BETA, "src/beta.rs")])
@@ -38,7 +39,8 @@ fn state() -> crate::mcp::McpState {
             expires_at,
         },
     );
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         format!("trace:{BARE}:alpha_leaf"),
         CachedGraphData {
             data: serde_json::to_value([edge(BARE, "probe.src.alpha.alpha_leaf")])
@@ -46,7 +48,8 @@ fn state() -> crate::mcp::McpState {
             expires_at,
         },
     );
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         format!("trace:{ALPHA}:alpha_leaf"),
         CachedGraphData {
             data: serde_json::to_value([edge(ALPHA, "probe.src.alpha.alpha_leaf")])

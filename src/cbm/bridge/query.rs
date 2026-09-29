@@ -17,16 +17,9 @@ impl GraphBridge {
         &mut self,
     ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
         let key = "symbol_importance".to_string();
-        if self.check_cache(&key) {
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .map_err(|e| CbmError::ParseError(format!("cached symbol_importance: {e}")));
+        if let Some(data) = self.cached_value(&key) {
+            return serde_json::from_value(data)
+                .map_err(|e| CbmError::ParseError(format!("cached symbol_importance: {e}")));
         }
         let project = self.project_str();
         let symbols = self.query(move |c| c.get_symbol_importance(&project, Some(1)))?;
@@ -65,16 +58,9 @@ impl GraphBridge {
         _depth: usize,
     ) -> Result<Vec<String>, CbmError> {
         let key = format!("blast:{symbol}");
-        if self.check_cache(&key) {
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .map_err(|e| CbmError::ParseError(format!("cached blast radius: {e}")));
+        if let Some(data) = self.cached_value(&key) {
+            return serde_json::from_value(data)
+                .map_err(|e| CbmError::ParseError(format!("cached blast radius: {e}")));
         }
         let escaped = symbol.replace('\'', "\\'");
         let cypher = format!(
@@ -109,16 +95,9 @@ impl GraphBridge {
             )
         };
         let key = "dead_code".to_string();
-        if self.check_cache(&key) {
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .map_err(|e| CbmError::ParseError(format!("cached dead_code: {e}")));
+        if let Some(data) = self.cached_value(&key) {
+            return serde_json::from_value(data)
+                .map_err(|e| CbmError::ParseError(format!("cached dead_code: {e}")));
         }
         let project = self.project_str();
         let mut entries = Vec::new();
@@ -152,16 +131,9 @@ impl GraphBridge {
     /// populate cross-file call edges (confidence = 0.75). Cached with TTL.
     pub fn get_call_edges(&mut self) -> Result<Vec<(String, String)>, CbmError> {
         let key = "call_edges".to_string();
-        if self.check_cache(&key) {
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .map_err(|e| CbmError::ParseError(format!("cached call_edges: {e}")));
+        if let Some(data) = self.cached_value(&key) {
+            return serde_json::from_value(data)
+                .map_err(|e| CbmError::ParseError(format!("cached call_edges: {e}")));
         }
         let cypher = "MATCH (a:Function)-[:CALLS]->(b:Function) RETURN a.name, b.name".to_string();
         let project = self.project_str();
@@ -209,17 +181,10 @@ impl GraphBridge {
     /// failures now propagate as [`CbmError::Err`].
     pub fn get_architecture(&mut self) -> Result<ArchitectureOverview, CbmError> {
         let key = "architecture".to_string();
-        if self.check_cache(&key) {
+        if let Some(data) = self.cached_value(&key) {
             // Cache hit is a successful query.
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .map_err(|e| CbmError::ParseError(format!("cached architecture: {e}")));
+            return serde_json::from_value(data)
+                .map_err(|e| CbmError::ParseError(format!("cached architecture: {e}")));
         }
         let project = self.project_str();
         let arch = self.query(move |c| c.get_architecture(&project))?;
@@ -252,16 +217,8 @@ impl GraphBridge {
         }
         let key = format!("endpoint:{method_name}");
         let project = self.project_str();
-        if self.check_cache(&key) {
-            return serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .unwrap_or_default();
+        if let Some(data) = self.cached_value(&key) {
+            return serde_json::from_value(data).unwrap_or_default();
         }
 
         let escaped = method_name.replace('\'', "\\'");
@@ -316,52 +273,30 @@ impl GraphBridge {
     }
 
     /// Execute a Cypher-like query against an EXPLICIT project, served from the
-    /// same shared graph cache.
-    ///
-    /// The active-project key above (`cypher2:{cypher}`) is valid only while the
-    /// bridge's active project IS the queried project: `set_project` /
-    /// `set_workspace_root` clear the in-memory cache on every switch, and the
-    /// disk store partitions by `(project_root, project_str)`. A caller that
-    /// names a project explicitly — `cbm_proxy` resolves the request's project
-    /// per call and deliberately does NOT promote it to the active project —
-    /// cannot reuse that key, because two repositories that both declare the
-    /// same symbol produce the same Cypher text, and one key would then serve
-    /// one project's rows to the other.
-    ///
-    /// This entry point therefore carries the project in the key
-    /// (`cypher2:{project}:{cypher}`) while reusing the *same* cache, TTL, disk
-    /// write-through, and invalidation as every other graph query. Nothing is
-    /// added: no second cache, no persistence, no lifecycle, and entries written
-    /// here can never be read by the active-project key (or vice versa), so
-    /// WSC-004's workspace isolation holds by construction.
+    /// same project-owned graph cache. Project isolation is carried by the
+    /// typed cache key rather than encoded into the query string.
     pub fn query_graph_scoped(&mut self, cypher: &str, project: &str) -> QueryResult {
-        let key = format!("{QUERY_CACHE_KEY_NAMESPACE}:{project}:{cypher}");
-        self.query_graph_inner(&key, cypher, project)
+        let key = format!("{QUERY_CACHE_KEY_NAMESPACE}:{cypher}");
+        let project = self.resolve_project_id(project);
+        self.query_graph_inner(&key, cypher, &project)
     }
 
     /// Shared body of the two `query_graph` entry points: one cache lookup, one
     /// typed transport call, one write-through.
     fn query_graph_inner(&mut self, key: &str, cypher: &str, project: &str) -> QueryResult {
         let q = cypher.to_string();
-        let project = project.to_string();
-        if self.check_cache(key) {
+        if let Some(data) = self.cached_value_for(project, key) {
             // Cache hit is a successful query — clear any stale error.
-            let result = serde_json::from_value(
-                self.cache
-                    .get(key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .unwrap_or(QueryResult {
+            let result = serde_json::from_value(data).unwrap_or(QueryResult {
                 nodes: vec![],
                 edges: vec![],
             });
             self.set_last_error(None);
             return result;
         }
-        let result = self.query(move |c| c.query_graph(&q, &project));
+        let project = project.to_string();
+        let query_project = project.clone();
+        let result = self.query(move |c| c.query_graph(&q, &query_project));
         match result {
             Ok(table) => {
                 self.set_last_error(None);
@@ -375,7 +310,7 @@ impl GraphBridge {
                 // "N node(s), 0 edge(s)" while the raw proxy path surfaced
                 // the very same rows intact.)
                 let r = convert_query_rows(&table.columns, &table.rows);
-                self.cache_insert(key, &r);
+                self.cache_insert_for(&project, key, &r);
                 r
             }
             Err(e) => {
@@ -392,17 +327,9 @@ impl GraphBridge {
         let key = format!("search:{query}");
         let project = self.project_str();
         let q = query.to_string();
-        if self.check_cache(&key) {
+        if let Some(data) = self.cached_value(&key) {
             // Cache hit is a successful query — clear any stale error.
-            let result = serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .unwrap_or_default();
+            let result = serde_json::from_value(data).unwrap_or_default();
             self.set_last_error(None);
             return result;
         }
@@ -441,22 +368,15 @@ impl GraphBridge {
     /// active project. The proxy uses this to keep project selection scoped to
     /// a single call.
     pub(crate) fn search_scoped(&mut self, query: &str, project: &str) -> Vec<GraphNode> {
+        let project = self.resolve_project_id(project);
         if project == self.project_str() {
             return self.search(query);
         }
 
-        let key = format!("search:{project}:{query}");
+        let key = format!("search:{query}");
         let q = query.to_string();
-        if self.check_cache(&key) {
-            let result = serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .unwrap_or_default();
+        if let Some(data) = self.cached_value_for(&project, &key) {
+            let result = serde_json::from_value(data).unwrap_or_default();
             self.set_last_error(None);
             return result;
         }
@@ -468,14 +388,14 @@ impl GraphBridge {
             )
         });
         let name_pattern = if has_regex { q } else { format!(".*{q}.*") };
-        let project = project.to_string();
-        let result = self.query(move |c| c.search_graph(&name_pattern, &project, None));
+        let query_project = project.clone();
+        let result = self.query(move |c| c.search_graph(&name_pattern, &query_project, None));
         match result {
             Ok(nodes) => {
                 self.set_last_error(None);
                 let graph_nodes: Vec<GraphNode> =
                     nodes.iter().filter_map(map_search_result).collect();
-                self.cache_insert(&key, &graph_nodes);
+                self.cache_insert_for(&project, &key, &graph_nodes);
                 graph_nodes
             }
             Err(error) => {
@@ -523,17 +443,9 @@ impl GraphBridge {
         };
         let key = format!("trace:{from}:{to}");
         let project = self.project_str();
-        if self.check_cache(&key) {
+        if let Some(data) = self.cached_value(&key) {
             // Cache hit is a successful query — clear any stale error.
-            let result = serde_json::from_value(
-                self.cache
-                    .get(&key)
-                    .expect("cache entry should exist after check_cache() returned true")
-                    .value()
-                    .data
-                    .clone(),
-            )
-            .unwrap_or_default();
+            let result = serde_json::from_value(data).unwrap_or_default();
             self.set_last_error(None);
             return result;
         }

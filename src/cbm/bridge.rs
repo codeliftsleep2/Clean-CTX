@@ -117,6 +117,34 @@ pub(crate) struct CachedGraphData {
     pub(crate) expires_at: Instant,
 }
 
+/// Structural owner for one cached graph-query result.
+///
+/// Query text is only unique inside a CBM project. Keeping the canonical
+/// project identity in the key prevents active-project changes from making an
+/// entry visible to another repository.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) struct GraphCacheKey {
+    project: String,
+    query: String,
+}
+
+impl GraphCacheKey {
+    pub(crate) fn new(project: impl Into<String>, query: impl Into<String>) -> Self {
+        Self {
+            project: project.into(),
+            query: query.into(),
+        }
+    }
+
+    pub(crate) fn belongs_to(&self, project: &str) -> bool {
+        self.project == project
+    }
+
+    pub(crate) fn query_contains(&self, value: &str) -> bool {
+        self.query.contains(value)
+    }
+}
+
 // â”€â”€ P1-9: Non-blocking indexing state machine â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /// Tracks the state of project indexing for the CBM graph bridge.
@@ -170,7 +198,7 @@ pub struct GraphBridge {
     /// P1-9: Changed from `Option<CbmClient>` to allow spawning the
     /// indexing thread while sharing the client handle.
     pub(crate) client: Arc<Mutex<Option<CbmClient>>>,
-    pub(crate) cache: DashMap<String, CachedGraphData>,
+    pub(crate) cache: DashMap<GraphCacheKey, CachedGraphData>,
     pub(crate) status: CbmStatus,
     pub(crate) cache_ttl: u64,
     pub(crate) project: Option<String>,
@@ -234,6 +262,43 @@ pub mod test_helpers {
         bridge.cache_ttl
     }
 
+    /// Seed one cache entry under the bridge's current canonical project.
+    pub(crate) fn seed_active_cache(
+        bridge: &GraphBridge,
+        query: impl Into<String>,
+        data: CachedGraphData,
+    ) {
+        bridge
+            .cache
+            .insert(GraphCacheKey::new(bridge.project_str(), query), data);
+    }
+
+    /// Seed one cache entry under an explicitly selected canonical project.
+    pub(crate) fn seed_cache(
+        bridge: &GraphBridge,
+        project: &str,
+        query: impl Into<String>,
+        data: CachedGraphData,
+    ) {
+        bridge
+            .cache
+            .insert(GraphCacheKey::new(project, query), data);
+    }
+
+    /// Report whether the active project owns a cache entry for `query`.
+    pub(crate) fn active_cache_contains(bridge: &GraphBridge, query: &str) -> bool {
+        bridge
+            .cache
+            .contains_key(&GraphCacheKey::new(bridge.project_str(), query))
+    }
+
+    /// Report whether an explicit project owns a cache entry for `query`.
+    pub(crate) fn cache_contains(bridge: &GraphBridge, project: &str, query: &str) -> bool {
+        bridge
+            .cache
+            .contains_key(&GraphCacheKey::new(project, query))
+    }
+
     /// Create a mock GraphBridge with canned symbol importance data.
     ///
     /// P0-2: Fixed — the mock now sets `status: CbmStatus::Available` and
@@ -262,7 +327,7 @@ pub mod test_helpers {
             last_error: None,
         };
         // Pre-seed the symbol_importance cache entry
-        let key = "symbol_importance".to_string();
+        let key = GraphCacheKey::new("test-project", "symbol_importance");
         let json = serde_json::to_value(&symbol_importance).unwrap_or_default();
         bridge.cache.insert(
             key,
@@ -305,7 +370,7 @@ pub mod test_helpers {
         };
         // Seed a cache entry so is_available() is true (client is None).
         bridge.cache.insert(
-            "__available__".to_string(),
+            GraphCacheKey::new("test-project", "__available__"),
             CachedGraphData {
                 data: serde_json::json!("available"),
                 expires_at: Instant::now() + Duration::from_secs(3600),
@@ -345,7 +410,7 @@ pub mod test_helpers {
         let ttl = Duration::from_secs(3600);
         let call_json = serde_json::to_value(&call_edges).unwrap_or_default();
         bridge.cache.insert(
-            "call_edges".to_string(),
+            GraphCacheKey::new("test-project", "call_edges"),
             CachedGraphData {
                 data: call_json,
                 expires_at: Instant::now() + ttl,
@@ -353,7 +418,7 @@ pub mod test_helpers {
         );
         let si_json = serde_json::to_value(&symbol_importance).unwrap_or_default();
         bridge.cache.insert(
-            "symbol_importance".to_string(),
+            GraphCacheKey::new("test-project", "symbol_importance"),
             CachedGraphData {
                 data: si_json,
                 expires_at: Instant::now() + ttl,
@@ -361,7 +426,7 @@ pub mod test_helpers {
         );
         let dc_json = serde_json::to_value(&dead_code).unwrap_or_default();
         bridge.cache.insert(
-            "dead_code".to_string(),
+            GraphCacheKey::new("test-project", "dead_code"),
             CachedGraphData {
                 data: dc_json,
                 expires_at: Instant::now() + ttl,

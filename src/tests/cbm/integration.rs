@@ -218,7 +218,8 @@ fn cached_query_clears_stale_error() {
     // Seed a search cache entry so search() takes the cache-hit path.
     use crate::cbm::bridge::CachedGraphData;
     let ttl = std::time::Instant::now() + std::time::Duration::from_secs(3600);
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         "search:UserService".to_string(),
         CachedGraphData {
             data: json!([]),

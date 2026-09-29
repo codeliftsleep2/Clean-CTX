@@ -147,7 +147,8 @@ fn disk_cache_project_isolation_across_workspace_switches() {
         }
     });
     let expires = std::time::Instant::now() + std::time::Duration::from_secs(600);
-    bridge.cache.insert(
+    crate::cbm::bridge::test_helpers::seed_active_cache(
+        &bridge,
         "symbol_importance".to_string(),
         CachedGraphData {
             data: seeded.clone(),
@@ -166,11 +167,11 @@ fn disk_cache_project_isolation_across_workspace_switches() {
     // Hand the store to the bridge afterwards (it is consumed on attach).
     bridge.attach_disk_cache(store);
 
-    // Repo B has nothing on disk or in memory under its own keys.
+    // Repo B has nothing on disk or in memory under its own ownership key.
     bridge.set_workspace_root(root_b.path());
     assert!(
-        bridge.cache.get("symbol_importance").is_none(),
-        "switching workspace roots must clear the in-memory cache"
+        !crate::cbm::bridge::test_helpers::active_cache_contains(&bridge, "symbol_importance"),
+        "repo A's retained entry must not be visible under repo B"
     );
     let from_b = bridge.get_symbol_importance_mut();
     assert!(
@@ -178,8 +179,8 @@ fn disk_cache_project_isolation_across_workspace_switches() {
         "repo B query must FAIL (no client), never return a fake-empty Ok"
     );
 
-    // Back to repo A: hydration from A's disk partition must restore the
-    // exact seeded entry (no CBM round-trip needed).
+    // Back to repo A: its retained memory entry must be reusable (and the
+    // matching disk partition remains available across process restarts).
     bridge.set_workspace_root(root_a.path());
     let from_a = bridge
         .get_symbol_importance_mut()

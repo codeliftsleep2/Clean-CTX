@@ -376,6 +376,13 @@ from CBM before compression. The wrapper and proxy paths therefore have intentio
 different freshness semantics — prefer wrappers for repeated queries where staleness
 is acceptable, and the proxy when fresh data is required.
 
+Every structured cache entry is owned by one canonical CBM project. Identical
+query text in two projects produces distinct entries; switching the active
+project preserves those safely isolated entries. After `apply_edit`, the next
+structured graph operation refreshes the dirty project and invalidates all and
+only that project's memory and disk results. Explicit-project disk access uses
+the registered project-to-root mapping and never the unrelated active root.
+
 ### Clean-CTX-First Repository Discovery
 
 Use Clean-CTX as the primary repository and code-intelligence layer. Do not
