@@ -167,12 +167,7 @@ fn owner_rows(
                 writeln!(output, "X|{}", quoted(&owner["extends"], "class extends")?).unwrap();
             }
             for written_type in string_values(&owner["base_type_refs"], "base type refs")? {
-                writeln!(
-                    output,
-                    "R|{}",
-                    quoted(&json!(written_type), "base type ref")?
-                )
-                .unwrap();
+                writeln!(output, "R|{written_type}").unwrap();
             }
             for implemented in string_values(&owner["implements"], "implements")? {
                 writeln!(output, "J|{implemented}").unwrap();

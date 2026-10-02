@@ -147,7 +147,7 @@ fn method_mut<'a>(value: &'a mut Value, id: &str) -> Option<&'a mut Value> {
 fn declaration_tag(tag: &str) -> bool {
     matches!(
         tag,
-        "C" | "I" | "X" | "J" | "cm" | "cf" | "F" | "M" | "p" | "mo"
+        "C" | "I" | "X" | "R" | "J" | "cm" | "cf" | "F" | "M" | "p" | "mo"
     )
 }
 
