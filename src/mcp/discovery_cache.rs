@@ -92,12 +92,15 @@ impl DiscoveryScope {
     }
 }
 
-/// One completed discovery: scope + discovery mode + target entity name.
+/// One completed discovery: scope + discovery mode + target entity name +
+/// optional semantic coverage. A legacy/Edit discovery cannot suppress a
+/// later operation that requires a fidelity-qualified projection.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 struct DiscoveryKey {
     scope: DiscoveryScope,
     mode: DiscoveryMode,
     name: String,
+    semantic_fidelity: Option<crate::workspace::index::SemanticFidelity>,
 }
 
 /// Session-scoped discovery completion cache (see module docs).
@@ -130,10 +133,21 @@ impl HydrationDiscoveryCache {
         mode: DiscoveryMode,
         name: &str,
     ) -> bool {
+        self.is_complete_for(scope, mode, name, None)
+    }
+
+    pub(crate) fn is_complete_for(
+        &self,
+        scope: &DiscoveryScope,
+        mode: DiscoveryMode,
+        name: &str,
+        semantic_fidelity: Option<crate::workspace::index::SemanticFidelity>,
+    ) -> bool {
         let key = DiscoveryKey {
             scope: scope.clone(),
             mode,
             name: name.to_string(),
+            semantic_fidelity,
         };
         self.completed
             .get(&key)
@@ -149,6 +163,16 @@ impl HydrationDiscoveryCache {
         mode: DiscoveryMode,
         name: &str,
     ) {
+        self.mark_complete_for(scope, mode, name, None);
+    }
+
+    pub(crate) fn mark_complete_for(
+        &mut self,
+        scope: &DiscoveryScope,
+        mode: DiscoveryMode,
+        name: &str,
+        semantic_fidelity: Option<crate::workspace::index::SemanticFidelity>,
+    ) {
         // Track the scope so a later invalidation has a generation to bump.
         let generation = *self.generations.entry(scope.clone()).or_insert(0);
         self.completed.insert(
@@ -156,6 +180,7 @@ impl HydrationDiscoveryCache {
                 scope: scope.clone(),
                 mode,
                 name: name.to_string(),
+                semantic_fidelity,
             },
             generation,
         );

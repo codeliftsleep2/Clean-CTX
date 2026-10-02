@@ -282,6 +282,10 @@ mod tests_filesystem_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_entities_auto_compile.rs"]
 mod tests_entities_auto_compile;
 
+#[cfg(all(test, feature = "rust", feature = "angular"))]
+#[path = "../../tests/mcp/workspace_query_hydration_fidelity.rs"]
+mod tests_hydration_fidelity;
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_cycle_witness.rs"]
 mod tests_cycle_witness;

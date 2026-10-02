@@ -80,7 +80,13 @@ fn try_prepare_find_entities(
             None => index.find_entities_by_name(&name),
         };
     }
-    let hydration = context.hydrate(state, "find_entities", &name, workspace_root)?;
+    let hydration = context.hydrate(
+        state,
+        "find_entities",
+        &name,
+        workspace_root,
+        crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
+    )?;
     Ok(PreparedQuery::indexed(move |index| {
         let entities = match scope.as_ref() {
             Some(scope) => index.find_entities_by_name_in_scope(&name, scope),

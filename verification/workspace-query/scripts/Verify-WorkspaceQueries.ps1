@@ -29,6 +29,7 @@ $interfaceReverse = Response "inheritance-interface-reverse"
 Require (@((Structured $find).entities | Where-Object { $_.domain -eq "angular" -and $_.entity_type -eq "Service" -and $_.name -eq "Alpha" }).Count -gt 0) "find_entities omitted angular Service Alpha"
 Require (@((Structured $forward).edges | Where-Object { $_.relation -eq "Injects" -and $_.subject.name -eq "Alpha" -and $_.object.name -eq "Repository" }).Count -gt 0) "forward_edges omitted Alpha Injects Repository"
 Require (@((Structured $reverse).edges | Where-Object { $_.relation -eq "Injects" -and $_.subject.name -eq "Alpha" -and $_.object.name -eq "Repository" }).Count -gt 0) "reverse_edges omitted Alpha Injects Repository"
+Require (@((Structured $forward).edges | Where-Object { $_.relation -eq "Injects" -and $_.subject.name -eq "Alpha" -and $_.object.name -eq "Repository" }).Count -eq 1) "Low-first hydration did not produce exactly one Alpha Injects Repository edge"
 Require (@((Structured $inFile).entities | Where-Object { $_.name -eq "Alpha" }).Count -gt 0) "entities_in_file omitted Alpha"
 Require (@((Structured $transitive).dependencies | Where-Object { $_.Count -eq 3 -and $_[0] -eq "angular" -and $_[1] -eq "Service" -and $_[2] -eq "Repository" }).Count -gt 0) "transitive_dependencies omitted angular Service Repository"
 Require ((Structured $cycle).has_cycle -eq $false) "acyclic fixture reported a cycle"
@@ -60,5 +61,5 @@ $report = [ordered]@{
 }
 $reportPath = Join-Path (Split-Path $captures) "visibility-report.json"
 [IO.File]::WriteAllText($reportPath, ($report | ConvertTo-Json -Depth 20), [Text.UTF8Encoding]::new($false))
-Write-Host "PASS: structured workspace-query facts match the controlled production graph."
+Write-Host "PASS: Low-first hydration upgraded Angular Injects and structured workspace-query facts match the controlled production graph."
 Write-Host "Visibility report: $reportPath"

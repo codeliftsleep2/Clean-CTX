@@ -155,3 +155,31 @@ fn repeated_invalidation_keeps_entries_stale() {
     ));
     assert!(!cache.is_complete(&scope("root"), DiscoveryMode::Declaration, "FooService"));
 }
+
+#[test]
+fn semantic_fidelity_is_part_of_discovery_completion_identity() {
+    use crate::workspace::index::SemanticFidelity;
+
+    let mut cache = HydrationDiscoveryCache::new();
+    let scope = scope("root");
+    cache.mark_complete(&scope, DiscoveryMode::Declaration, "Consumer");
+
+    assert!(!cache.is_complete_for(
+        &scope,
+        DiscoveryMode::Declaration,
+        "Consumer",
+        Some(SemanticFidelity::High),
+    ));
+    cache.mark_complete_for(
+        &scope,
+        DiscoveryMode::Declaration,
+        "Consumer",
+        Some(SemanticFidelity::High),
+    );
+    assert!(cache.is_complete_for(
+        &scope,
+        DiscoveryMode::Declaration,
+        "Consumer",
+        Some(SemanticFidelity::High),
+    ));
+}

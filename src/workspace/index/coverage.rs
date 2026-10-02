@@ -1,7 +1,7 @@
 use super::WorkspaceIndex;
 use crate::layers::meta::semantic::SemanticEdge;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SemanticFidelity {
     Low,
     Medium,

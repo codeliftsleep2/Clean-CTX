@@ -19,6 +19,8 @@ use super::{
     required_name,
 };
 use crate::mcp::McpState;
+use crate::mcp::tool_handlers::hydration::HydrationRequirement;
+use crate::workspace::index::SemanticFidelity;
 use serde_json::Value;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
@@ -59,7 +61,8 @@ fn try_prepare_forward_edges(
             scope.as_ref(),
         );
     }
-    let hydration = context.hydrate(state, "forward_edges", name, workspace_root)?;
+    let requirement = edge_hydration_requirement(args);
+    let hydration = context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
@@ -121,7 +124,8 @@ fn try_prepare_reverse_edges(
             scope.as_ref(),
         );
     }
-    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root)?;
+    let requirement = edge_hydration_requirement(args);
+    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
@@ -143,6 +147,18 @@ fn try_prepare_reverse_edges(
         }
         Ok(QueryAnswer::new("reverse_edges", structured))
     }))
+}
+
+/// Angular service edges include constructor `Injects`, whose authoritative
+/// producer is High-only. Keep this requirement local to the proven identity;
+/// workspace edge operations do not name a relation and therefore cannot
+/// support a sound global relation/fidelity matrix here.
+fn edge_hydration_requirement(args: &Value) -> HydrationRequirement {
+    if args["domain"] == "angular" && args["entity_type"] == "Service" {
+        HydrationRequirement::Semantic(SemanticFidelity::High)
+    } else {
+        HydrationRequirement::LegacyEdit
+    }
 }
 
 fn forward_edges<'a>(

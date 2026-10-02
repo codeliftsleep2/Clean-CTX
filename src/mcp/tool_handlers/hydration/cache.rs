@@ -12,7 +12,7 @@
 // cache lock only for the individual lookup/insert, never across CBM calls,
 // filesystem scans, source reads, or compilation.
 
-use super::filesystem::root_key;
+use super::{HydrationRequirement, filesystem::root_key};
 use crate::mcp::McpState;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use std::path::PathBuf;
@@ -24,10 +24,15 @@ pub(super) fn discovery_is_complete(
     scope: &DiscoveryScope,
     discovery: DiscoveryMode,
     query_name: &str,
+    requirement: HydrationRequirement,
 ) -> bool {
-    state
-        .hydration_discovery_lock()
-        .is_complete(scope, discovery, query_name)
+    let cache = state.hydration_discovery_lock();
+    match requirement {
+        HydrationRequirement::LegacyEdit => cache.is_complete(scope, discovery, query_name),
+        HydrationRequirement::Semantic(fidelity) => {
+            cache.is_complete_for(scope, discovery, query_name, Some(fidelity))
+        }
+    }
 }
 
 /// Record a successful discovery for one scope/mode/name.
@@ -36,10 +41,15 @@ pub(super) fn mark_discovery_complete(
     scope: &DiscoveryScope,
     discovery: DiscoveryMode,
     query_name: &str,
+    requirement: HydrationRequirement,
 ) {
-    state
-        .hydration_discovery_lock()
-        .mark_complete(scope, discovery, query_name);
+    let mut cache = state.hydration_discovery_lock();
+    match requirement {
+        HydrationRequirement::LegacyEdit => cache.mark_complete(scope, discovery, query_name),
+        HydrationRequirement::Semantic(fidelity) => {
+            cache.mark_complete_for(scope, discovery, query_name, Some(fidelity));
+        }
+    }
 }
 
 /// Split `roots` into the roots whose discovery must still run and the number
@@ -52,12 +62,13 @@ pub(super) fn pending_discovery_roots(
     discovery: DiscoveryMode,
     query_name: &str,
     roots: Vec<PathBuf>,
+    requirement: HydrationRequirement,
 ) -> (Vec<PathBuf>, usize) {
     let mut pending = Vec::new();
     let mut cached = 0;
     for root in roots {
         let scope = DiscoveryScope::filesystem(root_key(&root));
-        if discovery_is_complete(state, &scope, discovery, query_name) {
+        if discovery_is_complete(state, &scope, discovery, query_name, requirement) {
             cached += 1;
         } else {
             pending.push(root);
@@ -73,6 +84,7 @@ pub(super) fn mark_discovery_complete_for_roots(
     discovery: DiscoveryMode,
     query_name: &str,
     roots: &[PathBuf],
+    requirement: HydrationRequirement,
 ) {
     let scopes: Vec<DiscoveryScope> = roots
         .iter()
@@ -80,6 +92,11 @@ pub(super) fn mark_discovery_complete_for_roots(
         .collect();
     let mut cache = state.hydration_discovery_lock();
     for scope in &scopes {
-        cache.mark_complete(scope, discovery, query_name);
+        cache.mark_complete_for(
+            scope,
+            discovery,
+            query_name,
+            requirement.semantic_fidelity(),
+        );
     }
 }

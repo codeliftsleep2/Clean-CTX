@@ -4,7 +4,8 @@ This package audits the boundary between the authoritative `WorkspaceIndex`
 answer and what an MCP host may place in model context. It makes no production
 contract change.
 
-The fixture is published through registered `provide_code_context`, then all six
+The fixture is published at Low fidelity through registered
+`provide_code_context`, then all six
 `workspace_query` operations are invoked through the registered MCP dispatcher.
 Each capture retains the complete JSON-RPC response, `content`, and
 `structuredContent`.
@@ -29,6 +30,9 @@ trace is still required to establish whether that host exposes
 The primary capture also verifies generic structural inheritance through the
 production path: class `Extends`, class `Implements`, and interface `Extends`
 must be visible through both forward and reverse workspace queries.
+Its first Angular `forward_edges` request additionally verifies that hydration
+upgrades the current Low projection before answering the High-only constructor
+`Injects` relation.
 
 ## Live contract harnesses
 

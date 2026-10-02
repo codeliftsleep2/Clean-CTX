@@ -64,7 +64,13 @@ fn try_prepare_transitive_dependencies(
             }
         };
     }
-    let hydration = context.hydrate(state, "transitive_dependencies", name, workspace_root)?;
+    let hydration = context.hydrate(
+        state,
+        "transitive_dependencies",
+        name,
+        workspace_root,
+        crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
+    )?;
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();

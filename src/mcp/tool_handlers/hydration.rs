@@ -28,6 +28,11 @@ pub(crate) use invalidation::{
     invalidate_discovery_for_edited_path, invalidate_discovery_for_root,
 };
 
+mod publication;
+#[cfg(all(test, feature = "rust"))]
+pub(crate) use publication::compile_candidate;
+use publication::{compile_candidate_for, select_candidates};
+
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use filesystem::{
     TraversalStats, last_test_traversal_stats, reset_test_scan_calls, test_scan_calls,
@@ -55,6 +60,21 @@ pub(crate) use test_support::*;
 /// against this cap. Exceeding it is reported structurally (`projects_truncated`)
 /// rather than by dropping information silently.
 pub(super) const HYDRATION_MAX_PROJECT_COVERAGE: usize = 16;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub(super) enum HydrationRequirement {
+    LegacyEdit,
+    Semantic(crate::workspace::index::SemanticFidelity),
+}
+
+impl HydrationRequirement {
+    fn semantic_fidelity(self) -> Option<crate::workspace::index::SemanticFidelity> {
+        match self {
+            Self::LegacyEdit => None,
+            Self::Semantic(fidelity) => Some(fidelity),
+        }
+    }
+}
 
 /// The complete result of one hydration discovery/compile cycle.
 ///
@@ -112,21 +132,39 @@ pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
     ) && args["name"].as_str().is_some_and(|name| !name.is_empty())
 }
 
+#[cfg(all(test, feature = "rust"))]
 pub(super) fn hydrate_workspace_index(
     state: &McpState,
     query_type: &str,
     query_name: &str,
     workspace_root: Option<&str>,
 ) -> Result<HydrationReport, String> {
+    hydrate_workspace_index_for(
+        state,
+        query_type,
+        query_name,
+        workspace_root,
+        HydrationRequirement::LegacyEdit,
+    )
+}
+
+pub(super) fn hydrate_workspace_index_for(
+    state: &McpState,
+    query_type: &str,
+    query_name: &str,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+) -> Result<HydrationReport, String> {
     let discovery = discovery_kind(query_type);
-    let outcome = discover_candidate_paths(state, discovery, query_name, workspace_root);
+    let outcome =
+        discover_candidate_paths(state, discovery, query_name, workspace_root, requirement);
     let candidate_paths = outcome.candidates;
     let mut project_coverage = outcome.project_coverage;
     let discovered = candidate_paths.len();
-    let selected = select_candidates(state, candidate_paths);
+    let selected = select_candidates(state, candidate_paths, requirement);
     let mut compiled = 0;
     for path in &selected {
-        if try_compile_candidate(state, path, workspace_root)? {
+        if compile_candidate_for(state, path, workspace_root, requirement)? {
             compiled += 1;
         }
     }
@@ -166,6 +204,7 @@ fn discover_candidate_paths(
     discovery: DiscoveryMode,
     query_name: &str,
     workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
 ) -> DiscoveryOutcome {
     #[cfg(all(test, feature = "rust"))]
     {
@@ -195,6 +234,7 @@ fn discover_candidate_paths(
             filesystem_roots,
             query_name,
             "cbm_unavailable",
+            requirement,
         );
     };
     let projects = bridge.configured_projects();
@@ -231,7 +271,7 @@ fn discover_candidate_paths(
         // only in-session producer of CBM dirty state is `apply_edit`, which
         // invalidates this scope, and every other CBM consumer resolves its
         // own indexing gate.
-        if discovery_is_complete(state, &scope, discovery, query_name) {
+        if discovery_is_complete(state, &scope, discovery, query_name, requirement) {
             cbm_attempted = true;
             successful_roots.insert(root_key(&root));
             coverage.push(ProjectCoverage {
@@ -279,7 +319,7 @@ fn discover_candidate_paths(
                     // return an incomplete candidate set and must stay
                     // retryable instead of being cached as "searched".
                     if readiness == "ready" {
-                        mark_discovery_complete(state, &scope, discovery, query_name);
+                        mark_discovery_complete(state, &scope, discovery, query_name, requirement);
                     }
                 }
                 Err(_) => {
@@ -335,7 +375,7 @@ fn discover_candidate_paths(
                 // zero candidates. Failed or not-yet-ready discovery is never
                 // recorded, so it stays eligible for retry.
                 if readiness == "ready" {
-                    mark_discovery_complete(state, &scope, discovery, query_name);
+                    mark_discovery_complete(state, &scope, discovery, query_name, requirement);
                 }
             }
             Err(_) => {
@@ -365,7 +405,7 @@ fn discover_candidate_paths(
     // when it completed) but still counts as covered, so it is neither
     // re-scanned nor reported as un-covered.
     let (pending_roots, cached_roots) =
-        pending_discovery_roots(state, discovery, query_name, fallback_roots);
+        pending_discovery_roots(state, discovery, query_name, fallback_roots, requirement);
 
     let fallback_reason = match (saw_unavailable, saw_search_failure) {
         (true, true) => "cbm_partial_failure",
@@ -407,7 +447,13 @@ fn discover_candidate_paths(
 
     let scan = scan(state, &pending_roots, query_name);
     if scan.completed {
-        mark_discovery_complete_for_roots(state, discovery, query_name, &pending_roots);
+        mark_discovery_complete_for_roots(
+            state,
+            discovery,
+            query_name,
+            &pending_roots,
+            requirement,
+        );
     }
     candidates.extend(scan.candidates);
     let any_cbm_success = !successful_roots.is_empty();
@@ -436,9 +482,10 @@ fn filesystem_only_discovery(
     roots: Vec<PathBuf>,
     query_name: &str,
     fallback_reason: &'static str,
+    requirement: HydrationRequirement,
 ) -> DiscoveryOutcome {
     let (pending_roots, cached_roots) =
-        pending_discovery_roots(state, discovery, query_name, roots);
+        pending_discovery_roots(state, discovery, query_name, roots, requirement);
     if pending_roots.is_empty() {
         if cached_roots == 0 {
             // No root was configured (or every root was already unusable):
@@ -466,7 +513,13 @@ fn filesystem_only_discovery(
     }
     let scan = scan(state, &pending_roots, query_name);
     if scan.completed {
-        mark_discovery_complete_for_roots(state, discovery, query_name, &pending_roots);
+        mark_discovery_complete_for_roots(
+            state,
+            discovery,
+            query_name,
+            &pending_roots,
+            requirement,
+        );
     }
     let covered = scan.attempted || cached_roots > 0;
     let provider = if covered { "filesystem" } else { "none" };
@@ -518,64 +571,6 @@ fn append_rooted_paths(candidates: &mut Vec<String>, root: &Path, paths: Vec<Str
             &rooted.to_string_lossy(),
         ))
     }));
-}
-
-fn select_candidates(state: &McpState, candidates: Vec<String>) -> Vec<String> {
-    let indexed = state.workspace_index_read();
-    let mut seen = HashSet::new();
-    let mut selected: Vec<_> = candidates
-        .into_iter()
-        .map(|path| crate::dictionary::path::canonical_identity_key(&path))
-        .filter(|path| seen.insert(path.clone()))
-        .filter(|path| !indexed.file_map().contains_key(path))
-        .collect();
-    drop(indexed);
-    selected.sort();
-    selected
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(crate) fn compile_candidate(
-    state: &McpState,
-    resolved_path: &str,
-    workspace_root: Option<&str>,
-) -> bool {
-    try_compile_candidate(state, resolved_path, workspace_root).unwrap_or(false)
-}
-
-fn try_compile_candidate(
-    state: &McpState,
-    resolved_path: &str,
-    workspace_root: Option<&str>,
-) -> Result<bool, String> {
-    let validated = match super::super::tool_helpers::resolve_file_path_checked(
-        resolved_path,
-        workspace_root,
-        &state.config.additional_roots,
-    ) {
-        Ok(path) => path,
-        Err(_) => return Ok(false),
-    };
-
-    state.preflight_semantic_publication(&validated)?;
-
-    match super::super::tool_helpers::compile_file_ir_focused(
-        &validated,
-        crate::compression::Fidelity::Edit,
-        state,
-        None,
-    ) {
-        Ok((_, semantic_edges, _)) => {
-            if !semantic_edges.is_empty() {
-                let canonical = crate::dictionary::path::canonical_identity_key(&validated);
-                let mut index = state.workspace_index_lock();
-                index.remove_file(&canonical);
-                index.add_edges(&canonical, semantic_edges);
-            }
-            Ok(true)
-        }
-        Err(_) => Ok(false),
-    }
 }
 
 // Discovery-cache invalidation entry points live in `hydration/invalidation.rs`

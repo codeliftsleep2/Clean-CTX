@@ -2,7 +2,9 @@
 
 use super::outcome::{QueryAnswer, QueryFailure, QueryResult};
 use crate::mcp::McpState;
-use crate::mcp::tool_handlers::hydration::{HydrationReport, hydrate_workspace_index};
+use crate::mcp::tool_handlers::hydration::{
+    HydrationReport, HydrationRequirement, hydrate_workspace_index_for,
+};
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
 use std::collections::HashMap;
@@ -51,6 +53,7 @@ impl PreparedQuery {
 struct HydrationKey {
     inbound: bool,
     name: String,
+    requirement: HydrationRequirement,
 }
 
 /// Shared, request-local preparation state. It is deliberately neither stored
@@ -85,14 +88,18 @@ impl PreparationContext {
         query_type: &str,
         name: &str,
         workspace_root: Option<&str>,
+        requirement: HydrationRequirement,
     ) -> Result<HydrationReport, QueryFailure> {
         let key = HydrationKey {
             inbound: query_type == "reverse_edges",
             name: name.to_string(),
+            requirement,
         };
         self.hydration
             .entry(key)
-            .or_insert_with(|| hydrate_workspace_index(state, query_type, name, workspace_root))
+            .or_insert_with(|| {
+                hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement)
+            })
             .clone()
             .map_err(QueryFailure::internal)
     }

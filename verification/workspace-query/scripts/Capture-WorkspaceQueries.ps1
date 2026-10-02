@@ -43,7 +43,9 @@ try {
     $session = Start-CleanCtxSession -BinaryPath $BinaryPath -WorkingDirectory $outputRoot
     $file = Join-Path $workspace "graph.ts"
     $published = Invoke-CleanCtxTool $session 1 "provide_code_context" @{
-        filePath = $file; workspaceRoot = $workspace; fidelity = "high"
+        # Deliberately publish Low first. The Angular Service edge query below
+        # must upgrade semantic coverage before answering High-only Injects.
+        filePath = $file; workspaceRoot = $workspace; fidelity = "low"
     }
     if ($published.error) { throw "publication failed: $($published.error.message)" }
     Save-Query "publication" $published
