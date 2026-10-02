@@ -71,6 +71,11 @@ public sealed class BazService
     public BazService(IFooService fooService) {}
 }
 
+public sealed class AttributedConsumer
+{
+    public AttributedConsumer([FromServices] IFooService fooService) {}
+}
+
 public sealed class ImplementsFoo : IFooService
 {
     public void Handle() {}
@@ -88,12 +93,15 @@ public sealed class CallOnly
 
     let reverse = query_edges(&state, "reverse_edges", "TypeRef", "IFooService");
     let reverse = reverse.as_array().expect("reverse edge array");
-    assert_eq!(reverse.len(), 2, "{reverse:?}");
+    assert_eq!(reverse.len(), 3, "{reverse:?}");
     let subjects: Vec<&str> = reverse
         .iter()
         .map(|edge| edge["subject"]["name"].as_str().expect("subject name"))
         .collect();
-    assert_eq!(subjects, vec!["BarController", "BazService"]);
+    assert_eq!(
+        subjects,
+        vec!["BarController", "BazService", "AttributedConsumer"]
+    );
     assert!(reverse.iter().all(|edge| {
         edge["relation"].as_str() == Some("HasConstructorParameterType")
             && edge["object"]["entity_type"].as_str() == Some("TypeRef")
@@ -110,4 +118,20 @@ public sealed class CallOnly
         Some("HasConstructorParameterType")
     );
     assert_eq!(forward[0]["object"]["name"].as_str(), Some("IFooService"));
+
+    let attributed = query_edges(&state, "forward_edges", "Class", "AttributedConsumer");
+    let attributed = attributed.as_array().expect("forward edge array");
+    assert_eq!(attributed.len(), 1, "{attributed:?}");
+    assert_eq!(
+        attributed[0]["relation"].as_str(),
+        Some("HasConstructorParameterType")
+    );
+    assert_eq!(
+        attributed[0]["object"]["entity_type"].as_str(),
+        Some("TypeRef")
+    );
+    assert_eq!(
+        attributed[0]["object"]["name"].as_str(),
+        Some("IFooService")
+    );
 }

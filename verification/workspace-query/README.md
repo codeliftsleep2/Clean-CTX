@@ -64,7 +64,8 @@ non-empty string and that an array is rejected with guidance to use top-level
 C# workspace and proves the production path from constructor parameter type to
 canonical IR, generic semantic projection, `WorkspaceIndex`, and direct MCP
 `reverse_edges` / `forward_edges` answers. It also checks ordinary-method and
-interface-implementation negative controls, repeated-query stability, and stale
-edge removal after source replacement. The relation is the source-signature
-fact `HasConstructorParameterType` targeting `builtin/TypeRef`; the harness does
-not claim runtime .NET DI registration or implementation resolution.
+interface-implementation negative controls, a balanced `[FromServices]`
+parameter attribute, repeated-query stability, and stale edge removal after
+source replacement. The relation is the source-signature fact
+`HasConstructorParameterType` targeting `builtin/TypeRef`; the harness does not
+claim runtime .NET DI registration or implementation resolution.

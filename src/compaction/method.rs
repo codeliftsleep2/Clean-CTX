@@ -433,13 +433,12 @@ fn compact_method_medium(sig: &str) -> String {
         && signature::is_return_type_first(parts.prefix)
     {
         // C#: "ActionResult<UserDto> GetAll(id:int)" → "GetAll(id:int)"
-        let (params, ret) = split_params_ret(s);
-        let mut out = format!("{}({})", parts.name, params);
-        if !ret.is_empty() {
-            out.push(':');
-            out.push_str(&ret);
-        }
-        out
+        let (params, _) = split_params_ret(s);
+        // Medium intentionally omits return types for return-type-first
+        // declarations. A trailing C# `where` or Java `throws` clause is not a
+        // return annotation and must be omitted with that return type, never
+        // rewritten as `:<clause>` for the canonical parser to consume.
+        format!("{}({})", parts.name, params)
     } else {
         // TS/Java name-first: collapse spaces around punctuation.
         s.replace(": ", ":")

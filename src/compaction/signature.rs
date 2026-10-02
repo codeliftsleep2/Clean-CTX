@@ -343,6 +343,60 @@ pub(crate) fn split_parameters(params: &str) -> Vec<&str> {
     out
 }
 
+/// Resolve the declared return type around a method's parameter list.
+///
+/// Name-first languages put the return annotation after the list (`: T` or
+/// `-> T`). Return-type-first languages keep it in `prefix`. Post-parameter
+/// constraint/exception clauses are neither form: C# and Rust use `where`,
+/// while Java uses `throws`. Those clauses are removed only at top level so a
+/// nested generic/function type cannot be split accidentally.
+pub(crate) fn declared_return_type<'a>(prefix: &'a str, tail: &'a str) -> Option<&'a str> {
+    let tail = tail.trim();
+    if let Some(annotation) = tail.strip_prefix(':') {
+        let annotation = annotation.trim();
+        return (!annotation.is_empty()).then_some(annotation);
+    }
+
+    let clause = top_level_keyword(tail, "where")
+        .into_iter()
+        .chain(top_level_keyword(tail, "throws"))
+        .min();
+    let annotation = clause.map_or(tail, |index| tail[..index].trim_end());
+    if !annotation.is_empty() {
+        Some(annotation)
+    } else {
+        return_type_from_prefix(prefix)
+    }
+}
+
+fn top_level_keyword(text: &str, keyword: &str) -> Option<usize> {
+    let bytes = text.as_bytes();
+    let mut depth = 0i32;
+    let mut index = 0usize;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'"' | b'\'' => {
+                index = super::method::skip_quoted_literal(bytes, index);
+                continue;
+            }
+            b'<' | b'(' | b'[' | b'{' => depth += 1,
+            b'>' | b')' | b']' | b'}' => depth = (depth - 1).max(0),
+            _ => {}
+        }
+        if depth == 0
+            && bytes[index..].starts_with(keyword.as_bytes())
+            && (index == 0 || bytes[index - 1].is_ascii_whitespace())
+            && bytes
+                .get(index + keyword.len())
+                .is_none_or(u8::is_ascii_whitespace)
+        {
+            return Some(index);
+        }
+        index += 1;
+    }
+    None
+}
+
 /// Split one written parameter into its canonical `(name, type)` fields.
 ///
 /// Name-first declarations (`name: Type`) retain their established handling.
@@ -352,12 +406,15 @@ pub(crate) fn split_parameters(params: &str) -> Vec<&str> {
 /// modifiers describe the parameter slot rather than the written type identity
 /// and are therefore removed from the canonical type.
 pub(crate) fn parse_parameter(parameter: &str) -> (String, String) {
-    let parameter = parameter.trim();
+    let parameter = strip_leading_parameter_metadata(parameter.trim());
     if let Some(colon_pos) = top_level_separator(parameter, ':') {
-        return (
-            parameter[..colon_pos].trim().to_string(),
-            parameter[colon_pos + 1..].trim().to_string(),
-        );
+        let name = parameter[..colon_pos]
+            .trim()
+            .trim_start_matches("...")
+            .trim_end_matches('?')
+            .trim();
+        let ty = strip_top_level_default(parameter[colon_pos + 1..].trim());
+        return (name.to_string(), ty.to_string());
     }
 
     let declaration = strip_top_level_default(parameter);
@@ -373,6 +430,70 @@ pub(crate) fn parse_parameter(parameter: &str) -> (String, String) {
     } else {
         (name.to_string(), ty.to_string())
     }
+}
+
+/// Remove balanced declaration metadata without knowing framework names.
+/// C# attributes use `[...]`; Java and TypeScript decorators use `@Name` with
+/// an optional balanced argument list. Only leading groups are peeled.
+fn strip_leading_parameter_metadata(mut parameter: &str) -> &str {
+    loop {
+        parameter = parameter.trim_start();
+        if parameter.starts_with('[') {
+            let Some(end) = matching_delimiter_end(parameter, b'[', b']', 0) else {
+                return parameter;
+            };
+            parameter = &parameter[end..];
+            continue;
+        }
+        if parameter.starts_with('@') {
+            let bytes = parameter.as_bytes();
+            let mut end = 1usize;
+            while end < bytes.len()
+                && (is_ident_byte(bytes[end]) || bytes[end] == b'.' || bytes[end] == b'$')
+            {
+                end += 1;
+            }
+            if end == 1 {
+                return parameter;
+            }
+            if bytes.get(end) == Some(&b'(') {
+                let Some(group_end) = matching_delimiter_end(parameter, b'(', b')', end) else {
+                    return parameter;
+                };
+                end = group_end;
+            }
+            parameter = &parameter[end..];
+            continue;
+        }
+        return parameter;
+    }
+}
+
+fn matching_delimiter_end(text: &str, open: u8, close: u8, start: usize) -> Option<usize> {
+    let bytes = text.as_bytes();
+    if bytes.get(start) != Some(&open) {
+        return None;
+    }
+    let mut depth = 0i32;
+    let mut index = start;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'"' | b'\'' => {
+                index = super::method::skip_quoted_literal(bytes, index);
+                continue;
+            }
+            byte if byte == open => depth += 1,
+            byte if byte == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return Some(index + 1);
+                }
+            }
+            _ => {}
+        }
+        index += 1;
+    }
+    None
 }
 
 fn strip_parameter_modifiers(mut parameter: &str) -> &str {

@@ -1,5 +1,5 @@
-// Live MCP acceptance harness for the structural method-identity fix
-// (provide_code_context: generic method names and tuple return types).
+// Live MCP acceptance harness for shared signature-producer fixes
+// (provide_code_context: identities, returns, and canonical parameters).
 //
 // THIS IS A HAND-OFF ARTIFACT, NOT A TEST. It exists so the operator can drive
 // a freshly built binary and read real output. The contract for this fix lives
@@ -8,6 +8,7 @@
 //   src/tests/compaction/signature.rs                  (shared structural boundary)
 //   src/tests/ir/method_signature_shape.rs             (RED-SIG1..RED-SIG12)
 //   src/tests/ir/signature_cross_language.rs           (TS / Java / Rust probes)
+//   src/tests/ir/signature_producer_regressions.rs      (C# producer probes)
 //   src/tests/mcp/provider_code_context_signature.rs   (end-to-end dispatch)
 //   src/tests/mcp/focus_generic_methods.rs              (documented focus selectors)
 //
@@ -25,7 +26,9 @@
 //   * tuple members not interpreted as the parameter list,
 //   * real formal parameters preserved (three, not four),
 //   * no fabricated `X <body expression>` / extends line,
-//   * bare and owner-qualified focus selectors resolve generic C# and TS methods.
+//   * bare and owner-qualified focus selectors resolve generic C# and TS methods,
+//   * C#/Java/Rust post-parameter clauses do not replace declared returns,
+//   * optional/rest/default/annotation syntax does not pollute parameter fields.
 
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
@@ -200,6 +203,11 @@ public static class QueryablePairExtensions
     {
         return values.Length == 0 ? 0 : values.OrderByDescending(v => v).First();
     }
+
+    public static T Constrained<T>() where T : new()
+    {
+        return new T();
+    }
 ${Array.from(
   { length: 30 },
   (_, i) => `
@@ -218,6 +226,11 @@ ${Array.from(
 const TS_FIXTURE = `export function pair<A, B>(a: A, b: B): [A, B] {
   return [a, b];
 }
+interface Foo {}
+declare const fallback: Foo;
+export function optional(value?: Foo): void {}
+export function rest(...items: Foo[]): void {}
+export function defaulted(value: Foo = fallback): void {}
 ${Array.from(
   { length: 30 },
   (_, i) => `
@@ -248,6 +261,7 @@ impl Pairer {
     pub fn pair<A, B>(a: A, b: B) -> (i32, i32) {
         (1, 2)
     }
+    pub fn constrained<T>() -> T where T: Default { T::default() }
 ${Array.from(
   { length: 30 },
   (_, i) => `
@@ -265,6 +279,8 @@ const JAVA_FIXTURE = `public class Pairer {
     public <A, B> Result<A> pair(A a, B b) {
         return null;
     }
+    public Result load() throws IOException { return null; }
+    public void check(@NotNull Foo value) {}
 ${Array.from(
   { length: 30 },
   (_, i) => `
@@ -370,6 +386,16 @@ async function caseCsharpMatrix() {
         !getPairParams.includes('alpha') && !getPairParams.includes('beta'),
         getPairParams || '(no parameter section at this fidelity)',
       );
+      if (fidelity !== 'low') {
+        const constrained = text.split('\n').find((line) => line.includes('M Constrained')) ?? '';
+        check(
+          'A',
+          `${fidelity}: C# where clause is not the return type`,
+          !constrained.includes('→ where') &&
+            (fidelity === 'medium' ? constrained.includes('→ $v') : constrained.includes('→ T')),
+          constrained.trim(),
+        );
+      }
       if (fidelity === 'low') {
         // Low renders no parameter section for a non-overloaded method (the
         // established Low contract), so there is nothing to assert here — and
@@ -382,7 +408,7 @@ async function caseCsharpMatrix() {
         check(
           'A',
           `${fidelity}: the declared parameter survives`,
-          getPairParams.includes('int[] values'),
+          getPairParams.includes('values:int[]'),
           getPairParams,
         );
       }
@@ -497,6 +523,28 @@ async function caseCrossLanguage() {
           `${entry.label} ${fidelity}: a type parameter is never the identity`,
           !text.includes('M B>') && !text.includes('M B\n'),
         );
+        if (entry.label === 'java') {
+          const load = text.split('\n').find((line) => line.includes('M load')) ?? '';
+          check(
+            'C',
+            `Java ${fidelity}: throws clause is not the return type`,
+            !load.includes('→ throws') &&
+              (fidelity === 'medium' ? load.includes('→ $v') : load.includes('→ Result')),
+            load.trim(),
+          );
+        }
+        if (fidelity === 'high' && entry.label === 'typescript') {
+          check('C', 'TypeScript optional marker is not a parameter name', !text.includes('p:value?:'));
+          check('C', 'TypeScript rest marker is not a parameter name', !text.includes('p:...items:'));
+          check('C', 'TypeScript default is not a parameter type', !text.includes('Foo = fallback'));
+        }
+        if (fidelity === 'high' && entry.label === 'rust') {
+          const constrained = text.split('\n').find((line) => line.includes('M constrained')) ?? '';
+          check('C', 'Rust where clause is not the return type', constrained.includes('→ -> T') && !constrained.includes('→ -> T where'), constrained.trim());
+        }
+        if (fidelity === 'high' && entry.label === 'java') {
+          check('C', 'Java annotation is not a parameter type', !text.includes('@NotNull Foo'));
+        }
       }
     } finally {
       client.close();

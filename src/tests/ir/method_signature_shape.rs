@@ -609,3 +609,5 @@ fn red_sig12_ordinary_methods_are_unchanged() {
 
 #[path = "signature_cross_language.rs"]
 mod signature_cross_language;
+#[path = "signature_producer_regressions.rs"]
+mod signature_producer_regressions;

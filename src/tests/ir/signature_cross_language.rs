@@ -160,6 +160,35 @@ fn typescript_method_with_two_type_params_keeps_its_identity() {
     );
 }
 
+#[cfg(feature = "typescript")]
+#[test]
+fn typescript_parameter_decorations_do_not_enter_canonical_fields() {
+    const SRC: &str = r#"
+declare const fallback: Foo;
+declare const TOKEN: unknown;
+declare function Inject(token: unknown): ParameterDecorator;
+interface Foo {}
+interface ApiClient {}
+class Consumer {
+  optional(value?: Foo): void {}
+  rest(...items: Foo[]): void {}
+  defaulted(value: Foo = fallback): void {}
+  constructor(@Inject(TOKEN) api: ApiClient) {}
+}
+"#;
+    let ir = compile_ts(SRC, Fidelity::High);
+    for (name, expected_names, expected_types) in [
+        ("optional", vec!["value"], vec!["Foo"]),
+        ("rest", vec!["items"], vec!["Foo[]"]),
+        ("defaulted", vec!["value"], vec!["Foo"]),
+        ("constructor", vec!["api"], vec!["ApiClient"]),
+    ] {
+        let facts = method(&ir, name);
+        assert_eq!(facts.params, expected_names, "{name}");
+        assert_eq!(facts.param_types, expected_types, "{name}");
+    }
+}
+
 // ── Rust ───────────────────────────────────────────────────────────
 
 #[cfg(feature = "rust")]
@@ -190,6 +219,14 @@ fn rust_fn_with_two_type_params_and_tuple_return_keeps_its_identity() {
     // Both halves of the combination survive at verbatim fidelity.
     let ir = compile_rs(SRC, Fidelity::High);
     assert_eq!(method(&ir, "pair<A, B>").return_type, "-> (i32, i32)");
+}
+
+#[cfg(feature = "rust")]
+#[test]
+fn rust_where_clause_is_not_part_of_the_canonical_return_type() {
+    const SRC: &str = "pub struct Factory; impl Factory { pub fn create<T>() -> T where T: Default { T::default() } }";
+    let ir = compile_rs(SRC, Fidelity::High);
+    assert_eq!(method(&ir, "create<T>").return_type, "-> T");
 }
 
 // ── Java (control) ─────────────────────────────────────────────────
@@ -228,4 +265,29 @@ fn java_method_with_two_type_params_keeps_its_identity() {
             "{fidelity:?}: Java type-first parameters keep type and name separate"
         );
     }
+}
+
+#[cfg(feature = "java")]
+#[test]
+fn java_throws_clause_is_not_the_canonical_return_type() {
+    const SRC: &str =
+        "public class Loader { public Result load() throws IOException { return null; } }";
+    for (fidelity, expected_return) in [(Fidelity::Medium, "$v"), (Fidelity::High, "Result")] {
+        let ir = compile_java(SRC, fidelity);
+        assert_eq!(
+            method(&ir, "load").return_type,
+            expected_return,
+            "{fidelity:?}"
+        );
+    }
+}
+
+#[cfg(feature = "java")]
+#[test]
+fn java_parameter_annotation_is_not_part_of_the_canonical_type() {
+    const SRC: &str = "public class Validator { public void check(@NotNull Foo value) {} }";
+    let ir = compile_java(SRC, Fidelity::High);
+    let facts = method(&ir, "check");
+    assert_eq!(facts.params, ["value"]);
+    assert_eq!(facts.param_types, ["Foo"]);
 }

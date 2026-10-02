@@ -14,7 +14,7 @@
 
 use crate::compaction::method::{find_method_params, strip_base_initializer_clause};
 use crate::compaction::modifiers::strip_csharp_attributes;
-use crate::compaction::signature::{return_type_from_prefix, split_head_parts};
+use crate::compaction::signature::{declared_return_type, split_head_parts};
 use crate::ir::opcodes::TYPE_VOID;
 
 /// Parsed method signature — the result of parsing the string returned
@@ -143,21 +143,10 @@ pub(super) fn parse_method_sig(sig: &str) -> MethodSig {
                 .to_string(),
         };
         let tail = sig[pe + 1..].trim();
-        let rt = if let Some(stripped) = tail.strip_prefix(':') {
-            stripped.trim().to_string()
-        } else if !tail.is_empty() {
-            // `-> T` (Rust) and any other trailing annotation.
-            tail.to_string()
-        } else {
-            // Nothing follows the parameter list, so the declaration is
-            // return-type-first (C#): take the declared type read from the
-            // prefix, with modifiers and the declaration's own
-            // type-parameter list excluded.
-            head_parts
-                .and_then(|parts| return_type_from_prefix(parts.prefix))
-                .map(str::to_string)
-                .unwrap_or_else(|| TYPE_VOID.to_string())
-        };
+        let rt = head_parts
+            .and_then(|parts| declared_return_type(parts.prefix, tail))
+            .map(str::to_string)
+            .unwrap_or_else(|| TYPE_VOID.to_string());
         (name, params, rt)
     } else {
         (sig.to_string(), String::new(), TYPE_VOID.to_string())

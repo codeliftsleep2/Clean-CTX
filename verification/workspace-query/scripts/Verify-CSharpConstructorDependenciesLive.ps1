@@ -150,6 +150,7 @@ try {
     $interfacePath = Join-Path $workspace 'IFooService.cs'
     $barPath = Join-Path $workspace 'BarController.cs'
     $bazPath = Join-Path $workspace 'BazService.cs'
+    $attributedPath = Join-Path $workspace 'AttributedConsumer.cs'
     $implementsPath = Join-Path $workspace 'ImplementsOnly.cs'
     $methodPath = Join-Path $workspace 'MethodOnly.cs'
 
@@ -170,6 +171,14 @@ public sealed class BarController
 public sealed class BazService
 {
     public BazService(IFooService fooService)
+    {
+    }
+}
+'@
+    Write-Utf8File $attributedPath @'
+public sealed class AttributedConsumer
+{
+    public AttributedConsumer([FromServices] IFooService fooService)
     {
     }
 }
@@ -208,7 +217,7 @@ public sealed class MethodOnly
     }
     Write-Host 'PASS: live tools/list exposes workspace_query.'
 
-    foreach ($path in @($interfacePath, $barPath, $bazPath, $implementsPath, $methodPath)) {
+    foreach ($path in @($interfacePath, $barPath, $bazPath, $attributedPath, $implementsPath, $methodPath)) {
         Compile-File $path
     }
 
@@ -228,12 +237,13 @@ public sealed class MethodOnly
 
     $reverse = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $reverseEdges = @($reverse.edges)
-    if ($reverseEdges.Count -ne 2) {
-        throw "Expected exactly two constructor consumers, found $($reverseEdges.Count): $($reverse | ConvertTo-Json -Compress -Depth 20)"
+    if ($reverseEdges.Count -ne 3) {
+        throw "Expected exactly three constructor consumers, found $($reverseEdges.Count): $($reverse | ConvertTo-Json -Compress -Depth 20)"
     }
     $expectedConsumers = @{
         BarController = $barPath
         BazService = $bazPath
+        AttributedConsumer = $attributedPath
     }
     foreach ($edge in $reverseEdges) {
         $subject = [string]$edge.subject.name
@@ -250,7 +260,7 @@ public sealed class MethodOnly
         }
     }
     Assert-Coverage $reverse 'established_indexed_capability' $true $true 'TypeRef consumer shape'
-    Write-Host 'PASS: reverse_edges(TypeRef/IFooService) returns exactly the two C# constructor consumers.'
+    Write-Host 'PASS: reverse_edges(TypeRef/IFooService) includes the attributed C# constructor consumer.'
 
     $barForward = Query-Edges 'forward_edges' 'Class' 'BarController'
     Assert-ForwardConstructorEdge $barForward 'BarController' $barPath
@@ -259,6 +269,10 @@ public sealed class MethodOnly
     $bazForward = Query-Edges 'forward_edges' 'Class' 'BazService'
     Assert-ForwardConstructorEdge $bazForward 'BazService' $bazPath
     Write-Host 'PASS: forward_edges(Class/BazService) exposes its constructor parameter type dependency.'
+
+    $attributedForward = Query-Edges 'forward_edges' 'Class' 'AttributedConsumer'
+    Assert-ForwardConstructorEdge $attributedForward 'AttributedConsumer' $attributedPath
+    Write-Host 'PASS: [FromServices] metadata does not pollute the constructor TypeRef identity.'
 
     $methodForward = Query-Edges 'forward_edges' 'Class' 'MethodOnly'
     Assert-NoConstructorEdge $methodForward 'MethodOnly'
@@ -307,8 +321,9 @@ public sealed class BarController
     Compile-File $barPath
     $afterReplacement = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $replacementEdges = @($afterReplacement.edges)
-    if ($replacementEdges.Count -ne 1 -or
-        -not (Test-ConstructorEdge $replacementEdges[0] 'BazService' $bazPath)) {
+    if ($replacementEdges.Count -ne 2 -or
+        @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'BazService' $bazPath }).Count -ne 1 -or
+        @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'AttributedConsumer' $attributedPath }).Count -ne 1) {
         throw "Recompilation did not replace the stale constructor dependency: $($afterReplacement | ConvertTo-Json -Compress -Depth 20)"
     }
     if (@($replacementEdges | Where-Object { $_.subject.name -eq 'BarController' }).Count -ne 0) {

@@ -83,6 +83,65 @@ fn name_first_and_untyped_parameters_keep_their_existing_shape() {
     );
 }
 
+#[test]
+fn name_first_parameter_decorations_do_not_enter_canonical_fields() {
+    for (written, expected_name, expected_type) in [
+        ("value?: Foo", "value", "Foo"),
+        ("...items: Foo[]", "items", "Foo[]"),
+        ("value: Foo = fallback", "value", "Foo"),
+        ("value?: Foo = fallback", "value", "Foo"),
+    ] {
+        assert_eq!(
+            parse_parameter(written),
+            (expected_name.to_string(), expected_type.to_string()),
+            "{written}"
+        );
+    }
+}
+
+#[test]
+fn balanced_parameter_metadata_does_not_enter_name_or_type() {
+    for (written, expected_name, expected_type) in [
+        (
+            "[FromServices(Name = \"primary]\")] IFooService service",
+            "service",
+            "IFooService",
+        ),
+        ("@jakarta.validation.NotNull Foo value", "value", "Foo"),
+        (
+            "@Inject(core.TOKENS.get(\"api)\")) api: ApiClient",
+            "api",
+            "ApiClient",
+        ),
+    ] {
+        assert_eq!(
+            parse_parameter(written),
+            (expected_name.to_string(), expected_type.to_string()),
+            "{written}"
+        );
+    }
+}
+
+#[test]
+fn post_parameter_clauses_are_not_return_types() {
+    assert_eq!(
+        declared_return_type("public T ", "where T : new()"),
+        Some("T")
+    );
+    assert_eq!(
+        declared_return_type("public Result ", "throws IOException"),
+        Some("Result")
+    );
+    assert_eq!(
+        declared_return_type("", "-> T where T: Clone"),
+        Some("-> T")
+    );
+    assert_eq!(
+        declared_return_type("", ": Promise<Result<T, Error>>"),
+        Some("Promise<Result<T, Error>>")
+    );
+}
+
 // ── Structural head extraction ─────────────────────────────────────
 
 #[test]
@@ -405,6 +464,21 @@ fn low_label_typescript_two_type_params_keeps_the_identifier() {
 fn medium_label_typescript_two_type_params_keeps_the_identifier() {
     let out = extract_method_sig("function pair<A, B>(a: A, b: B): [A, B]", Fidelity::Medium);
     assert!(out.starts_with("function pair<A,B>("), "got: {out}");
+}
+
+#[test]
+fn medium_return_type_first_labels_drop_post_parameter_clauses() {
+    assert_eq!(
+        extract_method_sig(
+            "public T Constrained<T>() where T : new()",
+            Fidelity::Medium
+        ),
+        "Constrained<T>()"
+    );
+    assert_eq!(
+        extract_method_sig("public Result load() throws IOException", Fidelity::Medium),
+        "load()"
+    );
 }
 
 #[test]
