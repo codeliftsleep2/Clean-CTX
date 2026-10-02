@@ -363,13 +363,13 @@ pub(crate) fn parse_parameter(parameter: &str) -> (String, String) {
     let declaration = strip_top_level_default(parameter);
     let declaration = strip_parameter_modifiers(declaration);
     let Some(boundary) = last_top_level_whitespace(declaration) else {
-        return (declaration.to_string(), "void".to_string());
+        return (declaration.to_string(), "$v".to_string());
     };
 
     let name = declaration[boundary..].trim();
     let ty = declaration[..boundary].trim();
     if name.is_empty() || ty.is_empty() {
-        (declaration.to_string(), "void".to_string())
+        (declaration.to_string(), "$v".to_string())
     } else {
         (name.to_string(), ty.to_string())
     }

@@ -215,14 +215,17 @@ fn java_method_with_two_type_params_keeps_its_identity() {
         );
         assert_eq!(
             method(&ir, "pair").params,
-            if fidelity == Fidelity::Low {
-                vec!["a".to_string(), "b".to_string()]
-            } else {
-                // A colon-free parameter list keeps the declaration text (the
-                // established C#/Java parameter shape), never an inflated list.
-                vec!["A a".to_string(), "B b".to_string()]
-            },
+            vec!["a".to_string(), "b".to_string()],
             "{fidelity:?}: the two written parameters stay two"
+        );
+        assert_eq!(
+            method(&ir, "pair").param_types,
+            if fidelity == Fidelity::Low {
+                vec!["$v".to_string(), "$v".to_string()]
+            } else {
+                vec!["A".to_string(), "B".to_string()]
+            },
+            "{fidelity:?}: Java type-first parameters keep type and name separate"
         );
     }
 }

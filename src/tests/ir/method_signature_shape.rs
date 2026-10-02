@@ -190,6 +190,7 @@ public class Ordinary
 struct MethodFacts {
     name: String,
     params: Vec<String>,
+    param_types: Vec<String>,
     return_type: String,
     flags: Vec<String>,
 }
@@ -207,14 +208,16 @@ fn methods(ir: &CompiledIR) -> Vec<MethodFacts> {
                     MethodFacts {
                         name: name.clone(),
                         params: Vec::new(),
+                        param_types: Vec::new(),
                         return_type: String::new(),
                         flags: Vec::new(),
                     },
                 );
             }
-            CoreOp::Param(mid, _pid, _ty, param_name) => {
+            CoreOp::Param(mid, _pid, param_type, param_name) => {
                 if let Some(facts) = facts.get_mut(mid) {
                     facts.params.push(param_name.clone());
+                    facts.param_types.push(param_type.clone());
                 }
             }
             CoreOp::Return(mid, ty) => {
@@ -322,13 +325,10 @@ fn red_sig1_parameter_list_is_not_inflated_by_nested_generic_commas() {
             "{fidelity:?}: the declaration writes three parameters, got {:?}",
             facts.params
         );
-        assert!(facts.params[0].contains("source"), "{:?}", facts.params);
-        assert!(
-            facts.params[1].contains("keySelector") && facts.params[1].contains("TSecond"),
-            "{:?}",
-            facts.params
-        );
-        assert!(facts.params[2].contains("direction"), "{:?}", facts.params);
+        assert_eq!(facts.params, ["source", "keySelector", "direction"]);
+        assert!(facts.param_types[0].contains("IQueryable<TFirst>"));
+        assert!(facts.param_types[1].contains("Func<TFirst, TSecond>"));
+        assert_eq!(facts.param_types[2], "ListSortDirection");
     }
 }
 
@@ -403,14 +403,14 @@ fn red_sig5_named_tuple_return_preserves_every_field() {
     // HIGH: the declaration's own parameter list and its tuple return type.
     let ir = compile_cs(CS_TUPLES, Fidelity::High);
     let facts = method(&ir, "GetPair");
-    assert_eq!(facts.params, vec!["int[] values".to_string()]);
+    assert_eq!(facts.params, vec!["values".to_string()]);
     assert_eq!(facts.return_type, "(int alpha, int beta)");
 
     // MEDIUM: the Medium label contract drops declared return types, so the
     // tuple members must NOT reappear as the name or as parameters.
     let ir = compile_cs(CS_TUPLES, Fidelity::Medium);
     let facts = method(&ir, "GetPair");
-    assert_eq!(facts.params, vec!["int[] values".to_string()]);
+    assert_eq!(facts.params, vec!["values".to_string()]);
     assert_eq!(facts.return_type, "$v");
 
     // LOW: bare parameter names only.
@@ -443,10 +443,7 @@ fn red_sig6_second_tuple_method_stays_distinct() {
     }
 
     let ir = compile_cs(CS_TUPLES, Fidelity::High);
-    assert_eq!(
-        method(&ir, "Tenth").params,
-        vec!["string[] names".to_string()]
-    );
+    assert_eq!(method(&ir, "Tenth").params, vec!["names".to_string()]);
     assert_eq!(method(&ir, "Tenth").return_type, "(string name, int count)");
     assert_ne!(
         method(&ir, "GetPair").return_type,
@@ -472,7 +469,7 @@ fn red_sig7_no_fabricated_overload_group_for_distinct_methods() {
 fn red_sig8_unnamed_tuple_return_preserves_every_field() {
     let ir = compile_cs(CS_UNNAMED_TUPLE, Fidelity::High);
     let facts = method(&ir, "GetPair");
-    assert_eq!(facts.params, vec!["int[] values".to_string()]);
+    assert_eq!(facts.params, vec!["values".to_string()]);
     assert_eq!(facts.return_type, "(int, int)");
     assert!(
         !method_names(&ir).iter().any(|n| n == "static"),
@@ -484,7 +481,7 @@ fn red_sig8_unnamed_tuple_return_preserves_every_field() {
 fn red_sig9_instance_tuple_method_proves_static_is_incidental() {
     let ir = compile_cs(CS_INSTANCE_TUPLE, Fidelity::High);
     let facts = method(&ir, "GetPair");
-    assert_eq!(facts.params, vec!["int[] values".to_string()]);
+    assert_eq!(facts.params, vec!["values".to_string()]);
     assert_eq!(facts.return_type, "(int alpha, int beta)");
     assert!(
         !method_names(&ir)
@@ -588,7 +585,11 @@ fn red_sig12_ordinary_methods_are_unchanged() {
     let ir = compile_cs(CS_ORDINARY, Fidelity::Medium);
     assert_eq!(
         method(&ir, "Add").params,
-        vec!["int a".to_string(), "int b".to_string()]
+        vec!["a".to_string(), "b".to_string()]
+    );
+    assert_eq!(
+        method(&ir, "Add").param_types,
+        vec!["int".to_string(), "int".to_string()]
     );
     assert!(method(&ir, "Reset").params.is_empty());
 

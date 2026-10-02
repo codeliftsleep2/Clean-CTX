@@ -72,7 +72,13 @@ fn evaluate_calls_in_file(
         Ok(hierarchy) => hierarchy,
         Err(error) => return Err(QueryFailure::from_projection(&error)),
     };
-    let overloads = match matching_overloads(&hierarchy, &request) {
+    let type_first_parameters = matches!(
+        std::path::Path::new(&resolved_path)
+            .extension()
+            .and_then(|extension| extension.to_str()),
+        Some("cs" | "java")
+    );
+    let overloads = match matching_overloads(&hierarchy, &request, type_first_parameters) {
         Ok(overloads) => overloads,
         Err(message) => return Err(QueryFailure::invalid(message)),
     };
@@ -153,6 +159,7 @@ fn required_nested_str(args: &Value, object: Option<&str>, field: &str) -> Resul
 fn matching_overloads(
     hierarchy: &HierarchicalIR,
     request: &CallRequest,
+    type_first_parameters: bool,
 ) -> Result<Vec<Value>, String> {
     let owners: Vec<&[MethodNode]> = if request.owner_kind == "class" {
         hierarchy
@@ -185,7 +192,7 @@ fn matching_overloads(
         .filter(|method| method.name == request.method_name)
         .enumerate()
         .filter_map(|(overload_occurrence, method)| {
-            let parameters = visible_parameters(method);
+            let parameters = visible_parameters(method, type_first_parameters);
             if request
                 .parameters
                 .as_ref()
@@ -208,12 +215,13 @@ fn matching_overloads(
         .collect())
 }
 
-fn visible_parameters(method: &MethodNode) -> Vec<String> {
+fn visible_parameters(method: &MethodNode, type_first_parameters: bool) -> Vec<String> {
     method
         .params
         .iter()
         .map(|parameter| match (parameter.get(1), parameter.get(2)) {
             (Some(kind), Some(written)) if kind == crate::ir::opcodes::TYPE_VOID => written.clone(),
+            (Some(kind), Some(written)) if type_first_parameters => format!("{kind} {written}"),
             (Some(kind), _) => kind.clone(),
             _ => String::new(),
         })
