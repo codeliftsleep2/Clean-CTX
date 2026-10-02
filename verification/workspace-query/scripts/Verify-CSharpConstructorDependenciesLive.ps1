@@ -78,6 +78,22 @@ function Query-Edges {
     Get-Structured $response "$Type builtin/$EntityType/$Name"
 }
 
+function Assert-Coverage {
+    param(
+        $Result,
+        [string]$Status,
+        [bool]$IdentityIndexed,
+        [bool]$CapabilityEstablished,
+        [string]$Scenario
+    )
+    if ($Result.coverage.status -ne $Status -or
+        [bool]$Result.coverage.identity_indexed -ne $IdentityIndexed -or
+        [bool]$Result.coverage.capability_established -ne $CapabilityEstablished -or
+        [bool]$Result.coverage.source_complete) {
+        throw "$Scenario returned misleading coverage: $($Result.coverage | ConvertTo-Json -Compress -Depth 20)"
+    }
+}
+
 function Test-ConstructorEdge {
     param($Edge, [string]$Subject, [string]$ExpectedFile)
     $subjectFile = [string]$Edge.subject.file
@@ -196,6 +212,20 @@ public sealed class MethodOnly
         Compile-File $path
     }
 
+    $bogus = Query-Edges 'reverse_edges' 'DefinitelyUnsupported' 'DefinitelyMissing'
+    if ($bogus.count -ne 0) {
+        throw "A bogus exact identity returned edges: $($bogus | ConvertTo-Json -Compress -Depth 20)"
+    }
+    Assert-Coverage $bogus 'identity_not_indexed' $false $false 'bogus exact identity'
+    Write-Host 'PASS: a bogus exact identity reports identity_not_indexed instead of absence.'
+
+    $unsupportedInterface = Query-Edges 'reverse_edges' 'Interface' 'IFooService'
+    if ($unsupportedInterface.count -ne 0) {
+        throw "The unsupported Interface consumer shape returned edges: $($unsupportedInterface | ConvertTo-Json -Compress -Depth 20)"
+    }
+    Assert-Coverage $unsupportedInterface 'capability_not_established' $true $false 'Interface consumer shape'
+    Write-Host 'PASS: a real Interface identity reports capability_not_established for consumer lookup.'
+
     $reverse = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $reverseEdges = @($reverse.edges)
     if ($reverseEdges.Count -ne 2) {
@@ -219,6 +249,7 @@ public sealed class MethodOnly
             throw "Expected exactly one reverse edge for $subject."
         }
     }
+    Assert-Coverage $reverse 'established_indexed_capability' $true $true 'TypeRef consumer shape'
     Write-Host 'PASS: reverse_edges(TypeRef/IFooService) returns exactly the two C# constructor consumers.'
 
     $barForward = Query-Edges 'forward_edges' 'Class' 'BarController'
@@ -231,7 +262,27 @@ public sealed class MethodOnly
 
     $methodForward = Query-Edges 'forward_edges' 'Class' 'MethodOnly'
     Assert-NoConstructorEdge $methodForward 'MethodOnly'
+    Assert-Coverage $methodForward 'established_indexed_capability' $true $true 'unused Class forward capability'
     Write-Host 'PASS: an ordinary C# method parameter does not become a constructor dependency.'
+
+    $batch = Get-Structured (Invoke-Tool 'workspace_query' @{
+        workspaceRoot = $workspace
+        queries = @(
+            @{ id = 'bogus'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'DefinitelyUnsupported'; name = 'DefinitelyMissing' },
+            @{ id = 'unsupported'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'Interface'; name = 'IFooService' },
+            @{ id = 'positive'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'TypeRef'; name = 'IFooService' },
+            @{ id = 'zero'; type = 'forward_edges'; domain = 'builtin'; entity_type = 'Class'; name = 'MethodOnly' }
+        )
+    }) 'exact-identity coverage batch'
+    $batchResults = @($batch.results)
+    if ($batchResults.Count -ne 4 -or @($batchResults | Where-Object { $_.status -ne 'ok' }).Count -ne 0) {
+        throw "Coverage batch did not preserve four successful item outcomes: $($batch | ConvertTo-Json -Compress -Depth 30)"
+    }
+    Assert-Coverage $batchResults[0].result 'identity_not_indexed' $false $false 'batched bogus identity'
+    Assert-Coverage $batchResults[1].result 'capability_not_established' $true $false 'batched unsupported capability'
+    Assert-Coverage $batchResults[2].result 'established_indexed_capability' $true $true 'batched positive capability'
+    Assert-Coverage $batchResults[3].result 'established_indexed_capability' $true $true 'batched genuine zero'
+    Write-Host 'PASS: batch results preserve independent exact-identity coverage.'
 
     $implementsForward = Query-Edges 'forward_edges' 'Class' 'ImplementsOnly'
     Assert-NoConstructorEdge $implementsForward 'ImplementsOnly'

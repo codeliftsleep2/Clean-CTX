@@ -9,6 +9,7 @@
 // narrowing — may neither extend a path nor close a cycle.
 
 use super::{
+    coverage::{CapabilityDirection, exact_identity_coverage},
     discovery_field,
     identity::IdentityRequest,
     optional_i32,
@@ -49,6 +50,7 @@ fn try_prepare_transitive_dependencies(
     // it further, so an out-of-path edge cannot extend the walk either.
     let scope = context.scope(state, args)?;
     let identity = IdentityRequest::new(args, name);
+    let exact_identity = identity.exact().is_some();
     if let Some(exact) = identity.exact() {
         let index = state.workspace_index_read();
         let _ = match scope.as_ref() {
@@ -96,6 +98,15 @@ fn try_prepare_transitive_dependencies(
             "depth_used": depth,
             "resolved_identity": resolved_identity,
         });
+        if exact_identity {
+            structured["coverage"] = exact_identity_coverage(
+                index,
+                &resolved,
+                scope.as_ref(),
+                CapabilityDirection::Forward,
+                &hydration,
+            );
+        }
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }

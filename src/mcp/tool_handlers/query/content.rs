@@ -77,6 +77,13 @@ fn answer_envelope(
         "reverse_edges" => Some("incoming"),
         _ => None,
     };
+    let coverage = structured.get("coverage");
+    let coverage_status = coverage
+        .and_then(|value| value.get("status"))
+        .and_then(Value::as_str);
+    let source_complete = coverage
+        .and_then(|value| value.get("source_complete"))
+        .and_then(Value::as_bool);
     let mut query = json!({
         "type": query_type,
         "direction": direction,
@@ -104,6 +111,15 @@ fn answer_envelope(
             args.get("method").cloned().unwrap_or(Value::Null),
         );
     }
+    let mut completeness = json!({
+        "authority": if file_local_calls { "fresh_canonical_file_ir" } else if query_type == "has_cycle" { "workspace_index" } else { "workspace_index_after_registered_hydration" },
+        "status": coverage_status.unwrap_or(if file_local_calls { "authoritative_file_snapshot" } else { "authoritative_index_snapshot_for_effective_scope" }),
+        "zero_result": zero_result,
+        "discovery": structured.get("discovery"),
+    });
+    if let Some(source_complete) = source_complete {
+        completeness["source_complete"] = source_complete.into();
+    }
     json!({
         "schema": "clean-ctx/workspace-query-answer",
         "schema_version": WORKSPACE_QUERY_CONTENT_VERSION,
@@ -114,12 +130,7 @@ fn answer_envelope(
             "additional_roots": additional_roots,
             "within_path": args.get("withinPath"),
         },
-        "completeness": {
-            "authority": if file_local_calls { "fresh_canonical_file_ir" } else if query_type == "has_cycle" { "workspace_index" } else { "workspace_index_after_registered_hydration" },
-            "status": if file_local_calls { "authoritative_file_snapshot" } else if query_type == "has_cycle" { "indexed_evidence_only" } else { "authoritative_index_snapshot_for_effective_scope" },
-            "zero_result": zero_result,
-            "discovery": structured.get("discovery"),
-        },
+        "completeness": completeness,
         "result": model_result(query_type, structured),
     })
 }

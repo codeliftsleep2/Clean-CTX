@@ -57,6 +57,7 @@ use serde_json::Value;
 mod batch;
 mod calls;
 mod content;
+mod coverage;
 mod diagnostics;
 mod edges;
 mod entities;
@@ -311,6 +312,10 @@ mod tests_name_validation;
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_calls.rs"]
 mod tests_native_calls;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_exact_identity_coverage.rs"]
+mod tests_exact_identity_coverage;
 
 // Native call facts for the additional language producers (TypeScript, Java,
 // Rust)

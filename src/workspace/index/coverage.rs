@@ -1,5 +1,10 @@
 use super::WorkspaceIndex;
+use super::{
+    EntityKey, StoredEdge, entity_occurrence_admitted, identity_key, selected_occurrences,
+};
 use crate::layers::meta::semantic::SemanticEdge;
+use crate::workspace::scope::WorkspaceScope;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum SemanticFidelity {
@@ -38,6 +43,45 @@ pub(super) struct SemanticCoverage {
 }
 
 impl WorkspaceIndex {
+    /// Whether this exact semantic identity has an admitted indexed occurrence.
+    pub fn has_identity_in_scope(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+        scope: Option<&WorkspaceScope>,
+    ) -> bool {
+        self.entities
+            .get(&identity_key(domain, entity_type, name))
+            .is_some_and(|occurrences| {
+                occurrences
+                    .iter()
+                    .any(|occurrence| entity_occurrence_admitted(occurrence, scope))
+            })
+    }
+
+    /// Whether the scoped index contains outgoing projection evidence for this
+    /// domain/entity-type family. This establishes only indexed capability; it
+    /// does not claim source completeness or define a global support matrix.
+    pub fn has_forward_capability_evidence(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        scope: Option<&WorkspaceScope>,
+    ) -> bool {
+        has_adjacency_evidence(&self.forward, domain, entity_type, scope)
+    }
+
+    /// Incoming counterpart of [`WorkspaceIndex::has_forward_capability_evidence`].
+    pub fn has_reverse_capability_evidence(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        scope: Option<&WorkspaceScope>,
+    ) -> bool {
+        has_adjacency_evidence(&self.reverse, domain, entity_type, scope)
+    }
+
     pub fn has_current_semantic_projection(
         &self,
         file_path: &str,
@@ -68,4 +112,17 @@ impl WorkspaceIndex {
             },
         );
     }
+}
+
+fn has_adjacency_evidence(
+    adjacency: &HashMap<EntityKey, Vec<StoredEdge>>,
+    domain: &str,
+    entity_type: &str,
+    scope: Option<&WorkspaceScope>,
+) -> bool {
+    adjacency.iter().any(|(key, _)| {
+        key.0 == domain
+            && key.1 == entity_type
+            && !selected_occurrences(adjacency, key, scope).is_empty()
+    })
 }

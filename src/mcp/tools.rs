@@ -391,7 +391,19 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "description": "Cycle detection result (has_cycle)."
                     },
                     "cycle": workspace_query_cycle_schema(),
-                    "coverage": { "type": "object", "description": "Index-evidence coverage limits for has_cycle." },
+                    "coverage": {
+                        "type": "object",
+                        "description": "Structured index-evidence and semantic-capability coverage for exact-identity edge/traversal queries and has_cycle.",
+                        "properties": {
+                            "status": {
+                                "type": "string",
+                                "enum": ["established_indexed_capability", "identity_not_indexed", "capability_not_established", "indexed_evidence_only"]
+                            },
+                            "identity_indexed": { "type": "boolean" },
+                            "capability_established": { "type": "boolean" },
+                            "source_complete": { "type": "boolean" }
+                        }
+                    },
                     "identity_model": { "type": "string", "description": "Semantic identity model used by has_cycle." },
                     "identity_ambiguous": { "type": "boolean", "description": "Whether a has_cycle witness identity has multiple admitted physical occurrences." },
                     "identity_ambiguities": { "type": "array", "description": "Ambiguous witness identities and their admitted occurrence files.", "items": { "type": "object" } },

@@ -11,6 +11,7 @@
 // declaration file.
 
 use super::{
+    coverage::{CapabilityDirection, exact_identity_coverage},
     discovery_field,
     identity::IdentityRequest,
     outcome::QueryAnswer,
@@ -51,6 +52,7 @@ fn try_prepare_forward_edges(
     // `withinPath` is refused before the index is consulted.
     let scope = context.scope(state, args)?;
     let identity = IdentityRequest::new(args, name);
+    let exact_identity = identity.exact().is_some();
     if let Some(exact) = identity.exact() {
         let index = state.workspace_index_read();
         let _ = forward_edges(
@@ -79,6 +81,15 @@ fn try_prepare_forward_edges(
             "count": count,
             "resolved_identity": resolved_identity,
         });
+        if exact_identity {
+            structured["coverage"] = exact_identity_coverage(
+                index,
+                &resolved,
+                scope.as_ref(),
+                CapabilityDirection::Forward,
+                &hydration,
+            );
+        }
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
@@ -114,6 +125,7 @@ fn try_prepare_reverse_edges(
     // optional `withinPath` narrows it further to one provenance subtree.
     let scope = context.scope(state, args)?;
     let identity = IdentityRequest::new(args, name);
+    let exact_identity = identity.exact().is_some();
     if let Some(exact) = identity.exact() {
         let index = state.workspace_index_read();
         let _ = reverse_edges(
@@ -142,6 +154,15 @@ fn try_prepare_reverse_edges(
             "count": count,
             "resolved_identity": resolved_identity,
         });
+        if exact_identity {
+            structured["coverage"] = exact_identity_coverage(
+                index,
+                &resolved,
+                scope.as_ref(),
+                CapabilityDirection::Reverse,
+                &hydration,
+            );
+        }
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }

@@ -71,3 +71,32 @@ fn transitive_and_zero_results_preserve_current_non_path_semantics() {
     assert_eq!(zero["completeness"]["zero_result"], true);
     assert_eq!(zero["result"]["edges"], json!([]));
 }
+
+#[test]
+fn workspace_query_exact_identity_coverage_content_envelope() {
+    let structured = json!({
+        "edges": [],
+        "count": 0,
+        "coverage": {
+            "status": "capability_not_established",
+            "identity_indexed": true,
+            "capability_established": false,
+            "source_complete": false
+        }
+    });
+    let value = payload(&render(
+        "reverse_edges",
+        &json!({ "domain": "builtin", "entity_type": "Interface", "name": "IFooService" }),
+        &structured,
+        &[],
+    ));
+    assert_eq!(
+        value["completeness"]["status"],
+        "capability_not_established"
+    );
+    assert_eq!(value["completeness"]["source_complete"], false);
+    assert_eq!(
+        value["result"]["coverage"], structured["coverage"],
+        "structured coverage must survive in the model-facing result"
+    );
+}
