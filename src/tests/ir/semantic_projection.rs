@@ -10,9 +10,9 @@
 
 use crate::ir::opcodes::CoreOp;
 use crate::ir::semantic_projection::{
-    BUILTIN_DOMAIN, BUILTIN_LAYER, CLASS_ENTITY_TYPE, METHOD_ENTITY_TYPE, TYPE_REF_ENTITY_TYPE,
-    project_calls, project_constructor_parameter_types, project_generic_facts,
-    project_method_declarations,
+    BUILTIN_DOMAIN, BUILTIN_LAYER, CLASS_ENTITY_TYPE, INTERFACE_ENTITY_TYPE, METHOD_ENTITY_TYPE,
+    TYPE_REF_ENTITY_TYPE, project_calls, project_constructor_parameter_types,
+    project_generic_facts, project_inheritance, project_method_declarations,
 };
 use crate::layers::meta::semantic::SemanticRelation;
 
@@ -162,6 +162,110 @@ fn generic_projection_orders_declarations_before_calls() {
             .iter()
             .all(|edge| edge.relation == SemanticRelation::Calls),
         "declaration occurrences must precede call facts"
+    );
+}
+
+#[test]
+fn canonical_inheritance_projects_typed_names_and_written_external_targets() {
+    let instructions = vec![
+        CoreOp::DefClass("C1".into(), "Base".into()),
+        CoreOp::DefClass("C2".into(), "Worker".into()),
+        CoreOp::DefInterface("I1".into(), "Runnable".into()),
+        CoreOp::DefInterface("I2".into(), "AdvancedRunnable".into()),
+        CoreOp::Extends("C2".into(), "C1".into()),
+        CoreOp::Implements("C2".into(), "I1".into()),
+        CoreOp::InterfaceExtends("I2".into(), "I1".into()),
+        CoreOp::Extends("C1".into(), "ExternalBase".into()),
+        CoreOp::BaseTypeRef("C2".into(), "UnknownBaseOrContract".into()),
+    ];
+
+    let edges = project_inheritance(&instructions, "C:/repo/Worker.cs");
+    assert_eq!(edges.len(), 4);
+    let facts: Vec<_> = edges
+        .iter()
+        .map(|edge| {
+            (
+                edge.relation,
+                edge.subject.entity_type,
+                edge.subject.name.as_str(),
+                edge.object.entity_type,
+                edge.object.name.as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        facts,
+        vec![
+            (
+                SemanticRelation::Extends,
+                CLASS_ENTITY_TYPE,
+                "Worker",
+                CLASS_ENTITY_TYPE,
+                "Base"
+            ),
+            (
+                SemanticRelation::Implements,
+                CLASS_ENTITY_TYPE,
+                "Worker",
+                INTERFACE_ENTITY_TYPE,
+                "Runnable"
+            ),
+            (
+                SemanticRelation::Extends,
+                INTERFACE_ENTITY_TYPE,
+                "AdvancedRunnable",
+                INTERFACE_ENTITY_TYPE,
+                "Runnable"
+            ),
+            (
+                SemanticRelation::Extends,
+                CLASS_ENTITY_TYPE,
+                "Base",
+                CLASS_ENTITY_TYPE,
+                "ExternalBase"
+            ),
+        ]
+    );
+    assert!(edges.iter().all(|edge| {
+        edge.layer == BUILTIN_LAYER
+            && edge.call_evidence.is_none()
+            && edge.subject.file.as_deref() == Some("C:/repo/Worker.cs")
+            && edge.object.file == edge.subject.file
+    }));
+    assert!(edges.iter().all(|edge| {
+        edge.object.name != "UnknownBaseOrContract" && edge.subject.name != "UnknownBaseOrContract"
+    }));
+}
+
+#[test]
+fn base_type_ref_projects_neither_extends_nor_implements() {
+    let instructions = vec![
+        CoreOp::DefClass("C1".into(), "AmbiguousOwner".into()),
+        CoreOp::BaseTypeRef("C1".into(), "Shared".into()),
+    ];
+
+    let edges = project_inheritance(&instructions, "C:/repo/Ambiguous.cs");
+    assert!(
+        edges.is_empty(),
+        "canonical uncertainty must not become an Extends or Implements semantic edge"
+    );
+}
+
+#[test]
+fn generic_projection_includes_structural_inheritance_after_existing_facts() {
+    let mut instructions = stream();
+    instructions.extend([
+        CoreOp::DefClass("C2".into(), "Child".into()),
+        CoreOp::Extends("C2".into(), "Example".into()),
+    ]);
+    let edges = project_generic_facts(&instructions, "C:/repo/Example.cs");
+    assert_eq!(
+        edges.last().map(|edge| edge.relation),
+        Some(SemanticRelation::Extends)
+    );
+    assert_eq!(
+        edges.last().map(|edge| edge.subject.name.as_str()),
+        Some("Child")
     );
 }
 

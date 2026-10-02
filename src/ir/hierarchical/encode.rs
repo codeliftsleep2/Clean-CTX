@@ -36,6 +36,7 @@ use support::*;
 /// - Flags → appended to its target MethodId as one preserved occurrence
 /// - ClassFlags → appended to its target ClassId as one preserved occurrence
 /// - Extends → set on the class named by its child ID
+/// - BaseTypeRef → retained as an unresolved written base-list target
 /// - Implements → added to the class named by its target ID
 /// - Injects → appended to its target ClassId as one preserved occurrence
 /// - DefInterface → creates a distinct InterfaceNode
@@ -90,6 +91,7 @@ pub fn try_ir_to_hierarchical(
                     modifiers: Vec::new(),
                     class_flags: Vec::new(),
                     extends: None,
+                    base_type_refs: Vec::new(),
                     implements: Vec::new(),
                     injects: Vec::new(),
                     patterns: Vec::new(),
@@ -161,6 +163,7 @@ pub fn try_ir_to_hierarchical(
             | CoreOp::Flags(..)
             | CoreOp::ClassFlags(..)
             | CoreOp::Extends(..)
+            | CoreOp::BaseTypeRef(..)
             | CoreOp::InterfaceExtends(..)
             | CoreOp::Implements(..)
             | CoreOp::Injects(..)
@@ -433,6 +436,11 @@ pub fn try_ir_to_hierarchical(
             CoreOp::Extends(raw_class, parent) => {
                 let class_idx = class_location(&class_locations, raw_class, "EXT", instruction)?;
                 classes[class_idx].extends = Some(parent.clone());
+            }
+            CoreOp::BaseTypeRef(raw_class, written_type) => {
+                let class_idx =
+                    class_location(&class_locations, raw_class, "BASE_REF", instruction)?;
+                classes[class_idx].base_type_refs.push(written_type.clone());
             }
             CoreOp::InterfaceExtends(raw_interface, parent) => {
                 let interface_idx =

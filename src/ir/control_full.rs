@@ -196,6 +196,7 @@ pub fn normalize_control_full(
                 "modifier_occurrences": value.modifiers,
                 "class_flag_occurrences": value.class_flags,
                 "extends": value.extends,
+                "base_type_refs": value.base_type_refs,
                 "implements": value.implements,
                 "injection_occurrences": value.injects,
                 "patterns": patterns(&value.patterns),

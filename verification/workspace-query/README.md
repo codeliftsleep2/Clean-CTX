@@ -26,6 +26,10 @@ records whether `content` itself contains those facts. A real Claude/Codex host
 trace is still required to establish whether that host exposes
 `structuredContent` to the model.
 
+The primary capture also verifies generic structural inheritance through the
+production path: class `Extends`, class `Implements`, and interface `Extends`
+must be visible through both forward and reverse workspace queries.
+
 ## Live contract harnesses
 
 The tracked scripts below drive a freshly built server over MCP stdio and

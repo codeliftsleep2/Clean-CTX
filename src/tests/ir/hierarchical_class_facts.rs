@@ -93,6 +93,61 @@ fn repeated_class_facts_round_trip_without_union_or_replacement() {
 }
 
 #[test]
+fn unresolved_base_type_ref_round_trips_without_classification() {
+    let ir = compiled(vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "ExternalContract".into()),
+    ]);
+
+    let hierarchy = try_ir_to_hierarchical(&ir).expect("identity graph is valid");
+    let class = &hierarchy.classes[0];
+    assert_eq!(class.base_type_refs, vec!["ExternalContract"]);
+    assert!(class.extends.is_none());
+    assert!(class.implements.is_empty());
+    assert_eq!(hierarchical_to_ir(&hierarchy), ir.instructions);
+
+    let wire = ir_to_hierarchical_wire(&ir);
+    assert_eq!(wire["hs"], 9);
+    assert_eq!(
+        wire["ir"]["c"][0]["br"],
+        serde_json::json!(["ExternalContract"])
+    );
+    assert_eq!(wire_to_ir(&wire).unwrap().instructions, ir.instructions);
+}
+
+#[test]
+fn unresolved_base_type_ref_requires_a_class_owner() {
+    let error = try_ir_to_hierarchical(&compiled(vec![
+        CoreOp::DefInterface("I1".into(), "Contract".into()),
+        CoreOp::BaseTypeRef("I1".into(), "ExternalContract".into()),
+    ]))
+    .expect_err("an interface identity must not own a C# class base-list fact");
+
+    assert!(matches!(
+        error,
+        HierarchicalProjectionError::KindMismatch {
+            operation: "BASE_REF",
+            ref id,
+            expected: ProjectionIdentityKind::Class,
+            actual: ProjectionIdentityKind::Interface,
+            instruction: 1,
+        } if id == "I1"
+    ));
+}
+
+#[test]
+fn unresolved_and_resolved_base_facts_conflict_for_one_class() {
+    assert!(
+        try_ir_to_hierarchical(&compiled(vec![
+            CoreOp::DefClass("C1".into(), "Worker".into()),
+            CoreOp::BaseTypeRef("C1".into(), "Unknown".into()),
+            CoreOp::Extends("C1".into(), "KnownBase".into()),
+        ]))
+        .is_err()
+    );
+}
+
+#[test]
 fn revision_four_wire_emits_occurrence_preserving_class_shapes() {
     let ir = compiled(vec![
         CoreOp::DefClass("C1".into(), "Sample".into()),
@@ -103,7 +158,7 @@ fn revision_four_wire_emits_occurrence_preserving_class_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 8);
+    assert_eq!(wire["hs"], 9);
     assert_eq!(
         wire["ir"]["c"][0]["mo"],
         serde_json::json!([["EXPORT"], ["ABSTRACT"]])

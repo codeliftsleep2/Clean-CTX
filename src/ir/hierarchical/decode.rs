@@ -19,7 +19,7 @@ use super::*;
 ///
 /// This is the inverse of `ir_to_hierarchical`. The resulting instruction
 /// order is: classes emit DefClass (unless synthetic), then class flags/
-/// extends/implements/injects, then fields, then methods with their
+/// extends/base-type-refs/implements/injects, then fields, then methods with their
 /// params/return/flags/patterns, then imports, then type aliases.
 ///
 /// NOTE: The original interleaving of instructions across methods/fields is
@@ -47,6 +47,11 @@ pub fn hierarchical_to_ir(hir: &HierarchicalIR) -> Vec<CoreOp> {
             // Extends
             if let Some(parent) = &class.extends {
                 instructions.push(CoreOp::Extends(class.id.clone(), parent.clone()));
+            }
+
+            // Unresolved C# first base-list targets
+            for written_type in &class.base_type_refs {
+                instructions.push(CoreOp::BaseTypeRef(class.id.clone(), written_type.clone()));
             }
 
             // Implements

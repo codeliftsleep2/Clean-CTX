@@ -157,12 +157,12 @@ fn cs_layer_extracts_inheritance_with_colon() {
 
     let ops = layer.process_capture("class.root", "public class MyClass : BaseClass", &mut ctx);
 
-    let has_extend = ops
+    let has_base_ref = ops
         .iter()
-        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
+        .any(|op| matches!(op, CoreOp::BaseTypeRef(c, b) if c == "C1" && b == "BaseClass"));
     assert!(
-        has_extend,
-        "C# layer should emit EXT op for inheritance: {:?}",
+        has_base_ref,
+        "C# layer must preserve an unclassified first base-list target: {:?}",
         ops
     );
 }
@@ -182,11 +182,16 @@ fn cs_layer_extracts_interfaces_from_colon() {
         &mut ctx,
     );
 
-    // First item after : is the base class (Extends), rest are interfaces (Implements)
-    let has_extend = ops
+    // The first item remains neutral until complete same-file declarations are
+    // available; later items are interfaces by C# syntax.
+    let has_base_ref = ops
         .iter()
-        .any(|op| matches!(op, CoreOp::Extends(c, b) if c == "C1" && b == "BaseClass"));
-    assert!(has_extend, "C# should emit EXT for base class: {:?}", ops);
+        .any(|op| matches!(op, CoreOp::BaseTypeRef(c, b) if c == "C1" && b == "BaseClass"));
+    assert!(
+        has_base_ref,
+        "C# should preserve the first base-list target: {:?}",
+        ops
+    );
 
     let implement_count = ops
         .iter()

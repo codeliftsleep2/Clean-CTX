@@ -9,11 +9,8 @@
 // Estimated savings: 40-60% reduction in wire bytes vs. positional encoding.
 
 use super::compiler::CompiledIR;
-use super::opcodes::{
-    ControlSummary, CoreOp, DeclarationModifier, ExecutionContextKind, PatternFact, SideEffectKind,
-};
+use super::opcodes::{ControlSummary, CoreOp};
 use super::wire::DecodeError;
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 const HIERARCHICAL_SCHEMA_REVISION_2: u64 = 2;
@@ -21,12 +18,14 @@ const HIERARCHICAL_SCHEMA_REVISION_3: u64 = 3;
 const HIERARCHICAL_SCHEMA_REVISION_4: u64 = 4;
 const HIERARCHICAL_SCHEMA_REVISION_5: u64 = 5;
 const HIERARCHICAL_SCHEMA_REVISION_6: u64 = 6;
-const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 7;
-const HIERARCHICAL_SCHEMA_VERSION: u64 = 8;
+const HIERARCHICAL_SCHEMA_REVISION_7: u64 = 7;
+const PREVIOUS_HIERARCHICAL_SCHEMA_VERSION: u64 = 8;
+const HIERARCHICAL_SCHEMA_VERSION: u64 = 9;
 
 mod decode;
 mod encode;
 mod migrate;
+mod nodes;
 mod reduce;
 use migrate::upgrade_revision_5_pattern_facts;
 pub(crate) use reduce::hierarchy_to_wire_reduced;
@@ -39,257 +38,9 @@ pub use super::identity::{
 };
 pub use decode::hierarchical_to_ir;
 pub use encode::{ir_to_hierarchical, try_ir_to_hierarchical};
-
-/// Top-level hierarchical IR container.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HierarchicalIR {
-    /// Classes (each contains methods, fields, relationships, etc.)
-    #[serde(rename = "c")]
-    pub classes: Vec<ClassNode>,
-
-    #[serde(rename = "if", default, skip_serializing_if = "Vec::is_empty")]
-    pub interfaces: Vec<InterfaceNode>,
-
-    /// Top-level imports — flat array of [alias, module, named]
-    #[serde(rename = "i", default, skip_serializing_if = "Vec::is_empty")]
-    pub imports: Vec<Vec<String>>,
-
-    /// Type aliases — flat array of [alias, original]
-    #[serde(rename = "t", default, skip_serializing_if = "Vec::is_empty")]
-    pub type_aliases: Vec<Vec<String>>,
-
-    /// Structural invocations (native call graph).
-    ///
-    /// Flat, like `imports` and `type_aliases`: the caller is already an
-    /// explicit method id, so the class→method nesting adds no shared
-    /// context to compress, and the flat entry mirrors `CoreOp::Call`
-    /// losslessly (caller, callee NAME, written argument count, and the
-    /// spread qualifier when the written count is not an exact arity). Typed
-    /// (not a string tuple) so a malformed document fails decoding loudly
-    /// instead of silently defaulting an argument count.
-    #[serde(rename = "ca", default, skip_serializing_if = "Vec::is_empty")]
-    pub calls: Vec<HierarchicalCall>,
-}
-
-/// A semantically distinct interface container.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct InterfaceNode {
-    #[serde(rename = "n")]
-    pub id: String,
-    #[serde(rename = "nm")]
-    pub name: String,
-    #[serde(rename = "m", default, skip_serializing_if = "Vec::is_empty")]
-    pub methods: Vec<MethodNode>,
-    #[serde(rename = "f", default, skip_serializing_if = "Vec::is_empty")]
-    pub fields: Vec<FieldNode>,
-    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
-    pub modifiers: Vec<Vec<DeclarationModifier>>,
-    #[serde(rename = "x", default, skip_serializing_if = "Vec::is_empty")]
-    pub extends: Vec<String>,
-}
-
-/// One structural invocation in the flat hierarchical call table.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HierarchicalCall {
-    /// Caller method alias id (e.g. "M1").
-    #[serde(rename = "c")]
-    pub caller: String,
-
-    /// Callee textual name as written at the call site (never a resolved
-    /// declaration identity).
-    #[serde(rename = "n")]
-    pub callee: String,
-
-    /// Written argument count at the call site.
-    #[serde(rename = "a")]
-    pub explicit_arg_count: usize,
-
-    /// Whether at least one written argument expands at run time.
-    ///
-    /// `true` means `explicit_arg_count` counts argument NODES and is never the
-    /// runtime/declared arity, so a consumer must not read it as exact-arity
-    /// evidence. `false` for every exact call (C#, Java, and TypeScript calls
-    /// with no spread argument). Absent in the serialized form when `false`,
-    /// so an exact call keeps the pre-qualifier shape byte-for-byte, and an
-    /// older document that omits the field decodes as exact.
-    #[serde(rename = "s", default, skip_serializing_if = "spread_is_absent")]
-    pub has_spread: bool,
-}
-
-/// `skip_serializing_if` predicate for [`HierarchicalCall::has_spread`]: an
-/// exact call must serialize exactly as it did before the qualifier existed.
-fn spread_is_absent(has_spread: &bool) -> bool {
-    !has_spread
-}
-
-/// A single class node — the top-level structural container.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ClassNode {
-    /// Class alias ID (e.g., "C1")
-    #[serde(rename = "n")]
-    pub id: String,
-
-    /// Original class name
-    #[serde(rename = "nm")]
-    pub name: String,
-
-    /// Methods within this class
-    #[serde(rename = "m", default, skip_serializing_if = "Vec::is_empty")]
-    pub methods: Vec<MethodNode>,
-
-    /// Fields within this class
-    #[serde(rename = "f", default, skip_serializing_if = "Vec::is_empty")]
-    pub fields: Vec<FieldNode>,
-
-    /// Ordered class declaration-modifier occurrences.
-    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
-    pub modifiers: Vec<Vec<DeclarationModifier>>,
-
-    /// Residual class-metadata flag occurrences (for example CFG and GP).
-    ///
-    /// Each inner vector is one `CoreOp::ClassFlags` occurrence. The hierarchy
-    /// preserves occurrence order, payload order, and duplicate values.
-    #[serde(rename = "fl", default, skip_serializing_if = "Vec::is_empty")]
-    pub class_flags: Vec<Vec<String>>,
-
-    /// Extends (parent class alias ID)
-    #[serde(rename = "x", default, skip_serializing_if = "Option::is_none")]
-    pub extends: Option<String>,
-
-    /// Implements (interface alias IDs)
-    #[serde(rename = "im", default, skip_serializing_if = "Vec::is_empty")]
-    pub implements: Vec<String>,
-
-    /// Injection occurrences (dependency aliases).
-    ///
-    /// Each inner vector is one `CoreOp::Injects` occurrence. Operation
-    /// boundaries, payload order, and duplicate values are preserved.
-    #[serde(rename = "ij", default, skip_serializing_if = "Vec::is_empty")]
-    pub injects: Vec<Vec<String>>,
-
-    /// Class-level pattern ops (e.g., CTOR)
-    #[serde(rename = "p", default, skip_serializing_if = "Vec::is_empty")]
-    pub patterns: Vec<PatternEntry>,
-
-    /// True if this class was synthesized (no DefClass in original stream).
-    /// Synthetic classes emit NO DefClass instruction during hierarchical_to_ir.
-    #[serde(rename = "sy", default, skip_serializing_if = "is_false")]
-    pub synthetic: bool,
-}
-
-/// Helper serde skip for false booleans.
-fn is_false(v: &bool) -> bool {
-    !*v
-}
-
-/// A single method node — nested inside a class.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct MethodNode {
-    /// Method alias ID (e.g., "M1")
-    #[serde(rename = "n")]
-    pub id: String,
-
-    /// Original method name
-    #[serde(rename = "nm")]
-    pub name: String,
-
-    /// Parameters — array of [param_id, type, name]
-    #[serde(rename = "p", default, skip_serializing_if = "Vec::is_empty")]
-    pub params: Vec<Vec<String>>,
-
-    /// Return type
-    #[serde(rename = "r", default, skip_serializing_if = "Option::is_none")]
-    pub return_type: Option<String>,
-
-    /// Ordered method declaration-modifier occurrences.
-    #[serde(rename = "mo", default, skip_serializing_if = "Vec::is_empty")]
-    pub modifiers: Vec<Vec<DeclarationModifier>>,
-
-    /// Ordered typed control-summary occurrences.
-    #[serde(rename = "cs", default, skip_serializing_if = "Vec::is_empty")]
-    pub control_summaries: Vec<Vec<ControlSummary>>,
-
-    /// Ordered typed pattern-fact occurrences.
-    #[serde(rename = "pf", default, skip_serializing_if = "Vec::is_empty")]
-    pub pattern_facts: Vec<Vec<PatternFact>>,
-
-    /// Unknown legacy method-metadata occurrences.
-    ///
-    /// Each inner vector is one `CoreOp::Flags` occurrence. The hierarchy
-    /// preserves occurrence order, payload order, and duplicate values.
-    #[serde(rename = "fl", default, skip_serializing_if = "Vec::is_empty")]
-    pub flags: Vec<Vec<String>>,
-
-    /// Method-level pattern ops
-    #[serde(rename = "pa", default, skip_serializing_if = "Vec::is_empty")]
-    pub patterns: Vec<PatternEntry>,
-
-    /// Verbatim method body text — byte-exact copy from source.
-    /// Only present when `Fidelity::Edit` was used to compile.
-    #[serde(rename = "b", default, skip_serializing_if = "Option::is_none")]
-    pub body: Option<String>,
-
-    /// apply_edit plan Phase 1: absolute byte offset of the body slice's
-    /// start within the source that produced this IR. Present iff `body`
-    /// is present AND the producing IR carried spans (legacy span-less
-    /// bodies decode without offsets).
-    #[serde(rename = "bs", default, skip_serializing_if = "Option::is_none")]
-    pub body_start: Option<u64>,
-
-    /// Absolute byte offset one past the end of the body slice. Present
-    /// iff `body_start` is present (pairing invariant).
-    #[serde(rename = "be", default, skip_serializing_if = "Option::is_none")]
-    pub body_end: Option<u64>,
-
-    /// Control-flow metadata: [kind, target] tuples (R-43a).
-    /// kind: "if" | "loop" | "match" | "try" | "await" | "return"
-    #[serde(rename = "cf", default, skip_serializing_if = "Vec::is_empty")]
-    pub control_flow: Vec<Vec<String>>,
-
-    /// Data-flow metadata: [direction, target] tuples (R-43a).
-    /// direction: "reads" | "writes"
-    #[serde(rename = "df", default, skip_serializing_if = "Vec::is_empty")]
-    pub data_flow: Vec<Vec<String>>,
-
-    /// Side-effect annotations (R-43a), in canonical occurrence order.
-    /// effect_type: "pure" | "io" | "mutation" | "async" | "transaction"
-    #[serde(rename = "se", default, skip_serializing_if = "Vec::is_empty")]
-    pub side_effect: Vec<SideEffectKind>,
-
-    /// Execution context annotations (R-43a), in canonical occurrence order.
-    /// context_type: "sync" | "async" | "thread_bound" | "transaction_scope" | "realtime"
-    #[serde(rename = "ec", default, skip_serializing_if = "Vec::is_empty")]
-    pub execution_context: Vec<ExecutionContextKind>,
-}
-
-/// A single field node — nested inside a class.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct FieldNode {
-    /// Field alias ID (e.g., "F1")
-    #[serde(rename = "n")]
-    pub id: String,
-
-    /// Original field name
-    #[serde(rename = "nm")]
-    pub name: String,
-
-    /// Field type
-    #[serde(rename = "t", default, skip_serializing_if = "Option::is_none")]
-    pub field_type: Option<String>,
-}
-
-/// A pattern entry — compressed structural pattern (CTOR, GETTER, etc.).
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct PatternEntry {
-    /// Pattern name (e.g., "CTOR", "GETTER")
-    #[serde(rename = "n")]
-    pub name: String,
-
-    /// Pattern args (metadata) — stored as-is from the original Pattern op.
-    /// The hierarchical format does NOT add/remove CID/MID prefixes.
-    #[serde(rename = "a", default, skip_serializing_if = "Vec::is_empty")]
-    pub args: Vec<String>,
-}
+pub use nodes::{
+    ClassNode, FieldNode, HierarchicalCall, HierarchicalIR, InterfaceNode, MethodNode, PatternEntry,
+};
 
 /// Encode a compiled IR into the hierarchical wire format (JSON).
 ///
@@ -360,6 +111,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         | Some(HIERARCHICAL_SCHEMA_REVISION_4)
         | Some(HIERARCHICAL_SCHEMA_REVISION_5)
         | Some(HIERARCHICAL_SCHEMA_REVISION_6)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_7)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(unsupported) => {
@@ -386,6 +138,7 @@ pub fn wire_to_ir(value: &Value) -> Result<CompiledIR, DecodeError> {
         }
         Some(HIERARCHICAL_SCHEMA_REVISION_5) => upgrade_revision_5_pattern_facts(&mut ir_val)?,
         Some(HIERARCHICAL_SCHEMA_REVISION_6)
+        | Some(HIERARCHICAL_SCHEMA_REVISION_7)
         | Some(PREVIOUS_HIERARCHICAL_SCHEMA_VERSION)
         | Some(HIERARCHICAL_SCHEMA_VERSION) => {}
         Some(_) => unreachable!("unsupported revisions returned above"),

@@ -83,6 +83,13 @@ pub enum CoreOp {
     /// ["EXT", child_id, parent_id]
     Extends(String, String),
 
+    /// ["BASE_REF", class_id, written_type]
+    ///
+    /// A C# first base-list target whose class/interface kind is not provable
+    /// from the current file. This preserves source evidence without claiming
+    /// either `Extends` or `Implements`.
+    BaseTypeRef(String, String),
+
     /// ["EXT_I", interface_id, parent_interface]
     InterfaceExtends(String, String),
 
@@ -260,6 +267,9 @@ impl fmt::Display for CoreOp {
             CoreOp::Flags(tid, flags) => write!(f, "FLAGS {} {}", tid, flags.join(" ")),
             CoreOp::ClassFlags(cid, flags) => write!(f, "FLAGS_C {} {}", cid, flags.join(" ")),
             CoreOp::Extends(child, parent) => write!(f, "EXT {} {}", child, parent),
+            CoreOp::BaseTypeRef(child, written_type) => {
+                write!(f, "BASE_REF {} {}", child, written_type)
+            }
             CoreOp::InterfaceExtends(child, parent) => write!(f, "EXT_I {} {}", child, parent),
             CoreOp::Implements(cid, iid) => write!(f, "IMPL {} {}", cid, iid),
             CoreOp::Injects(cid, deps) => write!(f, "INJECTS {} {}", cid, deps.join(" ")),
@@ -373,6 +383,7 @@ pub fn arity(opcode: &str) -> Option<i32> {
         "FLAGS" => Some(-1),    // target_id, flags...
         "FLAGS_C" => Some(-1),  // class_id, flags...
         "EXT" => Some(3),       // child_id, parent_id
+        "BASE_REF" => Some(3),  // class_id, written_type
         "EXT_I" => Some(3),     // interface_id, parent_interface
         "IMPL" => Some(3),      // class_id, iface_id
         "INJECTS" => Some(-1),  // class_id, deps...
@@ -415,6 +426,7 @@ pub fn opcode_name(op: &CoreOp) -> &'static str {
         CoreOp::Flags(..) => "FLAGS",
         CoreOp::ClassFlags(..) => "FLAGS_C",
         CoreOp::Extends(..) => "EXT",
+        CoreOp::BaseTypeRef(..) => "BASE_REF",
         CoreOp::InterfaceExtends(..) => "EXT_I",
         CoreOp::Implements(..) => "IMPL",
         CoreOp::Injects(..) => "INJECTS",

@@ -33,6 +33,7 @@ fn class(id: &str, name: &str, methods: Vec<MethodNode>) -> ClassNode {
         modifiers: Vec::new(),
         class_flags: Vec::new(),
         extends: None,
+        base_type_refs: Vec::new(),
         implements: Vec::new(),
         injects: Vec::new(),
         patterns: Vec::new(),

@@ -71,6 +71,14 @@ fn op_to_tuple_extends() {
 }
 
 #[test]
+fn base_type_ref_positional_round_trip() {
+    let original = CoreOp::BaseTypeRef("C1".into(), "ExternalContract".into());
+    let tuple = op_to_tuple(&original);
+    assert_eq!(tuple, vec!["BASE_REF", "C1", "ExternalContract"]);
+    assert_eq!(tuple_to_op(&tuple), Some(original));
+}
+
+#[test]
 fn op_to_tuple_implements() {
     let tuple = op_to_tuple(&CoreOp::Implements("C1".into(), "I1".into()));
     assert_eq!(tuple, vec!["IMPL", "C1", "I1"]);

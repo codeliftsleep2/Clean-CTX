@@ -12,7 +12,7 @@
 // │ Instructions: [count(varint), instruction*]             │
 // │                                                         │
 // │ Instruction:                                            │
-// │   opcode_idx: u8 (0-29)                                 │
+// │   opcode_idx: u8 (0-30)                                 │
 // │   operands: [varint]* (string table indices)            │
 // │   For variadic ops: operand_count as varint prefix      │
 // └─────────────────────────────────────────────────────────┘
@@ -97,6 +97,8 @@ const OP_DEF_IM: u8 = 26;
 const OP_DEF_IF: u8 = 27;
 const OP_MOD_I: u8 = 28;
 const OP_EXT_I: u8 = 29;
+// Neutral C# first-base-list reference whose target kind is unresolved.
+const OP_BASE_REF: u8 = 30;
 
 /// Highest defined opcode index.
 ///
@@ -105,7 +107,7 @@ const OP_EXT_I: u8 = 29;
 /// additive `OP_CALL_SPREAD`) are allocated after the edit-mode `OP_BODY`, so
 /// a guard bounded at `OP_BODY` would report a defined opcode as unknown and
 /// make CALL facts unrepresentable over the binary wire.
-const OP_MAX: u8 = OP_EXT_I;
+const OP_MAX: u8 = OP_BASE_REF;
 
 /// Opcodes that have a variable number of operands (beyond the first one).
 fn is_variadic(op_idx: u8) -> bool {
@@ -143,6 +145,7 @@ fn op_to_index(op: &CoreOp) -> u8 {
         CoreOp::Flags(..) => OP_FLAGS,
         CoreOp::ClassFlags(..) => OP_FLAGS_C,
         CoreOp::Extends(..) => OP_EXT,
+        CoreOp::BaseTypeRef(..) => OP_BASE_REF,
         CoreOp::InterfaceExtends(..) => OP_EXT_I,
         CoreOp::Implements(..) => OP_IMPL,
         CoreOp::Injects(..) => OP_INJECTS,
@@ -380,6 +383,10 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
             CoreOp::Extends(child, parent) => {
                 encode_operand(&mut buf, child);
                 encode_operand(&mut buf, parent);
+            }
+            CoreOp::BaseTypeRef(child, written_type) => {
+                encode_operand(&mut buf, child);
+                encode_operand(&mut buf, written_type);
             }
             CoreOp::InterfaceExtends(child, parent) => {
                 encode_operand(&mut buf, child);

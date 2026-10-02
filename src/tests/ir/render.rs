@@ -403,6 +403,25 @@ fn fidelity_comparison_shows_progressive_detail() {
     );
 }
 
+#[test]
+fn unresolved_base_type_is_rendered_as_uncertain() {
+    let output = ir_to_text(
+        &[
+            vec!["DEF_C".into(), "C1".into(), "Worker".into()],
+            vec![
+                "BASE_REF".into(),
+                "C1".into(),
+                "UnknownBaseOrContract".into(),
+            ],
+        ],
+        Fidelity::Low,
+    );
+
+    assert!(output.contains("$base? UnknownBaseOrContract"));
+    assert!(!output.contains("$x UnknownBaseOrContract"));
+    assert!(!output.contains("$m UnknownBaseOrContract"));
+}
+
 /// Verify that compiling the same source at different fidelities
 /// produces instruction streams with similar structure (not necessarily
 /// identical, because fidelity can affect capture names like `async`).

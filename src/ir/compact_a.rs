@@ -10,9 +10,9 @@
 use serde_json::{Value, json};
 use std::fmt::Write;
 
-pub const LEGEND: &str = "S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]. N.D[owner_id,ordered_core_injection_groups]; NO_CORE_INJECTION_OCCURRENCES is authoritative; constructor parameters are signatures and NEVER injection evidence; duplicates significant. N.V tagged rows: mod,cs,pf,lf,pt,cf,df,se,ec. N.E framework relation direction is subject -> object; subject_file and object_file are independent. B[method_id,start,end,utf8_bytes]";
+pub const LEGEND: &str = "S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,base_type_refs,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]. N.D[owner_id,ordered_core_injection_groups]; NO_CORE_INJECTION_OCCURRENCES is authoritative; constructor parameters are signatures and NEVER injection evidence; duplicates significant. N.V tagged rows: mod,cs,pf,lf,pt,cf,df,se,ec. N.E framework relation direction is subject -> object; subject_file and object_file are independent. B[method_id,start,end,utf8_bytes]";
 
-pub const FILE_CONTEXT_LEGEND: &str = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]";
+pub const FILE_CONTEXT_LEGEND: &str = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,base_type_refs,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]";
 pub const FILE_CONTEXT_SCHEMA: &str = "clean-ctx/file-context";
 pub const FILE_CONTEXT_VERSION: u64 = 1;
 
@@ -117,6 +117,7 @@ fn envelope(normalized: &Value) -> Value {
                 owner["modifier_occurrences"],
                 owner["class_flag_occurrences"],
                 owner["extends"],
+                owner["base_type_refs"],
                 owner["implements"],
                 owner["injection_occurrences"],
                 owner["patterns"]

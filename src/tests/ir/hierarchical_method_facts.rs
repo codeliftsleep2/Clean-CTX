@@ -144,7 +144,7 @@ fn versioned_wire_emits_occurrence_preserving_shapes() {
     ]);
 
     let wire = ir_to_hierarchical_wire(&ir);
-    assert_eq!(wire["hs"], 8);
+    assert_eq!(wire["hs"], 9);
     assert_eq!(
         wire["ir"]["c"][0]["m"][0]["mo"],
         serde_json::json!([["STATIC"]])

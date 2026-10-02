@@ -123,6 +123,13 @@ pub(super) fn validate(ir: &CompiledIR, index: &IdentityIndex) -> Result<(), Ide
             CoreOp::Extends(raw_class, _) => {
                 require_target("EXT", raw_class, IdentityKind::Class, instruction, index)?
             }
+            CoreOp::BaseTypeRef(raw_class, _) => require_target(
+                "BASE_REF",
+                raw_class,
+                IdentityKind::Class,
+                instruction,
+                index,
+            )?,
             CoreOp::InterfaceExtends(raw_interface, _) => require_target(
                 "EXT_I",
                 raw_interface,

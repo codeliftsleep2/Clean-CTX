@@ -5,7 +5,108 @@
 // only contains resolve_forward_aliases. These tests cover the function-level
 // behavior of find_body_start_in and extract_method_body which moved to pipeline.rs.
 
-use crate::ir::pipeline::{find_body_start_in, extract_method_body};
+use crate::ir::pipeline::{extract_method_body, find_body_start_in};
+use crate::ir::{compiler_methods::resolve_forward_aliases, opcodes::CoreOp};
+
+#[test]
+fn forward_declared_interface_reclassifies_ambiguous_extends_as_implements() {
+    let mut instructions = vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "IWorker".into()),
+        CoreOp::DefInterface("I1".into(), "IWorker".into()),
+    ];
+
+    resolve_forward_aliases(&mut instructions);
+
+    assert!(instructions.iter().any(
+        |op| matches!(op, CoreOp::Implements(owner, target) if owner == "C1" && target == "I1")
+    ));
+    assert!(
+        !instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::Extends(..)))
+    );
+}
+
+#[test]
+fn forward_declared_class_refines_base_type_ref_as_extends() {
+    let mut instructions = vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "BaseWorker".into()),
+        CoreOp::DefClass("C2".into(), "BaseWorker".into()),
+    ];
+
+    resolve_forward_aliases(&mut instructions);
+
+    assert!(instructions.iter().any(
+        |op| matches!(op, CoreOp::Extends(owner, target) if owner == "C1" && target == "C2")
+    ));
+}
+
+#[test]
+fn class_interface_name_collision_keeps_base_type_ref_neutral() {
+    let mut instructions = vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "Shared".into()),
+        CoreOp::DefClass("C2".into(), "Shared".into()),
+        CoreOp::DefInterface("I1".into(), "Shared".into()),
+    ];
+
+    resolve_forward_aliases(&mut instructions);
+
+    assert!(instructions.iter().any(
+        |op| matches!(op, CoreOp::BaseTypeRef(owner, target) if owner == "C1" && target == "Shared")
+    ));
+    assert!(!instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(..) | CoreOp::Implements(..))));
+}
+
+#[test]
+fn duplicate_same_kind_names_keep_base_type_ref_neutral() {
+    for declarations in [
+        vec![
+            CoreOp::DefClass("C2".into(), "Shared".into()),
+            CoreOp::DefClass("C3".into(), "Shared".into()),
+        ],
+        vec![
+            CoreOp::DefInterface("I1".into(), "Shared".into()),
+            CoreOp::DefInterface("I2".into(), "Shared".into()),
+        ],
+    ] {
+        let mut instructions = vec![
+            CoreOp::DefClass("C1".into(), "Worker".into()),
+            CoreOp::BaseTypeRef("C1".into(), "Shared".into()),
+        ];
+        instructions.extend(declarations);
+
+        resolve_forward_aliases(&mut instructions);
+
+        assert!(instructions.iter().any(
+            |op| matches!(op, CoreOp::BaseTypeRef(owner, target) if owner == "C1" && target == "Shared")
+        ));
+        assert!(!instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::Extends(..) | CoreOp::Implements(..))));
+    }
+}
+
+#[test]
+fn unresolved_base_type_ref_remains_neutral_and_written() {
+    let mut instructions = vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "ExternalContract".into()),
+    ];
+
+    resolve_forward_aliases(&mut instructions);
+
+    assert!(instructions.iter().any(
+        |op| matches!(op, CoreOp::BaseTypeRef(owner, target) if owner == "C1" && target == "ExternalContract")
+    ));
+    assert!(!instructions
+        .iter()
+        .any(|op| matches!(op, CoreOp::Extends(..) | CoreOp::Implements(..))));
+}
 
 // ── find_body_start_in ───────────────────────────────────────────
 
@@ -29,7 +130,10 @@ fn find_body_start_skips_param_default_object_literal() {
     let brace_index = result.unwrap();
     // The body brace is the one AFTER the closing paren — the `{` at the end
     // of "..., b: 2}) " — there should be a `)` before the brace
-    assert!(raw[..brace_index].contains(')'), "brace should be after the closing paren");
+    assert!(
+        raw[..brace_index].contains(')'),
+        "brace should be after the closing paren"
+    );
 }
 
 /// H-3 regression: nested parens in a param default must be tracked correctly.
@@ -145,7 +249,10 @@ fn extract_body_is_byte_exact() {
 fn extract_body_preserves_own_line_brace_indentation() {
     let raw = "function foo(param1: string)\n    {\n  console.log('test');\n}";
     let body = extract_method_body(raw).expect("should extract body");
-    assert!(body.starts_with("    {"), "body should start with indented brace");
+    assert!(
+        body.starts_with("    {"),
+        "body should start with indented brace"
+    );
 }
 
 /// Same-line brace: starts at the brace itself (signature emitted separately).

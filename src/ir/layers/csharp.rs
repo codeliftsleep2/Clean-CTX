@@ -338,14 +338,12 @@ impl LanguageLayer for CSharpLayer {
                 // Extract inheritance from raw text
                 let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
-                    // Emit Extends
+                    // The first C# base-list entry is syntactically ambiguous:
+                    // it may name either the single base class or the first
+                    // implemented interface. Preserve that uncertainty until
+                    // the post-pass has the complete same-file declarations.
                     if let Some(base_id) = base.clone() {
-                        let base_alias = context
-                            .symbol_table
-                            .alias_for(&base_id)
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| base_id.clone());
-                        ops.push(CoreOp::Extends(class_id.clone(), base_alias));
+                        ops.push(CoreOp::BaseTypeRef(class_id.clone(), base_id.clone()));
 
                         // R-43a: Detect SignalR Hub base class in the context
                         // so per-method ExecutionContext("realtime") ops are

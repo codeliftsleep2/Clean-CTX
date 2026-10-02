@@ -11,6 +11,9 @@
 //   CoreOp::DefMethod        → registering occurrence for the callable entity
 //   CoreOp::Call             → SemanticRelation::Calls (with call evidence)
 //   constructor CoreOp::Param → HasConstructorParameterType
+//   CoreOp::Extends          → SemanticRelation::Extends (Class → Class)
+//   CoreOp::Implements       → SemanticRelation::Implements (Class → Interface)
+//   CoreOp::InterfaceExtends → SemanticRelation::Extends (Interface → Interface)
 //
 // Identity model (unchanged, Model C): an entity is (domain, entity_type,
 // name). Generic callables are `builtin` / `Method`; a call relationship is
@@ -35,6 +38,10 @@ pub const BUILTIN_DOMAIN: &str = "builtin";
 pub const METHOD_ENTITY_TYPE: &str = "Method";
 /// Entity type of a generic class declaration.
 pub const CLASS_ENTITY_TYPE: &str = "Class";
+/// Entity type of a generic interface/protocol declaration. Rust traits are
+/// normalized to this role when they occur as an `Implements` target because
+/// `CoreOp::Implements` intentionally carries no source-language kind.
+pub const INTERFACE_ENTITY_TYPE: &str = "Interface";
 /// Entity type of an unresolved written type reference.
 pub const TYPE_REF_ENTITY_TYPE: &str = "TypeRef";
 /// Provenance layer recorded on generic semantic edges.
@@ -121,6 +128,81 @@ pub fn project_calls(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
         .collect()
 }
 
+fn named_entity(entity_type: &'static str, name: &str, file: &str) -> EntityRef {
+    EntityRef::new(BUILTIN_DOMAIN, entity_type, name).with_file(file.to_string())
+}
+
+/// Project canonical structural inheritance facts onto the workspace graph.
+///
+/// Canonical operands may be either internal aliases or unresolved written
+/// names. Declared aliases are translated back to their source names; an
+/// external target remains the written name and is not presented as resolved.
+/// Interface inheritance intentionally uses the existing generic `Extends`
+/// relation with typed Interface endpoints rather than adding a second public
+/// relation that duplicates the endpoint types.
+pub fn project_inheritance(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
+    let classes: HashMap<&str, &str> = instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefClass(id, name) if !name.is_empty() => Some((id.as_str(), name.as_str())),
+            _ => None,
+        })
+        .collect();
+    let interfaces: HashMap<&str, &str> = instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefInterface(id, name) if !name.is_empty() => {
+                Some((id.as_str(), name.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
+
+    let class_name = |id: &str| classes.get(id).copied();
+    let interface_name = |id: &str| interfaces.get(id).copied();
+
+    instructions
+        .iter()
+        .filter_map(|op| {
+            let (relation, subject_type, subject_name, object_type, object_name) = match op {
+                CoreOp::Extends(owner, target) => (
+                    SemanticRelation::Extends,
+                    CLASS_ENTITY_TYPE,
+                    class_name(owner)?,
+                    CLASS_ENTITY_TYPE,
+                    classes.get(target.as_str()).copied().unwrap_or(target),
+                ),
+                CoreOp::Implements(owner, target) => (
+                    SemanticRelation::Implements,
+                    CLASS_ENTITY_TYPE,
+                    class_name(owner)?,
+                    INTERFACE_ENTITY_TYPE,
+                    interfaces
+                        .get(target.as_str())
+                        .or_else(|| classes.get(target.as_str()))
+                        .copied()
+                        .unwrap_or(target),
+                ),
+                CoreOp::InterfaceExtends(owner, target) => (
+                    SemanticRelation::Extends,
+                    INTERFACE_ENTITY_TYPE,
+                    interface_name(owner)?,
+                    INTERFACE_ENTITY_TYPE,
+                    interfaces.get(target.as_str()).copied().unwrap_or(target),
+                ),
+                _ => return None,
+            };
+            Some(SemanticEdge {
+                relation,
+                subject: named_entity(subject_type, subject_name, file),
+                object: named_entity(object_type, object_name, file),
+                layer: BUILTIN_LAYER,
+                call_evidence: None,
+            })
+        })
+        .collect()
+}
+
 /// Project constructor parameter types as class-level query relationships.
 ///
 /// Constructor identity is derived only from canonical ownership: a
@@ -183,6 +265,7 @@ pub fn project_generic_facts(instructions: &[CoreOp], file: &str) -> Vec<Semanti
     let mut edges = project_method_declarations(instructions, file);
     edges.extend(project_calls(instructions, file));
     edges.extend(project_constructor_parameter_types(instructions, file));
+    edges.extend(project_inheritance(instructions, file));
     edges
 }
 

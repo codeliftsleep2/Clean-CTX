@@ -31,6 +31,7 @@ fn make_class(name: &str) -> ClassNode {
         modifiers: vec![],
         class_flags: vec![],
         extends: None,
+        base_type_refs: vec![],
         implements: vec![],
         injects: vec![],
         patterns: vec![],

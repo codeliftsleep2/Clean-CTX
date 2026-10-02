@@ -275,6 +275,14 @@ fn collect_definitions_and_singular_facts(ir: &CompiledIR) -> Result<IdentityInd
                 raw_class,
                 instruction,
             )?,
+            CoreOp::BaseTypeRef(raw_class, _) => insert_singular(
+                &mut facts.extends,
+                ClassId::from_serialized(raw_class),
+                "BASE_REF",
+                IdentityKind::Class,
+                raw_class,
+                instruction,
+            )?,
             CoreOp::Import(alias, ..) => {
                 require_non_empty("IMP", IdentityKind::ImportAlias, alias, None, instruction)?;
                 insert_definition(

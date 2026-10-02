@@ -13,6 +13,7 @@ fn all_variants_with_duplicates() -> CompiledIR {
         version: 42,
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Owner".into()),
+            CoreOp::DefClass("C2".into(), "UnresolvedOwner".into()),
             CoreOp::DefMethod("C1".into(), "M1".into(), "work".into()),
             CoreOp::DefMethod("C1".into(), "M2".into(), "expression".into()),
             CoreOp::DefField("C1".into(), "F1".into(), "value".into()),
@@ -43,6 +44,7 @@ fn all_variants_with_duplicates() -> CompiledIR {
             CoreOp::Flags("M1".into(), vec!["legacy".into(), "legacy".into()]),
             CoreOp::ClassFlags("C1".into(), vec!["metadata".into()]),
             CoreOp::Extends("C1".into(), "Base".into()),
+            CoreOp::BaseTypeRef("C2".into(), "ExternalContract".into()),
             CoreOp::Implements("C1".into(), "I1".into()),
             CoreOp::Injects("C1".into(), vec!["Repo".into(), "Repo".into()]),
             CoreOp::Import("IM1".into(), "pkg".into(), "Thing".into()),

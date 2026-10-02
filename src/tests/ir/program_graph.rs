@@ -91,6 +91,19 @@ fn test_empty_graph() {
 }
 
 #[test]
+fn unresolved_base_type_ref_does_not_create_a_typed_graph_edge() {
+    let instructions = vec![
+        CoreOp::DefClass("C1".into(), "Worker".into()),
+        CoreOp::BaseTypeRef("C1".into(), "UnknownBaseOrContract".into()),
+    ];
+    let graph = GraphBuilder::build_from_instructions(&instructions);
+
+    assert!(graph.edges.is_empty());
+    assert!(graph.edges_of_type("extends").is_empty());
+    assert!(graph.edges_of_type("implements").is_empty());
+}
+
+#[test]
 fn test_graph_node_fields() {
     let ir = sample_ir();
     let graph = GraphBuilder::build(&[ir], &GlobalSymbolTable::new());

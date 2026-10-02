@@ -351,6 +351,11 @@ pub fn decode(data: &[u8]) -> Result<CompiledIR, BinaryDecodeError> {
                     let parent = read_operand(&data[pos..], &mut pos)?;
                     CoreOp::Extends(child, parent)
                 }
+                OP_BASE_REF => {
+                    let child = read_operand(&data[pos..], &mut pos)?;
+                    let written_type = read_operand(&data[pos..], &mut pos)?;
+                    CoreOp::BaseTypeRef(child, written_type)
+                }
                 OP_EXT_I => {
                     let child = read_operand(&data[pos..], &mut pos)?;
                     let parent = read_operand(&data[pos..], &mut pos)?;

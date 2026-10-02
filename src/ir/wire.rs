@@ -113,6 +113,9 @@ pub fn op_to_tuple(op: &CoreOp) -> Vec<String> {
             v
         }
         CoreOp::Extends(child, parent) => vec!["EXT".into(), child.clone(), parent.clone()],
+        CoreOp::BaseTypeRef(child, written_type) => {
+            vec!["BASE_REF".into(), child.clone(), written_type.clone()]
+        }
         CoreOp::InterfaceExtends(child, parent) => {
             vec!["EXT_I".into(), child.clone(), parent.clone()]
         }
@@ -335,6 +338,9 @@ pub fn tuple_to_op(tuple: &[String]) -> Option<CoreOp> {
             } else {
                 None
             }
+        }
+        "BASE_REF" => {
+            (tuple.len() >= 3).then(|| CoreOp::BaseTypeRef(tuple[1].clone(), tuple[2].clone()))
         }
         "EXT_I" => {
             (tuple.len() >= 3).then(|| CoreOp::InterfaceExtends(tuple[1].clone(), tuple[2].clone()))

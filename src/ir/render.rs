@@ -154,6 +154,10 @@ pub fn ir_to_text(instructions: &[Vec<String>], fidelity: Fidelity) -> String {
                 let iface = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
                 output.push_str(&format!(" $m {}", iface));
             }
+            "BASE_REF" => {
+                let written_type = insn.get(2).map(|s| s.as_str()).unwrap_or("?");
+                output.push_str(&format!(" $base? {}", written_type));
+            }
             "FIELD_T" => {
                 let type_op = insn.get(2).map(|s| s.as_str()).unwrap_or("$v");
                 output.push_str(&format!(":{}", type_op));

@@ -523,7 +523,8 @@ fn red_sig10_static_class_has_no_false_extends_edge() {
     }
 }
 
-/// The class head is still read correctly: a real base list is preserved.
+/// The class head is still read correctly: an unresolved base-list target is
+/// preserved without claiming class inheritance or interface implementation.
 #[test]
 fn red_sig10_real_base_list_is_still_detected() {
     const WITH_BASE: &str = r#"namespace Pairs;
@@ -537,18 +538,23 @@ public class Derived : BaseType
 }
 "#;
     let ir = compile_cs(WITH_BASE, Fidelity::Medium);
-    let parents: Vec<&str> = ir
+    let base_refs: Vec<&str> = ir
         .instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::Extends(_child, parent) => Some(parent.as_str()),
+            CoreOp::BaseTypeRef(_child, target) => Some(target.as_str()),
             _ => None,
         })
         .collect();
     assert_eq!(
-        parents,
+        base_refs,
         vec!["BaseType"],
-        "a declared base type is still read"
+        "an unresolved written base type is still preserved"
+    );
+    assert!(
+        !ir.instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::Extends(..) | CoreOp::Implements(..)))
     );
 }
 

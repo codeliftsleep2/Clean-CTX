@@ -37,6 +37,14 @@ fn core_op_extends_display() {
 }
 
 #[test]
+fn core_op_base_type_ref_contract() {
+    let op = CoreOp::BaseTypeRef("C1".into(), "ExternalContract".into());
+    assert_eq!(format!("{}", op), "BASE_REF C1 ExternalContract");
+    assert_eq!(opcode_name(&op), "BASE_REF");
+    assert_eq!(arity("BASE_REF"), Some(3));
+}
+
+#[test]
 fn core_op_import_display() {
     let op = CoreOp::Import("IM1".into(), "rxjs".into(), "map".into());
     assert_eq!(format!("{}", op), "IMP IM1 rxjs map");
@@ -230,6 +238,10 @@ fn opcode_name_matches_variant() {
     assert_eq!(
         opcode_name(&CoreOp::Extends("C1".into(), "C2".into())),
         "EXT"
+    );
+    assert_eq!(
+        opcode_name(&CoreOp::BaseTypeRef("C1".into(), "External".into())),
+        "BASE_REF"
     );
     assert_eq!(
         opcode_name(&CoreOp::Implements("C1".into(), "I1".into())),

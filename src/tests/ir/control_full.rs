@@ -11,6 +11,7 @@ pub(super) fn fixture() -> (CompiledIR, crate::ir::HierarchicalIR, Vec<SemanticE
         version: 7,
         instructions: vec![
             CoreOp::DefClass("C1".into(), "Owner".into()),
+            CoreOp::BaseTypeRef("C1".into(), "ExternalContract".into()),
             CoreOp::Injects(
                 "C1".into(),
                 vec!["Repo".into(), "Repo".into(), "Clock".into()],
@@ -55,6 +56,10 @@ fn normalizer_preserves_ids_occurrences_unresolved_calls_and_provenance() {
     );
 
     assert_eq!(normalized["classes"][0]["id"], "C1");
+    assert_eq!(
+        normalized["classes"][0]["base_type_refs"],
+        serde_json::json!(["ExternalContract"])
+    );
     assert_eq!(normalized["classes"][0]["methods"][0]["id"], "M1");
     assert_eq!(normalized["classes"][0]["methods"][1]["id"], "M2");
     assert_eq!(

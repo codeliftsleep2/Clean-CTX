@@ -249,6 +249,7 @@ pub(super) fn encode_scoped_declarations(oracle: &Value) -> Value {
                 class["modifier_occurrences"],
                 class["class_flag_occurrences"],
                 class["extends"],
+                class["base_type_refs"],
                 class["implements"],
                 class["injection_occurrences"],
                 class["patterns"]
@@ -284,7 +285,8 @@ pub(super) fn decode_scoped_declarations(encoded: &Value) -> Value {
         "methods": record[3].as_array().unwrap().iter().map(decode_method).collect::<Vec<_>>(),
         "fields": record[4], "modifier_occurrences": record[5],
         "class_flag_occurrences": record[6], "extends": record[7],
-        "implements": record[8], "injection_occurrences": record[9], "patterns": record[10]
+        "base_type_refs": record[8], "implements": record[9],
+        "injection_occurrences": record[10], "patterns": record[11]
     })).collect::<Vec<_>>();
     let interfaces = encoded["i"].as_array().unwrap().iter().map(|record| json!({
         "kind": "interface", "id": record[0], "name": record[1],

@@ -181,6 +181,7 @@ class opcodes are not overloaded or renumbered.
 | 27 | `DefInterfaceField` | `interface`, `field`, `name` |
 | 28 | `InterfaceModifiers` | count, `interface`, ordered typed values |
 | 29 | `InterfaceExtends` | `interface`, `parent` |
+| 30 | `BaseTypeRef` | `class`, written unresolved type |
 
 `count` is the number of following string-table operands for that instruction.
 It is not a deduplication boundary. Instruction occurrences and payload

@@ -282,6 +282,9 @@ mod workspace_query_dispatch;
 #[path = "workspace_query_builtin.rs"]
 mod workspace_query_builtin;
 
+#[path = "workspace_query_inheritance.rs"]
+mod workspace_query_inheritance;
+
 #[cfg(feature = "csharp")]
 #[path = "workspace_query_csharp_constructor_types.rs"]
 mod workspace_query_csharp_constructor_types;

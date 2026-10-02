@@ -27,6 +27,7 @@ pub enum DeltaOpcode {
     Flags,
     ClassFlags,
     Extends,
+    BaseTypeRef,
     InterfaceExtends,
     Implements,
     Injects,
@@ -61,6 +62,7 @@ impl DeltaOpcode {
             "FLAGS" => Some(Self::Flags),
             "FLAGS_C" => Some(Self::ClassFlags),
             "EXT" => Some(Self::Extends),
+            "BASE_REF" => Some(Self::BaseTypeRef),
             "EXT_I" => Some(Self::InterfaceExtends),
             "IMPL" => Some(Self::Implements),
             "INJECTS" => Some(Self::Injects),
@@ -90,6 +92,7 @@ impl DeltaOpcode {
                 | Self::Return
                 | Self::FieldType
                 | Self::Extends
+                | Self::BaseTypeRef
                 | Self::Import
                 | Self::Body
         )
@@ -117,6 +120,7 @@ impl DeltaIdentity {
             | DeltaOpcode::Return
             | DeltaOpcode::FieldType
             | DeltaOpcode::Extends
+            | DeltaOpcode::BaseTypeRef
             | DeltaOpcode::InterfaceExtends
             | DeltaOpcode::Import
             | DeltaOpcode::Body => 2,

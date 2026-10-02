@@ -56,6 +56,7 @@ pub fn primary_key_from_tuple(tuple: &[String]) -> String {
         "FLAGS" => format!("FLAGS:{}", tuple.get(1).unwrap_or(&String::new())),
         "FLAGS_C" => format!("FLAGS_C:{}", tuple.get(1).unwrap_or(&String::new())),
         "EXT" => format!("EXT:{}", tuple.get(1).unwrap_or(&String::new())),
+        "BASE_REF" => format!("BASE_REF:{}", tuple.get(1).unwrap_or(&String::new())),
         "EXT_I" => format!("EXT_I:{}", tuple.get(1).unwrap_or(&String::new())),
         "IMPL" => format!(
             "IMPL:{}:{}",
@@ -147,6 +148,7 @@ pub fn key_tuple_from_tuple(tuple: &[String]) -> Vec<String> {
         "FLAGS" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "FLAGS_C" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "EXT" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
+        "BASE_REF" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "EXT_I" => vec![tuple[0].clone(), tuple.get(1).cloned().unwrap_or_default()],
         "IMPL" => vec![
             tuple[0].clone(),

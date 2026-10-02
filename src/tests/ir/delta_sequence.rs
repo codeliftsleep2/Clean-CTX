@@ -60,6 +60,21 @@ fn corrected_delta_preserves_duplicates_payloads_order_and_positions() {
 }
 
 #[test]
+fn base_type_ref_delta_replays_written_uncertainty() {
+    let base = compiled(
+        1,
+        vec![CoreOp::BaseTypeRef("C1".into(), "OldContract".into())],
+    );
+    let target = compiled(
+        2,
+        vec![CoreOp::BaseTypeRef("C1".into(), "NewContract".into())],
+    );
+
+    let (_delta, replayed) = replay(&base, &target);
+    assert_eq!(replayed, target_tuples(&target));
+}
+
+#[test]
 fn corrected_delta_supports_arbitrary_removal_and_duplicate_replacement() {
     let io = CoreOp::SideEffect("M1".into(), SideEffectKind::Io);
     let base = compiled(

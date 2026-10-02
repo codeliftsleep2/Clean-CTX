@@ -70,7 +70,7 @@ pub fn render_hierarchical_for_llm_focused(
     let mut output = String::new();
 
     // ── SCHEMA vNext header ──
-    output.push_str("// SCHEMA vNext  @=meta C=class X=extends I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n");
+    output.push_str("// SCHEMA vNext  @=meta C=class X=extends B?=unresolved-base-type I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\n");
 
     // ── Classes ──
     for class in &hir.classes {
@@ -151,6 +151,12 @@ fn render_class(
     // Extends
     if let Some(parent) = &class.extends {
         output.push_str(&format!("X {}\n", parent));
+    }
+
+    // Canonical uncertainty: written C# base-list target, not a claim that
+    // the target is a class or interface.
+    for written_type in &class.base_type_refs {
+        output.push_str(&format!("B? {}\n", written_type));
     }
 
     // Implements

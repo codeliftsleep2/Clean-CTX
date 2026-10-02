@@ -13,6 +13,13 @@ if (-not $BinaryPath) { $BinaryPath = Join-Path $RepositoryRoot "target\debug\cl
 if (-not (Test-Path -LiteralPath $BinaryPath)) {
     throw "Missing production binary. Run: cargo build --all-features --bin clean-ctx"
 }
+$binary = Get-Item -LiteralPath $BinaryPath
+$newestSource = Get-ChildItem (Join-Path $RepositoryRoot "src") -Recurse -File -Filter "*.rs" |
+    Sort-Object LastWriteTimeUtc -Descending |
+    Select-Object -First 1
+if ($newestSource -and $binary.LastWriteTimeUtc -lt $newestSource.LastWriteTimeUtc) {
+    throw "Stale production binary ($($binary.LastWriteTime)). Newer source: $($newestSource.FullName) ($($newestSource.LastWriteTime)). Run: cargo build --all-features --bin clean-ctx"
+}
 
 New-Item -ItemType Directory -Force $workspace, $captures | Out-Null
 Copy-Item (Join-Path $packageRoot "fixtures\graph.ts") (Join-Path $workspace "graph.ts") -Force
@@ -48,7 +55,11 @@ try {
         @{ id=5; name="entities-in-file"; args=@{ type="entities_in_file"; file_path=$file; workspaceRoot=$workspace } },
         @{ id=6; name="transitive-dependencies"; args=@{ type="transitive_dependencies"; domain="angular"; entity_type="Service"; name="Alpha"; depth=3; workspaceRoot=$workspace } },
         @{ id=7; name="has-cycle"; args=@{ type="has_cycle"; workspaceRoot=$workspace } },
-        @{ id=8; name="negative-reverse-edges"; args=@{ type="reverse_edges"; domain="angular"; entity_type="Service"; name="MissingService"; workspaceRoot=$workspace } }
+        @{ id=8; name="negative-reverse-edges"; args=@{ type="reverse_edges"; domain="angular"; entity_type="Service"; name="MissingService"; workspaceRoot=$workspace } },
+        @{ id=9; name="inheritance-class-forward"; args=@{ type="forward_edges"; domain="builtin"; entity_type="Class"; name="ConcreteWorker"; workspaceRoot=$workspace } },
+        @{ id=10; name="inheritance-base-reverse"; args=@{ type="reverse_edges"; domain="builtin"; entity_type="Class"; name="BaseWorker"; workspaceRoot=$workspace } },
+        @{ id=11; name="inheritance-interface-forward"; args=@{ type="forward_edges"; domain="builtin"; entity_type="Interface"; name="WorkerContract"; workspaceRoot=$workspace } },
+        @{ id=12; name="inheritance-interface-reverse"; args=@{ type="reverse_edges"; domain="builtin"; entity_type="Interface"; name="WorkerContract"; workspaceRoot=$workspace } }
     )
     foreach ($query in $queries) {
         Save-Query $query.name (Invoke-CleanCtxTool $session $query.id "workspace_query" $query.args)
