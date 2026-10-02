@@ -74,16 +74,12 @@ pub(super) fn resolve_forward_aliases(instructions: &mut [CoreOp]) {
                     }
                 }
             }
-            CoreOp::Implements(_, target)
-                if !interface_aliases.contains(target.as_str()) =>
-            {
+            CoreOp::Implements(_, target) if !interface_aliases.contains(target.as_str()) => {
                 if let Some(Some(alias)) = interface_name_to_alias.get(target.as_str()) {
                     *target = alias.clone();
                 }
             }
-            CoreOp::InterfaceExtends(_, target)
-                if !interface_aliases.contains(target.as_str()) =>
-            {
+            CoreOp::InterfaceExtends(_, target) if !interface_aliases.contains(target.as_str()) => {
                 if let Some(Some(alias)) = interface_name_to_alias.get(target.as_str()) {
                     *target = alias.clone();
                 }
