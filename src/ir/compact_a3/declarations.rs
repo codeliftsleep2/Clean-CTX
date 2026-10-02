@@ -166,6 +166,14 @@ fn owner_rows(
             if !owner["extends"].is_null() {
                 writeln!(output, "X|{}", quoted(&owner["extends"], "class extends")?).unwrap();
             }
+            for written_type in string_values(&owner["base_type_refs"], "base type refs")? {
+                writeln!(
+                    output,
+                    "R|{}",
+                    quoted(&json!(written_type), "base type ref")?
+                )
+                .unwrap();
+            }
             for implemented in string_values(&owner["implements"], "implements")? {
                 writeln!(output, "J|{implemented}").unwrap();
             }
@@ -293,7 +301,7 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                         "1" => true,
                         _ => return Err("invalid synthetic flag".into()),
                     };
-                    json!({"kind":"class","id":id,"name":parsed_string(columns[2])?,"synthetic":synthetic,"methods":[],"fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],"extends":null,"implements":[]})
+                    json!({"kind":"class","id":id,"name":parsed_string(columns[2])?,"synthetic":synthetic,"methods":[],"fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],"extends":null,"base_type_refs":[],"implements":[]})
                 };
                 let owners = if interface {
                     &mut interfaces
@@ -386,13 +394,21 @@ pub fn decode_declarations(input: &str) -> Result<Value, String> {
                         .push(json!({"id":id,"name":parsed_string(entry[1])?,"type":parsed_optional(entry[2])?}));
                 }
             }
-            "X" | "J" => {
+            "X" | "R" | "J" => {
                 if columns.len() != 2 {
                     return Err("invalid relation record".into());
                 }
                 let (interface, owner) = current_owner.ok_or("relation outside owner")?;
                 let value = parsed_string(columns[1])?;
-                if columns[0] == "J" {
+                if columns[0] == "R" {
+                    if interface {
+                        return Err("interface cannot own unresolved base type".into());
+                    }
+                    classes[owner]["base_type_refs"]
+                        .as_array_mut()
+                        .unwrap()
+                        .push(value);
+                } else if columns[0] == "J" {
                     if interface {
                         return Err("interface cannot implement".into());
                     }

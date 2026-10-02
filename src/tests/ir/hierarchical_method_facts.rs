@@ -252,7 +252,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
         "file": "alpha-1",
         "v": 7,
         "encoding": "hierarchical",
-        "hs": 9,
+        "hs": 10,
         "ir": { "c": [] }
     }))
     .expect_err("unknown hierarchy schema must not be guessed");
@@ -260,7 +260,7 @@ fn unknown_hierarchy_schema_revision_fails_loudly() {
     assert!(
         error
             .to_string()
-            .contains("unsupported hierarchical schema version: 9"),
+            .contains("unsupported hierarchical schema version: 10"),
         "unexpected error: {error}"
     );
 }

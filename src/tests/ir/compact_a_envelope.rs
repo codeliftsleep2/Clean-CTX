@@ -291,7 +291,7 @@ fn file_context_a2_excludes_workspace_edges_but_keeps_local_graph_facts() {
     assert_eq!(envelope["n"]["D"], json!([["C1", "inj"]]));
     assert_eq!(envelope["n"]["V"], json!([]));
     assert_eq!(
-        envelope["d"]["c"][0][9],
+        envelope["d"]["c"][0][10],
         json!([["Repo", "Repo", "Clock"], ["Repo"]])
     );
 }

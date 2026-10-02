@@ -10,7 +10,7 @@ fn oracle() -> serde_json::Value {
             "kind":"class","id":"C1","name":"Complete","synthetic":false,
             "fields":[{"id":"F1","name":"repo","type":"Repository"}],
             "modifier_occurrences":[["EXPORT"]],"class_flag_occurrences":[],
-            "extends":null,"implements":["Runner"],"injection_occurrences":[["Repository"]],
+            "extends":null,"base_type_refs":[],"implements":["Runner"],"injection_occurrences":[["Repository"]],
             "patterns":[{"name":"SERVICE","args":["C1"]}],
             "methods":[{
                 "id":"M1","name":"run","parameters":[{"id":"P1","name":"value","type":"string"}],
@@ -142,7 +142,7 @@ fn sparse_oracle() -> serde_json::Value {
             "kind":"class","id":"C7","name":"Alpha","synthetic":false,
             "fields":[{"id":"F23","name":"data","type":"Data"}],
             "modifier_occurrences":[],"class_flag_occurrences":[],
-            "extends":null,"implements":[],"injection_occurrences":[],
+            "extends":null,"base_type_refs":[],"implements":[],"injection_occurrences":[],
             "patterns":[{"name":"SERVICE","args":["C7"]}],
             "methods":[
                 {"id":"M41","name":"run","parameters":[{"id":"P88","name":"value","type":"string"}],

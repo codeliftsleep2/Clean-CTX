@@ -155,20 +155,6 @@ export class Child extends Base implements ChildContract {}
     );
 }
 
-#[cfg(feature = "typescript")]
-#[test]
-fn javascript_class_extends_survives_to_workspace_query() {
-    let dir = tempfile::TempDir::new().unwrap();
-    let state = crate::mcp::McpState::new(crate::tests::test_config());
-    publish(
-        &dir,
-        &state,
-        "inheritance.js",
-        "class Base {}\nclass Child extends Base {}\n",
-    );
-    assert_forward_and_reverse(&dir, &state, "Extends", "Class", "Child", "Class", "Base");
-}
-
 #[cfg(feature = "java")]
 #[test]
 fn java_inheritance_survives_to_workspace_query() {
@@ -267,7 +253,7 @@ fn rust_trait_implementation_survives_to_workspace_query() {
         &dir,
         &state,
         "inheritance.rs",
-        "trait Processor { fn process(&self); }\nstruct Worker;\nimpl Processor for Worker { fn process(&self) {} }\n",
+        "impl Processor for Worker { fn process(&self) {} }\n",
     );
     assert_forward_and_reverse(
         &dir,

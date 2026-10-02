@@ -22,7 +22,7 @@ fn oracle() -> Value {
             "methods":[method("M1","run|first",json!([{"id":"P1","name":"input|one","type":"string"}])),method("M2","run|second",json!([{"id":"P2","name":"input","type":null}]))],
             "fields":[{"id":"F1","name":"value|field","type":"Value"}],
             "modifier_occurrences":[["EXPORT"],[]],"class_flag_occurrences":[["ABSTRACT"]],
-            "extends":"Base|Owner","implements":["Runner"],
+            "extends":"Base|Owner","base_type_refs":["External|Contract"],"implements":["Runner"],
             "injection_occurrences":[["Repository"],["Repository"]],
             "patterns":[{"name":"SERVICE","args":["C1"]}]
         }],
@@ -67,6 +67,7 @@ fn phase1a_declarations_roundtrip_typed_identity_groups_and_delimiters() {
     let oracle = oracle();
     let encoded = encode_declarations(&oracle).expect("encode A3 declarations");
     assert!(encoded.starts_with("A3|4|H|"));
+    assert!(encoded.contains("R|\"External|Contract\"\n"));
     assert!(!encoded.contains("\"parameters\""));
     assert_eq!(
         decode_declarations(&encoded).expect("decode A3 declarations"),
@@ -137,7 +138,7 @@ fn phase3d_numeric_single_value_keeps_explicit_count() {
                 "body":null,"body_start":null,"body_end":null,
                 "control_flow":[],"data_flow":[],"side_effects":[],"execution_contexts":[]}],
             "fields":[],"modifier_occurrences":[],"class_flag_occurrences":[],
-            "extends":null,"implements":[],"injection_occurrences":[],"patterns":[]
+            "extends":null,"base_type_refs":[],"implements":[],"injection_occurrences":[],"patterns":[]
         }],
         "interfaces":[]
     });
