@@ -30,7 +30,7 @@ use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::program_graph::ProgramGraph;
 use crate::compaction::modifiers::{MODIFIERS_LOW, strip_csharp_attributes, strip_modifiers};
-use crate::compaction::signature::split_parameters;
+use crate::compaction::signature::{parse_parameter, split_parameters};
 use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::CapEntry;
 use crate::layers::meta::semantic::SemanticEdge;
@@ -419,13 +419,7 @@ impl PassContext {
                 if param.is_empty() {
                     continue;
                 }
-                let (param_name, param_type) = if let Some(colon_pos) = param.find(':') {
-                    let pname = param[..colon_pos].trim().to_string();
-                    let ptype = param[colon_pos + 1..].trim().to_string();
-                    (pname, ptype)
-                } else {
-                    (param.to_string(), TYPE_VOID.to_string())
-                };
+                let (param_name, param_type) = parse_parameter(param);
 
                 let param_id = self.next_id("P");
                 self.instructions.push(CoreOp::Param(

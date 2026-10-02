@@ -144,17 +144,17 @@ fn compile_base_initializer_ctor_keeps_constructor_identity() {
     );
 
     // CoreOp::Param(method_id, param_id, type, name)
-    let param_names: Vec<&str> = ir
+    let parameters: Vec<(&str, &str)> = ir
         .instructions
         .iter()
         .filter_map(|op| match op {
-            CoreOp::Param(_, _, _, name) => Some(name.as_str()),
+            CoreOp::Param(_, _, ty, name) => Some((ty.as_str(), name.as_str())),
             _ => None,
         })
         .collect();
     assert!(
-        param_names.contains(&"string prefix"),
-        "the constructor's own parameter group must reach the Param ops, got {param_names:?}"
+        parameters.contains(&("string", "prefix")),
+        "the constructor parameter type/name must remain separate, got {parameters:?}"
     );
 
     let return_types: Vec<&str> = ir
@@ -169,6 +169,40 @@ fn compile_base_initializer_ctor_keeps_constructor_identity() {
         return_types.iter().all(|t| *t == TYPE_VOID),
         "a constructor has no return type, got {return_types:?}"
     );
+}
+
+#[test]
+fn compile_csharp_constructor_preserves_parameter_type_and_name() {
+    let source = concat!(
+        "public interface IFooService {}\n",
+        "public sealed class BarController\n",
+        "{\n",
+        "    public BarController(IFooService fooService) {}\n",
+        "}\n"
+    );
+    let (language, query) = detect_language(source);
+    let mut compiler = IRCompiler::new();
+    let ir = compiler
+        .compile(
+            source,
+            "constructor_parameter.cs",
+            language,
+            query,
+            Fidelity::Low,
+            None,
+        )
+        .expect("C# compilation should succeed");
+
+    let constructor_id = ir.instructions.iter().find_map(|op| match op {
+        CoreOp::DefMethod(_, method_id, name) if name == "BarController" => Some(method_id),
+        _ => None,
+    });
+    let constructor_id = constructor_id.expect("constructor method");
+    assert!(ir.instructions.iter().any(|op| matches!(
+        op,
+        CoreOp::Param(method_id, _, ty, name)
+            if method_id == constructor_id && ty == "IFooService" && name == "fooService"
+    )));
 }
 
 #[test]

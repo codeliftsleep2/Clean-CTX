@@ -10,6 +10,7 @@
 //
 //   CoreOp::DefMethod        → registering occurrence for the callable entity
 //   CoreOp::Call             → SemanticRelation::Calls (with call evidence)
+//   constructor CoreOp::Param → HasConstructorParameterType
 //
 // Identity model (unchanged, Model C): an entity is (domain, entity_type,
 // name). Generic callables are `builtin` / `Method`; a call relationship is
@@ -32,6 +33,10 @@ use crate::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, Seman
 pub const BUILTIN_DOMAIN: &str = "builtin";
 /// Entity type of a generic callable.
 pub const METHOD_ENTITY_TYPE: &str = "Method";
+/// Entity type of a generic class declaration.
+pub const CLASS_ENTITY_TYPE: &str = "Class";
+/// Entity type of an unresolved written type reference.
+pub const TYPE_REF_ENTITY_TYPE: &str = "TypeRef";
 /// Provenance layer recorded on generic semantic edges.
 pub const BUILTIN_LAYER: &str = "builtin";
 
@@ -116,6 +121,59 @@ pub fn project_calls(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
         .collect()
 }
 
+/// Project constructor parameter types as class-level query relationships.
+///
+/// Constructor identity is derived only from canonical ownership: a
+/// `DefMethod` is a constructor when its owning `DefClass` has the same name.
+/// Every `Param` occurrence remains in canonical IR. The workspace index may
+/// deduplicate repeated same-type parameters into the existential class-level
+/// fact that the class has at least one constructor parameter of that type.
+pub fn project_constructor_parameter_types(
+    instructions: &[CoreOp],
+    file: &str,
+) -> Vec<SemanticEdge> {
+    let classes: HashMap<&str, &str> = instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefClass(class_id, name) if !name.is_empty() => {
+                Some((class_id.as_str(), name.as_str()))
+            }
+            _ => None,
+        })
+        .collect();
+    let constructors: HashMap<&str, &str> = instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::DefMethod(class_id, method_id, method_name) => {
+                let class_name = *classes.get(class_id.as_str())?;
+                (method_name == class_name).then_some((method_id.as_str(), class_name))
+            }
+            _ => None,
+        })
+        .collect();
+
+    instructions
+        .iter()
+        .filter_map(|op| match op {
+            CoreOp::Param(method_id, _parameter_id, parameter_type, _parameter_name)
+                if !parameter_type.is_empty() && parameter_type != super::opcodes::TYPE_VOID =>
+            {
+                let class_name = *constructors.get(method_id.as_str())?;
+                Some(SemanticEdge {
+                    relation: SemanticRelation::HasConstructorParameterType,
+                    subject: EntityRef::new(BUILTIN_DOMAIN, CLASS_ENTITY_TYPE, class_name)
+                        .with_file(file.to_string()),
+                    object: EntityRef::new(BUILTIN_DOMAIN, TYPE_REF_ENTITY_TYPE, parameter_type)
+                        .with_file(file.to_string()),
+                    layer: BUILTIN_LAYER,
+                    call_evidence: None,
+                })
+            }
+            _ => None,
+        })
+        .collect()
+}
+
 /// Project the complete generic semantic surface of one compiled file:
 /// callable declarations first (registration occurrences), then call facts.
 ///
@@ -124,6 +182,7 @@ pub fn project_calls(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
 pub fn project_generic_facts(instructions: &[CoreOp], file: &str) -> Vec<SemanticEdge> {
     let mut edges = project_method_declarations(instructions, file);
     edges.extend(project_calls(instructions, file));
+    edges.extend(project_constructor_parameter_types(instructions, file));
     edges
 }
 

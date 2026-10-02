@@ -136,6 +136,15 @@ ordered call occurrences (`callee_written`, `explicit_argument_count`, and
 `has_spread`). It does not run hydration, publish session/WorkspaceIndex state,
 expose canonical IDs, or claim that a written callee is resolved.
 
+Direct constructor-consumer lookup is relation- and language-specific:
+Angular dependency injection uses `Injects`, while a C# constructor parameter
+projects the source-true `HasConstructorParameterType` relation from
+`builtin / Class / <consumer>` to `builtin / TypeRef / <written type>`. Query
+the C# form with `reverse_edges` on that exact `TypeRef` identity. It does not
+claim container registration, runtime .NET DI, or a resolved interface/class
+declaration. Consequently, a successful empty reverse-edge lookup for an
+identity whose relation is not projected is not verified absence of consumers.
+
 Use the single form for one question or when a client does not consume batch
 results. Use `queries` when two or more independent questions share the same
 workspace scope, especially mixed `find_entities`, edge, traversal, and cycle

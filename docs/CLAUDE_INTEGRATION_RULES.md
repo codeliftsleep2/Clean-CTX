@@ -173,6 +173,15 @@ queries, `domain` and `entity_type` are optional identity filters:
 CBM/filesystem discovery supplies candidate files only. Clean-CTX alone compiles
 those files and determines `WorkspaceIndex` relationships.
 
+Constructor-consumer queries are language-specific. Angular DI uses `Injects`.
+For C#, "who consumes `IFooService` through a constructor?" uses
+`reverse_edges` with `domain: "builtin"`, `entity_type: "TypeRef"`, and the
+written type name; the returned relation is `HasConstructorParameterType`.
+This records a source signature only. It does not identify a .NET container
+registration, prove runtime injection, or answer which implementation .NET DI
+will supply. An empty `reverse_edges` result for another identity/relation
+therefore is not evidence that C# constructor consumers are absent.
+
 ### `entities_in_file`
 
 Pass `file_path`, `workspaceRoot`, and optional `fidelity`. It compiles an

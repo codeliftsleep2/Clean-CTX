@@ -27,6 +27,62 @@ const CS_EXTENSION_TWO_TYPE_PARAMS: &str = concat!(
 /// The C# tuple-returning declaration from the reported defect (Case B).
 const CS_NAMED_TUPLE_RETURN: &str = "public static (int alpha, int beta) GetPair(int[] values)";
 
+#[test]
+fn type_first_parameters_preserve_structural_type_syntax() {
+    for (written, expected_name, expected_type) in [
+        ("IFooService foo", "foo", "IFooService"),
+        (
+            "IRepository<Order> repository",
+            "repository",
+            "IRepository<Order>",
+        ),
+        ("IFooService? optionalFoo", "optionalFoo", "IFooService?"),
+        ("IReadOnlyList<Foo> items", "items", "IReadOnlyList<Foo>"),
+        ("Foo[] values", "values", "Foo[]"),
+    ] {
+        assert_eq!(
+            parse_parameter(written),
+            (expected_name.to_string(), expected_type.to_string()),
+            "{written}"
+        );
+    }
+}
+
+#[test]
+fn csharp_parameter_modifiers_are_not_part_of_type_identity() {
+    for written in ["ref Foo foo", "out Foo foo", "in Foo foo"] {
+        assert_eq!(
+            parse_parameter(written),
+            ("foo".to_string(), "Foo".to_string()),
+            "{written}"
+        );
+    }
+    assert_eq!(
+        parse_parameter("params Foo[] values"),
+        ("values".to_string(), "Foo[]".to_string())
+    );
+    assert_eq!(
+        parse_parameter("this IRepository<Order> repository"),
+        ("repository".to_string(), "IRepository<Order>".to_string())
+    );
+    assert_eq!(
+        parse_parameter("ref readonly Foo value"),
+        ("value".to_string(), "Foo".to_string())
+    );
+}
+
+#[test]
+fn name_first_and_untyped_parameters_keep_their_existing_shape() {
+    assert_eq!(
+        parse_parameter("foo: IFooService"),
+        ("foo".to_string(), "IFooService".to_string())
+    );
+    assert_eq!(
+        parse_parameter("foo"),
+        ("foo".to_string(), crate::ir::opcodes::TYPE_VOID.to_string())
+    );
+}
+
 // ── Structural head extraction ─────────────────────────────────────
 
 #[test]

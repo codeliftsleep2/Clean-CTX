@@ -282,6 +282,10 @@ mod workspace_query_dispatch;
 #[path = "workspace_query_builtin.rs"]
 mod workspace_query_builtin;
 
+#[cfg(feature = "csharp")]
+#[path = "workspace_query_csharp_constructor_types.rs"]
+mod workspace_query_csharp_constructor_types;
+
 // Workspace-scope regressions: a query issued FOR a workspace answers with the
 // evidence asserted from inside that workspace only (occurrence provenance, never
 // semantic identity). `workspace_query_scope` owns the fixtures and RED-SCOPE1–8;

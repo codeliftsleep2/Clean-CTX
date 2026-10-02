@@ -36,6 +36,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/V
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-HasCycleLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-IdentityResolutionLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-CSharpConstructorDependenciesLive.ps1
 ```
 
 These are repeatable operator-verification assets, not Rust regression tests or
@@ -50,3 +51,12 @@ equivalent legacy single calls. It also verifies that `name` remains a singular
 non-empty string and that an array is rejected with guidance to use top-level
 `queries`. Generated captures are written beneath
 `target/workspace-query-batch-verification/`; they are operator evidence only.
+
+`Verify-CSharpConstructorDependenciesLive.ps1` creates an isolated multi-file
+C# workspace and proves the production path from constructor parameter type to
+canonical IR, generic semantic projection, `WorkspaceIndex`, and direct MCP
+`reverse_edges` / `forward_edges` answers. It also checks ordinary-method and
+interface-implementation negative controls, repeated-query stability, and stale
+edge removal after source replacement. The relation is the source-signature
+fact `HasConstructorParameterType` targeting `builtin/TypeRef`; the harness does
+not claim runtime .NET DI registration or implementation resolution.

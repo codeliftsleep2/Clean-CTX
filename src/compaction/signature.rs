@@ -343,6 +343,98 @@ pub(crate) fn split_parameters(params: &str) -> Vec<&str> {
     out
 }
 
+/// Split one written parameter into its canonical `(name, type)` fields.
+///
+/// Name-first declarations (`name: Type`) retain their established handling.
+/// Type-first declarations (C#/Java) are split at the last top-level
+/// whitespace boundary, so whitespace and commas inside generic/array syntax
+/// cannot turn pieces of the type into a parameter name. C# passing/collection
+/// modifiers describe the parameter slot rather than the written type identity
+/// and are therefore removed from the canonical type.
+pub(crate) fn parse_parameter(parameter: &str) -> (String, String) {
+    let parameter = parameter.trim();
+    if let Some(colon_pos) = top_level_separator(parameter, ':') {
+        return (
+            parameter[..colon_pos].trim().to_string(),
+            parameter[colon_pos + 1..].trim().to_string(),
+        );
+    }
+
+    let declaration = strip_top_level_default(parameter);
+    let declaration = strip_parameter_modifiers(declaration);
+    let Some(boundary) = last_top_level_whitespace(declaration) else {
+        return (declaration.to_string(), "void".to_string());
+    };
+
+    let name = declaration[boundary..].trim();
+    let ty = declaration[..boundary].trim();
+    if name.is_empty() || ty.is_empty() {
+        (declaration.to_string(), "void".to_string())
+    } else {
+        (name.to_string(), ty.to_string())
+    }
+}
+
+fn strip_parameter_modifiers(mut parameter: &str) -> &str {
+    const MODIFIERS: &[&str] = &["ref", "out", "in", "params", "this", "scoped", "readonly"];
+    loop {
+        let mut stripped = None;
+        for modifier in MODIFIERS {
+            if let Some(rest) = parameter.strip_prefix(modifier)
+                && rest.chars().next().is_some_and(char::is_whitespace)
+            {
+                stripped = Some(rest.trim_start());
+                break;
+            }
+        }
+        match stripped {
+            Some(rest) => parameter = rest,
+            None => return parameter,
+        }
+    }
+}
+
+fn top_level_separator(parameter: &str, separator: char) -> Option<usize> {
+    let mut depth = 0i32;
+    for (index, ch) in parameter.char_indices() {
+        match ch {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth = (depth - 1).max(0),
+            '=' if depth == 0 => return None,
+            _ if depth == 0 && ch == separator => return Some(index),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn strip_top_level_default(parameter: &str) -> &str {
+    let mut depth = 0i32;
+    for (index, ch) in parameter.char_indices() {
+        match ch {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth = (depth - 1).max(0),
+            '=' if depth == 0 => return parameter[..index].trim_end(),
+            _ => {}
+        }
+    }
+    parameter
+}
+
+fn last_top_level_whitespace(parameter: &str) -> Option<usize> {
+    let mut depth = 0i32;
+    let mut boundary = None;
+    for (index, ch) in parameter.char_indices() {
+        match ch {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth = (depth - 1).max(0),
+            _ if depth == 0 && ch.is_whitespace() => boundary = Some(index),
+            _ => {}
+        }
+    }
+    boundary
+}
+
 #[cfg(test)]
 #[path = "../tests/compaction/signature.rs"]
 mod tests;

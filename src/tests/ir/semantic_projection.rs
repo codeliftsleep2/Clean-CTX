@@ -10,7 +10,8 @@
 
 use crate::ir::opcodes::CoreOp;
 use crate::ir::semantic_projection::{
-    BUILTIN_DOMAIN, BUILTIN_LAYER, METHOD_ENTITY_TYPE, project_calls, project_generic_facts,
+    BUILTIN_DOMAIN, BUILTIN_LAYER, CLASS_ENTITY_TYPE, METHOD_ENTITY_TYPE, TYPE_REF_ENTITY_TYPE,
+    project_calls, project_constructor_parameter_types, project_generic_facts,
     project_method_declarations,
 };
 use crate::layers::meta::semantic::SemanticRelation;
@@ -162,6 +163,64 @@ fn generic_projection_orders_declarations_before_calls() {
             .all(|edge| edge.relation == SemanticRelation::Calls),
         "declaration occurrences must precede call facts"
     );
+}
+
+#[test]
+fn constructor_parameter_projection_uses_canonical_ownership_and_type_refs() {
+    let instructions = vec![
+        CoreOp::DefClass("C1".into(), "BarController".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "BarController".into()),
+        CoreOp::Param(
+            "M1".into(),
+            "P1".into(),
+            "IFooService".into(),
+            "fooService".into(),
+        ),
+        CoreOp::DefMethod("C1".into(), "M2".into(), "Handle".into()),
+        CoreOp::Param("M2".into(), "P2".into(), "IFooService".into(), "foo".into()),
+    ];
+    let edges = project_constructor_parameter_types(&instructions, "C:/repo/BarController.cs");
+    assert_eq!(
+        edges.len(),
+        1,
+        "ordinary method parameters must not project"
+    );
+    let edge = &edges[0];
+    assert_eq!(edge.relation, SemanticRelation::HasConstructorParameterType);
+    assert_eq!(edge.subject.domain, BUILTIN_DOMAIN);
+    assert_eq!(edge.subject.entity_type, CLASS_ENTITY_TYPE);
+    assert_eq!(edge.subject.name, "BarController");
+    assert_eq!(edge.object.domain, BUILTIN_DOMAIN);
+    assert_eq!(edge.object.entity_type, TYPE_REF_ENTITY_TYPE);
+    assert_eq!(edge.object.name, "IFooService");
+    assert_eq!(edge.layer, BUILTIN_LAYER);
+    assert_eq!(
+        edge.subject.file.as_deref(),
+        Some("C:/repo/BarController.cs")
+    );
+    assert_eq!(edge.object.file, edge.subject.file);
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn compiled_csharp_constructor_projects_the_written_parameter_type() {
+    let source = r#"
+public interface IFooService {}
+
+public sealed class BarController
+{
+    public BarController(IFooService fooService) {}
+    public void Handle(IFooService foo) {}
+}
+"#;
+    let instructions = compile_csharp(source);
+    let edges = project_constructor_parameter_types(&instructions, "C:/repo/BarController.cs");
+    assert_eq!(edges.len(), 1, "only the constructor parameter projects");
+    let edge = &edges[0];
+    assert_eq!(edge.subject.name, "BarController");
+    assert_eq!(edge.object.name, "IFooService");
+    assert_eq!(edge.object.entity_type, TYPE_REF_ENTITY_TYPE);
+    assert_eq!(edge.relation, SemanticRelation::HasConstructorParameterType);
 }
 
 // ── Blast radius: a corrupted declaration identity is not rendering-only ──

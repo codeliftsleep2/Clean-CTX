@@ -154,6 +154,12 @@ pub enum SemanticRelation {
     Defines,
     /// One symbol calls another.
     Calls,
+    /// A class declares a constructor parameter with the written type.
+    ///
+    /// This is a source-signature fact, not proof of runtime dependency
+    /// injection or container registration. Its object is an unresolved
+    /// `builtin / TypeRef` identity.
+    HasConstructorParameterType,
 }
 
 /// Call-specific evidence carried by a `Calls` semantic edge.
