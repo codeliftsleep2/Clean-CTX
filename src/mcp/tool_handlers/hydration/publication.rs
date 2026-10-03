@@ -65,6 +65,7 @@ pub(super) fn compile_candidate_for(
         Err(_) => return Ok(CandidatePublication::Failed),
     };
     let canonical = state.semantic_owner_path(&validated);
+    let publication = state.begin_semantic_publication(&canonical);
     let (fidelity, coverage) = match requirement {
         HydrationRequirement::LegacyEdit => (Fidelity::Edit, None),
         HydrationRequirement::Semantic(coverage) => {
@@ -97,19 +98,34 @@ pub(super) fn compile_candidate_for(
         &validated, fidelity, state, None,
     ) {
         Ok((_, semantic_edges, compiled_hash)) => {
-            let mut index = state.workspace_index_lock();
-            if let Some(coverage) = coverage {
-                index.replace_semantic_projection(
-                    &canonical,
-                    semantic_edges,
-                    coverage,
-                    compiled_hash,
-                );
-            } else if !semantic_edges.is_empty() {
-                index.remove_file(&canonical);
-                index.add_edges(&canonical, semantic_edges);
-            }
-            Ok(CandidatePublication::Published)
+            let expected_hash = compiled_hash.clone();
+            publication
+                .commit(
+                    || {
+                        state
+                            .read_source(&validated)
+                            .map(|current| {
+                                state.cache_read().compute_hash(current.as_bytes()) == expected_hash
+                            })
+                            .map_err(|error| error.to_string())
+                    },
+                    || {
+                        let mut index = state.workspace_index_lock();
+                        if let Some(coverage) = coverage {
+                            index.replace_semantic_projection(
+                                &canonical,
+                                semantic_edges,
+                                coverage,
+                                compiled_hash,
+                            );
+                        } else if !semantic_edges.is_empty() {
+                            index.remove_file(&canonical);
+                            index.add_edges(&canonical, semantic_edges);
+                        }
+                        Ok::<_, String>(CandidatePublication::Published)
+                    },
+                )
+                .map(|published| published.unwrap_or(CandidatePublication::Failed))
         }
         Err(_) => Ok(CandidatePublication::Failed),
     }

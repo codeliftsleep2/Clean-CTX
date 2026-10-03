@@ -81,6 +81,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "File excluded by config: {file_path_str}"
         )));
     }
+    let publication = state.begin_semantic_publication(&semantic_owner);
     state
         .preflight_semantic_publication(&resolved_path)
         .map_err(ProvideFailure::internal)?;
@@ -265,42 +266,62 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         economic.selected,
         crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
     );
-    super::super::provide_persistence::persist_read_baseline(
-        state,
-        &durable_owner,
-        effective_fidelity,
-        &ir,
-        &semantic_edges,
-        &source_hash,
-        raw_tokens,
-        candidate_tokens,
-    )
-    .map_err(ProvideFailure::internal)?;
-
+    #[cfg(test)]
+    super::publication_race_test_support::pause_after_compile(&resolved_path);
     let canonical_path = semantic_owner;
-    state
-        .ir_context_lock()
-        .load_ir(ir.clone(), Some(source_hash.clone()));
-    state.remember_context_fidelity(&ir.file_id, effective_fidelity);
-    {
-        let mut index = state.workspace_index_lock();
-        match crate::workspace::index::SemanticFidelity::from_compilation(effective_fidelity) {
-            Some(semantic_fidelity) => index.replace_semantic_projection(
-                &canonical_path,
-                semantic_edges.clone(),
-                semantic_fidelity,
-                source_hash,
-            ),
-            None => {
-                index.remove_file(&canonical_path);
-                index.add_edges(&canonical_path, semantic_edges.clone());
-            }
-        }
+    let expected_source_hash = source_hash.clone();
+    let published = publication
+        .commit(
+            || {
+                Ok::<_, &'static str>(state.read_source(&resolved_path).is_ok_and(|current| {
+                    state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
+                }))
+            },
+            || {
+                super::super::provide_persistence::persist_read_baseline(
+                    state,
+                    &durable_owner,
+                    effective_fidelity,
+                    &ir,
+                    &semantic_edges,
+                    &source_hash,
+                    raw_tokens,
+                    candidate_tokens,
+                )?;
+                state
+                    .ir_context_lock()
+                    .load_ir(ir.clone(), Some(source_hash.clone()));
+                state.remember_context_fidelity(&ir.file_id, effective_fidelity);
+                {
+                    let mut index = state.workspace_index_lock();
+                    match crate::workspace::index::SemanticFidelity::from_compilation(
+                        effective_fidelity,
+                    ) {
+                        Some(semantic_fidelity) => index.replace_semantic_projection(
+                            &canonical_path,
+                            semantic_edges.clone(),
+                            semantic_fidelity,
+                            source_hash,
+                        ),
+                        None => {
+                            index.remove_file(&canonical_path);
+                            index.add_edges(&canonical_path, semantic_edges.clone());
+                        }
+                    }
+                }
+                state.remember_semantic_edges(&ir.file_id, semantic_edges);
+                state
+                    .llm_text_cache_lock()
+                    .insert(ir.file_id.clone(), economic.text.clone());
+                Ok(())
+            },
+        )
+        .map_err(ProvideFailure::internal)?;
+    if published.is_none() {
+        return Err(ProvideFailure::internal(
+            "Context publication was superseded by a newer same-file source snapshot; retry the request",
+        ));
     }
-    state.remember_semantic_edges(&ir.file_id, semantic_edges);
-    state
-        .llm_text_cache_lock()
-        .insert(ir.file_id.clone(), economic.text.clone());
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(
         &canonical_path,

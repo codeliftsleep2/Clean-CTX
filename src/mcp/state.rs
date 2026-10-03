@@ -72,6 +72,7 @@ macro_rules! lock_or_recover {
 }
 
 pub(crate) mod physical_identity;
+mod publication;
 mod source_cache;
 
 #[path = "durable_semantics.rs"]
@@ -172,6 +173,10 @@ pub struct McpState {
             durable_semantics::PendingSemanticTransition,
         >,
     >,
+    /// Orders competing publication candidates for each canonical semantic
+    /// owner while allowing their source reads and compilation to run in
+    /// parallel.
+    semantic_publication_clocks: publication::SemanticPublicationClocks,
 
     /// Tracks which cache breakpoints have already been emitted this session.
     /// Key format: "{region}::{breaker}" — e.g., "tools::tools-v1".
@@ -296,6 +301,7 @@ impl McpState {
             context_fidelities: Mutex::new(HashMap::new()),
             semantic_edge_snapshots: Mutex::new(HashMap::new()),
             pending_semantic_transitions: Mutex::new(HashMap::new()),
+            semantic_publication_clocks: Default::default(),
             llm_text_cache: Mutex::new(HashMap::new()),
             emitted_breakpoints: Mutex::new(HashSet::new()),
             cache_metrics: Mutex::new(CacheMetrics::default()),

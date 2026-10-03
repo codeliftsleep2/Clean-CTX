@@ -654,6 +654,17 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ## Architectural Debt
 
+### PUB-001 Same-Owner Semantic Publication Is Source-Ordered
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Parallel compilation may finish out of order, but completion order must never let an older source snapshot replace semantic authority already committed from a newer snapshot of the same physical owner. |
+| **Invariant** | Every authoritative `provide_code_context` and hydration publication receives a generation from its canonical semantic owner and validates its compiled source hash again at the commit boundary. Commit is serialized only for that owner. A candidate whose source is no longer current, or whose generation is older than an already committed generation, publishes no canonical IR, fidelity, semantic-edge snapshot, WorkspaceIndex projection, rendered cache, or durable checkpoint. Different semantic owners remain independently compilable and publishable. |
+| **Enforcement** | `src/mcp/state/publication.rs`; `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/mcp/tool_handlers/hydration/publication.rs`; deterministic controlled-interleaving regression `src/tests/mcp/provide_publication_race.rs`. |
+| **Authority** | `McpState::begin_semantic_publication`; `SemanticPublicationTicket::commit` |
+| **Type** | ENFORCED (file-scoped generation/source precondition + test) |
+| **Gate** | `cargo test --all-features` |
+
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
 | Property | Value |
