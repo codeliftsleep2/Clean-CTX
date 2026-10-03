@@ -92,8 +92,18 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     state.remember_semantic_edges(&alias, restored.semantic_edges.clone());
     {
         let mut index = state.workspace_index_lock();
-        index.remove_file(&canonical_path);
-        index.add_edges(&canonical_path, restored.semantic_edges);
+        match crate::workspace::index::SemanticFidelity::from_compilation(restored.fidelity) {
+            Some(semantic_fidelity) => index.replace_semantic_projection(
+                &canonical_path,
+                restored.semantic_edges,
+                semantic_fidelity,
+                restored.source_hash,
+            ),
+            None => {
+                index.remove_file(&canonical_path);
+                index.add_edges(&canonical_path, restored.semantic_edges);
+            }
+        }
     }
     state
         .llm_text_cache_lock()

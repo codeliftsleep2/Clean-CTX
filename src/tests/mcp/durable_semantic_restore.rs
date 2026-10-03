@@ -328,3 +328,39 @@ fn malformed_or_mismatched_edge_snapshot_fails_without_session_mutation() {
     assert_eq!(state.ir_context_read().get_ir(&alias).cloned(), prior_ir);
     assert_eq!(edge_json(&state, &alias), prior_edges);
 }
+
+#[test]
+fn restore_reconstructs_current_semantic_projection_coverage() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("coverage.ts");
+    let file = path.to_string_lossy().into_owned();
+    let source = "export class RestoredCoverage {}\n";
+    std::fs::write(&path, source).expect("source");
+    let producer = state(&root);
+
+    let saved = dispatch(&producer, 40, "compress_code_context", args(&file, &root));
+    assert!(saved.get("error").is_none(), "{saved}");
+
+    let restarted = state(&root);
+    let restored = dispatch(
+        &restarted,
+        41,
+        "restore_context",
+        json!({ "filePath": file, "workspaceRoot": root.path() }),
+    );
+    assert!(restored.get("error").is_none(), "{restored}");
+
+    let canonical = restarted.semantic_owner_path(&path.to_string_lossy());
+    let source_hash = restarted.cache_read().compute_hash(source.as_bytes());
+    assert!(
+        restarted
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::Low,
+                &source_hash,
+            ),
+        "restored Low-fidelity facts must restore their truthful source-hash coverage"
+    );
+}
