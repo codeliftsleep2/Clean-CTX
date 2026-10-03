@@ -120,6 +120,18 @@ fn answer_envelope(
     if let Some(source_complete) = source_complete {
         completeness["source_complete"] = source_complete.into();
     }
+    if let Some(result_semantics) = coverage
+        .and_then(|value| value.get("result_semantics"))
+        .and_then(Value::as_str)
+    {
+        completeness["result_semantics"] = result_semantics.into();
+    }
+    if let Some(omitted_possible) = coverage
+        .and_then(|value| value.get("omitted_possible"))
+        .and_then(Value::as_bool)
+    {
+        completeness["omitted_possible"] = omitted_possible.into();
+    }
     json!({
         "schema": "clean-ctx/workspace-query-answer",
         "schema_version": WORKSPACE_QUERY_CONTENT_VERSION,

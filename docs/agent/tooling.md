@@ -144,6 +144,16 @@ the C# form with `reverse_edges` on that exact `TypeRef` identity. It does not
 claim container registration, runtime .NET DI, or a resolved interface/class
 declaration. Consequently, a successful empty reverse-edge lookup for an
 identity whose relation is not projected is not verified absence of consumers.
+For `builtin / Interface / <name>`, reverse coverage returns an
+`alternative_query` naming the same-name `builtin / TypeRef` lookup used by C#
+constructor consumption. Exact edge results remain index-backed lower bounds:
+when `source_complete` is false, `result_semantics: "lower_bound"` and
+`omitted_possible: true` mean `count` may omit uncompiled source files;
+`discovered_not_compiled_this_cycle`, when present, is the per-cycle
+discovered-minus-compiled gap and can include already-indexed or deduplicated
+candidates; it is not an exact omitted-file count.
+This relation does not cover service-locator calls such as
+`GetRequiredService<T>()` because no constructor parameter declares that fact.
 
 Use the single form for one question or when a client does not consume batch
 results. Use `queries` when two or more independent questions share the same

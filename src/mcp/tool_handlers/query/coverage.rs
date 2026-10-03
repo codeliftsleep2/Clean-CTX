@@ -35,19 +35,42 @@ pub(super) fn exact_identity_coverage(
     };
     let status = if !identity_indexed {
         "identity_not_indexed"
+    } else if !capability_established {
+        "capability_not_established"
     } else if hydration.hydration_attempted && hydration.discovery_status != "completed" {
         "indexed_evidence_only"
-    } else if capability_established {
-        "established_indexed_capability"
     } else {
-        "capability_not_established"
+        "established_indexed_capability"
     };
-    json!({
+    let mut coverage = json!({
         "status": status,
         "identity_indexed": identity_indexed,
         "capability_established": capability_established,
         "source_complete": false,
-    })
+        "result_semantics": "lower_bound",
+        "omitted_possible": true,
+    });
+    let discovered_not_compiled_this_cycle = hydration
+        .candidates_discovered
+        .saturating_sub(hydration.candidates_compiled);
+    if discovered_not_compiled_this_cycle > 0 {
+        coverage["discovered_not_compiled_this_cycle"] =
+            discovered_not_compiled_this_cycle.into();
+    }
+    if matches!(direction, CapabilityDirection::Reverse)
+        && identity.domain == "builtin"
+        && identity.entity_type == "Interface"
+    {
+        coverage["alternative_query"] = json!({
+            "type": "reverse_edges",
+            "domain": "builtin",
+            "entity_type": "TypeRef",
+            "name": identity.name,
+            "relation": "HasConstructorParameterType",
+            "meaning": "C# classes declaring a constructor parameter with this written type"
+        });
+    }
+    coverage
 }
 
 #[cfg(test)]

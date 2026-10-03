@@ -401,7 +401,20 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                             },
                             "identity_indexed": { "type": "boolean" },
                             "capability_established": { "type": "boolean" },
-                            "source_complete": { "type": "boolean" }
+                            "source_complete": { "type": "boolean" },
+                            "result_semantics": {
+                                "type": "string",
+                                "enum": ["lower_bound"]
+                            },
+                            "omitted_possible": { "type": "boolean" },
+                            "discovered_not_compiled_this_cycle": {
+                                "type": "integer",
+                                "minimum": 0
+                            },
+                            "alternative_query": {
+                                "type": "object",
+                                "description": "Supported direct query to use when this exact identity does not own the requested semantic capability."
+                            }
                         }
                     },
                     "identity_model": { "type": "string", "description": "Semantic identity model used by has_cycle." },

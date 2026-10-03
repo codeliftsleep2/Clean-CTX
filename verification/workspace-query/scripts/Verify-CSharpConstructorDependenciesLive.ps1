@@ -89,7 +89,9 @@ function Assert-Coverage {
     if ($Result.coverage.status -ne $Status -or
         [bool]$Result.coverage.identity_indexed -ne $IdentityIndexed -or
         [bool]$Result.coverage.capability_established -ne $CapabilityEstablished -or
-        [bool]$Result.coverage.source_complete) {
+        [bool]$Result.coverage.source_complete -or
+        $Result.coverage.result_semantics -ne 'lower_bound' -or
+        [bool]$Result.coverage.omitted_possible -ne $true) {
         throw "$Scenario returned misleading coverage: $($Result.coverage | ConvertTo-Json -Compress -Depth 20)"
     }
 }
@@ -233,7 +235,15 @@ public sealed class MethodOnly
         throw "The unsupported Interface consumer shape returned edges: $($unsupportedInterface | ConvertTo-Json -Compress -Depth 20)"
     }
     Assert-Coverage $unsupportedInterface 'capability_not_established' $true $false 'Interface consumer shape'
-    Write-Host 'PASS: a real Interface identity reports capability_not_established for consumer lookup.'
+    $alternative = $unsupportedInterface.coverage.alternative_query
+    if ($alternative.type -ne 'reverse_edges' -or
+        $alternative.domain -ne 'builtin' -or
+        $alternative.entity_type -ne 'TypeRef' -or
+        $alternative.name -ne 'IFooService' -or
+        $alternative.relation -ne 'HasConstructorParameterType') {
+        throw "Interface coverage omitted the supported TypeRef alternative: $($unsupportedInterface.coverage | ConvertTo-Json -Compress -Depth 20)"
+    }
+    Write-Host 'PASS: a real Interface identity points to the supported TypeRef constructor-consumer query.'
 
     $reverse = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $reverseEdges = @($reverse.edges)
@@ -261,6 +271,7 @@ public sealed class MethodOnly
     }
     Assert-Coverage $reverse 'established_indexed_capability' $true $true 'TypeRef consumer shape'
     Write-Host 'PASS: reverse_edges(TypeRef/IFooService) includes the attributed C# constructor consumer.'
+    Write-Host 'PASS: constructor-consumer count is explicitly marked as an index-backed lower bound.'
 
     $barForward = Query-Edges 'forward_edges' 'Class' 'BarController'
     Assert-ForwardConstructorEdge $barForward 'BarController' $barPath

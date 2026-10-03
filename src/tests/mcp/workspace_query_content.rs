@@ -81,7 +81,16 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
             "status": "capability_not_established",
             "identity_indexed": true,
             "capability_established": false,
-            "source_complete": false
+            "source_complete": false,
+            "result_semantics": "lower_bound",
+            "omitted_possible": true,
+            "alternative_query": {
+                "type": "reverse_edges",
+                "domain": "builtin",
+                "entity_type": "TypeRef",
+                "name": "IFooService",
+                "relation": "HasConstructorParameterType"
+            }
         }
     });
     let value = payload(&render(
@@ -95,6 +104,13 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
         "capability_not_established"
     );
     assert_eq!(value["completeness"]["source_complete"], false);
+    assert_eq!(value["completeness"]["result_semantics"], "lower_bound");
+    assert_eq!(value["completeness"]["omitted_possible"], true);
+    assert_eq!(value["result"]["coverage"]["result_semantics"], "lower_bound");
+    assert_eq!(
+        value["result"]["coverage"]["alternative_query"]["entity_type"],
+        "TypeRef"
+    );
     assert_eq!(
         value["result"]["coverage"], structured["coverage"],
         "structured coverage must survive in the model-facing result"

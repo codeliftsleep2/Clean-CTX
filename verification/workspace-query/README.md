@@ -72,4 +72,7 @@ interface-implementation negative controls, a balanced `[FromServices]`
 parameter attribute, repeated-query stability, and stale edge removal after
 source replacement. The relation is the source-signature fact
 `HasConstructorParameterType` targeting `builtin/TypeRef`; the harness does not
-claim runtime .NET DI registration or implementation resolution.
+claim runtime .NET DI registration or implementation resolution. It also
+verifies that the TypeRef result is explicitly marked as a lower bound and that
+an unsupported same-name `builtin/Interface` reverse lookup points callers to
+the supported `builtin/TypeRef` query.

@@ -46,6 +46,39 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-033: C# Constructor-Injected Interface Consumers Were Not Reliably Discoverable ([#97](https://github.com/codeliftsleep2/Clean-CTX/issues/97))
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-02 |
+| **Environment** | Claude + clean-ctx-tools 1.3.0 live MCP verification |
+| **Repository/context** | Real C# workspace with an interface, one implementation, and constructor-injected consumers distributed across multiple directories |
+| **Symptom** | `workspace_query(reverse_edges)` on the Interface identity returned no consumers, while the first `TypeRef`-based repair returned only 11 of 12 real constructor injectors. The missing consumer appeared when the query was narrowed to its directory. The unscoped response exposed `discovered > compiled` and `source_complete=false`, but its count still looked authoritative and the Interface response did not direct the operator to the separate same-named `TypeRef` identity. |
+| **Root cause** | C# constructor parameter types had no dedicated semantic relationship, so the Interface declaration identity could not lead to consumers whose evidence is authored by constructor-bearing classes. The initial `HasConstructorParameterType` projection made those consumers queryable through `builtin/TypeRef`, but hydration could still leave discovered source uncompiled while the response lacked an explicit lower-bound contract. Interface and written type-reference identities are intentionally distinct, so discoverability also required an explicit alternative query rather than identity conflation. |
+| **Classification** | Semantic / query truthfulness and discoverability |
+| **Reproducible locally?** | Yes — deterministic compiler, semantic-projection, query, coverage, and content-envelope regressions |
+| **Local regression** | `src/tests/compaction/signature.rs`; `src/tests/ir/compiler.rs`; `src/tests/ir/semantic_projection.rs`; `src/tests/ir/signature_producer_regressions.rs`; `src/tests/mcp/workspace_query_csharp_constructor_types.rs`; `src/tests/mcp/workspace_query_coverage.rs`; `src/tests/mcp/workspace_query_exact_identity_coverage.rs`; `src/tests/mcp/workspace_query_content.rs` |
+| **Live scenario required?** | Yes — `verification/workspace-query/scripts/Verify-CSharpConstructorDependenciesLive.ps1` exercises the production MCP binary, TypeRef forward/reverse edges, Interface alternative-query guidance, lower-bound coverage, and batched parity. |
+| **Architectural invariant** | WSC-001 (authoritative indexed facts do not imply complete source coverage); WSC-002 (Clean-CTX compilation alone authors WorkspaceIndex semantics); WSC-003 (hydration completion is reusable only after current/successful candidate publication) |
+| **Status** | Fixed — tracked implementation and regressions added; live re-verification pending after the coverage-precedence correction |
+
+**Resolution:** C# constructor parameters now publish
+`HasConstructorParameterType` edges from `builtin/Class` to the written
+`builtin/TypeRef`. Exact-identity coverage explicitly reports index-backed
+results as lower bounds when source coverage is incomplete, including omitted
+possibility and the discovered-versus-compiled difference. Reverse lookup on a
+same-named `builtin/Interface` retains its distinct identity and reports
+`capability_not_established` with the precise `TypeRef` reverse query as the
+supported alternative. Capability absence takes precedence over a partial
+hydration overlay, so the alternative cannot be hidden behind the generic
+`indexed_evidence_only` status.
+
+**Known limit:** service-locator retrieval such as `GetRequiredService<T>()`
+is not constructor-parameter evidence and is outside
+`HasConstructorParameterType` coverage.
+
+---
+
 ## DIS-2026-032: Array-Valued Workspace Query Names Produced Misleading Results
 
 | Field | Value |

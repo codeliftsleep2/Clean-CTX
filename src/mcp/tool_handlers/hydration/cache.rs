@@ -2,9 +2,9 @@
 //
 // Discovery is the expensive half of hydration: a CBM project search (plus its
 // lazy-reindex gate) or a full filesystem walk-and-read of the root.
-// Compilation was already deduplicated by `WorkspaceIndex::file_map()`, so
-// before this cache every repeated identical query rediscovered the same
-// candidates only to discard them as already compiled.
+// Compilation is deduplicated by the current semantic projections in
+// `WorkspaceIndex`, so before this cache every repeated identical query
+// rediscovered the same candidates only to discard them as already current.
 //
 // These helpers are the only place hydration touches the session-scoped
 // discovery cache (`crate::mcp::discovery_cache`). They record *completion* of
@@ -77,26 +77,13 @@ pub(super) fn pending_discovery_roots(
     (pending, cached)
 }
 
-/// Record successful filesystem discovery for every root in a completed scan.
-/// A partial scan deliberately records nothing, so its roots stay retryable.
-pub(super) fn mark_discovery_complete_for_roots(
-    state: &McpState,
-    discovery: DiscoveryMode,
-    query_name: &str,
+/// Produce the cache scopes for a completed filesystem scan. Hydration commits
+/// them only after every selected candidate is current or publishes.
+pub(super) fn discovery_scopes_for_roots(
     roots: &[PathBuf],
-    requirement: HydrationRequirement,
-) {
-    let scopes: Vec<DiscoveryScope> = roots
+) -> Vec<DiscoveryScope> {
+    roots
         .iter()
         .map(|root| DiscoveryScope::filesystem(root_key(root)))
-        .collect();
-    let mut cache = state.hydration_discovery_lock();
-    for scope in &scopes {
-        cache.mark_complete_for(
-            scope,
-            discovery,
-            query_name,
-            requirement.semantic_fidelity(),
-        );
-    }
+        .collect()
 }

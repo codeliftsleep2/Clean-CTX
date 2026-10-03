@@ -179,8 +179,19 @@ For C#, "who consumes `IFooService` through a constructor?" uses
 written type name; the returned relation is `HasConstructorParameterType`.
 This records a source signature only. It does not identify a .NET container
 registration, prove runtime injection, or answer which implementation .NET DI
-will supply. An empty `reverse_edges` result for another identity/relation
-therefore is not evidence that C# constructor consumers are absent.
+will supply. It also does not cover service-locator calls such as
+`GetRequiredService<T>()`, because those are not constructor parameters.
+
+Query the written type identity, not the declaration identity:
+`reverse_edges(builtin/TypeRef/IFooService)`. A reverse query on
+`builtin/Interface/IFooService` does not own this capability and returns an
+`alternative_query` pointing to the `TypeRef` form. Exact edge-query coverage
+with `source_complete: false` also reports `result_semantics: "lower_bound"`
+and `omitted_possible: true`; its `count` is a minimum, not a complete consumer
+count. When discovery found more candidates than it compiled in that cycle,
+`discovered_not_compiled_this_cycle` reports the observed gap; it can include
+already-indexed or deduplicated candidates and is not itself an omitted-file
+count.
 
 ### `entities_in_file`
 

@@ -4,6 +4,13 @@ use crate::mcp::McpState;
 use crate::workspace::index::SemanticFidelity;
 use std::collections::HashSet;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum CandidatePublication {
+    Published,
+    Current,
+    Failed,
+}
+
 pub(super) fn select_candidates(
     state: &McpState,
     candidates: Vec<String>,
@@ -40,7 +47,7 @@ pub(crate) fn compile_candidate(
         workspace_root,
         HydrationRequirement::LegacyEdit,
     )
-    .unwrap_or(false)
+    .is_ok_and(|outcome| outcome == CandidatePublication::Published)
 }
 
 pub(super) fn compile_candidate_for(
@@ -48,14 +55,14 @@ pub(super) fn compile_candidate_for(
     resolved_path: &str,
     workspace_root: Option<&str>,
     requirement: HydrationRequirement,
-) -> Result<bool, String> {
+) -> Result<CandidatePublication, String> {
     let validated = match super::super::super::tool_helpers::resolve_file_path_checked(
         resolved_path,
         workspace_root,
         &state.config.additional_roots,
     ) {
         Ok(path) => path,
-        Err(_) => return Ok(false),
+        Err(_) => return Ok(CandidatePublication::Failed),
     };
     let canonical = state.semantic_owner_path(&validated);
     let (fidelity, coverage) = match requirement {
@@ -69,7 +76,7 @@ pub(super) fn compile_candidate_for(
                 .workspace_index_read()
                 .has_current_semantic_projection(&canonical, coverage, &source_hash)
             {
-                return Ok(false);
+                return Ok(CandidatePublication::Current);
             }
             let fidelity = match coverage {
                 SemanticFidelity::Low => Fidelity::Low,
@@ -79,6 +86,11 @@ pub(super) fn compile_candidate_for(
             (fidelity, Some(coverage))
         }
     };
+
+    #[cfg(all(test, feature = "rust"))]
+    if super::take_test_publication_failure(&canonical) {
+        return Ok(CandidatePublication::Failed);
+    }
 
     state.preflight_semantic_publication(&validated)?;
     match super::super::super::tool_helpers::compile_file_ir_focused(
@@ -97,8 +109,8 @@ pub(super) fn compile_candidate_for(
                 index.remove_file(&canonical);
                 index.add_edges(&canonical, semantic_edges);
             }
-            Ok(true)
+            Ok(CandidatePublication::Published)
         }
-        Err(_) => Ok(false),
+        Err(_) => Ok(CandidatePublication::Failed),
     }
 }

@@ -92,6 +92,11 @@ fn assert_coverage(
         "{result}"
     );
     assert_eq!(result["coverage"]["source_complete"], false, "{result}");
+    assert_eq!(
+        result["coverage"]["result_semantics"], "lower_bound",
+        "{result}"
+    );
+    assert_eq!(result["coverage"]["omitted_possible"], true, "{result}");
 }
 
 #[test]
@@ -108,6 +113,17 @@ fn workspace_query_exact_identity_coverage_single_results() {
     let unsupported = structured(&unsupported_response);
     assert_eq!(unsupported["count"], 0);
     assert_coverage(unsupported, "capability_not_established", true, false);
+    assert_eq!(
+        unsupported["coverage"]["alternative_query"],
+        json!({
+            "type": "reverse_edges",
+            "domain": "builtin",
+            "entity_type": "TypeRef",
+            "name": "IFooService",
+            "relation": "HasConstructorParameterType",
+            "meaning": "C# classes declaring a constructor parameter with this written type"
+        })
+    );
 
     let positive_response = dispatch(&state, exact("IFooService", "TypeRef"));
     let positive = structured(&positive_response);
@@ -192,7 +208,20 @@ fn workspace_query_exact_identity_coverage_schema() {
         "identity_indexed",
         "capability_established",
         "source_complete",
+        "omitted_possible",
     ] {
         assert_eq!(coverage["properties"][field]["type"], "boolean");
     }
+    assert_eq!(
+        coverage["properties"]["result_semantics"]["enum"],
+        json!(["lower_bound"])
+    );
+    assert_eq!(
+        coverage["properties"]["discovered_not_compiled_this_cycle"]["type"],
+        "integer"
+    );
+    assert_eq!(
+        coverage["properties"]["alternative_query"]["type"],
+        "object"
+    );
 }

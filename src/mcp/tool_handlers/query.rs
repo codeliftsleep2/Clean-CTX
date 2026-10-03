@@ -279,6 +279,10 @@ mod tests_hydration_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_9.rs"]
 mod tests_filesystem_discovery_cache;
 
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_publication_retry.rs"]
+mod tests_publication_retry;
+
 #[cfg(all(test, feature = "rust", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_entities_auto_compile.rs"]
 mod tests_entities_auto_compile;

@@ -52,6 +52,28 @@ pub(crate) static TEST_SEARCHED_PROJECTS: Mutex<Vec<String>> = Mutex::new(Vec::n
 
 static TEST_DISCOVERY_CALLS: Mutex<Vec<(String, TestDiscoveryKind)>> = Mutex::new(Vec::new());
 
+static TEST_PUBLICATION_FAILURE_ONCE: Mutex<Option<String>> = Mutex::new(None);
+
+pub(crate) fn fail_test_publication_once(path: &str) {
+    *TEST_PUBLICATION_FAILURE_ONCE
+        .lock()
+        .expect("TEST_PUBLICATION_FAILURE_ONCE lock poisoned") = Some(
+        crate::dictionary::path::canonical_identity_key(path),
+    );
+}
+
+pub(super) fn take_test_publication_failure(path: &str) -> bool {
+    let mut failure = TEST_PUBLICATION_FAILURE_ONCE
+        .lock()
+        .expect("TEST_PUBLICATION_FAILURE_ONCE lock poisoned");
+    if failure.as_deref() == Some(path) {
+        failure.take();
+        true
+    } else {
+        false
+    }
+}
+
 pub(crate) fn set_test_project_search_results(results: HashMap<String, TestProjectSearchResult>) {
     *TEST_PROJECT_SEARCH_RESULTS
         .lock()
@@ -103,6 +125,10 @@ pub(crate) fn clear_test_project_search_results() {
         .lock()
         .expect("TEST_DISCOVERY_CALLS lock poisoned")
         .clear();
+    TEST_PUBLICATION_FAILURE_ONCE
+        .lock()
+        .expect("TEST_PUBLICATION_FAILURE_ONCE lock poisoned")
+        .take();
 }
 
 pub(crate) fn searched_projects() -> Vec<String> {

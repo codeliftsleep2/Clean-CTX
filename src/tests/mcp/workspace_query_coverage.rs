@@ -32,6 +32,8 @@ fn workspace_query_exact_identity_coverage_partial_hydration() {
     let hydration = HydrationReport {
         hydration_attempted: true,
         discovery_status: "partial",
+        candidates_discovered: 12,
+        candidates_compiled: 4,
         ..HydrationReport::default()
     };
     let coverage = exact_identity_coverage(
@@ -45,4 +47,53 @@ fn workspace_query_exact_identity_coverage_partial_hydration() {
     assert_eq!(coverage["identity_indexed"], true);
     assert_eq!(coverage["capability_established"], true);
     assert_eq!(coverage["source_complete"], false);
+    assert_eq!(coverage["result_semantics"], "lower_bound");
+    assert_eq!(coverage["omitted_possible"], true);
+    assert_eq!(coverage["discovered_not_compiled_this_cycle"], 8);
+}
+
+#[test]
+fn interface_reverse_coverage_points_to_csharp_constructor_type_query() {
+    let mut index = WorkspaceIndex::new();
+    let identity = ResolvedIdentity {
+        domain: "builtin".into(),
+        entity_type: "Interface".into(),
+        name: "IFooService".into(),
+    };
+    let interface = EntityRef::new("builtin", "Interface", "IFooService")
+        .with_file("IFooService.cs".to_string());
+    index.add_edges(
+        "IFooService.cs",
+        vec![SemanticEdge {
+            relation: SemanticRelation::Defines,
+            subject: interface.clone(),
+            object: interface,
+            layer: "builtin",
+            call_evidence: None,
+        }],
+    );
+
+    let hydration = HydrationReport {
+        hydration_attempted: true,
+        discovery_status: "partial",
+        candidates_discovered: 14,
+        ..HydrationReport::default()
+    };
+    let coverage = exact_identity_coverage(
+        &index,
+        &identity,
+        None,
+        CapabilityDirection::Reverse,
+        &hydration,
+    );
+    assert_eq!(coverage["status"], "capability_not_established");
+    assert_eq!(coverage["discovered_not_compiled_this_cycle"], 14);
+    assert_eq!(coverage["alternative_query"]["type"], "reverse_edges");
+    assert_eq!(coverage["alternative_query"]["domain"], "builtin");
+    assert_eq!(coverage["alternative_query"]["entity_type"], "TypeRef");
+    assert_eq!(coverage["alternative_query"]["name"], "IFooService");
+    assert_eq!(
+        coverage["alternative_query"]["relation"],
+        "HasConstructorParameterType"
+    );
 }

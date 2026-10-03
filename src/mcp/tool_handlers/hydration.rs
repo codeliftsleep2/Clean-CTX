@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 
 mod cache;
 use cache::{
-    discovery_is_complete, mark_discovery_complete, mark_discovery_complete_for_roots,
+    discovery_is_complete, discovery_scopes_for_roots, mark_discovery_complete,
     pending_discovery_roots,
 };
 
@@ -31,7 +31,7 @@ pub(crate) use invalidation::{
 mod publication;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use publication::compile_candidate;
-use publication::{compile_candidate_for, select_candidates};
+use publication::{CandidatePublication, compile_candidate_for, select_candidates};
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use filesystem::{
@@ -67,15 +67,6 @@ pub(super) enum HydrationRequirement {
     Semantic(crate::workspace::index::SemanticFidelity),
 }
 
-impl HydrationRequirement {
-    fn semantic_fidelity(self) -> Option<crate::workspace::index::SemanticFidelity> {
-        match self {
-            Self::LegacyEdit => None,
-            Self::Semantic(fidelity) => Some(fidelity),
-        }
-    }
-}
-
 /// The complete result of one hydration discovery/compile cycle.
 ///
 /// This is the INTERNAL record: it deliberately keeps the full provider,
@@ -88,7 +79,8 @@ pub(super) struct HydrationReport {
     pub(super) hydration_attempted: bool,
     pub(super) discovery_provider: &'static str,
     /// The single completion source of truth: `"completed"` iff discovery
-    /// completed across every configured root. The former separate
+    /// completed across every configured root and candidate publication did
+    /// not fail. The former separate
     /// `discovery_completed` boolean encoded exactly this state (it was `true`
     /// iff this was `"completed"` on every return path, verified against the
     /// tree), and two encodings of one state are not retained — neither in the
@@ -122,6 +114,8 @@ struct DiscoveryOutcome {
     status: &'static str,
     attempted: bool,
     fallback_reason: Option<&'static str>,
+    /// Successful discoveries awaiting semantic-publication commit.
+    completions: Vec<DiscoveryScope>,
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -163,9 +157,17 @@ pub(super) fn hydrate_workspace_index_for(
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths, requirement);
     let mut compiled = 0;
+    let mut publication_failed = false;
     for path in &selected {
-        if compile_candidate_for(state, path, workspace_root, requirement)? {
-            compiled += 1;
+        match compile_candidate_for(state, path, workspace_root, requirement)? {
+            CandidatePublication::Published => compiled += 1,
+            CandidatePublication::Current => {}
+            CandidatePublication::Failed => publication_failed = true,
+        }
+    }
+    if !publication_failed {
+        for scope in &outcome.completions {
+            mark_discovery_complete(state, scope, discovery, query_name, requirement);
         }
     }
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
@@ -175,7 +177,11 @@ pub(super) fn hydrate_workspace_index_for(
     Ok(HydrationReport {
         hydration_attempted: outcome.attempted,
         discovery_provider: outcome.provider,
-        discovery_status: outcome.status,
+        discovery_status: if publication_failed {
+            "partial"
+        } else {
+            outcome.status
+        },
         fallback_reason: outcome.fallback_reason,
         candidates_discovered: discovered,
         candidates_compiled: compiled,
@@ -218,6 +224,7 @@ fn discover_candidate_paths(
                         status: "completed",
                         attempted: true,
                         fallback_reason: None,
+                        completions: Vec::new(),
                     };
                 }
             }
@@ -245,6 +252,7 @@ fn discover_candidate_paths(
     let mut cbm_attempted = false;
     let mut saw_unavailable = false;
     let mut saw_search_failure = false;
+    let mut completions = Vec::new();
 
     for configured_root in &state.config.additional_roots {
         let resolved = bridge.resolve_project_id(configured_root);
@@ -319,7 +327,7 @@ fn discover_candidate_paths(
                     // return an incomplete candidate set and must stay
                     // retryable instead of being cached as "searched".
                     if readiness == "ready" {
-                        mark_discovery_complete(state, &scope, discovery, query_name, requirement);
+                        completions.push(scope);
                     }
                 }
                 Err(_) => {
@@ -375,7 +383,7 @@ fn discover_candidate_paths(
                 // zero candidates. Failed or not-yet-ready discovery is never
                 // recorded, so it stays eligible for retry.
                 if readiness == "ready" {
-                    mark_discovery_complete(state, &scope, discovery, query_name, requirement);
+                    completions.push(scope);
                 }
             }
             Err(_) => {
@@ -425,6 +433,7 @@ fn discover_candidate_paths(
                 status: "completed",
                 attempted: cbm_attempted,
                 fallback_reason: None,
+                completions,
             };
         }
         // Every fallback root is already discovered for this generation, so no
@@ -442,18 +451,13 @@ fn discover_candidate_paths(
             status: "completed",
             attempted: true,
             fallback_reason: Some(fallback_reason),
+            completions,
         };
     }
 
     let scan = scan(state, &pending_roots, query_name);
     if scan.completed {
-        mark_discovery_complete_for_roots(
-            state,
-            discovery,
-            query_name,
-            &pending_roots,
-            requirement,
-        );
+        completions.extend(discovery_scopes_for_roots(&pending_roots));
     }
     candidates.extend(scan.candidates);
     let any_cbm_success = !successful_roots.is_empty();
@@ -473,6 +477,7 @@ fn discover_candidate_paths(
         status: discovery_status(attempted, completed, any_cbm_success),
         attempted,
         fallback_reason: Some(fallback_reason),
+        completions,
     }
 }
 
@@ -497,6 +502,7 @@ fn filesystem_only_discovery(
                 status: "failed",
                 attempted: false,
                 fallback_reason: Some("filesystem_unavailable"),
+                completions: Vec::new(),
             };
         }
         // Nothing left to scan: every configured root's fallback discovery
@@ -509,18 +515,15 @@ fn filesystem_only_discovery(
             status: "completed",
             attempted: true,
             fallback_reason: Some(fallback_reason),
+            completions: Vec::new(),
         };
     }
     let scan = scan(state, &pending_roots, query_name);
-    if scan.completed {
-        mark_discovery_complete_for_roots(
-            state,
-            discovery,
-            query_name,
-            &pending_roots,
-            requirement,
-        );
-    }
+    let completions = if scan.completed {
+        discovery_scopes_for_roots(&pending_roots)
+    } else {
+        Vec::new()
+    };
     let covered = scan.attempted || cached_roots > 0;
     let provider = if covered { "filesystem" } else { "none" };
     DiscoveryOutcome {
@@ -534,6 +537,7 @@ fn filesystem_only_discovery(
         } else {
             "filesystem_unavailable"
         }),
+        completions,
     }
 }
 
