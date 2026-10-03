@@ -24,6 +24,10 @@ use std::collections::BTreeMap;
 use super::opcodes::CoreOp;
 use crate::compression::type_aliases::apply_type_aliases;
 
+/// Durable-compatibility generation for the post-compilation type-alias
+/// transform. Configuration values are versioned separately.
+pub(crate) const TYPE_ALIAS_TRANSFORM_GENERATION: u32 = 1;
+
 /// Apply configured type aliases to a compiled IR instruction stream.
 ///
 /// Scans `FieldType`, `Return`, and `Param` ops for type names that

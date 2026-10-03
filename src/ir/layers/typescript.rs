@@ -25,6 +25,11 @@ use crate::ir::opcodes::{
     ExecutionContextKind, SideEffectKind,
 };
 
+/// Durable canonical semantics produced by the TypeScript IR layer.
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
+/// TypeScript canonical-fact meanings consumed by semantic projection.
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
+
 /// TypeScript language layer (Layer 2).
 /// Processes TypeScript-specific captures and emits additional CoreOp instructions.
 pub struct TypeScriptLayer;

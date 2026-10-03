@@ -21,6 +21,9 @@
 // class. Explicit argument count travels as edge EVIDENCE
 // (`CallEvidence::explicit_arg_count`) and never enters an entity name, so no
 // `Foo/2` or `Foo$arity2` semantic name can be produced.
+
+/// Generation of the language-agnostic canonical-fact projection.
+pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 //
 // A callee that is never declared in the compiled workspace still appears as
 // the OBJECT of a `Calls` edge (it is honestly unresolved); only the caller is

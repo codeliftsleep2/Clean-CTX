@@ -30,6 +30,10 @@ use crate::config::CleanCtxConfig;
 use crate::layers::meta::semantic::SemanticEdge;
 use std::path::Path;
 
+/// Durable generations for Angular marker and semantic production.
+pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+
 /// Structured output of a single meta-layer pass.
 ///
 /// This replaces the previous render-then-reparse anti-pattern where

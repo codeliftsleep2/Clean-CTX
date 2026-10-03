@@ -19,6 +19,10 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
+/// Durable generations for Spring marker and semantic production.
+pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+
 pub(crate) mod annotations;
 pub(crate) mod detect;
 #[cfg(test)]

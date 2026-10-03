@@ -28,6 +28,11 @@ use crate::ir::opcodes::{
 };
 use std::collections::HashMap;
 
+/// Durable canonical semantics produced by the C# IR layer.
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
+/// C# canonical-fact meanings consumed by semantic projection.
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
+
 /// True when `head` (a declaration head, never a full body) carries `word`
 /// as a standalone modifier token. Splits on non-identifier characters so
 /// `static` inside `SomeStaticType`, `"static ..."`, or `// static` never

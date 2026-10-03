@@ -37,6 +37,9 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerEvaluation, MetaLayerOutput};
 use std::path::Path;
 
+/// Durable generation of the always-on builtin declaration projection.
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+
 #[cfg(test)]
 thread_local! {
     static EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
