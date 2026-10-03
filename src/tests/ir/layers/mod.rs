@@ -317,7 +317,7 @@ fn cs_legitimate_static_method_stays_static() {
 // ── C# SignalR Hub / IDisposable Regression Tests ─────
 
 #[test]
-fn cs_signalr_hub_sets_context_flag() {
+fn cs_signalr_hub_class_semantics_apply_to_its_method() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new("public class ChatHub : Hub<IChatClient>", Fidelity::Low);
     ctx.current_class = Some("C1".into());
@@ -336,11 +336,12 @@ fn cs_signalr_hub_sets_context_flag() {
         "class.root must NOT emit ExecutionContext (was causing E010): {:?}",
         ops
     );
-    assert!(ctx.is_signalr_hub, "is_signalr_hub must be set");
-    assert!(
-        !ctx.is_disposable_class,
-        "is_disposable_class must remain false"
-    );
+    ctx.current_method = Some("M1".into());
+    let method_ops = layer.process_capture("method.root", "public void Send()", &mut ctx);
+    assert!(method_ops.iter().any(|op| matches!(
+        op,
+        CoreOp::ExecutionContext(mid, ExecutionContextKind::Realtime) if mid == "M1"
+    )));
 }
 #[test]
 fn cs_signalr_hub_method_emits_realtime_ctx() {
@@ -351,7 +352,7 @@ fn cs_signalr_hub_method_emits_realtime_ctx() {
     );
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
-    ctx.is_signalr_hub = true; // Set by prior class.root
+    let _ = layer.process_capture("class.root", "public class ChatHub : Hub", &mut ctx);
 
     let ops = layer.process_capture(
         "method.root",
@@ -388,7 +389,7 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
     );
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
-    ctx.is_signalr_hub = true;
+    let _ = layer.process_capture("class.root", "public class ChatHub : Hub", &mut ctx);
 
     let ops = layer.process_capture(
         "method.root",
@@ -417,7 +418,7 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
 }
 
 #[test]
-fn cs_disposable_class_sets_context_flag() {
+fn cs_disposable_class_semantics_apply_to_its_method() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new(
         "public class ResourceHolder : SomeBase, IDisposable",
@@ -439,8 +440,13 @@ fn cs_disposable_class_sets_context_flag() {
         "class.root must NOT emit SideEffect(C1, ...) (was causing E009): {:?}",
         ops
     );
-    assert!(ctx.is_disposable_class, "is_disposable_class must be set");
-    assert!(!ctx.is_signalr_hub, "is_signalr_hub must remain false");
+    ctx.current_method = Some("M1".into());
+    let method_ops = layer.process_capture("method.root", "public void Dispose()", &mut ctx);
+    assert!(
+        method_ops
+            .iter()
+            .any(|op| matches!(op, CoreOp::SideEffect(mid, SideEffectKind::Io) if mid == "M1"))
+    );
 }
 
 #[test]
@@ -449,7 +455,11 @@ fn cs_disposable_class_method_emits_io_side_effect() {
     let mut ctx = LayerContext::new("public void Dispose()", Fidelity::Low);
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
-    ctx.is_disposable_class = true;
+    let _ = layer.process_capture(
+        "class.root",
+        "public class ResourceHolder : SomeBase, IDisposable",
+        &mut ctx,
+    );
 
     let ops = layer.process_capture("method.root", "public void Dispose()", &mut ctx);
 
@@ -471,10 +481,8 @@ fn cs_disposable_class_method_emits_io_side_effect() {
 // ── Cross-contamination regression ────────────────────
 #[test]
 fn cs_signalr_hub_flags_reset_between_classes() {
-    // R-43a: When a file has multiple classes, the is_signalr_hub and
-    // is_disposable_class flags must be reset for each new class.root.
-    // Otherwise a plain class after a SignalR hub would incorrectly emit
-    // ExecutionContext(method, "realtime") for every method.
+    // R-43a: A plain sibling after a SignalR hub must not inherit the hub's
+    // ExecutionContext(method, "realtime") semantics.
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new("", Fidelity::Low);
 
@@ -485,26 +493,16 @@ fn cs_signalr_hub_flags_reset_between_classes() {
         "public class ChatHub : Hub<IChatClient>",
         &mut ctx,
     );
-    assert!(ctx.is_signalr_hub, "first class should set is_signalr_hub");
-    assert!(
-        !ctx.is_disposable_class,
-        "first class should NOT set is_disposable_class"
-    );
+    ctx.current_method = Some("M1".into());
+    let hub_ops = layer.process_capture("method.root", "public void Send()", &mut ctx);
+    assert!(hub_ops.iter().any(|op| matches!(
+        op,
+        CoreOp::ExecutionContext(mid, ExecutionContextKind::Realtime) if mid == "M1"
+    )));
 
     // Process second class (plain class, no Hub)
     ctx.current_class = Some("C2".into());
     let _ = layer.process_capture("class.root", "public class PlainClass", &mut ctx);
-    assert!(
-        !ctx.is_signalr_hub,
-        "second class must reset is_signalr_hub: {:?}",
-        ctx.is_signalr_hub
-    );
-    assert!(
-        !ctx.is_disposable_class,
-        "second class must keep is_disposable_class false: {:?}",
-        ctx.is_disposable_class
-    );
-
     // Verify that a method on the second class does NOT get realtime context
     ctx.current_method = Some("M10".into());
     let ops = layer.process_capture("method.root", "public void DoSomething()", &mut ctx);
@@ -529,14 +527,6 @@ fn layer_context_initializes_correctly() {
     assert!(ctx.current_class.is_none());
     assert!(ctx.current_method.is_none());
     assert!(ctx.symbol_table.is_empty());
-    assert!(
-        !ctx.is_signalr_hub,
-        "is_signalr_hub should default to false"
-    );
-    assert!(
-        !ctx.is_disposable_class,
-        "is_disposable_class should default to false"
-    );
 }
 
 #[test]

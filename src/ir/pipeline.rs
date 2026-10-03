@@ -545,6 +545,10 @@ mod tests;
 #[path = "../tests/ir/method_signature_shape.rs"]
 mod signature_shape_tests;
 
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../tests/ir/csharp_nested_class_semantics.rs"]
+mod csharp_nested_class_semantics_tests;
+
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../tests/ir/typescript_export_ownership.rs"]
 mod typescript_export_ownership_tests;

@@ -26,6 +26,7 @@ use crate::ir::opcodes::{
     CTRL_AWAIT, CTRL_TRY, CoreOp, DATAFLOW_READ, DATAFLOW_WRITE, DeclarationModifier,
     ExecutionContextKind, SideEffectKind,
 };
+use std::collections::HashMap;
 
 /// True when `head` (a declaration head, never a full body) carries `word`
 /// as a standalone modifier token. Splits on non-identifier characters so
@@ -83,11 +84,21 @@ fn split_depth_zero_arrow(head: &str) -> &str {
 
 /// C# language layer (Layer 2).
 /// Processes C#-specific captures and emits additional CoreOp instructions.
-pub struct CSharpLayer;
+#[derive(Clone, Copy, Default)]
+struct ClassSemantics {
+    is_signalr_hub: bool,
+    is_disposable: bool,
+}
+
+pub struct CSharpLayer {
+    class_semantics: HashMap<String, ClassSemantics>,
+}
 
 impl CSharpLayer {
     pub fn new() -> Self {
-        Self
+        Self {
+            class_semantics: HashMap::new(),
+        }
     }
 
     /// Extract class inheritance from a C# class declaration.
@@ -328,16 +339,10 @@ impl LanguageLayer for CSharpLayer {
 
         match capture_name {
             "class.root" => {
-                // Reset per-class flags (R-43a): these are set during class.root
-                // processing and consumed during method.root processing. They must
-                // be reset for each new class to prevent cross-contamination when
-                // a file contains multiple classes.
-                context.is_signalr_hub = false;
-                context.is_disposable_class = false;
-
                 // Extract inheritance from raw text
                 let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
+                    let mut semantics = ClassSemantics::default();
                     // The first C# base-list entry is syntactically ambiguous:
                     // it may name either the single base class or the first
                     // implemented interface. Preserve that uncertainty until
@@ -349,7 +354,7 @@ impl LanguageLayer for CSharpLayer {
                         // so per-method ExecutionContext("realtime") ops are
                         // emitted during method.root processing (fixes E010).
                         if Self::is_signalr_hub(&base_id) {
-                            context.is_signalr_hub = true;
+                            semantics.is_signalr_hub = true;
                         }
                     }
                     // Emit Implements for each interface
@@ -373,8 +378,11 @@ impl LanguageLayer for CSharpLayer {
                         .iter()
                         .any(|i| i.trim() == "IDisposable" || i.trim() == "IAsyncDisposable");
                     if implements_disposable {
-                        context.is_disposable_class = true;
+                        semantics.is_disposable = true;
                     }
+                    // Class semantics use the same owner identity that the
+                    // pipeline restores after a nested type scope closes.
+                    self.class_semantics.insert(class_id.clone(), semantics);
                 }
             }
             // Nested type roots own their own members but emit no class-level
@@ -406,8 +414,15 @@ impl LanguageLayer for CSharpLayer {
                     let exec_ops = Self::extract_method_execution_semantics(method_id, raw_text);
                     ops.extend(exec_ops);
 
+                    let class_semantics = context
+                        .current_class
+                        .as_ref()
+                        .and_then(|class_id| self.class_semantics.get(class_id))
+                        .copied()
+                        .unwrap_or_default();
+
                     // R-43a: Per-method SignalR hub realtime context
-                    if context.is_signalr_hub {
+                    if class_semantics.is_signalr_hub {
                         ops.push(CoreOp::ExecutionContext(
                             method_id.clone(),
                             ExecutionContextKind::Realtime,
@@ -415,7 +430,7 @@ impl LanguageLayer for CSharpLayer {
                     }
 
                     // R-43a: Per-method IDisposable side-effect
-                    if context.is_disposable_class {
+                    if class_semantics.is_disposable {
                         ops.push(CoreOp::SideEffect(method_id.clone(), SideEffectKind::Io));
                     }
                 }
@@ -428,6 +443,7 @@ impl LanguageLayer for CSharpLayer {
 
     fn finalize(&mut self, context: &mut LayerContext) -> Vec<CoreOp> {
         let _ = context;
+        self.class_semantics.clear();
         Vec::new()
     }
 }
