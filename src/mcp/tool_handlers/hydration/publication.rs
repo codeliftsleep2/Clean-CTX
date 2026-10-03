@@ -9,12 +9,15 @@ pub(super) fn select_candidates(
     candidates: Vec<String>,
     requirement: HydrationRequirement,
 ) -> Vec<String> {
-    let indexed = state.workspace_index_read();
     let mut seen = HashSet::new();
-    let mut selected: Vec<_> = candidates
+    let resolved: Vec<_> = candidates
         .into_iter()
-        .map(|path| crate::dictionary::path::canonical_identity_key(&path))
+        .map(|path| state.semantic_owner_path(&path))
         .filter(|path| seen.insert(path.clone()))
+        .collect();
+    let indexed = state.workspace_index_read();
+    let mut selected: Vec<_> = resolved
+        .into_iter()
         .filter(|path| match requirement {
             HydrationRequirement::LegacyEdit => !indexed.file_map().contains_key(path),
             HydrationRequirement::Semantic(_) => true,
@@ -54,7 +57,7 @@ pub(super) fn compile_candidate_for(
         Ok(path) => path,
         Err(_) => return Ok(false),
     };
-    let canonical = crate::dictionary::path::canonical_identity_key(&validated);
+    let canonical = state.semantic_owner_path(&validated);
     let (fidelity, coverage) = match requirement {
         HydrationRequirement::LegacyEdit => (Fidelity::Edit, None),
         HydrationRequirement::Semantic(coverage) => {

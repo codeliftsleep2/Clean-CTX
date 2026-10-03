@@ -103,7 +103,7 @@ fn assert_one_injects_foo(response: &Value) {
 }
 
 fn current_at(state: &McpState, path: &std::path::Path, fidelity: SemanticFidelity) -> bool {
-    let canonical = crate::dictionary::path::canonical_identity_key(&path.to_string_lossy());
+    let canonical = state.semantic_owner_path(&path.to_string_lossy());
     let source = state
         .read_source(&path.to_string_lossy())
         .expect("fixture source");
@@ -111,6 +111,94 @@ fn current_at(state: &McpState, path: &std::path::Path, fidelity: SemanticFideli
     state
         .workspace_index_read()
         .has_current_semantic_projection(&canonical, fidelity, &source_hash)
+}
+
+#[cfg(any(windows, unix))]
+fn assert_hard_link_provide_and_hydration_publish_one_alias_and_occurrence() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let owner = root.path().join("consumer.service.ts");
+    let alternate = root.path().join("consumer.alias.ts");
+    std::fs::write(&owner, SOURCE).expect("fixture");
+    std::fs::hard_link(&owner, &alternate).expect("hard-link fixture");
+    let provide_state = state();
+    let root_text = root.path().to_string_lossy().into_owned();
+    let owner_text = owner.to_string_lossy().into_owned();
+    let alternate_text = alternate.to_string_lossy().into_owned();
+
+    for (id, file) in [(10, &owner_text), (11, &alternate_text)] {
+        crate::protocol::captured_responses().clear();
+        dispatch_tools_call(
+            &json!(id),
+            "provide_code_context",
+            &json!({ "arguments": {
+                "filePath": file,
+                "workspaceRoot": root_text.clone(),
+                "fidelity": "low"
+            }}),
+            &provide_state,
+        );
+        let provided = response();
+        assert!(provided.get("error").is_none(), "{provided}");
+    }
+
+    assert_eq!(
+        provide_state.alias_for_path(&owner_text),
+        provide_state.alias_for_path(&alternate_text),
+        "provide calls must share one session alias"
+    );
+
+    let hydration_state = state();
+    let hydrated = find_consumer(&hydration_state, root.path());
+    assert!(hydrated.get("error").is_none(), "{hydrated}");
+    let entities = hydrated["result"]["structuredContent"]["entities"]
+        .as_array()
+        .expect("entity results");
+    let consumers: Vec<_> = entities
+        .iter()
+        .filter(|entity| entity["name"] == "Consumer")
+        .collect();
+    assert!(
+        !consumers.is_empty(),
+        "Consumer must be published: {hydrated}"
+    );
+    let owner_files: std::collections::HashSet<_> = consumers
+        .iter()
+        .filter_map(|entity| entity["file"].as_str())
+        .collect();
+    assert_eq!(
+        owner_files.len(),
+        1,
+        "hard-link discovery must publish one physical-owner spelling: {hydrated}"
+    );
+    let occurrence_keys: std::collections::HashSet<_> = consumers
+        .iter()
+        .map(|entity| {
+            (
+                entity["domain"].as_str(),
+                entity["entity_type"].as_str(),
+                entity["name"].as_str(),
+                entity["file"].as_str(),
+            )
+        })
+        .collect();
+    assert_eq!(
+        occurrence_keys.len(),
+        consumers.len(),
+        "hard-link discovery must not duplicate a semantic occurrence: {hydrated}"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_hard_link_provide_and_hydration_publish_one_alias_and_occurrence() {
+    assert_hard_link_provide_and_hydration_publish_one_alias_and_occurrence();
+}
+
+#[cfg(unix)]
+#[test]
+fn unix_hard_link_provide_and_hydration_publish_one_alias_and_occurrence() {
+    assert_hard_link_provide_and_hydration_publish_one_alias_and_occurrence();
 }
 
 #[test]

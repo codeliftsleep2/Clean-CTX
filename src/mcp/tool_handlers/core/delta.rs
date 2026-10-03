@@ -95,6 +95,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             return;
         }
     };
+    let semantic_owner = state.semantic_owner_path(&resolved_path);
+    let durable_owner = state.durable_owner_path(&resolved_path);
     if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
         send_response(&invalid_session_ir_response(id, &error));
         return;
@@ -123,7 +125,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     // A-08: Check if source has changed before compiling
     let path_alias = state
         .alias_for_path(&resolved_path)
-        .unwrap_or_else(|| resolved_path.clone());
+        .unwrap_or_else(|| semantic_owner.clone());
     let prev_version = state.file_version(&path_alias).unwrap_or(0);
 
     // Try to skip compilation if source is unchanged
@@ -221,7 +223,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             }
         };
 
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    let canonical_path = semantic_owner;
 
     // P0-4: Re-acquire lock atomically for delta computation
     // This ensures no other worker modified ir_context between our check and delta computation
@@ -251,7 +253,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         if super::provide_persistence::read_checkpoint_required(state, fidelity) {
             if let Err(error) = ensure_persisted_baseline(
                 state,
-                &resolved_path,
+                &durable_owner,
                 fidelity,
                 &prev_compiled,
                 &previous_hash,
@@ -272,7 +274,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         state.remember_context_fidelity(&path_alias, fidelity);
         if let Err(error) = state.remember_pending_transition(
             &path_alias,
-            &resolved_path,
+            &durable_owner,
             delta,
             source_hash.clone(),
             semantic_edges.clone(),
@@ -302,7 +304,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             let compressed_tokens = count_tokens_with_tokenizer(&content, tokenizer_ref);
             let previous_full_tokens = state
                 .session_stats_lock()
-                .file_stats(&resolved_path)
+                .file_stats(&canonical_path)
                 .map(|stats| stats.compressed_tokens);
             let mut response = serde_json::json!({
                 "jsonrpc": "2.0", "id": id, "result": {
@@ -317,7 +319,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             // Delta output is rolling dynamic content — mark as tail (ephemeral).
             inject_tail_breakpoint(&mut response, state);
             state.record_compression(
-                &resolved_path,
+                &canonical_path,
                 raw_tokens,
                 compressed_tokens,
                 &fidelity_name,
@@ -335,7 +337,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 if checkpoint_required {
                     if let Err(error) = persist_baseline(
                         state,
-                        &resolved_path,
+                        &durable_owner,
                         fidelity,
                         &compiled,
                         &source_hash,
@@ -349,7 +351,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 // When policy requires a read-side checkpoint, its durable
                 // commit precedes publication of the corresponding live
                 // owner. Manual-checkpoint mode publishes session state only.
-                let committed_alias = state.get_or_create_alias(resolved_path.clone());
+                let committed_alias = state.get_or_create_alias(canonical_path.clone());
                 compiled.file_id.clone_from(&committed_alias);
                 state
                     .ir_context_lock()

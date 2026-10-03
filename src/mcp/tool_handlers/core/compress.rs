@@ -38,6 +38,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         Ok(f) => f,
         Err(()) => return,
     };
+    let semantic_owner = state.semantic_owner_path(&resolved_path);
+    let durable_owner = state.durable_owner_path(&resolved_path);
 
     if state.config.is_excluded(&resolved_path) {
         send_response(&serde_json::json!({
@@ -92,7 +94,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     if effective_fidelity == crate::compression::Fidelity::Verbatim {
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
         state.record_compression(
-            &resolved_path,
+            &durable_owner,
             raw_tokens,
             raw_tokens,
             "verbatim",
@@ -135,7 +137,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         // publication.
         if let Err(error) = super::provide_persistence::persist_read_baseline(
             state,
-            &resolved_path,
+            &durable_owner,
             effective_fidelity,
             &ir,
             &semantic_edges,
@@ -152,9 +154,9 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             return;
         }
 
-        let path_alias = state.get_or_create_alias(resolved_path.clone());
+        let path_alias = state.get_or_create_alias(semantic_owner.clone());
         ir.file_id.clone_from(&path_alias);
-        let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+        let canonical_path = semantic_owner;
         let economic = super::content::economical_presentation_document(
             &ir,
             &hir,
@@ -182,13 +184,13 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         }
         state.remember_semantic_edges(&path_alias, semantic_edges.clone());
         if state.persistence_store_lock().is_some() {
-            state.remember_persisted_path(&path_alias, &resolved_path);
+            state.remember_persisted_path(&path_alias, &canonical_path);
         }
         state
             .llm_text_cache_lock()
             .insert(path_alias, llm_text_with_footer.clone());
         state.record_compression(
-            &resolved_path,
+            &canonical_path,
             raw_tokens,
             compressed_tokens,
             &format!("{:?}", effective_fidelity).to_lowercase(),

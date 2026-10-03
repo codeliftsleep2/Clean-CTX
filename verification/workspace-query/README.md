@@ -51,6 +51,10 @@ These are repeatable operator-verification assets, not Rust regression tests or
 CI gates. The corresponding authoritative contracts remain under
 `src/tests/**`.
 
+On Windows, Linux, and macOS, `Verify-EntitiesInFileLive.ps1` also creates two
+hard-link spellings and verifies that registered workspace queries publish one
+physical entity occurrence.
+
 `Verify-BatchQueriesLive.ps1` creates an isolated TypeScript workspace and
 drives the freshly built production binary over MCP stdio. It verifies the
 published batch schema, mixed ordered results, item-local failure isolation,

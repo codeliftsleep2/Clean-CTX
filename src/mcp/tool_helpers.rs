@@ -402,11 +402,11 @@ fn compile_source_ir_focused_with_identity(
         crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension))
     })?;
 
-    // File Identity Correction: compute the durable canonical identity
-    // for EntityRef.file provenance. This is the authoritative file
-    // identity for semantic edges and the WorkspaceIndex, distinct from
-    // the session-local αN alias.
-    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+    // EntityRef.file provenance uses the canonical semantic owner. This keeps
+    // paths (rather than platform file IDs) in public/index records while
+    // ensuring hard-link spellings cannot create distinct occurrences for one
+    // physical file. It remains distinct from the session-local αN alias.
+    let canonical_path = state.semantic_owner_path(file_path);
 
     // NF-02: Determine the next version based on the previous context state
     // A-08: Compute source hash for change detection

@@ -14,7 +14,7 @@ pub(super) fn read_checkpoint_required(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_read_baseline(
     state: &McpState,
-    resolved_path: &str,
+    owner_path: &str,
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
@@ -29,12 +29,12 @@ pub(super) fn persist_read_baseline(
     let Some(store) = guard.as_ref() else {
         return Ok(());
     };
-    let durable_ir = crate::mcp::persistence_ir::baseline(compiled, resolved_path);
+    let durable_ir = crate::mcp::persistence_ir::baseline(compiled, owner_path);
     let binary = crate::ir::binary_wire::encode(&durable_ir);
     let persisted = store.sqlite().is_some_and(|mut sqlite| {
         sqlite
             .save_context_with_semantics(
-                resolved_path,
+                owner_path,
                 fidelity,
                 "",
                 &binary,

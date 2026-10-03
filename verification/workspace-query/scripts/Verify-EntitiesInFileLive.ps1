@@ -16,6 +16,7 @@ $workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("clean-ctx-live-" + [g
 [System.IO.Directory]::CreateDirectory($workspace) | Out-Null
 
 $typescriptPath = Join-Path $workspace 'service.ts'
+$typescriptHardLink = Join-Path $workspace 'service-hard-link.ts'
 $csharpPath = Join-Path $workspace 'UsersController.cs'
 $process = $null
 $nextId = 1
@@ -85,6 +86,19 @@ function Invoke-WorkspaceQuery {
             file_path = $FilePath
             workspaceRoot = $workspace
             fidelity = $Fidelity
+        }
+    }
+}
+
+function Invoke-FindEntities {
+    param([Parameter(Mandatory)] [string]$Name)
+
+    return Invoke-McpRequest -Method 'tools/call' -Params @{
+        name = 'workspace_query'
+        arguments = @{
+            type = 'find_entities'
+            name = $Name
+            workspaceRoot = $workspace
         }
     }
 }
@@ -188,6 +202,24 @@ public class UsersController : ControllerBase
     $firstEntities = @(Get-Entities -Response $firstTouch)
     Assert-Entity -Entities $firstEntities -Domain 'builtin' -EntityType 'Class' -Name 'LiveUserService' -Present $true
     Write-Host 'PASS: entities_in_file compiles an untracked TypeScript file on first touch.'
+
+    if ($IsWindows -or $IsLinux -or $IsMacOS) {
+        New-Item -ItemType HardLink -Path $typescriptHardLink -Target $typescriptPath | Out-Null
+        $hardLinkTouch = Invoke-WorkspaceQuery -FilePath $typescriptHardLink -Fidelity 'high'
+        Assert-NoError -Response $hardLinkTouch -Scenario 'hard-link alternate query'
+        $hardLinkEntities = @(Get-Entities -Response $hardLinkTouch)
+        Assert-Entity -Entities $hardLinkEntities -Domain 'builtin' -EntityType 'Class' -Name 'LiveUserService' -Present $true
+
+        $hardLinkDiscovery = Invoke-FindEntities -Name 'LiveUserService'
+        Assert-NoError -Response $hardLinkDiscovery -Scenario 'hard-link discovery query'
+        $hardLinkOccurrences = @((Get-Entities -Response $hardLinkDiscovery) | Where-Object {
+            $_.domain -eq 'builtin' -and $_.entity_type -eq 'Class' -and $_.name -eq 'LiveUserService'
+        })
+        if ($hardLinkOccurrences.Count -ne 1) {
+            throw "Expected one physical LiveUserService occurrence, found $($hardLinkOccurrences.Count)."
+        }
+        Write-Host 'PASS: hard-link spellings publish one workspace occurrence.'
+    }
 
     $lowerRequest = Invoke-WorkspaceQuery -FilePath $typescriptPath -Fidelity 'low'
     Assert-NoError -Response $lowerRequest -Scenario 'lower-fidelity reuse query'

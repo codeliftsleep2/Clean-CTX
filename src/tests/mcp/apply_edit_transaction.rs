@@ -1,4 +1,6 @@
 use crate::ir::opcodes::CoreOp;
+#[cfg(any(windows, unix))]
+use crate::mcp::context_store::ContextStore;
 use crate::mcp::tool_handlers::control_full_test_support;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
@@ -65,6 +67,125 @@ fn durable(state: &crate::mcp::McpState, file: &str) -> crate::ir::compiler::Com
         .unwrap()
         .unwrap()
         .ir
+}
+
+#[cfg(any(windows, unix))]
+fn assert_hard_link_edit_refusal_preserves_one_durable_lifecycle_owner() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let owner = root.path().join("hard-link-owner.ts");
+    let alternate = root.path().join("hard-link-alternate.ts");
+    let old_body = "{\r\n    return \"same\";\r\n  }";
+    let new_body = "{\r\n    return \"changed\";\r\n  }";
+    let bytes = source(old_body);
+    std::fs::write(&owner, &bytes).expect("owner fixture");
+    std::fs::hard_link(&owner, &alternate).expect("hard-link fixture");
+    let owner_text = owner.to_string_lossy().into_owned();
+    let alternate_text = alternate.to_string_lossy().into_owned();
+    let lifecycle_state = state(&root);
+
+    let produced = baseline(&lifecycle_state, &owner_text, &root);
+    assert!(produced.get("error").is_none(), "{produced}");
+    let repeated = baseline(&lifecycle_state, &alternate_text, &root);
+    assert!(repeated.get("error").is_none(), "{repeated}");
+    let alias = lifecycle_state
+        .alias_for_path(&owner_text)
+        .expect("owner alias");
+    assert_eq!(
+        lifecycle_state.alias_for_path(&alternate_text).as_deref(),
+        Some(alias.as_str())
+    );
+    let before_version = lifecycle_state.file_version(&alias);
+    let before_ir = lifecycle_state.ir_context_read().get_ir(&alias).cloned();
+    let before_hash = lifecycle_state
+        .ir_context_read()
+        .get_source_hash(&alias)
+        .cloned();
+    let before_edges = serde_json::to_value(lifecycle_state.semantic_edges(&alias)).unwrap();
+    let before_fidelity = lifecycle_state.context_fidelity(&alias);
+
+    let rejected = dispatch(
+        &lifecycle_state,
+        2,
+        "apply_edit",
+        replace_body(&alternate_text, old_body, new_body),
+    );
+    assert_eq!(rejected["error"]["code"], -32602, "{rejected}");
+    assert_eq!(
+        rejected["error"]["data"]["code"],
+        "hard_link_edit_unsupported"
+    );
+    assert_eq!(std::fs::read(&owner).unwrap(), bytes);
+    assert_eq!(std::fs::read(&alternate).unwrap(), bytes);
+    assert_eq!(lifecycle_state.file_version(&alias), before_version);
+    assert_eq!(
+        lifecycle_state.ir_context_read().get_ir(&alias).cloned(),
+        before_ir
+    );
+    assert_eq!(
+        lifecycle_state
+            .ir_context_read()
+            .get_source_hash(&alias)
+            .cloned(),
+        before_hash
+    );
+    assert_eq!(
+        serde_json::to_value(lifecycle_state.semantic_edges(&alias)).unwrap(),
+        before_edges
+    );
+    assert_eq!(lifecycle_state.context_fidelity(&alias), before_fidelity);
+    assert_eq!(lifecycle_state.pending_transition_count(&alias), 0);
+    assert_eq!(
+        lifecycle_state.alias_for_path(&owner_text).as_deref(),
+        Some(alias.as_str())
+    );
+    assert_eq!(
+        lifecycle_state.alias_for_path(&alternate_text).as_deref(),
+        Some(alias.as_str())
+    );
+
+    {
+        let guard = lifecycle_state.persistence_store_lock();
+        let sqlite = guard.as_ref().unwrap().sqlite().unwrap();
+        assert!(sqlite.has_context(&owner_text));
+        assert!(!sqlite.has_context(&alternate_text));
+        assert!(!sqlite.has_edit_intent(&owner_text).unwrap());
+        assert!(!sqlite.has_edit_intent(&alternate_text).unwrap());
+    }
+    drop(lifecycle_state);
+
+    let restarted = state(&root);
+    let owner_alias = restarted.get_or_create_alias(owner_text.clone());
+    let alternate_alias = restarted.get_or_create_alias(alternate_text);
+    assert_eq!(owner_alias, alternate_alias);
+    let canonical_owner = crate::dictionary::path::canonical_identity_key(&owner_text);
+    assert_eq!(
+        restarted.path_for_alias(&owner_alias).as_deref(),
+        Some(canonical_owner.as_str())
+    );
+    let restored = dispatch(
+        &restarted,
+        3,
+        "restore_context",
+        json!({
+            "filePath": alternate.to_string_lossy(),
+            "workspaceRoot": root.path().to_string_lossy()
+        }),
+    );
+    assert!(restored.get("error").is_none(), "{restored}");
+    assert_eq!(restored["result"]["_meta"]["file"], canonical_owner);
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_hard_link_edit_refusal_preserves_one_durable_lifecycle_owner() {
+    assert_hard_link_edit_refusal_preserves_one_durable_lifecycle_owner();
+}
+
+#[cfg(unix)]
+#[test]
+fn unix_hard_link_edit_refusal_preserves_one_durable_lifecycle_owner() {
+    assert_hard_link_edit_refusal_preserves_one_durable_lifecycle_owner();
 }
 
 #[test]

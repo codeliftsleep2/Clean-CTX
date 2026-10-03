@@ -35,9 +35,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     } else {
         requested.to_string()
     };
-    if crate::dictionary::path::canonical_identity_key(&requested_path)
-        != crate::dictionary::path::canonical_identity_key(&durable_path)
-    {
+    if state.semantic_owner_path(&requested_path) != state.semantic_owner_path(&durable_path) {
         return send_persistence_error(id, "Requested file does not match its durable identity");
     }
     if let Err(error) = state.preflight_semantic_publication(&durable_path) {
@@ -199,9 +197,9 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
     } else {
         requested
     };
-    let canonical_requested = crate::dictionary::path::canonical_identity_key(requested_path);
-    if canonical_requested != crate::dictionary::path::canonical_identity_key(&owned_path)
-        || canonical_requested != crate::dictionary::path::canonical_identity_key(&durable_path)
+    let canonical_requested = state.semantic_owner_path(requested_path);
+    if canonical_requested != state.semantic_owner_path(&owned_path)
+        || canonical_requested != state.semantic_owner_path(&durable_path)
     {
         return send_persistence_error(id, "Requested file does not match its durable identity");
     }
@@ -433,7 +431,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         }
         Err(_) => (compact(), false),
     };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+    let canonical_path = state.semantic_owner_path(file_path);
     state
         .ir_context_lock()
         .load_ir(ir.clone(), Some(restored.source_hash));

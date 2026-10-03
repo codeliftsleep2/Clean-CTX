@@ -74,6 +74,8 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         &state.config.additional_roots,
     )
     .map_err(ProvideFailure::invalid)?;
+    let semantic_owner = state.semantic_owner_path(&resolved_path);
+    let durable_owner = state.durable_owner_path(&resolved_path);
     if state.config.is_excluded(&resolved_path) {
         return Err(ProvideFailure::internal(format!(
             "File excluded by config: {file_path_str}"
@@ -93,7 +95,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         .read_source(&resolved_path)
         .map_err(|error| ProvideFailure::internal(format!("Cannot read file: {error}")))?;
     let source = source_arc.as_str();
-    let alias = state.get_or_create_alias(resolved_path.clone());
+    let alias = state.get_or_create_alias(semantic_owner.clone());
 
     #[cfg(feature = "angular")]
     if let Some(result) = super::super::provide_angular::try_evaluate_angular_template(
@@ -265,7 +267,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     );
     super::super::provide_persistence::persist_read_baseline(
         state,
-        &resolved_path,
+        &durable_owner,
         effective_fidelity,
         &ir,
         &semantic_edges,
@@ -275,7 +277,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     )
     .map_err(ProvideFailure::internal)?;
 
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    let canonical_path = semantic_owner;
     state
         .ir_context_lock()
         .load_ir(ir.clone(), Some(source_hash.clone()));
@@ -301,7 +303,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         .insert(ir.file_id.clone(), economic.text.clone());
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(
-        &resolved_path,
+        &canonical_path,
         raw_tokens,
         selected_tokens,
         &format!("{:?}", effective_fidelity).to_lowercase(),

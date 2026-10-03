@@ -15,10 +15,8 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     let durable_path = state
         .alias_for_path(requested)
         .and_then(|alias| state.persisted_path(&alias))
-        .unwrap_or_else(|| requested.to_string());
-    if crate::dictionary::path::canonical_identity_key(requested)
-        != crate::dictionary::path::canonical_identity_key(&durable_path)
-    {
+        .unwrap_or_else(|| state.durable_owner_path(requested));
+    if state.semantic_owner_path(requested) != state.semantic_owner_path(&durable_path) {
         return send_restore_error(id, "Requested file does not match its durable identity");
     }
 
@@ -83,7 +81,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         }
         Err(_) => (compact(), false),
     };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_path);
+    let canonical_path = state.semantic_owner_path(&durable_path);
     let edge_count = restored.semantic_edges.len();
 
     state

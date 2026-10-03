@@ -36,8 +36,6 @@ use std::sync::{Mutex, RwLock};
 // (`CacheEntry`, `source_cache` reads, metadata-based invalidation), split
 // out of this file into one semantic module when `hydration_discovery` was
 // added below.
-mod source_cache;
-
 /// P1-5: Lock recovery macro — replaces 20+ identical 4-line match patterns.
 ///
 /// Usage: `let guard = lock_or_recover!(self.dict.lock(), "dict");`
@@ -73,6 +71,9 @@ macro_rules! lock_or_recover {
     };
 }
 
+pub(crate) mod physical_identity;
+mod source_cache;
+
 #[path = "durable_semantics.rs"]
 pub(crate) mod durable_semantics;
 
@@ -102,9 +103,10 @@ pub struct CbmFilterState {
 /// 1. `ir_context` (RwLock) - IR state for delta computation
 /// 2. `source_cache` (Mutex) - File content cache
 /// 3. `cache` (RwLock) - Local state cache for snapshots
-/// 4. `dict` (Mutex) - Path dictionary for aliases
-/// 5. `persistence_store` (Mutex) - SQLite persistence
-/// 6. All other Mutex fields (any order)
+/// 4. `physical_identities` (Mutex) - physical-file alias ownership
+/// 5. `dict` (Mutex) - Path dictionary for aliases
+/// 6. `persistence_store` (Mutex) - SQLite persistence
+/// 7. All other Mutex fields (any order)
 ///
 /// Violating this order may cause deadlocks under concurrent load.
 ///
@@ -124,6 +126,9 @@ pub struct McpState {
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
     /// `compress_code_context` and `compress_workspace`.
     pub dict: Mutex<PathDictionary>,
+    /// Auxiliary platform physical-file lookup. Canonical paths remain the
+    /// externally visible and durable identity representation.
+    physical_identities: Mutex<physical_identity::PhysicalIdentityRegistry>,
     /// Content-hash + baseline-snapshot cache. Mutated in place by
     /// `diff_code_context` and the orchestrators.
     pub cache: RwLock<LocalStateCache>,
@@ -244,8 +249,10 @@ impl McpState {
             None
         };
 
-        // Rehydrate session stats from DB if available
+        // Rehydrate session stats and register durable physical owners before
+        // any caller spelling can claim session identity.
         let mut session_stats = SessionStats::new();
+        let mut physical_identities = physical_identity::PhysicalIdentityRegistry::default();
         if let Some(ref store) = persistence_store {
             // Rebuild only from already committed durable state.
             if let Some(guard) = store.sqlite() {
@@ -256,6 +263,11 @@ impl McpState {
                     }
                     Err(e) => {
                         eprintln!("[clean-ctx] WARNING: Failed to rebuild stats from DB: {e}");
+                    }
+                }
+                if let Ok(contexts) = guard.list_contexts(i64::MAX as usize) {
+                    for context in contexts {
+                        physical_identities.register_durable_owner(&context.file_path);
                     }
                 }
             }
@@ -271,6 +283,7 @@ impl McpState {
 
         Self {
             dict: Mutex::new(PathDictionary::new()),
+            physical_identities: Mutex::new(physical_identities),
             cache: RwLock::new(LocalStateCache::new()),
             config,
             ir_context: RwLock::new(ContextState::new()),
@@ -449,7 +462,8 @@ impl McpState {
 
     /// Get or create a path alias (thread-safe convenience method).
     pub fn get_or_create_alias(&self, path: String) -> String {
-        self.dict_lock().get_or_create_alias(path)
+        let owner = self.semantic_owner_path(&path);
+        self.dict_lock().get_or_create_alias(owner)
     }
 
     /// Resolve a session-local file alias to its durable canonical path.
@@ -458,7 +472,8 @@ impl McpState {
     }
 
     pub fn alias_for_path(&self, path: &str) -> Option<String> {
-        self.dict_lock().alias_for_path(path).map(str::to_owned)
+        let owner = self.semantic_owner_path(path);
+        self.dict_lock().alias_for_path(&owner).map(str::to_owned)
     }
 
     pub fn remember_context_fidelity(&self, alias: &str, fidelity: Fidelity) {

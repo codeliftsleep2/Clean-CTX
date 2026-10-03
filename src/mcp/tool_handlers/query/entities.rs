@@ -143,7 +143,7 @@ fn try_prepare_entities_in_file(
             return Ok(PreparedQuery::answer(empty_entities_in_file()));
         }
     };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    let canonical_path = state.semantic_owner_path(&resolved_path);
     // The optional SECOND layer: when a `withinPath` is present, the explicit file
     // must lie inside it, and a file outside it is answered exactly like a file
     // outside the workspace (the same minimal zero-result shape). With no

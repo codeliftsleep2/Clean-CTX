@@ -50,7 +50,7 @@ fn evaluate_calls_in_file(
         Ok(path) => path,
         Err(message) => return Err(QueryFailure::invalid(message)),
     };
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    let canonical_path = state.semantic_owner_path(&resolved_path);
     if scope
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))

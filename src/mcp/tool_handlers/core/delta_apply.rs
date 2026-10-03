@@ -253,7 +253,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             *ir_ctx = candidate;
             drop(ir_ctx);
             if let Some(transition) = pending_transition {
-                let canonical_path = crate::dictionary::path::canonical_identity_key(&durable_file);
+                let canonical_path = state.semantic_owner_path(&durable_file);
                 let mut index = state.workspace_index_lock();
                 index.remove_file(&canonical_path);
                 index.add_edges(&canonical_path, transition.semantic_edges.clone());

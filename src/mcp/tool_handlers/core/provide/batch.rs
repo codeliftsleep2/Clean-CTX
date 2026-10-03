@@ -151,7 +151,7 @@ fn canonical_key(params: &Value, state: &McpState) -> Option<String> {
     let resolved =
         resolve_file_path_checked(file_path, workspace_root, &state.config.additional_roots)
             .ok()?;
-    Some(crate::dictionary::path::canonical_identity_key(&resolved))
+    Some(state.semantic_owner_path(&resolved))
 }
 
 fn success_response(

@@ -140,9 +140,10 @@ impl super::McpState {
     /// Resolve crash-recovery ownership before a registered path may compile,
     /// checkpoint, or publish authoritative semantics for one file.
     pub(crate) fn preflight_semantic_publication(&self, file_path: &str) -> Result<(), String> {
-        match self.recover_pending_edit(file_path)? {
+        let owner = self.durable_owner_path(file_path);
+        match self.recover_pending_edit(&owner)? {
             crate::mcp::sqlite_store::EditRecovery::None => Ok(()),
-            _ => self.hydrate_recovered_durable_state(file_path),
+            _ => self.hydrate_recovered_durable_state(&owner),
         }
     }
 
@@ -186,7 +187,7 @@ impl super::McpState {
         self.remember_persisted_path(&alias, file_path);
         self.remember_context_fidelity(&alias, restored.fidelity);
         self.remember_semantic_edges(&alias, restored.semantic_edges.clone());
-        let canonical_path = crate::dictionary::path::canonical_identity_key(file_path);
+        let canonical_path = self.semantic_owner_path(file_path);
         let mut index = self.workspace_index_lock();
         index.remove_file(&canonical_path);
         index.add_edges(&canonical_path, restored.semantic_edges);
@@ -196,8 +197,9 @@ impl super::McpState {
     }
 
     pub fn remember_persisted_path(&self, alias: &str, file_path: &str) {
+        let owner = self.durable_owner_path(file_path);
         lock_or_recover!(self.persisted_paths.lock(), "persisted_paths")
-            .insert(alias.to_string(), file_path.to_string());
+            .insert(alias.to_string(), owner);
     }
 
     pub fn persisted_path(&self, alias: &str) -> Option<String> {
@@ -219,7 +221,7 @@ impl super::McpState {
     pub(crate) fn forget_context_caches(&self, file_path: &str) {
         self.invalidate_source_cache(file_path);
         self.cache_write().forget_file(file_path);
-        let canonical = crate::dictionary::path::canonical_identity_key(file_path);
+        let canonical = self.semantic_owner_path(file_path);
         self.cbm_filter_lock()
             .skip_sets
             .retain(|path, _| crate::dictionary::path::canonical_identity_key(path) != canonical);

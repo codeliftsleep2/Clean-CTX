@@ -241,3 +241,42 @@ fn alias_identity_unresolvable_paths_fall_back_to_raw_key() {
         state.get_or_create_alias("/nonexistent/alpha.rs".to_string())
     );
 }
+
+#[cfg(any(windows, unix))]
+fn assert_hard_link_spellings_share_one_semantic_owner_and_alias() {
+    let root = tempfile::tempdir().expect("workspace");
+    let owner = root.path().join("owner.ts");
+    let alternate = root.path().join("alternate.ts");
+    std::fs::write(&owner, "export class Shared {}\n").expect("owner fixture");
+    std::fs::hard_link(&owner, &alternate).expect("hard-link fixture");
+
+    let state = McpState::new(crate::tests::test_config());
+    let owner_text = owner.to_string_lossy().into_owned();
+    let alternate_text = alternate.to_string_lossy().into_owned();
+
+    assert_ne!(
+        crate::dictionary::path::canonical_identity_key(&owner_text),
+        crate::dictionary::path::canonical_identity_key(&alternate_text),
+        "the fixture must retain two canonical path spellings"
+    );
+    assert_eq!(
+        state.semantic_owner_path(&owner_text),
+        state.semantic_owner_path(&alternate_text)
+    );
+    assert_eq!(
+        state.get_or_create_alias(owner_text),
+        state.get_or_create_alias(alternate_text)
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_hard_link_spellings_share_one_semantic_owner_and_alias() {
+    assert_hard_link_spellings_share_one_semantic_owner_and_alias();
+}
+
+#[cfg(unix)]
+#[test]
+fn unix_hard_link_spellings_share_one_semantic_owner_and_alias() {
+    assert_hard_link_spellings_share_one_semantic_owner_and_alias();
+}

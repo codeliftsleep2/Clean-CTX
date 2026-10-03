@@ -101,6 +101,14 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             None,
         );
     }
+    if crate::mcp::state::physical_identity::has_multiple_hard_links(&resolved_path) {
+        return err_response(
+            id,
+            -32602,
+            "Structural edits are disabled for files with multiple hard links".to_string(),
+            Some(serde_json::json!({ "code": "hard_link_edit_unsupported" })),
+        );
+    }
     if let Ok(metadata) = std::fs::metadata(&resolved_path)
         && let Err(e) = state.config.resource_limits.check_file_size(metadata.len())
     {
@@ -330,7 +338,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
 
     let version = target_ir.version;
     target_ir.file_id.clone_from(&alias);
-    let canonical_path = crate::dictionary::path::canonical_identity_key(&resolved_path);
+    let canonical_path = state.semantic_owner_path(&resolved_path);
     state
         .ir_context_lock()
         .load_ir(target_ir, Some(new_hash.clone()));

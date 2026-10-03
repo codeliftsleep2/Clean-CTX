@@ -19,6 +19,8 @@ The harness covers these live scenarios:
 - I: cross-file source isolation, including CRLF plus UTF-8 BOM bytes;
 - J: legacy fallback quarantine through registered
   `inspect_legacy_fallbacks`.
+- K (Windows/Linux/macOS): hard-link aliases reconnect to one durable owner and structural
+  edit refusal leaves both source spellings and durable storage unchanged.
 
 ## Prerequisites
 

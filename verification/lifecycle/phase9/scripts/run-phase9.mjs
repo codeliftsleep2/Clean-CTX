@@ -17,6 +17,7 @@ const workspace = path.join(stateRoot, 'workspace');
 const fallbackDir = path.join(workspace, '.clean-ctx', 'fallback');
 const dbPath = path.join(workspace, '.clean-ctx', 'persistence.db');
 const primary = path.join(workspace, 'primary.ts');
+const hardLinkAlias = path.join(workspace, 'primary-hard-link.ts');
 const peer = path.join(workspace, 'peer.cs');
 const seedScript = path.join(scriptDir, 'seed-recovery.py');
 const failures = [];
@@ -229,6 +230,40 @@ async function main() {
     check('H', 'purge leaves source, peer, and quarantine artifacts unchanged', sameSnapshot(purgeBefore, snapshot([primary, peer, ...artifactPaths])));
     check('I', 'peer CRLF/BOM bytes remain untouched', fs.readFileSync(peer).equals(initialPeer));
   });
+
+  if (['win32', 'linux', 'darwin'].includes(process.platform)) {
+    fs.linkSync(primary, hardLinkAlias);
+    const beforeHardLinkEdit = snapshot([primary, hardLinkAlias, dbPath]);
+    await withClient(async (client) => {
+      const restoredAlias = resultOf(await client.tool('restore_context', {
+        filePath: hardLinkAlias, workspaceRoot: workspace,
+      }), 'hard-link alias restart restore');
+      const restoredOwner = resultOf(await client.tool('restore_context', {
+        filePath: primary, workspaceRoot: workspace,
+      }), 'hard-link owner restart restore');
+      check('K', 'both hard-link spellings reconnect to one durable owner',
+        restoredAlias._meta?.file === primary && restoredOwner._meta?.file === primary);
+
+      const rejected = await client.tool('apply_edit', {
+        filePath: hardLinkAlias,
+        workspaceRoot: workspace,
+        operations: [{
+          type: 'replace_body',
+          target: 'Unsafe.run',
+          expectedOldText: '{\n    const label = "café";\n    try {\n      return `${label}:DELTA-TARGET`;\n    } catch (error) {\n      return String(error);\n    }\n  }',
+          newText: '{\n    return "must-not-apply";\n  }',
+        }],
+      });
+      check('K', 'hard-linked structural edit is rejected before mutation',
+        rejected.error?.data?.code === 'hard_link_edit_unsupported');
+      const sessions = resultOf(await client.tool('list_sessions'), 'hard-link list_sessions');
+      const sessionText = sessions.content?.[0]?.text ?? '';
+      check('K', 'no competing durable owner is published',
+        sessionText.includes(primary) && !sessionText.includes(hardLinkAlias));
+    });
+    check('K', 'rejected edit preserves both source spellings and durable bytes',
+      sameSnapshot(beforeHardLinkEdit, snapshot([primary, hardLinkAlias, dbPath])));
+  }
 
   await withClient(async (client) => {
     const restored = resultOf(await client.tool('restore_context', { filePath: primary, workspaceRoot: workspace }), 'restart restore');
