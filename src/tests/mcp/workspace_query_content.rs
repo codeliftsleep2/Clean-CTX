@@ -106,7 +106,10 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
     assert_eq!(value["completeness"]["source_complete"], false);
     assert_eq!(value["completeness"]["result_semantics"], "lower_bound");
     assert_eq!(value["completeness"]["omitted_possible"], true);
-    assert_eq!(value["result"]["coverage"]["result_semantics"], "lower_bound");
+    assert_eq!(
+        value["result"]["coverage"]["result_semantics"],
+        "lower_bound"
+    );
     assert_eq!(
         value["result"]["coverage"]["alternative_query"]["entity_type"],
         "TypeRef"

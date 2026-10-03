@@ -54,8 +54,7 @@ pub(super) fn exact_identity_coverage(
         .candidates_discovered
         .saturating_sub(hydration.candidates_compiled);
     if discovered_not_compiled_this_cycle > 0 {
-        coverage["discovered_not_compiled_this_cycle"] =
-            discovered_not_compiled_this_cycle.into();
+        coverage["discovered_not_compiled_this_cycle"] = discovered_not_compiled_this_cycle.into();
     }
     if matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"

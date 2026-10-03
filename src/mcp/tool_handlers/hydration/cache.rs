@@ -79,9 +79,7 @@ pub(super) fn pending_discovery_roots(
 
 /// Produce the cache scopes for a completed filesystem scan. Hydration commits
 /// them only after every selected candidate is current or publishes.
-pub(super) fn discovery_scopes_for_roots(
-    roots: &[PathBuf],
-) -> Vec<DiscoveryScope> {
+pub(super) fn discovery_scopes_for_roots(roots: &[PathBuf]) -> Vec<DiscoveryScope> {
     roots
         .iter()
         .map(|root| DiscoveryScope::filesystem(root_key(root)))

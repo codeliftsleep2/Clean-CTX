@@ -57,9 +57,8 @@ static TEST_PUBLICATION_FAILURE_ONCE: Mutex<Option<String>> = Mutex::new(None);
 pub(crate) fn fail_test_publication_once(path: &str) {
     *TEST_PUBLICATION_FAILURE_ONCE
         .lock()
-        .expect("TEST_PUBLICATION_FAILURE_ONCE lock poisoned") = Some(
-        crate::dictionary::path::canonical_identity_key(path),
-    );
+        .expect("TEST_PUBLICATION_FAILURE_ONCE lock poisoned") =
+        Some(crate::dictionary::path::canonical_identity_key(path));
 }
 
 pub(super) fn take_test_publication_failure(path: &str) -> bool {
