@@ -96,6 +96,18 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         .file_stats(&requested_path)
         .map(|stats| (stats.raw_tokens as u64, stats.compressed_tokens as u64))
         .unwrap_or((0, 0));
+    let source = match state.read_source(&durable_path) {
+        Ok(source) => source,
+        Err(error) => return send_persistence_error(id, &error.to_string()),
+    };
+    let identities = match crate::mcp::compatibility::derive_identities(
+        &source,
+        std::path::Path::new(&durable_path),
+        &state.config,
+    ) {
+        Ok(identities) => identities,
+        Err(error) => return send_persistence_error(id, &error.to_string()),
+    };
 
     let store_guard = state.persistence_store_lock();
     let Some(store) = store_guard.as_ref() else {
@@ -111,6 +123,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                 &source_hash,
                 version,
                 &semantic_edges,
+                &identities,
             )
             .unwrap_or(false)
     });
@@ -119,7 +132,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     } else {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_semantics(
+                .save_context_with_compatibility(
                     &durable_path,
                     fidelity,
                     &compact,
@@ -129,6 +142,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                     &semantic_edges,
                     raw_tokens,
                     compressed_tokens,
+                    &identities,
                 )
                 .is_ok()
         });

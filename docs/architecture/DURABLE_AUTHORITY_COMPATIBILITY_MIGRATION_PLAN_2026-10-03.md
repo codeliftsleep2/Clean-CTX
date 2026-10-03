@@ -1,13 +1,13 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Approved architecture, implementation not started  
+**Status:** Implementation in progress; Phases 0-2 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-03):** Phases 0 and 1 complete; Phase 1 focused
-structural contract suite reported GREEN by the repository owner
+**Phase status (2026-10-03):** Phases 0-2 complete; Phase 2 focused persistence
+suite reported GREEN by the repository owner
 
 ## 1. Objective
 
@@ -394,6 +394,29 @@ Exit criteria:
 - every new artifact/identity pair has one atomic owner;
 - legacy rows remain preserved and explicitly unproven;
 - Binary `0x04` is unchanged.
+
+#### Phase 2 implementation record (2026-10-03)
+
+Implemented schema version 6 with resumable, idempotent nullable identity
+columns and no legacy backfill. Canonical baselines, semantic snapshots,
+delta snapshots, and production edit intents now persist their scoped
+identity evidence atomically. Structural loads preserve each identity as
+optional evidence without granting compatibility.
+
+Tracked evidence:
+
+- schema-column regression observed RED before migration and GREEN after;
+- four-identity round-trip regression observed RED with four NULL values and
+  GREEN after the atomic writer was installed;
+- legacy NULL evidence, mid-transaction rollback, edit-intent target epoch,
+  and interrupted-migration resumption are covered as tracked contracts;
+- owner-reported focused result:
+
+  ```powershell
+  cargo test --all-features mcp::sqlite_store::compatibility_persistence_tests -- --nocapture
+  ```
+
+  Six tests passed with no reported warnings.
 
 ### Phase 3 - Structural load and authoritative validation boundary
 

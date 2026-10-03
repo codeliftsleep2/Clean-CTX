@@ -342,6 +342,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                         &compiled,
                         &source_hash,
                         &semantic_edges,
+                        &source,
                     ) {
                         send_response(&invalid_session_ir_response(id, &error));
                         return;

@@ -285,6 +285,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     &ir,
                     &semantic_edges,
                     &source_hash,
+                    source,
                     raw_tokens,
                     candidate_tokens,
                 )?;

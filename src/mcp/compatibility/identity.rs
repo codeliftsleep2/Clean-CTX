@@ -109,6 +109,16 @@ pub(crate) struct CompatibilityIdentities {
     pub semantic_producers: SemanticProducerIdentity,
 }
 
+/// Identity evidence loaded from durable storage. Each component remains
+/// optional so legacy absence is represented rather than guessed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PersistedCompatibilityIdentities {
+    pub canonical_config: Option<CanonicalConfigIdentity>,
+    pub canonical_producers: Option<CanonicalProducerIdentity>,
+    pub semantic_config: Option<SemanticConfigIdentity>,
+    pub semantic_producers: Option<SemanticProducerIdentity>,
+}
+
 impl CanonicalProducerIdentity {
     pub(crate) fn differs_bidirectionally(&self, other: &Self) -> bool {
         self.relevant_producers != other.relevant_producers

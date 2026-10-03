@@ -19,6 +19,7 @@ pub(super) fn persist_read_baseline(
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
     source_hash: &str,
+    source: &str,
     raw_tokens: usize,
     compressed_tokens: usize,
 ) -> Result<(), &'static str> {
@@ -31,9 +32,15 @@ pub(super) fn persist_read_baseline(
     };
     let durable_ir = crate::mcp::persistence_ir::baseline(compiled, owner_path);
     let binary = crate::ir::binary_wire::encode(&durable_ir);
+    let identities = crate::mcp::compatibility::derive_identities(
+        source,
+        std::path::Path::new(owner_path),
+        &state.config,
+    )
+    .map_err(|_| "Durable compatibility identity derivation failed")?;
     let persisted = store.sqlite().is_some_and(|mut sqlite| {
         sqlite
-            .save_context_with_semantics(
+            .save_context_with_compatibility(
                 owner_path,
                 fidelity,
                 "",
@@ -43,6 +50,7 @@ pub(super) fn persist_read_baseline(
                 semantic_edges,
                 raw_tokens as u64,
                 compressed_tokens as u64,
+                &identities,
             )
             .is_ok()
     });

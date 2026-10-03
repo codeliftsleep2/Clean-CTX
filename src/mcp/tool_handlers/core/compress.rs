@@ -142,6 +142,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             &ir,
             &semantic_edges,
             &source_hash,
+            source_text,
             raw_tokens,
             compressed_tokens,
         ) {

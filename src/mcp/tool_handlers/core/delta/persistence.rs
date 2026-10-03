@@ -12,13 +12,20 @@ pub(super) fn persist_baseline(
     compiled: &CompiledIR,
     source_hash: &str,
     semantic_edges: &[SemanticEdge],
+    source: &str,
 ) -> Result<(), String> {
     let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
     let binary = crate::ir::binary_wire::encode(&durable);
+    let identities = crate::mcp::compatibility::derive_identities(
+        source,
+        std::path::Path::new(file_path),
+        &state.config,
+    )
+    .map_err(|error| format!("compatibility identity derivation failed: {error}"))?;
     if let Some(ref store) = *state.persistence_store_lock() {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_semantics(
+                .save_context_with_compatibility(
                     file_path,
                     fidelity,
                     "",
@@ -28,6 +35,7 @@ pub(super) fn persist_baseline(
                     semantic_edges,
                     0,
                     0,
+                    &identities,
                 )
                 .is_ok()
         });
@@ -79,6 +87,9 @@ pub(super) fn ensure_persisted_baseline(
         let semantic_edges = state
             .semantic_edges(&compiled.file_id)
             .ok_or_else(|| "missing authoritative semantic-edge baseline".to_string())?;
+        let source = state
+            .read_source(file_path)
+            .map_err(|error| format!("cannot derive durable compatibility: {error}"))?;
         persist_baseline(
             state,
             file_path,
@@ -86,6 +97,7 @@ pub(super) fn ensure_persisted_baseline(
             compiled,
             source_hash,
             &semantic_edges,
+            &source,
         )?;
         state.remember_persisted_path(&compiled.file_id, file_path);
     }

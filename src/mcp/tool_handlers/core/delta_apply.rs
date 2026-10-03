@@ -201,6 +201,25 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                             new_version,
                             &transition.semantic_edges,
                         );
+                    let compatibility = state
+                        .read_source(&durable_file)
+                        .map_err(|error| error.to_string())
+                        .and_then(|source| {
+                            crate::mcp::compatibility::derive_identities(
+                                &source,
+                                std::path::Path::new(&durable_file),
+                                &state.config,
+                            )
+                            .map_err(|error| error.to_string())
+                        });
+                    let compatibility = match compatibility {
+                        Ok(compatibility) => compatibility,
+                        Err(error) => {
+                            drop(ir_ctx);
+                            send_response(&invalid_session_ir_response(id, &error));
+                            return;
+                        }
+                    };
                     let persisted = persisted_context.as_ref().is_some_and(|context_id| {
                         state
                             .persistence_store_lock()
@@ -214,6 +233,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                                             edit_type,
                                             &compact,
                                             &snapshot,
+                                            &compatibility,
                                         )
                                         .is_ok()
                                 })
