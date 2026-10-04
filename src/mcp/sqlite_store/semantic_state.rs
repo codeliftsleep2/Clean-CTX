@@ -2,11 +2,9 @@
 
 use super::SqliteStore;
 use crate::compression::Fidelity;
-use crate::ir::compiler::CompiledIR;
 use crate::layers::meta::semantic::SemanticEdge;
-use crate::mcp::compatibility::identity::{
-    CompatibilityIdentities, PersistedCompatibilityIdentities,
-};
+use crate::mcp::compatibility::identity::{CompatibilityIdentities, PersistedCompatibilityIdentities};
+use crate::mcp::compatibility::validator::{CompatibilityFailure, UntrustedDurableContext};
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::state::durable_semantics::DurableSemanticSnapshot;
 use rusqlite::{OptionalExtension, params};
@@ -30,16 +28,6 @@ pub(super) fn should_fail_semantic_save(file_path: &str) -> bool {
         return true;
     }
     false
-}
-
-pub(crate) struct RestoredDurableContext {
-    pub ir: CompiledIR,
-    pub semantic_edges: Vec<SemanticEdge>,
-    pub source_hash: String,
-    pub fidelity: Fidelity,
-    // Phase 3 consumes this evidence at the authoritative validation gate.
-    #[allow(dead_code)]
-    pub compatibility: PersistedCompatibilityIdentities,
 }
 
 impl SqliteStore {
@@ -256,17 +244,19 @@ impl SqliteStore {
         &self,
         file_path: &str,
         target_sequence: Option<u32>,
-    ) -> Result<Option<RestoredDurableContext>, Box<dyn std::error::Error>> {
-        let metadata = match ContextStore::load_latest(self, file_path)? {
+    ) -> Result<Option<UntrustedDurableContext>, CompatibilityFailure> {
+        let metadata = match ContextStore::load_latest(self, file_path).map_err(physical_error)? {
             Some(metadata) => metadata,
             None => return Ok(None),
         };
         let context_id = self
-            .current_context_id(file_path)?
-            .ok_or_else(|| format!("missing persisted owner for {file_path}"))?;
+            .current_context_id(file_path)
+            .map_err(physical_error)?
+            .ok_or_else(|| structural_error(format!("missing persisted owner for {file_path}")))?;
         let (ir, _) = self
-            .load_context_with_deltas(file_path, target_sequence)?
-            .ok_or_else(|| format!("missing canonical IR for {file_path}"))?;
+            .load_context_with_deltas(file_path, target_sequence)
+            .map_err(physical_error)?
+            .ok_or_else(|| structural_error(format!("missing canonical IR for {file_path}")))?;
         let snapshot_row = self
             .conn
             .query_row(
@@ -290,8 +280,11 @@ impl SqliteStore {
                     ))
                 },
             )
-            .optional()?
-            .ok_or_else(|| format!("missing semantic-edge snapshot for {file_path}"))?;
+            .optional()
+            .map_err(physical_error)?
+            .ok_or_else(|| {
+                structural_error(format!("missing semantic-edge snapshot for {file_path}"))
+            })?;
         let (
             row_file,
             row_hash,
@@ -302,26 +295,32 @@ impl SqliteStore {
             semantic_config,
             semantic_producers,
         ) = snapshot_row;
-        let snapshot: DurableSemanticSnapshot = serde_json::from_str(&snapshot_json)
-            .map_err(|error| format!("malformed semantic-edge snapshot: {error}"))?;
+        let snapshot: DurableSemanticSnapshot = serde_json::from_str(&snapshot_json).map_err(
+            |error| structural_error(format!("malformed semantic-edge snapshot: {error}")),
+        )?;
         if row_file != file_path || snapshot.file_path != file_path {
-            return Err("semantic-edge snapshot file identity mismatch".into());
+            return Err(structural_error(
+                "semantic-edge snapshot file identity mismatch",
+            ));
         }
         if row_hash != snapshot.source_hash {
-            return Err("canonical and semantic-edge source hashes do not match".into());
+            return Err(structural_error(
+                "canonical and semantic-edge source hashes do not match",
+            ));
         }
         if target_sequence.is_none() && snapshot.source_hash != metadata.source_hash {
-            return Err("latest canonical and semantic-edge source hashes do not match".into());
+            return Err(structural_error(
+                "latest canonical and semantic-edge source hashes do not match",
+            ));
         }
         if row_version < 0 || row_version as u64 != ir.version || snapshot.version != ir.version {
-            return Err(format!(
+            return Err(structural_error(format!(
                 "canonical and semantic-edge versions do not match: IR v{}, edges v{}",
                 ir.version, snapshot.version
-            )
-            .into());
+            )));
         }
-        let semantic_edges = snapshot.restore_edges()?;
-        Ok(Some(RestoredDurableContext {
+        let semantic_edges = snapshot.restore_edges().map_err(structural_error)?;
+        Ok(Some(UntrustedDurableContext {
             ir,
             semantic_edges,
             source_hash: snapshot.source_hash,
@@ -369,9 +368,21 @@ impl SqliteStore {
 
 fn decode_optional_identity<T: serde::de::DeserializeOwned>(
     encoded: Option<String>,
-) -> Result<Option<T>, Box<dyn std::error::Error>> {
+) -> Result<Option<T>, CompatibilityFailure> {
     encoded
         .map(|value| serde_json::from_str(&value))
         .transpose()
-        .map_err(Into::into)
+        .map_err(physical_error)
+}
+
+fn physical_error(error: impl std::fmt::Display) -> CompatibilityFailure {
+    CompatibilityFailure::PhysicalSchemaIncompatibility {
+        detail: error.to_string(),
+    }
+}
+
+fn structural_error(detail: impl Into<String>) -> CompatibilityFailure {
+    CompatibilityFailure::StructuralSnapshotIncoherence {
+        detail: detail.into(),
+    }
 }

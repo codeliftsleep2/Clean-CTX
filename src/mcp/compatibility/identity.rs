@@ -120,12 +120,14 @@ pub(crate) struct PersistedCompatibilityIdentities {
 }
 
 impl CanonicalProducerIdentity {
+    #[cfg(test)]
     pub(crate) fn differs_bidirectionally(&self, other: &Self) -> bool {
         self.relevant_producers != other.relevant_producers
     }
 }
 
 impl SemanticProducerIdentity {
+    #[cfg(test)]
     pub(crate) fn differs_bidirectionally(&self, other: &Self) -> bool {
         self.relevant_producers != other.relevant_producers
     }

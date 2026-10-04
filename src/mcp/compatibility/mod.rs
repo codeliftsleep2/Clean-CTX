@@ -1,15 +1,14 @@
 //! Compatibility vocabulary for durable canonical and semantic authority.
 //!
-//! Phase 1 only derives deterministic values. Persistence and adoption do not
-//! consume these identities yet.
-
-// Phase 1 intentionally introduces the value model before Phase 2 wires it
-// into persistence. Keeping the module warning-clean during that staged
-// migration requires allowing temporarily unconsumed compatibility values.
-#![allow(dead_code)]
+//! Identity derivation and pure validation remain separate from persistence
+//! decoding and live-state publication.
 
 pub(crate) mod identity;
 pub(crate) mod producer;
+// Phase 3 freezes typed evidence before Phase 4 routes restore adoption
+// through it. Limit the staged-use allowance to that module only.
+#[allow(dead_code)]
+pub(crate) mod validator;
 
 use crate::config::{CleanCtxConfig, MetaLayerConfig};
 use crate::layers::meta::MetaLayer;

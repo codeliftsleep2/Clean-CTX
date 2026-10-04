@@ -1,12 +1,12 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-2 complete
+**Status:** Implementation in progress; Phases 0-3 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-03):** Phases 0-2 complete; Phase 2 focused persistence
+**Phase status (2026-10-03):** Phases 0-3 complete; Phase 3 focused validation
 suite reported GREEN by the repository owner
 
 ## 1. Objective
@@ -456,6 +456,32 @@ Exit criteria:
 
 - raw durable values cannot reach the compatibility-aware publication API;
 - compatibility policy has one implementation rather than handler copies.
+
+#### Phase 3 implementation record (2026-10-03)
+
+Structural SQLite loads now return `UntrustedDurableContext`. Physical/schema
+decoding failures and cross-artifact structural incoherence enter the shared
+`CompatibilityFailure` taxonomy before leaving persistence. Pure validators
+derive current applicability from source, path, configuration, and the active
+producer registry, then return separate typed canonical and semantic evidence
+only after the complete context succeeds.
+
+The validator has no access to `McpState`, IRContext, semantic caches,
+WorkspaceIndex, fidelity ownership, or presentation caches. Its immutable
+component validators and consuming all-or-nothing entry point therefore cannot
+mutate live authority.
+
+Owner-reported focused result:
+
+```powershell
+cargo test --all-features mcp::compatibility::validator::tests -- --nocapture
+```
+
+Nine tests passed with no reported warnings. They cover successful typed
+evidence, source and fidelity rejection, scoped configuration mismatches,
+bidirectional producer-set mismatch, each missing legacy component, taxonomy
+separation, immutable validation, malformed identity encoding, and structural
+snapshot incoherence.
 
 ### Phase 4 - Restore adoption gate
 
