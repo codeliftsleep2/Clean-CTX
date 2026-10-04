@@ -71,7 +71,28 @@ pub(crate) enum CompatibilityFailure {
     #[error("legacy persistence is missing {component:?} identity")]
     MissingLegacyIdentity { component: CompatibilityComponent },
     #[error("historical source is not current: historical={historical}, current={current}")]
+    // Phase 5 consumes this classification when historical replay is gated.
+    #[allow(dead_code)]
     HistoricalSourceNotCurrent { historical: String, current: String },
+}
+
+impl CompatibilityFailure {
+    pub(crate) fn reason(&self) -> &'static str {
+        match self {
+            Self::PhysicalSchemaIncompatibility { .. } => "physical_schema_incompatibility",
+            Self::StructuralSnapshotIncoherence { .. } => "structural_snapshot_incoherence",
+            Self::SourceMismatch { .. } => "source_mismatch",
+            Self::InsufficientFidelity { .. } => "insufficient_fidelity",
+            Self::CanonicalConfigurationIncompatible => {
+                "canonical_configuration_incompatible"
+            }
+            Self::SemanticConfigurationIncompatible => "semantic_configuration_incompatible",
+            Self::CanonicalProducerIncompatible => "canonical_producer_incompatible",
+            Self::SemanticProducerIncompatible => "semantic_producer_incompatible",
+            Self::MissingLegacyIdentity { .. } => "missing_legacy_identity",
+            Self::HistoricalSourceNotCurrent { .. } => "historical_source_not_current",
+        }
+    }
 }
 
 pub(crate) fn validate_current_context(
@@ -99,8 +120,8 @@ pub(crate) fn validate_current_context(
             detail: format!("compatibility identity derivation failed: {error}"),
         }
     })?;
-    let canonical = validate_canonical(&loaded, &current)?;
     let semantic = validate_semantic(&loaded, &current)?;
+    let canonical = validate_canonical(&loaded, &current)?;
     Ok(CompatibleDurableContext {
         canonical,
         semantic,

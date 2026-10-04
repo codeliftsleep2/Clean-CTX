@@ -5,9 +5,6 @@
 
 pub(crate) mod identity;
 pub(crate) mod producer;
-// Phase 3 freezes typed evidence before Phase 4 routes restore adoption
-// through it. Limit the staged-use allowance to that module only.
-#[allow(dead_code)]
 pub(crate) mod validator;
 
 use crate::config::{CleanCtxConfig, MetaLayerConfig};

@@ -1,13 +1,14 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-3 complete
+**Status:** Implementation in progress; Phases 0-4 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-03):** Phases 0-3 complete; Phase 3 focused validation
-suite reported GREEN by the repository owner
+**Phase status (2026-10-04):** Phases 0-4 complete; Phase 4 restore compatibility
+matrix and existing durable restore authority reported GREEN by the repository
+owner
 
 ## 1. Objective
 
@@ -519,6 +520,33 @@ Exit criteria:
 - ordinary restore validates the complete context before any live mutation;
 - the current restore-only coverage reconstruction is reachable only through
   a compatible semantic projection.
+
+#### Phase 4 implementation record (2026-10-04)
+
+`restore_context` now loads structurally untrusted durable state, reads the
+current source, and obtains all-or-nothing typed canonical and semantic
+compatibility evidence before alias creation, hierarchy publication, IRContext
+loading, semantic caching, WorkspaceIndex/coverage replacement, fidelity and
+persisted-path ownership, or presentation caching.
+
+Compatibility rejection returns a stable structured `reason`. The tracked
+production-path matrix covers type-alias configuration, marker-only
+configuration, semantic enablement in both directions, canonical and semantic
+producer generations, both producer-set directions, missing legacy identity,
+and compatible restart reuse. Every rejection asserts that live authority
+remains untouched.
+
+Owner-reported focused results:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::core::restore::compatibility_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::persistence::durable_semantic_restore_tests -- --nocapture
+```
+
+The compatibility matrix passed ten tests with no reported warnings. The
+existing durable restore authority passed four tests after its intentionally
+source-divergent H1/H2 case was updated to require `source_mismatch` and zero
+publication.
 
 ### Phase 5 - Historical replay gate
 
