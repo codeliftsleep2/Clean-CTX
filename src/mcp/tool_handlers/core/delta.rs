@@ -97,6 +97,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     };
     let semantic_owner = state.semantic_owner_path(&resolved_path);
     let durable_owner = state.durable_owner_path(&resolved_path);
+    let publication = state.begin_semantic_publication(&semantic_owner);
     if let Err(error) = state.preflight_semantic_publication(&resolved_path) {
         send_response(&invalid_session_ir_response(id, &error));
         return;
@@ -126,11 +127,16 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     let path_alias = state
         .alias_for_path(&resolved_path)
         .unwrap_or_else(|| semantic_owner.clone());
-    let prev_version = state.file_version(&path_alias).unwrap_or(0);
-
     // Try to skip compilation if source is unchanged
     // P0-4: Hold lock during entire check to prevent TOCTOU race
     let ir_ctx = state.ir_context_lock();
+    let prev_version = ir_ctx.file_version(&path_alias).unwrap_or(0);
+    let previous_authority = (prev_version > 0 && ir_ctx.has_file(&path_alias)).then(|| {
+        (
+            ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default(),
+            ir_ctx.get_source_hash(&path_alias).cloned(),
+        )
+    });
     if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         if let Ok(source_arc) = state.read_source(&resolved_path) {
             let source_hash = {
@@ -222,91 +228,125 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 return;
             }
         };
+    compiled.version = prev_version + 1;
+
+    #[cfg(test)]
+    super::provide::publication_race_test_support::pause_after_compile(&resolved_path);
 
     let canonical_path = semantic_owner;
+    let expected_source_hash = source_hash.clone();
+    let committed = publication.commit(
+        || {
+            Ok::<_, String>(state.read_source(&resolved_path).is_ok_and(|current| {
+                state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
+            }))
+        },
+        || {
+            let mut ir_ctx = state.ir_context_lock();
+            let authority_is_current = match &previous_authority {
+                Some((instructions, previous_hash)) => {
+                    ir_ctx.file_version(&path_alias) == Some(prev_version)
+                        && ir_ctx.get_ir(&path_alias) == Some(instructions)
+                        && ir_ctx.get_source_hash(&path_alias) == previous_hash.as_ref()
+                }
+                None => state
+                    .alias_for_path(&resolved_path)
+                    .is_none_or(|alias| !ir_ctx.has_file(&alias)),
+            };
+            if !authority_is_current {
+                return Ok((false, None));
+            }
 
-    // P0-4: Re-acquire lock atomically for delta computation
-    // This ensures no other worker modified ir_context between our check and delta computation
-    let mut ir_ctx = state.ir_context_lock();
-    let mut delta = if prev_version > 0 && ir_ctx.has_file(&path_alias) {
-        let Some(prev_instructions) = ir_ctx.get_ir(&path_alias).cloned() else {
-            drop(ir_ctx);
+            let mut delta = if let Some((prev_instructions, previous_hash)) = &previous_authority {
+                let prev_compiled = compiled_from_tuples(
+                    path_alias.clone(),
+                    prev_version,
+                    prev_instructions.clone(),
+                )?;
+                let previous_hash = previous_hash
+                    .clone()
+                    .unwrap_or_else(|| source_hash.clone());
+                if super::provide_persistence::read_checkpoint_required(state, fidelity) {
+                    ensure_persisted_baseline(
+                        state,
+                        &durable_owner,
+                        fidelity,
+                        &prev_compiled,
+                        &previous_hash,
+                    )?;
+                }
+                SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
+            } else {
+                None
+            };
+            if let Some(delta) = &mut delta {
+                delta.target_hash = Some(source_hash.clone());
+                state.remember_context_fidelity(&path_alias, fidelity);
+                let compatibility = crate::mcp::compatibility::derive_identities(
+                    &source,
+                    std::path::Path::new(&durable_owner),
+                    &state.config,
+                )
+                .map_err(|error| format!("cannot derive delta compatibility: {error}"))?;
+                state.remember_pending_transition(
+                    &path_alias,
+                    &durable_owner,
+                    delta,
+                    source_hash.clone(),
+                    crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation(
+                        semantic_edges.clone(),
+                        source_hash.clone(),
+                        fidelity,
+                    ),
+                    compatibility,
+                )?;
+            } else if previous_authority.is_some() {
+                ir_ctx.set_source_hash(&path_alias, source_hash.clone());
+            } else {
+                let checkpoint_required =
+                    super::provide_persistence::read_checkpoint_required(state, fidelity);
+                if checkpoint_required {
+                    persist_baseline(
+                        state,
+                        &durable_owner,
+                        fidelity,
+                        &compiled,
+                        &source_hash,
+                        &semantic_edges,
+                        &source,
+                    )?;
+                }
+                let committed_alias = state.get_or_create_alias(canonical_path.clone());
+                compiled.file_id.clone_from(&committed_alias);
+                ir_ctx.load_ir(compiled.clone(), Some(source_hash.clone()));
+                state.remember_context_fidelity(&committed_alias, fidelity);
+                {
+                    let mut idx = state.workspace_index_lock();
+                    idx.remove_file(&canonical_path);
+                    idx.add_edges(&canonical_path, semantic_edges.clone());
+                }
+                state.remember_semantic_edges(&committed_alias, semantic_edges.clone());
+                if state.persistence_store_lock().is_some() {
+                    state.remember_persisted_path(&committed_alias, &resolved_path);
+                }
+            }
+            Ok((true, delta))
+        },
+    );
+    let delta = match committed {
+        Ok(Some((true, delta))) => delta,
+        Ok(None) | Ok(Some((false, _))) => {
             send_response(&invalid_session_ir_response(
                 id,
-                "missing prior canonical instruction stream",
+                "Delta authority was superseded by a newer same-file source snapshot; retry the request",
             ));
             return;
-        };
-        let prev_compiled =
-            match compiled_from_tuples(path_alias.clone(), prev_version, prev_instructions) {
-                Ok(compiled) => compiled,
-                Err(error) => {
-                    drop(ir_ctx);
-                    send_response(&invalid_session_ir_response(id, &error));
-                    return;
-                }
-            };
-        let previous_hash = ir_ctx
-            .get_source_hash(&path_alias)
-            .cloned()
-            .unwrap_or_else(|| source_hash.clone());
-        if super::provide_persistence::read_checkpoint_required(state, fidelity) {
-            if let Err(error) = ensure_persisted_baseline(
-                state,
-                &durable_owner,
-                fidelity,
-                &prev_compiled,
-                &previous_hash,
-            ) {
-                drop(ir_ctx);
-                send_response(&invalid_session_ir_response(id, &error));
-                return;
-            }
         }
-        SequenceDeltaComputer::new().compute(&prev_compiled, &compiled)
-    } else {
-        None
-    };
-    if let Some(delta) = &mut delta {
-        delta.target_hash = Some(source_hash.clone());
-    }
-    if let Some(delta) = &delta {
-        state.remember_context_fidelity(&path_alias, fidelity);
-        let compatibility = match crate::mcp::compatibility::derive_identities(
-            &source,
-            std::path::Path::new(&durable_owner),
-            &state.config,
-        ) {
-            Ok(compatibility) => compatibility,
-            Err(error) => {
-                drop(ir_ctx);
-                send_response(&invalid_session_ir_response(
-                    id,
-                    &format!("cannot derive delta compatibility: {error}"),
-                ));
-                return;
-            }
-        };
-        if let Err(error) = state.remember_pending_transition(
-            &path_alias,
-            &durable_owner,
-            delta,
-            source_hash.clone(),
-            crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation(
-                semantic_edges.clone(),
-                source_hash.clone(),
-                fidelity,
-            ),
-            compatibility,
-        ) {
-            drop(ir_ctx);
+        Err(error) => {
             send_response(&invalid_session_ir_response(id, &error));
             return;
         }
-    } else if prev_version > 0 {
-        ir_ctx.set_source_hash(&path_alias, source_hash.clone());
-    }
-    drop(ir_ctx);
+    };
 
     match delta {
         Some(d) => {
@@ -351,43 +391,6 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             send_response(&response);
         }
         None => {
-            if prev_version == 0 {
-                let checkpoint_required =
-                    super::provide_persistence::read_checkpoint_required(state, fidelity);
-                if checkpoint_required {
-                    if let Err(error) = persist_baseline(
-                        state,
-                        &durable_owner,
-                        fidelity,
-                        &compiled,
-                        &source_hash,
-                        &semantic_edges,
-                        &source,
-                    ) {
-                        send_response(&invalid_session_ir_response(id, &error));
-                        return;
-                    }
-                }
-
-                // When policy requires a read-side checkpoint, its durable
-                // commit precedes publication of the corresponding live
-                // owner. Manual-checkpoint mode publishes session state only.
-                let committed_alias = state.get_or_create_alias(canonical_path.clone());
-                compiled.file_id.clone_from(&committed_alias);
-                state
-                    .ir_context_lock()
-                    .load_ir(compiled.clone(), Some(source_hash.clone()));
-                state.remember_context_fidelity(&committed_alias, fidelity);
-                {
-                    let mut idx = state.workspace_index_lock();
-                    idx.remove_file(&canonical_path);
-                    idx.add_edges(&canonical_path, semantic_edges.clone());
-                }
-                state.remember_semantic_edges(&committed_alias, semantic_edges.clone());
-                if state.persistence_store_lock().is_some() {
-                    state.remember_persisted_path(&committed_alias, &resolved_path);
-                }
-            }
             let version = if prev_version == 0 {
                 compiled.version
             } else {
@@ -451,6 +454,10 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
 #[cfg(test)]
 #[path = "../../../tests/mcp/delta_sequence.rs"]
 mod sequence_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_publication_race.rs"]
+mod publication_race_tests;
 
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delta_edit_recovery.rs"]

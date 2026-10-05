@@ -15,7 +15,7 @@ mod evaluate;
 pub(super) mod outcome;
 
 #[cfg(test)]
-mod publication_race_test_support {
+pub(super) mod publication_race_test_support {
     use std::sync::{Condvar, Mutex};
 
     #[derive(Default)]
@@ -32,7 +32,7 @@ mod publication_race_test_support {
     });
     static SIGNAL: Condvar = Condvar::new();
 
-    pub(super) fn arm(path: &str) {
+    pub(crate) fn arm(path: &str) {
         let mut state = STATE.lock().expect("publication pause state");
         *state = PauseState {
             path: Some(crate::dictionary::path::canonical_identity_key(path)),
@@ -41,7 +41,7 @@ mod publication_race_test_support {
         };
     }
 
-    pub(super) fn pause_after_compile(path: &str) {
+    pub(crate) fn pause_after_compile(path: &str) {
         let canonical = crate::dictionary::path::canonical_identity_key(path);
         let mut state = STATE.lock().expect("publication pause state");
         if state.path.as_deref() != Some(canonical.as_str()) || state.paused {
@@ -55,14 +55,14 @@ mod publication_race_test_support {
         state.path = None;
     }
 
-    pub(super) fn wait_until_paused() {
+    pub(crate) fn wait_until_paused() {
         let mut state = STATE.lock().expect("publication pause state");
         while !state.paused {
             state = SIGNAL.wait(state).expect("publication pause wait");
         }
     }
 
-    pub(super) fn release() {
+    pub(crate) fn release() {
         let mut state = STATE.lock().expect("publication pause state");
         state.released = true;
         SIGNAL.notify_all();
