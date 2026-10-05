@@ -60,6 +60,7 @@ pub fn gitdiff_workspace(
     max_file_size: Option<usize>,
 ) -> Result<GitDiffSummary, crate::error::CleanCtxError> {
     let mut changes = collect_changed_files(root, from, to)?;
+    let file_count = changes.len();
 
     // Resource limit: cap the number of changed files processed.
     // Files beyond the cap are counted as skipped (fail-closed, never
@@ -77,7 +78,7 @@ pub fn gitdiff_workspace(
     let to_label = to.unwrap_or("working-tree");
     manifest.push_str(&format!(
         "§GITDIFF {from}..{to_label} ({} files)\n",
-        changes.len()
+        file_count
     ));
 
     let (mut added, mut deleted, mut modified, mut renamed) = (0usize, 0usize, 0usize, 0usize);
@@ -163,7 +164,7 @@ pub fn gitdiff_workspace(
 
     Ok(GitDiffSummary {
         manifest,
-        file_count: changes.len(),
+        file_count,
         counts: (added, deleted, modified, renamed),
         skipped,
     })
@@ -456,3 +457,7 @@ fn is_angular_template(path: &str) -> bool {
 #[cfg(test)]
 #[path = "../tests/gitdiff/engine.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/gitdiff/file_count_limit.rs"]
+mod file_count_limit_tests;
