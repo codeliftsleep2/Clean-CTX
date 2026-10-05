@@ -21,7 +21,9 @@
 
 /// Increment marker and semantic generations independently when identical
 /// Spring inputs change that producer's durable markers or semantic edges.
+#[cfg(feature = "spring_boot")]
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
+#[cfg(feature = "spring_boot")]
 pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
 
 pub(crate) mod annotations;

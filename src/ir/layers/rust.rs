@@ -25,8 +25,10 @@ use crate::ir::opcodes::{
 };
 
 /// Increment when identical Rust input can emit different canonical IR.
+#[cfg(feature = "rust")]
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
 /// Increment when Rust canonical facts change meaning for projection.
+#[cfg(feature = "rust")]
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
 
 /// Rust visibility enum
