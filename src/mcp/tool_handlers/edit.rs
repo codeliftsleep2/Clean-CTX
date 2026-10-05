@@ -262,11 +262,16 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         );
     }
 
+    let version = target_ir.version;
     // ── Crash-recoverable commit critical section ────────────────────
     let _commit_guard = commit_lock().lock().unwrap_or_else(|p| p.into_inner());
+    let committed = state.with_semantic_authority_update(&resolved_path, || {
     let staged = match stage_exact_bytes(&resolved_path, target_bytes) {
         Ok(staged) => staged,
-        Err(error) => return err_response(id, -32603, error, None),
+        Err(error) => {
+            err_response(id, -32603, error, None);
+            return false;
+        }
     };
     let stage_path = staged.path().to_string_lossy().into_owned();
     let transition_id = edit_transition_id(
@@ -287,12 +292,13 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     ) {
         Ok(identities) => identities,
         Err(error) => {
-            return err_response(
+            err_response(
                 id,
                 -32603,
                 format!("Edited compatibility identity derivation failed: {error}"),
                 None,
             );
+            return false;
         }
     };
     let intent = crate::mcp::sqlite_store::EditIntent {
@@ -310,16 +316,18 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         stage_path,
     };
     if let Err(error) = establish_edit_intent(state, &intent, &compatibility) {
-        return err_response(id, -32603, error, None);
+        err_response(id, -32603, error, None);
+        return false;
     }
     if let Err(error) = staged.persist(&resolved_path) {
         clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
-        return err_response(
+        err_response(
             id,
             -32603,
             format!("Atomic source replacement failed: {}", error.error),
             None,
         );
+        return false;
     }
     state.invalidate_source_cache(&resolved_path);
     if let Err(error) = commit_edit_semantics(
@@ -333,7 +341,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         &compatibility,
     ) {
         if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
-            return err_response(
+            err_response(
                 id,
                 -32603,
                 format!(
@@ -341,18 +349,19 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
                 ),
                 None,
             );
+            return false;
         }
         state.invalidate_source_cache(&resolved_path);
         clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
-        return err_response(
+        err_response(
             id,
             -32603,
             format!("Durable edit commit failed; exact prior source restored: {error}"),
             None,
         );
+        return false;
     }
 
-    let version = target_ir.version;
     target_ir.file_id.clone_from(&alias);
     let canonical_path = state.semantic_owner_path(&resolved_path);
     state
@@ -372,7 +381,12 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     state
         .cache_write()
         .update_and_verify(&resolved_path, &new_hash);
+    true
+    });
     drop(_commit_guard);
+    if !committed {
+        return;
+    }
     state.llm_text_cache_lock().remove(&alias);
     // ── Mark CBM project dirty (lazy reindex) ────────────────────
     if let Some(ref mut bridge) = *state.graph_bridge_lock() {

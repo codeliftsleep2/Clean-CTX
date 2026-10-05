@@ -6,6 +6,7 @@ use crate::ir::opcodes::CoreOp;
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -158,6 +159,121 @@ fn save_context_rejects_missing_session_and_mismatched_durable_identity() {
             .as_str()
             .is_some_and(|message| message.contains("durable identity")),
         "{mismatch}"
+    );
+}
+
+#[test]
+fn save_context_rejects_a_checkpoint_superseded_by_a_newer_owner_epoch() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let file = root.path().join("epoch.ts");
+    let file_text = file.to_string_lossy().into_owned();
+    let workspace = root.path().to_string_lossy().into_owned();
+    let first_source = "export class FirstEpoch { first(): void {} }\n";
+    let second_source = "export class SecondEpoch { second(): void {} }\n";
+    std::fs::write(&file, first_source).expect("first source");
+    let state = Arc::new(state(&root));
+    assert!(
+        compile(&state, &file_text, &workspace, 30)
+            .get("error")
+            .is_none()
+    );
+    let first_hash = state.cache_read().compute_hash(first_source.as_bytes());
+
+    super::save_snapshot_test_support::arm(&file_text);
+    let worker_state = Arc::clone(&state);
+    let worker_file = file_text.clone();
+    let save = std::thread::spawn(move || {
+        dispatch(
+            &worker_state,
+            31,
+            "save_context",
+            json!({ "filePath": worker_file }),
+        )
+    });
+    super::save_snapshot_test_support::wait_until_paused();
+
+    std::fs::write(&file, second_source).expect("second source");
+    state.invalidate_source_cache(&file_text);
+    state.arm_semantic_publication_attempt(&file_text);
+    let publisher_state = Arc::clone(&state);
+    let publisher_file = file_text.clone();
+    let publisher_workspace = workspace.clone();
+    let publisher = std::thread::spawn(move || {
+        dispatch(
+            &publisher_state,
+            32,
+            "provide_code_context",
+            json!({
+                "filePath": publisher_file,
+                "workspaceRoot": publisher_workspace,
+                "fidelity": "edit"
+            }),
+        )
+    });
+    state.wait_for_semantic_publication_attempt();
+
+    super::save_snapshot_test_support::release();
+    let saved = save.join().expect("save worker");
+    assert!(saved.get("error").is_some(), "{saved}");
+    assert!(
+        saved["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("outside the captured authority epoch")),
+        "{saved}"
+    );
+    let published = publisher.join().expect("publication worker");
+    assert!(published.get("error").is_none(), "{published}");
+    let alias = state.alias_for_path(&file_text).expect("owner alias");
+    let live_edges = serde_json::to_value(state.semantic_edges(&alias)).expect("live edges");
+    assert!(
+        live_edges.to_string().contains("SecondEpoch"),
+        "{live_edges}"
+    );
+
+    let durable = state
+        .persistence_store_lock()
+        .as_ref()
+        .and_then(|store| store.sqlite())
+        .and_then(|sqlite| sqlite.load_durable_context(&file_text, None).ok().flatten())
+        .expect("durable checkpoint");
+    let durable_edges = serde_json::to_value(&durable.semantic_edges).expect("durable edges");
+    let second_hash = state.cache_read().compute_hash(second_source.as_bytes());
+    assert_ne!(durable.source_hash, first_hash, "stale H1 was checkpointed");
+    assert_eq!(
+        durable.source_hash, second_hash,
+        "canonical epoch must be H2"
+    );
+    assert_eq!(durable.fidelity, crate::compression::Fidelity::Edit);
+    let durable_ir = format!("{:?}", durable.ir.instructions);
+    assert!(!durable_ir.contains("FirstEpoch"), "{durable_ir}");
+    assert!(durable_ir.contains("SecondEpoch"), "{durable_ir}");
+    assert!(
+        durable_edges.to_string().contains("SecondEpoch"),
+        "semantic epoch must expose H2: {durable_edges}"
+    );
+    assert!(
+        !durable_edges.to_string().contains("FirstEpoch"),
+        "{durable_edges}"
+    );
+    let identities =
+        crate::mcp::compatibility::derive_identities(second_source, file.as_path(), &state.config)
+            .expect("H2 compatibility identities");
+    assert_eq!(
+        durable.compatibility.canonical_config.as_ref(),
+        Some(&identities.canonical_config)
+    );
+    assert_eq!(
+        durable.compatibility.canonical_producers.as_ref(),
+        Some(&identities.canonical_producers)
+    );
+    assert_eq!(
+        durable.compatibility.semantic_config.as_ref(),
+        Some(&identities.semantic_config)
+    );
+    assert_eq!(
+        durable.compatibility.semantic_producers.as_ref(),
+        Some(&identities.semantic_producers)
     );
 }
 

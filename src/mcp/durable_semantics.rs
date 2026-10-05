@@ -211,15 +211,17 @@ impl super::McpState {
         let semantic = compatible.semantic;
         crate::ir::hierarchical::try_ir_to_hierarchical(&canonical.ir)
             .map_err(|error| format!("Recovered durable projection failed: {error}"))?;
-        let alias = self.get_or_create_alias(file_path.to_string());
-        let mut ir = canonical.ir;
-        ir.file_id.clone_from(&alias);
-        self.ir_context_lock()
-            .load_ir(ir, Some(canonical.source_hash));
-        self.remember_persisted_path(&alias, file_path);
-        self.remember_context_fidelity(&alias, canonical.fidelity);
-        self.publish_compatible_semantic_projection(&alias, file_path, semantic);
-        self.llm_text_cache_lock().remove(&alias);
+        self.with_semantic_authority_update(file_path, || {
+            let alias = self.get_or_create_alias(file_path.to_string());
+            let mut ir = canonical.ir;
+            ir.file_id.clone_from(&alias);
+            self.ir_context_lock()
+                .load_ir(ir, Some(canonical.source_hash));
+            self.remember_persisted_path(&alias, file_path);
+            self.remember_context_fidelity(&alias, canonical.fidelity);
+            self.publish_compatible_semantic_projection(&alias, file_path, semantic);
+            self.llm_text_cache_lock().remove(&alias);
+        });
         Ok(())
     }
 

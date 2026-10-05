@@ -145,6 +145,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         IncomingDelta::Sequence(_) => "sequence_v2",
         IncomingDelta::Legacy(_) => "legacy",
     };
+    state.with_semantic_authority_update(&durable_file, || {
     let mut ir_ctx = state.ir_context_lock();
     let mut candidate = ir_ctx.clone();
     let applied = match &delta {
@@ -327,4 +328,5 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             "error": { "code": -32603, "message": format!("Apply delta failed: {}", e) }
         })),
     }
+    });
 }

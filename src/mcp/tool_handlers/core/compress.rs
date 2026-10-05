@@ -127,34 +127,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let candidate_presentation =
-            crate::ir::render_hierarchical_for_llm(&hir, effective_fidelity);
-        let compressed_tokens = count_tokens_with_tokenizer(&candidate_presentation, tokenizer_ref);
-
-        // Automatic checkpoints are an optional read-side policy. Edit
-        // baselines remain mandatory because they establish safe edit
-        // authority. Any required checkpoint still commits before live
-        // publication.
-        if let Err(error) = super::provide_persistence::persist_read_baseline(
-            state,
-            &durable_owner,
-            effective_fidelity,
-            &ir,
-            &semantic_edges,
-            &source_hash,
-            source_text,
-            raw_tokens,
-            compressed_tokens,
-        ) {
-            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                id.clone(),
-                -32603,
-                error,
-                None,
-            ));
-            return;
-        }
-
+        let durable_candidate = ir.clone();
         let path_alias = state.get_or_create_alias(semantic_owner.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = semantic_owner;
@@ -174,36 +147,61 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
         );
 
-        state
-            .ir_context_lock()
-            .load_ir(ir.clone(), Some(source_hash.clone()));
-        state.remember_context_fidelity(&path_alias, effective_fidelity);
-        {
-            let mut idx = state.workspace_index_lock();
-            idx.remove_file(&canonical_path);
-            idx.add_edges(&canonical_path, semantic_edges.clone());
+        let published = state.with_semantic_authority_update(&canonical_path, || {
+            // Required durable baselines and live authority advance inside
+            // one owner-ordered mutation.
+            super::provide_persistence::persist_read_baseline(
+                state,
+                &durable_owner,
+                effective_fidelity,
+                &durable_candidate,
+                &semantic_edges,
+                &source_hash,
+                source_text,
+                raw_tokens,
+                compressed_tokens,
+            )?;
+            state
+                .ir_context_lock()
+                .load_ir(ir.clone(), Some(source_hash.clone()));
+            state.remember_context_fidelity(&path_alias, effective_fidelity);
+            {
+                let mut idx = state.workspace_index_lock();
+                idx.remove_file(&canonical_path);
+                idx.add_edges(&canonical_path, semantic_edges.clone());
+            }
+            state.remember_semantic_edges(&path_alias, semantic_edges.clone());
+            if state.persistence_store_lock().is_some() {
+                state.remember_persisted_path(&path_alias, &canonical_path);
+            }
+            state
+                .llm_text_cache_lock()
+                .insert(path_alias.clone(), llm_text_with_footer.clone());
+            state.record_compression(
+                &canonical_path,
+                raw_tokens,
+                compressed_tokens,
+                &format!("{:?}", effective_fidelity).to_lowercase(),
+                false,
+                "full",
+                None,
+                if raw_passthrough {
+                    "raw_passthrough"
+                } else {
+                    "ir_compression"
+                },
+            );
+            Ok::<_, String>(())
+        });
+        if let Err(error) = published {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
         }
-        state.remember_semantic_edges(&path_alias, semantic_edges.clone());
-        if state.persistence_store_lock().is_some() {
-            state.remember_persisted_path(&path_alias, &canonical_path);
-        }
-        state
-            .llm_text_cache_lock()
-            .insert(path_alias, llm_text_with_footer.clone());
-        state.record_compression(
-            &canonical_path,
-            raw_tokens,
-            compressed_tokens,
-            &format!("{:?}", effective_fidelity).to_lowercase(),
-            false,
-            "full",
-            None,
-            if raw_passthrough {
-                "raw_passthrough"
-            } else {
-                "ir_compression"
-            },
-        );
 
         let ir_value = match encoding {
             "positional" => {

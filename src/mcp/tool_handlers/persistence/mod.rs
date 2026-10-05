@@ -8,6 +8,9 @@ use crate::mcp::compatibility::validator::{CompatibilityFailure, validate_histor
 use crate::mcp::tool_handlers::core::{ContentKind, contract_fields_for_hierarchy};
 use crate::protocol::send_response;
 use serde_json::Value;
+#[cfg(test)]
+#[path = "../../../tests/mcp/save_context_race_support.rs"]
+pub(super) mod save_snapshot_test_support;
 
 /// Handle `save_context` — persists current in-memory context to the DB.
 pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) {
@@ -15,7 +18,6 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     if requested.is_empty() {
         return send_persistence_error(id, "Missing required parameter: filePath");
     }
-
     let direct_alias = state.ir_context_lock().has_file(requested);
     let alias = if direct_alias {
         requested.to_string()
@@ -42,27 +44,51 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     if let Err(error) = state.preflight_semantic_publication(&durable_path) {
         return send_persistence_error(id, &error);
     }
+    let snapshot_owner = durable_path.clone();
+    let persist = state.with_semantic_authority_snapshot(&snapshot_owner, || {
+        save_context_snapshot(id, state, alias, requested_path, durable_path)
+    });
+    if let Some(persist) = persist {
+        persist();
+    }
+}
+fn save_context_snapshot<'a>(
+    id: &'a Value,
+    state: &'a McpState,
+    alias: String,
+    requested_path: String,
+    durable_path: String,
+) -> Option<impl FnOnce() + 'a> {
     let fidelity = match state.context_fidelity(&alias) {
         Some(fidelity) => fidelity,
-        None => return send_persistence_error(id, "Missing fidelity for requested file"),
+        None => {
+            send_persistence_error(id, "Missing fidelity for requested file");
+            return None;
+        }
     };
     let (tuples, version, source_hash) = {
         let context = state.ir_context_lock();
         let Some(tuples) = context.get_ir(&alias).cloned() else {
-            return send_persistence_error(id, "Missing canonical IR for requested file");
+            send_persistence_error(id, "Missing canonical IR for requested file");
+            return None;
         };
         let Some(version) = context.file_version(&alias) else {
-            return send_persistence_error(id, "Missing canonical IR version for requested file");
+            send_persistence_error(id, "Missing canonical IR version for requested file");
+            return None;
         };
         let Some(source_hash) = context.get_source_hash(&alias).cloned() else {
-            return send_persistence_error(id, "Missing source hash for requested file");
+            send_persistence_error(id, "Missing source hash for requested file");
+            return None;
         };
         (tuples, version, source_hash)
     };
+    #[cfg(test)]
+    save_snapshot_test_support::pause_after_canonical_capture(&durable_path);
     let mut instructions = Vec::with_capacity(tuples.len());
     for tuple in &tuples {
         let Some(operation) = crate::ir::wire::tuple_to_op(tuple) else {
-            return send_persistence_error(id, "Session canonical IR contains an invalid tuple");
+            send_persistence_error(id, "Session canonical IR contains an invalid tuple");
+            return None;
         };
         instructions.push(operation);
     }
@@ -77,12 +103,15 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
             send_response(&crate::mcp::tool_handlers::core::projection_error_response(
                 id, &error,
             ));
-            return;
+            return None;
         }
     };
     let semantic_edges = match state.semantic_edges(&alias) {
         Some(edges) => edges,
-        None => return send_persistence_error(id, "Missing authoritative semantic-edge state"),
+        None => {
+            send_persistence_error(id, "Missing authoritative semantic-edge state");
+            return None;
+        }
     };
     let compact = crate::mcp::tool_handlers::core::content::presentation_document(
         &session_ir,
@@ -99,41 +128,38 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         .unwrap_or((0, 0));
     let source = match state.read_source(&durable_path) {
         Ok(source) => source,
-        Err(error) => return send_persistence_error(id, &error.to_string()),
+        Err(error) => {
+            send_persistence_error(id, &error.to_string());
+            return None;
+        }
     };
+    if state.cache_read().compute_hash(source.as_bytes()) != source_hash {
+        send_persistence_error(
+            id,
+            "Checkpoint source changed outside the captured authority epoch",
+        );
+        return None;
+    }
     let identities = match crate::mcp::compatibility::derive_identities(
         &source,
         std::path::Path::new(&durable_path),
         &state.config,
     ) {
         Ok(identities) => identities,
-        Err(error) => return send_persistence_error(id, &error.to_string()),
+        Err(error) => {
+            send_persistence_error(id, &error.to_string());
+            return None;
+        }
     };
 
-    let store_guard = state.persistence_store_lock();
-    let Some(store) = store_guard.as_ref() else {
-        return send_persistence_error(id, "Persistence is not enabled");
-    };
-    let already_durable = store.sqlite().is_some_and(|sqlite| {
-        sqlite
-            .durable_state_matches(
-                &durable_path,
-                fidelity,
-                &compact,
-                &binary,
-                &source_hash,
-                version,
-                &semantic_edges,
-                &identities,
-            )
-            .unwrap_or(false)
-    });
-    let saved_count = if already_durable {
-        0
-    } else {
-        let persisted = store.sqlite().is_some_and(|mut sqlite| {
+    Some(move || {
+        let store_guard = state.persistence_store_lock();
+        let Some(store) = store_guard.as_ref() else {
+            return send_persistence_error(id, "Persistence is not enabled");
+        };
+        let already_durable = store.sqlite().is_some_and(|sqlite| {
             sqlite
-                .save_context_with_compatibility(
+                .durable_state_matches(
                     &durable_path,
                     fidelity,
                     &compact,
@@ -141,25 +167,43 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                     &source_hash,
                     version,
                     &semantic_edges,
-                    raw_tokens,
-                    compressed_tokens,
                     &identities,
                 )
-                .is_ok()
+                .unwrap_or(false)
         });
-        if !persisted {
-            return send_persistence_error(id, "Requested checkpoint was not persisted");
-        }
-        1
-    };
+        let saved_count = if already_durable {
+            0
+        } else {
+            let persisted = store.sqlite().is_some_and(|mut sqlite| {
+                sqlite
+                    .save_context_with_compatibility(
+                        &durable_path,
+                        fidelity,
+                        &compact,
+                        &binary,
+                        &source_hash,
+                        version,
+                        &semantic_edges,
+                        raw_tokens,
+                        compressed_tokens,
+                        &identities,
+                    )
+                    .is_ok()
+            });
+            if !persisted {
+                return send_persistence_error(id, "Requested checkpoint was not persisted");
+            }
+            1
+        };
 
-    send_response(&serde_json::json!({
-        "jsonrpc": "2.0", "id": id,
-        "result": {
-            "content": [{ "type": "text", "text": format!("Saved {} context(s) to persistence DB.", saved_count) }],
-            "_meta": { "ok": true, "saved": saved_count, "already_durable": already_durable, "file": durable_path }
-        }
-    }));
+        send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "result": {
+                "content": [{ "type": "text", "text": format!("Saved {} context(s) to persistence DB.", saved_count) }],
+                "_meta": { "ok": true, "saved": saved_count, "already_durable": already_durable, "file": durable_path }
+            }
+        }));
+    })
 }
 
 fn send_persistence_error(id: &Value, message: &str) {
@@ -469,15 +513,17 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
     } else {
         (compact(), false)
     };
-    state
-        .ir_context_lock()
-        .load_ir(ir.clone(), Some(canonical.source_hash));
-    state.remember_persisted_path(&path_alias, file_path);
-    state.remember_context_fidelity(&path_alias, canonical.fidelity);
-    state.publish_compatible_semantic_projection(&path_alias, file_path, semantic);
-    state
-        .llm_text_cache_lock()
-        .insert(path_alias, rendered.clone());
+    state.with_semantic_authority_update(file_path, || {
+        state
+            .ir_context_lock()
+            .load_ir(ir.clone(), Some(canonical.source_hash));
+        state.remember_persisted_path(&path_alias, file_path);
+        state.remember_context_fidelity(&path_alias, canonical.fidelity);
+        state.publish_compatible_semantic_projection(&path_alias, file_path, semantic);
+        state
+            .llm_text_cache_lock()
+            .insert(path_alias, rendered.clone());
+    });
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,

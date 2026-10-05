@@ -107,15 +107,17 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     };
     let edge_count = semantic.semantic_edges.len();
 
-    state
-        .ir_context_lock()
-        .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
-    state.remember_persisted_path(&alias, &durable_path);
-    state.remember_context_fidelity(&alias, canonical.fidelity);
-    state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
-    state
-        .llm_text_cache_lock()
-        .insert(alias.clone(), full.clone());
+    state.with_semantic_authority_update(&durable_path, || {
+        state
+            .ir_context_lock()
+            .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
+        state.remember_persisted_path(&alias, &durable_path);
+        state.remember_context_fidelity(&alias, canonical.fidelity);
+        state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
+        state
+            .llm_text_cache_lock()
+            .insert(alias.clone(), full.clone());
+    });
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
 
     let mut response = serde_json::json!({

@@ -18,6 +18,10 @@ pub(crate) struct SemanticPublicationTicket {
     generation: u64,
 }
 
+#[cfg(test)]
+#[path = "../../tests/mcp/semantic_publication_clock_support.rs"]
+mod snapshot_test_support;
+
 impl SemanticPublicationTicket {
     /// Commit only when no newer candidate for this owner has already
     /// committed. The clock remains held through the complete publication so
@@ -38,22 +42,63 @@ impl SemanticPublicationTicket {
 }
 
 impl McpState {
-    /// Assign a monotonic generation before reading the source snapshot that
-    /// may later become authoritative.
-    pub(crate) fn begin_semantic_publication(&self, file_path: &str) -> SemanticPublicationTicket {
+    fn semantic_publication_clock(&self, file_path: &str) -> Arc<Mutex<SemanticPublicationClock>> {
         let owner = self.semantic_owner_path(file_path);
-        let clock = lock_or_recover!(
+        lock_or_recover!(
             self.semantic_publication_clocks.lock(),
             "semantic_publication_clocks"
         )
         .entry(owner)
         .or_insert_with(|| Arc::new(Mutex::new(SemanticPublicationClock::default())))
-        .clone();
+        .clone()
+    }
+
+    /// Run a checkpoint capture while publication for this semantic owner is
+    /// unable to advance. This observes authority; it does not create a new
+    /// publication generation or change the committed generation.
+    pub(crate) fn with_semantic_authority_snapshot<T>(
+        &self,
+        file_path: &str,
+        capture: impl FnOnce() -> T,
+    ) -> T {
+        let clock = self.semantic_publication_clock(file_path);
+        let _snapshot = lock_or_recover!(clock.lock(), "semantic_publication_clock");
+        capture()
+    }
+
+    /// Serialize one already-validated authority mutation with snapshots and
+    /// other mutations for the same owner. The callback must not recursively
+    /// acquire this owner's publication clock.
+    pub(crate) fn with_semantic_authority_update<T>(
+        &self,
+        file_path: &str,
+        update: impl FnOnce() -> T,
+    ) -> T {
+        self.with_semantic_authority_snapshot(file_path, update)
+    }
+
+    /// Assign a monotonic generation before reading the source snapshot that
+    /// may later become authoritative.
+    pub(crate) fn begin_semantic_publication(&self, file_path: &str) -> SemanticPublicationTicket {
+        let owner = self.semantic_owner_path(file_path);
+        let clock = self.semantic_publication_clock(&owner);
+        #[cfg(test)]
+        snapshot_test_support::publication_attempted(&owner);
         let generation = {
             let mut clock_state = lock_or_recover!(clock.lock(), "semantic_publication_clock");
             clock_state.next_generation += 1;
             clock_state.next_generation
         };
         SemanticPublicationTicket { clock, generation }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn arm_semantic_publication_attempt(&self, file_path: &str) {
+        snapshot_test_support::arm(&self.semantic_owner_path(file_path));
+    }
+
+    #[cfg(test)]
+    pub(crate) fn wait_for_semantic_publication_attempt(&self) {
+        snapshot_test_support::wait_until_attempted();
     }
 }
