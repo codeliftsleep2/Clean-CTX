@@ -77,7 +77,11 @@ fn generate_delta(
 
 fn durable_version(state: &crate::mcp::McpState, file: &str) -> u64 {
     let store = state.persistence_store_lock();
-    let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+    let sqlite = store
+        .as_ref()
+        .expect("persistence")
+        .sqlite()
+        .expect("SQLite");
     sqlite
         .load_durable_context(file, None)
         .expect("durable load")

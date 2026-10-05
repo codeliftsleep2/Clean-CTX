@@ -22,9 +22,9 @@ use rusqlite::{Connection, params};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+mod compatibility_schema;
 mod deletion;
 mod edit_intent;
-mod compatibility_schema;
 mod replay;
 mod semantic_state;
 

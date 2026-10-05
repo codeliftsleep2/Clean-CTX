@@ -300,15 +300,9 @@ fn complete_identities(
         0 => Ok(None),
         4 => Ok(Some(CompatibilityIdentities {
             canonical_config: value.canonical_config.clone().expect("counted identity"),
-            canonical_producers: value
-                .canonical_producers
-                .clone()
-                .expect("counted identity"),
+            canonical_producers: value.canonical_producers.clone().expect("counted identity"),
             semantic_config: value.semantic_config.clone().expect("counted identity"),
-            semantic_producers: value
-                .semantic_producers
-                .clone()
-                .expect("counted identity"),
+            semantic_producers: value.semantic_producers.clone().expect("counted identity"),
         })),
         _ => Err("edit intent has a partial compatibility envelope".into()),
     }

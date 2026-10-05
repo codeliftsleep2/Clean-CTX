@@ -43,7 +43,9 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
 
     let source = match state.read_source(&durable_path) {
         Ok(source) => source,
-        Err(error) => return send_restore_error(id, &format!("Cannot read current source: {error}")),
+        Err(error) => {
+            return send_restore_error(id, &format!("Cannot read current source: {error}"));
+        }
     };
     let required_fidelity = restored.fidelity;
     let compatible = match validate_current_context(
@@ -68,9 +70,11 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         Some(hierarchy) => hierarchy,
         None => return,
     };
-    let compact =
-        || super::content::presentation_document(&session_ir, &hierarchy, canonical.fidelity, state);
-    let source_matches = state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
+    let compact = || {
+        super::content::presentation_document(&session_ir, &hierarchy, canonical.fidelity, state)
+    };
+    let source_matches =
+        state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
     let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let economic = super::content::economical_presentation_document(
@@ -140,7 +144,7 @@ fn send_compatibility_error(id: &Value, error: &CompatibilityFailure) {
     send_response(&crate::mcp::tool_helpers::jsonrpc_error(
         id.clone(),
         -32603,
-        &format!("Durable restore rejected: {error}"),
+        format!("Durable restore rejected: {error}"),
         Some(serde_json::json!({
             "reason": error.reason(),
             "component": error.component()

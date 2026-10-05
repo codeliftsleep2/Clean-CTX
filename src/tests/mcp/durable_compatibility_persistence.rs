@@ -5,7 +5,10 @@ fn in_memory_store() -> SqliteStore {
     SqliteStore::open(Path::new(":memory:")).expect("open in-memory SQLite store")
 }
 
-fn identities(file: &str, source: &str) -> crate::mcp::compatibility::identity::CompatibilityIdentities {
+fn identities(
+    file: &str,
+    source: &str,
+) -> crate::mcp::compatibility::identity::CompatibilityIdentities {
     crate::mcp::compatibility::derive_identities(
         source,
         Path::new(file),
@@ -265,10 +268,13 @@ fn accepted_delta_keeps_canonical_epoch_and_writes_snapshot_local_semantic_ident
     let payload = crate::mcp::persistence_ir::PersistedDelta::normalize_legacy(&delta, file)
         .expect("persisted delta");
     let mut snapshot_identities = baseline_identities.clone();
-    snapshot_identities.semantic_producers.relevant_producers.insert(
-        crate::mcp::compatibility::identity::ProducerKey::BuiltinSemantic,
-        99,
-    );
+    snapshot_identities
+        .semantic_producers
+        .relevant_producers
+        .insert(
+            crate::mcp::compatibility::identity::ProducerKey::BuiltinSemantic,
+            99,
+        );
     let snapshot = crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
         file.to_string(),
         "hash-2".to_string(),

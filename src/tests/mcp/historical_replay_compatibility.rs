@@ -82,23 +82,28 @@ fn compatible_historical_replay_keeps_h1_identity_and_never_covers_h2() {
     let alias = restarted.alias_for_path(&file).expect("historical alias");
     let h1_hash = restarted.cache_read().compute_hash(h1.as_bytes());
     let h2_hash = restarted.cache_read().compute_hash(h2.as_bytes());
-    let replayed_hash = restarted
-        .ir_context_read()
-        .get_source_hash(&alias)
-        .cloned();
+    let replayed_hash = restarted.ir_context_read().get_source_hash(&alias).cloned();
     assert_eq!(replayed_hash, Some(h1_hash.clone()));
     assert_ne!(h1_hash, h2_hash);
     let canonical = restarted.semantic_owner_path(&file);
-    assert!(restarted.workspace_index_read().has_current_semantic_projection(
-        &canonical,
-        crate::workspace::index::SemanticFidelity::Low,
-        &h1_hash,
-    ));
-    assert!(!restarted.workspace_index_read().has_current_semantic_projection(
-        &canonical,
-        crate::workspace::index::SemanticFidelity::Low,
-        &h2_hash,
-    ));
+    assert!(
+        restarted
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::Low,
+                &h1_hash,
+            )
+    );
+    assert!(
+        !restarted
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::Low,
+                &h2_hash,
+            )
+    );
 
     let current = dispatch(
         &restarted,
@@ -112,11 +117,15 @@ fn compatible_historical_replay_keeps_h1_identity_and_never_covers_h2() {
         }),
     );
     assert!(current.get("error").is_none(), "{current}");
-    assert!(restarted.workspace_index_read().has_current_semantic_projection(
-        &canonical,
-        crate::workspace::index::SemanticFidelity::Low,
-        &h2_hash,
-    ));
+    assert!(
+        restarted
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::Low,
+                &h2_hash,
+            )
+    );
 }
 
 #[test]
@@ -129,10 +138,10 @@ fn historical_replay_rejects_producer_generation_mismatch() {
         let store = mutator.persistence_store_lock();
         let sqlite = store.as_ref().unwrap().sqlite().unwrap();
         let identities = sqlite.stored_compatibility_json(&file).unwrap();
-        let changed = identities[1]
-            .as_ref()
-            .unwrap()
-            .replace("\"shared_canonical_pipeline\":1", "\"shared_canonical_pipeline\":99");
+        let changed = identities[1].as_ref().unwrap().replace(
+            "\"shared_canonical_pipeline\":1",
+            "\"shared_canonical_pipeline\":99",
+        );
         sqlite
             .execute_batch(&format!(
                 "UPDATE contexts SET canonical_producer_identity = '{}'",
@@ -182,5 +191,8 @@ fn compatible_current_replay_preserves_existing_behavior() {
     assert!(restarted.ir_context_read().has_file(&alias));
     assert!(restarted.semantic_edges(&alias).is_some());
     assert!(restarted.context_fidelity(&alias).is_some());
-    assert_eq!(restarted.persisted_path(&alias).as_deref(), Some(file.as_str()));
+    assert_eq!(
+        restarted.persisted_path(&alias).as_deref(),
+        Some(file.as_str())
+    );
 }

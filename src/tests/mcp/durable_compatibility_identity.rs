@@ -1,9 +1,9 @@
-use super::identity::ProducerKey;
-use super::producer::GenerationCatalog;
 use super::derive_with_catalog;
+use super::identity::ProducerKey;
 use super::identity::{
     CanonicalProducerIdentity, CompatibilityIdentities, SemanticProducerIdentity,
 };
+use super::producer::GenerationCatalog;
 use crate::config::{CleanCtxConfig, MetaLayerConfig};
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
@@ -94,8 +94,14 @@ fn marker_only_config_changes_canonical_but_not_semantic_identity() {
     let first_identity = derive_angular(&first);
     let second_identity = derive_angular(&second);
 
-    assert_ne!(first_identity.canonical_config, second_identity.canonical_config);
-    assert_eq!(first_identity.semantic_config, second_identity.semantic_config);
+    assert_ne!(
+        first_identity.canonical_config,
+        second_identity.canonical_config
+    );
+    assert_eq!(
+        first_identity.semantic_config,
+        second_identity.semantic_config
+    );
 }
 
 #[test]
@@ -112,7 +118,10 @@ fn semantic_producing_config_changes_semantic_identity() {
     let first_identity = derive_angular(&first);
     let second_identity = derive_angular(&second);
 
-    assert_ne!(first_identity.semantic_config, second_identity.semantic_config);
+    assert_ne!(
+        first_identity.semantic_config,
+        second_identity.semantic_config
+    );
 }
 
 #[test]

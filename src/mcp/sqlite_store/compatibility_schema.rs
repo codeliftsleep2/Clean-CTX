@@ -21,10 +21,7 @@ pub(super) fn migrate(
             ("edit_intents", "semantic_producer_identity"),
         ] {
             if !has_column(connection, table, column)? {
-                connection.execute(
-                    &format!("ALTER TABLE {table} ADD COLUMN {column} TEXT"),
-                    [],
-                )?;
+                connection.execute(&format!("ALTER TABLE {table} ADD COLUMN {column} TEXT"), [])?;
             }
         }
         connection.execute(

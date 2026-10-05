@@ -4,9 +4,7 @@
 // and purge old deltas.
 
 use crate::mcp::McpState;
-use crate::mcp::compatibility::validator::{
-    CompatibilityFailure, validate_historical_context,
-};
+use crate::mcp::compatibility::validator::{CompatibilityFailure, validate_historical_context};
 use crate::mcp::tool_handlers::core::{ContentKind, contract_fields_for_hierarchy};
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -177,7 +175,7 @@ fn send_replay_compatibility_error(id: &Value, error: &CompatibilityFailure) {
     send_response(&crate::mcp::tool_helpers::jsonrpc_error(
         id.clone(),
         -32603,
-        &format!("Historical replay rejected: {error}"),
+        format!("Historical replay rejected: {error}"),
         Some(serde_json::json!({
             "reason": error.reason(),
             "component": error.component()
@@ -412,7 +410,9 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
 
     let source = match state.read_source(file_path) {
         Ok(source) => source,
-        Err(error) => return send_persistence_error(id, &format!("Cannot read current source: {error}")),
+        Err(error) => {
+            return send_persistence_error(id, &format!("Cannot read current source: {error}"));
+        }
     };
     let required_fidelity = restored.fidelity;
     let compatible = match validate_historical_context(
@@ -447,7 +447,8 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
             state,
         )
     };
-    let source_matches = state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
+    let source_matches =
+        state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
     let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let economic = crate::mcp::tool_handlers::core::content::economical_presentation_document(

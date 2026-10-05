@@ -3,7 +3,9 @@
 use super::SqliteStore;
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::SemanticEdge;
-use crate::mcp::compatibility::identity::{CompatibilityIdentities, PersistedCompatibilityIdentities};
+use crate::mcp::compatibility::identity::{
+    CompatibilityIdentities, PersistedCompatibilityIdentities,
+};
 use crate::mcp::compatibility::validator::{CompatibilityFailure, UntrustedDurableContext};
 use crate::mcp::context_store::ContextStore;
 use crate::mcp::state::durable_semantics::DurableSemanticSnapshot;
@@ -112,8 +114,7 @@ impl SqliteStore {
             Some(serde_json::to_string(&identities.semantic_producers)?),
         );
         Ok(stored.is_some_and(|stored| {
-            stored.0 == expected
-                && (stored.1, stored.2, stored.3, stored.4) == expected_identities
+            stored.0 == expected && (stored.1, stored.2, stored.3, stored.4) == expected_identities
         }))
     }
 
@@ -260,7 +261,7 @@ impl SqliteStore {
         let snapshot_row = self
             .conn
             .query_row(
-            "SELECT s.file_path, s.source_hash, s.semantic_version, s.edges_json,
+                "SELECT s.file_path, s.source_hash, s.semantic_version, s.edges_json,
                     c.canonical_config_identity, c.canonical_producer_identity,
                     s.semantic_config_identity, s.semantic_producer_identity
                  FROM semantic_edge_snapshots
@@ -295,9 +296,10 @@ impl SqliteStore {
             semantic_config,
             semantic_producers,
         ) = snapshot_row;
-        let snapshot: DurableSemanticSnapshot = serde_json::from_str(&snapshot_json).map_err(
-            |error| structural_error(format!("malformed semantic-edge snapshot: {error}")),
-        )?;
+        let snapshot: DurableSemanticSnapshot =
+            serde_json::from_str(&snapshot_json).map_err(|error| {
+                structural_error(format!("malformed semantic-edge snapshot: {error}"))
+            })?;
         if row_file != file_path || snapshot.file_path != file_path {
             return Err(structural_error(
                 "semantic-edge snapshot file identity mismatch",

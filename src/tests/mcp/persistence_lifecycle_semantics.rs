@@ -55,13 +55,11 @@ fn historical_replay_rejects_incompatible_config_before_live_mutation() {
         json!({ "filePath": file, "targetSequence": 0 }),
     );
     assert_eq!(
-        rejected["error"]["data"]["reason"],
-        "canonical_configuration_incompatible",
+        rejected["error"]["data"]["reason"], "canonical_configuration_incompatible",
         "{rejected}"
     );
     assert_eq!(
-        rejected["error"]["data"]["component"],
-        "canonical_configuration",
+        rejected["error"]["data"]["component"], "canonical_configuration",
         "{rejected}"
     );
     assert!(restarted.alias_for_path(&file).is_none());

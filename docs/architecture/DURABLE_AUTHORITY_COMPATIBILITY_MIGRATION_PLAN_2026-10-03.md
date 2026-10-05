@@ -1,8 +1,8 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-9 complete
-**Branch:** `feature/durable-authority-compatibility`  
-**Issues:** #117, #119, prerequisite and integration work for #116  
+**Status:** Complete; Phases 0-10 implemented and verified
+**Branch:** `feature/durable-authority-compatibility`
+**Issues:** #117, #119, prerequisite and integration work for #116
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
@@ -876,6 +876,26 @@ Exit criteria:
 - #117 and #119 can be closed;
 - #116 can be closed only if Phase 8 is included and green;
 - #118 remains independently open unless separately completed.
+
+**Implementation record (2026-10-04):** Complete. The production lifecycle
+was traced from scoped identity producers through derivation, atomic durable
+ownership, structural load, compatibility validation, typed canonical and
+semantic adoption, coverage, and MCP query/response consumption. Every
+production durable-context loader either validates before live adoption or
+uses the untrusted value only for a non-publishing precondition. Restore,
+historical replay, compatible edit recovery, and mutating delta publication
+converge on the typed semantic-publication boundary. No obsolete unchecked
+durable adoption path or unresolved critical/high architectural finding
+remains.
+
+The repository owner reported the complete Final Verification Gate from
+`docs/agent/verification.md` GREEN with no warnings. The branch-aware file-size
+guard checked 47 active text files successfully; strict UTF-8 and diff
+whitespace checks also passed. During finalization, stale persistence tests
+were aligned with the frozen compatibility contract and invalid workspace
+discovery fixtures were repaired so every mocked candidate names a real,
+semantically publishable file. Their seven focused regressions were reported
+GREEN before the complete gate was rerun.
 
 ## 7. Planned regression placement
 

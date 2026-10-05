@@ -331,12 +331,9 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
         )
         .expect("target compilation");
     target_ir.file_id.clone_from(&file);
-    let identities = crate::mcp::compatibility::derive_identities(
-        target_text,
-        &path,
-        &initial.config,
-    )
-    .expect("target identities");
+    let identities =
+        crate::mcp::compatibility::derive_identities(target_text, &path, &initial.config)
+            .expect("target identities");
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: "incompatible-recovery".to_string(),
         file_path: file.clone(),
@@ -375,10 +372,16 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
     assert_eq!(restarted.workspace_index_read().edge_count(), 0);
     assert!(restarted.llm_text_cache_lock().is_empty());
     let store = restarted.persistence_store_lock();
-    let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+    let sqlite = store
+        .as_ref()
+        .expect("persistence")
+        .sqlite()
+        .expect("SQLite");
     assert!(!sqlite.has_edit_intent(&file).expect("intent lookup"));
     assert_eq!(
-        sqlite.stored_compatibility_json(&file).expect("stored identities"),
+        sqlite
+            .stored_compatibility_json(&file)
+            .expect("stored identities"),
         [
             serde_json::to_string(&identities.canonical_config).ok(),
             serde_json::to_string(&identities.canonical_producers).ok(),
@@ -417,12 +420,9 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
         )
         .expect("target compilation");
     target_ir.file_id.clone_from(&file);
-    let identities = crate::mcp::compatibility::derive_identities(
-        target_text,
-        &path,
-        &initial.config,
-    )
-    .expect("target identities");
+    let identities =
+        crate::mcp::compatibility::derive_identities(target_text, &path, &initial.config)
+            .expect("target identities");
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: "compatible-recovery".to_string(),
         file_path: file.clone(),
@@ -463,13 +463,18 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
         restarted.context_fidelity(&alias),
         Some(crate::compression::Fidelity::Edit)
     );
-    assert_eq!(restarted.persisted_path(&alias).as_deref(), Some(file.as_str()));
-    assert!(!restarted
-        .persistence_store_lock()
-        .as_ref()
-        .expect("persistence")
-        .sqlite()
-        .expect("SQLite")
-        .has_edit_intent(&file)
-        .expect("intent lookup"));
+    assert_eq!(
+        restarted.persisted_path(&alias).as_deref(),
+        Some(file.as_str())
+    );
+    assert!(
+        !restarted
+            .persistence_store_lock()
+            .as_ref()
+            .expect("persistence")
+            .sqlite()
+            .expect("SQLite")
+            .has_edit_intent(&file)
+            .expect("intent lookup")
+    );
 }

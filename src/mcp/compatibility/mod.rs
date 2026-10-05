@@ -49,7 +49,12 @@ fn derive_with_catalog(
 
     Ok(CompatibilityIdentities {
         canonical_config: canonical_config_identity(config, &applicability)?,
-        canonical_producers: canonical_producer_identity(config, language, &applicability, catalog)?,
+        canonical_producers: canonical_producer_identity(
+            config,
+            language,
+            &applicability,
+            catalog,
+        )?,
         semantic_config: semantic_config_identity(config, &applicability),
         semantic_producers: semantic_producer_identity(language, &applicability, catalog)?,
     })
@@ -62,7 +67,10 @@ struct LanguageKeys {
 }
 
 fn language_keys(path: &Path) -> Result<LanguageKeys, IdentityDerivationError> {
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("");
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
     let layer = crate::layers::LayerRegistry::global()
         .language_layer_for_extension(extension)
         .filter(|layer| layer.language_ptr().is_some())
@@ -98,34 +106,12 @@ struct FrameworkApplicability {
 }
 
 impl FrameworkApplicability {
-    fn derive(
-        source: &str,
-        path: &Path,
-        config: &CleanCtxConfig,
-    ) -> Self {
+    fn derive(source: &str, path: &Path, config: &CleanCtxConfig) -> Self {
         let registry = crate::layers::LayerRegistry::global();
         Self {
-            angular: framework_applies(
-                registry.meta_layers(),
-                "angular",
-                source,
-                path,
-                config,
-            ),
-            dotnet: framework_applies(
-                registry.meta_layers(),
-                "dotnet",
-                source,
-                path,
-                config,
-            ),
-            spring: framework_applies(
-                registry.meta_layers(),
-                "spring_boot",
-                source,
-                path,
-                config,
-            ),
+            angular: framework_applies(registry.meta_layers(), "angular", source, path, config),
+            dotnet: framework_applies(registry.meta_layers(), "dotnet", source, path, config),
+            spring: framework_applies(registry.meta_layers(), "spring_boot", source, path, config),
         }
     }
 }
@@ -236,12 +222,7 @@ fn canonical_producer_identity(
             catalog,
         )?;
     }
-    insert_framework_producers(
-        &mut relevant_producers,
-        applicability,
-        catalog,
-        true,
-    )?;
+    insert_framework_producers(&mut relevant_producers, applicability, catalog, true)?;
     Ok(CanonicalProducerIdentity {
         schema_version: IDENTITY_SCHEMA_VERSION,
         relevant_producers,
@@ -265,12 +246,7 @@ fn semantic_producer_identity(
         ProducerKey::GenericSemanticProjection,
         catalog,
     )?;
-    insert_framework_producers(
-        &mut relevant_producers,
-        applicability,
-        catalog,
-        false,
-    )?;
+    insert_framework_producers(&mut relevant_producers, applicability, catalog, false)?;
     Ok(SemanticProducerIdentity {
         schema_version: IDENTITY_SCHEMA_VERSION,
         relevant_producers,

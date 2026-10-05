@@ -27,7 +27,12 @@ fn dispatch(state: &crate::mcp::McpState, id: i64, tool: &str, arguments: Value)
         .expect("registered response")
 }
 
-fn assert_clean_rejection(state: &crate::mcp::McpState, file: &str, response: &Value, reason: &str) {
+fn assert_clean_rejection(
+    state: &crate::mcp::McpState,
+    file: &str,
+    response: &Value,
+    reason: &str,
+) {
     assert_eq!(response["error"]["data"]["reason"], reason, "{response}");
     assert!(state.alias_for_path(file).is_none());
     assert_eq!(state.workspace_index_read().edge_count(), 0);
@@ -125,13 +130,11 @@ fn restore_rejects_canonical_type_alias_config_before_live_mutation() {
         json!({ "filePath": file, "workspaceRoot": root.path() }),
     );
     assert_eq!(
-        rejected["error"]["data"]["reason"],
-        "canonical_configuration_incompatible",
+        rejected["error"]["data"]["reason"], "canonical_configuration_incompatible",
         "{rejected}"
     );
     assert_eq!(
-        rejected["error"]["data"]["component"],
-        "canonical_configuration",
+        rejected["error"]["data"]["component"], "canonical_configuration",
         "{rejected}"
     );
     assert!(restarted.alias_for_path(&file).is_none());
@@ -222,7 +225,12 @@ fn restore_rejects_semantic_config_disabled_to_enabled() {
 fn restore_rejects_canonical_producer_generation_mismatch() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
-    let file = save_baseline(&root, "canonical-generation.ts", "export class App {}\n", |_| {});
+    let file = save_baseline(
+        &root,
+        "canonical-generation.ts",
+        "export class App {}\n",
+        |_| {},
+    );
     let producer = state_with_config(&root, |_| {});
     rewrite_identity(
         &producer,
@@ -230,19 +238,34 @@ fn restore_rejects_canonical_producer_generation_mismatch() {
         1,
         "contexts",
         "canonical_producer_identity",
-        |json| json.replace("\"shared_canonical_pipeline\":1", "\"shared_canonical_pipeline\":99"),
+        |json| {
+            json.replace(
+                "\"shared_canonical_pipeline\":1",
+                "\"shared_canonical_pipeline\":99",
+            )
+        },
     );
     drop(producer);
     let restarted = state_with_config(&root, |_| {});
     let rejected = restore(&restarted, &root, &file);
-    assert_clean_rejection(&restarted, &file, &rejected, "canonical_producer_incompatible");
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "canonical_producer_incompatible",
+    );
 }
 
 #[test]
 fn restore_rejects_semantic_producer_generation_mismatch() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
-    let file = save_baseline(&root, "semantic-generation.ts", "export class App {}\n", |_| {});
+    let file = save_baseline(
+        &root,
+        "semantic-generation.ts",
+        "export class App {}\n",
+        |_| {},
+    );
     let producer = state_with_config(&root, |_| {});
     rewrite_identity(
         &producer,
@@ -255,7 +278,12 @@ fn restore_rejects_semantic_producer_generation_mismatch() {
     drop(producer);
     let restarted = state_with_config(&root, |_| {});
     let rejected = restore(&restarted, &root, &file);
-    assert_clean_rejection(&restarted, &file, &rejected, "semantic_producer_incompatible");
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "semantic_producer_incompatible",
+    );
 }
 
 #[test]
@@ -270,22 +298,34 @@ fn restore_rejects_persisted_producer_when_current_set_lacks_it() {
         1,
         "contexts",
         "canonical_producer_identity",
-        |json| json.replace(
-            "\"shared_canonical_pipeline\":1,",
-            "\"angular_markers\":1,\"shared_canonical_pipeline\":1,",
-        ),
+        |json| {
+            json.replace(
+                "\"shared_canonical_pipeline\":1,",
+                "\"angular_markers\":1,\"shared_canonical_pipeline\":1,",
+            )
+        },
     );
     drop(producer);
     let restarted = state_with_config(&root, |_| {});
     let rejected = restore(&restarted, &root, &file);
-    assert_clean_rejection(&restarted, &file, &rejected, "canonical_producer_incompatible");
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "canonical_producer_incompatible",
+    );
 }
 
 #[test]
 fn restore_rejects_current_producer_when_persisted_set_lacks_it() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
-    let file = save_baseline(&root, "producer-missing.ts", "export class App {}\n", |_| {});
+    let file = save_baseline(
+        &root,
+        "producer-missing.ts",
+        "export class App {}\n",
+        |_| {},
+    );
     let producer = state_with_config(&root, |_| {});
     rewrite_identity(
         &producer,
@@ -298,7 +338,12 @@ fn restore_rejects_current_producer_when_persisted_set_lacks_it() {
     drop(producer);
     let restarted = state_with_config(&root, |_| {});
     let rejected = restore(&restarted, &root, &file);
-    assert_clean_rejection(&restarted, &file, &rejected, "canonical_producer_incompatible");
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "canonical_producer_incompatible",
+    );
 }
 
 #[test]
@@ -324,14 +369,22 @@ fn restore_rejects_legacy_missing_identity() {
 fn compatible_restart_reuses_and_publishes_complete_state() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
-    let file = save_baseline(&root, "compatible.ts", "export class Compatible {}\n", |_| {});
+    let file = save_baseline(
+        &root,
+        "compatible.ts",
+        "export class Compatible {}\n",
+        |_| {},
+    );
     let restarted = state_with_config(&root, |_| {});
     let restored = restore(&restarted, &root, &file);
     assert!(restored.get("error").is_none(), "{restored}");
     let alias = restarted.alias_for_path(&file).expect("restored alias");
     assert!(restarted.ir_context_read().has_file(&alias));
     assert!(restarted.context_fidelity(&alias).is_some());
-    assert_eq!(restarted.persisted_path(&alias).as_deref(), Some(file.as_str()));
+    assert_eq!(
+        restarted.persisted_path(&alias).as_deref(),
+        Some(file.as_str())
+    );
     assert!(restarted.semantic_edges(&alias).is_some());
     assert!(restarted.llm_text_cache_lock().contains_key(&alias));
 }

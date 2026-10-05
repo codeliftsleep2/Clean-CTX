@@ -91,9 +91,7 @@ fn ensure_persisted_baseline_with_identities(
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     source_hash: &str,
-    target_identities: Option<
-        &crate::mcp::compatibility::identity::CompatibilityIdentities,
-    >,
+    target_identities: Option<&crate::mcp::compatibility::identity::CompatibilityIdentities>,
 ) -> Result<(), String> {
     let missing = {
         let guard = state.persistence_store_lock();
@@ -124,9 +122,9 @@ fn ensure_persisted_baseline_with_identities(
             let current_identities = if let Some(identities) = target_identities {
                 identities
             } else {
-                let current_source = state.read_source(file_path).map_err(|error| {
-                    format!("cannot validate durable compatibility: {error}")
-                })?;
+                let current_source = state
+                    .read_source(file_path)
+                    .map_err(|error| format!("cannot validate durable compatibility: {error}"))?;
                 derived_identities = crate::mcp::compatibility::derive_identities(
                     &current_source,
                     std::path::Path::new(file_path),
@@ -135,11 +133,8 @@ fn ensure_persisted_baseline_with_identities(
                 .map_err(|error| format!("cannot derive durable compatibility: {error}"))?;
                 &derived_identities
             };
-            crate::mcp::compatibility::validator::validate_canonical(
-                &durable,
-                &current_identities,
-            )
-            .map_err(|error| error.to_string())?;
+            crate::mcp::compatibility::validator::validate_canonical(&durable, current_identities)
+                .map_err(|error| error.to_string())?;
             false
         }
     };
@@ -181,9 +176,7 @@ pub(crate) fn ensure_apply_baseline(
     alias: &str,
     file_path: &str,
     fidelity: crate::compression::Fidelity,
-    target_identities: Option<
-        &crate::mcp::compatibility::identity::CompatibilityIdentities,
-    >,
+    target_identities: Option<&crate::mcp::compatibility::identity::CompatibilityIdentities>,
 ) -> Result<(), String> {
     if state.persistence_store_lock().is_none() {
         return Ok(());

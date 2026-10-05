@@ -150,12 +150,16 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
         json!({ "filePath": file.clone(), "workspaceRoot": root.path() }),
     );
     assert_eq!(
-        restored_baseline["error"]["data"]["reason"],
-        "source_mismatch",
+        restored_baseline["error"]["data"]["reason"], "source_mismatch",
         "{restored_baseline}"
     );
     assert!(restarted_without_pending.alias_for_path(&file).is_none());
-    assert_eq!(restarted_without_pending.workspace_index_read().edge_count(), 0);
+    assert_eq!(
+        restarted_without_pending
+            .workspace_index_read()
+            .edge_count(),
+        0
+    );
     let standalone = dispatch(
         &restarted_without_pending,
         4,

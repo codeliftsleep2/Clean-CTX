@@ -64,9 +64,7 @@ pub(crate) struct SemanticConfigIdentity {
     pub dotnet: Option<DotNetSemanticConfigIdentity>,
 }
 
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum ProducerKey {
     SharedCanonicalPipeline,

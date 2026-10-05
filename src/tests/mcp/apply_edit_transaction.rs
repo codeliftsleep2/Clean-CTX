@@ -452,13 +452,19 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };
+    let identities = crate::mcp::compatibility::derive_identities(
+        target_text,
+        std::path::Path::new(&file),
+        &initial_state.config,
+    )
+    .expect("target compatibility identities");
     initial_state
         .persistence_store_lock()
         .as_ref()
         .unwrap()
         .sqlite()
         .unwrap()
-        .establish_edit_intent(&intent)
+        .establish_compatible_edit_intent(&intent, &identities)
         .unwrap();
     std::fs::write(&file, &target).unwrap();
     drop(initial_state);

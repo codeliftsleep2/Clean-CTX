@@ -98,9 +98,7 @@ impl CompatibilityFailure {
             Self::StructuralSnapshotIncoherence { .. } => "structural_snapshot_incoherence",
             Self::SourceMismatch { .. } => "source_mismatch",
             Self::InsufficientFidelity { .. } => "insufficient_fidelity",
-            Self::CanonicalConfigurationIncompatible => {
-                "canonical_configuration_incompatible"
-            }
+            Self::CanonicalConfigurationIncompatible => "canonical_configuration_incompatible",
             Self::SemanticConfigurationIncompatible => "semantic_configuration_incompatible",
             Self::CanonicalProducerIncompatible => "canonical_producer_incompatible",
             Self::SemanticProducerIncompatible => "semantic_producer_incompatible",
@@ -179,7 +177,10 @@ fn validate_with_identities(
     }
     let semantic = validate_semantic(&loaded, current)?;
     let canonical = validate_canonical(&loaded, current)?;
-    Ok(CompatibleDurableContext { canonical, semantic })
+    Ok(CompatibleDurableContext {
+        canonical,
+        semantic,
+    })
 }
 
 pub(crate) fn validate_canonical(

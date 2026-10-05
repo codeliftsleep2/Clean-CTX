@@ -107,6 +107,8 @@ fn failed_compress_baseline_commit_publishes_no_candidate_live_state() {
         prior_compact.as_ref()
     );
 
+    std::fs::write(&file, "export class Before { run(): void {} }\n").unwrap();
+    state.invalidate_source_cache(&file);
     let restored = dispatch(
         &state,
         4,
