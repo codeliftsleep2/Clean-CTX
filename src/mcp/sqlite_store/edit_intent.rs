@@ -3,6 +3,9 @@
 use super::SqliteStore;
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::SemanticEdge;
+use crate::mcp::compatibility::identity::{
+    CompatibilityIdentities, PersistedCompatibilityIdentities,
+};
 use crate::mcp::state::durable_semantics::DurableSemanticSnapshot;
 use rusqlite::{Connection, OptionalExtension, params};
 use sha2::{Digest, Sha256};
@@ -32,6 +35,7 @@ pub(crate) enum EditRecovery {
 struct StoredIntent {
     intent: EditIntent,
     edges_json: String,
+    compatibility: PersistedCompatibilityIdentities,
 }
 
 pub(super) fn migrate(conn: &Connection) -> Result<(), Box<dyn std::error::Error>> {
@@ -57,9 +61,26 @@ pub(super) fn migrate(conn: &Connection) -> Result<(), Box<dyn std::error::Error
 }
 
 impl SqliteStore {
+    #[cfg(test)]
     pub(crate) fn establish_edit_intent(
         &mut self,
         intent: &EditIntent,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.insert_edit_intent(intent, None)
+    }
+
+    pub(crate) fn establish_compatible_edit_intent(
+        &mut self,
+        intent: &EditIntent,
+        identities: &CompatibilityIdentities,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.insert_edit_intent(intent, Some(identities))
+    }
+
+    fn insert_edit_intent(
+        &mut self,
+        intent: &EditIntent,
+        identities: Option<&CompatibilityIdentities>,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let snapshot = DurableSemanticSnapshot::new(
             intent.file_path.clone(),
@@ -71,8 +92,11 @@ impl SqliteStore {
             "INSERT INTO edit_intents
              (file_path, transition_id, prior_hash, target_hash, prior_version,
               target_version, prior_source, target_source, target_ir,
-              target_edges_json, fidelity, stage_path)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+              target_edges_json, fidelity, stage_path, canonical_config_identity,
+              canonical_producer_identity, semantic_config_identity,
+              semantic_producer_identity)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+                     ?13, ?14, ?15, ?16)",
             params![
                 intent.file_path,
                 intent.transition_id,
@@ -86,6 +110,18 @@ impl SqliteStore {
                 serde_json::to_string(&snapshot)?,
                 intent.fidelity as i32,
                 intent.stage_path,
+                identities
+                    .map(|value| serde_json::to_string(&value.canonical_config))
+                    .transpose()?,
+                identities
+                    .map(|value| serde_json::to_string(&value.canonical_producers))
+                    .transpose()?,
+                identities
+                    .map(|value| serde_json::to_string(&value.semantic_config))
+                    .transpose()?,
+                identities
+                    .map(|value| serde_json::to_string(&value.semantic_producers))
+                    .transpose()?,
             ],
         )?;
         Ok(())
@@ -156,17 +192,32 @@ impl SqliteStore {
             return Err("edit intent semantic snapshot identity mismatch".into());
         }
         let edges = snapshot.restore_edges()?;
-        self.save_context_with_semantics(
-            file_path,
-            stored.intent.fidelity,
-            "",
-            &stored.intent.target_ir,
-            &stored.intent.target_hash,
-            stored.intent.target_version,
-            &edges,
-            0,
-            0,
-        )?;
+        if let Some(identities) = complete_identities(&stored.compatibility)? {
+            self.save_context_with_compatibility(
+                file_path,
+                stored.intent.fidelity,
+                "",
+                &stored.intent.target_ir,
+                &stored.intent.target_hash,
+                stored.intent.target_version,
+                &edges,
+                0,
+                0,
+                &identities,
+            )?;
+        } else {
+            self.save_context_with_semantics(
+                file_path,
+                stored.intent.fidelity,
+                "",
+                &stored.intent.target_ir,
+                &stored.intent.target_hash,
+                stored.intent.target_version,
+                &edges,
+                0,
+                0,
+            )?;
+        }
         self.clear_edit_intent(file_path, &stored.intent.transition_id)?;
         remove_stage(&stored.intent.stage_path);
         Ok(EditRecovery::TargetCommitted)
@@ -180,7 +231,9 @@ impl SqliteStore {
             .query_row(
                 "SELECT transition_id, prior_hash, target_hash, prior_version,
                         target_version, prior_source, target_source, target_ir,
-                        target_edges_json, fidelity, stage_path
+                        target_edges_json, fidelity, stage_path,
+                        canonical_config_identity, canonical_producer_identity,
+                        semantic_config_identity, semantic_producer_identity
                  FROM edit_intents WHERE file_path = ?1",
                 params![file_path],
                 |row| {
@@ -201,11 +254,57 @@ impl SqliteStore {
                             stage_path: row.get(10)?,
                         },
                         edges_json: row.get(8)?,
+                        compatibility: PersistedCompatibilityIdentities {
+                            canonical_config: decode_identity(row.get(11)?)?,
+                            canonical_producers: decode_identity(row.get(12)?)?,
+                            semantic_config: decode_identity(row.get(13)?)?,
+                            semantic_producers: decode_identity(row.get(14)?)?,
+                        },
                     })
                 },
             )
             .optional()
             .map_err(Into::into)
+    }
+}
+
+fn decode_identity<T: serde::de::DeserializeOwned>(
+    value: Option<String>,
+) -> Result<Option<T>, rusqlite::Error> {
+    value
+        .map(|encoded| {
+            serde_json::from_str(&encoded).map_err(|error| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    encoded.len(),
+                    rusqlite::types::Type::Text,
+                    Box::new(error),
+                )
+            })
+        })
+        .transpose()
+}
+
+fn complete_identities(
+    value: &PersistedCompatibilityIdentities,
+) -> Result<Option<CompatibilityIdentities>, Box<dyn std::error::Error>> {
+    let present = [
+        value.canonical_config.is_some(),
+        value.canonical_producers.is_some(),
+        value.semantic_config.is_some(),
+        value.semantic_producers.is_some(),
+    ]
+    .into_iter()
+    .filter(|present| *present)
+    .count();
+    match present {
+        0 => Ok(None),
+        4 => Ok(Some(CompatibilityIdentities {
+            canonical_config: value.canonical_config.clone().expect("counted identity"),
+            canonical_producers: value.canonical_producers.clone().expect("counted identity"),
+            semantic_config: value.semantic_config.clone().expect("counted identity"),
+            semantic_producers: value.semantic_producers.clone().expect("counted identity"),
+        })),
+        _ => Err("edit intent has a partial compatibility envelope".into()),
     }
 }
 

@@ -12,13 +12,40 @@ pub(super) fn persist_baseline(
     compiled: &CompiledIR,
     source_hash: &str,
     semantic_edges: &[SemanticEdge],
+    source: &str,
+) -> Result<(), String> {
+    let identities = crate::mcp::compatibility::derive_identities(
+        source,
+        std::path::Path::new(file_path),
+        &state.config,
+    )
+    .map_err(|error| format!("compatibility identity derivation failed: {error}"))?;
+    persist_baseline_with_identities(
+        state,
+        file_path,
+        fidelity,
+        compiled,
+        source_hash,
+        semantic_edges,
+        &identities,
+    )
+}
+
+fn persist_baseline_with_identities(
+    state: &McpState,
+    file_path: &str,
+    fidelity: crate::compression::Fidelity,
+    compiled: &CompiledIR,
+    source_hash: &str,
+    semantic_edges: &[SemanticEdge],
+    identities: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
     let binary = crate::ir::binary_wire::encode(&durable);
     if let Some(ref store) = *state.persistence_store_lock() {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_semantics(
+                .save_context_with_compatibility(
                     file_path,
                     fidelity,
                     "",
@@ -28,6 +55,7 @@ pub(super) fn persist_baseline(
                     semantic_edges,
                     0,
                     0,
+                    identities,
                 )
                 .is_ok()
         });
@@ -46,6 +74,24 @@ pub(super) fn ensure_persisted_baseline(
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     source_hash: &str,
+) -> Result<(), String> {
+    ensure_persisted_baseline_with_identities(
+        state,
+        file_path,
+        fidelity,
+        compiled,
+        source_hash,
+        None,
+    )
+}
+
+fn ensure_persisted_baseline_with_identities(
+    state: &McpState,
+    file_path: &str,
+    fidelity: crate::compression::Fidelity,
+    compiled: &CompiledIR,
+    source_hash: &str,
+    target_identities: Option<&crate::mcp::compatibility::identity::CompatibilityIdentities>,
 ) -> Result<(), String> {
     let missing = {
         let guard = state.persistence_store_lock();
@@ -72,6 +118,23 @@ pub(super) fn ensure_persisted_baseline(
             {
                 return Err("Durable baseline does not match session canonical state".to_string());
             }
+            let derived_identities;
+            let current_identities = if let Some(identities) = target_identities {
+                identities
+            } else {
+                let current_source = state
+                    .read_source(file_path)
+                    .map_err(|error| format!("cannot validate durable compatibility: {error}"))?;
+                derived_identities = crate::mcp::compatibility::derive_identities(
+                    &current_source,
+                    std::path::Path::new(file_path),
+                    &state.config,
+                )
+                .map_err(|error| format!("cannot derive durable compatibility: {error}"))?;
+                &derived_identities
+            };
+            crate::mcp::compatibility::validator::validate_canonical(&durable, current_identities)
+                .map_err(|error| error.to_string())?;
             false
         }
     };
@@ -79,14 +142,30 @@ pub(super) fn ensure_persisted_baseline(
         let semantic_edges = state
             .semantic_edges(&compiled.file_id)
             .ok_or_else(|| "missing authoritative semantic-edge baseline".to_string())?;
-        persist_baseline(
-            state,
-            file_path,
-            fidelity,
-            compiled,
-            source_hash,
-            &semantic_edges,
-        )?;
+        if let Some(identities) = target_identities {
+            persist_baseline_with_identities(
+                state,
+                file_path,
+                fidelity,
+                compiled,
+                source_hash,
+                &semantic_edges,
+                identities,
+            )?;
+        } else {
+            let source = state
+                .read_source(file_path)
+                .map_err(|error| format!("cannot derive durable compatibility: {error}"))?;
+            persist_baseline(
+                state,
+                file_path,
+                fidelity,
+                compiled,
+                source_hash,
+                &semantic_edges,
+                &source,
+            )?;
+        }
         state.remember_persisted_path(&compiled.file_id, file_path);
     }
     Ok(())
@@ -97,6 +176,7 @@ pub(crate) fn ensure_apply_baseline(
     alias: &str,
     file_path: &str,
     fidelity: crate::compression::Fidelity,
+    target_identities: Option<&crate::mcp::compatibility::identity::CompatibilityIdentities>,
 ) -> Result<(), String> {
     if state.persistence_store_lock().is_none() {
         return Ok(());
@@ -115,7 +195,14 @@ pub(crate) fn ensure_apply_baseline(
         .ok_or_else(|| "missing canonical baseline source hash".to_string())?;
     drop(ir_ctx);
     let compiled = compiled_from_tuples(alias.to_string(), version, instructions)?;
-    ensure_persisted_baseline(state, file_path, fidelity, &compiled, &source_hash)
+    ensure_persisted_baseline_with_identities(
+        state,
+        file_path,
+        fidelity,
+        &compiled,
+        &source_hash,
+        target_identities,
+    )
 }
 
 pub(crate) fn persisted_context_id(

@@ -2,6 +2,7 @@
 
 use super::common::{ContentKind, checked_hierarchy_or_respond, contract_fields_for_hierarchy};
 use crate::mcp::McpState;
+use crate::mcp::compatibility::validator::{CompatibilityFailure, validate_current_context};
 use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -36,79 +37,76 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         match sqlite.load_durable_context(&durable_path, None) {
             Ok(Some(restored)) => restored,
             Ok(None) => return send_restore_error(id, "No persisted context for requested file"),
-            Err(error) => {
-                return send_restore_error(id, &format!("Durable restore failed: {error}"));
-            }
+            Err(error) => return send_compatibility_error(id, &error),
         }
     };
 
-    if checked_hierarchy_or_respond(id, &restored.ir).is_none() {
+    let source = match state.read_source(&durable_path) {
+        Ok(source) => source,
+        Err(error) => {
+            return send_restore_error(id, &format!("Cannot read current source: {error}"));
+        }
+    };
+    let required_fidelity = restored.fidelity;
+    let compatible = match validate_current_context(
+        restored,
+        &source,
+        std::path::Path::new(&durable_path),
+        &state.config,
+        required_fidelity,
+    ) {
+        Ok(compatible) => compatible,
+        Err(error) => return send_compatibility_error(id, &error),
+    };
+    let canonical = compatible.canonical;
+    let semantic = compatible.semantic;
+    if checked_hierarchy_or_respond(id, &canonical.ir).is_none() {
         return;
     }
     let alias = state.get_or_create_alias(durable_path.clone());
-    let mut session_ir = restored.ir;
+    let mut session_ir = canonical.ir;
     session_ir.file_id.clone_from(&alias);
     let hierarchy = match checked_hierarchy_or_respond(id, &session_ir) {
         Some(hierarchy) => hierarchy,
         None => return,
     };
-    let compact =
-        || super::content::presentation_document(&session_ir, &hierarchy, restored.fidelity, state);
-    let (full, raw_passthrough) = match state.read_source(&durable_path) {
-        Ok(source) => {
-            let source_matches =
-                state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
-            let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
-            let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic = super::content::economical_presentation_document(
-                &session_ir,
-                &hierarchy,
-                restored.fidelity,
-                &source,
-                state,
-                tokenizer_kind,
-                tokenizer_box.as_deref(),
-            );
-            let selected_raw = matches!(
-                economic.selected,
-                crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-            );
-            if selected_raw && source_matches {
-                (economic.text, true)
-            } else {
-                (compact(), false)
-            }
-        }
-        Err(_) => (compact(), false),
+    let compact = || {
+        super::content::presentation_document(&session_ir, &hierarchy, canonical.fidelity, state)
     };
-    let canonical_path = state.semantic_owner_path(&durable_path);
-    let edge_count = restored.semantic_edges.len();
+    let source_matches =
+        state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
+    let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+    let economic = super::content::economical_presentation_document(
+        &session_ir,
+        &hierarchy,
+        canonical.fidelity,
+        &source,
+        state,
+        tokenizer_kind,
+        tokenizer_box.as_deref(),
+    );
+    let selected_raw = matches!(
+        economic.selected,
+        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+    );
+    let (full, raw_passthrough) = if selected_raw && source_matches {
+        (economic.text, true)
+    } else {
+        (compact(), false)
+    };
+    let edge_count = semantic.semantic_edges.len();
 
     state
         .ir_context_lock()
-        .load_ir(session_ir.clone(), Some(restored.source_hash.clone()));
+        .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
     state.remember_persisted_path(&alias, &durable_path);
-    state.remember_context_fidelity(&alias, restored.fidelity);
-    state.remember_semantic_edges(&alias, restored.semantic_edges.clone());
-    {
-        let mut index = state.workspace_index_lock();
-        match crate::workspace::index::SemanticFidelity::from_compilation(restored.fidelity) {
-            Some(semantic_fidelity) => index.replace_semantic_projection(
-                &canonical_path,
-                restored.semantic_edges,
-                semantic_fidelity,
-                restored.source_hash,
-            ),
-            None => {
-                index.remove_file(&canonical_path);
-                index.add_edges(&canonical_path, restored.semantic_edges);
-            }
-        }
-    }
+    state.remember_context_fidelity(&alias, canonical.fidelity);
+    state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
     state
         .llm_text_cache_lock()
         .insert(alias.clone(), full.clone());
-    let (content_kind, byte_exact) = contract_fields_for_hierarchy(restored.fidelity, &hierarchy);
+    let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
 
     let mut response = serde_json::json!({
         "jsonrpc": "2.0", "id": id,
@@ -141,3 +139,19 @@ fn send_restore_error(id: &Value, message: &str) {
         None,
     ));
 }
+
+fn send_compatibility_error(id: &Value, error: &CompatibilityFailure) {
+    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        -32603,
+        format!("Durable restore rejected: {error}"),
+        Some(serde_json::json!({
+            "reason": error.reason(),
+            "component": error.component()
+        })),
+    ));
+}
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/durable_restore_compatibility.rs"]
+mod compatibility_tests;

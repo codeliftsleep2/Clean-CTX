@@ -56,14 +56,21 @@ fn establish_intent(
         .cloned()
         .unwrap();
     let prior_version = state.file_version(&alias).unwrap();
+    let target_source = std::str::from_utf8(&target).unwrap();
     let (mut target_ir, target_edges, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             file,
-            std::str::from_utf8(&target).unwrap(),
+            target_source,
             crate::compression::Fidelity::Edit,
             state,
         )
         .unwrap();
+    let identities = crate::mcp::compatibility::derive_identities(
+        target_source,
+        std::path::Path::new(file),
+        &state.config,
+    )
+    .unwrap();
     target_ir.file_id = file.to_string();
     let target_version = target_ir.version;
     let intent = crate::mcp::sqlite_store::EditIntent {
@@ -86,7 +93,7 @@ fn establish_intent(
         .unwrap()
         .sqlite()
         .unwrap()
-        .establish_edit_intent(&intent)
+        .establish_compatible_edit_intent(&intent, &identities)
         .unwrap();
     target_version
 }

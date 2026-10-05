@@ -25,6 +25,11 @@ use crate::ir::opcodes::{
     ExecutionContextKind, SideEffectKind,
 };
 
+/// Increment when identical TypeScript input can emit different canonical IR.
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
+/// Increment when TypeScript canonical facts change meaning for projection.
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
+
 /// TypeScript language layer (Layer 2).
 /// Processes TypeScript-specific captures and emits additional CoreOp instructions.
 pub struct TypeScriptLayer;

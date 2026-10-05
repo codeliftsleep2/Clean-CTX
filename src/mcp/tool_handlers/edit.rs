@@ -280,6 +280,21 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     let mut durable_ir = target_ir.clone();
     durable_ir.file_id.clone_from(&resolved_path);
     let target_binary = crate::ir::binary_wire::encode(&durable_ir);
+    let compatibility = match crate::mcp::compatibility::derive_identities(
+        &report.new_source,
+        std::path::Path::new(&resolved_path),
+        &state.config,
+    ) {
+        Ok(identities) => identities,
+        Err(error) => {
+            return err_response(
+                id,
+                -32603,
+                format!("Edited compatibility identity derivation failed: {error}"),
+                None,
+            );
+        }
+    };
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: transition_id.clone(),
         file_path: resolved_path.clone(),
@@ -294,7 +309,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         fidelity: Fidelity::Edit,
         stage_path,
     };
-    if let Err(error) = establish_edit_intent(state, &intent) {
+    if let Err(error) = establish_edit_intent(state, &intent, &compatibility) {
         return err_response(id, -32603, error, None);
     }
     if let Err(error) = staged.persist(&resolved_path) {
@@ -315,6 +330,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         &new_hash,
         target_ir.version,
         &semantic_edges,
+        &compatibility,
     ) {
         if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
             return err_response(
@@ -512,6 +528,7 @@ fn edit_transition_id(
 fn establish_edit_intent(
     state: &McpState,
     intent: &crate::mcp::sqlite_store::EditIntent,
+    compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let guard = state.persistence_store_lock();
     let Some(store) = guard.as_ref() else {
@@ -520,7 +537,7 @@ fn establish_edit_intent(
     store
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?
-        .establish_edit_intent(intent)
+        .establish_compatible_edit_intent(intent, compatibility)
         .map_err(|error| format!("Cannot establish durable edit intent: {error}"))
 }
 
@@ -533,6 +550,7 @@ fn commit_edit_semantics(
     target_hash: &str,
     target_version: u64,
     semantic_edges: &[crate::layers::meta::semantic::SemanticEdge],
+    compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let guard = state.persistence_store_lock();
     let Some(store) = guard.as_ref() else {
@@ -542,7 +560,7 @@ fn commit_edit_semantics(
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
     sqlite
-        .save_context_with_semantics(
+        .save_context_with_compatibility(
             file_path,
             Fidelity::Edit,
             "",
@@ -552,6 +570,7 @@ fn commit_edit_semantics(
             semantic_edges,
             0,
             0,
+            compatibility,
         )
         .map_err(|error| format!("Atomic durable semantic commit failed: {error}"))?;
     if let Err(error) = sqlite.clear_edit_intent(file_path, transition_id) {

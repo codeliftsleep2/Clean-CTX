@@ -279,9 +279,15 @@ fn overwrite_and_durable_restore_preserve_persisted_ownership_coherently() {
     );
     let restored_without_source = dispatch(&state, 14, "restore_context", args());
     assert!(
-        restored_without_source.get("error").is_none(),
-        "restore must not recompile or require source: {restored_without_source}"
+        restored_without_source["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("Cannot read current source")),
+        "restore must reject when current-source compatibility cannot be proven: {restored_without_source}"
     );
+    let alias = state
+        .alias_for_path(&file_path)
+        .expect("existing durable owner alias");
+    assert!(state.ir_context_read().get_ir(&alias).is_none());
 
     state
         .persistence_store_lock()

@@ -149,9 +149,16 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
         "restore_context",
         json!({ "filePath": file.clone(), "workspaceRoot": root.path() }),
     );
-    assert!(
-        restored_baseline.get("error").is_none(),
+    assert_eq!(
+        restored_baseline["error"]["data"]["reason"], "source_mismatch",
         "{restored_baseline}"
+    );
+    assert!(restarted_without_pending.alias_for_path(&file).is_none());
+    assert_eq!(
+        restarted_without_pending
+            .workspace_index_read()
+            .edge_count(),
+        0
     );
     let standalone = dispatch(
         &restarted_without_pending,
@@ -159,12 +166,7 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
         "apply_delta",
         json!({ "delta": delta.clone(), "currentVersion": from.clone() }),
     );
-    assert!(
-        standalone["error"]["message"]
-            .as_str()
-            .is_some_and(|message| message.contains("authoritative semantic-edge snapshot")),
-        "{standalone}"
-    );
+    assert!(standalone.get("error").is_some(), "{standalone}");
 
     let applied = dispatch(
         &producer,

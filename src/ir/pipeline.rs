@@ -35,6 +35,11 @@ use crate::compression::Fidelity;
 use crate::compression::capture_pipeline::CapEntry;
 use crate::layers::meta::semantic::SemanticEdge;
 
+/// Durable-compatibility generation for language-agnostic canonical pipeline
+/// semantics. Increment only when identical producer inputs can yield a
+/// meaningfully different canonical instruction stream.
+pub(crate) const CANONICAL_PIPELINE_GENERATION: u32 = 1;
+
 mod core;
 mod meta_layer;
 mod post;

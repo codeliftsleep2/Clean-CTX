@@ -652,6 +652,22 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### PERSIST-002 Durable Authority Requires Scoped Compatibility Evidence
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Structurally decodable durable state must never become live canonical or semantic authority under a runtime that would have produced different facts. |
+| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
+| **Publication** | `CompatibleCanonicalState` and `CompatibleSemanticProjection` are the typed evidence boundary. Compatible restore, replay, recovery, and mutating delta publication share `McpState::publish_compatible_semantic_projection`; coverage is recorded only for the projection's own source hash and a certifiable compilation fidelity. WorkspaceIndex stores coverage but owns no compatibility policy. |
+| **Producer generations** | Each producing module owns its generation constant and increments it only when identical relevant inputs can yield different durable canonical facts, markers, or semantic edges. Configuration changes are represented by configuration identity instead. Refactors with identical durable output do not bump generations, and unrelated producers are never bumped together. |
+| **Diagnostics** | Rejections expose a stable structured `reason` and affected `component`; human-readable details may describe source hashes or fidelity but never substitute for the structured classification. |
+| **Enforcement** | Identity determinism and scoping: `src/tests/mcp/durable_compatibility_identity.rs`. Atomic persistence and legacy absence: `durable_compatibility_persistence.rs`. Pure validation: `durable_compatibility_validation.rs`. Production restore/replay/delta/recovery/publication: `durable_restore_compatibility.rs`, `historical_replay_compatibility.rs`, `delta_compatibility_epoch.rs`, `delta_fidelity_persistence.rs`, `semantic_publication_recovery.rs`, `delta_edit_recovery.rs`, and `replay_edit_recovery.rs`. |
+| **Authority** | `src/mcp/compatibility/{identity,producer,validator}.rs`; `src/mcp/sqlite_store/{compatibility_schema,semantic_state,edit_intent}.rs`; `src/mcp/durable_semantics.rs`; restore, replay, delta, and edit handlers under `src/mcp/tool_handlers/` |
+| **Type** | STRUCTURAL + ENFORCED (test) |
+| **Gate** | Focused compatibility authorities plus the final `cargo test --workspace --all-targets --all-features` and zero-warning Clippy gate |
+
+---
+
 ## Architectural Debt
 
 ### PUB-001 Same-Owner Semantic Publication Is Source-Ordered

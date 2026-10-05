@@ -4,6 +4,7 @@
 // and purge old deltas.
 
 use crate::mcp::McpState;
+use crate::mcp::compatibility::validator::{CompatibilityFailure, validate_historical_context};
 use crate::mcp::tool_handlers::core::{ContentKind, contract_fields_for_hierarchy};
 use crate::protocol::send_response;
 use serde_json::Value;
@@ -96,6 +97,18 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
         .file_stats(&requested_path)
         .map(|stats| (stats.raw_tokens as u64, stats.compressed_tokens as u64))
         .unwrap_or((0, 0));
+    let source = match state.read_source(&durable_path) {
+        Ok(source) => source,
+        Err(error) => return send_persistence_error(id, &error.to_string()),
+    };
+    let identities = match crate::mcp::compatibility::derive_identities(
+        &source,
+        std::path::Path::new(&durable_path),
+        &state.config,
+    ) {
+        Ok(identities) => identities,
+        Err(error) => return send_persistence_error(id, &error.to_string()),
+    };
 
     let store_guard = state.persistence_store_lock();
     let Some(store) = store_guard.as_ref() else {
@@ -111,6 +124,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                 &source_hash,
                 version,
                 &semantic_edges,
+                &identities,
             )
             .unwrap_or(false)
     });
@@ -119,7 +133,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
     } else {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_semantics(
+                .save_context_with_compatibility(
                     &durable_path,
                     fidelity,
                     &compact,
@@ -129,6 +143,7 @@ pub(crate) fn handle_save_context(id: &Value, params: &Value, state: &McpState) 
                     &semantic_edges,
                     raw_tokens,
                     compressed_tokens,
+                    &identities,
                 )
                 .is_ok()
         });
@@ -153,6 +168,18 @@ fn send_persistence_error(id: &Value, message: &str) {
         -32603,
         message,
         None,
+    ));
+}
+
+fn send_replay_compatibility_error(id: &Value, error: &CompatibilityFailure) {
+    send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+        id.clone(),
+        -32603,
+        format!("Historical replay rejected: {error}"),
+        Some(serde_json::json!({
+            "reason": error.reason(),
+            "component": error.component()
+        })),
     ));
 }
 
@@ -377,14 +404,31 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         match sqlite.load_durable_context(file_path, target_seq) {
             Ok(Some(restored)) => restored,
             Ok(None) => return send_persistence_error(id, "No persisted context found"),
-            Err(error) => {
-                return send_persistence_error(id, &format!("Replay failed: {error}"));
-            }
+            Err(error) => return send_replay_compatibility_error(id, &error),
         }
     };
 
+    let source = match state.read_source(file_path) {
+        Ok(source) => source,
+        Err(error) => {
+            return send_persistence_error(id, &format!("Cannot read current source: {error}"));
+        }
+    };
+    let required_fidelity = restored.fidelity;
+    let compatible = match validate_historical_context(
+        restored,
+        &source,
+        std::path::Path::new(file_path),
+        &state.config,
+        required_fidelity,
+    ) {
+        Ok(compatible) => compatible,
+        Err(error) => return send_replay_compatibility_error(id, &error),
+    };
+    let canonical = compatible.canonical;
+    let semantic = compatible.semantic;
     let path_alias = state.get_or_create_alias(file_path.to_string());
-    let mut ir = restored.ir;
+    let mut ir = canonical.ir;
     ir.file_id.clone_from(&path_alias);
     let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&ir) {
         Ok(hierarchy) => hierarchy,
@@ -399,54 +443,42 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         crate::mcp::tool_handlers::core::content::presentation_document(
             &ir,
             &hierarchy,
-            restored.fidelity,
+            canonical.fidelity,
             state,
         )
     };
-    let (rendered, raw_passthrough) = match state.read_source(file_path) {
-        Ok(source) => {
-            let source_matches =
-                state.cache_read().compute_hash(source.as_bytes()) == restored.source_hash;
-            let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
-            let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
-            let economic =
-                crate::mcp::tool_handlers::core::content::economical_presentation_document(
-                    &ir,
-                    &hierarchy,
-                    restored.fidelity,
-                    &source,
-                    state,
-                    tokenizer_kind,
-                    tokenizer_box.as_deref(),
-                );
-            let selected_raw = matches!(
-                economic.selected,
-                crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
-            );
-            if selected_raw && source_matches {
-                (economic.text, true)
-            } else {
-                (compact(), false)
-            }
-        }
-        Err(_) => (compact(), false),
+    let source_matches =
+        state.cache_read().compute_hash(source.as_bytes()) == canonical.source_hash;
+    let tokenizer_kind = crate::mcp::tools::parse_tokenizer_arg(params, &state.config);
+    let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
+    let economic = crate::mcp::tool_handlers::core::content::economical_presentation_document(
+        &ir,
+        &hierarchy,
+        canonical.fidelity,
+        &source,
+        state,
+        tokenizer_kind,
+        tokenizer_box.as_deref(),
+    );
+    let selected_raw = matches!(
+        economic.selected,
+        crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
+    );
+    let (rendered, raw_passthrough) = if selected_raw && source_matches {
+        (economic.text, true)
+    } else {
+        (compact(), false)
     };
-    let canonical_path = state.semantic_owner_path(file_path);
     state
         .ir_context_lock()
-        .load_ir(ir.clone(), Some(restored.source_hash));
+        .load_ir(ir.clone(), Some(canonical.source_hash));
     state.remember_persisted_path(&path_alias, file_path);
-    state.remember_context_fidelity(&path_alias, restored.fidelity);
-    state.remember_semantic_edges(&path_alias, restored.semantic_edges.clone());
-    {
-        let mut index = state.workspace_index_lock();
-        index.remove_file(&canonical_path);
-        index.add_edges(&canonical_path, restored.semantic_edges);
-    }
+    state.remember_context_fidelity(&path_alias, canonical.fidelity);
+    state.publish_compatible_semantic_projection(&path_alias, file_path, semantic);
     state
         .llm_text_cache_lock()
         .insert(path_alias, rendered.clone());
-    let (content_kind, byte_exact) = contract_fields_for_hierarchy(restored.fidelity, &hierarchy);
+    let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
         "result": {
@@ -519,6 +551,10 @@ mod save_context_contract_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/durable_semantic_restore.rs"]
 mod durable_semantic_restore_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/historical_replay_compatibility.rs"]
+mod historical_replay_compatibility_tests;
 
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delete_context_contract.rs"]

@@ -22,6 +22,7 @@ use rusqlite::{Connection, params};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+mod compatibility_schema;
 mod deletion;
 mod edit_intent;
 mod replay;
@@ -194,6 +195,8 @@ impl SqliteStore {
             edit_intent::migrate(&self.conn)?;
         }
 
+        compatibility_schema::migrate(&self.conn, current_version)?;
+
         Ok(())
     }
 
@@ -339,6 +342,17 @@ impl SqliteStore {
     pub(crate) fn execute_batch(&self, sql: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.conn.execute_batch(sql)?;
         Ok(())
+    }
+
+    /// Test-only schema inspection for tracked migration regressions.
+    #[cfg(test)]
+    pub(crate) fn column_names(
+        &self,
+        table: &str,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut statement = self.conn.prepare(&format!("PRAGMA table_info({table})"))?;
+        let rows = statement.query_map([], |row| row.get(1))?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
     /// Purge deltas older than the specified number of days.
@@ -576,3 +590,7 @@ fn short_path_hash(file_path: &str) -> String {
 #[cfg(test)]
 #[path = "../tests/mcp/sqlite_store.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/durable_compatibility_persistence.rs"]
+mod compatibility_persistence_tests;

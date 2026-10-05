@@ -15,6 +15,13 @@ use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
+/// Increment when identical Java input can emit different canonical IR.
+#[cfg(feature = "java")]
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
+/// Increment when Java canonical facts change meaning for projection.
+#[cfg(feature = "java")]
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
+
 /// Java language layer (Layer 2).
 /// Processes Java-specific captures and emits additional CoreOp instructions.
 pub struct JavaLayer;

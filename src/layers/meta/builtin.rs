@@ -37,6 +37,9 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerEvaluation, MetaLayerOutput};
 use std::path::Path;
 
+/// Increment when identical captures emit different builtin declaration edges.
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+
 #[cfg(test)]
 thread_local! {
     static EVALUATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };

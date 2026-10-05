@@ -322,6 +322,11 @@ fn red_h5_apply_edit_invalidates_discovery_for_the_edited_root() {
         "export class Editable {\n  ping() {\n    return 1;\n  }\n}\n",
     )
     .unwrap();
+    std::fs::write(
+        primary.path().join("Editable.ts"),
+        "export class Editable { ping() { return 0; } }\n",
+    )
+    .unwrap();
     let state = state_with_roots(primary.path(), &[additional.path().to_path_buf()]);
     let primary_slug = project_slug(primary.path());
     let additional_slug = project_slug(additional.path());
@@ -521,6 +526,7 @@ fn red_h9_explicit_repository_refresh_invalidates_discovery() {
     let _serial = serialize();
     let root = tempfile::TempDir::new().unwrap();
     write_service(root.path());
+    write_consumer(root.path(), "ConsumerA.ts", "ConsumerA");
     let state = state_with_roots(root.path(), &[]);
     let slug = project_slug(root.path());
     configure(
@@ -557,6 +563,9 @@ fn red_h10_additional_roots_are_discovered_independently() {
     let first_extra = tempfile::TempDir::new().unwrap();
     let second_extra = tempfile::TempDir::new().unwrap();
     std::fs::write(primary.path().join("Shared.ts"), "export class Shared {}\n").unwrap();
+    for root in [first_extra.path(), second_extra.path()] {
+        std::fs::write(root.join("Shared.ts"), "export class Shared {}\n").unwrap();
+    }
     let state = state_with_roots(
         primary.path(),
         &[

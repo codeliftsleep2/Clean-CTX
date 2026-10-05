@@ -27,10 +27,14 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let root = tempfile::TempDir::new().unwrap();
-    let current = root.path().join("current.rs");
-    let retry = root.path().join("retry.rs");
-    fs::write(&current, "pub struct Current; // CurrentSeed RetryTarget\n").unwrap();
-    fs::write(&retry, "pub struct RetryTarget;\n").unwrap();
+    let current = root.path().join("current.ts");
+    let retry = root.path().join("retry.ts");
+    fs::write(
+        &current,
+        "export class Current {} // CurrentSeed RetryTarget\n",
+    )
+    .unwrap();
+    fs::write(&retry, "export class RetryTarget {}\n").unwrap();
 
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
@@ -48,7 +52,7 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
 
     set_test_project_search_results(HashMap::from([(
         slug.clone(),
-        Ok(vec![node("current.rs")]),
+        Ok(vec![node("current.ts")]),
     )]));
     let seeded = hydrate_workspace_index_for(
         &state,
@@ -62,7 +66,7 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
 
     set_test_project_search_results(HashMap::from([(
         slug.clone(),
-        Ok(vec![node("current.rs"), node("retry.rs")]),
+        Ok(vec![node("current.ts"), node("retry.ts")]),
     )]));
     fail_test_publication_once(&retry.to_string_lossy());
 

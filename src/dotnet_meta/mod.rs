@@ -22,6 +22,11 @@
 // - `footer`         : `§ΦMAP` workspace footer formatter
 // - (this file)      : Public surface, `MetaBlock` struct, `run_meta_layer`
 
+/// Increment marker and semantic generations independently when identical
+/// .NET inputs change that producer's durable markers or semantic edges.
+pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+
 pub mod aspnet;
 pub mod automapper;
 #[cfg(test)]
