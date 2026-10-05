@@ -1,14 +1,14 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-6 complete
+**Status:** Implementation in progress; Phases 0-7 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-04):** Phases 0-6 complete; Phase 6 delta-chain epoch
-regressions, positive replacement behavior, and existing delta persistence
-authorities reported GREEN by the repository owner
+**Phase status (2026-10-04):** Phases 0-7 complete; Phase 7 compatibility-gated
+edit recovery and existing semantic, delta, and replay recovery authorities
+reported GREEN by the repository owner
 
 ## 1. Objective
 
@@ -683,6 +683,42 @@ Exit criteria:
 
 - recovery never relabels an old target with current identities;
 - incompatibility cannot make durable recovery itself impossible.
+
+#### Phase 7 implementation record (2026-10-04)
+
+Pending-edit recovery continues to reconcile filesystem bytes and complete or
+roll back the durable transaction using the identities stored on the intent.
+Recovered state now passes through `validate_current_context` before any alias,
+IRContext, semantic cache, WorkspaceIndex, fidelity, persisted-path, or
+presentation-cache mutation. Incompatibility therefore leaves a coherent
+durable artifact under its original epoch while skipping live adoption;
+compatible targets retain the previous publication behavior.
+
+The tracked RED regression recovered an A-epoch target under a B runtime. It
+proved durable completion and preservation of all four A identities, then
+failed because the old path created a live alias. The unchanged regression
+passed after compatibility-gated hydration was installed. A complementary
+positive test confirms compatible target hash, IR, semantic edges, fidelity,
+and persisted-path publication.
+
+Existing delta, replay, and semantic recovery fixtures were migrated from the
+obsolete identity-less test helper to `establish_compatible_edit_intent`,
+matching the Phase 2 production path. Their byte-level success, rollback, and
+irreconcilable-recovery assertions were not weakened. Missing legacy identity
+remains unproven and cannot be adopted.
+
+Owner-reported results:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::semantic_publication_recovery_tests::incompatible_recovered_target_completes_durably_without_live_publication -- --exact
+cargo test --all-features mcp::tool_handlers::semantic_publication_recovery_tests::compatible_recovered_target_commits_and_publishes_with_stored_identity -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::edit_recovery_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::semantic_publication_recovery_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::persistence::replay_edit_recovery_tests -- --nocapture
+```
+
+All focused and existing recovery authorities were reported GREEN with no
+reported warnings.
 
 ### Phase 8 - Compatibility-aware semantic publication and #116 completion
 

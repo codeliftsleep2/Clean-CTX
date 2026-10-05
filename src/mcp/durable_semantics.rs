@@ -178,20 +178,37 @@ impl super::McpState {
                 .map_err(|error| format!("Recovered durable load failed: {error}"))?
                 .ok_or_else(|| "Recovered durable context is missing".to_string())?
         };
-        crate::ir::hierarchical::try_ir_to_hierarchical(&restored.ir)
+        let source = match self.read_source(file_path) {
+            Ok(source) => source,
+            Err(_) => return Ok(()),
+        };
+        let required_fidelity = restored.fidelity;
+        let compatible = match crate::mcp::compatibility::validator::validate_current_context(
+            restored,
+            &source,
+            std::path::Path::new(file_path),
+            &self.config,
+            required_fidelity,
+        ) {
+            Ok(compatible) => compatible,
+            Err(_) => return Ok(()),
+        };
+        let canonical = compatible.canonical;
+        let semantic = compatible.semantic;
+        crate::ir::hierarchical::try_ir_to_hierarchical(&canonical.ir)
             .map_err(|error| format!("Recovered durable projection failed: {error}"))?;
         let alias = self.get_or_create_alias(file_path.to_string());
-        let mut ir = restored.ir;
+        let mut ir = canonical.ir;
         ir.file_id.clone_from(&alias);
         self.ir_context_lock()
-            .load_ir(ir, Some(restored.source_hash));
+            .load_ir(ir, Some(canonical.source_hash));
         self.remember_persisted_path(&alias, file_path);
-        self.remember_context_fidelity(&alias, restored.fidelity);
-        self.remember_semantic_edges(&alias, restored.semantic_edges.clone());
+        self.remember_context_fidelity(&alias, canonical.fidelity);
+        self.remember_semantic_edges(&alias, semantic.semantic_edges.clone());
         let canonical_path = self.semantic_owner_path(file_path);
         let mut index = self.workspace_index_lock();
         index.remove_file(&canonical_path);
-        index.add_edges(&canonical_path, restored.semantic_edges);
+        index.add_edges(&canonical_path, semantic.semantic_edges);
         drop(index);
         self.llm_text_cache_lock().remove(&alias);
         Ok(())

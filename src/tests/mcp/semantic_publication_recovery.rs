@@ -4,12 +4,20 @@ use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
+    configured_state(root, |_| {})
+}
+
+fn configured_state(
+    root: &tempfile::TempDir,
+    configure: impl FnOnce(&mut crate::config::CleanCtxConfig),
+) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
     config.persistence.db_path = root.path().join("p9-20.db").to_string_lossy().into_owned();
     config
         .additional_roots
         .push(root.path().to_string_lossy().into_owned());
+    configure(&mut config);
     crate::mcp::McpState::new(config)
 }
 
@@ -48,13 +56,20 @@ fn establish_irreconcilable_intent(
         .cloned()
         .expect("prior hash");
     let prior_version = state.file_version(&alias).expect("prior version");
+    let target_source = std::str::from_utf8(target).expect("UTF-8 fixture");
     let (mut ir, edges, target_hash) = crate::mcp::tool_helpers::compile_source_ir_candidate(
         file,
-        std::str::from_utf8(target).expect("UTF-8 fixture"),
+        target_source,
         crate::compression::Fidelity::Edit,
         state,
     )
     .expect("target compilation");
+    let identities = crate::mcp::compatibility::derive_identities(
+        target_source,
+        std::path::Path::new(file),
+        &state.config,
+    )
+    .expect("target identities");
     ir.file_id = file.to_string();
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: format!("p9-20-{}", ir.version),
@@ -76,7 +91,7 @@ fn establish_irreconcilable_intent(
         .unwrap()
         .sqlite()
         .unwrap()
-        .establish_edit_intent(&intent)
+        .establish_compatible_edit_intent(&intent, &identities)
         .expect("edit intent");
     std::fs::write(file, disk).unwrap();
 }
@@ -285,4 +300,176 @@ fn save_recovery_checkpoints_the_recovered_target() {
             .iter()
             .any(|tuple| tuple.iter().any(|part| part.contains("Target")))
     );
+}
+
+#[test]
+fn incompatible_recovered_target_completes_durably_without_live_publication() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("incompatible-recovery.ts");
+    let file = path.to_string_lossy().into_owned();
+    let prior = b"export class Prior { run() { return 1; } }\n";
+    let target = b"export class Target { value: UserId; }\n";
+    std::fs::write(&path, prior).expect("prior source");
+
+    let initial = state(&root);
+    baseline(&initial, &root, &file);
+    let alias = initial.alias_for_path(&file).expect("session alias");
+    let prior_hash = initial
+        .ir_context_read()
+        .get_source_hash(&alias)
+        .cloned()
+        .expect("prior hash");
+    let prior_version = initial.file_version(&alias).expect("prior version");
+    let target_text = std::str::from_utf8(target).expect("UTF-8 target");
+    let (mut target_ir, target_edges, target_hash) =
+        crate::mcp::tool_helpers::compile_source_ir_candidate(
+            &file,
+            target_text,
+            crate::compression::Fidelity::Edit,
+            &initial,
+        )
+        .expect("target compilation");
+    target_ir.file_id.clone_from(&file);
+    let identities = crate::mcp::compatibility::derive_identities(
+        target_text,
+        &path,
+        &initial.config,
+    )
+    .expect("target identities");
+    let intent = crate::mcp::sqlite_store::EditIntent {
+        transition_id: "incompatible-recovery".to_string(),
+        file_path: file.clone(),
+        prior_hash,
+        target_hash,
+        prior_version,
+        target_version: target_ir.version,
+        prior_source: prior.to_vec(),
+        target_source: target.to_vec(),
+        target_ir: crate::ir::binary_wire::encode(&target_ir),
+        target_edges,
+        fidelity: crate::compression::Fidelity::Edit,
+        stage_path: String::new(),
+    };
+    initial
+        .persistence_store_lock()
+        .as_ref()
+        .expect("persistence")
+        .sqlite()
+        .expect("SQLite")
+        .establish_compatible_edit_intent(&intent, &identities)
+        .expect("compatible edit intent");
+    std::fs::write(&path, target).expect("target source");
+    drop(initial);
+
+    let restarted = configured_state(&root, |config| {
+        config
+            .type_aliases
+            .insert("uid".to_string(), "UserId".to_string());
+    });
+    restarted
+        .preflight_semantic_publication(&file)
+        .expect("durable recovery remains possible");
+
+    assert!(restarted.alias_for_path(&file).is_none());
+    assert_eq!(restarted.workspace_index_read().edge_count(), 0);
+    assert!(restarted.llm_text_cache_lock().is_empty());
+    let store = restarted.persistence_store_lock();
+    let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+    assert!(!sqlite.has_edit_intent(&file).expect("intent lookup"));
+    assert_eq!(
+        sqlite.stored_compatibility_json(&file).expect("stored identities"),
+        [
+            serde_json::to_string(&identities.canonical_config).ok(),
+            serde_json::to_string(&identities.canonical_producers).ok(),
+            serde_json::to_string(&identities.semantic_config).ok(),
+            serde_json::to_string(&identities.semantic_producers).ok(),
+        ]
+    );
+}
+
+#[test]
+fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("compatible-recovery.ts");
+    let file = path.to_string_lossy().into_owned();
+    let prior = b"export class Prior { run() { return 1; } }\n";
+    let target = b"export class CompatibleTarget { run() { return 2; } }\n";
+    std::fs::write(&path, prior).expect("prior source");
+
+    let initial = state(&root);
+    baseline(&initial, &root, &file);
+    let alias = initial.alias_for_path(&file).expect("session alias");
+    let prior_hash = initial
+        .ir_context_read()
+        .get_source_hash(&alias)
+        .cloned()
+        .expect("prior hash");
+    let prior_version = initial.file_version(&alias).expect("prior version");
+    let target_text = std::str::from_utf8(target).expect("UTF-8 target");
+    let (mut target_ir, target_edges, target_hash) =
+        crate::mcp::tool_helpers::compile_source_ir_candidate(
+            &file,
+            target_text,
+            crate::compression::Fidelity::Edit,
+            &initial,
+        )
+        .expect("target compilation");
+    target_ir.file_id.clone_from(&file);
+    let identities = crate::mcp::compatibility::derive_identities(
+        target_text,
+        &path,
+        &initial.config,
+    )
+    .expect("target identities");
+    let intent = crate::mcp::sqlite_store::EditIntent {
+        transition_id: "compatible-recovery".to_string(),
+        file_path: file.clone(),
+        prior_hash,
+        target_hash: target_hash.clone(),
+        prior_version,
+        target_version: target_ir.version,
+        prior_source: prior.to_vec(),
+        target_source: target.to_vec(),
+        target_ir: crate::ir::binary_wire::encode(&target_ir),
+        target_edges,
+        fidelity: crate::compression::Fidelity::Edit,
+        stage_path: String::new(),
+    };
+    initial
+        .persistence_store_lock()
+        .as_ref()
+        .expect("persistence")
+        .sqlite()
+        .expect("SQLite")
+        .establish_compatible_edit_intent(&intent, &identities)
+        .expect("compatible edit intent");
+    std::fs::write(&path, target).expect("target source");
+    drop(initial);
+
+    let restarted = state(&root);
+    restarted
+        .preflight_semantic_publication(&file)
+        .expect("compatible recovery");
+
+    let alias = restarted.alias_for_path(&file).expect("recovered alias");
+    assert_eq!(
+        restarted.ir_context_read().get_source_hash(&alias),
+        Some(&target_hash)
+    );
+    assert!(restarted.semantic_edges(&alias).is_some());
+    assert_eq!(
+        restarted.context_fidelity(&alias),
+        Some(crate::compression::Fidelity::Edit)
+    );
+    assert_eq!(restarted.persisted_path(&alias).as_deref(), Some(file.as_str()));
+    assert!(!restarted
+        .persistence_store_lock()
+        .as_ref()
+        .expect("persistence")
+        .sqlite()
+        .expect("SQLite")
+        .has_edit_intent(&file)
+        .expect("intent lookup"));
 }
