@@ -185,7 +185,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             };
             let target_edges = pending_transition
                 .as_ref()
-                .map(|transition| transition.semantic_edges.clone())
+                .map(|transition| transition.semantic.semantic_edges.clone())
                 .or_else(|| state.semantic_edges(&file))
                 .unwrap_or_default();
             let normalized = crate::ir::normalize_control_full(
@@ -207,7 +207,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                             durable_file.clone(),
                             source_hash.clone(),
                             new_version,
-                            &transition.semantic_edges,
+                            &transition.semantic.semantic_edges,
                         );
                     let persisted = persisted_context.as_ref().is_some_and(|context_id| {
                         state
@@ -262,12 +262,11 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             *ir_ctx = candidate;
             drop(ir_ctx);
             if let Some(transition) = pending_transition {
-                let canonical_path = state.semantic_owner_path(&durable_file);
-                let mut index = state.workspace_index_lock();
-                index.remove_file(&canonical_path);
-                index.add_edges(&canonical_path, transition.semantic_edges.clone());
-                drop(index);
-                state.remember_semantic_edges(&file, transition.semantic_edges);
+                state.publish_compatible_semantic_projection(
+                    &file,
+                    &durable_file,
+                    transition.semantic,
+                );
                 state.consume_pending_transition(&file, from, new_version);
             }
             // The acknowledgement is already committed at this point. Source

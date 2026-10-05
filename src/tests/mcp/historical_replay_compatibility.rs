@@ -89,7 +89,30 @@ fn compatible_historical_replay_keeps_h1_identity_and_never_covers_h2() {
     assert_eq!(replayed_hash, Some(h1_hash.clone()));
     assert_ne!(h1_hash, h2_hash);
     let canonical = restarted.semantic_owner_path(&file);
+    assert!(restarted.workspace_index_read().has_current_semantic_projection(
+        &canonical,
+        crate::workspace::index::SemanticFidelity::Low,
+        &h1_hash,
+    ));
     assert!(!restarted.workspace_index_read().has_current_semantic_projection(
+        &canonical,
+        crate::workspace::index::SemanticFidelity::Low,
+        &h2_hash,
+    ));
+
+    let current = dispatch(
+        &restarted,
+        3,
+        "workspace_query",
+        json!({
+            "type": "entities_in_file",
+            "file_path": file,
+            "workspaceRoot": root.path(),
+            "fidelity": "low"
+        }),
+    );
+    assert!(current.get("error").is_none(), "{current}");
+    assert!(restarted.workspace_index_read().has_current_semantic_projection(
         &canonical,
         crate::workspace::index::SemanticFidelity::Low,
         &h2_hash,

@@ -465,18 +465,12 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
     } else {
         (compact(), false)
     };
-    let canonical_path = state.semantic_owner_path(file_path);
     state
         .ir_context_lock()
         .load_ir(ir.clone(), Some(canonical.source_hash));
     state.remember_persisted_path(&path_alias, file_path);
     state.remember_context_fidelity(&path_alias, canonical.fidelity);
-    state.remember_semantic_edges(&path_alias, semantic.semantic_edges.clone());
-    {
-        let mut index = state.workspace_index_lock();
-        index.remove_file(&canonical_path);
-        index.add_edges(&canonical_path, semantic.semantic_edges);
-    }
+    state.publish_compatible_semantic_projection(&path_alias, file_path, semantic);
     state
         .llm_text_cache_lock()
         .insert(path_alias, rendered.clone());

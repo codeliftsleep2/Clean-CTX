@@ -91,7 +91,6 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     } else {
         (compact(), false)
     };
-    let canonical_path = state.semantic_owner_path(&durable_path);
     let edge_count = semantic.semantic_edges.len();
 
     state
@@ -99,22 +98,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
     state.remember_persisted_path(&alias, &durable_path);
     state.remember_context_fidelity(&alias, canonical.fidelity);
-    state.remember_semantic_edges(&alias, semantic.semantic_edges.clone());
-    {
-        let mut index = state.workspace_index_lock();
-        match crate::workspace::index::SemanticFidelity::from_compilation(semantic.fidelity) {
-            Some(semantic_fidelity) => index.replace_semantic_projection(
-                &canonical_path,
-                semantic.semantic_edges,
-                semantic_fidelity,
-                semantic.source_hash,
-            ),
-            None => {
-                index.remove_file(&canonical_path);
-                index.add_edges(&canonical_path, semantic.semantic_edges);
-            }
-        }
-    }
+    state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
     state
         .llm_text_cache_lock()
         .insert(alias.clone(), full.clone());

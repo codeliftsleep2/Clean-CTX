@@ -20,7 +20,7 @@ pub(crate) struct PendingSemanticTransition {
     pub to: u64,
     pub target_source_hash: String,
     pub delta_identity: String,
-    pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
     pub compatibility: crate::mcp::compatibility::identity::CompatibilityIdentities,
 }
 
@@ -204,12 +204,7 @@ impl super::McpState {
             .load_ir(ir, Some(canonical.source_hash));
         self.remember_persisted_path(&alias, file_path);
         self.remember_context_fidelity(&alias, canonical.fidelity);
-        self.remember_semantic_edges(&alias, semantic.semantic_edges.clone());
-        let canonical_path = self.semantic_owner_path(file_path);
-        let mut index = self.workspace_index_lock();
-        index.remove_file(&canonical_path);
-        index.add_edges(&canonical_path, semantic.semantic_edges);
-        drop(index);
+        self.publish_compatible_semantic_projection(&alias, file_path, semantic);
         self.llm_text_cache_lock().remove(&alias);
         Ok(())
     }
@@ -253,6 +248,29 @@ impl super::McpState {
         .insert(alias.to_string(), edges);
     }
 
+    pub(crate) fn publish_compatible_semantic_projection(
+        &self,
+        alias: &str,
+        file_path: &str,
+        projection: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
+    ) {
+        self.remember_semantic_edges(alias, projection.semantic_edges.clone());
+        let canonical_path = self.semantic_owner_path(file_path);
+        let mut index = self.workspace_index_lock();
+        match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
+            Some(fidelity) => index.replace_semantic_projection(
+                &canonical_path,
+                projection.semantic_edges,
+                fidelity,
+                projection.source_hash,
+            ),
+            None => {
+                index.remove_file(&canonical_path);
+                index.add_edges(&canonical_path, projection.semantic_edges);
+            }
+        }
+    }
+
     pub(crate) fn semantic_edges(&self, alias: &str) -> Option<Vec<SemanticEdge>> {
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),
@@ -268,11 +286,14 @@ impl super::McpState {
         durable_file: &str,
         delta: &SequenceDelta,
         target_source_hash: String,
-        semantic_edges: Vec<SemanticEdge>,
+        semantic: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
         compatibility: crate::mcp::compatibility::identity::CompatibilityIdentities,
     ) -> Result<(), String> {
         if delta.target_hash.as_deref() != Some(target_source_hash.as_str()) {
             return Err("generated delta target hash does not match semantic state".to_string());
+        }
+        if semantic.source_hash != target_source_hash {
+            return Err("generated semantic projection has wrong target hash".to_string());
         }
         let key = PendingTransitionKey {
             alias: alias.to_string(),
@@ -285,7 +306,7 @@ impl super::McpState {
             to: delta.to,
             target_source_hash,
             delta_identity: sequence_delta_identity(delta)?,
-            semantic_edges,
+            semantic,
             compatibility,
         };
         lock_or_recover!(

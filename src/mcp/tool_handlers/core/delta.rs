@@ -292,7 +292,11 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             &durable_owner,
             delta,
             source_hash.clone(),
-            semantic_edges.clone(),
+            crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation(
+                semantic_edges.clone(),
+                source_hash.clone(),
+                fidelity,
+            ),
             compatibility,
         ) {
             drop(ir_ctx);

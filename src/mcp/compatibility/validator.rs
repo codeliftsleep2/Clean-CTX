@@ -33,6 +33,20 @@ pub(crate) struct CompatibleSemanticProjection {
     pub fidelity: Fidelity,
 }
 
+impl CompatibleSemanticProjection {
+    pub(crate) fn from_current_compilation(
+        semantic_edges: Vec<SemanticEdge>,
+        source_hash: String,
+        fidelity: Fidelity,
+    ) -> Self {
+        Self {
+            semantic_edges,
+            source_hash,
+            fidelity,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct CompatibleDurableContext {
     pub canonical: CompatibleCanonicalState,

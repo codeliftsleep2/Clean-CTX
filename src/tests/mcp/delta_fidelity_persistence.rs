@@ -448,3 +448,71 @@ fn committed_delta_acknowledgement_keeps_matching_raw_economics_fallback() {
         "export class Race { second(): void {} }\n"
     );
 }
+
+#[test]
+fn mutating_apply_delta_establishes_target_semantic_coverage_immediately() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("delta-coverage.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let target_source = std::fs::read_to_string(&path).expect("target source");
+    let target_hash = state.cache_read().compute_hash(target_source.as_bytes());
+
+    let applied = dispatch(
+        &state,
+        27,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(applied.get("error").is_none(), "{applied}");
+    let canonical = state.semantic_owner_path(&file);
+    assert!(
+        state
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::High,
+                &target_hash,
+            ),
+        "accepted mutating delta must certify its target semantic projection"
+    );
+}
+
+#[test]
+fn covered_delta_target_skips_redundant_equal_fidelity_hydration() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("delta-hydration.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let applied = dispatch(
+        &state,
+        28,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+    assert!(applied.get("error").is_none(), "{applied}");
+
+    let queried = dispatch(
+        &state,
+        29,
+        "workspace_query",
+        json!({
+            "type": "entities_in_file",
+            "file_path": file,
+            "workspaceRoot": root.path(),
+            "fidelity": "high"
+        }),
+    );
+
+    assert!(queried.get("error").is_none(), "{queried}");
+    assert_eq!(
+        queried["result"]["structuredContent"]["discovery"]["compiled"]
+            .as_u64()
+            .unwrap_or(0),
+        0,
+        "current High coverage must suppress redundant hydration: {queried}"
+    );
+}

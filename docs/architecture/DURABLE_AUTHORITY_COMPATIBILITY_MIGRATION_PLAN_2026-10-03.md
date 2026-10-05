@@ -1,14 +1,14 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-7 complete
+**Status:** Implementation in progress; Phases 0-8 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-04):** Phases 0-7 complete; Phase 7 compatibility-gated
-edit recovery and existing semantic, delta, and replay recovery authorities
-reported GREEN by the repository owner
+**Phase status (2026-10-04):** Phases 0-8 complete; Phase 8 typed semantic
+publication, truthful coverage, and affected restore/replay/delta/recovery
+authorities reported GREEN by the repository owner
 
 ## 1. Objective
 
@@ -752,6 +752,46 @@ Exit criteria:
 
 - every authoritative adoption path uses the same typed publication boundary;
 - #116's contract gap is closed without weakening #117/#119.
+
+#### Phase 8 implementation record (2026-10-04)
+
+`McpState::publish_compatible_semantic_projection` is now the sole publication
+boundary for compatible durable restore, historical replay, compatible
+pending-edit recovery, and mutating delta acknowledgement. It accepts
+`CompatibleSemanticProjection`, replaces the session semantic snapshot and
+WorkspaceIndex facts together, and records source-hash/fidelity coverage only
+when `SemanticFidelity::from_compilation` can certify it. Edit and Verbatim
+remain deliberately uncertified, preserving the existing non-monotonicity
+invariant.
+
+Pending delta transitions now own a typed semantic projection captured from
+the current compilation. Delta persistence, acknowledgement, semantic cache,
+index facts, and coverage therefore consume one target hash, fidelity, and edge
+set. Restore, replay, and recovery no longer contain their own direct
+`remove_file` plus `add_edges` adoption sequences.
+
+The tracked RED regression showed that a successful mutating delta installed
+target edges without target coverage. It passed unchanged after the typed
+publication boundary was integrated. Additional contracts prove that the next
+equal-fidelity hydration compiles zero candidates, historical replay certifies
+H1 but never disk H2, and a current-source query transitions coverage from H1
+to H2.
+
+Owner-reported results:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests::mutating_apply_delta_establishes_target_semantic_coverage_immediately -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests::covered_delta_target_skips_redundant_equal_fidelity_hydration -- --exact
+cargo test --all-features mcp::tool_handlers::persistence::historical_replay_compatibility_tests::compatible_historical_replay_keeps_h1_identity_and_never_covers_h2 -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::persistence::historical_replay_compatibility_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::persistence::durable_semantic_restore_tests -- --nocapture
+cargo test --all-features mcp::tool_handlers::semantic_publication_recovery_tests -- --nocapture
+```
+
+All focused regressions and affected publication authorities were reported
+GREEN with no reported warnings. #116's implementation boundary is closed;
+issue closure remains contingent on final migration verification.
 
 ### Phase 9 - Diagnostics, documentation, and harness decision
 
