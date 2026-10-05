@@ -57,6 +57,9 @@ Task-relevant context rather than indiscriminate source dumping:
 * **Layered cache reuse** - unchanged files reuse canonical IR and tokenizer counts, while CBM graph entries and disk partitions remain isolated by canonical project identity.
 * **Explicit IR-level delta transport** - `delta_code_context` computes an instruction-level transition and `apply_delta` acknowledges it through a code-side protocol (up to 53% CPU/latency savings in measured delta workflows). Ordinary context reads remain complete and never silently switch to deltas.
 * **Structural edits** - `apply_edit` performs byte-exact edits on previously-seen files using the semantic model.
+  The exact physical source precondition is revalidated at commit, so an
+  externally superseded file is never overwritten merely because replacement
+  itself would be atomic.
 
 ### MCP integration
 
@@ -64,7 +67,7 @@ Exposes code intelligence and context capabilities to AI coding agents through t
 
 * **`provide_code_context`** - complete model-facing context for either one `filePath` or a failure-isolated `files` batch of 1–8 items; batch callers may choose safe mirrored, structured-only, or indexed content placement. The tool auto-detects file type, selects per-item fidelity, and filters low-importance symbols. Structured delta transport remains explicit through `delta_code_context` / `apply_delta`.
 * **`workspace_query`** - single or heterogeneous batched semantic queries: entity lookup, forward/reverse edges, file entities/calls, transitive dependencies, and cycle detection.
-* **`compress_code_context` / `restore_context`** - direct compression control with history and stats.
+* **`compress_code_context` / `restore_context`** - direct compression control and compatible durable reuse. Restore admits the path and validates current source plus scoped canonical/semantic compatibility before persisted state can become live authority.
 * **`diff_code_context` / `diff_commits`** - AST-level change-sets, single-file and git ref-range.
 * **`delta_code_context` / `apply_delta`** - explicit, code-side IR delta generation and acknowledgement. Clean-CTX exposes both server tools; the repository does not ship an automatic host consumer.
 * **`apply_edit`** - structural edits on previously-seen files.
@@ -127,6 +130,8 @@ Compact IR      Semantic edges      Φ markers
 2. **Compile to IR** - `CoreIRPass` emits a typed instruction stream; `LanguageLayerPass` adds behavioral annotations; `MetaLayerPass` extracts framework-specific semantic edges.
 3. **Compress** - `PatternRecognitionPass` collapses recognized patterns into compact opcodes; `ValidationPass` enforces IRPAT-001 and structural validity.
 4. **Index** - semantic edges flow into `WorkspaceIndex` for cross-file queries.
+   An authoritative source refresh retracts evidence owned by sources no longer
+   present; CBM assists discovery but does not determine semantic truth.
 5. **Serve** - MCP tools expose context compilation and semantic queries to AI agents.
 
 ---

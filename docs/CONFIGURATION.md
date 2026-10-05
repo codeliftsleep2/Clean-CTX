@@ -201,13 +201,17 @@ Diffs an entire workspace between two git refs, emitting per-file AST-level chan
 | `workspaceRoot` | ❌ | Project root. Defaults to CWD. Resolved against the trusted root. |
 | `fidelity` | ❌ | `low` / `medium` / `high`. Defaults to config `default_fidelity`. |
 
-**Output:** A `§GITDIFF <from>..<to> (N files)` header followed by per-file `┌ FILE αN <path> (+A -D ~M)` sections. Added files emit a compact skeleton; deleted files a one-line entry; renamed files (via `--find-renames`) a `~ FILE αN <old> → <new>` section. Non-compressible extensions (html/css/json) fall back to a line-count delta so the tool never fails on grammar-missing files.
+**Output:** A `§GITDIFF <from>..<to> (N files)` header followed by per-file `┌ FILE αN <path> (+A -D ~M)` sections. Added files emit a compact skeleton; deleted files a one-line entry; renamed files (via `--find-renames`) a `~ FILE αN <old> → <new>` section; Git `T` emits `~ FILE αN: <path> (type changed)` without claiming the old/new physical types. Non-compressible extensions (html/css/json) fall back to a line-count delta so the tool never fails on grammar-missing files.
 
 **Security posture:**
 - **Ref injection** — refs are validated against the strict allowlist `^[A-Za-z0-9][A-Za-z0-9._/\-~]*$` (first char never `-`), rejecting flag-injection attempts like `--upload-pack`.
 - **XPIA** — `workspaceRoot` is resolved via `resolve_file_path_checked` (anchored to the process CWD); git output paths are validated (no absolute escapes).
 - **No shell** — all git calls use `std::process::Command` with explicit `arg()` calls and `--end-of-options`; never shell-interpolated.
-- **Resource limits** — the changed-file count is capped by `resource_limits.max_workspace_files` and per-file size by `resource_limits.max_file_size_bytes`; files exceeding either are counted in `_meta.skipped`.
+- **Resource limits** — discovery records the complete changed-file set first;
+  `resource_limits.max_workspace_files` bounds processing, not `_meta.fileCount`.
+  Limit-excluded and later size/processing skips contribute to `_meta.skipped`.
+  The accounting invariant is `added + deleted + modified + renamed +
+  typeChanged + skipped == fileCount`.
 - **Fail-closed** — invalid refs, non-git directories, or git errors return structured `-32602`/`-32603` errors, never partial output.
 
 ## Persistence Configuration
@@ -243,6 +247,14 @@ Controls SQLite-backed cross-session storage:
 Required checkpoints commit before the corresponding live state is
 published. A failed durable write therefore cannot publish a partial live
 candidate.
+
+Configuration reuse is scoped by meaning: canonical and semantic
+configuration identities are separate, as are their producer identities.
+Changing a configuration dimension that affects either projection can make a
+stored artifact ineligible for live reuse even when its SQLite schema and
+binary format still decode. Package/crate version, Git revision, schema
+version, and one whole-configuration hash are not substitutes for those
+compatibility checks.
 
 Persistence is **enabled by default** — cross-session compression history is
 a core feature. It is automatically disabled in CI environments (A-14) to

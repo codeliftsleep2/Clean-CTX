@@ -385,6 +385,13 @@ sequence deltas with the physical file identity.
 
 ### Delta Application
 
+`delta_code_context` is conditional on the exact authoritative baseline epoch
+identified by its `from` version, canonical instructions, and source identity.
+If that baseline or source precondition is superseded before commit, the
+transition is rejected/retried; merely reading a baseline and later diffing
+current source is insufficient. This authority epoch is distinct from both the
+`dv:2` transport version and durable canonical compatibility identities.
+
 `ContextState` in `src/ir/replay.rs` manages per-file IR state:
 - `FileState`: ordered instruction tuples + primary-key index (HashMap)
 - `ContextState`: per-file HashMap + global monotonic version
@@ -480,7 +487,7 @@ The state machine supports:
 | `apply_delta` | `handle_apply_delta` | Explicit code-side acknowledgement of an exact pending delta |
 | `provide_code_context` | `handle_provide_code_context` | Heuristic model-facing entry point for one file or an ordered failure-isolated batch; always returns complete current context |
 | `workspace_query` | registered query handler | One scoped semantic operation or an ordered heterogeneous batch over `WorkspaceIndex` and registered hydration |
-| `restore_context` | `handle_restore_context` | Restore checked binary-v04 IR, delta-v2 history, and aligned edges without recompiling source |
+| `restore_context` | `handle_restore_context` | After trusted-root admission and current-source/scoped compatibility validation, adopt checked binary-v04 IR, delta-v2 history, and structurally valid aligned edges without unnecessary recompilation |
 | `context_history` | `handle_context_history` | Per-file delta history |
 | `context_stats` | `handle_context_stats` | Session dashboard |
 

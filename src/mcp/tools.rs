@@ -151,7 +151,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "delta_code_context",
-            "description": "IR-level delta compression using versioned positional sequence edits.",
+            "description": "Derives an IR-level positional transition from the exact current authoritative baseline; a superseded baseline or source precondition is rejected before the transition can become authoritative.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -194,12 +194,12 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "restore_context",
-            "description": "Restores a file's persisted canonical IR, delta history, fidelity, source hash, and complete semantic-edge state.",
+            "description": "After trusted-root admission, validates current source plus scoped canonical/semantic compatibility and structurally validates durable semantics before adopting a file's persisted canonical IR, delta history, fidelity, source hash, and complete semantic-edge state. Durable loading alone never establishes live authority.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit workspace root for reliable path resolution; defaults to CWD for backward compatibility." }
+                    "workspaceRoot": { "type": "string", "description": "Explicit trusted root used with configured additional roots for path resolution and admission before recovery, durable loading, or live side effects; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
@@ -309,7 +309,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "replay_history",
-            "description": "Replay deltas from the DB for a file up to a specific edit sequence.",
+            "description": "Validate and replay compatible durable deltas for a file up to a specific edit sequence, then adopt the result through the owner's authority-ordering boundary.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

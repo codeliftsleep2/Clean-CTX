@@ -294,7 +294,7 @@ current context for either one file or an ordered batch.
 |------|---------|
 | `provide_code_context` | **Model-facing entry point** — one file or an ordered, failure-isolated batch; selects per-file fidelity and returns complete current context |
 | `delta_code_context` / `apply_delta` | Explicit code-side delta generation and acknowledgement |
-| `restore_context` | Transactionally restore persisted canonical IR, checked delta history, and aligned semantic edges without recompiling source |
+| `restore_context` | After trusted-root admission and current-source/scoped compatibility validation, adopt compatible persisted canonical IR, checked history, and aligned semantic edges without unnecessary recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
@@ -312,11 +312,18 @@ is enabled by default (stored in `.clean-ctx/persistence.db` relative to the
 project root) and can be disabled in `.clean-ctx.json` with
 `"persistence": { "enabled": false }`.
 
-Durable authority is not stored presentation text. A checkpoint aligns
+Durable authority is not established by successful decoding or by stored
+presentation text. A checkpoint aligns
 physical binary `0x04` IR, source hash, version, fidelity, and the semantic-edge
 snapshot. Checked `dv:2` history replays from that baseline; SCHEMA-vNext is
 regenerated after restore. Stored `pretty_text` is compatibility/diagnostic
 data and is never canonical restore authority.
+
+Checkpoint fields must be captured coherently from one owner authority epoch;
+do not assemble independently sampled live structures. Durable adoption then
+validates current source/fidelity and the separately scoped canonical and
+semantic configuration/producer identities. A deserialized semantic snapshot
+also crosses intrinsic structural validation before it can create live edges.
 
 ### Architecture
 
@@ -388,7 +395,9 @@ Persistence hooks fire automatically in:
   live publication
 - `apply_edit` → staged edit intent plus transactional source/semantic update
 - `delete_context` → transactional durable and live semantic deletion
-- `restore_context` / `replay_history` → checked durable decode and replay
+- `restore_context` / `replay_history` → trusted-root admission, current-source
+  and scoped compatibility validation, checked durable decode/replay, then
+  owner-ordered adoption
 
 ### Adding a New ContextStore Implementation
 
@@ -526,6 +535,13 @@ fn language_for_extension_handles_python() {
 ---
 
 ## Adding a New Tool
+
+If a tool can change canonical IR, semantic snapshots, `WorkspaceIndex`, the
+rendered cache, durable state, or physical source for an existing semantic
+owner, it must join the existing owner-scoped authority boundary. Never publish
+those structures independently. Operations derived from a baseline must bind
+to that exact authority epoch and revalidate any physical-source precondition
+at commit.
 
 Tools are defined in `src/mcp/tools.rs`. To add a new MCP tool:
 

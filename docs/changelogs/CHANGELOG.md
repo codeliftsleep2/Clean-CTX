@@ -18,6 +18,16 @@ hardening record.
 
 ### Architectural hardening
 
+* **Post-release authority hardening (#116–#127)** — durable bytes now cross
+  structural, current-source/fidelity, and separately scoped canonical/semantic
+  configuration and producer compatibility gates before live adoption;
+  same-owner authority changes are operation-ordered; checkpoints capture one
+  coherent owner epoch; stale physical-source edits fail before intent or
+  replacement; authoritative workspace refreshes retract absent source owners;
+  and Git diff accounting preserves the complete pre-truncation file count,
+  skipped work, and a distinct type-change classification while retaining the
+  legacy four-count tuple.
+
 * **Typed canonical IR and identity authority** — declarations, parameters,
   modifiers, control summaries, pattern facts, side effects, execution
   contexts, calls, bodies, relationships, and explicit-interface facts have

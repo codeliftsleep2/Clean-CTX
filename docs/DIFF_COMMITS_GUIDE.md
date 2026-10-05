@@ -105,10 +105,11 @@ The tool returns a `content` string with this structure:
 - FILE α3: <path> (deleted)
 ~ FILE α4: <old> → <new> (+A -D ~M)
 <change-set body>
+~ FILE α5: <path> (type changed)
 ```
 
 - The header line `§GITDIFF <from>..<to> (N files)` gives the scope.
-- Each file section starts with `┌ FILE αN:` (modified/added), `- FILE αN:` (deleted), or `~ FILE αN:` (renamed).
+- Each file section starts with `┌ FILE αN:` (modified/added), `- FILE αN:` (deleted), or `~ FILE αN:` (renamed or type changed). A type-change entry means only that Git reported an object/file-type change; Clean-CTX does not claim the specific old/new physical types.
 - The `(+A -D ~M)` counts are per-file: added/deleted/modified structural elements.
 - Files exceeding resource limits are emitted as one-line skip entries and counted in `skipped`.
 
@@ -127,7 +128,12 @@ The tool enforces two caps to prevent runaway output:
 - **`max_files`** (default: 100) — caps the number of changed files processed. Files beyond the cap are counted in `skipped`.
 - **`max_file_size`** (default: 10 MB) — caps per-file content size. Oversized files are skipped with an "exceeds size limit" marker.
 
-A skipped file is counted in `skipped` **only** — it is never double-counted in `counts`. The invariant `added + deleted + modified + renamed + typeChanged + skipped == fileCount` always holds.
+`fileCount` is the complete changed-file set discovered before `max_files`
+truncates processing. A skipped file is counted in `skipped` **only** — it is
+never double-counted in the classification counts. The structured metadata
+exposes `counts.typeChanged`; the legacy four-element `counts` tuple remains
+unchanged for compatibility. The invariant `added + deleted + modified +
+renamed + typeChanged + skipped == fileCount` always holds.
 
 ## When to use it (vs. other tools)
 

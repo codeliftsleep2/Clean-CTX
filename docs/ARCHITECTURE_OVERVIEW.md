@@ -2,9 +2,9 @@
 
 > **Owner:** System + module architecture · **Status:** Living reference
 > **Version:** 0.8.0
-> **Last updated:** 2026-09-29 (architectural-hardening certification,
-> SCHEMA-vNext, failure-isolated context/query batching, response projections,
-> project-scoped caches, and compilation-scoped meta evaluation)
+> **Last updated:** 2026-10-05 (durable-authority compatibility,
+> owner-scoped publication ordering, current-source reconciliation,
+> edit preconditions, and truthful Git-diff accounting)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 
@@ -67,6 +67,9 @@ Caching remains separated by authority:
 - unchanged file compilation may reuse canonical IR and tokenizer counts;
 - discovery completion caches only successful search completion, never answers;
 - `WorkspaceIndex` remains the live semantic-answer authority; and
+- an authoritative source-universe refresh retracts evidence owned by sources
+  no longer present in that universe; CBM may discover candidates but never
+  decides semantic truth; and
 - CBM graph memory/disk entries are keyed by canonical project ownership, so
   project switching and invalidation cannot erase or serve another project's
   partition.
@@ -197,8 +200,8 @@ complete current representation:
 |------|---------|
 | `provide_code_context` | **Model-facing entry point** — one file or an ordered, failure-isolated batch of up to eight files; selects per-file fidelity and returns complete current context through mirrored, structured, or indexed batch projection |
 | `workspace_query` | Scoped semantic graph access through one legacy operation or an ordered, failure-isolated heterogeneous batch of up to 32 operations |
-| `delta_code_context` / `apply_delta` | Explicit code-side IR transition generation and acknowledgement |
-| `restore_context` | Transactionally restore persisted canonical IR, delta history, and semantic-edge ownership without source recompilation |
+| `delta_code_context` / `apply_delta` | Explicit code-side IR transition derived from an exact authoritative baseline and acknowledged only while that baseline remains current |
+| `restore_context` | Admit the requested path, validate current source plus scoped canonical/semantic compatibility, then adopt compatible persisted canonical and semantic state without unnecessary recompilation |
 | `context_history` | View compression history and delta savings for tracked files |
 | `context_stats` | Dashboard: token savings, compression stats, session metrics |
 
@@ -238,6 +241,24 @@ The persistence layer provides **cross-session persistence** for compression con
 
 ### Design Decisions
 
+- **Load is not authority**: durable rows may decode successfully yet remain
+  ineligible for live adoption. Current source/fidelity plus separate canonical
+  configuration, canonical producer, semantic configuration, and semantic
+  producer identities must validate before their respective live publication.
+- **Trusted restore admission**: `workspaceRoot` plus configured additional
+  roots define the restore admission boundary. Admission precedes recovery,
+  durable owner registration/loading, and every live or cached side effect.
+- **Coherent checkpoint capture**: canonical IR, source identity, fidelity,
+  semantic projection, and compatibility identities are captured from one
+  owner authority epoch under that owner's guard; persistence I/O follows
+  after capture and does not impose a global authority lock.
+- **Owner-scoped ordering**: authority-changing operations for one semantic
+  owner share one commit domain, so an older in-flight operation cannot win by
+  finishing later. Different owners remain independent. The ordering tracks
+  operation generation, not the historical age of a selected snapshot.
+- **Physical source preconditions**: an edit re-proves its exact source-byte
+  precondition at the owner commit boundary before intent staging or atomic
+  replacement; atomic replacement alone is not compare-and-swap.
 - **Durable publication boundary**: persistence-enabled semantic operations commit the requested file's canonical IR and complete edge snapshot before publishing live state; failure is structural and mutation-free.
 - **File-scoped authority**: reads never flush pending work, and one file's save, restore, replay, delta, edit, or deletion cannot commit another file's lifecycle state.
 - **Shared edit recovery**: pending byte-exact edit intents resolve before any durable semantic load, compilation, checkpoint, or index hydration becomes authoritative.
@@ -253,7 +274,7 @@ The persistence layer provides **cross-session persistence** for compression con
 | `save_context` | Explicit manual checkpoint to DB |
 | `delete_context` | Transactionally remove one file's durable and session semantic context without modifying source |
 | `list_sessions` | Show tracked sessions/files |
-| `replay_history` | Replay deltas from DB up to target sequence |
+| `replay_history` | Validate and adopt compatible historical state up to a target sequence within the owner's current operation-ordering position |
 | `purge_old_deltas` | Trim old delta history by age |
 | `inspect_legacy_fallbacks` | Read-only report over quarantined incomplete legacy artifacts; never imports or mutates them |
 
@@ -820,6 +841,11 @@ v0.6.0 after semantic coverage was verified through `extract_semantic_edges()` a
 Cross-file semantic queries now go through `WorkspaceIndex` (`src/workspace/index.rs`),
 which aggregates `SemanticEdge` objects from all files, deduplicates by identity, and
 provides forward/reverse traversal and transitive dependency resolution.
+At an authoritative source-universe refresh, it also retracts ownership for
+indexed sources proven no longer current (for example after external deletion
+or rename). This is structural reconciliation at refresh, not per-query stale
+filtering or filesystem watching. CBM can identify where to inspect; only
+Clean-CTX source compilation and publication establish current semantic truth.
 
 Phi text markers (`Φcmp:`, `Φsvc:`, `Φmod:`, etc.) remain unchanged and continue to be
 emitted through the existing meta-layer pipeline.

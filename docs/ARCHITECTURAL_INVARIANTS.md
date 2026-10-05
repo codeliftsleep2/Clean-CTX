@@ -644,7 +644,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Operators must be able to keep ordinary context reads session-only without weakening crash recovery, edit safety, or explicitly requested persistence. |
-| **Invariant** | `persistence.enabled = false` creates no durable store. With persistence enabled, `auto_save = true` checkpoints canonical read-produced baselines before publishing their live owners; `auto_save = false` leaves ordinary `provide_code_context`, `compress_code_context`, and read-only delta-generation results session-only until `save_context`. Edit-fidelity baselines remain durable because they establish safe edit authority. Accepted `apply_edit` and `apply_delta` transitions, explicit saves, and explicit deletions remain durable regardless of `auto_save`. Verbatim and Angular-template presentations are never checkpointed because they own no canonical IR. Every required checkpoint atomically aligns canonical IR, semantic edges, source hash, version, and fidelity before live publication. |
+| **Invariant** | `persistence.enabled = false` creates no durable store. With persistence enabled, `auto_save = true` checkpoints canonical read-produced baselines before publishing their live owners; `auto_save = false` leaves ordinary `provide_code_context`, `compress_code_context`, and read-only delta-generation results session-only until `save_context`. Edit-fidelity baselines remain durable because they establish safe edit authority. Accepted `apply_edit` and `apply_delta` transitions, explicit saves, and explicit deletions remain durable regardless of `auto_save`. Verbatim and Angular-template presentations are never checkpointed because they own no canonical IR. Every required checkpoint atomically aligns canonical IR, semantic edges, source hash, version, fidelity, and compatibility identities before live publication. The complete payload is captured from one owner authority epoch while holding that owner's guard; persistence I/O may follow after capture and does not require a global authority lock. |
 | **Enforcement** | `src/mcp/tool_handlers/core/provide_persistence.rs` owns read-checkpoint policy; canonical producers consult it before live publication. Mutation handlers retain their independent transactional persistence boundaries. `src/tests/mcp/auto_save_contract.rs` covers disabled persistence, manual session-only reads, every canonical automatic producer, explicit save/restart/restore, and mandatory Edit authority. `src/tests/mcp/delta_fidelity_persistence.rs` covers accepted delta durability with auto-save disabled. Existing baseline-publication and edit-transaction regressions enforce failure atomicity. |
 | **Authority** | `src/config.rs` (`PersistenceConfig`), `src/mcp/tool_handlers/core/{provide_persistence,provide,compress,delta,delta_apply}.rs`, `src/mcp/tool_handlers/edit.rs`, `src/mcp/tool_handlers/persistence/mod.rs` |
 | **Type** | ENFORCED (test) |
@@ -657,7 +657,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Structurally decodable durable state must never become live canonical or semantic authority under a runtime that would have produced different facts. |
-| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
+| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Structural decoding, intrinsic semantic validation (`Calls` iff call evidence exists), current-source/fidelity validation, canonical compatibility, and semantic compatibility precede their respective live adoption/publication boundaries. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
 | **Publication** | `CompatibleCanonicalState` and `CompatibleSemanticProjection` are the typed evidence boundary. Compatible restore, replay, recovery, and mutating delta publication share `McpState::publish_compatible_semantic_projection`; coverage is recorded only for the projection's own source hash and a certifiable compilation fidelity. WorkspaceIndex stores coverage but owns no compatibility policy. |
 | **Producer generations** | Each producing module owns its generation constant and increments it only when identical relevant inputs can yield different durable canonical facts, markers, or semantic edges. Configuration changes are represented by configuration identity instead. Refactors with identical durable output do not bump generations, and unrelated producers are never bumped together. |
 | **Diagnostics** | Rejections expose a stable structured `reason` and affected `component`; human-readable details may describe source hashes or fidelity but never substitute for the structured classification. |
@@ -668,7 +668,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
-## Architectural Debt
+## Concurrent Authority
 
 ### PUB-001 Same-Owner Semantic Publication Is Source-Ordered
 
@@ -680,6 +680,23 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Authority** | `McpState::begin_semantic_publication`; `SemanticPublicationTicket::commit` |
 | **Type** | ENFORCED (file-scoped operation generation, candidate preconditions, and tests) |
 | **Gate** | `cargo test --all-features` |
+
+---
+
+### WSC-010 Authoritative Refresh Retracts Absent Semantic Owners
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Evidence owned by a source that has been deleted, renamed, or otherwise removed from the current semantic source universe must not remain queryable as current workspace truth after an authoritative refresh. |
+| **Invariant** | A successful authoritative source-universe refresh structurally retracts `WorkspaceIndex` entity, edge, and coverage ownership for sources under the refreshed root before targeted hydration republishes current evidence. Retraction is a refresh-boundary lifecycle operation, not per-query filtering, filesystem watching, historical-state promotion, or a CBM semantic decision. CBM may discover candidate locations; only Clean-CTX compilation and authority publication establish semantic truth. Other roots retain independent ownership. |
+| **Enforcement** | `src/mcp/tool_handlers/hydration/invalidation.rs`; `src/workspace/index/remove.rs`; `src/tests/mcp/workspace_query_9.rs` covers stale positive evidence, deleted owners, cycle evidence, non-hydrating queries, and root isolation. |
+| **Authority** | `reconcile_external_refresh_for_root`; `WorkspaceIndex::remove_files_in_root` |
+| **Type** | ENFORCED (structural reconciliation boundary + tests) |
+| **Gate** | `cargo test --all-features workspace_query_9` |
+
+---
+
+## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
