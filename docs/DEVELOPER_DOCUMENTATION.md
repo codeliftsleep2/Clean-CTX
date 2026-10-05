@@ -1,7 +1,7 @@
 # Clean-CTX — Developer Documentation
 
 > **Owner:** How-to-extend (languages/tools/opcodes/Φ markers) + opcode/marker vocabulary + build/test gates · **Status:** Living reference
-> **Version:** 0.8.0 · **Last updated:** 2026-09-29
+> **Version:** 0.9.0 · **Last updated:** 2026-10-05
 >
 > **Positioning:** This is the extension guide. Current architecture is owned
 > by `ARCHITECTURE_OVERVIEW.md` and `ARCHITECTURAL_INVARIANTS.md`; the exact

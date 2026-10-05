@@ -1,7 +1,7 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.8.0
+> **Version:** 0.9.0
 > **Last updated:** 2026-10-05 (durable-authority compatibility,
 > owner-scoped publication ordering, current-source reconciliation,
 > edit preconditions, and truthful Git-diff accounting)

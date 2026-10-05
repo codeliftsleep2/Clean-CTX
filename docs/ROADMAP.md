@@ -1,7 +1,7 @@
 # Clean-CTX — Future Roadmap
 
-**Last reviewed:** 2026-09-27
-**Current release line:** `0.8.0-rc`
+**Last reviewed:** 2026-10-05
+**Current release line:** `0.9.0`
 
 > **Positioning:** This file is a directional and historical release ledger,
 > not production architecture authority. Current behavior is defined by code,
@@ -17,8 +17,8 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Release candidate** | v0.8.0-rc | Typed IR, exact persistence, lifecycle safety | ✅ Phase 9 certified; live field gate pending |
-| **Field gate** | v0.8.0 | Real-workspace validation of the certified release candidate | Pending |
+| **Current** | v0.9.0 | Authority and correctness hardening | Release metadata prepared; final gate/tag pending |
+| **Previous** | v0.8.0 | Typed IR, exact persistence, batching, and field validation | ✅ Shipped |
 | **Future** | Unscheduled | Demand-driven items retained below | Proposed/deferred |
 
 ---
