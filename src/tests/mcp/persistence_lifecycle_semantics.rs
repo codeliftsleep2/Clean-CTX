@@ -3,6 +3,67 @@ use crate::ir::opcodes::CoreOp;
 use crate::mcp::tool_handlers::control_full_test_support;
 use serde_json::json;
 
+fn configured_state(
+    root: &tempfile::TempDir,
+    configure: impl FnOnce(&mut crate::config::CleanCtxConfig),
+) -> crate::mcp::McpState {
+    let mut config = crate::tests::test_config();
+    config.persistence.enabled = true;
+    config.persistence.db_path = root
+        .path()
+        .join("phase-8c.db")
+        .to_string_lossy()
+        .into_owned();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    configure(&mut config);
+    crate::mcp::McpState::new(config)
+}
+
+#[test]
+fn historical_replay_rejects_incompatible_config_before_live_mutation() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temporary workspace");
+    let path = root.path().join("historical-config.ts");
+    let file = path.to_string_lossy().into_owned();
+    std::fs::write(&path, "export class Historical { value: UserId; }\n").expect("source");
+
+    let producer = configured_state(&root, |_| {});
+    let saved = dispatch(
+        &producer,
+        200,
+        "compress_code_context",
+        json!({
+            "filePath": file,
+            "workspaceRoot": root.path(),
+            "fidelity": "low"
+        }),
+    );
+    assert!(saved.get("error").is_none(), "{saved}");
+    drop(producer);
+
+    let restarted = configured_state(&root, |config| {
+        config
+            .type_aliases
+            .insert("uid".to_string(), "UserId".to_string());
+    });
+    let rejected = dispatch(
+        &restarted,
+        201,
+        "replay_history",
+        json!({ "filePath": file, "targetSequence": 0 }),
+    );
+    assert_eq!(
+        rejected["error"]["data"]["reason"],
+        "canonical_configuration_incompatible",
+        "{rejected}"
+    );
+    assert!(restarted.alias_for_path(&file).is_none());
+    assert_eq!(restarted.workspace_index_read().edge_count(), 0);
+    assert!(restarted.llm_text_cache_lock().is_empty());
+}
+
 #[test]
 fn registered_dispatch_exposes_migrated_semantic_families_after_reload() {
     let _serial = crate::protocol::handler_response_serial();

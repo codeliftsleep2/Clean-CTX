@@ -1,14 +1,14 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-4 complete
+**Status:** Implementation in progress; Phases 0-5 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-04):** Phases 0-4 complete; Phase 4 restore compatibility
-matrix and existing durable restore authority reported GREEN by the repository
-owner
+**Phase status (2026-10-04):** Phases 0-5 complete; Phase 5 historical replay
+compatibility regressions and existing replay lifecycle authority reported GREEN
+by the repository owner
 
 ## 1. Objective
 
@@ -565,6 +565,35 @@ Exit criteria:
 
 - replay uses the shared validator;
 - replay does not manufacture current-source authority from historical state.
+
+#### Phase 5 implementation record (2026-10-04)
+
+`replay_history` now loads structurally untrusted durable state and obtains
+typed canonical and semantic compatibility evidence through the shared
+validator before alias creation or any live-state mutation. Identity
+applicability is derived from the current source and configuration, while an
+accepted historical artifact retains its persisted H1 source hash. Replay
+therefore cannot manufacture current H2 authority, and raw passthrough remains
+available only when the current bytes match H1.
+
+The tracked regressions cover incompatible canonical configuration, producer
+generation mismatch, missing legacy identity, compatible historical H1 replay
+without H2 coverage, and compatible current-source replay. The first
+configuration regression was preserved unchanged through the required
+RED/GREEN procedure.
+
+Owner-reported results:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::persistence::lifecycle_tests::semantics::historical_replay_rejects_incompatible_config_before_live_mutation -- --exact
+cargo test --all-features historical_replay_ -- --nocapture
+cargo test --all-features mcp::tool_handlers::persistence::lifecycle_tests::semantics -- --nocapture
+```
+
+The exact regression first failed because replay adopted incompatible state,
+then passed unchanged after the production gate was implemented. The full
+focused Phase 5 replay suite and the existing replay lifecycle suite were also
+reported GREEN, with no reported warnings.
 
 ### Phase 6 - Delta-chain compatibility epoch
 

@@ -71,7 +71,8 @@ pub(crate) enum CompatibilityFailure {
     #[error("legacy persistence is missing {component:?} identity")]
     MissingLegacyIdentity { component: CompatibilityComponent },
     #[error("historical source is not current: historical={historical}, current={current}")]
-    // Phase 5 consumes this classification when historical replay is gated.
+    // The frozen compatibility taxonomy reserves this for publication paths
+    // that distinguish valid historical authority from current-source authority.
     #[allow(dead_code)]
     HistoricalSourceNotCurrent { historical: String, current: String },
 }
@@ -109,23 +110,43 @@ pub(crate) fn validate_current_context(
             current: current_hash,
         });
     }
+    let current = derive_identities(source, path, config).map_err(|error| {
+        CompatibilityFailure::StructuralSnapshotIncoherence {
+            detail: format!("compatibility identity derivation failed: {error}"),
+        }
+    })?;
+    validate_with_identities(loaded, &current, required_fidelity)
+}
+
+pub(crate) fn validate_historical_context(
+    loaded: UntrustedDurableContext,
+    current_source: &str,
+    path: &Path,
+    config: &CleanCtxConfig,
+    required_fidelity: Fidelity,
+) -> Result<CompatibleDurableContext, CompatibilityFailure> {
+    let current = derive_identities(current_source, path, config).map_err(|error| {
+        CompatibilityFailure::StructuralSnapshotIncoherence {
+            detail: format!("compatibility identity derivation failed: {error}"),
+        }
+    })?;
+    validate_with_identities(loaded, &current, required_fidelity)
+}
+
+fn validate_with_identities(
+    loaded: UntrustedDurableContext,
+    current: &CompatibilityIdentities,
+    required_fidelity: Fidelity,
+) -> Result<CompatibleDurableContext, CompatibilityFailure> {
     if fidelity_rank(loaded.fidelity) < fidelity_rank(required_fidelity) {
         return Err(CompatibilityFailure::InsufficientFidelity {
             persisted: loaded.fidelity,
             required: required_fidelity,
         });
     }
-    let current = derive_identities(source, path, config).map_err(|error| {
-        CompatibilityFailure::StructuralSnapshotIncoherence {
-            detail: format!("compatibility identity derivation failed: {error}"),
-        }
-    })?;
-    let semantic = validate_semantic(&loaded, &current)?;
-    let canonical = validate_canonical(&loaded, &current)?;
-    Ok(CompatibleDurableContext {
-        canonical,
-        semantic,
-    })
+    let semantic = validate_semantic(&loaded, current)?;
+    let canonical = validate_canonical(&loaded, current)?;
+    Ok(CompatibleDurableContext { canonical, semantic })
 }
 
 pub(crate) fn validate_canonical(
