@@ -2,8 +2,13 @@ use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
+    state_with_auto_save(root, true)
+}
+
+fn state_with_auto_save(root: &tempfile::TempDir, auto_save: bool) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
+    config.persistence.auto_save = auto_save;
     config.persistence.db_path = root
         .path()
         .join("historical-replay.db")
@@ -125,6 +130,45 @@ fn compatible_historical_replay_keeps_h1_identity_and_never_covers_h2() {
                 crate::workspace::index::SemanticFidelity::Low,
                 &h2_hash,
             )
+    );
+}
+
+#[test]
+fn replay_started_after_newer_live_publication_may_deliberately_adopt_historical_state() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let h1 = "export class HistoricalOne {}\n";
+    let h2 = "export class CurrentTwo {}\n";
+    let file = baseline(&root, h1);
+    std::fs::write(&file, h2).expect("current source");
+
+    let state = state_with_auto_save(&root, false);
+    let current = dispatch(
+        &state,
+        10,
+        "provide_code_context",
+        json!({
+            "filePath": file,
+            "workspaceRoot": root.path(),
+            "fidelity": "high"
+        }),
+    );
+    assert!(current.get("error").is_none(), "{current}");
+    let alias = state.alias_for_path(&file).expect("current alias");
+    let h1_hash = state.cache_read().compute_hash(h1.as_bytes());
+    let h2_hash = state.cache_read().compute_hash(h2.as_bytes());
+    assert_eq!(
+        state.ir_context_read().get_source_hash(&alias),
+        Some(&h2_hash),
+        "B must commit H2 before the later replay begins"
+    );
+
+    let replayed = replay(&state, &root, &file);
+    assert!(replayed.get("error").is_none(), "{replayed}");
+    assert_eq!(
+        state.ir_context_read().get_source_hash(&alias),
+        Some(&h1_hash),
+        "a genuinely later historical replay remains a valid authority transition"
     );
 }
 

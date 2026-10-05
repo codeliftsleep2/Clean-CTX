@@ -7,6 +7,60 @@ use crate::mcp::tool_helpers::inject_baseline_breakpoint;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+#[cfg(test)]
+pub(super) mod historical_adoption_race_test_support {
+    use std::sync::{Condvar, Mutex};
+
+    #[derive(Default)]
+    struct PauseState {
+        owner: Option<String>,
+        paused: bool,
+        released: bool,
+    }
+
+    static STATE: Mutex<PauseState> = Mutex::new(PauseState {
+        owner: None,
+        paused: false,
+        released: false,
+    });
+    static SIGNAL: Condvar = Condvar::new();
+
+    pub(crate) fn arm(file_path: &str) {
+        *STATE.lock().expect("historical adoption pause state") = PauseState {
+            owner: Some(crate::dictionary::path::canonical_identity_key(file_path)),
+            paused: false,
+            released: false,
+        };
+    }
+
+    pub(crate) fn pause_before_live_adoption(file_path: &str) {
+        let owner = crate::dictionary::path::canonical_identity_key(file_path);
+        let mut state = STATE.lock().expect("historical adoption pause state");
+        if state.owner.as_deref() != Some(owner.as_str()) || state.paused {
+            return;
+        }
+        state.paused = true;
+        SIGNAL.notify_all();
+        while !state.released {
+            state = SIGNAL.wait(state).expect("historical adoption pause wait");
+        }
+        state.owner = None;
+    }
+
+    pub(crate) fn wait_until_paused() {
+        let mut state = STATE.lock().expect("historical adoption pause state");
+        while !state.paused {
+            state = SIGNAL.wait(state).expect("historical adoption pause wait");
+        }
+    }
+
+    pub(crate) fn release() {
+        let mut state = STATE.lock().expect("historical adoption pause state");
+        state.released = true;
+        SIGNAL.notify_all();
+    }
+}
+
 pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpState) {
     let requested = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
     if requested.is_empty() {
@@ -30,6 +84,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     if state.semantic_owner_path(&requested) != state.semantic_owner_path(&durable_path) {
         return send_restore_error(id, "Requested file does not match its durable identity");
     }
+    let publication = state.begin_semantic_publication(&durable_path);
 
     if let Err(error) = state.recover_pending_edit(&durable_path) {
         return send_restore_error(id, &error);
@@ -107,17 +162,35 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
     };
     let edge_count = semantic.semantic_edges.len();
 
-    state.with_semantic_authority_update(&durable_path, || {
-        state
-            .ir_context_lock()
-            .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
-        state.remember_persisted_path(&alias, &durable_path);
-        state.remember_context_fidelity(&alias, canonical.fidelity);
-        state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
-        state
-            .llm_text_cache_lock()
-            .insert(alias.clone(), full.clone());
-    });
+    #[cfg(test)]
+    historical_adoption_race_test_support::pause_before_live_adoption(&durable_path);
+    let published = publication.commit(
+        // Compatibility validation above owns historical eligibility. The
+        // ticket orders this restore operation, not the age of its snapshot.
+        || Ok::<_, String>(true),
+        || {
+            state
+                .ir_context_lock()
+                .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
+            state.remember_persisted_path(&alias, &durable_path);
+            state.remember_context_fidelity(&alias, canonical.fidelity);
+            state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
+            state
+                .llm_text_cache_lock()
+                .insert(alias.clone(), full.clone());
+            Ok(())
+        },
+    );
+    match published {
+        Ok(Some(())) => {}
+        Ok(None) => {
+            return send_restore_error(
+                id,
+                "Historical restore was superseded by a newer same-owner authority operation; retry the request",
+            );
+        }
+        Err(error) => return send_restore_error(id, &error),
+    }
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
 
     let mut response = serde_json::json!({
@@ -215,3 +288,7 @@ mod compatibility_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/restore_path_admission.rs"]
 mod path_admission_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/historical_adoption_publication_race.rs"]
+mod historical_adoption_publication_race_tests;
