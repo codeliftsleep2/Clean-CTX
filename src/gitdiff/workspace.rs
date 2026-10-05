@@ -4,8 +4,8 @@
 //
 // Uses `git diff --name-status --find-renames` to enumerate files that
 // changed between two refs, classifying each as Added / Deleted /
-// Modified / Renamed. Provides `show_file` to retrieve a file's content
-// at a specific ref via `git show <ref>:<path>`.
+// Modified / Renamed / TypeChanged. Provides `show_file` to retrieve a
+// file's content at a specific ref via `git show <ref>:<path>`.
 //
 // Security: paths returned by git are validated against the same
 // allowlist as refs (no absolute escapes, no flag injection). The
@@ -24,13 +24,18 @@ pub enum FileChange {
     Modified(String),
     /// File was renamed from `old_path` to `new_path`.
     Renamed(String, String),
+    /// Git reported a change in the path's object/file type.
+    TypeChanged(String),
 }
 
 impl FileChange {
     /// The path to use for content retrieval at the `to` ref.
     pub fn current_path(&self) -> &str {
         match self {
-            FileChange::Added(p) | FileChange::Modified(p) | FileChange::Deleted(p) => p,
+            FileChange::Added(p)
+            | FileChange::Modified(p)
+            | FileChange::Deleted(p)
+            | FileChange::TypeChanged(p) => p,
             FileChange::Renamed(_, new) => new,
         }
     }
@@ -38,7 +43,10 @@ impl FileChange {
     /// The path to use for content retrieval at the `from` ref.
     pub fn baseline_path(&self) -> &str {
         match self {
-            FileChange::Added(p) | FileChange::Modified(p) | FileChange::Deleted(p) => p,
+            FileChange::Added(p)
+            | FileChange::Modified(p)
+            | FileChange::Deleted(p)
+            | FileChange::TypeChanged(p) => p,
             FileChange::Renamed(old, _) => old,
         }
     }
@@ -61,6 +69,7 @@ impl FileChange {
 ///   - `M\tpath`          → Modified
 ///   - `D\tpath`          → Deleted
 ///   - `R100\told\tnew`   → Renamed (100 = similarity score)
+///   - `T\tpath`          → TypeChanged
 pub fn collect_changed_files(
     root: &str,
     from: &str,
@@ -109,6 +118,7 @@ pub fn collect_changed_files(
             "A" => changes.push(FileChange::Added(path1.to_string())),
             "M" => changes.push(FileChange::Modified(path1.to_string())),
             "D" => changes.push(FileChange::Deleted(path1.to_string())),
+            "T" => changes.push(FileChange::TypeChanged(path1.to_string())),
             // Rename status is `R<similarity>` e.g. R100.
             s if s.starts_with('R') => {
                 let new_path = path2.unwrap_or("");

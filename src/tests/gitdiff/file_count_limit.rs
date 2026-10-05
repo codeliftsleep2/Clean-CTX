@@ -60,7 +60,12 @@ fn file_count_limit_preserves_discovered_total_and_accounts_for_skips() {
         "the truncated remainder must be skipped"
     );
     assert_eq!(
-        summary.counts.0 + summary.counts.1 + summary.counts.2 + summary.counts.3 + summary.skipped,
+        summary.counts.0
+            + summary.counts.1
+            + summary.counts.2
+            + summary.counts.3
+            + summary.type_changed
+            + summary.skipped,
         summary.file_count,
         "processed counts plus skipped must equal the discovered total"
     );

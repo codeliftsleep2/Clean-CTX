@@ -151,6 +151,10 @@ fn diff_commits_emits_canonical_envelope() {
         meta.contains_key("fileCount"),
         "diff_commits _meta must carry fileCount, got: {meta:?}"
     );
+    assert!(
+        meta["counts"].get("typeChanged").is_some(),
+        "diff_commits counts must carry typeChanged, got: {meta:?}"
+    );
 }
 
 /// Create a temp git repo with two commits (one modified file).

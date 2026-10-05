@@ -57,7 +57,7 @@ fn init_two_commit_repo() -> tempfile::TempDir {
 }
 
 #[test]
-fn collect_changed_files_classifies_all_statuses() {
+fn collect_changed_files_classifies_added_modified_deleted_and_renamed() {
     let dir = init_two_commit_repo();
     let root = dir.path().to_str().unwrap();
 
@@ -68,12 +68,14 @@ fn collect_changed_files_classifies_all_statuses() {
     let mut modified = Vec::new();
     let mut deleted = Vec::new();
     let mut renamed = Vec::new();
+    let mut type_changed = Vec::new();
     for c in &changes {
         match c {
             FileChange::Added(p) => added.push(p.clone()),
             FileChange::Modified(p) => modified.push(p.clone()),
             FileChange::Deleted(p) => deleted.push(p.clone()),
             FileChange::Renamed(old, new) => renamed.push((old.clone(), new.clone())),
+            FileChange::TypeChanged(p) => type_changed.push(p.clone()),
         }
     }
 
@@ -84,6 +86,7 @@ fn collect_changed_files_classifies_all_statuses() {
         renamed,
         vec![("keep.txt".to_string(), "renamed.txt".to_string())]
     );
+    assert!(type_changed.is_empty());
 }
 
 #[test]

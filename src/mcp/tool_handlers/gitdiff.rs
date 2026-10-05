@@ -115,6 +115,7 @@ pub(crate) fn handle_diff_commits(id: &Value, params: &Value, state: &McpState) 
                             "deleted": summary.counts.1,
                             "modified": summary.counts.2,
                             "renamed": summary.counts.3,
+                            "typeChanged": summary.type_changed,
                         },
                         "skipped": summary.skipped,
                     }

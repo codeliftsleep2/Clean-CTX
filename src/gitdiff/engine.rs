@@ -35,10 +35,12 @@ use crate::angular_meta::template_compress::compress_template_to_string;
 pub struct GitDiffSummary {
     /// The rendered manifest text (the `content` payload for MCP).
     pub manifest: String,
-    /// Total files changed (added + deleted + modified + renamed).
+    /// Total files changed (added + deleted + modified + renamed + type changed).
     pub file_count: usize,
     /// Per-change counts: (added, deleted, modified, renamed).
     pub counts: (usize, usize, usize, usize),
+    /// Number of paths Git classified as object/file-type changes.
+    pub type_changed: usize,
     /// Number of files skipped because they exceeded resource limits.
     pub skipped: usize,
 }
@@ -82,6 +84,7 @@ pub fn gitdiff_workspace(
     ));
 
     let (mut added, mut deleted, mut modified, mut renamed) = (0usize, 0usize, 0usize, 0usize);
+    let mut type_changed = 0usize;
 
     for (alias, change) in (1usize..).zip(changes.iter()) {
         match change {
@@ -159,6 +162,10 @@ pub fn gitdiff_workspace(
                     }
                 }
             }
+            FileChange::TypeChanged(path) => {
+                type_changed += 1;
+                manifest.push_str(&format!("~ FILE α{alias}: {path} (type changed)\n"));
+            }
         }
     }
 
@@ -166,6 +173,7 @@ pub fn gitdiff_workspace(
         manifest,
         file_count,
         counts: (added, deleted, modified, renamed),
+        type_changed,
         skipped,
     })
 }
@@ -461,3 +469,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/gitdiff/file_count_limit.rs"]
 mod file_count_limit_tests;
+
+#[cfg(test)]
+#[path = "../tests/gitdiff/type_change.rs"]
+mod type_change_tests;

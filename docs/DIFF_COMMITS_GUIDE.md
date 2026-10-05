@@ -18,6 +18,7 @@ When both `fromRef` and `toRef` are provided, it runs `git diff --name-status --
 | **Added** (other) | Line-count: `+42 lines (0 → 42)` |
 | **Deleted** | One-line entry: `- FILE αN: path (deleted)` |
 | **Renamed** | Diff between old path at `from` and new path at `to` |
+| **Type changed** | One-line entry recording that Git reported a change in the path's object/file type |
 
 ## How it saves tokens
 
@@ -126,7 +127,7 @@ The tool enforces two caps to prevent runaway output:
 - **`max_files`** (default: 100) — caps the number of changed files processed. Files beyond the cap are counted in `skipped`.
 - **`max_file_size`** (default: 10 MB) — caps per-file content size. Oversized files are skipped with an "exceeds size limit" marker.
 
-A skipped file is counted in `skipped` **only** — it is never double-counted in `counts`. The invariant `counts + skipped == file_count` always holds.
+A skipped file is counted in `skipped` **only** — it is never double-counted in `counts`. The invariant `added + deleted + modified + renamed + typeChanged + skipped == fileCount` always holds.
 
 ## When to use it (vs. other tools)
 
