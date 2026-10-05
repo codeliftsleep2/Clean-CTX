@@ -5,7 +5,6 @@ use crate::gitdiff::workspace::{FileChange, collect_changed_files};
 struct TypeChangeRepo {
     dir: tempfile::TempDir,
     regular_commit: String,
-    symlink_blob: String,
 }
 
 impl TypeChangeRepo {
@@ -25,17 +24,12 @@ impl TypeChangeRepo {
             .trim()
             .to_string();
 
-        let symlink_blob =
-            run_git_with_input(root, &["hash-object", "-w", "--stdin"], "target.txt\n")
-                .trim()
-                .to_string();
-        set_symlink_index_entry(root, &symlink_blob);
-        run_git(root, &["commit", "-q", "-m", "symlink object"]);
+        set_gitlink_index_entry(root, &regular_commit);
+        run_git(root, &["commit", "-q", "-m", "gitlink object"]);
 
         Self {
             dir,
             regular_commit,
-            symlink_blob,
         }
     }
 
@@ -48,7 +42,9 @@ impl TypeChangeRepo {
             self.root(),
             &["reset", "-q", "--hard", &self.regular_commit],
         );
-        set_symlink_index_entry(self.root(), &self.symlink_blob);
+        std::fs::remove_file(self.dir.path().join("path.txt")).expect("remove regular file");
+        std::fs::create_dir(self.dir.path().join("path.txt")).expect("create gitlink directory");
+        set_gitlink_index_entry(self.root(), &self.regular_commit);
     }
 }
 
@@ -81,36 +77,8 @@ fn run_git_output(root: &str, args: &[&str]) -> String {
     String::from_utf8(output.stdout).expect("UTF-8 git output")
 }
 
-fn run_git_with_input(root: &str, args: &[&str], input: &str) -> String {
-    use std::io::Write;
-    use std::process::Stdio;
-
-    let mut child = std::process::Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(args)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("git command");
-    child
-        .stdin
-        .as_mut()
-        .expect("git stdin")
-        .write_all(input.as_bytes())
-        .expect("write git stdin");
-    let output = child.wait_with_output().expect("git output");
-    assert!(
-        output.status.success(),
-        "git {args:?} failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    String::from_utf8(output.stdout).expect("UTF-8 git output")
-}
-
-fn set_symlink_index_entry(root: &str, blob: &str) {
-    let cache_info = format!("120000,{blob},path.txt");
+fn set_gitlink_index_entry(root: &str, commit: &str) {
+    let cache_info = format!("160000,{commit},path.txt");
     run_git(root, &["update-index", "--add", "--cacheinfo", &cache_info]);
 }
 

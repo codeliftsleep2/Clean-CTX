@@ -199,7 +199,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "filePath": { "type": "string" },
-                    "workspaceRoot": { "type": "string", "description": "Explicit trusted root used with configured additional roots for path resolution and admission before recovery, durable loading, or live side effects; defaults to CWD for backward compatibility." }
+                    "workspaceRoot": { "type": "string", "description": "Strongly recommended. Explicit trusted root used with configured additional roots for path resolution and admission before recovery, durable loading, or live side effects; defaults to CWD for backward compatibility." }
                 },
                 "required": ["filePath"]
             }
