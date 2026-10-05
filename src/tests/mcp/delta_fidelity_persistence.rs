@@ -88,6 +88,136 @@ fn pending_tiny_delta(
 }
 
 #[test]
+fn apply_delta_rejects_canonical_config_epoch_mismatch_without_advancing_chain() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("config-epoch.ts");
+    let mut epoch_config = config(&root);
+    epoch_config.persistence.auto_save = true;
+    let state = crate::mcp::McpState::new(epoch_config);
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let alias = state.alias_for_path(&file).expect("session alias");
+    let baseline_version = state.file_version(&alias).expect("baseline version");
+
+    let mut incompatible_config = state.config.clone();
+    incompatible_config
+        .type_aliases
+        .insert("uid".to_string(), "UserId".to_string());
+    let target_source = std::fs::read_to_string(&path).expect("target source");
+    let incompatible = crate::mcp::compatibility::derive_identities(
+        &target_source,
+        &path,
+        &incompatible_config,
+    )
+    .expect("incompatible identities");
+    let incompatible_json = serde_json::to_string(&incompatible.canonical_config)
+        .expect("canonical config identity JSON")
+        .replace('\'', "''");
+    {
+        let store = state.persistence_store_lock();
+        let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+        assert!(
+            sqlite
+                .baseline_binary(&file)
+                .expect("baseline lookup")
+                .is_some(),
+            "fixture requires an existing durable chain"
+        );
+        sqlite
+            .execute_batch(&format!(
+                "UPDATE contexts SET canonical_config_identity = '{incompatible_json}'"
+            ))
+            .expect("replace persisted epoch");
+    }
+
+    let rejected = dispatch(
+        &state,
+        25,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(
+        rejected["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("canonical configuration is incompatible")),
+        "{rejected}"
+    );
+    assert_eq!(state.file_version(&alias), Some(baseline_version));
+    let durable_version = {
+        let store = state.persistence_store_lock();
+        let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+        sqlite
+            .load_durable_context(&file, None)
+            .expect("durable load")
+            .expect("durable baseline")
+            .ir
+            .version
+    };
+    assert_eq!(durable_version, baseline_version);
+}
+
+#[test]
+fn apply_delta_rejects_canonical_producer_epoch_mismatch_without_advancing_chain() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("producer-epoch.ts");
+    let mut epoch_config = config(&root);
+    epoch_config.persistence.auto_save = true;
+    let state = crate::mcp::McpState::new(epoch_config);
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let alias = state.alias_for_path(&file).expect("session alias");
+    let baseline_version = state.file_version(&alias).expect("baseline version");
+
+    {
+        let store = state.persistence_store_lock();
+        let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+        let identities = sqlite
+            .stored_compatibility_json(&file)
+            .expect("stored compatibility");
+        let incompatible = identities[1]
+            .as_ref()
+            .expect("canonical producer identity")
+            .replace(
+                "\"shared_canonical_pipeline\":1",
+                "\"shared_canonical_pipeline\":99",
+            )
+            .replace('\'', "''");
+        sqlite
+            .execute_batch(&format!(
+                "UPDATE contexts SET canonical_producer_identity = '{incompatible}'"
+            ))
+            .expect("replace persisted producer epoch");
+    }
+
+    let rejected = dispatch(
+        &state,
+        26,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+
+    assert!(
+        rejected["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("canonical producer set or generation is incompatible")),
+        "{rejected}"
+    );
+    assert_eq!(state.file_version(&alias), Some(baseline_version));
+    let durable_version = {
+        let store = state.persistence_store_lock();
+        let sqlite = store.as_ref().expect("persistence").sqlite().expect("SQLite");
+        sqlite
+            .load_durable_context(&file, None)
+            .expect("durable load")
+            .expect("durable baseline")
+            .ir
+            .version
+    };
+    assert_eq!(durable_version, baseline_version);
+}
+
+#[test]
 fn apply_delta_rejects_missing_authoritative_fidelity_before_mutation() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("temp workspace");

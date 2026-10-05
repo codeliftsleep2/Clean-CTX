@@ -272,12 +272,28 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     }
     if let Some(delta) = &delta {
         state.remember_context_fidelity(&path_alias, fidelity);
+        let compatibility = match crate::mcp::compatibility::derive_identities(
+            &source,
+            std::path::Path::new(&durable_owner),
+            &state.config,
+        ) {
+            Ok(compatibility) => compatibility,
+            Err(error) => {
+                drop(ir_ctx);
+                send_response(&invalid_session_ir_response(
+                    id,
+                    &format!("cannot derive delta compatibility: {error}"),
+                ));
+                return;
+            }
+        };
         if let Err(error) = state.remember_pending_transition(
             &path_alias,
             &durable_owner,
             delta,
             source_hash.clone(),
             semantic_edges.clone(),
+            compatibility,
         ) {
             drop(ir_ctx);
             send_response(&invalid_session_ir_response(id, &error));
@@ -439,6 +455,10 @@ mod edit_recovery_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delta_fidelity_persistence.rs"]
 mod fidelity_persistence_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_compatibility_epoch.rs"]
+mod compatibility_epoch_tests;
 
 // Presentation boundary: the delta is code-side only. Its model-visible
 // `content` is a minimal summary (adds/mods/dels counts), never a full

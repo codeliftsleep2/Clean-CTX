@@ -1,14 +1,14 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-5 complete
+**Status:** Implementation in progress; Phases 0-6 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
 whole-configuration or whole-executable fingerprints
 
-**Phase status (2026-10-04):** Phases 0-5 complete; Phase 5 historical replay
-compatibility regressions and existing replay lifecycle authority reported GREEN
-by the repository owner
+**Phase status (2026-10-04):** Phases 0-6 complete; Phase 6 delta-chain epoch
+regressions, positive replacement behavior, and existing delta persistence
+authorities reported GREEN by the repository owner
 
 ## 1. Objective
 
@@ -614,6 +614,47 @@ Exit criteria:
 
 - no supported delta operation changes the chain epoch in place;
 - sequence-delta version remains a structural check only.
+
+#### Phase 6 implementation record (2026-10-04)
+
+Existing durable-chain reuse now validates the baseline's canonical
+configuration and producer identities before delta persistence or live IR
+mutation. A mismatch leaves both the durable sequence and the session version
+unchanged. Matching epochs continue to append, while an explicitly persisted
+compatible baseline establishes a replacement epoch rather than relabeling the
+old chain.
+
+Generated pending transitions now own the target compatibility identities
+alongside their target hash and semantic edges. Apply-time validation,
+missing-baseline materialization, and atomic semantic-snapshot persistence all
+consume that captured evidence. This preserves acknowledgements after the
+source file disappears and prevents different reads from assigning different
+epochs to one accepted target. Canonical identities remain baseline-owned;
+semantic identities remain version-local on each snapshot.
+
+The canonical configuration and canonical producer rejection regressions each
+failed against the ungated implementation by committing version 2, then passed
+unchanged after the shared canonical validator was installed. An initially
+invalid configuration fixture was discarded and restarted from RED after it
+was found not to create a durable baseline.
+
+Owner-reported results:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests::apply_delta_rejects_canonical_config_epoch_mismatch_without_advancing_chain -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests::apply_delta_rejects_canonical_producer_epoch_mismatch_without_advancing_chain -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::compatibility_epoch_tests -- --nocapture
+cargo test --all-features mcp::sqlite_store::compatibility_persistence_tests::accepted_delta_keeps_canonical_epoch_and_writes_snapshot_local_semantic_identity -- --exact
+cargo test --all-features mcp::tool_handlers::core::delta::fidelity_persistence_tests -- --nocapture
+cargo test --all-features mcp::sqlite_store::compatibility_persistence_tests -- --nocapture
+```
+
+The positive epoch module, snapshot-local identity contract, complete delta
+fidelity persistence authority, and complete compatibility persistence
+authority were reported GREEN with no reported warnings. The existing
+missing-source acknowledgement regression initially caught a post-generation
+disk dependency and passed after identity ownership moved to the pending
+transition.
 
 ### Phase 7 - Pending-edit recovery separation
 

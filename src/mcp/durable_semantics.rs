@@ -21,6 +21,7 @@ pub(crate) struct PendingSemanticTransition {
     pub target_source_hash: String,
     pub delta_identity: String,
     pub semantic_edges: Vec<SemanticEdge>,
+    pub compatibility: crate::mcp::compatibility::identity::CompatibilityIdentities,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -251,6 +252,7 @@ impl super::McpState {
         delta: &SequenceDelta,
         target_source_hash: String,
         semantic_edges: Vec<SemanticEdge>,
+        compatibility: crate::mcp::compatibility::identity::CompatibilityIdentities,
     ) -> Result<(), String> {
         if delta.target_hash.as_deref() != Some(target_source_hash.as_str()) {
             return Err("generated delta target hash does not match semantic state".to_string());
@@ -267,6 +269,7 @@ impl super::McpState {
             target_source_hash,
             delta_identity: sequence_delta_identity(delta)?,
             semantic_edges,
+            compatibility,
         };
         lock_or_recover!(
             self.pending_semantic_transitions.lock(),

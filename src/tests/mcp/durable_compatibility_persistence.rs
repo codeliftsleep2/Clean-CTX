@@ -225,3 +225,86 @@ fn compatibility_migration_resumes_when_columns_exist_without_version_row() {
             .contains(&"canonical_config_identity".to_string())
     );
 }
+
+#[test]
+fn accepted_delta_keeps_canonical_epoch_and_writes_snapshot_local_semantic_identity() {
+    let mut store = in_memory_store();
+    let file = "/workspace/delta-epoch.ts";
+    let baseline_identities = identities(file, "export class Baseline {}");
+    let baseline = crate::ir::compiler::CompiledIR {
+        file_id: file.to_string(),
+        version: 1,
+        instructions: Vec::new(),
+    };
+    let context_id = store
+        .save_context_with_compatibility(
+            file,
+            crate::compression::Fidelity::High,
+            "",
+            &crate::ir::binary_wire::encode(&baseline),
+            "hash-1",
+            1,
+            &[],
+            0,
+            0,
+            &baseline_identities,
+        )
+        .expect("persist baseline epoch");
+
+    let delta = crate::ir::delta::IRDelta {
+        file: file.to_string(),
+        from: 1,
+        to: 2,
+        ops: crate::ir::delta::DeltaOps {
+            adds: Vec::new(),
+            mods: Vec::new(),
+            dels: Vec::new(),
+        },
+        intent: None,
+    };
+    let payload = crate::mcp::persistence_ir::PersistedDelta::normalize_legacy(&delta, file)
+        .expect("persisted delta");
+    let mut snapshot_identities = baseline_identities.clone();
+    snapshot_identities.semantic_producers.relevant_producers.insert(
+        crate::mcp::compatibility::identity::ProducerKey::BuiltinSemantic,
+        99,
+    );
+    let snapshot = crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
+        file.to_string(),
+        "hash-2".to_string(),
+        2,
+        &[],
+    );
+    store
+        .append_delta_with_semantics(
+            &context_id,
+            &payload,
+            "legacy",
+            "",
+            &snapshot,
+            &snapshot_identities,
+        )
+        .expect("append compatible epoch delta");
+
+    let loaded = store
+        .load_durable_context(file, None)
+        .expect("load durable chain")
+        .expect("durable context");
+    assert_eq!(loaded.ir.version, 2);
+    assert_eq!(
+        loaded.compatibility.canonical_config,
+        Some(baseline_identities.canonical_config)
+    );
+    assert_eq!(
+        loaded.compatibility.canonical_producers,
+        Some(baseline_identities.canonical_producers)
+    );
+    assert_eq!(
+        loaded.compatibility.semantic_config,
+        Some(snapshot_identities.semantic_config)
+    );
+    assert_eq!(
+        loaded.compatibility.semantic_producers,
+        Some(snapshot_identities.semantic_producers)
+    );
+}
