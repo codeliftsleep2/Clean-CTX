@@ -17,6 +17,10 @@ use crate::protocol::send_response;
 
 use super::super::tool_helpers::{compile_source_ir_candidate, resolve_file_path_checked};
 
+#[cfg(test)]
+#[path = "../../tests/mcp/apply_edit_race_support.rs"]
+pub(crate) mod race_test_support;
+
 /// Serializes apply_edit COMMIT critical sections (disk write + session
 /// state refresh). The plan's "reuse the RwLock" idea deadlocks today:
 /// `compile_file_ir_focused` internally takes an ir_context READ lock via
@@ -119,13 +123,13 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         let e = EditError::NoTrackedState(resolved_path.clone());
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     };
-    // v1 policy (Open Question 2): no prior tracked state → refuse.
     if !state.ir_context_read().has_file(&alias) {
         let e = EditError::NoTrackedState(resolved_path.clone());
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
     // ── Unit relocation against CURRENT bytes (plan step 2/3) ────────
+    let publication = state.begin_semantic_publication(&resolved_path);
     match state.recover_pending_edit(&resolved_path) {
         Ok(crate::mcp::sqlite_store::EditRecovery::TargetCommitted) => {
             return err_response(
@@ -224,17 +228,12 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     // ── Verify + splice + gate (all in memory) ───────────────────────
     let report = match apply::apply(source, &units, &operations) {
         Ok(r) => r,
-        // All EditError variants are caller-state problems (bad params,
-        // stale expectations, policy gates) → invalid-request code.
         Err(e) => return err_response(id, -32602, e.to_string(), Some(e.structured())),
     };
     if let Err(e) = apply::verify_syntax(&report.new_source, extension) {
-        // Hard gate: nothing was written; report parse location.
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
-    // Compile and checked-project the exact in-memory candidate before any
-    // source, durable, or live owner changes.
     let (mut target_ir, semantic_edges, new_hash) = match compile_source_ir_candidate(
         &resolved_path,
         &report.new_source,
@@ -263,14 +262,18 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     }
 
     let version = target_ir.version;
+    #[cfg(test)]
+    race_test_support::pause_before_commit(&resolved_path);
     // ── Crash-recoverable commit critical section ────────────────────
     let _commit_guard = commit_lock().lock().unwrap_or_else(|p| p.into_inner());
-    let committed = state.with_semantic_authority_update(&resolved_path, || {
+    let committed = publication.commit(
+    || Ok::<_, ()>(std::fs::read(&resolved_path).is_ok_and(|bytes| bytes == prior_bytes)),
+    || {
     let staged = match stage_exact_bytes(&resolved_path, target_bytes) {
         Ok(staged) => staged,
         Err(error) => {
             err_response(id, -32603, error, None);
-            return false;
+            return Err(());
         }
     };
     let stage_path = staged.path().to_string_lossy().into_owned();
@@ -298,7 +301,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
                 format!("Edited compatibility identity derivation failed: {error}"),
                 None,
             );
-            return false;
+            return Err(());
         }
     };
     let intent = crate::mcp::sqlite_store::EditIntent {
@@ -317,7 +320,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     };
     if let Err(error) = establish_edit_intent(state, &intent, &compatibility) {
         err_response(id, -32603, error, None);
-        return false;
+        return Err(());
     }
     if let Err(error) = staged.persist(&resolved_path) {
         clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
@@ -327,7 +330,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             format!("Atomic source replacement failed: {}", error.error),
             None,
         );
-        return false;
+        return Err(());
     }
     state.invalidate_source_cache(&resolved_path);
     if let Err(error) = commit_edit_semantics(
@@ -349,7 +352,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
                 ),
                 None,
             );
-            return false;
+            return Err(());
         }
         state.invalidate_source_cache(&resolved_path);
         clear_edit_intent_best_effort(state, &resolved_path, &transition_id);
@@ -359,7 +362,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             format!("Durable edit commit failed; exact prior source restored: {error}"),
             None,
         );
-        return false;
+        return Err(());
     }
 
     target_ir.file_id.clone_from(&alias);
@@ -381,27 +384,31 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     state
         .cache_write()
         .update_and_verify(&resolved_path, &new_hash);
-    true
+    Ok(())
     });
     drop(_commit_guard);
-    if !committed {
-        return;
+    match committed {
+        Ok(Some(())) => {}
+        Ok(None) => {
+            let current = std::fs::read(&resolved_path).unwrap_or_default();
+            return stale_source_response(
+                id,
+                Some(&live_hash),
+                durable_hash.as_deref(),
+                &hash_bytes(state, &current),
+            );
+        }
+        Err(()) => return,
     }
     state.llm_text_cache_lock().remove(&alias);
     // ── Mark CBM project dirty (lazy reindex) ────────────────────
     if let Some(ref mut bridge) = *state.graph_bridge_lock() {
         if bridge.is_available() {
             bridge.mark_project_dirty(std::path::Path::new(&resolved_path));
-            // No synchronous CBM reindex — the next graph query will
-            // refresh automatically.
         }
     }
 
     // ── Invalidate hydration discovery for the edited root ───────
-    // The edit may have introduced or removed a declaration/consumer that
-    // only a fresh discovery pass can see, so any hydration discovery already
-    // completed for this root in the current generation is no longer valid.
-    // Cheap and unconditional — the next hydration rediscovers.
     super::hydration::invalidate_discovery_for_edited_path(state, &resolved_path);
 
     // ── Minimal response (plan step 6) ───────────────────────────────

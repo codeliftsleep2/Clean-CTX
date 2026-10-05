@@ -4,6 +4,7 @@ use crate::mcp::context_store::ContextStore;
 use crate::mcp::tool_handlers::control_full_test_support;
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
+use std::sync::Arc;
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let mut config = crate::tests::test_config();
@@ -400,6 +401,57 @@ fn candidate_compilation_failure_precedes_source_intent_and_live_mutation() {
             .unwrap()
             .has_edit_intent(&file)
             .unwrap()
+    );
+}
+
+#[test]
+fn edit_rejects_source_authority_published_after_candidate_preparation() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("authority-race.ts");
+    let file = path.to_string_lossy().into_owned();
+    let old_body = "{\n    return \"old\";\n  }";
+    let edit_body = "{\n    return \"edit\";\n  }";
+    let newer_body = "{\n    return \"newer\";\n  }";
+    std::fs::write(&path, source(old_body)).unwrap();
+    let state = Arc::new(state(&root));
+    assert!(baseline(&state, &file, &root).get("error").is_none());
+
+    crate::mcp::tool_handlers::edit::race_test_support::arm(&file);
+    let worker_state = Arc::clone(&state);
+    let worker_file = file.clone();
+    let edit = std::thread::spawn(move || {
+        crate::protocol::captured_responses().clear();
+        crate::mcp::tool_handlers::edit::handle_apply_edit(
+            &json!(10),
+            &json!({ "arguments": replace_body(&worker_file, old_body, edit_body) }),
+            &worker_state,
+        );
+        crate::protocol::captured_responses()
+            .pop()
+            .expect("apply_edit response")
+    });
+    crate::mcp::tool_handlers::edit::race_test_support::wait_until_paused();
+
+    let newer_source = source(newer_body);
+    std::fs::write(&path, &newer_source).unwrap();
+    state.invalidate_source_cache(&file);
+    let published = baseline(&state, &file, &root);
+    assert!(published.get("error").is_none(), "{published}");
+
+    crate::mcp::tool_handlers::edit::race_test_support::release();
+    let edit_response = edit.join().unwrap();
+
+    assert_eq!(
+        edit_response["error"]["data"]["code"], "stale_edit_source",
+        "an edit prepared from superseded H1 must reject rather than overwrite H3: {edit_response}"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), newer_source);
+    let alias = state.alias_for_path(&file).unwrap();
+    let newer_hash = state.cache_read().compute_hash(&newer_source);
+    assert_eq!(
+        state.ir_context_read().get_source_hash(&alias),
+        Some(&newer_hash)
     );
 }
 
