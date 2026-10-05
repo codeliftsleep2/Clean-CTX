@@ -35,6 +35,17 @@ impl McpState {
         self.source_cache_lock().remove(&cache_key);
     }
 
+    /// Drop every cached source snapshot owned below `root`.
+    ///
+    /// An explicit external refresh starts a new root generation. Clearing the
+    /// matching snapshots ensures that metadata granularity cannot make fresh
+    /// hydration recompile pre-refresh bytes of an otherwise current file.
+    pub(crate) fn invalidate_source_cache_in_root(&self, root: &str) {
+        let root = std::path::Path::new(root);
+        self.source_cache_lock()
+            .retain(|path, _| !std::path::Path::new(path).starts_with(root));
+    }
+
     /// Resolve a cache key for `source_cache`. On Windows, `canonicalize`
     /// on TempDir paths can trigger Defender deep-scan hooks (10-30s per
     /// call). We skip canonicalize when the path has no relative components,

@@ -20,6 +20,7 @@ pub(super) fn select_candidates(
     let resolved: Vec<_> = candidates
         .into_iter()
         .map(|path| state.semantic_owner_path(&path))
+        .filter(|path| current_source_candidate_is_eligible(state, path))
         .filter(|path| seen.insert(path.clone()))
         .collect();
     let indexed = state.workspace_index_read();
@@ -33,6 +34,17 @@ pub(super) fn select_candidates(
     drop(indexed);
     selected.sort();
     selected
+}
+
+fn current_source_candidate_is_eligible(state: &McpState, path: &str) -> bool {
+    let path = std::path::Path::new(path);
+    path.is_file()
+        && !state.config.is_excluded(&path.to_string_lossy())
+        && path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .and_then(crate::compression::language::language_for_extension)
+            .is_some()
 }
 
 #[cfg(all(test, feature = "rust"))]

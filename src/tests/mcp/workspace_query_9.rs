@@ -11,6 +11,7 @@
 
 use crate::cbm::GraphBridge;
 use crate::cbm::bridge::cbm_project_slug;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::mcp::tool_handlers::hydration::{
     TestProjectReadiness, clear_test_project_search_results, last_test_traversal_stats,
     reset_test_scan_calls, set_test_project_readiness, set_test_project_search_results,
@@ -101,6 +102,120 @@ fn call_query(
 
 fn write_source(path: &Path, contents: &str) {
     std::fs::write(path, contents).unwrap();
+}
+
+fn dependency_edge(from: &str, to: &str) -> SemanticEdge {
+    SemanticEdge {
+        relation: SemanticRelation::Injects,
+        subject: EntityRef::new("angular", "Service", from),
+        object: EntityRef::new("angular", "Service", to),
+        layer: "angular",
+        call_evidence: None,
+    }
+}
+
+// ── #118: successful external refresh retracts the old root generation ─
+
+#[test]
+fn external_refresh_retracts_stale_evidence_before_targeted_hydration() {
+    let _serial = serialize();
+    reset_test_scan_calls();
+    let root = tempfile::TempDir::new().unwrap();
+    let file = root.path().join("Authority.ts");
+    write_source(&file, "export class OldName {}\n");
+    let state = filesystem_only_state(&[]);
+
+    let initial = call_query(&state, "find_entities", "OldName", root.path());
+    assert_eq!(initial["count"], 1, "the old generation is initially live");
+
+    write_source(&file, "export class NewName {}\n");
+    crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(
+        &state,
+        &root.path().to_string_lossy(),
+    );
+
+    let refreshed = call_query(&state, "find_entities", "OldName", root.path());
+    assert_eq!(
+        refreshed["count"], 0,
+        "stale positive evidence must stay retracted"
+    );
+    assert_eq!(
+        test_scan_calls(),
+        2,
+        "the refreshed generation must perform fresh targeted discovery"
+    );
+}
+
+#[test]
+fn external_refresh_retracts_a_deleted_semantic_owner() {
+    let _serial = serialize();
+    let root = tempfile::TempDir::new().unwrap();
+    let file = root.path().join("DeletedOwner.ts");
+    write_source(&file, "export class DeletedOwner {}\n");
+    let state = filesystem_only_state(&[]);
+
+    let initial = call_query(&state, "find_entities", "DeletedOwner", root.path());
+    assert_eq!(initial["count"], 1, "the owner is initially current");
+
+    std::fs::remove_file(&file).expect("delete source outside Clean-CTX");
+    crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(
+        &state,
+        &root.path().to_string_lossy(),
+    );
+
+    let refreshed = call_query(&state, "find_entities", "DeletedOwner", root.path());
+    assert_eq!(
+        refreshed["count"], 0,
+        "a deleted owner cannot remain current after external refresh"
+    );
+}
+
+#[test]
+fn external_refresh_retracts_stale_cycle_without_query_specific_filtering() {
+    let _serial = serialize();
+    let root = tempfile::TempDir::new().unwrap();
+    let owner = root.path().join("cycle.ts").to_string_lossy().into_owned();
+    let state = filesystem_only_state(&[]);
+    {
+        let mut index = state.workspace_index_lock();
+        index.add_edges(
+            &owner,
+            vec![
+                dependency_edge("AlphaService", "BetaService"),
+                dependency_edge("BetaService", "AlphaService"),
+            ],
+        );
+        assert!(
+            index.has_cycle(),
+            "the stale owner initially supplies a cycle"
+        );
+    }
+
+    crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(
+        &state,
+        &root.path().to_string_lossy(),
+    );
+
+    crate::protocol::captured_responses().clear();
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(118),
+        "workspace_query",
+        &serde_json::json!({
+            "arguments": {
+                "type": "has_cycle",
+                "kind": "dependency",
+                "workspaceRoot": root.path().to_string_lossy()
+            }
+        }),
+        &state,
+    );
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("has_cycle response");
+    assert_eq!(
+        response["result"]["structuredContent"]["has_cycle"], false,
+        "the non-hydrating query must inherit reconciled owner authority"
+    );
 }
 
 // ── RED-FS1: a repeated query does not re-walk the filesystem ───────────

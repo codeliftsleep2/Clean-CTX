@@ -270,17 +270,6 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
 
     let mut args = tool_params;
 
-    // Explicit reindex of a repository refreshes CBM's graph for it, so any
-    // hydration discovery previously recorded against the pre-refresh graph is
-    // stale. `index_repository` exists precisely for external edits Clean-CTX
-    // cannot observe, which makes it the documented boundary at which the
-    // session's discovery cache must be dropped.
-    if cbm_tool == "index_repository" {
-        if let Some(repo_path) = args.get("repo_path").and_then(|value| value.as_str()) {
-            crate::mcp::tool_handlers::hydration::invalidate_discovery_for_root(state, repo_path);
-        }
-    }
-
     // Step 2: Forward to CBM via pipe — intercept the raw response text.
     //
     // The indexing gate must resolve against the project actually being queried
@@ -338,6 +327,16 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
             }
         }));
         return;
+    }
+    // A successful explicit reindex is the documented external-edit boundary.
+    // CBM establishes graph freshness but remains discovery-only; Clean-CTX
+    // retracts the root's previous semantic generation so only canonical-source
+    // hydration can publish current WorkspaceIndex authority again. Perform the
+    // transition only after transport and CBM soft-error checks succeed.
+    if cbm_tool == "index_repository"
+        && let Some(repo_path) = args.get("repo_path").and_then(Value::as_str)
+    {
+        crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(state, repo_path);
     }
     let raw_response = crate::cbm::caller_verify_proxy::verify_proxy_response(
         bridge,

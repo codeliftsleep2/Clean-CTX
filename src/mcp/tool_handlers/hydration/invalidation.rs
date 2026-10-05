@@ -3,7 +3,7 @@
 // A completed discovery stops being valid when the workspace can contain newly
 // relevant source. Every hook below reuses an existing workspace-lifecycle
 // event — `apply_edit` (via `invalidate_discovery_for_edited_path`) and explicit
-// repository reindexing (via `invalidate_discovery_for_root`) — rather than
+// repository reindexing (via `reconcile_external_refresh_for_root`) — rather than
 // introducing a watcher, timer, TTL, or background worker.
 //
 // External edits remain the documented Clean-CTX boundary: the host editor's
@@ -41,12 +41,26 @@ pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: 
     }
 }
 
-/// Invalidate hydration discovery for one repository root.
+/// Establish a new current-source generation for one repository root.
 ///
 /// Called when a repository is explicitly reindexed (`index_repository`, or
 /// `cbm_proxy` with `cbm_tool: "index_repository"`). That tool exists precisely
-/// for external edits Clean-CTX cannot observe, so a refresh must also drop the
-/// discovery recorded against the pre-refresh graph.
+/// for external edits Clean-CTX cannot observe. After the refresh succeeds,
+/// both discovery and semantic projections from the previous generation cease
+/// to be current. Fresh hydration may republish eligible owners from canonical
+/// source; durable historical artifacts do not independently regain authority.
+pub(crate) fn reconcile_external_refresh_for_root(state: &McpState, root: &str) {
+    let identity = crate::dictionary::path::canonical_identity_key(root);
+    invalidate_discovery_for_root(state, &identity);
+    state.invalidate_source_cache_in_root(&identity);
+    state.workspace_index_lock().remove_files_in_root(&identity);
+}
+
+/// Drop completed discovery for one root without changing semantic authority.
+///
+/// This remains available to focused cache-granularity tests and lifecycle
+/// events that establish only discovery staleness. External repository refresh
+/// uses [`reconcile_external_refresh_for_root`] instead.
 pub(crate) fn invalidate_discovery_for_root(state: &McpState, root: &str) {
     let identity = crate::dictionary::path::canonical_identity_key(root);
     state.hydration_discovery_lock().invalidate_root(&identity);

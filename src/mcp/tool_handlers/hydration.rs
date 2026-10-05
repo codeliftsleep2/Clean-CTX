@@ -24,8 +24,10 @@ mod filesystem;
 use filesystem::{configured_roots, deduplicate_roots, root_key, scan};
 
 mod invalidation;
+#[cfg(all(test, feature = "rust"))]
+pub(crate) use invalidation::invalidate_discovery_for_root;
 pub(crate) use invalidation::{
-    invalidate_discovery_for_edited_path, invalidate_discovery_for_root,
+    invalidate_discovery_for_edited_path, reconcile_external_refresh_for_root,
 };
 
 mod publication;
