@@ -13,11 +13,21 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         return send_restore_error(id, "Missing required parameter: filePath");
     }
 
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
+    let requested = match resolve_durable_path_checked(
+        requested,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
+        Ok(path) => path,
+        Err(error) => return send_restore_error(id, &error),
+    };
+
     let durable_path = state
-        .alias_for_path(requested)
+        .alias_for_path(&requested)
         .and_then(|alias| state.persisted_path(&alias))
-        .unwrap_or_else(|| state.durable_owner_path(requested));
-    if state.semantic_owner_path(requested) != state.semantic_owner_path(&durable_path) {
+        .unwrap_or_else(|| state.durable_owner_path(&requested));
+    if state.semantic_owner_path(&requested) != state.semantic_owner_path(&durable_path) {
         return send_restore_error(id, "Requested file does not match its durable identity");
     }
 
@@ -152,6 +162,54 @@ fn send_compatibility_error(id: &Value, error: &CompatibilityFailure) {
     ));
 }
 
+/// Admit a durable owner without requiring the source file to still exist.
+/// Its containing directory must exist so symlinks and `..` are resolved.
+fn resolve_durable_path_checked(
+    path: &str,
+    workspace_root: Option<&str>,
+    additional_roots: &[String],
+) -> Result<String, String> {
+    use crate::mcp::tool_helpers::{resolve_file_path, resolve_file_path_checked};
+
+    let resolved = resolve_file_path(path, workspace_root);
+    if std::path::Path::new(&resolved).exists() {
+        return resolve_file_path_checked(path, workspace_root, additional_roots);
+    }
+    let candidate = std::path::Path::new(&resolved);
+    if candidate.symlink_metadata().is_ok() {
+        return Err(format!(
+            "path cannot be resolved safely within workspace root: {resolved}"
+        ));
+    }
+    let parent = candidate
+        .parent()
+        .ok_or_else(|| format!("path has no containing directory: {resolved}"))?;
+    let canonical_parent = parent
+        .canonicalize()
+        .map_err(|_| format!("path parent does not exist: {}", parent.display()))?;
+    let trusted = resolve_file_path(workspace_root.unwrap_or("."), None);
+    let canonical_root = std::path::Path::new(&trusted)
+        .canonicalize()
+        .map_err(|_| format!("workspace root does not exist: {trusted}"))?;
+    let authorized = canonical_parent.starts_with(&canonical_root)
+        || additional_roots.iter().any(|root| {
+            std::path::Path::new(root)
+                .canonicalize()
+                .is_ok_and(|root| canonical_parent.starts_with(root))
+        });
+    if !authorized {
+        return Err(format!(
+            "path outside workspace root: {resolved} (workspace root: {})",
+            canonical_root.display()
+        ));
+    }
+    Ok(resolved)
+}
+
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/durable_restore_compatibility.rs"]
 mod compatibility_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/restore_path_admission.rs"]
+mod path_admission_tests;
