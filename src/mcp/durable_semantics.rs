@@ -96,6 +96,7 @@ impl TryFrom<&DurableSemanticEdge> for SemanticEdge {
     type Error = String;
 
     fn try_from(edge: &DurableSemanticEdge) -> Result<Self, Self::Error> {
+        validate_relation_evidence(edge.relation, edge.call_evidence)?;
         Ok(Self {
             relation: edge.relation,
             subject: edge.subject.restore()?,
@@ -103,6 +104,19 @@ impl TryFrom<&DurableSemanticEdge> for SemanticEdge {
             layer: intern_label(&edge.layer)?,
             call_evidence: edge.call_evidence,
         })
+    }
+}
+
+fn validate_relation_evidence(
+    relation: SemanticRelation,
+    call_evidence: Option<CallEvidence>,
+) -> Result<(), String> {
+    match (relation, call_evidence) {
+        (SemanticRelation::Calls, None) => {
+            Err("durable Calls edge is missing call evidence".to_string())
+        }
+        (SemanticRelation::Calls, Some(_)) | (_, None) => Ok(()),
+        (_, Some(_)) => Err("durable non-Calls edge carries call evidence".to_string()),
     }
 }
 

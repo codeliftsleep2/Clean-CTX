@@ -48,6 +48,35 @@ fn indexed_component_edges(state: &crate::mcp::McpState, component: &str) -> Val
         .expect("serializable indexed component edges")
 }
 
+fn replace_first_durable_edge(
+    state: &crate::mcp::McpState,
+    relation: &str,
+    call_evidence: Option<Value>,
+) {
+    let store = state.persistence_store_lock();
+    let sqlite = store.as_ref().unwrap().sqlite().unwrap();
+    let mutation = match call_evidence {
+        Some(evidence) => format!(
+            "UPDATE semantic_edge_snapshots
+             SET edges_json = json_set(
+                 edges_json,
+                 '$.edges[0].relation', '{relation}',
+                 '$.edges[0].call_evidence', json('{evidence}')
+             )"
+        ),
+        None => format!(
+            "UPDATE semantic_edge_snapshots
+             SET edges_json = json_remove(
+                 json_set(edges_json, '$.edges[0].relation', '{relation}'),
+                 '$.edges[0].call_evidence'
+             )"
+        ),
+    };
+    sqlite
+        .execute_batch(&mutation)
+        .expect("replace durable semantic edge");
+}
+
 #[test]
 fn generated_delta_persists_and_restores_complete_target_edges() {
     let _serial = crate::protocol::handler_response_serial();
@@ -329,6 +358,57 @@ fn malformed_or_mismatched_edge_snapshot_fails_without_session_mutation() {
     assert!(missing.get("error").is_some(), "{missing}");
     assert_eq!(state.ir_context_read().get_ir(&alias).cloned(), prior_ir);
     assert_eq!(edge_json(&state, &alias), prior_edges);
+}
+
+#[test]
+fn relation_incompatible_edge_evidence_fails_without_session_mutation() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("relation-evidence.ts");
+    let file = path.to_string_lossy().into_owned();
+    std::fs::write(
+        &path,
+        "import { Component } from '@angular/core';\n@Component({ selector: 'stable', template: '' })\nexport class StableComponent {}\n",
+    )
+    .expect("source");
+    let state = state(&root);
+    let compressed = dispatch(&state, 20, "compress_code_context", args(&file, &root));
+    assert!(compressed.get("error").is_none(), "{compressed}");
+    let alias = state.alias_for_path(&file).expect("alias");
+    let prior_ir = state.ir_context_read().get_ir(&alias).cloned();
+    let prior_edges = edge_json(&state, &alias);
+    let prior_index_edges = indexed_component_edges(&state, "StableComponent");
+    let prior_index_count = state.workspace_index_read().edge_count();
+    let prior_llm = state.llm_text_cache_lock().get(&alias).cloned();
+
+    for (id, relation, evidence) in [
+        (21, "Calls", None),
+        (
+            22,
+            "Injects",
+            Some(json!({ "explicit_arg_count": 3, "has_spread": false })),
+        ),
+    ] {
+        replace_first_durable_edge(&state, relation, evidence);
+        let rejected = dispatch(
+            &state,
+            id,
+            "restore_context",
+            json!({ "filePath": file, "workspaceRoot": root.path() }),
+        );
+        assert_eq!(
+            rejected["error"]["data"]["reason"], "structural_snapshot_incoherence",
+            "{rejected}"
+        );
+        assert_eq!(state.ir_context_read().get_ir(&alias).cloned(), prior_ir);
+        assert_eq!(edge_json(&state, &alias), prior_edges);
+        assert_eq!(
+            indexed_component_edges(&state, "StableComponent"),
+            prior_index_edges
+        );
+        assert_eq!(state.workspace_index_read().edge_count(), prior_index_count);
+        assert_eq!(state.llm_text_cache_lock().get(&alias), prior_llm.as_ref());
+    }
 }
 
 #[test]
