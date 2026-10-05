@@ -1,6 +1,6 @@
 # Durable Authority Compatibility Migration Plan
 
-**Status:** Implementation in progress; Phases 0-8 complete
+**Status:** Implementation in progress; Phases 0-9 complete
 **Branch:** `feature/durable-authority-compatibility`  
 **Issues:** #117, #119, prerequisite and integration work for #116  
 **Out of scope:** #118, Binary `0x04` redesign, relation-family persistence,
@@ -815,6 +815,28 @@ Exit criteria:
 - documentation matches the production lifecycle;
 - legacy remediation is explicit: compile current source to establish a new
   baseline rather than blessing or deleting old history.
+
+**Implementation record (2026-10-04):** Complete. Restore and historical
+replay compatibility failures now expose a stable mismatch `reason` and a
+coarser actionable `component` without exposing serialized identity payloads.
+`PERSIST-002` records the durable compatibility lifecycle, legacy remediation,
+typed publication boundary, and ownership model in
+`docs/ARCHITECTURAL_INVARIANTS.md`. Producer-generation bump rules are
+documented beside each producer owner.
+
+No new operator harness was added. Existing tracked restart, replay, delta,
+and recovery tests already exercise the production compatibility boundaries.
+A generation-mismatch harness would require the same test-only generation
+seams as those regressions and would not add live-system evidence, so it would
+be redundant under the harness policy.
+
+The repository owner reported these focused tracked tests GREEN with no
+reported warnings:
+
+```powershell
+cargo test --all-features mcp::tool_handlers::core::restore::compatibility_tests::restore_rejects_canonical_type_alias_config_before_live_mutation -- --exact
+cargo test --all-features mcp::tool_handlers::persistence::lifecycle_tests::semantics::historical_replay_rejects_incompatible_config_before_live_mutation -- --exact
+```
 
 ### Phase 10 - Final integration audit and verification
 

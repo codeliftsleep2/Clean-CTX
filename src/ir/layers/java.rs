@@ -15,9 +15,9 @@ use super::declaration::{declaration_head, has_modifier, interface_parents};
 use super::{LanguageLayer, LayerContext};
 use crate::ir::opcodes::{CoreOp, DeclarationModifier};
 
-/// Durable canonical semantics produced by the Java IR layer.
+/// Increment when identical Java input can emit different canonical IR.
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
-/// Java canonical-fact meanings consumed by semantic projection.
+/// Increment when Java canonical facts change meaning for projection.
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
 
 /// Java language layer (Layer 2).

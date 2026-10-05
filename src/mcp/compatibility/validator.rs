@@ -108,6 +108,25 @@ impl CompatibilityFailure {
             Self::HistoricalSourceNotCurrent { .. } => "historical_source_not_current",
         }
     }
+
+    pub(crate) fn component(&self) -> &'static str {
+        match self {
+            Self::PhysicalSchemaIncompatibility { .. } => "physical_schema",
+            Self::StructuralSnapshotIncoherence { .. } => "structural_snapshot",
+            Self::SourceMismatch { .. } | Self::HistoricalSourceNotCurrent { .. } => "source",
+            Self::InsufficientFidelity { .. } => "fidelity",
+            Self::CanonicalConfigurationIncompatible => "canonical_configuration",
+            Self::SemanticConfigurationIncompatible => "semantic_configuration",
+            Self::CanonicalProducerIncompatible => "canonical_producers",
+            Self::SemanticProducerIncompatible => "semantic_producers",
+            Self::MissingLegacyIdentity { component } => match component {
+                CompatibilityComponent::CanonicalConfiguration => "canonical_configuration",
+                CompatibilityComponent::CanonicalProducers => "canonical_producers",
+                CompatibilityComponent::SemanticConfiguration => "semantic_configuration",
+                CompatibilityComponent::SemanticProducers => "semantic_producers",
+            },
+        }
+    }
 }
 
 pub(crate) fn validate_current_context(

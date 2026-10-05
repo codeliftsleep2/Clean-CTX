@@ -24,9 +24,9 @@ use crate::ir::opcodes::{
     SideEffectKind,
 };
 
-/// Durable canonical semantics produced by the Rust IR layer.
+/// Increment when identical Rust input can emit different canonical IR.
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
-/// Rust canonical-fact meanings consumed by semantic projection.
+/// Increment when Rust canonical facts change meaning for projection.
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
 
 /// Rust visibility enum

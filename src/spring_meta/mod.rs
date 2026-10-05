@@ -19,7 +19,8 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
-/// Durable generations for Spring marker and semantic production.
+/// Increment marker and semantic generations independently when identical
+/// Spring inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
 pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
 

@@ -129,6 +129,11 @@ fn restore_rejects_canonical_type_alias_config_before_live_mutation() {
         "canonical_configuration_incompatible",
         "{rejected}"
     );
+    assert_eq!(
+        rejected["error"]["data"]["component"],
+        "canonical_configuration",
+        "{rejected}"
+    );
     assert!(restarted.alias_for_path(&file).is_none());
     assert_eq!(restarted.workspace_index_read().edge_count(), 0);
     assert!(restarted.llm_text_cache_lock().is_empty());

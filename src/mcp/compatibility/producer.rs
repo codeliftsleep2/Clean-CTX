@@ -1,5 +1,9 @@
 //! Scoped producer-generation catalog. Constants remain owned by their
-//! producers; this catalog only assembles the active runtime view.
+//! producers; this catalog only assembles the active runtime view. A producer
+//! owner increments its generation when unchanged inputs can produce different
+//! durable canonical facts, markers, or semantic edges. Refactors that preserve
+//! those outputs do not bump generations, and unrelated producers never bump
+//! together merely because they ship in the same release.
 
 use super::identity::ProducerKey;
 use std::collections::BTreeMap;

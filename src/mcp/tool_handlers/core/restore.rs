@@ -141,7 +141,10 @@ fn send_compatibility_error(id: &Value, error: &CompatibilityFailure) {
         id.clone(),
         -32603,
         &format!("Durable restore rejected: {error}"),
-        Some(serde_json::json!({ "reason": error.reason() })),
+        Some(serde_json::json!({
+            "reason": error.reason(),
+            "component": error.component()
+        })),
     ));
 }
 

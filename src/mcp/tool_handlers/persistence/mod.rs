@@ -178,7 +178,10 @@ fn send_replay_compatibility_error(id: &Value, error: &CompatibilityFailure) {
         id.clone(),
         -32603,
         &format!("Historical replay rejected: {error}"),
-        Some(serde_json::json!({ "reason": error.reason() })),
+        Some(serde_json::json!({
+            "reason": error.reason(),
+            "component": error.component()
+        })),
     ));
 }
 

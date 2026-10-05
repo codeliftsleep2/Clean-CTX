@@ -28,9 +28,9 @@ use crate::ir::opcodes::{
 };
 use std::collections::HashMap;
 
-/// Durable canonical semantics produced by the C# IR layer.
+/// Increment when identical C# input can emit different canonical IR.
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
-/// C# canonical-fact meanings consumed by semantic projection.
+/// Increment when C# canonical facts change meaning for projection.
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
 
 /// True when `head` (a declaration head, never a full body) carries `word`
