@@ -1,7 +1,7 @@
 use super::*;
 use crate::native_text::{
     angular_filter::AngularOperation, cargo_filter::CargoOperation, dotnet_filter::DotnetOperation,
-    node_build_filter::NodeBuildOperation,
+    maven_filter::MavenOperation, node_build_filter::NodeBuildOperation,
 };
 
 #[test]
@@ -193,6 +193,38 @@ fn selects_only_diagnostic_dotnet_operations() {
         "dotnet build-server shutdown",
         "./dotnet build",
         "dotnet build && echo done",
+    ] {
+        assert_eq!(diagnostic_target(command), None, "admitted {command}");
+    }
+}
+
+#[test]
+fn selects_only_approved_maven_lifecycle_operations() {
+    for (command, operation) in [
+        ("mvn compile", MavenOperation::Compile),
+        ("mvn package -DskipTests", MavenOperation::Package),
+        ("mvn install -DskipTests", MavenOperation::Install),
+        ("mvn clean package -DskipTests", MavenOperation::Package),
+        ("mvn clean compile package", MavenOperation::Package),
+    ] {
+        assert_eq!(
+            diagnostic_target(command),
+            Some(DiagnosticTarget::MavenStdout(operation))
+        );
+    }
+    for command in [
+        "mvn clean",
+        "mvn test",
+        "mvn verify",
+        "mvn --version",
+        "mvn package --help",
+        "mvn clean --show-version package",
+        "mvn help:effective-pom",
+        "mvn package exec:java",
+        "mvn package dependency:tree",
+        "mvn -q package",
+        "./mvnw package",
+        "mvn package && echo done",
     ] {
         assert_eq!(diagnostic_target(command), None, "admitted {command}");
     }

@@ -305,6 +305,49 @@ fn ineligible_dotnet_operations_do_not_filter_resembling_output() {
 }
 
 #[test]
+fn maven_build_filters_only_stdout_and_preserves_semantic_summary() {
+    let stdout = "[INFO] Building app 1.0.0\n[INFO] --- compiler:compile ---\n[WARNING] retained\n[INFO] BUILD SUCCESS\n[INFO] Total time: 2 s";
+    let stderr = "    Compiling must-remain\nindex abc1234..def5678 100644";
+    let (response, facts) = process(&event("mvn clean package -DskipTests", stdout, stderr));
+    let output = response.expect("approved Maven lifecycle should filter stdout");
+    let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+    let transformed = updated["stdout"].as_str().unwrap();
+    assert!(!transformed.contains("Building app"));
+    assert!(!transformed.contains("compiler:compile"));
+    assert!(transformed.contains("[WARNING] retained"));
+    assert!(transformed.contains("BUILD SUCCESS"));
+    assert!(transformed.contains("Total time: 2 s"));
+    assert!(transformed.contains("§FILTERED maven-build:"));
+    assert_eq!(updated["stderr"].as_str(), Some(stderr));
+    assert_eq!(
+        facts.fields[0].filter.as_ref().unwrap().filter_id,
+        "maven-build-v1"
+    );
+    assert!(facts.fields[1].filter.is_none());
+}
+
+#[test]
+fn ineligible_maven_goals_do_not_filter_resembling_output() {
+    let stdout = "[INFO] Building must-remain\n[INFO] --- must-remain ---";
+    for command in [
+        "mvn clean",
+        "mvn test",
+        "mvn package --help",
+        "mvn package exec:java",
+        "mvn package dependency:tree",
+        "./mvnw package",
+        "mvn package | tail -20",
+    ] {
+        let (response, facts) = process(&event(command, stdout, ""));
+        assert!(response.is_none(), "replaced ineligible command {command}");
+        assert_eq!(
+            facts.pass_through_reason,
+            Some(PassThroughReason::Unchanged)
+        );
+    }
+}
+
+#[test]
 fn facts_are_allowlisted_and_exclude_sensitive_payloads() {
     let input = event(
         "git diff --password command-secret",

@@ -1,6 +1,6 @@
 use crate::native_text::{
     angular_filter::AngularOperation, cargo_filter::CargoOperation, dotnet_filter::DotnetOperation,
-    node_build_filter::NodeBuildOperation,
+    maven_filter::MavenOperation, node_build_filter::NodeBuildOperation,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -12,6 +12,7 @@ pub(super) enum DiagnosticTarget {
     EslintStdout,
     NodeBuildStdout(NodeBuildOperation),
     DotnetStdout(DotnetOperation),
+    MavenStdout(MavenOperation),
 }
 
 pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
@@ -87,6 +88,42 @@ pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
             node_build_target(script, &words)
         }
         [executable, operation, ..] if executable == "dotnet" => dotnet_target(operation, &words),
+        [executable, first_goal, remaining @ ..] if executable == "mvn" => {
+            maven_target(first_goal, remaining)
+        }
+        _ => None,
+    }
+}
+
+fn maven_target(first_goal: &str, remaining: &[String]) -> Option<DiagnosticTarget> {
+    if requests_help(remaining)
+        || remaining.iter().any(|argument| {
+            matches!(
+                argument.as_str(),
+                "--version" | "-v" | "-V" | "--show-version"
+            )
+        })
+    {
+        return None;
+    }
+    let mut operation = maven_operation(first_goal);
+    if first_goal != "clean" && operation.is_none() {
+        return None;
+    }
+    for argument in remaining {
+        if argument.starts_with('-') || argument == "clean" {
+            continue;
+        }
+        operation = Some(maven_operation(argument)?);
+    }
+    operation.map(DiagnosticTarget::MavenStdout)
+}
+
+fn maven_operation(goal: &str) -> Option<MavenOperation> {
+    match goal {
+        "compile" => Some(MavenOperation::Compile),
+        "package" => Some(MavenOperation::Package),
+        "install" => Some(MavenOperation::Install),
         _ => None,
     }
 }

@@ -5,7 +5,8 @@
 **Status:** Supported-first scope and operation-sensitive field authority
 approved. The shared reduction kernel and Rust build/check/clippy slice are
 owner-verified green. The TypeScript/Angular slice is owner-verified green. The
-C#/.NET slice is implemented and awaiting owner verification.
+C#/.NET slice is owner-verified green. The Java/Spring Maven slice is
+implemented and awaiting owner verification.
 
 **Scope:** Architecture freeze and incremental implementation record for the
 supported-toolchain native diagnostic slices. Cargo verification is performed
@@ -521,6 +522,41 @@ total lines for build and 100 for test.
 
 Tracked regressions cover specialized selection, rejected semantic roles,
 boilerplate removal, warning/summary retention, distinct bounds and identities,
+stdout-only authority, stderr isolation, and output-content non-authority.
+Verification results must not be recorded until supplied by the repository
+owner.
+
+The repository owner reported the requested C#/.NET verification green on
+2026-10-06. This closes its deterministic local gate.
+
+## 19. Java/Spring Maven Slice Implementation Record
+
+The Maven slice recognizes only the successful simple-command lifecycle
+boundary established by repository evidence:
+
+```text
+mvn compile         -> MavenOperation::Compile -> stdout
+mvn package         -> MavenOperation::Package -> stdout
+mvn install         -> MavenOperation::Install -> stdout
+mvn clean <approved build phase> -> the approved build operation -> stdout
+```
+
+`clean` alone has no diagnostic authority. After the first lifecycle goal,
+every positional goal must be `clean`, `compile`, `package`, or `install`;
+otherwise the invocation is rejected. This prevents an approved phase from
+authorizing later arbitrary plugin execution such as `exec:java` or requested
+inspection such as `dependency:tree`. Options beginning with `-` are retained,
+but options preceding the first goal, wrapper executables, unsupported phases,
+and shell compounds remain conservatively ineligible.
+
+The producer policy removes only the catalog-established blank, plugin-header,
+transfer-progress, numeric module-progress, and generic project-building lines.
+Warnings, project scanning, build result, total time, and completion timestamp
+remain. The shared kernel applies a 50-line total bound, one disclosure marker,
+repeat protection, common accounting, and no success collapse.
+
+Tracked regressions cover lifecycle composition, arbitrary-goal rejection,
+numeric progress recognition, semantic summary retention, the shared bound,
 stdout-only authority, stderr isolation, and output-content non-authority.
 Verification results must not be recorded until supplied by the repository
 owner.
