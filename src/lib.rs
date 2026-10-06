@@ -22,6 +22,7 @@
 pub mod analytics;
 pub mod cache;
 pub mod cbm;
+pub mod claude_native;
 pub mod config;
 pub mod edit;
 pub mod intelligence;
@@ -41,6 +42,7 @@ pub mod gitdiff;
 pub mod ir;
 pub mod layers;
 pub mod meta_util;
+pub mod native_text;
 pub mod observability;
 pub mod proxy_spawner;
 pub mod spring_meta;

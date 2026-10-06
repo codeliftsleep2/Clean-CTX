@@ -264,6 +264,7 @@ dependencies = [
  "ignore",
  "proptest",
  "rayon",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

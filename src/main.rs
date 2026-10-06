@@ -6,6 +6,7 @@
 // and `.clean-ctx/` directory in the current directory.
 
 use clap::Parser;
+use std::io::{Read, Write};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -31,6 +32,17 @@ enum Cli {
         #[arg(long)]
         stop: bool,
     },
+    /// Run a Claude Code native hook adapter
+    ClaudeHook {
+        #[command(subcommand)]
+        event: ClaudeHookEvent,
+    },
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum ClaudeHookEvent {
+    /// Transform one successful PostToolUse event from stdin
+    PostToolUse,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -50,6 +62,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
         Ok(Cli::ConfigDump) => cmd_config_dump(),
         Ok(Cli::Proxy { stop }) => cmd_proxy(stop),
+        Ok(Cli::ClaudeHook {
+            event: ClaudeHookEvent::PostToolUse,
+        }) => cmd_claude_post_tool_use(),
         // When no arguments are given, clap emits DisplayHelpOnMissingArgumentOrSubcommand.
         // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
         // Any future Cli variant is automatically dispatched above — no parallel
@@ -59,6 +74,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Err(e) => e.exit(),
     }
+}
+
+#[cfg(test)]
+#[path = "tests/claude_native/cli_contract.rs"]
+mod claude_cli_tests;
+
+fn cmd_claude_post_tool_use() -> Result<(), Box<dyn std::error::Error>> {
+    // Match the repository's established maximum JSON-line ingress size.
+    const MAX_HOOK_BYTES: u64 = 16 * 1024 * 1024;
+    let mut input = Vec::new();
+    std::io::stdin()
+        .take(MAX_HOOK_BYTES + 1)
+        .read_to_end(&mut input)?;
+
+    let output = clean_ctx::claude_native::render_hook_io(&input, MAX_HOOK_BYTES as usize)?;
+    std::io::stderr().lock().write_all(&output.stderr)?;
+    std::io::stdout().lock().write_all(&output.stdout)?;
+    Ok(())
 }
 
 /// Handle `clean-ctx setup` — check CBM availability and optionally generate config.

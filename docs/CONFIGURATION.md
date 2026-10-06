@@ -126,6 +126,131 @@ configuration files continue to parse. `provide_code_context` always returns
 complete model-facing content. Code-side delta transport is explicitly invoked
 through `delta_code_context` and acknowledged through `apply_delta`.
 
+## Claude-Native Tool Use
+
+Clean-CTX can process successful Claude Code `Bash` results through Claude's
+native `PostToolUse` lifecycle. This integration is separate from the MCP
+server and HTTP proxy: it invokes the `clean-ctx` binary as a synchronous
+Claude Code command hook.
+
+Hook registration is the complete opt-in. There is no `claude_native` block in
+`.clean-ctx.json` and no additional Clean-CTX environment variable to enable.
+
+### Build and install the binary
+
+Build the branch containing the native adapter on the machine where Claude Code
+runs:
+
+```bash
+cargo build --release --all-features
+```
+
+Use the resulting binary at `target/release/clean-ctx` on Linux/macOS or
+`target\release\clean-ctx.exe` on Windows. An installed copy is also valid, but
+the hook must resolve to the newly built version.
+
+### Register the Claude Code hook
+
+For a machine-local project configuration, merge the following entry into
+`.claude/settings.local.json`. Do not overwrite unrelated Claude settings.
+
+Linux/macOS:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/absolute/path/to/RustContextLayerAI/target/release/clean-ctx",
+            "args": ["claude-hook", "post-tool-use"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Windows:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\absolute\\path\\to\\RustContextLayerAI\\target\\release\\clean-ctx.exe",
+            "args": ["claude-hook", "post-tool-use"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+An absolute binary path is recommended. Claude Code command hooks receive the
+event JSON on stdin; Clean-CTX writes hook-protocol JSON only to stdout and
+non-sensitive capability facts to stderr. The hook must remain synchronous, so
+do not add `"async": true`.
+
+`.claude/settings.local.json` applies only to the current project and is local
+to the machine. Use `.claude/settings.json` instead only when the project should
+share and commit the hook configuration. Claude Code may require workspace
+trust or hook approval before running a project hook.
+
+After changing hook settings, start a new Claude Code session and run `/hooks`
+to confirm that a `PostToolUse` hook with the `Bash` matcher is registered. For
+debug logging, start Claude Code with:
+
+```bash
+claude --debug-file claude-hook-debug.log
+```
+
+See the official [Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
+for hook locations, matcher behavior, command handlers, and
+`updatedToolOutput` validation.
+
+### First-slice behavior
+
+The current native slice accepts only successful built-in `Bash` results whose
+structured response contains string `stdout` and `stderr` fields with
+`interrupted: false` and `isImage: false`. It then applies:
+
+```text
+stdout: ANSI normalization -> recognized-secret redaction -> optional git-diff-v1 filtering
+stderr: ANSI normalization -> recognized-secret redaction
+```
+
+The Git filter is selected from the authoritative Bash command and currently
+matches `git diff` and `git show`. A useful live smoke test is:
+
+```bash
+git show --color=always HEAD
+```
+
+When filtering reduces the result, the model-visible output includes one
+`§FILTERED git-diff: ...` disclosure line.
+
+Unsupported, malformed, failed, interrupted, image, unchanged, or invalid
+results receive no replacement. Failed Bash output remains native and
+unchanged. The first slice does not support Claude's `PowerShell` tool or other
+tool schemas.
+
+Secret redaction covers only recognized secrets in selected fields of the
+supported successful Bash result before delivery to the model. It does not
+claim protection for tool execution, Claude hook infrastructure, telemetry,
+failed results, transcripts, or unsupported result shapes.
+
 ## Environment Variables
 
 ### Proxy Configuration
