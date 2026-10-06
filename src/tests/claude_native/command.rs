@@ -1,5 +1,8 @@
 use super::*;
-use crate::native_text::cargo_filter::CargoOperation;
+use crate::native_text::{
+    angular_filter::AngularOperation, cargo_filter::CargoOperation,
+    node_build_filter::NodeBuildOperation,
+};
 
 #[test]
 fn selects_only_approved_operation_and_field_pairs() {
@@ -77,4 +80,95 @@ fn unbalanced_quotes_and_substitution_inside_double_quotes_are_rejected() {
     assert_eq!(diagnostic_target("cargo check 'unterminated"), None);
     assert_eq!(diagnostic_target("cargo check \"$(printf arg)\""), None);
     assert_eq!(diagnostic_target("cargo check \"`printf arg`\""), None);
+}
+
+#[test]
+fn selects_supported_typescript_and_angular_operations() {
+    for command in ["tsc --noEmit", "npx tsc -p tsconfig.json", "bunx tsc"] {
+        assert_eq!(
+            diagnostic_target(command),
+            Some(DiagnosticTarget::TscStdout)
+        );
+    }
+    for (command, operation) in [
+        (
+            "ng build --configuration production",
+            AngularOperation::Build,
+        ),
+        ("ng test --watch=false", AngularOperation::Test),
+        ("ng lint", AngularOperation::Lint),
+    ] {
+        assert_eq!(
+            diagnostic_target(command),
+            Some(DiagnosticTarget::AngularStdout(operation))
+        );
+    }
+}
+
+#[test]
+fn selects_supported_eslint_and_bounded_node_script_forms() {
+    for command in [
+        "eslint src",
+        "npx eslint src",
+        "bunx eslint src",
+        "npm lint",
+        "npm run eslint",
+        "pnpm run lint",
+        "yarn eslint",
+    ] {
+        assert_eq!(
+            diagnostic_target(command),
+            Some(DiagnosticTarget::EslintStdout)
+        );
+    }
+    for (command, operation) in [
+        ("npm run build", NodeBuildOperation::Build),
+        ("pnpm compile", NodeBuildOperation::Compile),
+        ("yarn run bundle", NodeBuildOperation::Bundle),
+        ("bun build", NodeBuildOperation::Build),
+    ] {
+        assert_eq!(
+            diagnostic_target(command),
+            Some(DiagnosticTarget::NodeBuildStdout(operation))
+        );
+    }
+}
+
+#[test]
+fn rejects_unapproved_wrappers_scripts_and_watch_modes() {
+    for command in [
+        "pnpm tsc",
+        "yarn tsc",
+        "./node_modules/.bin/tsc",
+        "npx ng build",
+        "bun lint",
+        "npm run arbitrary",
+        "npm install",
+        "npm run dev",
+        "tsc --watch",
+        "tsc --version",
+        "tsc --showConfig",
+        "npx tsc --listFilesOnly",
+        "eslint --print-config src/app.ts",
+        "npm run lint -- --help",
+        "ng build --watch=true",
+        "ng build --help",
+        "ng test -w",
+        "npm run build -- --help",
+        "npm run build && echo done",
+    ] {
+        assert_eq!(diagnostic_target(command), None, "admitted {command}");
+    }
+}
+
+#[test]
+fn typescript_watch_policy_does_not_leak_into_existing_producers() {
+    assert_eq!(
+        diagnostic_target("git diff -- -w"),
+        Some(DiagnosticTarget::GitDiffStdout)
+    );
+    assert_eq!(
+        diagnostic_target("cargo check --config profile.dev.opt-level=\"w\""),
+        Some(DiagnosticTarget::CargoStderr(CargoOperation::Check))
+    );
 }

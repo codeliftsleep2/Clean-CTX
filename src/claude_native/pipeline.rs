@@ -4,8 +4,10 @@ use super::{
     facts::{ClaudeNativeFacts, FieldFacts, PassThroughReason, ProcessingOutcome},
 };
 use crate::native_text::{
-    ansi::normalize_terminal_text, cargo_filter::filter_cargo_diagnostics,
-    git_diff_filter::filter_git_diff, redaction::redact_recognized_secrets,
+    angular_filter::filter_angular_diagnostics, ansi::normalize_terminal_text,
+    cargo_filter::filter_cargo_diagnostics, eslint_filter::filter_eslint_diagnostics,
+    git_diff_filter::filter_git_diff, node_build_filter::filter_node_build_output,
+    redaction::redact_recognized_secrets, tsc_filter::filter_tsc_diagnostics,
 };
 use serde_json::{Value, json};
 use std::{
@@ -119,8 +121,20 @@ fn transform(bash: &bash::BashSuccess<'_>) -> (String, String, Vec<FieldFacts>) 
     let target = diagnostic_target(bash.command);
     let stdout_normalized = normalize_terminal_text(bash.stdout);
     let stdout_redacted = redact_recognized_secrets(&stdout_normalized.text);
-    let stdout_filtered = matches!(target, Some(DiagnosticTarget::GitDiffStdout))
-        .then(|| filter_git_diff(&stdout_redacted.text));
+    let stdout_filtered = match target {
+        Some(DiagnosticTarget::GitDiffStdout) => Some(filter_git_diff(&stdout_redacted.text)),
+        Some(DiagnosticTarget::TscStdout) => Some(filter_tsc_diagnostics(&stdout_redacted.text)),
+        Some(DiagnosticTarget::AngularStdout(operation)) => {
+            Some(filter_angular_diagnostics(&stdout_redacted.text, operation))
+        }
+        Some(DiagnosticTarget::EslintStdout) => {
+            Some(filter_eslint_diagnostics(&stdout_redacted.text))
+        }
+        Some(DiagnosticTarget::NodeBuildStdout(operation)) => {
+            Some(filter_node_build_output(&stdout_redacted.text, operation))
+        }
+        _ => None,
+    };
     let stdout = stdout_filtered
         .as_ref()
         .map_or_else(|| stdout_redacted.text.clone(), |v| v.text.clone());

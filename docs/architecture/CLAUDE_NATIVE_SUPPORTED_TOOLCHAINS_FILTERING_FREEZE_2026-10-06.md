@@ -4,7 +4,8 @@
 
 **Status:** Supported-first scope and operation-sensitive field authority
 approved. The shared reduction kernel and Rust build/check/clippy slice are
-implemented and owner-verified green on 2026-10-06.
+owner-verified green. The TypeScript/Angular slice is implemented and awaiting
+owner verification.
 
 **Scope:** Architecture and design freeze only. No production code or tests
 were changed, and no Cargo command was run.
@@ -457,6 +458,42 @@ No Rust live-Claude claim is made. The real Claude hook, binary, pipeline, and
 `updatedToolOutput` lifecycle was already established by Slice 1; Rust/Cargo is
 not a representative live workflow for this deployment. Its new behavior is
 therefore accepted through the tracked deterministic repository verification.
+
+## 17. TypeScript/Angular Slice Implementation Record
+
+The next supported-family slice implements stdout filtering for these exact
+successful simple-command forms:
+
+- direct `tsc`, plus the catalog-established `npx tsc` and `bunx tsc` wrappers;
+- direct `ng build`, `ng test`, and `ng lint`;
+- direct, `npx`, and `bunx` ESLint, plus the catalog-established
+  `npm|pnpm|yarn [run] eslint|lint` scripts; and
+- exact `npm|pnpm|yarn|bun [run] build|compile|bundle` scripts.
+
+Explicit watch mode, informational/help/config-listing modes, unsupported
+wrappers, package installation, arbitrary scripts, shell compounds, and
+redirection remain ineligible. This prevents executable-family identity from
+granting filtering authority when the requested operation has changed from
+diagnostics to user-requested information. All four producer families retain
+successful summaries and warnings; none uses success collapse.
+Their existing catalog bounds become producer policy supplied to the shared
+line-reduction kernel: TSC 100, Angular 80, ESLint 140, and Node build 120.
+
+Authority remains structurally upstream of reduction:
+
+```text
+simple command
+  -> typed TSC/Angular/ESLint/Node-build operation target
+  -> stdout selection
+  -> producer-specific noise semantics
+  -> shared deterministic line reduction
+```
+
+Cargo-like or Git-like stderr remains untouched for these targets. Output text
+cannot select a producer. Tracked tests cover command admission/rejection,
+semantic retention, bounds, disclosure, producer isolation, and field
+isolation. Verification results must not be recorded until supplied by the
+repository owner.
 
 ## Frozen Principle
 

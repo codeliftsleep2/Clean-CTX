@@ -1,9 +1,16 @@
-use crate::native_text::cargo_filter::CargoOperation;
+use crate::native_text::{
+    angular_filter::AngularOperation, cargo_filter::CargoOperation,
+    node_build_filter::NodeBuildOperation,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DiagnosticTarget {
     GitDiffStdout,
     CargoStderr(CargoOperation),
+    TscStdout,
+    AngularStdout(AngularOperation),
+    EslintStdout,
+    NodeBuildStdout(NodeBuildOperation),
 }
 
 pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
@@ -31,8 +38,116 @@ pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
             };
             Some(DiagnosticTarget::CargoStderr(operation))
         }
+        [executable, ..] if executable == "tsc" => {
+            tsc_is_diagnostic(&words).then_some(DiagnosticTarget::TscStdout)
+        }
+        [runner, executable, ..]
+            if matches!(runner.as_str(), "npx" | "bunx") && executable == "tsc" =>
+        {
+            tsc_is_diagnostic(&words).then_some(DiagnosticTarget::TscStdout)
+        }
+        [executable, operation, ..] if executable == "ng" => {
+            if requests_watch_mode(&words) || requests_help(&words) {
+                return None;
+            }
+            let operation = match operation.as_str() {
+                "build" => AngularOperation::Build,
+                "test" => AngularOperation::Test,
+                "lint" => AngularOperation::Lint,
+                _ => return None,
+            };
+            Some(DiagnosticTarget::AngularStdout(operation))
+        }
+        [executable, ..] if executable == "eslint" => {
+            eslint_is_diagnostic(&words).then_some(DiagnosticTarget::EslintStdout)
+        }
+        [runner, executable, ..]
+            if matches!(runner.as_str(), "npx" | "bunx") && executable == "eslint" =>
+        {
+            eslint_is_diagnostic(&words).then_some(DiagnosticTarget::EslintStdout)
+        }
+        [manager, script, ..]
+            if is_eslint_package_manager(manager)
+                && matches!(script.as_str(), "eslint" | "lint") =>
+        {
+            eslint_is_diagnostic(&words).then_some(DiagnosticTarget::EslintStdout)
+        }
+        [manager, run, script, ..]
+            if is_eslint_package_manager(manager)
+                && run == "run"
+                && matches!(script.as_str(), "eslint" | "lint") =>
+        {
+            eslint_is_diagnostic(&words).then_some(DiagnosticTarget::EslintStdout)
+        }
+        [manager, run, script, ..] if is_node_package_manager(manager) && run == "run" => {
+            node_build_target(script, &words)
+        }
+        [manager, script, ..] if is_node_package_manager(manager) => {
+            node_build_target(script, &words)
+        }
         _ => None,
     }
+}
+
+fn is_eslint_package_manager(word: &str) -> bool {
+    matches!(word, "npm" | "pnpm" | "yarn")
+}
+
+fn is_node_package_manager(word: &str) -> bool {
+    matches!(word, "npm" | "pnpm" | "yarn" | "bun")
+}
+
+fn node_build_target(script: &str, words: &[String]) -> Option<DiagnosticTarget> {
+    if requests_watch_mode(words) || requests_help(words) {
+        return None;
+    }
+    let operation = match script {
+        "build" => NodeBuildOperation::Build,
+        "compile" => NodeBuildOperation::Compile,
+        "bundle" => NodeBuildOperation::Bundle,
+        _ => return None,
+    };
+    Some(DiagnosticTarget::NodeBuildStdout(operation))
+}
+
+fn requests_watch_mode(words: &[String]) -> bool {
+    words
+        .iter()
+        .any(|word| matches!(word.as_str(), "--watch" | "--watch=true" | "-w"))
+}
+
+fn requests_help(words: &[String]) -> bool {
+    words
+        .iter()
+        .any(|word| matches!(word.as_str(), "--help" | "-h"))
+}
+
+fn tsc_is_diagnostic(words: &[String]) -> bool {
+    !requests_watch_mode(words)
+        && !words.iter().any(|word| {
+            matches!(
+                word.as_str(),
+                "--version"
+                    | "-v"
+                    | "--help"
+                    | "-h"
+                    | "--init"
+                    | "--showConfig"
+                    | "--listFiles"
+                    | "--listFilesOnly"
+                    | "--explainFiles"
+                    | "--traceResolution"
+            )
+        })
+}
+
+fn eslint_is_diagnostic(words: &[String]) -> bool {
+    !words.iter().any(|word| {
+        matches!(
+            word.as_str(),
+            "--help" | "-h" | "--version" | "-v" | "--print-config" | "--env-info"
+        )
+    })
 }
 
 fn simple_words(command: &str) -> Option<Vec<String>> {

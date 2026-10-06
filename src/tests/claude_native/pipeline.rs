@@ -190,6 +190,72 @@ fn cargo_filter_facts_do_not_leak_command_output_or_secrets() {
 }
 
 #[test]
+fn typescript_and_angular_targets_filter_only_stdout() {
+    let cases = [
+        (
+            "tsc --noEmit",
+            "Version 5.7.0\nsrc/app.ts(1,1): error TS1: retained",
+            "§FILTERED tsc:",
+            "tsc-v1",
+        ),
+        (
+            "ng build",
+            "Processing assets...\nBuild succeeded.",
+            "§FILTERED angular-build:",
+            "angular-build-v1",
+        ),
+        (
+            "eslint src",
+            "/repo/src/app.ts\n\n  1:1 warning retained",
+            "§FILTERED eslint:",
+            "eslint-v1",
+        ),
+        (
+            "npm run build",
+            "building...\n\n✓ done",
+            "§FILTERED node-build:",
+            "node-build-v1",
+        ),
+    ];
+    let stderr = "    Compiling must-remain\nindex abc1234..def5678 100644";
+    for (command, stdout, marker, filter_id) in cases {
+        let (response, facts) = process(&event(command, stdout, stderr));
+        let output = response.expect("approved stdout filter should replace output");
+        let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+        assert!(updated["stdout"].as_str().unwrap().contains(marker));
+        assert_eq!(updated["stderr"].as_str(), Some(stderr));
+        assert_eq!(
+            facts.fields[0].filter.as_ref().unwrap().filter_id,
+            filter_id
+        );
+        assert!(facts.fields[1].filter.is_none());
+    }
+}
+
+#[test]
+fn unsupported_typescript_and_node_commands_do_not_filter_resembling_output() {
+    let stdout = "Version 5.7.0\nProcessing assets...\n\nretained";
+    for command in [
+        "pnpm tsc",
+        "npx ng build",
+        "npm run arbitrary",
+        "npm install",
+        "tsc --watch",
+        "tsc --version",
+        "eslint --print-config src/app.ts",
+        "ng build --help",
+        "npm run build | tail -20",
+    ] {
+        let (response, facts) = process(&event(command, stdout, ""));
+        assert!(response.is_none(), "replaced ineligible command {command}");
+        assert_eq!(
+            facts.pass_through_reason,
+            Some(PassThroughReason::Unchanged)
+        );
+    }
+}
+
+#[test]
 fn facts_are_allowlisted_and_exclude_sensitive_payloads() {
     let input = event(
         "git diff --password command-secret",
