@@ -4,11 +4,12 @@
 
 **Status:** Supported-first scope and operation-sensitive field authority
 approved. The shared reduction kernel and Rust build/check/clippy slice are
-owner-verified green. The TypeScript/Angular slice is implemented and awaiting
-owner verification.
+owner-verified green. The TypeScript/Angular slice is owner-verified green. The
+C#/.NET slice is implemented and awaiting owner verification.
 
-**Scope:** Architecture and design freeze only. No production code or tests
-were changed, and no Cargo command was run.
+**Scope:** Architecture freeze and incremental implementation record for the
+supported-toolchain native diagnostic slices. Cargo verification is performed
+by the repository owner.
 
 ## 1. Executive Verdict
 
@@ -494,6 +495,35 @@ cannot select a producer. Tracked tests cover command admission/rejection,
 semantic retention, bounds, disclosure, producer isolation, and field
 isolation. Verification results must not be recorded until supplied by the
 repository owner.
+
+The repository owner reported the requested TypeScript/Angular verification
+green on 2026-10-06. This closes its deterministic local gate.
+
+## 18. C#/.NET Slice Implementation Record
+
+The .NET slice uses only specialized successful simple-command identities:
+
+```text
+dotnet build -> DotnetOperation::Build -> stdout -> dotnet-build-v1
+dotnet test  -> DotnetOperation::Test  -> stdout -> dotnet-test-v1
+```
+
+The broad proxy `dotnet` rule is not imported. `dotnet run`, `dotnet watch`,
+unknown operations, wrappers, shell compounds, help modes, build property,
+item, or target-result queries, and test-listing modes are ineligible. This
+prevents the executable family from gaining authority over application output
+or explicitly requested informational output.
+
+Both reducers preserve warnings, project/test identities, success summaries,
+error/warning counts, test counts, and test timing. Neither operation uses
+success collapse. Producer policy supplies distinct shared-kernel bounds: 40
+total lines for build and 100 for test.
+
+Tracked regressions cover specialized selection, rejected semantic roles,
+boilerplate removal, warning/summary retention, distinct bounds and identities,
+stdout-only authority, stderr isolation, and output-content non-authority.
+Verification results must not be recorded until supplied by the repository
+owner.
 
 ## Frozen Principle
 

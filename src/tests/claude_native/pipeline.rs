@@ -256,6 +256,55 @@ fn unsupported_typescript_and_node_commands_do_not_filter_resembling_output() {
 }
 
 #[test]
+fn dotnet_build_and_test_filter_only_stdout_with_distinct_semantics() {
+    for (command, stdout, marker, filter_id) in [
+        (
+            "dotnet build CleanCtx.sln",
+            "  Determining projects to restore...\nwarning CS0168: retained\nBuild succeeded.\nTime Elapsed 00:00:01",
+            "§FILTERED dotnet-build:",
+            "dotnet-build-v1",
+        ),
+        (
+            "dotnet test tests/CleanCtx.Tests",
+            "\nTest Run Passed.\nTotal tests: 42\nPassed: 42",
+            "§FILTERED dotnet-test:",
+            "dotnet-test-v1",
+        ),
+    ] {
+        let stderr = "    Compiling must-remain\nindex abc1234..def5678 100644";
+        let (response, facts) = process(&event(command, stdout, stderr));
+        let output = response.expect("approved .NET operation should filter stdout");
+        let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+        assert!(updated["stdout"].as_str().unwrap().contains(marker));
+        assert_eq!(updated["stderr"].as_str(), Some(stderr));
+        assert_eq!(
+            facts.fields[0].filter.as_ref().unwrap().filter_id,
+            filter_id
+        );
+        assert!(facts.fields[1].filter.is_none());
+    }
+}
+
+#[test]
+fn ineligible_dotnet_operations_do_not_filter_resembling_output() {
+    let stdout = "Microsoft (R) Build Engine\n  Determining projects\n\nretained";
+    for command in [
+        "dotnet run",
+        "dotnet watch test",
+        "dotnet test --list-tests",
+        "dotnet build --getProperty:TargetFramework",
+        "dotnet build | tail -20",
+    ] {
+        let (response, facts) = process(&event(command, stdout, ""));
+        assert!(response.is_none(), "replaced ineligible command {command}");
+        assert_eq!(
+            facts.pass_through_reason,
+            Some(PassThroughReason::Unchanged)
+        );
+    }
+}
+
+#[test]
 fn facts_are_allowlisted_and_exclude_sensitive_payloads() {
     let input = event(
         "git diff --password command-secret",

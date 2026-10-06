@@ -1,5 +1,5 @@
 use crate::native_text::{
-    angular_filter::AngularOperation, cargo_filter::CargoOperation,
+    angular_filter::AngularOperation, cargo_filter::CargoOperation, dotnet_filter::DotnetOperation,
     node_build_filter::NodeBuildOperation,
 };
 
@@ -11,6 +11,7 @@ pub(super) enum DiagnosticTarget {
     AngularStdout(AngularOperation),
     EslintStdout,
     NodeBuildStdout(NodeBuildOperation),
+    DotnetStdout(DotnetOperation),
 }
 
 pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
@@ -85,8 +86,38 @@ pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
         [manager, script, ..] if is_node_package_manager(manager) => {
             node_build_target(script, &words)
         }
+        [executable, operation, ..] if executable == "dotnet" => dotnet_target(operation, &words),
         _ => None,
     }
+}
+
+fn dotnet_target(operation: &str, words: &[String]) -> Option<DiagnosticTarget> {
+    if requests_help(words) || requests_dotnet_information(operation, words) {
+        return None;
+    }
+    let operation = match operation {
+        "build" => DotnetOperation::Build,
+        "test" => DotnetOperation::Test,
+        _ => return None,
+    };
+    Some(DiagnosticTarget::DotnetStdout(operation))
+}
+
+fn requests_dotnet_information(operation: &str, words: &[String]) -> bool {
+    words.iter().any(|word| {
+        (operation == "test" && matches!(word.as_str(), "--list-tests" | "-t"))
+            || (operation == "build"
+                && [
+                    "--getProperty",
+                    "-getProperty",
+                    "--getItem",
+                    "-getItem",
+                    "--getTargetResult",
+                    "-getTargetResult",
+                ]
+                .iter()
+                .any(|prefix| word.starts_with(prefix)))
+    })
 }
 
 fn is_eslint_package_manager(word: &str) -> bool {

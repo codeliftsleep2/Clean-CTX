@@ -3,6 +3,7 @@
 pub mod angular_filter;
 pub mod ansi;
 pub mod cargo_filter;
+pub mod dotnet_filter;
 pub mod eslint_filter;
 pub mod filter_facts;
 pub mod git_diff_filter;

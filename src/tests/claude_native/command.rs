@@ -1,6 +1,6 @@
 use super::*;
 use crate::native_text::{
-    angular_filter::AngularOperation, cargo_filter::CargoOperation,
+    angular_filter::AngularOperation, cargo_filter::CargoOperation, dotnet_filter::DotnetOperation,
     node_build_filter::NodeBuildOperation,
 };
 
@@ -171,4 +171,29 @@ fn typescript_watch_policy_does_not_leak_into_existing_producers() {
         diagnostic_target("cargo check --config profile.dev.opt-level=\"w\""),
         Some(DiagnosticTarget::CargoStderr(CargoOperation::Check))
     );
+}
+
+#[test]
+fn selects_only_diagnostic_dotnet_operations() {
+    assert_eq!(
+        diagnostic_target("dotnet build CleanCtx.sln --no-restore"),
+        Some(DiagnosticTarget::DotnetStdout(DotnetOperation::Build))
+    );
+    assert_eq!(
+        diagnostic_target("dotnet test tests/CleanCtx.Tests --no-build"),
+        Some(DiagnosticTarget::DotnetStdout(DotnetOperation::Test))
+    );
+    for command in [
+        "dotnet run",
+        "dotnet watch test",
+        "dotnet build --help",
+        "dotnet test --list-tests",
+        "dotnet test -t",
+        "dotnet build --getProperty:TargetFramework",
+        "dotnet build-server shutdown",
+        "./dotnet build",
+        "dotnet build && echo done",
+    ] {
+        assert_eq!(diagnostic_target(command), None, "admitted {command}");
+    }
 }
