@@ -5,8 +5,9 @@
 **Status:** Supported-first scope and operation-sensitive field authority
 approved. The shared reduction kernel and Rust build/check/clippy slice are
 owner-verified green. The TypeScript/Angular slice is owner-verified green. The
-C#/.NET slice is owner-verified green. The Java/Spring Maven slice is
-implemented and awaiting owner verification.
+C#/.NET and Java/Spring Maven slices are owner-verified green. Deterministic
+coverage for all approved supported-language families is complete;
+representative live field verification remains before milestone closure.
 
 **Scope:** Architecture freeze and incremental implementation record for the
 supported-toolchain native diagnostic slices. Cargo verification is performed
@@ -76,7 +77,7 @@ filtering failed diagnostics or claiming authority Claude does not expose.
 
 | Priority | Clean-CTX ecosystem | Native producer coverage | Explicit exclusions |
 |---:|---|---|---|
-| 1 | Rust | `cargo build`, `cargo check`, `cargo test`, `cargo clippy` | arbitrary `cargo run` program output; failed results |
+| 1 | Rust | `cargo build`, `cargo check`, `cargo clippy` | `cargo test`, arbitrary `cargo run` program output, and failed results |
 | 2 | TypeScript/Angular | `tsc`; `ng build/test/lint`; `eslint`; exact build-script forms | arbitrary package scripts; dev/watch servers; failed results |
 | 3 | C#/.NET | `dotnet build`, `dotnet test` | `dotnet run`; broad generic `dotnet` matching |
 | 4 | Java/Spring | Maven compile/package/install lifecycle | arbitrary exec goals; tools absent from repository evidence |
@@ -132,7 +133,7 @@ not permission to redesign its filter.
 |---|---|---:|---|
 | `cargo build ...` | `cargo-build-v1` | Yes, after stream-policy approval | Repository rule names the operation and stderr |
 | `cargo check ...` | `cargo-check-v1` | Yes, after stream-policy approval | Deterministic compiler-progress producer |
-| `cargo test ...` | `cargo-test-v1` | Yes, after stream-policy approval | Cargo-owned stderr can be reduced; test stdout remains separate |
+| `cargo test ...` | none | No | Cargo/compiler and test-program output boundaries are not frozen; no stream receives filter authority |
 | `cargo clippy ...` | `cargo-clippy-v1` | Yes, after stream-policy approval | Deterministic Cargo/Clippy diagnostics |
 | `cargo run ...` | none | No | stdout is arbitrary program output |
 | `tsc ...` | `tsc-v1` | Yes | Direct compiler invocation is deterministic |
@@ -560,6 +561,56 @@ numeric progress recognition, semantic summary retention, the shared bound,
 stdout-only authority, stderr isolation, and output-content non-authority.
 Verification results must not be recorded until supplied by the repository
 owner.
+
+The repository owner reported the requested Java/Spring Maven verification
+green on 2026-10-06. This closes its deterministic local gate.
+
+## 20. Supported-Language Completion Audit
+
+The completed deterministic coverage is:
+
+| Family | Approved successful operations | Field | Verification |
+|---|---|---|---|
+| Git baseline | `git diff`, `git show` | stdout | Owner-green plus prior live Claude evidence |
+| Rust | `cargo build`, `cargo check`, `cargo clippy` | stderr | Owner-green; no representative Rust live workflow required |
+| TypeScript/Angular | frozen TSC, Angular CLI, ESLint, and bounded Node build forms | stdout | Owner-green; live representative pending |
+| C#/.NET | `dotnet build`, `dotnet test` | stdout | Owner-green; live representative pending |
+| Java/Spring | Maven compile/package/install, optionally preceded by clean | stdout | Owner-green; live representative pending |
+
+The final static architecture audit confirms:
+
+- one operation-sensitive classifier grants producer and field authority;
+- shared reduction code executes authority but cannot infer or expand it;
+- producer modules own only semantic noise rules, identities, and bounds;
+- normalization and redaction still precede diagnostic filtering;
+- reconstruction remains field-local and schema-validated;
+- failed events remain unchanged;
+- arbitrary program, plugin, inspection, help, watch, wrapper, and compound
+  roles remain outside the frozen contracts;
+- shared facts contain accounting metadata rather than raw commands or output;
+- success collapse was not introduced; and
+- no proxy implementation or proxy/native coordination was added.
+
+### Remaining live field gate
+
+Before declaring the supported-language milestone externally complete, use the
+already-built hook in representative repositories and confirm:
+
+1. a successful ESLint warning-only run or Angular/Node build retains warnings
+   and useful summaries and emits exactly one disclosure when reduction occurs;
+2. a successful `dotnet build` retains `Build succeeded`, warning/error counts,
+   and any warnings while removing only frozen boilerplate;
+3. a successful Maven package/install run retains `BUILD SUCCESS`, warnings,
+   timing, and completion details while removing only frozen progress noise;
+4. each transformed result is accepted and consumed by Claude; and
+5. an informational or unsupported command from each available family remains
+   unchanged except for already-established normalization/redaction.
+
+Clean successful TSC commonly emits no output, so no replacement or disclosure
+is expected in that case. A lack of TSC marker alone is not a failure.
+
+Python, Go, meta-tool, and arbitrary-output filters remain outside this
+milestone. Deterministic completion does not authorize their implementation.
 
 ## Frozen Principle
 
