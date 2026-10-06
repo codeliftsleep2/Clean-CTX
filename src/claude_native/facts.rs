@@ -1,5 +1,5 @@
 use crate::native_text::{
-    ansi::NormalizationFacts, git_diff_filter::FilterFacts, redaction::RedactionFacts,
+    ansi::NormalizationFacts, filter_facts::FilterFacts, redaction::RedactionFacts,
 };
 use serde::Serialize;
 

@@ -1,6 +1,7 @@
 //! Claude Code native lifecycle adapter.
 
 mod bash;
+mod command;
 mod facts;
 mod hook;
 mod pipeline;

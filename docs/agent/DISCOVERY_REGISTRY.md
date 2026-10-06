@@ -46,6 +46,36 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-034: Claude-Native Bash Result Replacement Works End to End
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-06 |
+| **Environment** | Claude Code on Work Compute + Clean-CTX commit `352f8a9c` |
+| **Repository/context** | Real Claude `Bash` execution with the native `PostToolUse` hook registered to `clean-ctx claude-hook post-tool-use`; Git diff/show output containing ANSI, removable Git noise, readable patch structure, and a synthetic recognized credential |
+| **Symptom** | The first production slice needed field evidence that Claude accepted the reconstructed Bash result and actually consumed the transformed `updatedToolOutput`, rather than merely proving the adapter with fixtures. |
+| **Root cause** | N/A — this was the required real-lifecycle acceptance boundary. Deterministic tests cannot prove Claude hook invocation, built-in result-schema acceptance, or later model consumption. |
+| **Classification** | Protocol / live acceptance |
+| **Reproducible locally?** | Partially — transformations and wire contracts are deterministic; Claude consumption requires a live Claude Code session. |
+| **Local regression** | `src/tests/claude_native/{bash_schema,hook,pipeline,cli_contract}.rs`; `src/tests/native_text/{ansi,redaction,git_diff_filter}.rs` |
+| **Live scenario required?** | Yes — real successful Claude Bash execution through `PostToolUse` and `updatedToolOutput`. |
+| **Architectural invariant** | Claude owns lifecycle/native shape; Clean-CTX transforms only admitted successful Bash text fields and otherwise passes through unchanged. |
+| **Status** | Verified |
+
+**Observed result:** ANSI normalization and synthetic-secret redaction were
+visible to Claude. `git-diff-v1` reported `60 → 59` lines, and the count matched
+the removed noise. File headers, `+++`/`---` lines, and `@@` hunk headers were
+preserved, keeping the patch readable. A compound command outside the
+conservative leading `git diff/show` selector produced no disclosure marker and
+passed through unchanged.
+
+**Next boundary:** expansion beyond `git-diff-v1` must review each command's
+native stream and reduction semantics. Compound-command parsing and filters
+that require stderr are separate explicit contracts, not automatic extensions
+of this verified slice.
+
+---
+
 ## DIS-2026-033: C# Constructor-Injected Interface Consumers Were Not Reliably Discoverable ([#97](https://github.com/codeliftsleep2/Clean-CTX/issues/97))
 
 | Field | Value |

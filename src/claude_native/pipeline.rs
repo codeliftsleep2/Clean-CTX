@@ -1,11 +1,11 @@
 use super::{
     bash,
+    command::{DiagnosticTarget, diagnostic_target},
     facts::{ClaudeNativeFacts, FieldFacts, PassThroughReason, ProcessingOutcome},
 };
 use crate::native_text::{
-    ansi::normalize_terminal_text,
-    git_diff_filter::{command_selects_git_diff, filter_git_diff},
-    redaction::redact_recognized_secrets,
+    ansi::normalize_terminal_text, cargo_filter::filter_cargo_diagnostics,
+    git_diff_filter::filter_git_diff, redaction::redact_recognized_secrets,
 };
 use serde_json::{Value, json};
 use std::{
@@ -116,33 +116,39 @@ fn process_with_fault(event: &Value, fault: PipelineFault) -> (Option<Value>, Cl
 }
 
 fn transform(bash: &bash::BashSuccess<'_>) -> (String, String, Vec<FieldFacts>) {
+    let target = diagnostic_target(bash.command);
     let stdout_normalized = normalize_terminal_text(bash.stdout);
     let stdout_redacted = redact_recognized_secrets(&stdout_normalized.text);
-    let filtered =
-        command_selects_git_diff(bash.command).then(|| filter_git_diff(&stdout_redacted.text));
-    let stdout = filtered
+    let stdout_filtered = matches!(target, Some(DiagnosticTarget::GitDiffStdout))
+        .then(|| filter_git_diff(&stdout_redacted.text));
+    let stdout = stdout_filtered
         .as_ref()
         .map_or_else(|| stdout_redacted.text.clone(), |v| v.text.clone());
     let stdout_facts = FieldFacts {
         field: "stdout",
         normalization: stdout_normalized.facts,
         redaction: stdout_redacted.facts,
-        filter: filtered.and_then(|v| v.facts),
+        filter: stdout_filtered.and_then(|v| v.facts),
     };
 
     let stderr_normalized = normalize_terminal_text(bash.stderr);
     let stderr_redacted = redact_recognized_secrets(&stderr_normalized.text);
+    let stderr_filtered = match target {
+        Some(DiagnosticTarget::CargoStderr(operation)) => {
+            Some(filter_cargo_diagnostics(&stderr_redacted.text, operation))
+        }
+        _ => None,
+    };
+    let stderr = stderr_filtered
+        .as_ref()
+        .map_or_else(|| stderr_redacted.text.clone(), |value| value.text.clone());
     let stderr_facts = FieldFacts {
         field: "stderr",
         normalization: stderr_normalized.facts,
         redaction: stderr_redacted.facts,
-        filter: None,
+        filter: stderr_filtered.and_then(|value| value.facts),
     };
-    (
-        stdout,
-        stderr_redacted.text,
-        vec![stdout_facts, stderr_facts],
-    )
+    (stdout, stderr, vec![stdout_facts, stderr_facts])
 }
 
 fn classify_unsupported(event: &Value) -> PassThroughReason {

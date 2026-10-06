@@ -2,15 +2,15 @@
 
 **Date:** 2026-10-05
 
-**Status:** First production slice implemented; tracked verification is awaiting
-repository-owner execution.
+**Status:** Verified and closed. The deterministic repository gate passed and
+the real Claude Code `PostToolUse` lifecycle was confirmed on Work Compute.
 
 **Scope:** Claude-native `PostToolUse` success handling only. The HTTP proxy is
 outside this plan and remains unchanged.
 
 ## 1. Executive Verdict
 
-**FIRST CLAUDE-NATIVE VERTICAL SLICE READY TO IMPLEMENT**
+**FIRST CLAUDE-NATIVE VERTICAL SLICE VERIFIED AND CLOSED**
 
 The first slice is one successful Claude `Bash` result with the documented
 structured output shape. It normalizes and redacts the `stdout` and `stderr`
@@ -367,37 +367,33 @@ Required cases:
 
 These tests are frozen, not run in this planning phase.
 
-## 14. Native End-to-End Verification Plan
+## 14. Native End-to-End Verification Result
 
-No applicable Claude-hook lifecycle harness exists in the repository. MCP
-stdio subprocess fixtures prove a different protocol and must not be reused as
-evidence of Claude integration.
-
-After implementation and user-owned build verification, add a small operator
-harness/configuration fixture that registers:
+No repository fixture substitutes for the real Claude lifecycle. The operator
+registered the built binary on Work Compute as:
 
 ```text
 PostToolUse matcher: Bash
 command: <built clean-ctx> claude-hook post-tool-use
 ```
 
-The live proof uses a disposable Git repository committed as a deterministic
-fixture and asks Claude to run `git show --color=always HEAD`. The fixture patch
-contains a synthetic recognized credential and enough index/noise lines to
-prove:
+The live proof ran successful Bash Git output through the hook and confirmed:
 
-- the real successful Bash result reaches the hook;
-- ANSI is removed;
-- the synthetic credential is replaced;
-- Git noise is reduced with one disclosure marker;
-- `updatedToolOutput` is accepted; and
-- Claude can report the retained patch while being unable to repeat the
-  original synthetic credential from the model-visible result.
+- a real successful Bash result reached `PostToolUse`;
+- supported ANSI sequences were removed;
+- a synthetic recognized credential was replaced;
+- `git-diff-v1` reduced a 60-line result to 59 lines;
+- the `§FILTERED git-diff: 60 → 59 lines` disclosure count matched the observed
+  reduction;
+- file headers, `+++`/`---` lines, and `@@` hunk headers remained readable;
+- `updatedToolOutput` was accepted and consumed by Claude; and
+- a compound command outside the conservative leading `git diff/show` selector
+  passed through without a filter disclosure.
 
-The harness inspects no Claude telemetry and makes no transcript-at-rest claim.
-It must invoke the already-built binary and Git only; it must not run Cargo,
-build, tests, a server, or the proxy. The operator records native hook logs and
-the later model response as field-test evidence, separate from tracked tests.
+This evidence closes the supported first slice. It does not extend the security
+claim to Claude telemetry, transcripts at rest, failed results, other tools, or
+unsupported result shapes. The compound-command observation is conservative
+pass-through evidence, not authorization to add shell parsing implicitly.
 
 ## 15. Implementation Sequence
 

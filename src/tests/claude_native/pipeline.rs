@@ -68,7 +68,7 @@ fn no_change_means_no_updated_output() {
 }
 
 #[test]
-fn first_slice_never_filters_stderr() {
+fn git_filter_never_filters_stderr() {
     let stderr = "index abc1234..def5678 100644\nBinary files a and b differ";
     let (response, _) = process(&event("git diff", "\x1b[32mclean\x1b[0m", stderr));
     let output = response.expect("stdout normalization should produce a replacement");
@@ -76,6 +76,117 @@ fn first_slice_never_filters_stderr() {
         output["hookSpecificOutput"]["updatedToolOutput"]["stderr"].as_str(),
         Some(stderr)
     );
+}
+
+#[test]
+fn cargo_build_filters_only_its_approved_stderr_diagnostics() {
+    let stdout = "application-owned stdout\n    Compiling must-stay";
+    let stderr = "   Compiling clean-ctx v0.1.0\nwarning: retained\n --> src/lib.rs:1:1\n    Finished dev target(s)";
+    let (response, facts) = process(&event("cargo build --workspace", stdout, stderr));
+    let output = response.expect("Cargo progress removal should replace stderr");
+    let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+    assert_eq!(updated["stdout"].as_str(), Some(stdout));
+    let transformed = updated["stderr"].as_str().unwrap();
+    assert!(!transformed.contains("Compiling clean-ctx"));
+    assert!(transformed.contains("warning: retained"));
+    assert!(transformed.contains("--> src/lib.rs:1:1"));
+    assert!(transformed.contains("Finished dev"));
+    assert!(transformed.contains("§FILTERED cargo-build:"));
+    assert_eq!(
+        facts.fields[1].filter.as_ref().unwrap().filter_id,
+        "cargo-build-v1"
+    );
+    assert!(facts.fields[0].filter.is_none());
+}
+
+#[test]
+fn cargo_check_and_clippy_receive_distinct_operation_authority() {
+    for (command, filter_id, marker) in [
+        ("cargo check", "cargo-check-v1", "§FILTERED cargo-check:"),
+        (
+            "cargo clippy -- -D warnings",
+            "cargo-clippy-v1",
+            "§FILTERED cargo-clippy:",
+        ),
+    ] {
+        let (response, facts) = process(&event(command, "", "    Checking crate v0.1.0\nFinished"));
+        let output = response.expect("approved Cargo operation should filter stderr");
+        assert!(
+            output["hookSpecificOutput"]["updatedToolOutput"]["stderr"]
+                .as_str()
+                .unwrap()
+                .contains(marker)
+        );
+        assert_eq!(
+            facts.fields[1].filter.as_ref().unwrap().filter_id,
+            filter_id
+        );
+    }
+}
+
+#[test]
+fn cargo_test_run_unknown_and_compound_commands_receive_no_filter_authority() {
+    let stderr = "    Compiling must-stay\n    Finished must-stay";
+    for command in [
+        "cargo test",
+        "cargo run",
+        "cargo metadata",
+        "./cargo build",
+        "command cargo check",
+        "cargo +nightly clippy",
+        "cargo build && echo done",
+        "cargo check | tail -20",
+        "FOO=bar cargo clippy",
+    ] {
+        let (response, facts) = process(&event(command, "", stderr));
+        assert!(response.is_none(), "replaced ineligible command {command}");
+        assert_eq!(
+            facts.pass_through_reason,
+            Some(PassThroughReason::Unchanged),
+            "unexpected reason for {command}"
+        );
+    }
+}
+
+#[test]
+fn authorized_target_isolates_producer_semantics_and_fields() {
+    let cargo_noise = "    Compiling cargo-looking v0.1.0";
+    let git_noise = "index abc1234..def5678 100644";
+
+    let (git_response, git_facts) = process(&event("git diff", cargo_noise, git_noise));
+    assert!(git_response.is_none());
+    assert_eq!(
+        git_facts.pass_through_reason,
+        Some(PassThroughReason::Unchanged)
+    );
+
+    let (cargo_response, cargo_facts) = process(&event("cargo check", git_noise, cargo_noise));
+    let updated = &cargo_response.unwrap()["hookSpecificOutput"]["updatedToolOutput"];
+    assert_eq!(updated["stdout"].as_str(), Some(git_noise));
+    assert!(!updated["stderr"].as_str().unwrap().contains("Compiling"));
+    assert_eq!(
+        cargo_facts.fields[1].filter.as_ref().unwrap().filter_id,
+        "cargo-check-v1"
+    );
+}
+
+#[test]
+fn cargo_filter_facts_do_not_leak_command_output_or_secrets() {
+    let input = event(
+        "cargo build --package command-sentinel",
+        "",
+        "    Compiling output-sentinel v0.1.0\npassword=secret-sentinel\nFinished",
+    );
+    let facts = serde_json::to_string(&process(&input).1).unwrap();
+    for forbidden in [
+        "command-sentinel",
+        "output-sentinel",
+        "secret-sentinel",
+        "password=",
+    ] {
+        assert!(!facts.contains(forbidden), "facts leaked {forbidden}");
+    }
+    assert!(facts.contains("cargo-build-v1"));
 }
 
 #[test]
