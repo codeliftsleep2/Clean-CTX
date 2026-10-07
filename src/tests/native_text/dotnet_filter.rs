@@ -16,17 +16,55 @@ fn build_removes_boilerplate_and_preserves_warnings_and_summary() {
 }
 
 #[test]
-fn test_preserves_counts_and_success_summary_without_collapse() {
-    let input = "\nTest Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds";
+fn warning_prevents_success_collapse_and_preserves_diagnostics() {
+    let input = "warning NU1900: retained\nTest Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds";
     let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
     assert!(result.text.contains("Test Run Passed."));
     assert!(result.text.contains("Total tests: 42"));
     assert!(result.text.contains("Passed: 42"));
     assert!(result.text.contains("Total time: 1.234 Seconds"));
+    assert!(result.text.contains("warning NU1900: retained"));
     assert!(result.text.contains("§FILTERED dotnet-test:"));
     let facts = result.facts.unwrap();
     assert_eq!(facts.filter_id, "dotnet-test-v1");
     assert!(!facts.collapsed);
+}
+
+#[test]
+fn clean_inline_success_collapses_to_one_disclosed_line() {
+    let input = "Test run for app.dll\nPassed! -  Failed: 0, Passed: 43, Skipped: 0, Total: 43, Duration: 2.2 min";
+    let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
+    assert_eq!(
+        result.text,
+        "§FILTERED dotnet-test: 43 passed, 0 failed, 0 skipped, 2.2 min (2 → 1 lines)"
+    );
+    let facts = result.facts.unwrap();
+    assert_eq!(facts.reduction_kind, ReductionKind::SuccessCollapse);
+    assert!(facts.collapsed);
+    assert!(!facts.truncated);
+}
+
+#[test]
+fn clean_totals_block_success_collapses() {
+    let input = "Test Run Passed.\nTotal tests: 42\nPassed: 42\nTotal time: 1.234 Seconds";
+    let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
+    assert!(result.text.contains("42 passed, 0 failed, 0 skipped"));
+    assert!(result.text.contains("1.234 Seconds"));
+    assert!(result.facts.unwrap().collapsed);
+}
+
+#[test]
+fn skipped_failed_zero_test_and_unparseable_results_never_collapse() {
+    for input in [
+        "Passed! - Failed: 0, Passed: 42, Skipped: 1, Total: 43, Duration: 1 s",
+        "Failed! - Failed: 1, Passed: 42, Skipped: 0, Total: 43, Duration: 1 s",
+        "Passed! - Failed: 0, Passed: 0, Skipped: 0, Total: 0, Duration: 1 s",
+        "No test is available in app.dll.",
+    ] {
+        let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
+        assert!(!result.facts.as_ref().is_some_and(|facts| facts.collapsed));
+        assert_eq!(result.text, input);
+    }
 }
 
 #[test]

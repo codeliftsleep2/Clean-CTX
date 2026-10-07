@@ -47,8 +47,13 @@ pub fn filter_angular_diagnostics(text: &str, operation: AngularOperation) -> Fi
             let trimmed = line.trim_start();
             trimmed.starts_with("Build succeeded")
                 || trimmed.starts_with("Build failed")
+                || trimmed.starts_with("Application bundle generation complete.")
                 || (trimmed.starts_with("Executed ")
                     && (trimmed.contains("SUCCESS") || trimmed.contains("FAILED")))
+                || trimmed.starts_with("Test Files ")
+                || trimmed.starts_with("Tests ")
+                || trimmed.starts_with("Start at ")
+                || trimmed.starts_with("Duration ")
                 || trimmed.starts_with("All files pass linting")
         },
     )

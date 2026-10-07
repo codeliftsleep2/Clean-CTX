@@ -252,9 +252,17 @@ filters reserve space only for explicitly recognized terminal-summary formats
 and fill the remaining capacity from the head while preserving original order.
 Verified anchors include Cargo completion, TSC error counts, ESLint problem
 counts, .NET build totals/timing, VSTest pass/fail totals, Maven build totals,
-and Vite-style build completion. This is not a generic tail-preservation
-guarantee: Angular CLI build timestamp/bundle-completion lines and webpack
-`compiled ...` summaries are not currently recognized and may be truncated.
+Vite-style build completion, Angular application-builder completion, and
+Vitest test totals/timing. This is not a generic tail-preservation guarantee:
+webpack `compiled ...` summaries are not currently recognized and may be
+truncated.
+
+A clean successful `dotnet test` result is intentionally collapsed to one
+disclosure line only when parsed totals prove that at least one test ran, every
+test passed, none failed or was skipped, and the original output contains no
+warning indicator. The line retains the pass count and duration. Warnings,
+skips, failures, zero tests, or unparseable totals use the normal bounded
+filtering path instead.
 
 Important ineligible examples include `cargo run`, `cargo test`, `dotnet run`,
 `ng run <project>:serve[:configuration]`, watch mode, arbitrary package scripts

@@ -6,6 +6,7 @@ pub enum ReductionKind {
     NoiseRemoval,
     Truncation,
     NoiseRemovalAndTruncation,
+    SuccessCollapse,
     AlreadyFiltered,
 }
 

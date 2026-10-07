@@ -164,7 +164,7 @@ from the command; there is no fall-through to a broad generic filter.
 | `eslint-v1` | `stdout` | every warning/error, file/location, rule ID and summary | blank/decorative noise only | 140 lines unless revised | No; warnings must never become `ok` |
 | `node-build-v1` | `stdout` | all semantic build output | blank lines only in first version | 120 lines unless revised | No |
 | `dotnet-build-v1` | `stdout` initially | warnings/errors, projects/artifacts, success summary | stable build boilerplate proven by fixtures | 40 lines unless revised | No |
-| `dotnet-test-v1` | `stdout` initially | test counts, failures if ever present on a successful event, framework summary | stable runner boilerplate | 100 lines unless revised | No |
+| `dotnet-test-v1` | `stdout` initially | test counts, failures if ever present on a successful event, framework summary | stable runner boilerplate | 100 lines unless clean-success collapse applies | Parsed positive totals with zero failed/skipped and no warnings only |
 | `maven-build-v1` | `stdout` initially | module/build result, warnings, useful summary | download/plugin progress and stable boilerplate | 50 lines unless revised | No |
 
 Every stream assignment after Cargo is provisional until that family slice
@@ -243,7 +243,7 @@ The existing catalog frequently collapses successful output to `tool: ok`.
 That behavior is useful historical evidence but is not required to make the
 supported-family filters useful.
 
-Success collapse is therefore excluded from all four family slices initially.
+Success collapse was excluded from all four family slices initially.
 Noise stripping, structural retention, and bounded truncation provide useful
 reduction without replacing the whole successful result. This particularly
 avoids the existing ESLint behavior that can collapse warning-only output and
@@ -252,6 +252,14 @@ hide model-useful warnings.
 Any later collapse proposal is a separate semantic-authority decision with
 producer-specific evidence and regressions. It must not enter as an incidental
 port of TOML behavior.
+
+On 2026-10-07 the maintainer explicitly approved one narrow exception for
+`dotnet test`: a successful result may collapse to one disclosure line only
+when parsed totals prove a positive test count, every test passed, none failed
+or was skipped, and the original result has no warning indicator. Inline
+VSTest totals and the `Test Run Passed`/`Total tests` block are supported.
+Warnings, skips, failures, zero-test success, and unparseable output retain the
+existing bounded path. Facts report `success_collapse` and `collapsed: true`.
 
 ## 9. Overlap and Arbitrary-Output Findings
 
@@ -479,7 +487,8 @@ wrappers, package installation, arbitrary scripts, shell compounds, and
 redirection remain ineligible. This prevents executable-family identity from
 granting filtering authority when the requested operation has changed from
 diagnostics to user-requested information. All four producer families retain
-successful summaries and warnings; none uses success collapse.
+successful summaries and warnings. The sole collapse exception is the
+explicitly approved clean `dotnet test` contract in §8.
 Their existing catalog bounds become producer policy supplied to the shared
 line-reduction kernel: TSC 100, Angular 80, ESLint 140, and Node build 120.
 
@@ -525,9 +534,10 @@ prevents the executable family from gaining authority over application output
 or explicitly requested informational output.
 
 Both reducers preserve warnings, project/test identities, success summaries,
-error/warning counts, test counts, and test timing. Neither operation uses
-success collapse. Producer policy supplies distinct shared-kernel bounds: 40
-total lines for build and 100 for test.
+error/warning counts, test counts, and test timing. `dotnet test` additionally
+uses the narrowly approved clean-success collapse from §8. Producer policy
+supplies distinct shared-kernel bounds: 40 total lines for build and 100 for
+non-collapsed test output.
 
 Tracked regressions cover specialized selection, rejected semantic roles,
 boilerplate removal, warning/summary retention, distinct bounds and identities,
@@ -596,7 +606,8 @@ The final static architecture audit confirms:
 - arbitrary program, plugin, inspection, help, watch, wrapper, and compound
   roles remain outside the frozen contracts;
 - shared facts contain accounting metadata rather than raw commands or output;
-- success collapse was not introduced; and
+- success collapse exists only for parsed, warning-free, positive `dotnet test`
+  results with zero failures and skips; and
 - no proxy implementation or proxy/native coordination was added.
 
 ### Remaining live field gate
@@ -639,10 +650,12 @@ The first live replay found that summary authority remains format-specific.
 .NET build, ESLint, synthetic TSC, and synthetic Maven summaries survived, but
 real VSTest used two spaces in `Passed! -  Failed:` where the initial anchor
 assumed one. The VSTest anchor now compares whitespace-delimited semantic words
-and a tracked regression uses the real spacing. Angular CLI build completion
-lines (`Application bundle generation complete` and `Build at`) and webpack
-`compiled successfully/with warnings` remain unrecognized. They must not be
-added from reconstructed output; capture real producer fixtures first.
+and a tracked regression uses the real spacing. Real Angular 21
+application-builder and Vitest fixtures subsequently established `Application
+bundle generation complete`, `Test Files`, `Tests`, `Start at`, and `Duration`
+as summary anchors. Webpack `compiled
+successfully/with warnings` remains unrecognized and must not be added from
+reconstructed output; capture a real producer fixture first.
 
 Second, Claude debug evidence showed that sufficiently large successful Bash
 results can be persisted by the host before `PostToolUse`. The hook receives a

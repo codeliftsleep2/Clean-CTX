@@ -46,6 +46,30 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-036: Angular 21 Vitest Summaries Fell Beyond the Stdout Cap
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-07 |
+| **Environment** | Angular CLI 21.2.19, Node 24, application builder, Vitest 4.1.9 |
+| **Repository/context** | Anonymized real build and test output from a mid-size Angular workspace, replayed through eligible `ng run` commands |
+| **Symptom** | The 80-line stdout cap removed Vitest `Test Files`, `Tests`, `Start at`, and `Duration` lines; a larger build could similarly remove the application-builder completion line. Most bytes were emitted on stderr, which intentionally has no Angular filtering authority. |
+| **Root cause** | The Angular tail policy recognized Karma and legacy build summaries but not the current application-builder and Vitest formats. Stream authority remained stdout-only because no Angular stderr policy had been approved. |
+| **Classification** | Semantic format coverage plus a separate authority decision |
+| **Reproducible locally?** | Yes for stdout anchors using exact normalized fixture lines |
+| **Local regression** | `src/tests/native_text/angular_filter.rs` |
+| **Live scenario required?** | Yes for native-hook Angular execution and any future stderr policy |
+| **Architectural invariant** | Producer-owned anchors may preserve only fixture-proven semantic summaries; capturing stderr does not itself grant filtering authority |
+| **Status** | Stdout anchor fix implemented; verification pending. Angular stderr authority remains undecided |
+
+Real fixture evidence authorizes preservation of
+`Application bundle generation complete`, `Test Files`, `Tests`, `Start at`,
+and `Duration`. It does not authorize reconstructed webpack anchors or Angular
+stderr filtering. `Output location:` remains governed by the existing removal
+policy until separately decided.
+
+---
+
 ## DIS-2026-035: Claude Persists Oversized Bash Output Before PostToolUse
 
 | Field | Value |

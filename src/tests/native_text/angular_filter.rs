@@ -43,3 +43,39 @@ fn truncation_retains_terminal_build_summary() {
     assert!(result.text.contains("Build succeeded."));
     assert_eq!(result.text.lines().count(), 80);
 }
+
+#[test]
+fn truncation_retains_real_angular_application_builder_completion() {
+    let mut lines = (0..90)
+        .map(|line| format!("chunk-{line:03}.js | feature-{line:03}"))
+        .collect::<Vec<_>>();
+    lines.push(
+        "Application bundle generation complete. [37.398 seconds] - 2026-01-01T00:00:00.000Z"
+            .into(),
+    );
+    let result = filter_angular_diagnostics(&lines.join("\n"), AngularOperation::Build);
+    assert!(
+        result
+            .text
+            .contains("Application bundle generation complete.")
+    );
+    assert_eq!(result.text.lines().count(), 80);
+}
+
+#[test]
+fn truncation_retains_real_vitest_summary_block() {
+    let mut lines = (0..90)
+        .map(|line| format!("spec-app-case-{line:03}.js | retained"))
+        .collect::<Vec<_>>();
+    lines.extend([
+        " Test Files  40 passed (40)".into(),
+        " Tests  347 passed (347)".into(),
+        " Start at  10:37:20".into(),
+        " Duration  36.12s (transform 7.66s, tests 7.95s)".into(),
+    ]);
+    let result = filter_angular_diagnostics(&lines.join("\n"), AngularOperation::Test);
+    for summary in ["Test Files", "Tests", "Start at", "Duration"] {
+        assert!(result.text.contains(summary));
+    }
+    assert_eq!(result.text.lines().count(), 80);
+}
