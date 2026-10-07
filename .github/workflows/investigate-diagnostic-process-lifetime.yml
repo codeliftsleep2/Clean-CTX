@@ -2,6 +2,12 @@ name: Investigate diagnostic process lifetime
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/claude-native-tool-integrations
+    paths:
+      - .github/workflows/investigate-diagnostic-process-lifetime.yml
+      - scripts/investigations/diagnostic-process-lifetime/**
 
 permissions:
   contents: read
