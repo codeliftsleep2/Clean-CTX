@@ -1,6 +1,7 @@
 # Diagnostic Process-Lifetime Falsification
 
 **Date:** 2026-10-07  
+**Investigator:** Agent MaxHeadRoom  
 **Status:** Windows and GitHub Actions Ubuntu survived bounded process-ownership falsification with explicit platform limitations.  
 **Scope:** OS-level ownership and cancellation semantics for a closed diagnostic process tree. No production supervisor, Cargo command, Clean-CTX runtime, or MCP experiment.  
 **Starting decision chain:** Semantic compilation survived; executable resolution survived with an absolute-path constraint; parser truthfulness survived.
