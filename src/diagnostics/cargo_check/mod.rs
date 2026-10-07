@@ -4,7 +4,9 @@
 //! evidence into a bounded, sanitized semantic result.
 
 mod authority;
+mod environment;
 mod evidence;
+mod invocation;
 mod model;
 mod parser;
 mod policy;
@@ -14,6 +16,8 @@ pub use authority::{
     ApprovedCargoExecutable, ApprovedWorkspaceRoot, AuthorityError, AuthoritySource, DisplayPath,
     FileIdentity, PathClassification,
 };
+pub use environment::{CargoCheckEnvironment, EnvironmentFacts};
+pub use invocation::{CargoCheckInvocation, CargoCheckRequest};
 pub use model::{
     CargoCheckSemanticResult, CargoDiagnostic, CargoEvidence, ChildDiagnostic, DiagnosticLevel,
     EvidenceCategory, EvidenceFacts, EvidenceItem, ParserCoverage, RetentionFacts, SanitizedSpan,
@@ -29,3 +33,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/diagnostics/cargo_check_authority.rs"]
 mod authority_tests;
+
+#[cfg(test)]
+#[path = "../../tests/diagnostics/cargo_check_invocation.rs"]
+mod invocation_tests;

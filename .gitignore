@@ -48,3 +48,6 @@ scripts/agent/.scratch/
 *.agent-tmp.tmp
 
 *.PNG
+
+# Machine-local Codex MCP configuration (contains absolute paths).
+.codex/config.toml
