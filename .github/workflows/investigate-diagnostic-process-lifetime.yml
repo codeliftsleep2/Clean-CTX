@@ -1,0 +1,39 @@
+name: Investigate diagnostic process lifetime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux-process-group-falsifier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out investigation fixture
+        uses: actions/checkout@v4
+
+      - name: Record runner environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          uname -a
+          python3 --version
+          printf 'ImageOS=%s\n' "${ImageOS:-unset}"
+          printf 'ImageVersion=%s\n' "${ImageVersion:-unset}"
+
+      - name: Run bounded Linux process-group falsifier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/investigations/diagnostic-process-lifetime/run_linux_falsifier.py
+
+      - name: Upload lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diagnostic-process-lifetime-linux-evidence
+          path: scripts/investigations/diagnostic-process-lifetime/evidence
+          if-no-files-found: error
+          retention-days: 7
