@@ -24,6 +24,7 @@ pub mod cache;
 pub mod cbm;
 pub mod claude_native;
 pub mod config;
+pub mod diagnostics;
 pub mod edit;
 pub mod intelligence;
 pub mod mcp;
