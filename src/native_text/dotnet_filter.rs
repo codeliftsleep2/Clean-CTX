@@ -55,8 +55,7 @@ impl DotnetOperation {
                     || trimmed.starts_with("Time Elapsed")
             }
             Self::Test => {
-                trimmed.starts_with("Passed! - Failed:")
-                    || trimmed.starts_with("Failed! - Failed:")
+                is_vstest_totals_summary(trimmed)
                     || trimmed.starts_with("Test Run Passed")
                     || trimmed.starts_with("Test Run Failed")
                     || trimmed.starts_with("Total tests:")
@@ -67,6 +66,13 @@ impl DotnetOperation {
             }
         }
     }
+}
+
+fn is_vstest_totals_summary(line: &str) -> bool {
+    let mut words = line.split_whitespace();
+    matches!(words.next(), Some("Passed!" | "Failed!"))
+        && words.next() == Some("-")
+        && words.next() == Some("Failed:")
 }
 
 #[cfg(test)]

@@ -67,12 +67,14 @@ fn test_truncation_retains_terminal_passed_summary() {
     let mut lines = (0..110)
         .map(|line| format!("NuGet warning {line}: retained"))
         .collect::<Vec<_>>();
-    lines.push("Passed! - Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s".into());
+    // Real VSTest output can place two spaces after the dash. The anchor must
+    // recognize semantic words rather than depend on one formatting space.
+    lines.push("Passed! -  Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s".into());
     let result = filter_dotnet_diagnostics(&lines.join("\n"), DotnetOperation::Test);
     assert!(
         result
             .text
-            .contains("Passed! - Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s")
+            .contains("Passed! -  Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s")
     );
     assert_eq!(result.text.lines().count(), 100);
 }

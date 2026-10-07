@@ -247,10 +247,14 @@ queries, and arbitrary program-execution modes remain ineligible.
 | .NET | `dotnet build ...`, `dotnet test ...` | stdout | 40 / 100 |
 | Maven | `mvn [clean] compile\|package\|install ...` | stdout | 50 |
 
-The bounds include the disclosure line. When truncation is necessary, each
-producer reserves space for recognized terminal summaries (for example test
-counts, warning/error totals, build result, and timing) and fills the remaining
-space from the head while preserving original order.
+The bounds include the disclosure line. When truncation is necessary, the
+filters reserve space only for explicitly recognized terminal-summary formats
+and fill the remaining capacity from the head while preserving original order.
+Verified anchors include Cargo completion, TSC error counts, ESLint problem
+counts, .NET build totals/timing, VSTest pass/fail totals, Maven build totals,
+and Vite-style build completion. This is not a generic tail-preservation
+guarantee: Angular CLI build timestamp/bundle-completion lines and webpack
+`compiled ...` summaries are not currently recognized and may be truncated.
 
 Important ineligible examples include `cargo run`, `cargo test`, `dotnet run`,
 `ng run <project>:serve[:configuration]`, watch mode, arbitrary package scripts

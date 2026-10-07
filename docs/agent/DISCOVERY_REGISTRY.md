@@ -60,7 +60,7 @@ behavior is superseded.
 | **Local regression** | `src/tests/claude_native/pipeline.rs` and `src/tests/claude_native/bash_schema.rs` protect default preservation, explicit pointer omission, exact shape validation, and non-sensitive facts |
 | **Live scenario required?** | Yes — host acceptance, model reachability, and persistence/resume behavior |
 | **Architectural invariant** | Clean-CTX may alter only the model-visible replacement it owns; it must never claim control over a raw file Claude created before hook invocation |
-| **Status** | Investigating through a default-off experiment |
+| **Status** | Mitigation verified; accepted security limitation pending stronger discovery testing |
 
 **Approved experiment:** The explicit CLI flag
 `--drop-persisted-output-pointer` omits only `persistedOutputPath` and
@@ -70,6 +70,16 @@ because omission deliberately relaxes unknown-field preservation and because
 the host may depend on or independently retain this metadata. A successful
 experiment would demonstrate reduced model-visible reachability, not secrecy:
 the unredacted host file already exists outside the hook's authority.
+
+**Live result (2026-10-07):** Claude accepted the pointer-free replacement;
+preview filtering/redaction remained active; the returned object preserved all
+other observed members; facts contained the omission boolean and no path; and
+one saved/resumed transcript contained the redacted result without restoring
+either pointer field. A lightweight instructed model search did not locate the
+file, but the raw unredacted file still existed on disk. The mitigation is
+therefore verified as pointer containment only. Oversized results remain
+outside any secrecy guarantee, and the flag remains default-off until a more
+determined discovery test and product-default decision are completed.
 
 ---
 

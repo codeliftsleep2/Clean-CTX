@@ -635,6 +635,15 @@ tracked regressions place summaries beyond each cap. The repository owner
 reported both the focused regressions and the complete native-text suite green
 on 2026-10-06.
 
+The first live replay found that summary authority remains format-specific.
+.NET build, ESLint, synthetic TSC, and synthetic Maven summaries survived, but
+real VSTest used two spaces in `Passed! -  Failed:` where the initial anchor
+assumed one. The VSTest anchor now compares whitespace-delimited semantic words
+and a tracked regression uses the real spacing. Angular CLI build completion
+lines (`Application bundle generation complete` and `Build at`) and webpack
+`compiled successfully/with warnings` remain unrecognized. They must not be
+added from reconstructed output; capture real producer fixtures first.
+
 Second, Claude debug evidence showed that sufficiently large successful Bash
 results can be persisted by the host before `PostToolUse`. The hook receives a
 bounded preview plus `persistedOutputPath` and `persistedOutputSize`; replaying
@@ -652,11 +661,14 @@ deleting the host file, and it does not establish secrecy: the host created the
 file before invocation and may retain or expose it elsewhere. Structured facts
 record only that omission occurred, never the path.
 
-The experiment remains incomplete until a live field test proves whether
-Claude accepts the replacement, whether the model can still reach or restate
-raw-only content, and whether persistence/resume reintroduces the pointer. The
-default preservation behavior remains unchanged for every registration that
-does not supply the flag.
+The first live field test confirmed that Claude accepted the replacement, the
+model-visible result contained neither pointer field, facts exposed only the
+omission boolean, and one saved/resumed transcript retained the redacted result
+without reintroducing the pointer. A lightweight model search did not find the
+raw file, but this is not evidence that a determined search cannot discover it.
+The raw file still existed. The experiment therefore demonstrates containment
+by pointer omission, not secrecy, and remains default-off pending a stronger
+discovery test and an explicit product-default decision.
 
 ## Frozen Principle
 
