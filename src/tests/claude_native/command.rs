@@ -97,6 +97,9 @@ fn selects_supported_typescript_and_angular_operations() {
         ),
         ("ng test --watch=false", AngularOperation::Test),
         ("ng lint", AngularOperation::Lint),
+        ("ng run app:build:local", AngularOperation::Build),
+        ("ng run app:test --watch=false", AngularOperation::Test),
+        ("ng run app:lint", AngularOperation::Lint),
     ] {
         assert_eq!(
             diagnostic_target(command),
@@ -154,6 +157,13 @@ fn rejects_unapproved_wrappers_scripts_and_watch_modes() {
         "ng build --watch=true",
         "ng build --help",
         "ng test -w",
+        "ng run app:serve:local",
+        "ng run app:custom",
+        "ng run app:test --watch",
+        "ng run :test",
+        "ng run app:",
+        "ng run app:test:local:extra",
+        "npm run start",
         "npm run build -- --help",
         "npm run build && echo done",
     ] {

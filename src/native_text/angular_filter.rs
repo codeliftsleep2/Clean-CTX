@@ -1,6 +1,6 @@
 use super::{
     filter_facts::FilteredText,
-    line_filter::{LineFilterPolicy, filter_lines},
+    line_filter::{LineFilterPolicy, filter_lines_with_tail},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,7 +29,7 @@ impl AngularOperation {
 }
 
 pub fn filter_angular_diagnostics(text: &str, operation: AngularOperation) -> FilteredText {
-    filter_lines(
+    filter_lines_with_tail(
         text,
         LineFilterPolicy {
             filter_id: operation.filter_id(),
@@ -42,6 +42,14 @@ pub fn filter_angular_diagnostics(text: &str, operation: AngularOperation) -> Fi
                 || line.starts_with("Generating browser")
                 || line.starts_with("Processing assets")
                 || line.starts_with("Output location:")
+        },
+        |line| {
+            let trimmed = line.trim_start();
+            trimmed.starts_with("Build succeeded")
+                || trimmed.starts_with("Build failed")
+                || (trimmed.starts_with("Executed ")
+                    && (trimmed.contains("SUCCESS") || trimmed.contains("FAILED")))
+                || trimmed.starts_with("All files pass linting")
         },
     )
 }

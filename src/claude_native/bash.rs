@@ -35,18 +35,25 @@ pub(super) fn recognize(event: &Value) -> Option<BashSuccess<'_>> {
 pub(super) fn validate_reconstruction(
     original: &Map<String, Value>,
     rebuilt: &Map<String, Value>,
+    allow_persisted_pointer_omission: bool,
 ) -> bool {
     if rebuilt.get("stdout").and_then(Value::as_str).is_none()
         || rebuilt.get("stderr").and_then(Value::as_str).is_none()
         || rebuilt.get("interrupted") != Some(&Value::Bool(false))
         || rebuilt.get("isImage") != Some(&Value::Bool(false))
-        || original.len() != rebuilt.len()
     {
         return false;
     }
+    let may_omit = |key: &str| {
+        allow_persisted_pointer_omission
+            && matches!(key, "persistedOutputPath" | "persistedOutputSize")
+    };
     original.iter().all(|(key, value)| {
-        matches!(key.as_str(), "stdout" | "stderr") || rebuilt.get(key) == Some(value)
-    })
+        matches!(key.as_str(), "stdout" | "stderr")
+            || may_omit(key)
+            || rebuilt.get(key) == Some(value)
+    }) && rebuilt.keys().all(|key| original.contains_key(key))
+        && rebuilt.len() == original.keys().filter(|key| !may_omit(key)).count()
 }
 
 #[cfg(test)]

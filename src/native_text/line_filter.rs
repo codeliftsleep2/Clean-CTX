@@ -10,7 +10,16 @@ pub(crate) struct LineFilterPolicy {
 pub(crate) fn filter_lines(
     text: &str,
     policy: LineFilterPolicy,
+    remove_line: impl FnMut(&str) -> bool,
+) -> FilteredText {
+    filter_lines_with_tail(text, policy, remove_line, |_| false)
+}
+
+pub(crate) fn filter_lines_with_tail(
+    text: &str,
+    policy: LineFilterPolicy,
     mut remove_line: impl FnMut(&str) -> bool,
+    mut must_keep_tail: impl FnMut(&str) -> bool,
 ) -> FilteredText {
     let disclosure_prefix = format!("§FILTERED {}:", policy.disclosure_label);
     if text
@@ -25,7 +34,8 @@ pub(crate) fn filter_lines(
     let noise_removed = lines.len() != original_lines;
     let truncated = lines.len() + 1 > policy.max_output_lines;
     if truncated {
-        lines.truncate(policy.max_output_lines - 1);
+        lines =
+            retain_head_and_tail_anchors(lines, policy.max_output_lines - 1, &mut must_keep_tail);
     }
     if !noise_removed && !truncated {
         return unchanged(text);
@@ -57,6 +67,35 @@ pub(crate) fn filter_lines(
         text: output,
         facts: Some(facts),
     }
+}
+
+fn retain_head_and_tail_anchors<'a>(
+    lines: Vec<&'a str>,
+    capacity: usize,
+    must_keep_tail: &mut impl FnMut(&str) -> bool,
+) -> Vec<&'a str> {
+    let mut anchor_indices: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, line)| must_keep_tail(line).then_some(index))
+        .collect();
+    if anchor_indices.len() > capacity {
+        anchor_indices.drain(..anchor_indices.len() - capacity);
+    }
+
+    let head_capacity = capacity - anchor_indices.len();
+    let mut selected_indices: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter_map(|(index, _)| (!anchor_indices.contains(&index)).then_some(index))
+        .take(head_capacity)
+        .collect();
+    selected_indices.extend(anchor_indices);
+    selected_indices.sort_unstable();
+    selected_indices
+        .into_iter()
+        .map(|index| lines[index])
+        .collect()
 }
 
 fn unchanged(text: &str) -> FilteredText {

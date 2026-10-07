@@ -30,3 +30,14 @@ fn applies_tsc_line_bound_through_shared_kernel() {
     assert_eq!(result.text.lines().count(), 100);
     assert!(result.facts.unwrap().truncated);
 }
+
+#[test]
+fn truncation_retains_terminal_error_count_summary() {
+    let mut lines = (0..110)
+        .map(|line| format!("src/app.ts({line},1): warning TS1: retained"))
+        .collect::<Vec<_>>();
+    lines.push("Found 0 errors.".into());
+    let result = filter_tsc_diagnostics(&lines.join("\n"));
+    assert!(result.text.contains("Found 0 errors."));
+    assert_eq!(result.text.lines().count(), 100);
+}

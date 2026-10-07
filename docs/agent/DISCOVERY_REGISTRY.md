@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-035: Claude Persists Oversized Bash Output Before PostToolUse
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-06 |
+| **Environment** | Claude Code debug session + Clean-CTX native `PostToolUse` hook |
+| **Repository/context** | Large .NET and Angular workspace outputs (roughly 42–890 KB raw results) |
+| **Symptom** | Large eligible commands reached the model without a `§FILTERED` disclosure even though replaying the captured command/output directly through the same binary produced a replacement quickly. |
+| **Root cause** | Claude can persist the complete raw Bash result before invoking `PostToolUse`, then send the hook only a bounded preview plus `persistedOutputPath` and `persistedOutputSize`. Clean-CTX transforms the preview, but cannot retroactively redact the host-owned file; preserving the pointer can leave raw content model-reachable. |
+| **Classification** | Emergent lifecycle boundary |
+| **Reproducible locally?** | Envelope behavior is; host persistence ordering is not |
+| **Local regression** | `src/tests/claude_native/pipeline.rs` and `src/tests/claude_native/bash_schema.rs` protect default preservation, explicit pointer omission, exact shape validation, and non-sensitive facts |
+| **Live scenario required?** | Yes — host acceptance, model reachability, and persistence/resume behavior |
+| **Architectural invariant** | Clean-CTX may alter only the model-visible replacement it owns; it must never claim control over a raw file Claude created before hook invocation |
+| **Status** | Investigating through a default-off experiment |
+
+**Approved experiment:** The explicit CLI flag
+`--drop-persisted-output-pointer` omits only `persistedOutputPath` and
+`persistedOutputSize` from a recognized successful Bash replacement. It never
+reads, rewrites, truncates, or deletes the referenced file. It is default-off
+because omission deliberately relaxes unknown-field preservation and because
+the host may depend on or independently retain this metadata. A successful
+experiment would demonstrate reduced model-visible reachability, not secrecy:
+the unredacted host file already exists outside the hook's authority.
+
+---
+
 ## DIS-2026-034: Claude-Native Bash Result Replacement Works End to End
 
 | Field | Value |

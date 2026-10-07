@@ -468,7 +468,8 @@ The next supported-family slice implements stdout filtering for these exact
 successful simple-command forms:
 
 - direct `tsc`, plus the catalog-established `npx tsc` and `bunx tsc` wrappers;
-- direct `ng build`, `ng test`, and `ng lint`;
+- direct `ng build`, `ng test`, and `ng lint`, plus target-sensitive
+  `ng run <project>:build|test|lint[:configuration]` forms;
 - direct, `npx`, and `bunx` ESLint, plus the catalog-established
   `npm|pnpm|yarn [run] eslint|lint` scripts; and
 - exact `npm|pnpm|yarn|bun [run] build|compile|bundle` scripts.
@@ -481,6 +482,13 @@ diagnostics to user-requested information. All four producer families retain
 successful summaries and warnings; none uses success collapse.
 Their existing catalog bounds become producer policy supplied to the shared
 line-reduction kernel: TSC 100, Angular 80, ESLint 140, and Node build 120.
+
+Angular `run` authority derives from the literal target segment, not from the
+`ng` executable or `run` verb. `ng run <project>:serve[:configuration]`, custom
+targets, malformed target specifications, and the normal `npm run start` alias
+for a serve target remain ineligible. The representative bounded live Angular
+path is `ng run <project>:test --watch=false`; the long-running serve path is
+not a `PostToolUse` filtering scenario.
 
 Authority remains structurally upstream of reduction:
 
@@ -596,8 +604,10 @@ The final static architecture audit confirms:
 Before declaring the supported-language milestone externally complete, use the
 already-built hook in representative repositories and confirm:
 
-1. a successful ESLint warning-only run or Angular/Node build retains warnings
-   and useful summaries and emits exactly one disclosure when reduction occurs;
+1. a successful `ng run <project>:test --watch=false`, ESLint warning-only run,
+   or bounded Node build retains warnings and useful summaries and emits
+   exactly one disclosure when reduction occurs; `npm run start` remains
+   unchanged because it aliases a long-running serve target;
 2. a successful `dotnet build` retains `Build succeeded`, warning/error counts,
    and any warnings while removing only frozen boilerplate;
 3. a successful Maven package/install run retains `BUILD SUCCESS`, warnings,
@@ -611,6 +621,42 @@ is expected in that case. A lack of TSC marker alone is not a failure.
 
 Python, Go, meta-tool, and arbitrary-output filters remain outside this
 milestone. Deterministic completion does not authorize their implementation.
+
+## 21. Live Truncation and Oversized-Output Findings
+
+Live .NET and Angular/ESLint use exposed two distinct lifecycle issues.
+
+First, head-only truncation could discard terminal summaries even though each
+producer contract requires them. The shared reducer now accepts a
+producer-owned tail-anchor predicate, reserves capacity for matching summary
+lines, fills the remaining capacity from the head, preserves source order, and
+keeps the disclosure within the producer's existing bound. Producer-specific
+tracked regressions place summaries beyond each cap. The repository owner
+reported both the focused regressions and the complete native-text suite green
+on 2026-10-06.
+
+Second, Claude debug evidence showed that sufficiently large successful Bash
+results can be persisted by the host before `PostToolUse`. The hook receives a
+bounded preview plus `persistedOutputPath` and `persistedOutputSize`; replaying
+that same preview through Clean-CTX proves classification and transformation
+are working, but the saved file remains the original raw output. This is a host
+lifecycle boundary, not a filter-classification defect.
+
+An explicitly approved, default-off experiment therefore adds
+`--drop-persisted-output-pointer`. When a recognized Bash success contains a
+path pointer, the adapter may omit exactly the path and size fields from the
+replacement while continuing to transform the preview and preserve all other
+members. This narrow exception exists to test whether the model stops being
+directed to raw persisted content. It does not authorize reading, modifying, or
+deleting the host file, and it does not establish secrecy: the host created the
+file before invocation and may retain or expose it elsewhere. Structured facts
+record only that omission occurred, never the path.
+
+The experiment remains incomplete until a live field test proves whether
+Claude accepts the replacement, whether the model can still reach or restate
+raw-only content, and whether persistence/resume reintroduces the pointer. The
+default preservation behavior remains unchanged for every registration that
+does not supply the flag.
 
 ## Frozen Principle
 

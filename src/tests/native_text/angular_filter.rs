@@ -32,3 +32,14 @@ fn applies_angular_line_bound_through_shared_kernel() {
     assert_eq!(result.text.lines().count(), 80);
     assert!(result.facts.unwrap().truncated);
 }
+
+#[test]
+fn truncation_retains_terminal_build_summary() {
+    let mut lines = (0..90)
+        .map(|line| format!("warning {line}: retained"))
+        .collect::<Vec<_>>();
+    lines.push("Build succeeded.".into());
+    let result = filter_angular_diagnostics(&lines.join("\n"), AngularOperation::Build);
+    assert!(result.text.contains("Build succeeded."));
+    assert_eq!(result.text.lines().count(), 80);
+}

@@ -27,3 +27,14 @@ fn applies_node_build_line_bound_through_shared_kernel() {
     assert_eq!(result.text.lines().count(), 120);
     assert!(result.facts.unwrap().truncated);
 }
+
+#[test]
+fn truncation_retains_terminal_build_summary() {
+    let mut lines = (0..130)
+        .map(|line| format!("module output {line}"))
+        .collect::<Vec<_>>();
+    lines.push("✓ built in 1.23s".into());
+    let result = filter_node_build_output(&lines.join("\n"), NodeBuildOperation::Build);
+    assert!(result.text.contains("✓ built in 1.23s"));
+    assert_eq!(result.text.lines().count(), 120);
+}

@@ -1,4 +1,5 @@
 use super::{
+    PostToolUseOptions,
     facts::{ClaudeNativeFacts, PassThroughReason},
     pipeline,
 };
@@ -21,7 +22,23 @@ pub fn process_hook_value(event: &Value) -> HookProcessResult {
     HookProcessResult { response, facts }
 }
 
+pub fn process_hook_value_with_options(
+    event: &Value,
+    options: PostToolUseOptions,
+) -> HookProcessResult {
+    let (response, facts) = pipeline::process_with_options(event, options);
+    HookProcessResult { response, facts }
+}
+
 pub fn process_hook_bytes(input: &[u8], max_bytes: usize) -> HookProcessResult {
+    process_hook_bytes_with_options(input, max_bytes, PostToolUseOptions::default())
+}
+
+pub fn process_hook_bytes_with_options(
+    input: &[u8],
+    max_bytes: usize,
+    options: PostToolUseOptions,
+) -> HookProcessResult {
     if input.len() > max_bytes {
         return HookProcessResult {
             response: None,
@@ -29,7 +46,7 @@ pub fn process_hook_bytes(input: &[u8], max_bytes: usize) -> HookProcessResult {
         };
     }
     match serde_json::from_slice::<Value>(input) {
-        Ok(value) => process_hook_value(&value),
+        Ok(value) => process_hook_value_with_options(&value, options),
         Err(_) => HookProcessResult {
             response: None,
             facts: ClaudeNativeFacts::passed(PassThroughReason::InvalidEnvelope, 0),
@@ -38,7 +55,15 @@ pub fn process_hook_bytes(input: &[u8], max_bytes: usize) -> HookProcessResult {
 }
 
 pub fn render_hook_io(input: &[u8], max_bytes: usize) -> Result<HookIoOutput, serde_json::Error> {
-    let result = process_hook_bytes(input, max_bytes);
+    render_hook_io_with_options(input, max_bytes, PostToolUseOptions::default())
+}
+
+pub fn render_hook_io_with_options(
+    input: &[u8],
+    max_bytes: usize,
+    options: PostToolUseOptions,
+) -> Result<HookIoOutput, serde_json::Error> {
+    let result = process_hook_bytes_with_options(input, max_bytes, options);
     let mut stderr = serde_json::to_vec(&result.facts)?;
     stderr.push(b'\n');
     let stdout = match result.response {

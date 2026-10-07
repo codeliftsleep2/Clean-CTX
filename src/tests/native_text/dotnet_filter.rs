@@ -6,7 +6,7 @@ fn build_removes_boilerplate_and_preserves_warnings_and_summary() {
     let result = filter_dotnet_diagnostics(input, DotnetOperation::Build);
     assert!(!result.text.contains("Microsoft (R)"));
     assert!(!result.text.contains("Determining projects"));
-    assert!(!result.text.contains("Time Elapsed"));
+    assert!(result.text.contains("Time Elapsed"));
     assert!(result.text.contains("warning CS0168"));
     assert!(result.text.contains("Build succeeded."));
     assert!(result.text.contains("1 Warning(s)"));
@@ -41,4 +41,38 @@ fn build_and_test_apply_distinct_shared_kernel_bounds() {
     assert_eq!(test.text.lines().count(), 100);
     assert!(build.facts.unwrap().truncated);
     assert!(test.facts.unwrap().truncated);
+}
+
+#[test]
+fn build_truncation_retains_terminal_counts_and_timing() {
+    let mut lines = (0..50)
+        .map(|line| format!("warning CS{line:04}: retained warning"))
+        .collect::<Vec<_>>();
+    lines.extend([
+        "Build succeeded.".into(),
+        "    34 Warning(s)".into(),
+        "    0 Error(s)".into(),
+        "Time Elapsed 00:00:12.34".into(),
+    ]);
+    let result = filter_dotnet_diagnostics(&lines.join("\n"), DotnetOperation::Build);
+    assert!(result.text.contains("Build succeeded."));
+    assert!(result.text.contains("34 Warning(s)"));
+    assert!(result.text.contains("0 Error(s)"));
+    assert!(result.text.contains("Time Elapsed 00:00:12.34"));
+    assert_eq!(result.text.lines().count(), 40);
+}
+
+#[test]
+fn test_truncation_retains_terminal_passed_summary() {
+    let mut lines = (0..110)
+        .map(|line| format!("NuGet warning {line}: retained"))
+        .collect::<Vec<_>>();
+    lines.push("Passed! - Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s".into());
+    let result = filter_dotnet_diagnostics(&lines.join("\n"), DotnetOperation::Test);
+    assert!(
+        result
+            .text
+            .contains("Passed! - Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s")
+    );
+    assert_eq!(result.text.lines().count(), 100);
 }

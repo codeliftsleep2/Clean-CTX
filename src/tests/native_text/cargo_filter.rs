@@ -51,3 +51,14 @@ fn semantic_only_output_is_unchanged() {
     assert_eq!(result.text, input);
     assert!(result.facts.is_none());
 }
+
+#[test]
+fn truncation_retains_terminal_finished_summary() {
+    let mut lines = (0..120)
+        .map(|line| format!("warning: retained diagnostic {line}"))
+        .collect::<Vec<_>>();
+    lines.push("    Finished dev [unoptimized] target(s) in 2.34s".into());
+    let result = filter_cargo_diagnostics(&lines.join("\n"), CargoOperation::Build);
+    assert!(result.text.contains("Finished dev [unoptimized]"));
+    assert_eq!(result.text.lines().count(), 100);
+}

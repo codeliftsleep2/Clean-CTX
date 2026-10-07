@@ -21,3 +21,18 @@ fn applies_eslint_line_bound_through_shared_kernel() {
     assert_eq!(result.text.lines().count(), 140);
     assert!(result.facts.unwrap().truncated);
 }
+
+#[test]
+fn truncation_retains_terminal_problem_summary() {
+    let mut lines = (0..150)
+        .map(|line| format!("{line}:1 warning retained rule-name"))
+        .collect::<Vec<_>>();
+    lines.push("✖ 150 problems (0 errors, 150 warnings)".into());
+    let result = filter_eslint_diagnostics(&lines.join("\n"));
+    assert!(
+        result
+            .text
+            .contains("✖ 150 problems (0 errors, 150 warnings)")
+    );
+    assert_eq!(result.text.lines().count(), 140);
+}

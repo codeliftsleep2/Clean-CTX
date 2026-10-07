@@ -49,7 +49,15 @@ pub struct ClaudeNativeFacts {
     pub pass_through_reason: Option<PassThroughReason>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<FieldFacts>,
+    /// True only when the opt-in experiment omitted Claude's persisted-output
+    /// path and size metadata. The path itself is never recorded.
+    #[serde(skip_serializing_if = "is_false")]
+    pub persisted_output_pointer_omitted: bool,
     pub duration_micros: u128,
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
 }
 
 impl ClaudeNativeFacts {
@@ -63,6 +71,7 @@ impl ClaudeNativeFacts {
             validation_succeeded: false,
             pass_through_reason: Some(reason),
             fields: Vec::new(),
+            persisted_output_pointer_omitted: false,
             duration_micros,
         }
     }

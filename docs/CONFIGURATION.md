@@ -220,19 +220,45 @@ See the official [Claude Code hooks reference](https://code.claude.com/docs/en/h
 for hook locations, matcher behavior, command handlers, and
 `updatedToolOutput` validation.
 
-### First-slice behavior
+### Native Bash tool-result behavior
 
-The current native slice accepts only successful built-in `Bash` results whose
+The native integration accepts only successful built-in `Bash` results whose
 structured response contains string `stdout` and `stderr` fields with
 `interrupted: false` and `isImage: false`. It then applies:
 
 ```text
-stdout: ANSI normalization -> recognized-secret redaction -> optional git-diff-v1 filtering
-stderr: ANSI normalization -> recognized-secret redaction
+stdout: ANSI normalization -> recognized-secret redaction -> authorized stdout filter
+stderr: ANSI normalization -> recognized-secret redaction -> authorized stderr filter
 ```
 
-The Git filter is selected from the authoritative Bash command and currently
-matches `git diff` and `git show`. A useful live smoke test is:
+Filtering authority is operation- and stream-specific. Current eligible forms
+are summarized below; shell compounds, redirection, command substitution,
+leading environment assignments, unsupported wrappers, help/information
+queries, and arbitrary program-execution modes remain ineligible.
+
+| Producer | Eligible command forms | Filtered field | Maximum lines |
+|---|---|---:|---:|
+| Git | `git diff ...`, `git show ...` | stdout | 500 |
+| Cargo | `cargo build ...`, `cargo check ...`, `cargo clippy ...` | stderr | 100 |
+| TypeScript | `tsc ...`, `npx tsc ...`, `bunx tsc ...` | stdout | 100 |
+| Angular | `ng build/test/lint ...`; `ng run <project>:build\|test\|lint[:configuration]` | stdout | 80 |
+| ESLint | direct/`npx`/`bunx`; `npm\|pnpm\|yarn [run] eslint\|lint` | stdout | 140 |
+| Node build | exact `npm\|pnpm\|yarn\|bun [run] build\|compile\|bundle` scripts | stdout | 120 |
+| .NET | `dotnet build ...`, `dotnet test ...` | stdout | 40 / 100 |
+| Maven | `mvn [clean] compile\|package\|install ...` | stdout | 50 |
+
+The bounds include the disclosure line. When truncation is necessary, each
+producer reserves space for recognized terminal summaries (for example test
+counts, warning/error totals, build result, and timing) and fills the remaining
+space from the head while preserving original order.
+
+Important ineligible examples include `cargo run`, `cargo test`, `dotnet run`,
+`ng run <project>:serve[:configuration]`, watch mode, arbitrary package scripts
+such as `npm run start`, Maven exec/inspection goals, and any failed tool event.
+Package-script aliases do not reveal their underlying command to this hook, so
+only the explicitly allowlisted script names receive authority.
+
+A useful Git smoke test is:
 
 ```bash
 git show --color=always HEAD
@@ -243,13 +269,56 @@ When filtering reduces the result, the model-visible output includes one
 
 Unsupported, malformed, failed, interrupted, image, unchanged, or invalid
 results receive no replacement. Failed Bash output remains native and
-unchanged. The first slice does not support Claude's `PowerShell` tool or other
+unchanged. The integration does not support Claude's `PowerShell` tool or other
 tool schemas.
 
 Secret redaction covers only recognized secrets in selected fields of the
 supported successful Bash result before delivery to the model. It does not
 claim protection for tool execution, Claude hook infrastructure, telemetry,
 failed results, transcripts, or unsupported result shapes.
+
+### Experimental oversized-output pointer omission
+
+Live Claude Code debugging established an important host-ordering boundary:
+for sufficiently large Bash output, Claude may save the complete raw result to
+a file **before** invoking `PostToolUse`. The hook then receives a bounded text
+preview together with `persistedOutputPath` and `persistedOutputSize`. Clean-CTX
+can normalize, redact, and filter the preview, but it cannot retroactively
+redact the already-created file. Preserving the pointer also leaves that raw
+file potentially reachable to the model.
+
+To test whether removing that model-visible pointer improves containment, add
+this default-off experimental argument to the hook registration:
+
+```json
+"args": [
+  "claude-hook",
+  "post-tool-use",
+  "--drop-persisted-output-pointer"
+]
+```
+
+When enabled and `persistedOutputPath` is present, Clean-CTX omits exactly
+`persistedOutputPath` and `persistedOutputSize` from `updatedToolOutput`. It
+still transforms the preview normally, preserves every other response member,
+and records only a boolean omission fact—not the path. Pointer omission alone
+is enough to return a replacement even if preview text did not change.
+
+Why this is experimental and default-off:
+
+- Claude, not Clean-CTX, owns and creates the persisted file before the hook;
+- Clean-CTX never reads, rewrites, truncates, or deletes that file;
+- omitting metadata is an intentional exception to normal unknown-field
+  preservation and therefore requires explicit operator choice;
+- host acceptance, later model reachability, persistence, and session-resume
+  behavior must be verified live; and
+- this option is not a secrecy guarantee. The raw file still exists, and the
+  host may retain or expose it through another lifecycle surface.
+
+Registering a hook is scoped to the settings file containing it. A project with
+no project-level hook and no applicable user-level hook receives no native
+filtering at all. Confirm the effective registration with `/hooks` in each
+workspace used for field verification.
 
 ## Environment Variables
 

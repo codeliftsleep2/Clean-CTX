@@ -1,5 +1,5 @@
 use super::{
-    bash,
+    PostToolUseOptions, bash,
     command::{DiagnosticTarget, diagnostic_target},
     facts::{ClaudeNativeFacts, FieldFacts, PassThroughReason, ProcessingOutcome},
 };
@@ -17,7 +17,14 @@ use std::{
 };
 
 pub(super) fn process(event: &Value) -> (Option<Value>, ClaudeNativeFacts) {
-    process_inner(event, PipelineFault::None)
+    process_with_options(event, PostToolUseOptions::default())
+}
+
+pub(super) fn process_with_options(
+    event: &Value,
+    options: PostToolUseOptions,
+) -> (Option<Value>, ClaudeNativeFacts) {
+    process_inner(event, options, PipelineFault::None)
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -31,7 +38,11 @@ enum PipelineFault {
     Validation,
 }
 
-fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeNativeFacts) {
+fn process_inner(
+    event: &Value,
+    options: PostToolUseOptions,
+    fault: PipelineFault,
+) -> (Option<Value>, ClaudeNativeFacts) {
     #[cfg(not(test))]
     let _ = fault;
     let started = Instant::now();
@@ -62,7 +73,9 @@ fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeN
             ),
         );
     };
-    if stdout == bash.stdout && stderr == bash.stderr {
+    let omit_persisted_pointer =
+        options.drop_persisted_output_pointer && bash.response.contains_key("persistedOutputPath");
+    if stdout == bash.stdout && stderr == bash.stderr && !omit_persisted_pointer {
         return (
             None,
             ClaudeNativeFacts::passed(PassThroughReason::Unchanged, started.elapsed().as_micros()),
@@ -71,6 +84,10 @@ fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeN
     let mut rebuilt = bash.response.clone();
     rebuilt.insert("stdout".into(), Value::String(stdout));
     rebuilt.insert("stderr".into(), Value::String(stderr));
+    if omit_persisted_pointer {
+        rebuilt.remove("persistedOutputPath");
+        rebuilt.remove("persistedOutputSize");
+    }
     #[cfg(test)]
     if fault == PipelineFault::Reconstruction {
         rebuilt.remove("interrupted");
@@ -86,7 +103,7 @@ fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeN
     if fault == PipelineFault::Validation {
         rebuilt.insert("isImage".into(), Value::Bool(true));
     }
-    if !bash::validate_reconstruction(bash.response, &rebuilt) {
+    if !bash::validate_reconstruction(bash.response, &rebuilt, omit_persisted_pointer) {
         return (
             None,
             ClaudeNativeFacts::passed(
@@ -108,6 +125,7 @@ fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeN
         validation_succeeded: true,
         pass_through_reason: None,
         fields,
+        persisted_output_pointer_omitted: omit_persisted_pointer,
         duration_micros: started.elapsed().as_micros(),
     };
     (Some(response), facts)
@@ -115,7 +133,7 @@ fn process_inner(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeN
 
 #[cfg(test)]
 fn process_with_fault(event: &Value, fault: PipelineFault) -> (Option<Value>, ClaudeNativeFacts) {
-    process_inner(event, fault)
+    process_inner(event, PostToolUseOptions::default(), fault)
 }
 
 fn transform(bash: &bash::BashSuccess<'_>) -> (String, String, Vec<FieldFacts>) {

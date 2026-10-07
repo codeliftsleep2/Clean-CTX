@@ -256,6 +256,45 @@ fn unsupported_typescript_and_node_commands_do_not_filter_resembling_output() {
 }
 
 #[test]
+fn bounded_angular_run_test_target_uses_angular_test_filter() {
+    let stdout = "\nProcessing assets...\nTest summary retained";
+    let stderr = "runtime-looking stderr must remain";
+    let (response, facts) = process(&event("ng run app:test --watch=false", stdout, stderr));
+    let output = response.expect("bounded Angular test target should filter stdout");
+    let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+    assert!(
+        updated["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("§FILTERED angular-test:")
+    );
+    assert!(
+        updated["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("Test summary retained")
+    );
+    assert_eq!(updated["stderr"].as_str(), Some(stderr));
+    assert_eq!(
+        facts.fields[0].filter.as_ref().unwrap().filter_id,
+        "angular-test-v1"
+    );
+}
+
+#[test]
+fn angular_serve_and_start_alias_remain_ineligible() {
+    let stdout = "Processing assets...\nDevelopment server listening";
+    for command in ["ng run app:serve:local", "npm run start"] {
+        let (response, facts) = process(&event(command, stdout, ""));
+        assert!(response.is_none(), "replaced runtime command {command}");
+        assert_eq!(
+            facts.pass_through_reason,
+            Some(PassThroughReason::Unchanged)
+        );
+    }
+}
+
+#[test]
 fn dotnet_build_and_test_filter_only_stdout_with_distinct_semantics() {
     for (command, stdout, marker, filter_id) in [
         (
@@ -365,6 +404,64 @@ fn facts_are_allowlisted_and_exclude_sensitive_payloads() {
         assert!(!facts.contains(forbidden), "facts leaked {forbidden}");
     }
     assert!(facts.contains("redaction"));
+}
+
+#[test]
+fn persisted_output_pointer_is_preserved_by_default() {
+    let mut input = event("echo ok", "ok", "");
+    input["tool_response"]["persistedOutputPath"] = json!("private/raw-output.txt");
+    input["tool_response"]["persistedOutputSize"] = json!(63_000);
+
+    let (response, facts) = process(&input);
+
+    assert!(response.is_none());
+    assert_eq!(
+        facts.pass_through_reason,
+        Some(PassThroughReason::Unchanged)
+    );
+    assert!(!facts.persisted_output_pointer_omitted);
+}
+
+#[test]
+fn opt_in_omits_only_persisted_pointer_metadata_even_when_text_is_unchanged() {
+    let mut input = event("echo ok", "ok", "");
+    input["tool_response"]["persistedOutputPath"] = json!("private/raw-output.txt");
+    input["tool_response"]["persistedOutputSize"] = json!(63_000);
+
+    let options = PostToolUseOptions {
+        drop_persisted_output_pointer: true,
+    };
+    let (response, facts) = process_with_options(&input, options);
+    let output = response.expect("pointer omission alone must produce a replacement");
+    let updated = &output["hookSpecificOutput"]["updatedToolOutput"];
+
+    assert!(updated.get("persistedOutputPath").is_none());
+    assert!(updated.get("persistedOutputSize").is_none());
+    assert_eq!(updated["stdout"], "ok");
+    assert_eq!(updated["unknown"], json!({"ordered": [1, 2, 2, 3]}));
+    assert!(facts.persisted_output_pointer_omitted);
+
+    let serialized = serde_json::to_string(&facts).unwrap();
+    assert!(serialized.contains("persisted_output_pointer_omitted"));
+    assert!(!serialized.contains("private/raw-output.txt"));
+}
+
+#[test]
+fn opt_in_does_not_remove_size_without_a_persisted_path_pointer() {
+    let mut input = event("echo ok", "ok", "");
+    input["tool_response"]["persistedOutputSize"] = json!(63_000);
+    let options = PostToolUseOptions {
+        drop_persisted_output_pointer: true,
+    };
+
+    let (response, facts) = process_with_options(&input, options);
+
+    assert!(response.is_none());
+    assert_eq!(
+        facts.pass_through_reason,
+        Some(PassThroughReason::Unchanged)
+    );
+    assert!(!facts.persisted_output_pointer_omitted);
 }
 
 #[test]

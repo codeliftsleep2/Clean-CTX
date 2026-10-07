@@ -42,7 +42,11 @@ enum Cli {
 #[derive(Debug, clap::Subcommand)]
 enum ClaudeHookEvent {
     /// Transform one successful PostToolUse event from stdin
-    PostToolUse,
+    PostToolUse {
+        /// Experimentally omit Claude's persisted-output path and size metadata
+        #[arg(long)]
+        drop_persisted_output_pointer: bool,
+    },
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -63,8 +67,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(Cli::ConfigDump) => cmd_config_dump(),
         Ok(Cli::Proxy { stop }) => cmd_proxy(stop),
         Ok(Cli::ClaudeHook {
-            event: ClaudeHookEvent::PostToolUse,
-        }) => cmd_claude_post_tool_use(),
+            event:
+                ClaudeHookEvent::PostToolUse {
+                    drop_persisted_output_pointer,
+                },
+        }) => cmd_claude_post_tool_use(drop_persisted_output_pointer),
         // When no arguments are given, clap emits DisplayHelpOnMissingArgumentOrSubcommand.
         // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
         // Any future Cli variant is automatically dispatched above — no parallel
@@ -80,7 +87,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[path = "tests/claude_native/cli_contract.rs"]
 mod claude_cli_tests;
 
-fn cmd_claude_post_tool_use() -> Result<(), Box<dyn std::error::Error>> {
+fn cmd_claude_post_tool_use(
+    drop_persisted_output_pointer: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     // Match the repository's established maximum JSON-line ingress size.
     const MAX_HOOK_BYTES: u64 = 16 * 1024 * 1024;
     let mut input = Vec::new();
@@ -88,7 +97,14 @@ fn cmd_claude_post_tool_use() -> Result<(), Box<dyn std::error::Error>> {
         .take(MAX_HOOK_BYTES + 1)
         .read_to_end(&mut input)?;
 
-    let output = clean_ctx::claude_native::render_hook_io(&input, MAX_HOOK_BYTES as usize)?;
+    let options = clean_ctx::claude_native::PostToolUseOptions {
+        drop_persisted_output_pointer,
+    };
+    let output = clean_ctx::claude_native::render_hook_io_with_options(
+        &input,
+        MAX_HOOK_BYTES as usize,
+        options,
+    )?;
     std::io::stderr().lock().write_all(&output.stderr)?;
     std::io::stdout().lock().write_all(&output.stdout)?;
     Ok(())

@@ -34,3 +34,20 @@ fn applies_maven_bound_through_shared_kernel() {
     assert_eq!(result.text.lines().count(), 50);
     assert!(result.facts.unwrap().truncated);
 }
+
+#[test]
+fn truncation_retains_terminal_build_summaries() {
+    let mut lines = (0..60)
+        .map(|line| format!("[WARNING] retained {line}"))
+        .collect::<Vec<_>>();
+    lines.extend([
+        "[INFO] BUILD SUCCESS".into(),
+        "[INFO] Total time: 4.123 s".into(),
+        "[INFO] Finished at: 2026-10-06T12:00:00Z".into(),
+    ]);
+    let result = filter_maven_diagnostics(&lines.join("\n"), MavenOperation::Package);
+    assert!(result.text.contains("[INFO] BUILD SUCCESS"));
+    assert!(result.text.contains("[INFO] Total time: 4.123 s"));
+    assert!(result.text.contains("[INFO] Finished at:"));
+    assert_eq!(result.text.lines().count(), 50);
+}

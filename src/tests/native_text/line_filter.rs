@@ -41,3 +41,18 @@ fn preserves_unchanged_text_exactly() {
     assert_eq!(result.text, input);
     assert!(result.facts.is_none());
 }
+
+#[test]
+fn anchored_truncation_reserves_tail_and_preserves_original_order() {
+    let result = filter_lines_with_tail(
+        "head one\nhead two\nhead three\nsummary one\nsummary two",
+        POLICY,
+        |_| false,
+        |line| line.starts_with("summary"),
+    );
+    assert_eq!(
+        result.text,
+        "head one\nsummary one\nsummary two\n§FILTERED test-filter: 5 → 3 lines"
+    );
+    assert!(result.facts.unwrap().truncated);
+}

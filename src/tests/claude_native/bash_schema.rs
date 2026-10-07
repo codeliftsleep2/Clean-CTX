@@ -16,8 +16,25 @@ fn admits_documented_shape_and_preserves_unknown_members() {
     let admitted = recognize(&value).unwrap();
     let mut rebuilt = admitted.response.clone();
     rebuilt.insert("stdout".into(), Value::String("changed".into()));
-    assert!(validate_reconstruction(admitted.response, &rebuilt));
+    assert!(validate_reconstruction(admitted.response, &rebuilt, false));
     assert_eq!(rebuilt["future"], json!({"array": [3, 2, 2, 1]}));
+}
+
+#[test]
+fn persisted_pointer_omission_is_the_only_permitted_shape_exception() {
+    let mut value = event();
+    value["tool_response"]["persistedOutputPath"] = json!("sensitive/raw-output.txt");
+    value["tool_response"]["persistedOutputSize"] = json!(63_000);
+    let admitted = recognize(&value).unwrap();
+    let mut rebuilt = admitted.response.clone();
+    rebuilt.remove("persistedOutputPath");
+    rebuilt.remove("persistedOutputSize");
+
+    assert!(!validate_reconstruction(admitted.response, &rebuilt, false));
+    assert!(validate_reconstruction(admitted.response, &rebuilt, true));
+
+    rebuilt.remove("future");
+    assert!(!validate_reconstruction(admitted.response, &rebuilt, true));
 }
 
 #[test]

@@ -56,6 +56,7 @@ pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
                 "build" => AngularOperation::Build,
                 "test" => AngularOperation::Test,
                 "lint" => AngularOperation::Lint,
+                "run" => angular_run_operation(words.get(2)?)?,
                 _ => return None,
             };
             Some(DiagnosticTarget::AngularStdout(operation))
@@ -91,6 +92,26 @@ pub(super) fn diagnostic_target(command: &str) -> Option<DiagnosticTarget> {
         [executable, first_goal, remaining @ ..] if executable == "mvn" => {
             maven_target(first_goal, remaining)
         }
+        _ => None,
+    }
+}
+
+fn angular_run_operation(target_specification: &str) -> Option<AngularOperation> {
+    let mut parts = target_specification.split(':');
+    let project = parts.next()?;
+    let target = parts.next()?;
+    let configuration = parts.next();
+    if project.is_empty()
+        || target.is_empty()
+        || configuration.is_some_and(str::is_empty)
+        || parts.next().is_some()
+    {
+        return None;
+    }
+    match target {
+        "build" => Some(AngularOperation::Build),
+        "test" => Some(AngularOperation::Test),
+        "lint" => Some(AngularOperation::Lint),
         _ => None,
     }
 }

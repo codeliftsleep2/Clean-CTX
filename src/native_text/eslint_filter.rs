@@ -1,6 +1,6 @@
 use super::{
     filter_facts::FilteredText,
-    line_filter::{LineFilterPolicy, filter_lines},
+    line_filter::{LineFilterPolicy, filter_lines_with_tail},
 };
 
 const POLICY: LineFilterPolicy = LineFilterPolicy {
@@ -10,7 +10,19 @@ const POLICY: LineFilterPolicy = LineFilterPolicy {
 };
 
 pub fn filter_eslint_diagnostics(text: &str) -> FilteredText {
-    filter_lines(text, POLICY, |line| line.trim().is_empty())
+    filter_lines_with_tail(
+        text,
+        POLICY,
+        |line| line.trim().is_empty(),
+        |line| {
+            let trimmed = line.trim();
+            (trimmed.starts_with('✖') && trimmed.contains(" problem"))
+                || (trimmed.contains(" problem")
+                    && trimmed.contains(" error")
+                    && trimmed.contains(" warning"))
+                || trimmed.contains("potentially fixable with the `--fix` option")
+        },
+    )
 }
 
 #[cfg(test)]

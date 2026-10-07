@@ -1,6 +1,6 @@
 use super::{
     filter_facts::FilteredText,
-    line_filter::{LineFilterPolicy, filter_lines},
+    line_filter::{LineFilterPolicy, filter_lines_with_tail},
 };
 
 const MAX_OUTPUT_LINES: usize = 100;
@@ -31,7 +31,7 @@ impl CargoOperation {
 }
 
 pub fn filter_cargo_diagnostics(text: &str, operation: CargoOperation) -> FilteredText {
-    filter_lines(
+    filter_lines_with_tail(
         text,
         LineFilterPolicy {
             filter_id: operation.filter_id(),
@@ -39,6 +39,7 @@ pub fn filter_cargo_diagnostics(text: &str, operation: CargoOperation) -> Filter
             max_output_lines: MAX_OUTPUT_LINES,
         },
         is_progress_noise,
+        |line| line.trim_start().starts_with("Finished "),
     )
 }
 

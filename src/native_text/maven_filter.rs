@@ -1,6 +1,6 @@
 use super::{
     filter_facts::FilteredText,
-    line_filter::{LineFilterPolicy, filter_lines},
+    line_filter::{LineFilterPolicy, filter_lines_with_tail},
 };
 
 const POLICY: LineFilterPolicy = LineFilterPolicy {
@@ -17,15 +17,24 @@ pub enum MavenOperation {
 }
 
 pub fn filter_maven_diagnostics(text: &str, _operation: MavenOperation) -> FilteredText {
-    filter_lines(text, POLICY, |line| {
-        line.trim().is_empty()
-            || line.starts_with("[INFO] ---")
-            || line.starts_with("[INFO] Downloading")
-            || line.starts_with("[INFO] Downloaded")
-            || line.starts_with("[INFO] Progress")
-            || is_module_progress(line)
-            || line.starts_with("[INFO] Building ")
-    })
+    filter_lines_with_tail(
+        text,
+        POLICY,
+        |line| {
+            line.trim().is_empty()
+                || line.starts_with("[INFO] ---")
+                || line.starts_with("[INFO] Downloading")
+                || line.starts_with("[INFO] Downloaded")
+                || line.starts_with("[INFO] Progress")
+                || is_module_progress(line)
+                || line.starts_with("[INFO] Building ")
+        },
+        |line| {
+            line.starts_with("[INFO] BUILD ")
+                || line.starts_with("[INFO] Total time:")
+                || line.starts_with("[INFO] Finished at:")
+        },
+    )
 }
 
 fn is_module_progress(line: &str) -> bool {
