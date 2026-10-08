@@ -1,1 +1,91 @@
-{"version":1,"projects":{"probe":{"projectType":"application","root":"","sourceRoot":".","architect":{"build":{"builder":"@angular/build:application","options":{"browser":"main.ts","index":"index.html","tsConfig":"tsconfig.json","outputPath":"dist","budgets":[{"type":"initial","maximumWarning":"1b"}]}}}}}}
+{
+  "version": 1,
+  "projects": {
+    "probe": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": ".",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "main.ts",
+            "index": "index.html",
+            "tsConfig": "tsconfig.json",
+            "outputPath": "dist",
+            "budgets": [
+              {
+                "type": "initial",
+                "maximumWarning": "1b"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "probe-karma": {
+      "projectType": "application",
+      "root": "",
+      "architect": {
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "runner": "karma",
+            "buildTarget": "probe:build",
+            "tsConfig": "tsconfig.spec.json",
+            "include": [
+              "karma-probe.spec.ts"
+            ],
+            "watch": false,
+            "progress": false,
+            "runnerConfig": "karma.conf.cjs",
+            "browsers": [
+              "ChromeHeadlessOperator"
+            ]
+          }
+        }
+      },
+      "sourceRoot": "."
+    },
+    "probe-vitest": {
+      "projectType": "application",
+      "root": "",
+      "architect": {
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "runner": "vitest",
+            "buildTarget": "probe:build",
+            "tsConfig": "tsconfig.spec.json",
+            "include": [
+              "vitest-probe.spec.ts"
+            ],
+            "watch": false,
+            "progress": false
+          }
+        }
+      },
+      "sourceRoot": "."
+    },
+    "probe-legacy-karma": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": ".",
+      "architect": {
+        "test": {
+          "builder": "@angular/build:karma",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "karmaConfig": "karma.conf.cjs",
+            "include": [
+              "karma-probe.spec.ts"
+            ],
+            "browsers": "ChromeHeadlessOperator",
+            "watch": false,
+            "progress": false
+          }
+        }
+      }
+    }
+  }
+}

@@ -3,6 +3,8 @@ param(
     [string]$BinaryPath = '',
     [string]$DotnetPath = 'dotnet',
     [string]$NodePath = 'node',
+    [string]$ChromePath = '',
+    [string[]]$CaseNames = @(),
     [Parameter(Mandatory)][string]$NodeToolsRoot,
     [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 )
@@ -20,6 +22,13 @@ Copy-Item (Join-Path $PSScriptRoot '../fixtures/*') $workspace -Recurse
 $linkType = if ($IsWindows) { 'Junction' } else { 'SymbolicLink' }
 New-Item -ItemType $linkType -Path (Join-Path $workspace 'node_modules') -Target $modules | Out-Null
 $rows = [Collections.Generic.List[object]]::new()
+if (-not $ChromePath -and $env:CHROME_BIN) { $ChromePath = $env:CHROME_BIN }
+if (-not $ChromePath) {
+    foreach ($name in @('chromium', 'chromium-browser', 'google-chrome')) {
+        $command = Get-Command $name -ErrorAction SilentlyContinue
+        if ($command) { $ChromePath = $command.Source; break }
+    }
+}
 
 function Require([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -53,6 +62,7 @@ function Invoke-Captured([string]$Executable, [string[]]$Arguments, [string]$Dir
     $info.Environment['NUGET_PACKAGES'] = Join-Path $run 'nuget'
     $info.Environment['NG_CLI_ANALYTICS'] = 'false'
     $info.Environment['NO_COLOR'] = '1'
+    if ($ChromePath) { $info.Environment['CHROME_BIN'] = $ChromePath }
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $info
     try {
@@ -120,9 +130,16 @@ $cases = @(
     @{ name='tsc-clean'; exe=$NodePath; args=@((Join-Path $modules 'typescript/bin/tsc'), '--noEmit', '--skipLibCheck', 'valid.ts'); cwd=''; command='tsc --noEmit valid.ts'; exit=0; filter=''; keep=@(); reason='unchanged' },
     @{ name='tsc-failure'; exe=$NodePath; args=@((Join-Path $modules 'typescript/bin/tsc'), '--noEmit', '--skipLibCheck', 'invalid.ts'); cwd=''; command='tsc --noEmit invalid.ts'; exit=2; filter=''; keep=@('TS2322'); reason='unsupported_event' },
     @{ name='tsc-info'; exe=$NodePath; args=@((Join-Path $modules 'typescript/bin/tsc'), '--version'); cwd=''; command='tsc --version'; exit=0; filter=''; keep=@('Version'); reason='unchanged' },
-    @{ name='angular-warning'; exe=$NodePath; args=@((Join-Path $modules '@angular/cli/bin/ng.js'), 'build', 'probe', '--progress=false'); cwd='angular'; command='ng build probe --progress=false'; exit=0; filter='angular-build-v1'; keep=@('Application bundle generation complete', 'exceeded maximum budget') }
+    @{ name='angular-warning'; exe=$NodePath; args=@((Join-Path $modules '@angular/cli/bin/ng.js'), 'build', 'probe', '--progress=false'); cwd='angular'; command='ng build probe --progress=false'; exit=0; filter='angular-build-v1'; keep=@('Application bundle generation complete', 'exceeded maximum budget') },
+    @{ name='angular-karma-jasmine'; exe=$NodePath; args=@((Join-Path $modules '@angular/cli/bin/ng.js'), 'run', 'probe-karma:test', '--watch=false'); cwd='angular'; command='ng run probe-karma:test --watch=false'; exit=0; filter='angular-test-v1'; keep=@('Executed 2 of 2', 'TOTAL: 2 SUCCESS') },
+    @{ name='angular-classic-karma-jasmine'; exe=$NodePath; args=@((Join-Path $modules '@angular/cli/bin/ng.js'), 'run', 'probe-legacy-karma:test', '--watch=false'); cwd='angular'; command='ng run probe-legacy-karma:test --watch=false'; exit=0; filter='angular-test-v1'; keep=@('Executed 2 of 2', 'TOTAL: 2 SUCCESS') },
+    @{ name='angular-vitest-testbed'; exe=$NodePath; args=@((Join-Path $modules '@angular/cli/bin/ng.js'), 'run', 'probe-vitest:test', '--watch=false'); cwd='angular'; command='ng run probe-vitest:test --watch=false'; exit=0; filter='angular-test-v1'; keep=@('Test Files', 'Tests', '2 passed') }
 )
 $failures = 0
+if ($CaseNames.Count) {
+    foreach ($name in $CaseNames) { Require (@($cases | Where-Object name -eq $name).Count -eq 1) "Unknown case: $name" }
+    $cases = @($cases | Where-Object { $_.name -in $CaseNames })
+}
 foreach ($case in $cases) {
     try { Verify-Case $case } catch {
         $failures++
@@ -137,4 +154,4 @@ Save-Json (Join-Path $run 'results.json') @{
 }
 Write-Host "Evidence: $run"
 if ($failures) { throw "$failures compiler-output observation(s) failed" }
-Write-Host 'PASS: real C#/TypeScript/Angular/ESLint output through the built native hook adapter'
+Write-Host "PASS: $($rows.Count) selected real-output observations through the built native hook adapter"
