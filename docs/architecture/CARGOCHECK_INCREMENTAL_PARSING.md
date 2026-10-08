@@ -83,8 +83,8 @@ suite remains exclusively a CI gate. No Claude pilot was performed.
 
 ## Next boundary
 
-Continue semantic retention and omission disclosure, then sanitized fallback
-evidence hardening and final result-budget enforcement. The current parser feeds
-the existing retention implementation; this phase does not certify its memory
-bound or final structured-result bound. CLI exit codes, typed MCP integration,
+Semantic retention and omission disclosure are implemented in the subsequent
+`CARGOCHECK_SEMANTIC_RETENTION.md` phase. Continue sanitized fallback evidence
+hardening and final result-budget enforcement. This parsing phase alone does not
+certify retention or the final structured-result bound. CLI exit codes, typed MCP integration,
 production lifecycle trace, and the final bundled Claude pilot remain later work.

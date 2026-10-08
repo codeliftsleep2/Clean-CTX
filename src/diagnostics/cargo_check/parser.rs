@@ -1,23 +1,22 @@
 mod framing;
 mod json;
+mod nested;
+mod retention;
 mod shape;
 pub(crate) use framing::{CapturedFrame, ProducerStream};
 
 use super::evidence::EvidenceCollector;
 use super::model::{
-    CargoCheckSemanticResult, CargoDiagnostic, CargoEvidence, ChildDiagnostic, DiagnosticLevel,
-    EvidenceCategory, ParserCoverage, RetentionFacts, SanitizedSpan, Suggestion,
-    TransformationFacts,
+    CargoCheckSemanticResult, CargoEvidence, DiagnosticLevel, EvidenceCategory, ParserCoverage,
+    RetentionFacts, TransformationFacts,
 };
 use super::policy::CargoCheckPolicy;
-use super::sanitize::sanitize;
+use retention::Candidate;
 use serde_json::Value;
-use std::collections::BTreeMap;
 
 pub struct CargoCheckCompiler {
     policy: CargoCheckPolicy,
-    diagnostics: Vec<CargoDiagnostic>,
-    diagnostic_repeats: BTreeMap<String, usize>,
+    diagnostics: Vec<Candidate>,
     cargo_evidence: CargoEvidence,
     coverage: ParserCoverage,
     retention: RetentionFacts,
@@ -36,7 +35,6 @@ impl CargoCheckCompiler {
         Self {
             policy,
             diagnostics: Vec::new(),
-            diagnostic_repeats: BTreeMap::new(),
             cargo_evidence: CargoEvidence::default(),
             coverage: ParserCoverage::default(),
             retention: RetentionFacts::default(),
@@ -46,16 +44,11 @@ impl CargoCheckCompiler {
     }
 
     pub fn finish(mut self) -> CargoCheckSemanticResult {
-        let diagnostics = select_diagnostics(
+        let diagnostics = retention::finish(
             std::mem::take(&mut self.diagnostics),
             self.policy.maximum_diagnostics,
+            &mut self.retention,
         );
-        self.retention.diagnostics_retained = diagnostics.len();
-        self.retention.diagnostics_omitted = self
-            .retention
-            .diagnostics_seen
-            .saturating_sub(self.retention.diagnostics_retained)
-            .saturating_sub(self.retention.exact_repeats_collapsed);
         let (evidence, evidence_facts) = self.evidence.finish(self.policy.evidence_bytes);
 
         CargoCheckSemanticResult {
@@ -180,218 +173,33 @@ impl CargoCheckCompiler {
             self.retention.other_seen += 1;
         }
 
-        let diagnostic = self.compile_diagnostic(message, level, text);
-        let identity = diagnostic_identity(&diagnostic);
-        if let Some(index) = self.diagnostic_repeats.get(&identity).copied() {
-            self.diagnostics[index].repeat_count += 1;
-            self.retention.exact_repeats_collapsed += 1;
+        let identity = retention::identity(message);
+        if retention::observe_repeat(&mut self.diagnostics, &identity) {
             return;
         }
-        let index = self.diagnostics.len();
-        self.diagnostic_repeats.insert(identity, index);
-        self.diagnostics.push(diagnostic);
-    }
-
-    fn compile_diagnostic(
-        &mut self,
-        message: &serde_json::Map<String, Value>,
-        level: DiagnosticLevel,
-        text: &str,
-    ) -> CargoDiagnostic {
-        let mut primary = Vec::new();
-        let mut related = Vec::new();
-        let mut omitted_primary = 0;
-        let mut omitted_related = 0;
-        let mut suggestions = 0;
-        let mut omitted_suggestions = 0;
-
-        if let Some(spans) = message.get("spans").and_then(Value::as_array) {
-            for span in spans {
-                let is_primary = span
-                    .get("is_primary")
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-                let maximum = if is_primary {
-                    self.policy.maximum_primary_spans
-                } else {
-                    self.policy.maximum_related_spans
-                };
-                let target = if is_primary {
-                    &mut primary
-                } else {
-                    &mut related
-                };
-                if target.len() >= maximum {
-                    if is_primary {
-                        omitted_primary += 1;
-                    } else {
-                        omitted_related += 1;
-                    }
-                    continue;
-                }
-                let allow_suggestion = suggestions < self.policy.maximum_suggestions;
-                let compiled = compile_span(span, allow_suggestion, &mut self.transformations);
-                if compiled.suggestion.is_some() {
-                    suggestions += 1;
-                } else if span
-                    .get("suggested_replacement")
-                    .and_then(Value::as_str)
-                    .is_some()
-                {
-                    omitted_suggestions += 1;
-                }
-                target.push(compiled);
-            }
+        if !level.is_error() && level != DiagnosticLevel::Warning {
+            // Approved policy keeps notes/help as children, not top-level competitors.
+            return;
         }
-
-        let children_values = message
-            .get("children")
-            .and_then(Value::as_array)
-            .map(Vec::as_slice)
-            .unwrap_or_default();
-        let selected_children = select_head_tail(children_values, self.policy.maximum_children, 6);
-        let children = selected_children
-            .into_iter()
-            .filter_map(|child| compile_child(&child, &mut self.transformations))
-            .collect();
-
-        CargoDiagnostic {
+        let diagnostic = nested::compile_diagnostic(
+            message,
             level,
-            message: sanitize(text, &mut self.transformations),
-            code: message
-                .get("code")
-                .and_then(|code| code.get("code"))
-                .and_then(Value::as_str)
-                .map(|code| sanitize(code, &mut self.transformations)),
-            primary_spans: primary,
-            related_spans: related,
-            children,
-            rendered_evidence: message
-                .get("rendered")
-                .and_then(Value::as_str)
-                .map(|rendered| sanitize(rendered, &mut self.transformations)),
-            omitted_primary_spans: omitted_primary,
-            omitted_related_spans: omitted_related,
-            omitted_children: children_values
-                .len()
-                .saturating_sub(self.policy.maximum_children),
-            omitted_suggestions,
-            repeat_count: 1,
-        }
+            text,
+            self.policy,
+            &mut self.transformations,
+        );
+        retention::admit(
+            &mut self.diagnostics,
+            Candidate {
+                diagnostic,
+                identity,
+            },
+            self.policy.maximum_diagnostics,
+            &mut self.retention,
+        );
     }
 }
 
-fn compile_span(
-    value: &Value,
-    allow_suggestion: bool,
-    transformations: &mut TransformationFacts,
-) -> SanitizedSpan {
-    SanitizedSpan {
-        file: value
-            .get("file_name")
-            .and_then(Value::as_str)
-            .map(|value| sanitize(value, transformations))
-            .unwrap_or_else(|| "<unknown>".to_owned()),
-        line_start: number(value, "line_start"),
-        line_end: number(value, "line_end"),
-        column_start: number(value, "column_start"),
-        column_end: number(value, "column_end"),
-        label: value
-            .get("label")
-            .and_then(Value::as_str)
-            .map(|value| sanitize(value, transformations)),
-        suggestion: allow_suggestion
-            .then(|| value.get("suggested_replacement").and_then(Value::as_str))
-            .flatten()
-            .map(|replacement| Suggestion {
-                replacement: sanitize(replacement, transformations),
-                applicability: value
-                    .get("suggestion_applicability")
-                    .and_then(Value::as_str)
-                    .map(|value| sanitize(value, transformations)),
-            }),
-    }
-}
-
-fn compile_child(
-    value: &Value,
-    transformations: &mut TransformationFacts,
-) -> Option<ChildDiagnostic> {
-    Some(ChildDiagnostic {
-        level: DiagnosticLevel::from_producer(value.get("level")?.as_str()?),
-        message: sanitize(value.get("message")?.as_str()?, transformations),
-        spans: value
-            .get("spans")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .take(8)
-            .map(|span| compile_span(span, false, transformations))
-            .collect(),
-    })
-}
-
-fn number(value: &Value, key: &str) -> u64 {
-    value.get(key).and_then(Value::as_u64).unwrap_or(0)
-}
-
-fn diagnostic_identity(value: &CargoDiagnostic) -> String {
-    let location = value.primary_spans.first();
-    format!(
-        "{:?}|{}|{}|{}|{}",
-        value.level,
-        value.code.as_deref().unwrap_or_default(),
-        value.message,
-        location.map(|span| span.file.as_str()).unwrap_or_default(),
-        location.map(|span| span.line_start).unwrap_or_default(),
-    )
-}
-
-fn select_diagnostics(values: Vec<CargoDiagnostic>, maximum: usize) -> Vec<CargoDiagnostic> {
-    if values.len() <= maximum {
-        return values;
-    }
-    let errors: Vec<_> = values
-        .iter()
-        .filter(|item| item.level.is_error())
-        .cloned()
-        .collect();
-    let warnings: Vec<_> = values
-        .iter()
-        .filter(|item| item.level == DiagnosticLevel::Warning)
-        .cloned()
-        .collect();
-    let other: Vec<_> = values
-        .iter()
-        .filter(|item| !item.level.is_error() && item.level != DiagnosticLevel::Warning)
-        .cloned()
-        .collect();
-
-    let mut selected = select_head_tail(&errors, maximum, maximum.saturating_mul(3) / 4);
-    let remaining = maximum.saturating_sub(selected.len());
-    selected.extend(select_head_tail(
-        &warnings,
-        remaining,
-        remaining.saturating_mul(3) / 4,
-    ));
-    let remaining = maximum.saturating_sub(selected.len());
-    selected.extend(select_head_tail(
-        &other,
-        remaining,
-        remaining.saturating_mul(3) / 4,
-    ));
-    selected
-}
-
-fn select_head_tail<T: Clone>(values: &[T], maximum: usize, preferred_head: usize) -> Vec<T> {
-    if values.len() <= maximum {
-        return values.to_vec();
-    }
-    let head = preferred_head.min(maximum);
-    let tail = maximum - head;
-    values[..head]
-        .iter()
-        .chain(values[values.len() - tail..].iter())
-        .cloned()
-        .collect()
-}
+#[cfg(test)]
+#[path = "../../tests/diagnostics/cargo_check_retention.rs"]
+mod retention_tests;

@@ -54,6 +54,8 @@ pub struct ChildDiagnostic {
     pub level: DiagnosticLevel,
     pub message: String,
     pub spans: Vec<SanitizedSpan>,
+    pub spans_seen: usize,
+    pub omitted_spans: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -69,6 +71,18 @@ pub struct CargoDiagnostic {
     pub omitted_related_spans: usize,
     pub omitted_children: usize,
     pub omitted_suggestions: usize,
+    pub primary_spans_seen: usize,
+    pub related_spans_seen: usize,
+    pub children_seen: usize,
+    pub children_head_retained: usize,
+    pub children_tail_retained: usize,
+    pub suggestions_seen: usize,
+    pub suggestions_retained: usize,
+    pub distinct_suggestions_retained: usize,
+    pub suggestion_bytes_seen: usize,
+    pub omitted_suggestion_bytes: usize,
+    pub machine_applicable_suggestions_seen: usize,
+    pub machine_applicable_suggestions_retained: usize,
     pub repeat_count: usize,
 }
 
@@ -154,6 +168,16 @@ pub struct RetentionFacts {
     pub warnings_seen: usize,
     pub other_seen: usize,
     pub exact_repeats_collapsed: usize,
+    pub errors_retained: usize,
+    pub warnings_retained: usize,
+    pub errors_omitted: usize,
+    pub warnings_omitted: usize,
+    pub other_omitted: usize,
+    pub head_retained: usize,
+    pub tail_retained: usize,
+    pub peak_candidates: usize,
+    pub selection_policy: &'static str,
+    pub repeat_scope: &'static str,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
