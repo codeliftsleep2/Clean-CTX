@@ -1,0 +1,128 @@
+[
+  {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "protocolVersion": "2025-11-25",
+      "capabilities": {
+        "tools": {}
+      },
+      "serverInfo": {
+        "name": "amh-secret-boundary-probe",
+        "version": "0.0.0"
+      }
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 2,
+    "result": {
+      "tools": [
+        {
+          "name": "run_secret_boundary_probe",
+          "description": "Run one closed synthetic secrecy-boundary probe.",
+          "inputSchema": {
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "success",
+                  "failed_producer",
+                  "redaction_failure"
+                ]
+              }
+            },
+            "required": [
+              "mode"
+            ],
+            "additionalProperties": false
+          },
+          "outputSchema": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "exitCode": {
+                "type": "integer"
+              },
+              "stdout": {
+                "type": "string"
+              },
+              "stderr": {
+                "type": "string"
+              },
+              "redactionApplied": {
+                "type": "boolean"
+              },
+              "rawEvidenceWithheld": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 3,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "status=ok; exit_code=0\nstdout:\nordinary stdout diagnostic before\n[REDACTED_STDOUT]\nordinary stdout diagnostic after\nstderr:\nordinary stderr diagnostic before\n[REDACTED_STDERR]\nordinary stderr diagnostic after\n"
+        }
+      ],
+      "structuredContent": {
+        "status": "ok",
+        "exitCode": 0,
+        "stdout": "ordinary stdout diagnostic before\n[REDACTED_STDOUT]\nordinary stdout diagnostic after\n",
+        "stderr": "ordinary stderr diagnostic before\n[REDACTED_STDERR]\nordinary stderr diagnostic after\n",
+        "redactionApplied": true
+      },
+      "isError": false
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 4,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "status=producer_failed; exit_code=17\nstdout:\nordinary stdout diagnostic before\n[REDACTED_STDOUT]\nordinary stdout diagnostic after\nstderr:\nordinary stderr diagnostic before\n[REDACTED_STDERR]\nordinary stderr diagnostic after\n"
+        }
+      ],
+      "structuredContent": {
+        "status": "producer_failed",
+        "exitCode": 17,
+        "stdout": "ordinary stdout diagnostic before\n[REDACTED_STDOUT]\nordinary stdout diagnostic after\n",
+        "stderr": "ordinary stderr diagnostic before\n[REDACTED_STDERR]\nordinary stderr diagnostic after\n",
+        "redactionApplied": true
+      },
+      "isError": true
+    }
+  },
+  {
+    "jsonrpc": "2.0",
+    "id": 5,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "Secret-boundary probe failed closed: sanitization failed; raw evidence withheld."
+        }
+      ],
+      "structuredContent": {
+        "status": "redaction_failure",
+        "rawEvidenceWithheld": true
+      },
+      "isError": true
+    }
+  }
+]

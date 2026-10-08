@@ -1,0 +1,5 @@
+{
+  "stdout": "ordinary stdout diagnostic before\nCLEAN_CTX_AMH_CONTROL_SECRET_4F4483EF38F0FC06DA1535C4\nordinary stdout diagnostic after\n",
+  "stderr": "ordinary stderr diagnostic before\nCLEAN_CTX_AMH_CONTROL_SECRET_4F4483EF38F0FC06DA1535C4\nordinary stderr diagnostic after\n",
+  "exitCode": 0
+}

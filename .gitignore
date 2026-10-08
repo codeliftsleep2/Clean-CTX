@@ -48,3 +48,6 @@ scripts/agent/.scratch/
 *.agent-tmp.tmp
 
 *.PNG
+
+#Codex Folder
+/.codex

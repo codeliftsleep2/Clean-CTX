@@ -1,0 +1,18 @@
+{
+  "python": "3.13.5",
+  "platform": "win32",
+  "server_exit_code": 0,
+  "control_host_result_contains_control_marker": true,
+  "success_content_contains_marker": false,
+  "success_structured_content_contains_marker": false,
+  "failed_producer_is_error": true,
+  "failed_producer_result_contains_marker": false,
+  "redaction_failure_is_error": true,
+  "redaction_failure_withheld_raw": true,
+  "redaction_failure_result_contains_marker": false,
+  "serialized_mcp_responses_contain_marker": false,
+  "server_audit_contains_marker": false,
+  "server_stderr_contains_marker": false,
+  "controlled_artifact_leaks": [],
+  "all_protocol_assertions_passed": true
+}
