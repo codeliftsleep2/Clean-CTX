@@ -1,13 +1,18 @@
 # CargoCheck production lifecycle — Phase 11
 
+
+Current host scope: the owner selected Codex in the Rust build environment for
+CargoCheck. Earlier Claude-specific pilot plans are superseded by
+`CARGOCHECK_CODEX_PILOT.md`; Claude C#/TypeScript and meta-layer validation is
+separate. Host observations remain unrun.
 Status: production source paths traced and all five tracked real-Cargo black-box
 checks passed on Linux. The owner subsequently reported all four Windows
 lifecycle checks, the previously failing synthetic cancellation check, and the
-remaining focused tests and Clippy GREEN. The Claude pilot and CI status remain
+remaining focused tests and Clippy GREEN. The Codex pilot and CI status remain
 outstanding. A workspace-path disclosure in retained producer text was found
 while reviewing the Windows evidence. Its correction is documented in
-`CARGOCHECK_OPAQUE_WORKSPACE_PATHS.md` and needs Windows confirmation before
-the pilot.
+`CARGOCHECK_OPAQUE_WORKSPACE_PATHS.md`; the owner reports its focused Windows
+checks GREEN.
 
 ## Production call paths
 
@@ -101,10 +106,9 @@ UTF-8 without BOM, modified Rust files satisfied the 615-line ceiling, and
 
 ## Remaining gate
 
-Confirm the workspace-path correction on Windows, confirm the CI gate, and retain
-the full suite exclusively in CI. Then prepare one candidate and one preserved context package
-for the bundled Claude pilot described in the architecture freeze. No Claude
-pilot has been started.
+Confirm the CI gate and retain the full suite exclusively in CI. Then prepare
+one candidate and one preserved context package for the bundled Codex pilot in
+`CARGOCHECK_CODEX_PILOT.md`. No host pilot has been started.
 
 ## Windows owner follow-up
 

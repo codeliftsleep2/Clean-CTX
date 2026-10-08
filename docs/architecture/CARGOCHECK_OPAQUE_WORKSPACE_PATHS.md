@@ -42,6 +42,5 @@ The authorized focused CargoCheck core run passed all 102 tests. Package Clippy
 with all targets/features and `-D warnings` passed without warnings. The full
 test suite was not run locally; it remains reserved for CI.
 
-The frozen Claude pilot remains unrun. Its prepared handoff is
-`CARGOCHECK_CLAUDE_PILOT.md`. Confirm this correction on Windows and the CI gate
-before proceeding; the full suite remains CI-only.
+The owner reports the focused Windows correction checks GREEN. The Codex pilot remains unrun. Its prepared handoff is
+`CARGOCHECK_CODEX_PILOT.md`. Confirm the CI gate before proceeding; the full suite remains CI-only.

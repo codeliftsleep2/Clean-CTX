@@ -1,8 +1,14 @@
-# CargoCheck bundled Claude pilot — owner handoff
+# CargoCheck bundled Codex pilot — owner handoff
 
-Status: prepared, not executed. Host reported by the owner: Claude inside Visual
-Studio Code. The exact extension and version must be recorded; this document
-does not assume that every Claude-branded VS Code extension supports MCP.
+Status: prepared, not executed. The owner selected Codex in the Rust build
+environment for this CargoCheck pilot. Record the exact Codex client (CLI or
+VS Code extension), version, and execution environment before starting.
+
+This replaces the earlier Claude pilot plan for CargoCheck. Rust is used in the
+owner's testing/build workflow; Claude is used for C#/TypeScript and meta-layer
+workflows. Codex observations establish only the tested Codex host behavior.
+Claude validation for those other workflows remains separate and requires
+relevant diagnostic operations; this pilot does not establish their readiness.
 
 The pilot uses one frozen rebuilt candidate and one preserved context package.
 Run all cases during one planned host setup. Keep tool selection, result
@@ -14,23 +20,24 @@ evidence of the direct-MCP boundary.
 
 - Windows lifecycle checks and remaining focused verification are owner-reported
   GREEN. Linux verification is recorded in `CARGOCHECK_PRODUCTION_LIFECYCLE.md`.
-- The absolute-workspace-root disclosure correction is Linux-verified; see
-  `CARGOCHECK_OPAQUE_WORKSPACE_PATHS.md`. Confirm its focused Windows checks
-  and rebuild the candidate before starting this pilot.
+- The absolute-workspace-root disclosure correction is Linux-verified and its
+  focused Windows checks are owner-reported GREEN; see
+  `CARGOCHECK_OPAQUE_WORKSPACE_PATHS.md`. Use a rebuilt candidate containing it.
 - Confirm CI on the candidate implementation revision. The current CI workflow
   runs for main/master pushes and pull requests targeting main/master; feature
   branch pushes alone do not trigger it. A pull request to main supplies the
   existing CI gate. Never run the full suite locally for this handoff.
-- Record the VS Code extension name/version and confirm it exposes the configured
-  native MCP `cargo_check` tool. If it does not support MCP, record the host
+- Record the Codex client name/version and confirm it exposes the configured
+  native MCP `cargo_check` tool. If this client cannot connect to it, record the host
   limitation and stop before claiming a native-tool selection result.
 - Ensure the server's Windows launch environment has the installed MSVC toolchain
   PATH/INCLUDE/LIB environment, as in the successful owner lifecycle checks.
-  A developer shell opened after VS Code started does not prove the existing
-  extension/server inherited that environment.
+  A developer shell opened after the Codex client started does not prove the
+  existing client/server inherited that environment.
 
-No live-Claude call has been performed by the cloud agent. The cloud session has
-no callable Claude/VS Code host connector; host observations are owner-run.
+No live Codex pilot has been performed. This cloud chat does not establish that
+the candidate MCP server is connected to the owner's build-environment Codex
+client; host observations are owner-run.
 
 ## Freeze the candidate and context package
 
@@ -46,7 +53,7 @@ Get-FileHash $ctxCandidate -Algorithm SHA256
 ```
 
 Record commit, binary SHA-256, approved absolute Cargo path, toolchain version,
-extension/version, enabled MCP server list, and the operator-approved workspace.
+Codex client/version, enabled MCP server list, and the operator-approved workspace.
 Preserve these facts with the completed trial table and legitimate host evidence.
 Reusing the same binary is mandatory; do not rebuild between pilot cases.
 
@@ -55,11 +62,11 @@ manifest unchanged throughout the running admitted session; changing source or
 adding a build script does not require changing manifest authority.
 
 ```powershell
-$ctxPilot = Join-Path (Split-Path (Get-Location).Path -Parent) ("ctx-claude-pilot-" + [guid]::NewGuid())
+$ctxPilot = Join-Path (Split-Path (Get-Location).Path -Parent) ("ctx-codex-pilot-" + [guid]::NewGuid())
 New-Item -ItemType Directory $ctxPilot | Out-Null
 Set-Content "$ctxPilot\Cargo.toml" @(
     '[package]'
-    'name = "ctx_claude_pilot"'
+    'name = "ctx_codex_pilot"'
     'version = "0.1.0"'
     'edition = "2021"'
     '[lib]'
@@ -70,7 +77,7 @@ Set-Content "$ctxPilot\lib.rs" 'pub fn answer() -> u8 { 42 }'
 Set-Content "$ctxPilot\.clean-ctx.json" '{"cbm":{"enabled":false},"persistence":{"enabled":false},"proxy":{"auto_start":false}}'
 ```
 
-Configure one distinct pilot MCP server in the extension using:
+Configure one distinct pilot MCP server in the Codex client using:
 
 ```text
 command: <absolute ctxCandidate executable>
@@ -78,12 +85,27 @@ args: --workspace-root <absolute ctxPilot directory> --cargo-path <absolute ctxC
 transport: stdio
 ```
 
-Use the extension's documented MCP settings format; do not overwrite an existing
+Use the installed Codex client's documented MCP settings format; do not overwrite an existing
 server configuration. The pilot server must inherit the working MSVC environment.
 Confirm startup and tool availability in the host's MCP interface before trials.
 Existing MCP processes may stay running, but enable only the intended CargoCheck
 provider during neutral selection cases so duplicate tool names cannot confound
 the observation. Record enabled tools for each trial.
+
+For Codex clients using `config.toml`, the descriptor above corresponds to a
+separate entry like this (replace all example paths with the recorded paths):
+
+```toml
+[mcp_servers.clean_ctx_cargo_pilot]
+command = 'C:\absolute\path\clean-ctx.exe'
+args = ['--workspace-root', 'C:\absolute\path\ctx-codex-pilot', '--cargo-path', 'C:\absolute\path\cargo.exe']
+```
+
+Add the entry to the client's active configuration; preserve existing entries.
+Use Windows paths only for a Windows-native client/server. A WSL or remote client
+must use paths and a binary valid in that execution environment. Reconnect the
+pilot server as required by the client, and verify `cargo_check` is listed before
+prompting. Configuration alone does not prove that Codex can invoke the tool.
 
 ## Trials
 
@@ -99,7 +121,7 @@ to the constrained secrecy case.
 | Guidance comparison | Fresh conversation, same failing workspace. Add only: “For compiler diagnostics, use the configured cargo_check MCP tool and disclose incomplete evidence.” Repeat the neutral prompt. | Selection change compared with the unguided case, independently of diagnostic quality. |
 | Unavailable authority | Same candidate, separate pilot server with an explicit nonexistent absolute Cargo path. Disable the valid provider for this case. Ask the neutral prompt. | Static admission explanation, truthful unavailable result, model fallback behavior. Distinguish terminal fallback from native MCP evidence. |
 | Absent tool | Disable the pilot CargoCheck provider. Ask the neutral prompt in a fresh conversation. | Host/model fallback behavior and actual tools used; no invented native result. |
-| Host cancellation | Restore valid source and add the waiting build script below. Start a native CargoCheck and interrupt using the extension's actual cancellation control after the marker file appears. | Whether the host sent cancellation, owned process cleanup/result if inspectable, and subsequent successful native check in the same server session. An interrupted UI alone is not proof of cleanup. |
+| Host cancellation | Restore valid source and add the waiting build script below. Start a native CargoCheck and interrupt using the Codex client's actual cancellation control after the marker file appears. | Whether the host sent cancellation, owned process cleanup/result if inspectable, and subsequent successful native check in the same server session. An interrupted UI alone is not proof of cleanup. |
 | Representative workspace | Configure the same candidate for an explicitly approved real Rust workspace in a fresh admitted session. Ask the neutral prompt. | Diagnostic usefulness, path presentation, omissions, environment-dependent failure truthfulness, and decision quality. Preserve workspace revision. |
 
 Synthetic marker preparation, run by the owner outside model context:
@@ -131,7 +153,7 @@ script to `fn main() {}` and repeat a successful native check for recovery.
 
 ## Inspectable evidence and verdicts
 
-Inspect only the active pilot's legitimately exposed tool details, extension
+Inspect only the active pilot's legitimately exposed tool details, Codex
 output/debug views, exported conversation/transcript, and session-owned local
 persistence. Record exact surfaces available and unavailable. Do not infer
 `structuredContent` consumption from a plausible model summary; distinguish
