@@ -12,6 +12,7 @@ authoritative.
 
 Current packages:
 
+- `cargo-check/` — one-command CargoCheck MCP observations and Codex CLI pilot;
 - `context-compression/` — CONTROL-PROD/CONTROL-FULL capture, measurement, and
   reasoning-verification definitions;
 - `workspace-query/` — registered workspace graph-query capture and model-

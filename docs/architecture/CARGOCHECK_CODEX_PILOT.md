@@ -10,6 +10,23 @@ workflows. Codex observations establish only the tested Codex host behavior.
 Claude validation for those other workflows remains separate and requires
 relevant diagnostic operations; this pilot does not establish their readiness.
 
+## Standard operator harness
+
+Use [the CargoCheck verification package](../../verification/cargo-check/README.md)
+for the normal one-command workflow. It reuses `McpSession.ps1` and the existing
+`Run-CodexReasoning.ps1` invocation pattern. After CI is confirmed green:
+
+```powershell
+pwsh -NoProfile -File .\verification\cargo-check\scripts\Verify-CargoCheckCodex.ps1 -Build -CIGateConfirmed
+```
+
+It builds once, creates fixtures, supplies per-invocation MCP configuration,
+invokes Codex directly, and saves separate protocol/model observation verdicts.
+No manual MCP registration is needed for that lane. The manual registration
+instructions below are an alternative for interactive host/UI observations.
+Neither lane substitutes for tracked regressions or the CI gate. Missing UI or
+channel-consumption observations remain explicit rather than being inferred.
+
 The pilot uses one frozen rebuilt candidate and one preserved context package.
 Run all cases during one planned host setup. Keep tool selection, result
 rendering, secrecy, persistence, diagnostic usefulness, and cancellation as
