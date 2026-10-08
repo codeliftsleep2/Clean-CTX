@@ -22,6 +22,15 @@ use crate::protocol::send_response;
 /// P0-1: Uses &McpState (interior mutability) — shared across workers.
 pub(crate) fn dispatch(req: crate::protocol::JsonRpcRequest, state: &McpState) {
     match req.method.as_str() {
+        "notifications/cancelled" => {
+            if let Some(id) = req
+                .params
+                .as_ref()
+                .and_then(|params| params.get("requestId"))
+            {
+                state.cargo_check.cancel(id);
+            }
+        }
         "initialize" => {
             if let Some(ref id) = req.id {
                 handlers::handle_initialize(id);

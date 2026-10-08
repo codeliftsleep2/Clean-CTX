@@ -13,7 +13,17 @@ use std::io::{Read, Write};
     name = "clean-ctx",
     version = env!("CARGO_PKG_VERSION"),
     about = "Token Waste Reducer & Context Compiler",
+    args_conflicts_with_subcommands = true,
 )]
+struct StartupCli {
+    #[command(flatten)]
+    authority: clean_ctx::diagnostics::cargo_check::CargoCheckStartupOptions,
+    #[command(subcommand)]
+    command: Option<Cli>,
+}
+
+#[derive(Debug, Parser)]
+#[command(name = "clean-ctx", version = env!("CARGO_PKG_VERSION"))]
 enum Cli {
     /// Run one owned, bounded Cargo check in an explicitly approved workspace
     CargoCheck {
@@ -55,37 +65,25 @@ enum ClaudeHookEvent {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Idiomatic clap dispatch. With `version` now set on the command builder,
-    // clap natively handles `--version` / `-V` / `--help` / `-h` (printing and
-    // exiting) with code 0. This prevents MCP clients (Claude Code, VS Code,
-    // etc.) that probe the binary with `--version` from hanging in the stdio
-    // server loop.
-    //
-    // When NO subcommand is given, clap emits
-    // `DisplayHelpOnMissingArgumentOrSubcommand`, which we intercept to
-    // default to running the MCP server. Any future Cli variant is
-    // automatically dispatched above — no parallel manual whitelist to keep
-    // in sync.
-    match Cli::try_parse() {
-        Ok(Cli::CargoCheck { options }) => cmd_cargo_check(options),
-        Ok(Cli::Init) => cmd_init(),
-        Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
-        Ok(Cli::ConfigDump) => cmd_config_dump(),
-        Ok(Cli::Proxy { stop }) => cmd_proxy(stop),
-        Ok(Cli::ClaudeHook {
+    // Root options grant MCP execution authority only. With no subcommand,
+    // start stdio MCP; help/version exit through clap without starting a server.
+    let startup = match StartupCli::try_parse() {
+        Ok(startup) => startup,
+        Err(error) => error.exit(),
+    };
+    match startup.command {
+        None => clean_ctx::mcp::run_with_options(startup.authority),
+        Some(Cli::CargoCheck { options }) => cmd_cargo_check(options),
+        Some(Cli::Init) => cmd_init(),
+        Some(Cli::Setup { force }) => cmd_setup_cbm(force),
+        Some(Cli::ConfigDump) => cmd_config_dump(),
+        Some(Cli::Proxy { stop }) => cmd_proxy(stop),
+        Some(Cli::ClaudeHook {
             event:
                 ClaudeHookEvent::PostToolUse {
                     drop_persisted_output_pointer,
                 },
         }) => cmd_claude_post_tool_use(drop_persisted_output_pointer),
-        // When no arguments are given, clap emits DisplayHelpOnMissingArgumentOrSubcommand.
-        // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
-        // Any future Cli variant is automatically dispatched above — no parallel
-        // manual whitelist to keep in sync.
-        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
-            clean_ctx::mcp::run()
-        }
-        Err(e) => e.exit(),
     }
 }
 
@@ -118,6 +116,10 @@ mod claude_cli_tests;
 #[cfg(test)]
 #[path = "tests/diagnostics/cargo_check_main_options.rs"]
 mod cargo_check_cli_options_tests;
+
+#[cfg(test)]
+#[path = "tests/diagnostics/cargo_check_main_startup.rs"]
+mod cargo_check_startup_tests;
 
 fn cmd_claude_post_tool_use(
     drop_persisted_output_pointer: bool,

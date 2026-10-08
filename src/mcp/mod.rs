@@ -13,6 +13,7 @@
 
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
+pub(crate) mod cargo_check;
 pub(crate) mod compatibility;
 pub(crate) mod content_economics;
 pub(crate) mod context_store;
@@ -40,7 +41,13 @@ pub use state::McpState;
 
 /// Run the MCP server. This is the entry point called from `main()`.
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
-    server::run()
+    run_with_options(Default::default())
+}
+
+pub fn run_with_options(
+    options: crate::diagnostics::cargo_check::CargoCheckStartupOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    server::run(options)
 }
 
 // Regression and audit-fix tests compress src/main.rs and other .rs files,
@@ -71,3 +78,7 @@ mod apply_edit_tests;
 #[cfg(test)]
 #[path = "../tests/mcp/apply_edit_e2e.rs"]
 mod apply_edit_e2e_tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/cargo_check_mcp_regression.rs"]
+mod cargo_check_mcp_regression;

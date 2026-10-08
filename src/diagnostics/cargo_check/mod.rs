@@ -15,6 +15,7 @@ mod parser;
 mod policy;
 mod presentation;
 mod sanitize;
+mod startup;
 
 pub use authority::{
     ApprovedCargoExecutable, ApprovedWorkspaceRoot, AuthorityError, AuthoritySource, DisplayPath,
@@ -38,6 +39,7 @@ pub use model::{
 pub use parser::CargoCheckCompiler;
 pub use policy::CargoCheckPolicy;
 pub use presentation::{CargoCheckProjection, TextBudgetFacts, project_cargo_check};
+pub use startup::{CargoCheckStartupOptions, prepare_cargo_check_startup};
 
 #[cfg(test)]
 #[path = "../../tests/diagnostics/cargo_check.rs"]

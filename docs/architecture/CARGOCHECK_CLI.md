@@ -79,6 +79,6 @@ The full suite remains CI-only. No Claude pilot was run.
 
 ## Next phase
 
-Integrate the typed MCP tool with explicit startup authority and the same core
-result. Then complete production lifecycle verification and the final bundled
-Claude pilot. Existing operational policies remain frozen.
+The typed MCP tool now uses explicit startup authority and the same core result;
+see `CARGOCHECK_MCP.md`. Next complete production lifecycle verification and the
+final bundled Claude pilot. Existing operational policies remain frozen.

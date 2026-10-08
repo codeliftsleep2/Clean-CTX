@@ -176,9 +176,9 @@ fn schema_guidance_uses_current_model_workflow_terms() {
 /// Phase 3 MCP tool classification: clients should not have to apply the
 /// protocol's pessimistic mutation/open-world defaults to every local tool.
 #[test]
-fn every_registered_tool_has_conservative_standard_annotations() {
+fn cargo_check_mcp_catalog_has_conservative_standard_annotations() {
     let tools = tool_list();
-    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    assert_eq!(tools.len(), 26, "the complete public catalog is classified");
 
     for tool in &tools {
         let name = tool["name"].as_str().expect("registered tool name");
@@ -200,8 +200,8 @@ fn every_registered_tool_has_conservative_standard_annotations() {
         }
         assert_eq!(
             annotations["openWorldHint"],
-            serde_json::json!(false),
-            "Clean-CTX tools operate on the configured local workspace/provider boundary: {name}"
+            serde_json::json!(name == "cargo_check"),
+            "CargoCheck can access dependency networks; other tool hints retain their existing boundary: {name}"
         );
     }
 
@@ -315,7 +315,7 @@ fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
 /// Phase 5 MCP catalog economy: parser capability metadata belongs only on
 /// tools whose correct use depends on the enabled source-language grammars.
 #[test]
-fn supported_languages_is_limited_to_source_processing_tools() {
+fn cargo_check_mcp_catalog_languages_are_limited_to_source_processing_tools() {
     let tools = tool_list();
     let source_processing: std::collections::HashSet<&str> = [
         "compress_code_context",
@@ -329,7 +329,7 @@ fn supported_languages_is_limited_to_source_processing_tools() {
     .into_iter()
     .collect();
 
-    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    assert_eq!(tools.len(), 26, "the complete public catalog is classified");
     for tool in &tools {
         let name = tool["name"].as_str().expect("registered tool name");
         let languages = tool.get("supportedLanguages");
@@ -495,7 +495,7 @@ fn diff_code_context_changed_file_produces_diff() {
 /// matching tool names. A tool added to one but not the other would
 /// either not appear in the list or not be dispatchable.
 #[test]
-fn p3_21_tool_names_match_tool_list_and_registry() {
+fn cargo_check_mcp_catalog_tool_names_match_tool_list_and_registry() {
     use crate::mcp::tool_handlers::registry::create_default_registry;
 
     // Get tool names from tool_list()

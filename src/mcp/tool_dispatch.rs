@@ -87,6 +87,7 @@ pub fn setup_handler_registry_for_tests() {
 pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
     use std::collections::HashSet;
     let mut names = HashSet::new();
+    names.insert("cargo_check");
     names.insert("graph_search");
     names.insert("graph_query");
     names.insert("graph_trace");
@@ -99,6 +100,10 @@ pub(crate) fn inline_tool_names() -> std::collections::HashSet<&'static str> {
 
 pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, state: &McpState) {
     match tool_name {
+        "cargo_check" => {
+            super::cargo_check::handle(id, params, state);
+            return;
+        }
         "graph_search" => {
             crate::cbm::handlers::handle_graph_search(id, params, state);
             return;

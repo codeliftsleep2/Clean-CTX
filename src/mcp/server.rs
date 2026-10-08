@@ -108,7 +108,13 @@ pub(crate) const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 /// A-09: Uses a thread-pool Dispatcher so the stdin reader never blocks
 /// on slow requests. Each parsed request is enqueued to a worker thread;
 /// the reader immediately returns to reading the next line.
-pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) fn run(
+    options: crate::diagnostics::cargo_check::CargoCheckStartupOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let snapshot: Vec<_> = std::env::vars_os().collect();
+    let cargo_check = super::cargo_check::CargoCheckSession::new(
+        crate::diagnostics::cargo_check::prepare_cargo_check_startup(&options, &snapshot),
+    );
     // A-04: Initialize structured tracing. Configures the tracing
     // subscriber from environment variables:
     //   CLEAN_CTX_LOG       — log level (default: info)
@@ -146,6 +152,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = CleanCtxConfig::load(project_root);
     let mut state = McpState::new(config.clone());
+    state.cargo_check = cargo_check;
 
     // Auto-start the proxy if enabled in config. Non-fatal: if the
     // proxy binary is missing or fails to spawn, the MCP server
@@ -270,10 +277,41 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         // The closure captures the parsed request data and dispatches
         // it on a worker thread. The reader thread returns immediately.
         if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
+            // Handle cancellation on the reader thread even when every worker is busy.
+            if req.method == "notifications/cancelled" {
+                if let Some(id) = req
+                    .params
+                    .as_ref()
+                    .and_then(|params| params.get("requestId"))
+                {
+                    dispatcher.state().cargo_check.cancel(id);
+                }
+                continue;
+            }
+            let cargo_id = if req.method == "tools/call"
+                && req
+                    .params
+                    .as_ref()
+                    .is_some_and(|params| params["name"] == "cargo_check")
+            {
+                req.id.clone()
+            } else {
+                None
+            };
+            if let Some(id) = &cargo_id
+                && !dispatcher.state().cargo_check.reserve(id)
+            {
+                send_response(&serde_json::json!({"jsonrpc":"2.0","id":id,
+                    "error":{"code":-32600,"message":"CargoCheck request already active"}}));
+                continue;
+            }
             let req_for_handler = req.clone();
             if let Err(e) = dispatcher.spawn(&req, move |state| {
                 crate::mcp::router::dispatch(req_for_handler, state);
             }) {
+                if let Some(id) = &cargo_id {
+                    dispatcher.state().cargo_check.abandon(id);
+                }
                 eprintln!("[clean-ctx] ERROR: Failed to enqueue request: {}", e);
                 send_response(&serde_json::json!({
                     "jsonrpc": "2.0",
@@ -297,6 +335,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // finish, so terminate the auto-started proxy child FIRST (while
     // we still have access to the state via `dispatcher.state()`).
     eprintln!("[clean-ctx] Stdin exhausted, waiting for pending work...");
+    dispatcher.state().cargo_check.shutdown();
 
     // Terminate the auto-started proxy child (if any).
     if let Some(ref mut child) = *dispatcher.state().proxy_child_lock() {

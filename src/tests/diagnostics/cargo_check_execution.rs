@@ -33,6 +33,20 @@ fn execution_fixture_entrypoint() {
         }
     }
     match mode.as_str() {
+        "mcp-secret-evidence" => {
+            println!(
+                "{}",
+                serde_json::json!({"reason":"compiler-message","message":{
+                    "message":"Authorization: Bearer abc123456789", "level":"error", "spans":[], "children":[]
+                }})
+            );
+            println!(
+                "{}",
+                serde_json::json!({"reason":"future-cargo-message","value":"Authorization: Bearer abc123456789"})
+            );
+            eprintln!("Authorization: Bearer abc123456789");
+            std::process::exit(1);
+        }
         "diagnostic-paths" => {
             let workspace = std::env::current_dir().unwrap();
             let span = |file: std::path::PathBuf, primary| {

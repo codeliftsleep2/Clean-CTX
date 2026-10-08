@@ -27,11 +27,20 @@ pub(crate) fn handle_initialize(id: &Value) {
 
 /// Handle `tools/list` — returns the list of available tools with cache hints.
 pub(crate) fn handle_tools_list(id: &Value, state: &McpState) {
+    let mut catalog = tools::tool_list();
+    if let Some(failure) = state.cargo_check.admission_failure()
+        && let Some(tool) = catalog
+            .iter_mut()
+            .find(|tool| tool["name"] == "cargo_check")
+    {
+        let description = tool["description"].as_str().unwrap_or_default();
+        tool["description"] = serde_json::json!(format!("{description} Unavailable: {failure}."));
+    }
     let mut response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
-            "tools": tools::tool_list()
+            "tools": catalog
         }
     });
 

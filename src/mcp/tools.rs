@@ -438,6 +438,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
     ]
     .into_iter()
+    .chain(std::iter::once(super::cargo_check::definition()))
     .chain(cbm::cbm_tool_list())
     .collect();
     super::tool_annotations::inject(inject_supported_languages(tools))

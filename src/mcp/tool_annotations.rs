@@ -28,6 +28,11 @@ const MUTATING: ToolEffects = ToolEffects {
 
 fn effects(name: &str) -> ToolEffects {
     match name {
+        "cargo_check" => ToolEffects {
+            read_only: false,
+            destructive: false,
+            idempotent: false,
+        },
         // Source, graph, history, and diagnostic reads. Internal cache,
         // baseline, or session projection updates are not external mutations.
         "compress_code_context"
@@ -81,6 +86,7 @@ pub(super) fn inject(mut tools: Vec<Value>) -> Vec<Value> {
             .as_str()
             .expect("public MCP tool definition must have a name");
         let effects = effects(name);
+        let open_world = name == "cargo_check";
         tool.as_object_mut()
             .expect("public MCP tool definition must be an object")
             .insert(
@@ -89,7 +95,7 @@ pub(super) fn inject(mut tools: Vec<Value>) -> Vec<Value> {
                     "readOnlyHint": effects.read_only,
                     "destructiveHint": effects.destructive,
                     "idempotentHint": effects.idempotent,
-                    "openWorldHint": false,
+                    "openWorldHint": open_world,
                 }),
             );
     }
