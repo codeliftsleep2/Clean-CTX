@@ -51,7 +51,7 @@ impl CargoCheckCompiler {
         );
         let (evidence, evidence_facts) = self.evidence.finish(self.policy.evidence_bytes);
 
-        CargoCheckSemanticResult {
+        let mut result = CargoCheckSemanticResult {
             operation: "cargo_check",
             diagnostics,
             cargo_evidence: self.cargo_evidence,
@@ -60,7 +60,15 @@ impl CargoCheckCompiler {
             transformations: self.transformations,
             evidence,
             evidence_facts,
-        }
+            result_budget: Default::default(),
+        };
+        super::budget::initialize(&mut result, self.policy);
+        let _ = super::budget::enforce(
+            &mut result,
+            self.policy.structured_content_bytes,
+            super::budget::serialized_size,
+        );
+        result
     }
 
     fn observe_incompatible(&mut self, source_bytes: usize) {

@@ -114,7 +114,8 @@ pub(super) fn finish(
         }
         facts.head_retained += head;
         facts.tail_retained += tail;
-        for candidate in pool {
+        for (index, mut candidate) in pool.into_iter().enumerate() {
+            candidate.diagnostic.selection = if index < head { "head" } else { "tail" };
             *represented += candidate.diagnostic.repeat_count;
             facts.exact_repeats_collapsed += candidate.diagnostic.repeat_count - 1;
             selected.push(candidate.diagnostic);

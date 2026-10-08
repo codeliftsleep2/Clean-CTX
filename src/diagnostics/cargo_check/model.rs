@@ -36,6 +36,8 @@ impl DiagnosticLevel {
 pub struct Suggestion {
     pub replacement: String,
     pub applicability: Option<String>,
+    pub source_bytes: usize,
+    pub retention_slot: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -60,6 +62,7 @@ pub struct ChildDiagnostic {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct CargoDiagnostic {
+    pub selection: &'static str,
     pub level: DiagnosticLevel,
     pub message: String,
     pub code: Option<String>,
@@ -216,4 +219,36 @@ pub struct CargoCheckSemanticResult {
     pub transformations: TransformationFacts,
     pub evidence: Vec<EvidenceItem>,
     pub evidence_facts: EvidenceFacts,
+    pub result_budget: StructuredBudgetFacts,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct DetailCounts {
+    pub diagnostics: usize,
+    pub rendered: usize,
+    pub evidence_items: usize,
+    pub evidence_bytes: usize,
+    pub children: usize,
+    pub related_spans: usize,
+    pub suggestions: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CausalPreview {
+    pub level: DiagnosticLevel,
+    pub message: String,
+    pub source_sanitized_bytes: usize,
+    pub truncated: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct StructuredBudgetFacts {
+    pub limit_bytes: usize,
+    pub serialized_bytes: usize,
+    pub pre_reduction_bytes: usize,
+    pub activated: bool,
+    pub fields_reduced: Vec<&'static str>,
+    pub before: DetailCounts,
+    pub causal_preview: Option<CausalPreview>,
+    pub mandatory_facts_exceed_budget: bool,
 }

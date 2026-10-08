@@ -114,6 +114,6 @@ Incremental Cargo JSON decoding and mixed/malformed/truncated coverage accountin
 are implemented in the subsequent `CARGOCHECK_INCREMENTAL_PARSING.md` phase.
 The framer remains the capture boundary, not final result-budget certification.
 Online semantic retention is implemented in `CARGOCHECK_SEMANTIC_RETENTION.md`.
-Fallback evidence is implemented in `CARGOCHECK_FALLBACK_EVIDENCE.md`. Final result budgets,
-CLI exit-code projection, typed MCP integration, and production lifecycle trace
+Fallback evidence is implemented in `CARGOCHECK_FALLBACK_EVIDENCE.md`. Final result budgets are implemented in
+`CARGOCHECK_RESULT_BUDGETS.md`. CLI exit-code projection, typed MCP integration, and production lifecycle trace
 remain separate phases. The bundled Claude pilot remains last.

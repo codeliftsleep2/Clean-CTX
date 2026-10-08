@@ -122,14 +122,18 @@ pub(super) fn compile_diagnostic(
     let mut retained_bytes = 0;
     let mut machine_retained = 0;
     let mut compile = |span: &Value| {
-        let allow = replacement(span).is_some()
-            && selected_suggestions.contains(&suggestion_identity(span));
+        let slot = replacement(span).and_then(|_| {
+            selected_suggestions
+                .iter()
+                .position(|key| *key == suggestion_identity(span))
+        });
+        let allow = slot.is_some();
         if allow {
             retained += 1;
             retained_bytes += replacement(span).expect("selected replacement").len();
             machine_retained += usize::from(machine(span));
         }
-        compile_span(span, allow, transformations)
+        compile_span(span, slot, transformations)
     };
     let mut primary = Vec::new();
     let mut related = Vec::new();
@@ -176,6 +180,7 @@ pub(super) fn compile_diagnostic(
         })
         .collect();
     CargoDiagnostic {
+        selection: "unselected",
         level,
         message: sanitize(text, transformations),
         code: message
@@ -210,7 +215,11 @@ pub(super) fn compile_diagnostic(
     }
 }
 
-fn compile_span(value: &Value, allow: bool, facts: &mut TransformationFacts) -> SanitizedSpan {
+fn compile_span(
+    value: &Value,
+    slot: Option<usize>,
+    facts: &mut TransformationFacts,
+) -> SanitizedSpan {
     let number = |key| {
         value
             .get(key)
@@ -230,9 +239,11 @@ fn compile_span(value: &Value, allow: bool, facts: &mut TransformationFacts) -> 
             .get("label")
             .and_then(Value::as_str)
             .map(|text| sanitize(text, facts)),
-        suggestion: if allow {
+        suggestion: if let Some(retention_slot) = slot {
             replacement(value).map(|text| Suggestion {
                 replacement: sanitize(text, facts),
+                source_bytes: text.len(),
+                retention_slot,
                 applicability: value
                     .get("suggestion_applicability")
                     .and_then(Value::as_str)

@@ -78,6 +78,10 @@ impl ApprovedWorkspaceRoot {
         self.source
     }
 
+    pub(crate) fn manifest_identity(&self) -> &FileIdentity {
+        &self.manifest_identity
+    }
+
     pub fn revalidate(&self) -> Result<(), AuthorityError> {
         let canonical = self
             .canonical_root

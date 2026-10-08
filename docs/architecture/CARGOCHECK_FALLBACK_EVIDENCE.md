@@ -120,9 +120,8 @@ was corrected before the combined 76-test GREEN run; it is not RED evidence.
 
 ## Next boundary
 
-Enforce final result budgets: 512 KiB structured output and 24 KiB/240-line text.
-Authority, process, capture, completeness, and omission facts must survive the
-approved optional-detail reduction order. If mandatory facts cannot fit, return
-the approved bounded internal failure. CLI projection/exit codes, typed MCP
+Final result budgets are implemented in the subsequent
+`CARGOCHECK_RESULT_BUDGETS.md` phase, including mandatory-fact preservation and
+bounded failure. Continue CLI projection/exit codes, typed MCP
 integration, production lifecycle verification, and the final bundled Claude
 pilot remain subsequent work.

@@ -17,6 +17,7 @@ use std::time::{Duration, Instant};
 
 #[derive(Serialize)]
 pub struct CargoCheckExecution {
+    pub authority: super::invocation::InvocationFacts,
     pub root_outcome: Option<ProcessOutcome>,
     pub ownership: OwnershipFacts,
     pub cleanup: CleanupFacts,
@@ -145,6 +146,7 @@ pub fn execute_cargo_check(
         .unwrap_or_else(|error| error.into_inner())
         .finish();
     Ok(CargoCheckExecution {
+        authority: invocation.result_facts(),
         root_outcome,
         ownership: OwnershipFacts {
             mechanism: OwnedProcess::MECHANISM,

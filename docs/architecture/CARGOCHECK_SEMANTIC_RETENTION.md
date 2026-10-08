@@ -102,7 +102,6 @@ the CI gate.
 ## Next boundary
 
 Sanitized fallback evidence hardening is implemented in the subsequent
-`CARGOCHECK_FALLBACK_EVIDENCE.md` phase. Continue final result-budget
-enforcement. CLI
+`CARGOCHECK_FALLBACK_EVIDENCE.md` phase. Final result budgets are implemented in `CARGOCHECK_RESULT_BUDGETS.md`. CLI
 projection/exit codes, typed MCP integration, production lifecycle verification,
 and the final bundled Claude pilot remain later work.
