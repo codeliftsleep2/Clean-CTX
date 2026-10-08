@@ -1,6 +1,12 @@
 # CargoCheck bundled Codex pilot — owner handoff
 
-Status: prepared, not executed. The owner selected Codex in the Rust build
+Status: PAUSED by owner direction on 2026-10-08. Active product work is
+C#/.NET, Angular/TypeScript, and meta-layer behavior; this Rust pilot is not a
+prerequisite for those workflows. Partial owner-run pilot evidence identified an
+approval rejection; complete host validation remains unverified. Preserve the
+instructions below for reference without requesting further Rust pilot runs.
+
+Original host selection: the owner selected Codex in the Rust build
 environment for this CargoCheck pilot. Record the exact Codex client (CLI or
 VS Code extension), version, and execution environment before starting.
 

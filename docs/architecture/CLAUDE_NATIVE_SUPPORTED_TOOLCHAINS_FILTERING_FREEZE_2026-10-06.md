@@ -2,6 +2,34 @@
 
 **Date:** 2026-10-06
 
+## Current owner priority — 2026-10-08
+
+The owner redirected active work to C#/.NET, Angular/TypeScript, and meta-layer
+behavior in real development workflows. The CargoCheck/Codex pilot is paused;
+it is not a prerequisite for progress on these product workflows. Its existing
+implementation and verification evidence are retained without a host-readiness
+claim.
+
+Resume from the existing implementation and working verification patterns:
+
+- C#/.NET: preserve compiler warnings and build/test summaries through the
+  existing Claude hook; verify source-signature dependency facts through the
+  existing C# workspace-query production path.
+- Angular/TypeScript: preserve compiler/template/lint evidence through the
+  existing hook and expose framework metadata through the existing context
+  pipeline, including its semantic layers.
+- Meta-layer work concerns extraction, semantic projection, and model-visible
+  exposure through existing code-context operations. It does not imply approval
+  for arbitrary meta-tool command-output filters.
+
+The relevant existing operator assets are `verification/workspace-query/`,
+`verification/context-compression/edge-cases/`, and the established context
+capture/reasoning runners. Inspect and reuse them before adding a driver. Live
+results must come from the actual relevant client/workspace and must remain
+distinct from deterministic regression evidence. Do not introduce a new producer
+contract or reopen global policies merely to transfer CargoCheck to another
+language. The full test suite remains CI-only.
+
 **Status:** Supported-first scope and operation-sensitive field authority
 approved. The shared reduction kernel and Rust build/check/clippy slice are
 owner-verified green. The TypeScript/Angular slice is owner-verified green. The
