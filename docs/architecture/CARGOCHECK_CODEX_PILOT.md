@@ -16,6 +16,30 @@ rendering, secrecy, persistence, diagnostic usefulness, and cancellation as
 independent verdicts. A result from an ordinary Bash/terminal command is not
 evidence of the direct-MCP boundary.
 
+## Cloud execution evidence (2026-10-08)
+
+At the owner's request to run the checks directly, the cloud agent rebuilt
+candidate `fa926cf` and ran the existing tracked lifecycle tests against that
+binary and real Cargo on Linux:
+
+```text
+cargo build --locked -p clean-ctx --bin clean-ctx --all-features -j 4
+CLEAN_CTX_TEST_BINARY=/workspace/Clean-CTX/target/debug/clean-ctx CLEAN_CTX_TEST_CARGO=/workspace/.tooling/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo cargo test --locked -p clean-ctx --lib --all-features -j 4 cargo_check_lifecycle_ -- --ignored --test-threads=1
+```
+
+Build passed; all five tracked tests passed, zero failed, 3600 filtered out.
+The checks cover CLI success/failure/text, CLI SIGINT, MCP EOF cancellation,
+MCP cancellation and recovery, and MCP real-Cargo round-trip/session reuse.
+The round-trip checks assert catalog presence, both result surfaces' synthetic
+secret handling, and truthful success/nonzero behavior. These are protocol and
+lifecycle results, not Codex native-tool-selection or rendering results. The full
+suite was not run.
+
+This cloud chat's available native tools contain neither `cargo_check` nor a
+server-registration capability. Consequently the host-pilot verdict cells below
+remain NOT RUN. This does not indicate that the binary lacks its MCP tool; it
+indicates that the current chat cannot attach that server to its native inventory.
+
 ## Provision the MCP server first
 
 An empty Codex tool inventory is a setup prerequisite, not a failed diagnostic
