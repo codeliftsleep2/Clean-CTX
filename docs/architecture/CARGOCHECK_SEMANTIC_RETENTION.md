@@ -101,8 +101,8 @@ the CI gate.
 
 ## Next boundary
 
-Continue sanitized fallback evidence hardening, followed by final result-budget
-enforcement. The existing evidence collector still needs its category head/tail
-selection and omission accounting checked against the approved policy. CLI
+Sanitized fallback evidence hardening is implemented in the subsequent
+`CARGOCHECK_FALLBACK_EVIDENCE.md` phase. Continue final result-budget
+enforcement. CLI
 projection/exit codes, typed MCP integration, production lifecycle verification,
 and the final bundled Claude pilot remain later work.

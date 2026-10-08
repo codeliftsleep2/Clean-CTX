@@ -1,3 +1,4 @@
+use super::super::evidence::Anomaly;
 use super::super::model::EvidenceCategory;
 use super::CargoCheckCompiler;
 use super::json::CheckedJson;
@@ -92,12 +93,33 @@ impl CargoCheckCompiler {
             } else {
                 EvidenceCategory::Stderr
             };
-            self.evidence.observe_summary(
-                category,
-                "[producer frame withheld: framing, admission, or decoding fault]",
-                source_bytes(frame.observed_bytes),
-                &mut self.transformations,
-            );
+            let summary = "[producer frame withheld: framing, admission, or decoding fault]";
+            if stdout {
+                let anomaly = if over_limit {
+                    Anomaly::OverLimit
+                } else if frame.admission_cut {
+                    Anomaly::AdmissionCut
+                } else if !frame.terminated {
+                    Anomaly::Unterminated
+                } else if unavailable {
+                    Anomaly::DecodingUnavailable
+                } else {
+                    Anomaly::InvalidUtf8
+                };
+                self.evidence.observe_anomaly(
+                    anomaly,
+                    summary,
+                    source_bytes(frame.observed_bytes),
+                    &mut self.transformations,
+                );
+            } else {
+                self.evidence.observe_summary(
+                    category,
+                    summary,
+                    source_bytes(frame.observed_bytes),
+                    &mut self.transformations,
+                );
+            }
             return;
         }
         let text = decoded.expect("eligible frame has validated UTF-8");
@@ -119,7 +141,7 @@ impl CargoCheckCompiler {
             self.coverage.non_json_stdout += 1;
             self.evidence.observe(
                 EvidenceCategory::StdoutNonJson,
-                candidate,
+                text,
                 &mut self.transformations,
             );
             return;
@@ -129,8 +151,8 @@ impl CargoCheckCompiler {
             Ok(parsed) => parsed,
             Err(_) => {
                 self.coverage.malformed_json += 1;
-                self.evidence.observe_summary(
-                    EvidenceCategory::MalformedOrTruncated,
+                self.evidence.observe_anomaly(
+                    Anomaly::MalformedJson,
                     "[malformed Cargo JSON candidate withheld]",
                     source_bytes(frame.observed_bytes),
                     &mut self.transformations,
@@ -155,8 +177,9 @@ impl CargoCheckCompiler {
                 .observe_terminal_stderr(text, &mut self.transformations),
             Err(_) => {
                 self.coverage.invalid_utf8_terminal_samples += 1;
-                self.evidence.observe_terminal_stderr(
+                self.evidence.observe_terminal_summary(
                     "[terminal stderr sample withheld: invalid UTF-8]",
+                    bytes.len(),
                     &mut self.transformations,
                 );
             }

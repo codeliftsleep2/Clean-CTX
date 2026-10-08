@@ -101,6 +101,14 @@ pub struct EvidenceItem {
     pub category: EvidenceCategory,
     pub text: String,
     pub producer_order: u64,
+    pub selection: &'static str,
+    pub observation: &'static str,
+    pub anomaly: Option<&'static str>,
+    pub source_bytes: usize,
+    pub source_withheld: bool,
+    pub sanitized_record_bytes: usize,
+    pub sanitized_start: usize,
+    pub sanitized_end: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -112,6 +120,18 @@ pub struct EvidenceCategoryFacts {
     pub omitted_records: usize,
     pub omitted_bytes: usize,
     pub limit_activated: bool,
+    pub budget_bytes: usize,
+    pub borrowed_bytes: usize,
+    pub selection_policy: &'static str,
+    pub sanitized_bytes: usize,
+    pub omitted_sanitized_bytes: usize,
+    pub withheld_source_bytes: usize,
+    pub sanitized_empty_records: usize,
+    pub partially_retained_records: usize,
+    pub head_bytes: usize,
+    pub tail_bytes: usize,
+    pub exemplar_bytes: usize,
+    pub anomaly_records: BTreeMap<&'static str, usize>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
