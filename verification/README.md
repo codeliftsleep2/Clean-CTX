@@ -12,6 +12,8 @@ authoritative.
 
 Current packages:
 
+- `native-diagnostics/` — real C#/.NET, TypeScript, Angular, and ESLint output
+  replay through the built Claude hook adapter;
 - `cargo-check/` — one-command CargoCheck MCP observations and Codex CLI pilot;
 - `context-compression/edge-cases/` — production Binary0x04 capture, aligned
   semantic snapshots, separate model output, and C#/Angular restore checks;

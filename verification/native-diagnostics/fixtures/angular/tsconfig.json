@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ES2022","module":"preserve","moduleResolution":"bundler","experimentalDecorators":true,"skipLibCheck":true,"strict":true},"angularCompilerOptions":{"strictTemplates":true},"files":["main.ts"]}

@@ -1,0 +1,1 @@
+{"version":1,"projects":{"probe":{"projectType":"application","root":"","sourceRoot":".","architect":{"build":{"builder":"@angular/build:application","options":{"browser":"main.ts","index":"index.html","tsConfig":"tsconfig.json","outputPath":"dist","budgets":[{"type":"initial","maximumWarning":"1b"}]}}}}}}
