@@ -15,10 +15,14 @@ fn cargo_check_lifecycle_cli_real_cargo_success_failure_and_text() {
         .arg(configured("CLEAN_CTX_TEST_CARGO"))
         .arg("--json");
     let (status, stdout, stderr) = Process::spawn(command).finish();
-    assert_eq!(status.code(), Some(0));
     no_secret(&stdout);
     no_secret(&stderr);
     let result: Value = serde_json::from_slice(&stdout).unwrap();
+    assert_eq!(
+        status.code(),
+        Some(0),
+        "sanitized CargoCheck result: {result}"
+    );
     clean_result(&result);
     assert_eq!(result["root_outcome"]["exit_code"], 0);
     assert_eq!(result["cli_outcome"], "success");
@@ -93,7 +97,12 @@ fn cargo_check_lifecycle_mcp_real_cargo_round_trip_and_session_reuse() {
     );
     host.check(3);
     let success = host.receive(3);
-    assert_eq!(success["result"]["isError"], false);
+    no_secret(&serde_json::to_vec(&success).unwrap());
+    assert_eq!(
+        success["result"]["isError"], false,
+        "sanitized MCP result: {}",
+        success["result"]
+    );
     clean_result(&success["result"]["structuredContent"]);
     assert_eq!(
         success["result"]["structuredContent"]["authority"]["workspace_source"],
@@ -126,7 +135,7 @@ fn cargo_check_lifecycle_mcp_real_build_script_cancellation_and_recovery() {
     let root = fixture("pub fn answer() -> u8 { 42 }\n", Some(WAITING_BUILD));
     let mut host = Mcp::spawn(root.path(), false);
     host.check(10);
-    wait_for_file(&root.path().join("build-script-started"));
+    host.wait_for_build_script(&root.path().join("build-script-started"));
     host.cancel(10);
     let cancelled = host.receive(10);
     assert_eq!(cancelled["result"]["isError"], true);
@@ -148,7 +157,7 @@ fn cargo_check_lifecycle_mcp_eof_cancels_running_real_build_script() {
     let root = fixture("pub fn answer() -> u8 { 42 }\n", Some(WAITING_BUILD));
     let mut host = Mcp::spawn(root.path(), true);
     host.check(20);
-    wait_for_file(&root.path().join("build-script-started"));
+    host.wait_for_build_script(&root.path().join("build-script-started"));
     no_secret(&host.finish());
     let cancelled = host.receive(20);
     assert_eq!(

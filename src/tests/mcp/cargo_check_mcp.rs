@@ -376,7 +376,7 @@ fn cargo_check_mcp_host_cancellation_owns_and_cleans_running_process_tree() {
         let output = running.join().unwrap();
         assert!(
             workspace.path().join("descendant-ready").exists(),
-            "fixture must launch owned descendant"
+            "fixture must launch owned descendant; sanitized result: {output}"
         );
         assert_eq!(output["isError"], true);
         assert_eq!(

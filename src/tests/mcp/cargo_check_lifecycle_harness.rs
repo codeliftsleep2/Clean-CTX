@@ -192,6 +192,24 @@ impl Mcp {
             "params":{"name":"cargo_check","arguments":{}}}));
     }
 
+    pub fn wait_for_build_script(&self, path: &Path) {
+        let deadline = Instant::now() + DEADLINE;
+        while !path.exists() && Instant::now() < deadline {
+            if let Ok(response) = self.responses.try_recv() {
+                no_secret(&serde_json::to_vec(&response).unwrap());
+                panic!(
+                    "CargoCheck completed before the build script started; sanitized result: {}",
+                    response["result"]
+                );
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(
+            path.exists(),
+            "real build script must start before cancellation; no MCP result received"
+        );
+    }
+
     pub fn cancel(&mut self, id: i64) {
         self.send(json!({"jsonrpc":"2.0","method":"notifications/cancelled",
             "params":{"requestId":id,"reason":"PRIVATE_CANCEL_CANARY"}}));
@@ -205,6 +223,7 @@ impl Mcp {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub(super) fn wait_for_file(path: &Path) {
     let deadline = Instant::now() + DEADLINE;
     while !path.exists() && Instant::now() < deadline {
