@@ -1,3 +1,8 @@
+mod framing;
+mod json;
+mod shape;
+pub(crate) use framing::{CapturedFrame, ProducerStream};
+
 use super::evidence::EvidenceCollector;
 use super::model::{
     CargoCheckSemanticResult, CargoDiagnostic, CargoEvidence, ChildDiagnostic, DiagnosticLevel,
@@ -40,77 +45,6 @@ impl CargoCheckCompiler {
         }
     }
 
-    pub fn observe_stdout_frame(&mut self, bytes: &[u8], terminated: bool, over_limit: bool) {
-        self.coverage.stdout_frames += 1;
-        let over_limit = over_limit || bytes.len() > self.policy.maximum_frame_bytes;
-        if over_limit {
-            self.coverage.over_limit_frames += 1;
-        }
-        if !terminated {
-            self.coverage.truncated_frames += 1;
-        }
-
-        let bounded_bytes = &bytes[..bytes.len().min(self.policy.maximum_frame_bytes)];
-        let decoded = String::from_utf8_lossy(bounded_bytes);
-        if matches!(&decoded, std::borrow::Cow::Owned(_)) {
-            self.coverage.invalid_utf8_frames += 1;
-        }
-        if over_limit || !terminated {
-            self.evidence.observe(
-                EvidenceCategory::MalformedOrTruncated,
-                &decoded,
-                &mut self.transformations,
-            );
-            return;
-        }
-
-        let candidate = decoded.trim();
-        if !candidate.starts_with('{') {
-            self.coverage.non_json_stdout += 1;
-            self.evidence.observe(
-                EvidenceCategory::StdoutNonJson,
-                candidate,
-                &mut self.transformations,
-            );
-            return;
-        }
-
-        let value = match serde_json::from_str::<Value>(candidate) {
-            Ok(value) => value,
-            Err(_) => {
-                self.coverage.malformed_json += 1;
-                self.evidence.observe(
-                    EvidenceCategory::MalformedOrTruncated,
-                    candidate,
-                    &mut self.transformations,
-                );
-                return;
-            }
-        };
-        self.observe_structured(value);
-    }
-
-    pub fn observe_stderr_frame(&mut self, bytes: &[u8], terminated: bool, over_limit: bool) {
-        self.coverage.stderr_frames += 1;
-        let over_limit = over_limit || bytes.len() > self.policy.maximum_frame_bytes;
-        if over_limit {
-            self.coverage.over_limit_frames += 1;
-        }
-        if !terminated {
-            self.coverage.truncated_frames += 1;
-        }
-        let bounded_bytes = &bytes[..bytes.len().min(self.policy.maximum_frame_bytes)];
-        let decoded = String::from_utf8_lossy(bounded_bytes);
-        if matches!(&decoded, std::borrow::Cow::Owned(_)) {
-            self.coverage.invalid_utf8_frames += 1;
-        }
-        self.evidence.observe(
-            EvidenceCategory::Stderr,
-            &decoded,
-            &mut self.transformations,
-        );
-    }
-
     pub fn finish(mut self) -> CargoCheckSemanticResult {
         let diagnostics = select_diagnostics(
             std::mem::take(&mut self.diagnostics),
@@ -136,56 +70,65 @@ impl CargoCheckCompiler {
         }
     }
 
-    pub(crate) fn observe_stderr_terminal_sample(&mut self, bytes: &[u8]) {
-        let decoded = String::from_utf8_lossy(bytes);
-        if matches!(&decoded, std::borrow::Cow::Owned(_)) {
-            self.coverage.invalid_utf8_frames += 1;
-        }
-        self.evidence
-            .observe_terminal_stderr(&decoded, &mut self.transformations);
+    fn observe_incompatible(&mut self, source_bytes: usize) {
+        self.coverage.incompatible_structured += 1;
+        self.evidence.observe_summary(
+            EvidenceCategory::UnknownStructured,
+            "[Cargo JSON record withheld: ambiguous fields or incompatible shape]",
+            source_bytes,
+            &mut self.transformations,
+        );
     }
 
-    fn observe_structured(&mut self, value: Value) {
+    fn observe_structured(&mut self, value: Value, source_bytes: usize) {
         let Some(object) = value.as_object() else {
-            self.coverage.incompatible_structured += 1;
+            self.observe_incompatible(source_bytes);
             return;
         };
         let Some(reason) = object.get("reason").and_then(Value::as_str) else {
-            self.coverage.incompatible_structured += 1;
-            self.evidence.observe(
-                EvidenceCategory::UnknownStructured,
-                "structured record missing reason",
-                &mut self.transformations,
-            );
+            self.observe_incompatible(source_bytes);
             return;
         };
 
         match reason {
-            "compiler-message" => self.observe_compiler_message(object),
+            "compiler-message" => self.observe_compiler_message(object, source_bytes),
             "compiler-artifact" => {
+                if !shape::artifact(object) {
+                    self.observe_incompatible(source_bytes);
+                    return;
+                }
                 self.coverage.compiler_artifacts += 1;
                 self.cargo_evidence.artifact_records += 1;
             }
             "build-script-executed" => {
+                if !shape::build_script(object) {
+                    self.observe_incompatible(source_bytes);
+                    return;
+                }
                 self.coverage.build_scripts += 1;
                 self.cargo_evidence.build_script_records += 1;
             }
-            "build-finished" => self.observe_build_finished(object),
+            "build-finished" => self.observe_build_finished(object, source_bytes),
             other => {
                 self.coverage.unknown_structured += 1;
                 let summary = format!("unknown Cargo record reason: {other}");
-                self.evidence.observe(
+                self.evidence.observe_summary(
                     EvidenceCategory::UnknownStructured,
                     &summary,
+                    source_bytes,
                     &mut self.transformations,
                 );
             }
         }
     }
 
-    fn observe_build_finished(&mut self, object: &serde_json::Map<String, Value>) {
+    fn observe_build_finished(
+        &mut self,
+        object: &serde_json::Map<String, Value>,
+        source_bytes: usize,
+    ) {
         let Some(success) = object.get("success").and_then(Value::as_bool) else {
-            self.coverage.incompatible_structured += 1;
+            self.observe_incompatible(source_bytes);
             return;
         };
         self.coverage.build_finished += 1;
@@ -204,17 +147,25 @@ impl CargoCheckCompiler {
         self.cargo_evidence.build_finished_success = Some(success);
     }
 
-    fn observe_compiler_message(&mut self, object: &serde_json::Map<String, Value>) {
+    fn observe_compiler_message(
+        &mut self,
+        object: &serde_json::Map<String, Value>,
+        source_bytes: usize,
+    ) {
+        if !object.get("message").is_some_and(shape::diagnostic) {
+            self.observe_incompatible(source_bytes);
+            return;
+        }
         let Some(message) = object.get("message").and_then(Value::as_object) else {
-            self.coverage.incompatible_structured += 1;
+            self.observe_incompatible(source_bytes);
             return;
         };
         let Some(text) = message.get("message").and_then(Value::as_str) else {
-            self.coverage.incompatible_structured += 1;
+            self.observe_incompatible(source_bytes);
             return;
         };
         let Some(level_text) = message.get("level").and_then(Value::as_str) else {
-            self.coverage.incompatible_structured += 1;
+            self.observe_incompatible(source_bytes);
             return;
         };
 

@@ -48,7 +48,9 @@ Oversized or unterminated terminal samples are withheld. At drain completion the
 latest eligible sample is sanitized and retained inside the existing 48 KiB
 stderr category: earlier head evidence gets at most half and the terminal sample
 at most half. It does not enlarge the 96 KiB shared evidence budget. Sampling
-facts distinguish late samples from the compiler's admitted-frame coverage.
+facts distinguish late samples from physical-frame parser coverage. The next
+phase now accounts for all observed frames, including discarded frames; see
+`CARGOCHECK_INCREMENTAL_PARSING.md`.
 
 Cancellation is first-request-wins with separate host/user sources and a
 monotonic request offset. It immediately requests SIGKILL of the Linux group or
@@ -80,11 +82,12 @@ Linux verification completed after the owner's explicit per-run authorization:
   passed. New/materially modified source files remain below 615 lines.
 
 The implementation is Linux-verified and prepared for branch publication so a
-Windows operator can pull this phase. The full suite was not run.
-Real-workspace CargoCheck behavior and adapters remain later
-work. Windows code was neither compiled nor executed by these Linux checks:
-a Windows operator must run the same focused commands before cross-platform
-verification can be called complete.
+Windows operator can pull this phase. The owner subsequently reported both
+focused Windows checks GREEN on commit `88118b5`; that is owner-reported
+verification, not a Windows run in this Linux environment. The full suite was not run.
+Real-workspace CargoCheck behavior and adapters remain later work. Windows code
+was neither compiled nor executed by the Linux checks. The owner's Windows GREEN
+report completes the focused cross-platform verification for this phase.
 
 From the checkout on either supported platform, the focused commands are:
 
@@ -107,9 +110,9 @@ this phase's agent or local handoff instructions.
 
 ## Remaining work
 
-After this phase's focused verification is green, continue incremental Cargo
-JSON decoding and mixed/malformed/truncated coverage accounting. The present
-framer is the capture boundary, not final parser or result-budget certification.
+Incremental Cargo JSON decoding and mixed/malformed/truncated coverage accounting
+are implemented in the subsequent `CARGOCHECK_INCREMENTAL_PARSING.md` phase.
+The framer remains the capture boundary, not final result-budget certification.
 Subsequent semantic retention, fallback evidence hardening, final result budgets,
 CLI exit-code projection, typed MCP integration, and production lifecycle trace
 remain separate phases. The bundled Claude pilot remains last.

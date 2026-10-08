@@ -86,7 +86,8 @@ fn mixed_and_malformed_evidence_never_disappears() {
     );
 
     let result = compiler.finish();
-    assert_eq!(result.parser_coverage.non_json_stdout, 2);
+    // Invalid UTF-8 is withheld as a decoding fault, not compiled as text.
+    assert_eq!(result.parser_coverage.non_json_stdout, 1);
     assert_eq!(result.parser_coverage.malformed_json, 1);
     assert_eq!(result.parser_coverage.truncated_frames, 1);
     assert_eq!(result.parser_coverage.over_limit_frames, 1);

@@ -122,6 +122,19 @@ pub struct ParserCoverage {
     pub truncated_frames: usize,
     pub over_limit_frames: usize,
     pub invalid_utf8_frames: usize,
+    pub empty_stdout_frames: usize,
+    pub empty_stderr_frames: usize,
+    pub admission_cut_frames: usize,
+    pub decoding_unavailable_frames: usize,
+    pub unparsed_stdout_frames: usize,
+    pub unparsed_stderr_frames: usize,
+    pub unparsed_stdout_bytes: u64,
+    pub unparsed_stderr_bytes: u64,
+    pub json_candidates: usize,
+    pub parsed_json_objects: usize,
+    pub duplicate_json_fields: usize,
+    pub stderr_terminal_samples: usize,
+    pub invalid_utf8_terminal_samples: usize,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]

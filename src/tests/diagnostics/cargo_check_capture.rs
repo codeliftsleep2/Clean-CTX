@@ -197,3 +197,72 @@ fn stopped_reader_never_enters_read_and_discloses_missing_eof() {
     assert!(!facts.eof_observed);
     assert!(!facts.read_failed);
 }
+
+#[test]
+fn incremental_accounting_post_limit_complete_frames_remain_visible() {
+    let mut compiler = CargoCheckCompiler::default();
+    let mut stdout = Framer::new(true, policy(2, 2, 64));
+    stdout.observe(b"a\nb\nc\n", &mut compiler);
+    let capture = stdout.finish(&mut compiler);
+    assert_eq!(capture.complete_frames, 3);
+    assert_eq!(compiler.finish().parser_coverage.stdout_frames, 3);
+}
+
+#[test]
+fn incremental_accounting_capture_cut_is_not_eof_truncation() {
+    let mut compiler = CargoCheckCompiler::default();
+    let mut stdout = Framer::new(true, policy(2, 2, 64));
+    stdout.observe(b"long frame\n", &mut compiler);
+    stdout.finish(&mut compiler);
+    assert_eq!(compiler.finish().parser_coverage.truncated_frames, 0);
+}
+
+#[test]
+fn incremental_accounting_invalid_utf8_json_cannot_create_diagnostics() {
+    let mut compiler = CargoCheckCompiler::default();
+    compiler.observe_stdout_frame(
+        b"{\"reason\":\"compiler-message\",\"message\":{\"message\":\"\xff\",\"level\":\"error\"}}",
+        true,
+        false,
+    );
+    let result = compiler.finish();
+    assert_eq!(result.parser_coverage.invalid_utf8_frames, 1);
+    assert!(result.diagnostics.is_empty());
+}
+
+#[test]
+fn incremental_accounting_duplicate_json_fields_cannot_choose_completion_truth() {
+    let mut compiler = CargoCheckCompiler::default();
+    compiler.observe_stdout_frame(
+        b"{\"reason\":\"build-finished\",\"success\":false,\"success\":true}",
+        true,
+        false,
+    );
+    assert_eq!(
+        compiler.finish().cargo_evidence.build_finished_success,
+        None
+    );
+}
+
+#[test]
+fn incremental_accounting_incompatible_known_records_have_fallback_evidence() {
+    let mut compiler = CargoCheckCompiler::default();
+    compiler.observe_stdout_frame(
+        b"{\"reason\":\"build-finished\",\"success\":\"yes\"}",
+        true,
+        false,
+    );
+    let result = compiler.finish();
+    assert_eq!(result.parser_coverage.incompatible_structured, 1);
+    assert!(!result.evidence.is_empty());
+}
+
+#[test]
+fn incremental_accounting_invalid_spans_cannot_invent_source_locations() {
+    let mut compiler = CargoCheckCompiler::default();
+    compiler.observe_stdout_frame(
+        b"{\"reason\":\"compiler-message\",\"message\":{\"message\":\"failure\",\"level\":\"error\",\"spans\":[null]}}",
+        true, false,
+    );
+    assert!(compiler.finish().diagnostics.is_empty());
+}

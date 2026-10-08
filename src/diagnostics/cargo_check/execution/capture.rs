@@ -1,3 +1,4 @@
+use super::super::parser::{CapturedFrame, ProducerStream};
 use super::super::{CargoCheckCompiler, CargoCheckPolicy};
 use super::StreamCaptureFacts;
 use std::io::{self, Read};
@@ -76,22 +77,26 @@ impl Framer {
         let over_limit = self.frame_bytes > self.policy.maximum_frame_bytes as u64;
         self.facts.over_limit_frames += u64::from(over_limit);
         self.facts.admission_cut_frames += u64::from(self.frame_cut);
-        // Empty frames count as framing evidence without creating unbounded
-        // zero-byte evidence items in the existing compiler's collector.
-        if !self.frame.is_empty() {
-            // Incomplete samples may cut through a multiline credential. Do
-            // not pass an arbitrary raw prefix to a whole-string redactor.
-            let bytes = if over_limit || self.frame_cut || !terminated {
-                b"[producer frame withheld: incomplete or over limit]".as_slice()
+        // A complete bounded stderr sample can establish decoding truth even
+        // after ordinary admission stops. It never becomes a JSON candidate.
+        let bytes = if !self.stdout && self.late_stderr_frame.len() as u64 == self.frame_bytes {
+            &self.late_stderr_frame
+        } else {
+            &self.frame
+        };
+        compiler.observe_captured_frame(CapturedFrame {
+            stream: if self.stdout {
+                ProducerStream::Stdout
             } else {
-                &self.frame
-            };
-            if self.stdout {
-                compiler.observe_stdout_frame(bytes, terminated && !self.frame_cut, over_limit);
-            } else {
-                compiler.observe_stderr_frame(bytes, terminated && !self.frame_cut, over_limit);
-            }
-        }
+                ProducerStream::Stderr
+            },
+            bytes,
+            observed_bytes: self.frame_bytes,
+            terminated,
+            over_limit,
+            admission_cut: self.frame_cut,
+            decoding_available: !over_limit && bytes.len() as u64 == self.frame_bytes,
+        });
         if !self.stdout && self.frame_cut {
             if terminated && self.frame_bytes == 0 {
                 // Empty delimiters carry no terminal evidence; do not evict

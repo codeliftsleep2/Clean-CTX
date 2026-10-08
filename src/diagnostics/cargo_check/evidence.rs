@@ -33,17 +33,37 @@ impl EvidenceCollector {
         raw: &str,
         transformations: &mut TransformationFacts,
     ) {
+        self.observe_record(category, raw, raw.len(), false, transformations);
+    }
+
+    pub(crate) fn observe_summary(
+        &mut self,
+        category: EvidenceCategory,
+        summary: &str,
+        source_bytes: usize,
+        transformations: &mut TransformationFacts,
+    ) {
+        self.observe_record(category, summary, source_bytes, true, transformations);
+    }
+
+    fn observe_record(
+        &mut self,
+        category: EvidenceCategory,
+        raw: &str,
+        original_bytes: usize,
+        source_withheld: bool,
+        transformations: &mut TransformationFacts,
+    ) {
         self.order = self.order.saturating_add(1);
-        let original_bytes = raw.len();
         let budget = category_budget(category);
         let used = self.used.entry(category).or_default();
         let facts = self.facts.entry(category).or_default();
         facts.original_records += 1;
-        facts.original_bytes += original_bytes;
+        facts.original_bytes = facts.original_bytes.saturating_add(original_bytes);
 
         if *used >= budget {
             facts.omitted_records += 1;
-            facts.omitted_bytes += original_bytes;
+            facts.omitted_bytes = facts.omitted_bytes.saturating_add(original_bytes);
             facts.limit_activated = true;
             return;
         }
@@ -55,7 +75,10 @@ impl EvidenceCollector {
         *used += retained_bytes;
         facts.retained_records += 1;
         facts.retained_bytes += retained_bytes;
-        if retained_bytes < sanitized.len() {
+        if source_withheld {
+            facts.omitted_bytes = facts.omitted_bytes.saturating_add(original_bytes);
+            facts.limit_activated = true;
+        } else if retained_bytes < sanitized.len() {
             facts.omitted_bytes += sanitized.len() - retained_bytes;
             facts.limit_activated = true;
         }
