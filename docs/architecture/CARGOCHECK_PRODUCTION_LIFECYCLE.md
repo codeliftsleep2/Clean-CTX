@@ -1,8 +1,13 @@
 # CargoCheck production lifecycle — Phase 11
 
 Status: production source paths traced and all five tracked real-Cargo black-box
-checks passed on Linux. No production fix was needed. Windows owner verification
-and the Claude pilot remain outstanding.
+checks passed on Linux. The owner subsequently reported all four Windows
+lifecycle checks, the previously failing synthetic cancellation check, and the
+remaining focused tests and Clippy GREEN. The Claude pilot and CI status remain
+outstanding. A workspace-path disclosure in retained producer text was found
+while reviewing the Windows evidence. Its correction is documented in
+`CARGOCHECK_OPAQUE_WORKSPACE_PATHS.md` and needs Windows confirmation before
+the pilot.
 
 ## Production call paths
 
@@ -96,7 +101,19 @@ UTF-8 without BOM, modified Rust files satisfied the 615-line ceiling, and
 
 ## Remaining gate
 
-Obtain the outstanding Windows owner results and retain the full suite as the CI
-gate. Then prepare one candidate and one preserved context package
+Confirm the workspace-path correction on Windows, confirm the CI gate, and retain
+the full suite exclusively in CI. Then prepare one candidate and one preserved context package
 for the bundled Claude pilot described in the architecture freeze. No Claude
 pilot has been started.
+
+## Windows owner follow-up
+
+The real-Cargo fixtures initially lacked the MSVC linker in the selected child
+environment. Loading the installed Visual Studio developer shell supplied the
+already-approved PATH/INCLUDE/LIB toolchain environment. The subsequent build
+script launch failure also reproduced with ordinary Cargo and direct executable
+launch; the owner identified and resolved an antivirus block. No execution or
+environment policy was relaxed. The owner then reported the four portable
+lifecycle checks and the focused synthetic cancellation test GREEN, followed by
+GREEN for the remaining focused verification. Windows console Ctrl-C remains
+a host-specific pilot observation; the Linux SIGINT check does not run there.

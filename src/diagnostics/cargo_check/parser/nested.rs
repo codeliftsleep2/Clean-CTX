@@ -5,7 +5,7 @@ use super::super::model::{
     TransformationFacts,
 };
 use super::super::policy::CargoCheckPolicy;
-use super::super::sanitize::sanitize;
+use super::super::sanitize::sanitize_in_workspace as sanitize;
 use super::retention::head_tail;
 use serde_json::{Map, Value};
 
@@ -172,6 +172,7 @@ pub(super) fn compile_diagnostic(
                 ),
                 message: sanitize(
                     child["message"].as_str().expect("validated message"),
+                    workspace,
                     transformations,
                 ),
                 omitted_spans: seen.saturating_sub(spans.len()),
@@ -183,12 +184,12 @@ pub(super) fn compile_diagnostic(
     CargoDiagnostic {
         selection: "unselected",
         level,
-        message: sanitize(text, transformations),
+        message: sanitize(text, workspace, transformations),
         code: message
             .get("code")
             .and_then(|code| code.get("code"))
             .and_then(Value::as_str)
-            .map(|code| sanitize(code, transformations)),
+            .map(|code| sanitize(code, workspace, transformations)),
         omitted_primary_spans: primary_seen - primary.len(),
         omitted_related_spans: related_seen - related.len(),
         primary_spans: primary,
@@ -197,7 +198,7 @@ pub(super) fn compile_diagnostic(
         rendered_evidence: message
             .get("rendered")
             .and_then(Value::as_str)
-            .map(|text| sanitize(text, transformations)),
+            .map(|text| sanitize(text, workspace, transformations)),
         primary_spans_seen: primary_seen,
         related_spans_seen: related_seen,
         children_seen: child_values.len(),
@@ -244,6 +245,7 @@ fn compile_span(
                 .as_ref()
                 .map(|display| display.value.as_str())
                 .unwrap_or(raw_file),
+            workspace,
             facts,
         ),
         file_classification: display.as_ref().map(|display| display.classification),
@@ -254,16 +256,16 @@ fn compile_span(
         label: value
             .get("label")
             .and_then(Value::as_str)
-            .map(|text| sanitize(text, facts)),
+            .map(|text| sanitize(text, workspace, facts)),
         suggestion: if let Some(retention_slot) = slot {
             replacement(value).map(|text| Suggestion {
-                replacement: sanitize(text, facts),
+                replacement: sanitize(text, workspace, facts),
                 source_bytes: text.len(),
                 retention_slot,
                 applicability: value
                     .get("suggestion_applicability")
                     .and_then(Value::as_str)
-                    .map(|text| sanitize(text, facts)),
+                    .map(|text| sanitize(text, workspace, facts)),
             })
         } else {
             None

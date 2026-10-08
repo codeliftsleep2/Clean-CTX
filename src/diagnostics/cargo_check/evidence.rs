@@ -2,7 +2,7 @@ mod buffer;
 use super::model::{
     EvidenceCategory, EvidenceCategoryFacts, EvidenceFacts, EvidenceItem, TransformationFacts,
 };
-use super::sanitize::sanitize;
+use super::sanitize::sanitize_in_workspace;
 pub(crate) use buffer::Anomaly;
 use buffer::{Buffer, prefix_end};
 use std::collections::BTreeMap;
@@ -23,6 +23,7 @@ struct RecordMetadata {
 }
 
 pub(crate) struct EvidenceCollector {
+    workspace: Option<super::ApprovedWorkspaceRoot>,
     buffers: BTreeMap<EvidenceCategory, Buffer>,
     facts: BTreeMap<EvidenceCategory, EvidenceCategoryFacts>,
     order: u64,
@@ -45,9 +46,17 @@ impl EvidenceCollector {
             );
         }
         Self {
+            workspace: None,
             buffers,
             facts,
             order: 0,
+        }
+    }
+
+    pub(crate) fn for_workspace(workspace: super::ApprovedWorkspaceRoot) -> Self {
+        Self {
+            workspace: Some(workspace),
+            ..Self::new()
         }
     }
 
@@ -176,7 +185,7 @@ impl EvidenceCollector {
         }
         // Always sanitize before selection, including when a reservation is full:
         // a new tail or exemplar remains eligible and no partial raw prefix escapes.
-        let sanitized = sanitize(raw, transformations);
+        let sanitized = sanitize_in_workspace(raw, self.workspace.as_ref(), transformations);
         let length = sanitized.len();
         facts.sanitized_bytes = facts.sanitized_bytes.saturating_add(length);
         if length == 0 {

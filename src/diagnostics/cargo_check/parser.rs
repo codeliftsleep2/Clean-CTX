@@ -47,6 +47,7 @@ impl CargoCheckCompiler {
 
     pub(crate) fn for_workspace(workspace: super::ApprovedWorkspaceRoot) -> Self {
         Self {
+            evidence: EvidenceCollector::for_workspace(workspace.clone()),
             workspace: Some(workspace),
             ..Self::default()
         }

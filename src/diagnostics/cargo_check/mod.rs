@@ -56,3 +56,7 @@ mod invocation_tests;
 #[cfg(test)]
 #[path = "../../tests/diagnostics/cargo_check_result_budget.rs"]
 mod result_budget_tests;
+
+#[cfg(test)]
+#[path = "../../tests/diagnostics/cargo_check_opaque_paths.rs"]
+mod opaque_path_tests;
