@@ -48,6 +48,9 @@ $modelRoot = Join-Path $runRoot "model-workspaces"
 New-Item -ItemType Directory -Force $fixture, $modelRoot | Out-Null
 Write-PilotText (Join-Path $fixture "Cargo.toml") "[package]`nname='ctx_codex_pilot'`nversion='0.1.0'`nedition='2021'`n[lib]`npath='lib.rs'`n[workspace]`n"
 Write-PilotText (Join-Path $fixture ".clean-ctx.json") '{"cbm":{"enabled":false},"persistence":{"enabled":false},"proxy":{"auto_start":false},"cache":{"enabled":false},"observability":{"export_metrics":false}}'
+# The successful protocol case also verifies build-script compilation/linking
+# before either cleanup case replaces this script with the waiting child.
+Write-PilotText (Join-Path $fixture "build.rs") 'fn main() {}'
 $valid = 'pub fn answer() -> u8 { 42 }'
 $broken = 'pub fn broken() { let _: u8 = "wrong type"; }'
 $marker = [guid]::NewGuid().ToString('N')
@@ -101,6 +104,7 @@ try {
         Assert-Pilot ($response.error.code -eq -32602) "Unexpected caller arguments were not rejected."
     }
     foreach ($mode in @("cancel", "eof")) {
+        $stages = $null
         . Invoke-PilotCase "protocol-$mode-cleanup" {
             if ($mode -eq "eof") {
                 Stop-CleanCtxSession $session
@@ -116,23 +120,47 @@ fn main() {
 }
 '@
             $id = if ($mode -eq "cancel") { 5 } else { 7 }
-            Send-PilotRpc $session @{ jsonrpc = "2.0"; id = $id; method = "tools/call"; params = @{ name = "cargo_check"; arguments = @{} } }
-            Wait-PilotFile $started $session
-            $buildPid = [int](Get-Content -Raw -LiteralPath $started)
-            if ($mode -eq "cancel") {
-                Send-PilotRpc $session @{ jsonrpc = "2.0"; method = "notifications/cancelled"; params = @{ requestId = $id; reason = "owner pilot cancellation" } }
-            } else { $session.StandardInput.Close() }
-            $response = Receive-PilotRpc $session $id
-            Save-PilotJson "protocol-$mode-cleanup" $response
-            Assert-PilotResult $response $true
-            Assert-Pilot ($response.result.structuredContent.cleanup.cancellation_source -eq "host") "Host cancellation was not attributed."
-            Assert-Pilot ($null -eq (Get-Process -Id $buildPid -ErrorAction SilentlyContinue)) "Owned build script is still running."
-            Write-PilotText (Join-Path $fixture "build.rs") 'fn main() {}'
-            if ($mode -eq "cancel") {
-                $recovery = Invoke-CleanCtxTool $session 6 "cargo_check" @{}
-                Save-PilotJson "protocol-recovery" $recovery
-                Assert-PilotResult $recovery $false
+            $stages = [ordered]@{
+                request_id = $id; server_pid = $session.Id
+                request_sent_utc = [DateTime]::UtcNow.ToString('o')
+                cargo_process_observed = "Not directly observed by this protocol driver"
+                build_script_compilation_observed = "Not directly observed; warmup result is protocol-success.json"
+                marker_observed_utc = $null; build_script_pid = $null
+                cancellation_sent_utc = $null; cancellation_kind = $null
+                child_cleanup_verified = $false; readiness_failure = $null
             }
+            try {
+                Send-PilotRpc $session @{ jsonrpc = "2.0"; id = $id; method = "tools/call"; params = @{ name = "cargo_check"; arguments = @{} } }
+                # Drain the response concurrently while waiting for fixture readiness,
+                # just as the tracked Rust lifecycle harness watches both channels.
+                $pendingRead = $session.StandardOutput.ReadLineAsync()
+                Wait-PilotFile $started $session $id $pendingRead "protocol-$mode-startup"
+                $buildPid = [int](Get-Content -Raw -LiteralPath $started)
+                $stages.marker_observed_utc = [DateTime]::UtcNow.ToString('o')
+                $stages.build_script_pid = $buildPid
+                $stages.cancellation_sent_utc = [DateTime]::UtcNow.ToString('o')
+                $stages.cancellation_kind = $mode
+                if ($mode -eq "cancel") {
+                    Send-PilotRpc $session @{ jsonrpc = "2.0"; method = "notifications/cancelled"; params = @{ requestId = $id; reason = "owner pilot cancellation" } }
+                } else { $session.StandardInput.Close() }
+                $response = Receive-PilotRpc $session $id $pendingRead
+                Save-PilotJson "protocol-$mode-cleanup" $response
+                Assert-PilotResult $response $true
+                Assert-Pilot ($response.result.structuredContent.cleanup.cancellation_source -eq "host") "Host cancellation was not attributed."
+                Assert-Pilot ($null -eq (Get-Process -Id $buildPid -ErrorAction SilentlyContinue)) "Owned build script is still running."
+                $stages.child_cleanup_verified = $true
+                Write-PilotText (Join-Path $fixture "build.rs") 'fn main() {}'
+                if ($mode -eq "cancel") {
+                    $recovery = Invoke-CleanCtxTool $session 6 "cargo_check" @{}
+                    Save-PilotJson "protocol-recovery" $recovery
+                    Assert-PilotResult $recovery $false
+                }
+            } catch {
+                if ($null -eq $stages.marker_observed_utc) {
+                    $stages.readiness_failure = $_.Exception.Message
+                }
+                throw
+            } finally { Save-PilotJson "protocol-$mode-stages" $stages }
         }
     }
     Stop-CleanCtxSession $session
@@ -150,7 +178,9 @@ fn main() {
             @{ name = "codex-representative"; source = $valid; prompt = $neutral; available = "real"; expected = $null }
         )) {
             . Invoke-PilotCase $case.name {
-                Write-PilotText (Join-Path $fixture "lib.rs") $case.source
+                if ($case.available -ne "real") {
+                    Write-PilotText (Join-Path $fixture "lib.rs") $case.source
+                }
                 Invoke-PilotCodex $case
             }
         }

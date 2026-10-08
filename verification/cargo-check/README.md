@@ -70,6 +70,19 @@ host cancellation, owned build-script termination, recovery in the same session,
 and EOF cleanup. The waiting fixture has a 30-second fail-safe, not a production
 timeout. Cleanup/cancellation observations come from real MCP requests and the
 real build-script process. These do not claim that Codex sent the cancellation.
+The readiness wait concurrently drains the MCP response. If Cargo returns before
+the build-script marker, the sanitized response is saved in
+`protocol-cancel-startup.json` or `protocol-eof-startup.json` and a bounded text
+excerpt is printed. If the readiness deadline expires while Cargo is running,
+the harness cancels the request and saves its outcome. Diagnose this evidence
+before attributing readiness failures to a compiler, MSVC, or antivirus issue.
+Each cleanup case also writes a stages capture: request sent, marker/PID
+observed, cancellation or EOF sent, and child cleanup verified. Preparatory
+failure is reported separately as readiness FAIL and cleanup NOT RUN. Cargo
+process creation and live build-script compilation are not exposed as progress
+events by this MCP operation and are explicitly marked unobserved; the driver
+does not infer them from elapsed time. The successful protocol case now includes
+a trivial build script to verify compilation/linking before the waiting cases.
 
 Fresh Codex invocations cover neutral success/failure, explicit guidance,
 constrained synthetic secrecy, unavailable authority, absent provider fallback,
@@ -94,6 +107,12 @@ separate from native response/model/host persistence evidence.
 The console prints the run directory and verdict table. `summary.json` is the
 machine-readable report. Each case preserves RPC responses or Codex prompt,
 JSONL events, final answer, stderr, and selection/result surface observations.
+Per-case registration captures show the requested CLI configuration; event
+inventories preserve the observed event/item identities, server/tool tuple,
+statuses, and errors. They distinguish a tool never recognized from an observed
+terminal failure. The parser matches `clean_ctx_cargo_pilot` / `cargo_check`, not
+an invented Codex-native tool name. Unknown event shapes require raw evidence;
+they are not silently normalized into successful tool calls.
 `owner-oracle.json` contains the synthetic token for exact owner inspection;
 keep it out of model prompts. No real credential is used as a test marker.
 
