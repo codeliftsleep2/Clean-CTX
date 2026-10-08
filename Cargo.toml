@@ -144,6 +144,12 @@ ctor = "0.2"
 ctrlc = "3.4"
 tempfile = "3.27.0"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.31.3", features = ["fs", "signal", "process"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Pipes", "Win32_System_Threading"] }
+
 [dev-dependencies]
 serial_test = "3.2"
 proptest = "1.6"

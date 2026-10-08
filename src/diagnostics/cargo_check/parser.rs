@@ -136,6 +136,15 @@ impl CargoCheckCompiler {
         }
     }
 
+    pub(crate) fn observe_stderr_terminal_sample(&mut self, bytes: &[u8]) {
+        let decoded = String::from_utf8_lossy(bytes);
+        if matches!(&decoded, std::borrow::Cow::Owned(_)) {
+            self.coverage.invalid_utf8_frames += 1;
+        }
+        self.evidence
+            .observe_terminal_stderr(&decoded, &mut self.transformations);
+    }
+
     fn observe_structured(&mut self, value: Value) {
         let Some(object) = value.as_object() else {
             self.coverage.incompatible_structured += 1;

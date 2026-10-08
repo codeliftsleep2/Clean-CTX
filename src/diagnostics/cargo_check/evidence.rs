@@ -77,6 +77,63 @@ impl EvidenceCollector {
             },
         )
     }
+
+    /// Preserve one complete late stderr sample without enlarging the approved
+    /// category budget. Earlier stderr retains the head half; the terminal
+    /// sample gets the tail half. Call only once after that pipe is drained.
+    pub(crate) fn observe_terminal_stderr(
+        &mut self,
+        raw: &str,
+        transformations: &mut TransformationFacts,
+    ) {
+        if raw.is_empty() {
+            return;
+        }
+        let category = EvidenceCategory::Stderr;
+        let sanitized = sanitize(raw, transformations);
+        let tail = truncate_utf8_head_tail(&sanitized, STDERR_BUDGET / 2);
+        let mut remaining_head = STDERR_BUDGET / 2;
+        let facts = self.facts.entry(category).or_default();
+        self.items.retain_mut(|item| {
+            if item.category != category {
+                return true;
+            }
+            let old = item.text.len();
+            if remaining_head == 0 {
+                facts.retained_records = facts.retained_records.saturating_sub(1);
+                facts.omitted_records += 1;
+                facts.omitted_bytes += old;
+                return false;
+            }
+            let mut end = old.min(remaining_head);
+            while !item.text.is_char_boundary(end) {
+                end -= 1;
+            }
+            item.text.truncate(end);
+            remaining_head -= end;
+            facts.omitted_bytes += old - end;
+            true
+        });
+        self.order = self.order.saturating_add(1);
+        facts.original_records += 1;
+        facts.original_bytes += raw.len();
+        facts.retained_records += 1;
+        facts.omitted_bytes += sanitized.len().saturating_sub(tail.len());
+        facts.retained_bytes = self
+            .items
+            .iter()
+            .filter(|item| item.category == category)
+            .map(|item| item.text.len())
+            .sum::<usize>()
+            + tail.len();
+        facts.limit_activated = true;
+        self.used.insert(category, facts.retained_bytes);
+        self.items.push(EvidenceItem {
+            category,
+            text: tail,
+            producer_order: self.order,
+        });
+    }
 }
 
 fn category_budget(category: EvidenceCategory) -> usize {

@@ -1,11 +1,12 @@
 //! CargoCheck-specific semantic compilation.
 //!
-//! This module does not execute Cargo. It converts already framed producer
-//! evidence into a bounded, sanitized semantic result.
+//! Prepared invocations execute inside an OS-owned boundary; raw producer
+//! bytes remain internal to bounded capture and semantic compilation.
 
 mod authority;
 mod environment;
 mod evidence;
+mod execution;
 mod invocation;
 mod model;
 mod parser;
@@ -17,6 +18,10 @@ pub use authority::{
     FileIdentity, PathClassification,
 };
 pub use environment::{CargoCheckEnvironment, EnvironmentFacts};
+pub use execution::{
+    CancellationSource, CaptureFacts, CargoCheckCancellation, CargoCheckExecution, CleanupFacts,
+    ExecutionError, OwnershipFacts, ProcessOutcome, StreamCaptureFacts, execute_cargo_check,
+};
 pub use invocation::{CargoCheckInvocation, CargoCheckRequest};
 pub use model::{
     CargoCheckSemanticResult, CargoDiagnostic, CargoEvidence, ChildDiagnostic, DiagnosticLevel,

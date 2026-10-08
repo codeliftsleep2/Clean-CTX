@@ -23,6 +23,8 @@ impl CargoCheckRequest {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CargoCheckInvocation {
+    workspace_authority: ApprovedWorkspaceRoot,
+    cargo_authority: ApprovedCargoExecutable,
     executable: PathBuf,
     arguments: [OsString; 2],
     current_directory: PathBuf,
@@ -45,6 +47,8 @@ impl CargoCheckInvocation {
         cargo.revalidate()?;
         let environment = CargoCheckEnvironment::from_snapshot(environment_snapshot);
         Ok(Self {
+            workspace_authority: request.workspace.clone(),
+            cargo_authority: cargo.clone(),
             executable: cargo.canonical_path().to_path_buf(),
             arguments: [
                 OsString::from("check"),
@@ -58,6 +62,12 @@ impl CargoCheckInvocation {
 
     pub fn executable(&self) -> &Path {
         &self.executable
+    }
+
+    /// Recheck the admitted identities at the final process-creation boundary.
+    pub(crate) fn revalidate(&self) -> Result<(), AuthorityError> {
+        self.workspace_authority.revalidate()?;
+        self.cargo_authority.revalidate()
     }
 
     pub fn arguments(&self) -> &[OsString; 2] {
