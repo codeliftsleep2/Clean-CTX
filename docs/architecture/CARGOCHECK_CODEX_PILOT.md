@@ -16,6 +16,33 @@ rendering, secrecy, persistence, diagnostic usefulness, and cancellation as
 independent verdicts. A result from an ordinary Bash/terminal command is not
 evidence of the direct-MCP boundary.
 
+## Provision the MCP server first
+
+An empty Codex tool inventory is a setup prerequisite, not a failed diagnostic
+trial. CargoCheck is a tool inside the Clean-CTX stdio server; it is not installed
+into Codex by pulling this repository or opening a chat. Complete the candidate
+build, fixture creation, and client registration below before applying the tool
+availability gate. These are owner-run setup steps, not diagnostic trial results.
+
+If Codex currently reports no Clean-CTX tools:
+
+1. Pull the candidate revision in the Windows checkout.
+2. In the MSVC-loaded PowerShell, run the candidate build and create the fixture
+   using the next section. Keep that PowerShell session open for its variables.
+3. Generate the concrete configuration block below and add it to the active
+   Codex MCP configuration. For a standard local Codex installation this is
+   `$HOME\.codex\config.toml`; use the client's configuration UI to confirm
+   its active location if a custom profile or remote host is in use.
+4. Restart/reconnect the Codex client from the working developer environment.
+   Start a new conversation; an existing session may retain its old inventory.
+5. Confirm the `clean_ctx_cargo_pilot` server connected and that its `cargo_check`
+   tool appears. If it does not, inspect that server's connection/startup error.
+   Do not proceed to diagnostic trials or substitute terminal output.
+
+The server command is the candidate executable with root options and **no
+subcommand**. Do not configure the CLI `cargo-check` subcommand as an MCP server.
+Codex launches the stdio server; there is no separate network endpoint to start.
+
 ## Readiness gate
 
 - Windows lifecycle checks and remaining focused verification are owner-reported
@@ -41,7 +68,7 @@ client; host observations are owner-run.
 
 ## Freeze the candidate and context package
 
-After readiness is green, run one candidate build in the MSVC-loaded PowerShell
+For provisioning, run one candidate build in the MSVC-loaded PowerShell
 session from the checkout:
 
 ```powershell
@@ -92,20 +119,32 @@ Existing MCP processes may stay running, but enable only the intended CargoCheck
 provider during neutral selection cases so duplicate tool names cannot confound
 the observation. Record enabled tools for each trial.
 
-For Codex clients using `config.toml`, the descriptor above corresponds to a
-separate entry like this (replace all example paths with the recorded paths):
+For a Windows-native Codex client using `config.toml`, run this in the same
+PowerShell after creating `$ctxCandidate`, `$ctxCargo`, and `$ctxPilot`. It prints
+an entry with your actual paths; it does not change your configuration:
 
-```toml
+```powershell
+@"
 [mcp_servers.clean_ctx_cargo_pilot]
-command = 'C:\absolute\path\clean-ctx.exe'
-args = ['--workspace-root', 'C:\absolute\path\ctx-codex-pilot', '--cargo-path', 'C:\absolute\path\cargo.exe']
+command = '$ctxCandidate'
+args = ['--workspace-root', '$ctxPilot', '--cargo-path', '$ctxCargo']
+env_vars = ['PATH', 'INCLUDE', 'LIB', 'LIBPATH', 'SystemRoot', 'TEMP', 'TMP', 'USERPROFILE', 'RUSTUP_HOME', 'CARGO_HOME']
+"@
 ```
 
-Add the entry to the client's active configuration; preserve existing entries.
+Copy the printed entry into the active Codex configuration, preserving existing
+entries. If `clean_ctx_cargo_pilot` already exists, update that entry instead of
+creating a duplicate TOML table. `env_vars` requests forwarding of these named
+variables from the Codex client to the server; it does not populate a missing
+MSVC environment or change CargoCheck's strict child-environment policy. Restart
+the client from the MSVC developer environment so the forwarded values exist.
+
 Use Windows paths only for a Windows-native client/server. A WSL or remote client
 must use paths and a binary valid in that execution environment. Reconnect the
 pilot server as required by the client, and verify `cargo_check` is listed before
 prompting. Configuration alone does not prove that Codex can invoke the tool.
+If the client cannot expose its exact version, record that as unknown; do not
+invent it. Preserve the server error if connection fails.
 
 ## Trials
 
