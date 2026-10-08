@@ -89,6 +89,31 @@ The source checks do not claim a specialized Jasmine `Φspy` marker: the current
 spy marker extractor is Vitest-specific. Both complete spy source forms are
 preserved in the observed model content, and both styles produce TestBed edges.
 
+## C# framework/meta-layer MCP boundary
+
+```powershell
+pwsh -NoProfile -File verification/native-diagnostics/scripts/Verify-CSharpMetaLive.ps1
+```
+
+This driver reuses the existing `src/test_files/dotnet` fixtures, stdio session
+helper, read-only SQLite exporter, and production Binary0x04 decoder. It copies
+only four fixture files into an isolated runtime and checks:
+
+- ASP.NET `UserController`: exact `api/[controller]` route and all five actions;
+- EF Core `AppDbContext`: `User`, `Order`, and `Product` entity relations;
+- SignalR `ChatHub`: `SendMessage` and `SendToUser` hub-method targets;
+- AutoMapper `UserProfile`: source and destination entity relations;
+- an ordinary class: no fabricated .NET framework relations.
+
+Each expected relation must have the correct typed owner and exact target name
+in the decoded durable oracle and in a workspace query after fresh-session
+restore. The driver also verifies model-visible owner/method evidence and
+byte-exact source when raw passthrough is declared. All four framework cases
+and the negative control passed on Linux on 2026-10-08. Evidence is retained
+under `target/csharp-meta-verification/<unique-run>` with the binary hash.
+The driver does not compile these framework fixtures, infer runtime .NET DI
+registrations, or establish actual model-host consumption.
+
 This proves the built adapter handles real producer output. It does not prove
 Claude accepts or consumes the replacement, establish VS Code rendering or
 host persistence, constitute tracked regression-test evidence, or replace CI.
