@@ -17,7 +17,7 @@ fn build_removes_boilerplate_and_preserves_warnings_and_summary() {
 
 #[test]
 fn warning_prevents_success_collapse_and_preserves_diagnostics() {
-    let input = "warning NU1900: retained\nTest Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds";
+    let input = "  Determining projects to restore...\nwarning NU1900: retained\nTest Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds";
     let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
     assert!(result.text.contains("Test Run Passed."));
     assert!(result.text.contains("Total tests: 42"));
@@ -115,4 +115,12 @@ fn test_truncation_retains_terminal_passed_summary() {
             .contains("Passed! -  Failed: 0, Passed: 11, Skipped: 0, Total: 11, Duration: 1 s")
     );
     assert_eq!(result.text.lines().count(), 100);
+}
+
+#[test]
+fn warning_without_removable_noise_stays_exactly_unchanged() {
+    let input = "warning NU1900: retained\nTest Run Passed.\nTotal tests: 42\n     Passed: 42\n Total time: 1.234 Seconds";
+    let result = filter_dotnet_diagnostics(input, DotnetOperation::Test);
+    assert_eq!(result.text, input);
+    assert!(result.facts.is_none());
 }

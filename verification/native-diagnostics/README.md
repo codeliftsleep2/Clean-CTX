@@ -42,6 +42,9 @@ individual named cases; unknown names fail rather than selecting zero cases.
 - Each reduction uses the expected stdout filter, leaves stderr and unrelated
   metadata unchanged, and emits exactly one disclosure.
 - Successful empty TSC output stays empty.
+- A real two-test MSTest run checks the installed .NET 10 runtime and loaded
+  test assembly; its clean 2/2 VSTest summary collapses under `dotnet-test-v1`.
+  An intentional 1/2 failure receives no replacement and keeps its diagnostic.
 - A real TS2322 failure maps to `PostToolUseFailure` and receives no replacement.
 - Informational .NET and TypeScript commands receive no replacement.
 - Classic `@angular/build:karma` runs two Jasmine/TestBed tests in Chromium.
@@ -79,7 +82,8 @@ pwsh -NoProfile -File verification/native-diagnostics/scripts/Verify-AngularTest
 This second driver uses the same Karma/Jasmine and Vitest specs through
 registered `provide_code_context`, the existing read-only SQLite exporter, and
 the production Binary0x04 decoder. It checks model-visible suite/spy source,
-exact raw passthrough when declared, one `TestArtifact --Tests--> DiagnosticProbe`
+exact raw passthrough when declared, the exact compressed `T @spy` target
+when compression is selected, one `TestArtifact --Tests--> DiagnosticProbe`
 edge per spec, and a fresh-session restore plus workspace query retaining that
 edge. A generic spec with comment/string-only fake TestBed calls must produce
 no Angular Tests edge. All these MCP observations passed on Linux. Generated
@@ -129,7 +133,8 @@ pwsh -NoProfile -File verification/native-diagnostics/scripts/Verify-AngularAppM
 This driver preserves the existing Angular fixture tree, including HTML/SCSS
 companions and NgRx/routing relative paths. Its assertions cover legacy
 decorated inputs/outputs and constructor injection, generic signal-based
-inputs/outputs and `inject(UserService)` token metadata at High fidelity, NgRx dispatch/selection and effect actions,
+inputs/outputs and `inject(UserService)` token metadata at High fidelity,
+NgRx dispatch/selection and effect actions,
 and route/component/guard/resolver relations. An ordinary TypeScript class
 must not manufacture Angular or NgRx facts. Required edges are scoped to the
 asserting source file, including when fixture classes share a display name.
@@ -163,3 +168,46 @@ Current Angular marker generation is 4 and semantic generation is 3.
 Focused verification passed 433 Angular tests, 15 compatibility tests, package
 Clippy, and the existing five-case application MCP driver plus its negative
 control. Builds used the locked dependency graph; no full suite was run.
+
+
+## Local phase closure — 2026-10-08
+
+| Active phase | Result |
+|---|---|
+| Real C#/.NET, TypeScript and Angular producer output | Passed: 12 isolated cases, including real VSTest success and intentional failure |
+| Classic Karma/Jasmine, unit-test Karma/Jasmine and Vitest/TestBed | Passed: 2/2 tests in each runner; required inputs/models and typed outputs execute |
+| C# framework metadata and source-file identity | Passed: four framework fixtures, negative control, and base/constructor dependency queries |
+| Angular application and testing metadata | Passed: required inputs/models, spaced/nested generics, DI tokens, NgRx, routing and both spy APIs |
+| Physical baseline and restored-query boundary | Passed: complete Binary0x04 decoding, aligned snapshots, exact raw passthrough, compressed spy target and fresh-session queries |
+| Focused tracked verification and repository guards | Passed: 600 tests, all-target/all-feature package Clippy, formatting, active-file sizes and strict UTF-8 |
+
+Three unchanged tracked `required_signal_regression_` cases observed two
+intended failures and one passing negative control before the fix, then all
+three passed. Angular marker generation is now **5** and semantic generation
+**4**, so pre-fix durable Angular facts must be regenerated. Existing modern
+fixtures and both real TestBed runners exercise the corrected syntax.
+
+Final review also corrected two operator expectations rather than product
+contracts: compressed test metadata names the exact spy target instead of
+retaining literal `spyOn` syntax; and main's neutral C# base-list relation is
+`HasBaseType`, distinct from `HasConstructorParameterType`. The constructor
+harness checks all four returned relations and both declaring-file identities,
+then verifies only the appropriate constructor edge disappears after editing.
+Workspace queries return all relations; the harness selects each relation in
+its captured evidence and does not claim server-side relation filtering.
+
+The old .NET warning regression had lost its removable boilerplate in a prior
+fixture edit while still expecting a disclosure. That fixture now includes
+restore boilerplate; every original warning/summary/disclosure assertion stays
+intact. A separate tracked case requires exact unchanged output and no filter
+facts when a warning-bearing input has nothing removable. No production .NET
+filter policy changed.
+
+These are completed **local implementation/protocol phases**, not a claim that
+all external acceptance gates passed. The full repository suite stays CI-only;
+this cloud's read-only GitHub Actions request returned `Forbidden`, so CI status
+is unobserved. No authenticated Claude host is available here (CLI absent and
+neither supported API-key nor OAuth binding present). Actual Claude hook
+acceptance, model consumption and host persistence/resume remain external
+acceptance evidence; Codex output cannot certify those Claude-specific surfaces.
+The CargoCheck host pilot remains paused under the owner's priority change.

@@ -36,6 +36,11 @@ owner-verified green. The TypeScript/Angular slice is owner-verified green. The
 C#/.NET and Java/Spring Maven slices are owner-verified green. Deterministic
 coverage for all approved supported-language families is complete;
 representative live field verification remains before milestone closure.
+The 2026-10-08 C#/Angular continuation completed local producer, metadata,
+Binary0x04, and restored-query phases; actual Claude consumption and CI status
+remain separate acceptance evidence. See
+[`verification/native-diagnostics/README.md`](../../verification/native-diagnostics/README.md#local-phase-closure--2026-10-08)
+for the scoped phase record.
 
 **Scope:** Architecture freeze and incremental implementation record for the
 supported-toolchain native diagnostic slices. Cargo verification is performed
@@ -619,8 +624,8 @@ The completed deterministic coverage is:
 |---|---|---|---|
 | Git baseline | `git diff`, `git show` | stdout | Owner-green plus prior live Claude evidence |
 | Rust | `cargo build`, `cargo check`, `cargo clippy` | stderr | Owner-green; no representative Rust live workflow required |
-| TypeScript/Angular | frozen TSC, Angular CLI, ESLint, and bounded Node build forms | stdout | Owner-green; live representative pending |
-| C#/.NET | `dotnet build`, `dotnet test` | stdout | Owner-green; live representative pending |
+| TypeScript/Angular | frozen TSC, Angular CLI, ESLint, and bounded Node build forms | stdout | Owner-green; real producer/MCP observations passed; Claude consumption pending |
+| C#/.NET | `dotnet build`, `dotnet test` | stdout | Owner-green; real build/test and MCP observations passed; Claude consumption pending |
 | Java/Spring | Maven compile/package/install, optionally preceded by clean | stdout | Owner-green; live representative pending |
 
 The final static architecture audit confirms:

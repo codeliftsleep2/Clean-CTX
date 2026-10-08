@@ -9,12 +9,12 @@ import { UserService } from './user.service';
 })
 export class UserCardModernComponent {
   // Signal-based inputs (Angular 17.1+)
-  readonly userId = input<string>();
+  readonly userId = input.required < string > ();
   readonly userName = input<string>('default');
-  readonly items = input<any[]>([]);
+  readonly items = input < any[] > ([]);
 
   // Model (two-way binding signal) (Angular 17.1+)
-  readonly selected = model(false);
+  readonly selected = model.required<boolean>();
 
   // Signal-based output (Angular 17.1+)
   readonly userDeleted = output<string>();

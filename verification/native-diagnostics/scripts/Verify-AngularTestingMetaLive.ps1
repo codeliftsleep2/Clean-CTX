@@ -64,7 +64,14 @@ try {
             Require ($text -ceq [IO.File]::ReadAllText($path)) "$($case.file): raw source changed"
         }
         Require ($text.Contains($case.suite)) "$($case.file): suite missing in model content"
-        if ($case.spy) { Require ($text.Contains($case.spy)) "$($case.file): spy source missing in model content" }
+        if ($case.spy) {
+            if ($response.result._meta.content_kind -eq 'raw_passthrough') {
+                Require ($text.Contains($case.spy)) "$($case.file): spy source missing in raw model content"
+            } else {
+                Require ($response.result._meta.content_kind -eq 'skeleton_with_verbatim_bodies') "$($case.file): unexpected model content kind"
+                Require (@($text -split '\r?\n' | Where-Object { $_ -ceq 'T @spy = fixture.componentInstance.renderLabel' }).Count -eq 1) "$($case.file): exact spy target missing or duplicated in compressed model content"
+            }
+        }
     }
 } finally { Stop-CleanCtxSession $session; $session=$null }
 

@@ -298,40 +298,46 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                 scan += 1;
             }
             if scan < len {
-                let Some(func_name) = ["input", "output", "model", "inject"]
-                    .into_iter()
-                    .find(|name| body[scan..].starts_with(name))
-                else {
+                let Some((func_name, kind)) = [
+                    ("input", SignalKind::Input),
+                    ("output", SignalKind::Output),
+                    ("model", SignalKind::Model),
+                    ("inject", SignalKind::Inject),
+                ]
+                .into_iter()
+                .find(|(name, _)| body[scan..].starts_with(name)) else {
                     i += 1;
                     continue;
                 };
                 let mut open_paren = scan + func_name.len();
+                if matches!(kind, SignalKind::Input | SignalKind::Model)
+                    && body[open_paren..].starts_with(".required")
+                {
+                    open_paren += ".required".len();
+                }
+                while bytes.get(open_paren).is_some_and(u8::is_ascii_whitespace) {
+                    open_paren += 1;
+                }
                 if bytes.get(open_paren) == Some(&b'<') {
-                    let param = extract_entity_type(&body[open_paren + 1..]);
-                    open_paren += param.len() + 1;
+                    let rest = &body[open_paren + 1..];
+                    let param = extract_entity_type(rest);
+                    open_paren += 1 + rest.len() - rest.trim_start().len() + param.len();
+                    while bytes.get(open_paren).is_some_and(u8::is_ascii_whitespace) {
+                        open_paren += 1;
+                    }
                     if bytes.get(open_paren) != Some(&b'>') {
                         i += 1;
                         continue;
                     }
                     open_paren += 1;
                 }
+                while bytes.get(open_paren).is_some_and(u8::is_ascii_whitespace) {
+                    open_paren += 1;
+                }
                 if bytes.get(open_paren) != Some(&b'(') {
                     i += 1;
                     continue;
                 }
-
-                let kind = match func_name {
-                    "input" => SignalKind::Input,
-                    "output" => SignalKind::Output,
-                    "model" => SignalKind::Model,
-                    "inject" => SignalKind::Inject,
-                    // This match is exhaustive — the if/else above only matches these four.
-                    // Fallback to `Input` with a debug_assert for development safety.
-                    _ => {
-                        debug_assert!(false, "Unhandled signal kind: {}", func_name);
-                        SignalKind::Input
-                    }
-                };
 
                 // F-ANG-09: if the call is unterminated, treat as no alias.
                 let arg = consume_call_expression(body, open_paren)

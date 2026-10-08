@@ -14,6 +14,16 @@ version-history registry lives in
 
 ### Fixed
 
+* Native operator verification now covers real .NET test success/failure as
+  well as both Angular test frameworks. Compressed spy evidence and C# neutral
+  base-reference expectations follow their production contracts. The .NET
+  warning fixture again contains removable boilerplate; its original assertions
+  remain, with an additional exact unchanged-output check.
+* Angular signal metadata recognizes `input.required` and `model.required`,
+  including spaced and nested generic arguments, while rejecting lookalikes.
+  Angular marker generation is now 5 and semantic generation is 4. Existing
+  Karma/Jasmine and Vitest/TestBed fixtures exercise required inputs, required
+  models, and typed outputs with the real Angular compiler and runtime.
 * Angular `inject(Token)` metadata uses the written dependency token instead
   of its receiving field name, in both markers and semantic edges. Empty or
   computed token expressions produce no invented dependency. Angular marker

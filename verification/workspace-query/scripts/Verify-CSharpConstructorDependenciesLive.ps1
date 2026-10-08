@@ -240,13 +240,22 @@ public sealed class MethodOnly
         $alternative.domain -ne 'builtin' -or
         $alternative.entity_type -ne 'TypeRef' -or
         $alternative.name -ne 'IFooService' -or
-        $alternative.relation -ne 'HasConstructorParameterType') {
+        $alternative.relation -ne 'HasBaseType') {
         throw "Interface coverage omitted the supported TypeRef alternative: $($unsupportedInterface.coverage | ConvertTo-Json -Compress -Depth 20)"
     }
-    Write-Host 'PASS: a real Interface identity points to the supported TypeRef constructor-consumer query.'
-
+    Write-Host 'PASS: a real Interface identity points to the source-true TypeRef base-list query.'
     $reverse = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
-    $reverseEdges = @($reverse.edges)
+    if (@($reverse.edges).Count -ne 4) { throw 'Expected three constructor edges and one source-true base edge' }
+    $baseEdges = @($reverse.edges | Where-Object relation -eq 'HasBaseType')
+    if ($baseEdges.Count -ne 1 -or $baseEdges[0].subject.name -ne 'ImplementsOnly' -or
+        $baseEdges[0].subject.file -ne $implementsPath -or $baseEdges[0].subject.entity_type -ne 'Class' -or
+        $baseEdges[0].object.entity_type -ne 'TypeRef' -or $baseEdges[0].object.name -ne 'IFooService' -or
+        $baseEdges[0].object.file -ne $implementsPath -or $baseEdges[0].relation -ne 'HasBaseType') {
+        throw "Source-true base-list alternative returned incorrect identities: $($reverse | ConvertTo-Json -Compress -Depth 20)"
+    }
+    Write-Host 'PASS: neutral cross-file base references retain the declaring class file.'
+
+    $reverseEdges = @($reverse.edges | Where-Object relation -eq 'HasConstructorParameterType')
     if ($reverseEdges.Count -ne 3) {
         throw "Expected exactly three constructor consumers, found $($reverseEdges.Count): $($reverse | ConvertTo-Json -Compress -Depth 20)"
     }
@@ -315,7 +324,7 @@ public sealed class MethodOnly
 
     $firstKeys = @($reverseEdges | ForEach-Object { Edge-Key $_ } | Sort-Object)
     $repeated = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
-    $repeatedKeys = @($repeated.edges | ForEach-Object { Edge-Key $_ } | Sort-Object)
+    $repeatedKeys = @($repeated.edges | Where-Object relation -eq 'HasConstructorParameterType' | ForEach-Object { Edge-Key $_ } | Sort-Object)
     if (($firstKeys -join "`n") -ne ($repeatedKeys -join "`n")) {
         throw "Repeated constructor-consumer lookup changed its semantic answer: $($repeated | ConvertTo-Json -Compress -Depth 20)"
     }
@@ -331,7 +340,8 @@ public sealed class BarController
 '@
     Compile-File $barPath
     $afterReplacement = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
-    $replacementEdges = @($afterReplacement.edges)
+    $replacementEdges = @($afterReplacement.edges | Where-Object relation -eq 'HasConstructorParameterType')
+    if (@($afterReplacement.edges).Count -ne 3) { throw 'Expected two remaining constructor edges and the unchanged base edge' }
     if ($replacementEdges.Count -ne 2 -or
         @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'BazService' $bazPath }).Count -ne 1 -or
         @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'AttributedConsumer' $attributedPath }).Count -ne 1) {

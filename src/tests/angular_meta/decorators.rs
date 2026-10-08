@@ -480,3 +480,67 @@ class DiComponent {
     let (_, _, _, injects, _) = super::extract_graph_entries(source).unwrap();
     assert!(injects.is_empty(), "{injects:?}");
 }
+
+#[test]
+fn required_signal_regression_recognizes_inputs_and_models() {
+    let source = r#"@Component({ selector: 'required' })
+class Required {
+    readonly userId = input.required<string>();
+    readonly selected = model.required<boolean>();
+}"#;
+    assert_eq!(
+        extract_io_fields(source, Fidelity::High),
+        vec![(true, "userId".into())]
+    );
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Φmodel:") && line.contains("selected")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn required_signal_regression_preserves_generic_whitespace_and_nested_types() {
+    let source = r#"@Component({ selector: 'spaced' })
+class Spaced {
+    readonly userId = input.required< string > ();
+    readonly items = input < Array<{ tag: 'x>y' }> > ([]);
+    readonly changed = output < string > ();
+    readonly selected = model.required < boolean > ();
+}"#;
+    assert_eq!(
+        extract_io_fields(source, Fidelity::High),
+        vec![
+            (true, "userId".into()),
+            (true, "items".into()),
+            (false, "changed".into())
+        ]
+    );
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Φmodel:") && line.contains("selected")),
+        "{lines:?}"
+    );
+}
+
+#[test]
+fn required_signal_regression_rejects_lookalikes_and_lexical_decoys() {
+    let source = r#"@Component({ selector: 'decoys' })
+class Decoys {
+    readonly other = input.requiredOther<string>();
+    readonly invalid = output.required<string>();
+    readonly prefixed = inputValue<string>();
+    // readonly fake = input.required<string>();
+    readonly text = 'fake = model.required<boolean>()';
+}"#;
+    assert!(extract_io_fields(source, Fidelity::High).is_empty());
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        !lines.iter().any(|line| line.starts_with("Φmodel:")),
+        "{lines:?}"
+    );
+}

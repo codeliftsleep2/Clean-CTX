@@ -109,8 +109,12 @@ function Verify-Case($Case) {
         $filters = @($facts.fields | Where-Object { $_.ContainsKey('filter') })
         Require ($filters.Count -eq 1 -and $filters[0].field -eq 'stdout' -and $filters[0].filter.filter_id -eq $Case.filter) "$($Case.name): wrong filter/stream authority"
         Require ([regex]::Matches($updated.stdout, '§FILTERED ').Count -eq 1) "$($Case.name): expected exactly one disclosure"
+        if ($Case.ContainsKey('producer_pattern')) {
+            Require (($producer.stdout + $producer.stderr) -match $Case.producer_pattern) "$($Case.name): real completed test counts missing"
+            Require ($filters[0].filter.collapsed -eq $true) "$($Case.name): expected clean test-summary collapse"
+        }
         foreach ($needle in $Case.keep) {
-            Require (($producer.stdout + $producer.stderr).Contains($needle)) "$($Case.name): real producer evidence missing $needle"
+            if (-not $Case.ContainsKey('producer_pattern')) { Require (($producer.stdout + $producer.stderr).Contains($needle)) "$($Case.name): real producer evidence missing $needle" }
             Require (($updated.stdout + $updated.stderr).Contains($needle)) "$($Case.name): lost $needle"
         }
     } else {
@@ -125,6 +129,8 @@ function Verify-Case($Case) {
 
 $cases = @(
     @{ name='dotnet-warning'; exe=$DotnetPath; args=@('build', '--disable-build-servers', '-v:minimal'); cwd='dotnet'; command='dotnet build'; exit=0; filter='dotnet-build-v1'; keep=@('CS1030', 'CTX_OPERATOR_WARNING', 'Build succeeded.', 'Warning(s)', 'Error(s)') },
+    @{ name='dotnet-test'; exe=$DotnetPath; args=@('test', '--disable-build-servers', '-v:minimal'); cwd='dotnet-tests'; command='dotnet test --disable-build-servers -v:minimal'; exit=0; filter='dotnet-test-v1'; keep=@('2 passed, 0 failed, 0 skipped'); producer_pattern='Passed!\s*-\s*Failed:\s*0,\s*Passed:\s*2,\s*Skipped:\s*0,\s*Total:\s*2,' },
+    @{ name='dotnet-test-failure'; exe=$DotnetPath; args=@('test', '--disable-build-servers', '-v:minimal', '-p:ProbeFail=true'); cwd='dotnet-tests'; command='dotnet test --disable-build-servers -v:minimal -p:ProbeFail=true'; exit=1; filter=''; keep=@('Failed!', 'CTX_OPERATOR_FORCED_FAILURE'); reason='unsupported_event' },
     @{ name='dotnet-info'; exe=$DotnetPath; args=@('--version'); cwd='dotnet'; command='dotnet --version'; exit=0; filter=''; keep=@(); reason='unchanged' },
     @{ name='eslint-warning'; exe=$NodePath; args=@((Join-Path $modules 'eslint/bin/eslint.js'), 'warning.js'); cwd=''; command='eslint warning.js'; exit=0; filter='eslint-v1'; keep=@('CTX_OPERATOR_UNUSED', 'no-unused-vars', '1 problem', '1 warning'); },
     @{ name='tsc-clean'; exe=$NodePath; args=@((Join-Path $modules 'typescript/bin/tsc'), '--noEmit', '--skipLibCheck', 'valid.ts'); cwd=''; command='tsc --noEmit valid.ts'; exit=0; filter=''; keep=@(); reason='unchanged' },
