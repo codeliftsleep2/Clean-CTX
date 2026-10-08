@@ -76,6 +76,10 @@ foreach ($case in $cases) {
     & $HelperPath baseline-oracle (Join-Path $directory 'baseline.bin') (Join-Path $directory 'baseline.json') $oracle
     Require ($LASTEXITCODE -eq 0) "$($case.file): production Binary0x04 decoding failed"
     $payload = (([IO.File]::ReadAllText($oracle)) -replace '^[^\r\n]*\r?\n','') | ConvertFrom-Json -Depth 100
+    if ($case.spy) {
+        $spies = @($payload.type_aliases | Where-Object { $_.alias -eq '@spy' -and $_.original_type -eq 'fixture.componentInstance.renderLabel' })
+        Require ($spies.Count -eq 1) "$($case.file): durable spy marker missing or duplicated"
+    }
     $tests = @($payload.semantic_edges | Where-Object relation -eq 'Tests')
     if ($case.target) {
         Require ($tests.Count -eq 1 -and $tests[0].subject.name -eq $case.file -and $tests[0].object.name -eq $case.target) "$($case.file): expected one exact Tests edge"

@@ -85,9 +85,15 @@ edge. A generic spec with comment/string-only fake TestBed calls must produce
 no Angular Tests edge. All these MCP observations passed on Linux. Generated
 evidence lives under `target/angular-testing-meta-verification/<unique-run>`.
 
-The source checks do not claim a specialized Jasmine `Φspy` marker: the current
-spy marker extractor is Vitest-specific. Both complete spy source forms are
-preserved in the observed model content, and both styles produce TestBed edges.
+Both Jasmine and Vitest now produce specialized `Φspy` markers. The driver
+requires their exact `fixture.componentInstance.renderLabel` spy target once
+in the decoded durable metadata, alongside the TestBed edges and separate
+model-visible source checks. Jasmine `createSpy`, `createSpyObj`, `spyOn`, and
+`spyOnProperty` use the existing lexical guards and sorted/deduplicated marker
+projection. The marker expansion names both frameworks. Three tracked
+regressions (two observed RED before the fix), all 33 focused testing checks,
+package Clippy, and the updated MCP driver passed. Only the Angular marker
+producer generation advances again, to 3; semantic generation remains 2.
 
 ## C# framework/meta-layer MCP boundary
 

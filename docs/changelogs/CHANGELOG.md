@@ -14,6 +14,10 @@ version-history registry lives in
 
 ### Fixed
 
+* Angular testing metadata now recognizes Jasmine spy factories, method spies,
+  and property spies alongside Vitest spies. Comment/string guards, marker
+  deduplication, and fidelity gating remain shared. Only the Angular marker
+  producer generation advances to 3; semantic generation remains 2.
 * Angular signal-based input/output extraction recognizes generic calls and
   retains declared field names instead of whitespace-derived `?` names.
   Comment and string matches no longer produce signal fields or injection

@@ -64,6 +64,50 @@ fn high_spy_markers(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn jasmine_spy_regression_preserves_targets_and_assigned_spy_names() {
+    let source = r#"
+const callback = jasmine.createSpy('callback');
+const serviceMock = jasmine.createSpyObj('Service', ['load', 'save']);
+spyOn(service, 'load').and.returnValue(value);
+spyOnProperty(service, 'ready', 'get').and.returnValue(true);
+"#;
+    assert_eq!(
+        high_spy_markers(source),
+        [
+            "Φspy:callback",
+            "Φspy:service.load",
+            "Φspy:service.ready",
+            "Φspy:serviceMock"
+        ]
+    );
+    assert!(is_testing_source(source, Path::new("setup.ts")));
+}
+
+#[test]
+fn jasmine_spy_regression_ignores_comments_strings_and_qualified_lookalikes() {
+    let source = r#"
+// spyOn(fake, 'load');
+const text = "jasmine.createSpy('fake')";
+other.spyOn(fake, 'load');
+const callback = jasmine.createSpy('real');
+"#;
+    assert_eq!(high_spy_markers(source), ["Φspy:callback"]);
+}
+
+#[test]
+fn jasmine_spy_regression_retains_vitest_and_high_fidelity_gating() {
+    let source = "spyOn(service, 'load'); vi.spyOn(service, 'load'); const callback = vi.fn();";
+    assert_eq!(
+        high_spy_markers(source),
+        ["Φspy:callback", "Φspy:service.load"]
+    );
+    for fidelity in [Fidelity::Low, Fidelity::Medium] {
+        let shape = extract_testing_shape(source, fidelity).unwrap();
+        assert!(!shape.render(fidelity).contains("Φspy:"));
+    }
+}
+
+#[test]
 fn red_a1_spec_path_activates_without_angular_decorators() {
     assert!(is_testing_source(BASIC_SPEC, Path::new("foo.spec.ts")));
 }
@@ -99,14 +143,17 @@ fn testing_marker_vocabulary_round_trips_through_shared_phi_registry() {
         expand_phi::<TestKind>("ΦtestBed"),
         Some("TestBed configuration")
     );
-    assert_eq!(expand_phi::<TestKind>("Φspy"), Some("Vitest spy/mock"));
+    assert_eq!(
+        expand_phi::<TestKind>("Φspy"),
+        Some("Jasmine/Vitest spy/mock")
+    );
     let mut prefixes = std::collections::HashSet::new();
     for kind in TestKind::all_in_expand_order() {
         assert!(prefixes.insert(kind.marker_prefix()));
     }
     assert_eq!(
         crate::angular_meta::markers::expand_phi_in_line("Φspy:service.load"),
-        "Vitest spy/mock service.load"
+        "Jasmine/Vitest spy/mock service.load"
     );
 }
 

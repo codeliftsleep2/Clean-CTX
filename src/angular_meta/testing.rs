@@ -1,4 +1,4 @@
-//! Angular TestBed + Vitest source-shape extraction.
+//! Angular TestBed, Jasmine, and Vitest source-shape extraction.
 //!
 //! This detector is independent of Angular decorators. It deliberately uses
 //! conservative string scanning and the shared meta-layer delimiter helpers;
@@ -36,7 +36,7 @@ impl PhiMarker for TestKind {
             Self::Describe => "describe suite",
             Self::Test => "test case",
             Self::TestBed => "TestBed configuration",
-            Self::Spy => "Vitest spy/mock",
+            Self::Spy => "Jasmine/Vitest spy/mock",
         }
     }
 
@@ -136,6 +136,9 @@ pub fn is_testing_source(source: &str, path: &Path) -> bool {
         || source.contains("describe(")
         || source.contains("TestBed")
         || source.contains("vi.fn(")
+        || source.contains("jasmine.createSpy")
+        || source.contains("spyOn(")
+        || source.contains("spyOnProperty(")
 }
 
 /// Extract generic testing markers. The caller owns path-based eligibility;
@@ -155,7 +158,7 @@ pub(crate) fn extract_testing_shape_with_regions(
     let describe_count = describes.len();
     let test_count = tests.len();
     let test_bed = extract_test_bed_summaries(source, lexical_regions);
-    let spies = extract_vitest_spies(source, lexical_regions);
+    let spies = extract_testing_spies(source, lexical_regions);
     let shape = TestingShape {
         describe_count,
         test_count,
@@ -404,27 +407,31 @@ fn extract_provider_token(entry: &str) -> Option<String> {
     identifier_like(token).then(|| token.to_string())
 }
 
-fn extract_vitest_spies(source: &str, lexical_regions: &LexicalRegions) -> Vec<String> {
+fn extract_testing_spies(source: &str, lexical_regions: &LexicalRegions) -> Vec<String> {
     let mut spies = BTreeSet::new();
-    for start in call_positions(source, "vi.fn(", lexical_regions) {
-        let name = enclosing_object_assignment(source, start)
-            .unwrap_or_else(|| assignment_target_before(source, start));
-        if let Some(name) = name {
-            spies.insert(name.to_string());
+    for needle in ["vi.fn(", "jasmine.createSpy(", "jasmine.createSpyObj("] {
+        for start in call_positions(source, needle, lexical_regions) {
+            let name = enclosing_object_assignment(source, start)
+                .unwrap_or_else(|| assignment_target_before(source, start));
+            if let Some(name) = name {
+                spies.insert(name.to_string());
+            }
         }
     }
-    for start in call_positions(source, "vi.spyOn(", lexical_regions) {
-        let open = start + "vi.spyOn".len();
-        let Some(close) = find_matching(source, open, '(', ')') else {
-            continue;
-        };
-        let args = crate::angular_meta::util::split_top_level(&source[open + 1..close], ',');
-        if args.len() >= 2
-            && identifier_path(args[0].trim())
-            && let Some((method, _)) = first_literal_argument(&args[1], 0)
-            && identifier_like(&method)
-        {
-            spies.insert(format!("{}.{}", args[0].trim(), method));
+    for needle in ["vi.spyOn(", "spyOn(", "spyOnProperty("] {
+        for start in call_positions(source, needle, lexical_regions) {
+            let open = start + needle.len() - 1;
+            let Some(close) = find_matching(source, open, '(', ')') else {
+                continue;
+            };
+            let args = crate::angular_meta::util::split_top_level(&source[open + 1..close], ',');
+            if args.len() >= 2
+                && identifier_path(args[0].trim())
+                && let Some((method, _)) = first_literal_argument(&args[1], 0)
+                && identifier_like(&method)
+            {
+                spies.insert(format!("{}.{}", args[0].trim(), method));
+            }
         }
     }
     for start in call_positions(source, "vi.mock(", lexical_regions) {
