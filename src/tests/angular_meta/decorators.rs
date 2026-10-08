@@ -2,8 +2,60 @@
 //
 // Tests for decorator extraction from a class capture.
 
-use crate::angular_meta::decorators::extract_decorators;
+use crate::angular_meta::decorators::{extract_decorators, extract_io_fields};
 use crate::compression::Fidelity;
+
+#[test]
+fn modern_io_regression_preserves_generic_and_typed_field_names() {
+    let source = r#"@Component({ selector: 'modern' })
+class Modern {
+    readonly userId = input<string>();
+    readonly items = input<Array<{ id: number }>>([]);
+    readonly changed = output<string>();
+    readonly selected = model(false);
+    value: string = input('ready');
+}"#;
+    let fields = extract_io_fields(source, Fidelity::High);
+    for (input, name) in [
+        (true, "userId"),
+        (true, "items"),
+        (false, "changed"),
+        (true, "value"),
+    ] {
+        assert!(
+            fields.contains(&(input, name.to_string())),
+            "missing {name}: {fields:?}"
+        );
+    }
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.starts_with("Φmodel:") && line.contains("selected")),
+        "{lines:?}"
+    );
+    assert!(lines.iter().all(|line| !line.contains('?')), "{lines:?}");
+}
+
+#[test]
+fn modern_io_regression_ignores_commented_and_quoted_signal_calls() {
+    let source = r#"@Component({ selector: 'modern' })
+class Modern {
+    // readonly fake = input<string>();
+    /* readonly dependency = inject(FakeService); */
+    text = 'other = output()';
+    readonly valid = input(1);
+}"#;
+    assert_eq!(
+        extract_io_fields(source, Fidelity::High),
+        vec![(true, "valid".to_string())]
+    );
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        lines.iter().all(|line| !line.starts_with("Φinjects:")),
+        "{lines:?}"
+    );
+}
 
 fn lines_to_vec(opt: Option<crate::angular_meta::decorators::DecoratorsResult>) -> Vec<String> {
     opt.map(|r| r.lines).unwrap_or_default()

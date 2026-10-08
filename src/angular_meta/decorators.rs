@@ -25,14 +25,16 @@ use crate::angular_meta::decorator_args::{
     parse_provided_in,
 };
 use crate::angular_meta::decorator_scan::{
-    DecoratorKind, collect_decorators, collect_field_decorators, is_word_byte,
+    DecoratorKind, collect_decorators, collect_field_decorators,
 };
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
     build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
 };
 use crate::compression::Fidelity;
-use crate::meta_util::consume_call_expression;
+use crate::meta_util::{
+    LexicalRegions, consume_call_expression, extract_decl_name, extract_entity_type,
+};
 
 /// The kind of Angular class that can be extracted from decorators.
 /// Used as a private extraction helper — not a shared architectural type.
@@ -285,33 +287,38 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
     let mut out: Vec<SignalField> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();
+    let lexical_regions = LexicalRegions::new(body);
     let mut i = 0;
 
     while i < len {
-        if bytes[i] == b'=' {
+        if bytes[i] == b'=' && !lexical_regions.contains(i) {
             let after_eq = i + 1;
             let mut scan = after_eq;
             while scan < len && (bytes[scan] == b' ' || bytes[scan] == b'\t') {
                 scan += 1;
             }
             if scan < len {
-                let (func_name, open_paren) =
-                    if scan + 5 < len && &bytes[scan..scan + 6] == b"input(" {
-                        ("input", scan + 5)
-                    } else if scan + 5 < len && &bytes[scan..scan + 6] == b"model(" {
-                        ("model", scan + 5)
-                    } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
-                        ("output", scan + 6)
-                    } else if scan + 5 < len
-                        && &bytes[scan..scan + 6] == b"inject"
-                        && scan + 6 < len
-                        && bytes[scan + 6] == b'('
-                    {
-                        ("inject", scan + 6)
-                    } else {
+                let Some(func_name) = ["input", "output", "model", "inject"]
+                    .into_iter()
+                    .find(|name| body[scan..].starts_with(name))
+                else {
+                    i += 1;
+                    continue;
+                };
+                let mut open_paren = scan + func_name.len();
+                if bytes.get(open_paren) == Some(&b'<') {
+                    let param = extract_entity_type(&body[open_paren + 1..]);
+                    open_paren += param.len() + 1;
+                    if bytes.get(open_paren) != Some(&b'>') {
                         i += 1;
                         continue;
-                    };
+                    }
+                    open_paren += 1;
+                }
+                if bytes.get(open_paren) != Some(&b'(') {
+                    i += 1;
+                    continue;
+                }
 
                 let kind = match func_name {
                     "input" => SignalKind::Input,
@@ -332,21 +339,9 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     .unwrap_or_default();
                 let alias = parse_first_string_arg(&arg);
 
-                // Walk backwards from `=` to find the field name.
-                let name_end = if i > 0 { i } else { 0 };
-                let mut name_start = name_end;
-                while name_start > 0 {
-                    if is_word_byte(bytes[name_start - 1]) {
-                        name_start -= 1;
-                    } else {
-                        break;
-                    }
-                }
-                let name = body[name_start..name_end].trim().to_string();
-                let name = if name.is_empty() {
-                    "?".to_string()
-                } else {
-                    name
+                let Some(name) = extract_decl_name(&body[..=i]) else {
+                    i += 1;
+                    continue;
                 };
 
                 out.push(SignalField { kind, name, alias });

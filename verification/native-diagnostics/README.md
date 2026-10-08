@@ -114,6 +114,35 @@ under `target/csharp-meta-verification/<unique-run>` with the binary hash.
 The driver does not compile these framework fixtures, infer runtime .NET DI
 registrations, or establish actual model-host consumption.
 
+## Angular application/meta-layer MCP boundary
+
+```powershell
+pwsh -NoProfile -File verification/native-diagnostics/scripts/Verify-AngularAppMetaLive.ps1
+```
+
+This driver preserves the existing Angular fixture tree, including HTML/SCSS
+companions and NgRx/routing relative paths. Its assertions cover legacy
+decorated inputs/outputs and constructor injection, generic signal-based
+inputs/outputs at High fidelity, NgRx dispatch/selection and effect actions,
+and route/component/guard/resolver relations. An ordinary TypeScript class
+must not manufacture Angular or NgRx facts. Required edges are scoped to the
+asserting source file, including when fixture classes share a display name.
+
+All five positive cases and the negative control passed on Linux against the
+branch containing main's 0.9.1 C# base-type fix. Complete Binary0x04 decoding,
+aligned snapshots, model content, and fresh-session queries are checked with
+the same existing helpers. Evidence belongs beneath
+`target/angular-app-meta-verification/<unique-run>`.
+
+The first modern-input observation exposed missing generic signal fields,
+`?` names from whitespace, and comment-only injection evidence. Two unchanged
+tracked regressions in `src/tests/angular_meta/decorators.rs` failed before the
+extractor fix and passed afterward. Angular marker and semantic producer
+generations advance to 2 so the existing durable compatibility checks reject
+pre-fix persisted facts. The focused Angular meta-layer checks passed 428 tests;
+main's two cross-file C# query regressions, 15 compatibility identity tests,
+and package Clippy also passed. No full repository suite was run.
+
 This proves the built adapter handles real producer output. It does not prove
 Claude accepts or consumes the replacement, establish VS Code rendering or
 host persistence, constitute tracked regression-test evidence, or replace CI.

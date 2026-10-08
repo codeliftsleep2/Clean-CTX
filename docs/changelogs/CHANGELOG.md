@@ -10,6 +10,16 @@ version-history registry lives in
 
 ---
 
+## [Unreleased]
+
+### Fixed
+
+* Angular signal-based input/output extraction recognizes generic calls and
+  retains declared field names instead of whitespace-derived `?` names.
+  Comment and string matches no longer produce signal fields or injection
+  evidence. Angular marker and semantic producer generations advance so
+  pre-fix durable facts must be regenerated.
+
 ## [0.9.1] - 2026-10-08
 
 ### Queryable neutral C# base types
