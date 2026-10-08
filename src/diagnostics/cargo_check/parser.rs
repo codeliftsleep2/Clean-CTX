@@ -16,6 +16,7 @@ use serde_json::Value;
 
 pub struct CargoCheckCompiler {
     policy: CargoCheckPolicy,
+    workspace: Option<super::ApprovedWorkspaceRoot>,
     diagnostics: Vec<Candidate>,
     cargo_evidence: CargoEvidence,
     coverage: ParserCoverage,
@@ -34,12 +35,20 @@ impl CargoCheckCompiler {
     pub fn new(policy: CargoCheckPolicy) -> Self {
         Self {
             policy,
+            workspace: None,
             diagnostics: Vec::new(),
             cargo_evidence: CargoEvidence::default(),
             coverage: ParserCoverage::default(),
             retention: RetentionFacts::default(),
             transformations: TransformationFacts::default(),
             evidence: EvidenceCollector::new(),
+        }
+    }
+
+    pub(crate) fn for_workspace(workspace: super::ApprovedWorkspaceRoot) -> Self {
+        Self {
+            workspace: Some(workspace),
+            ..Self::default()
         }
     }
 
@@ -194,6 +203,7 @@ impl CargoCheckCompiler {
             level,
             text,
             self.policy,
+            self.workspace.as_ref(),
             &mut self.transformations,
         );
         retention::admit(

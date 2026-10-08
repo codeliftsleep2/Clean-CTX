@@ -14,6 +14,43 @@ fn create_workspace() -> tempfile::TempDir {
     temporary
 }
 
+#[test]
+#[cfg(any(target_os = "linux", windows))]
+fn cli_path_regression_execution_projects_typed_locations_without_absolute_host_paths() {
+    use crate::diagnostics::cargo_check::{
+        CargoCheckCancellation, CargoCheckCliOptions, run_cargo_check_cli,
+    };
+    let workspace = tempfile::tempdir().unwrap();
+    std::fs::write(
+        workspace.path().join("Cargo.toml"),
+        "[package]\nname='fixture'\n",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.path().join(".owned-execution-fixture"),
+        "diagnostic-paths",
+    )
+    .unwrap();
+    let options = CargoCheckCliOptions {
+        workspace_root: workspace.path().to_owned(),
+        cargo_path: Some(std::env::current_exe().unwrap()),
+        json: true,
+    };
+    let report = run_cargo_check_cli(
+        &options,
+        &std::env::vars_os().collect::<Vec<_>>(),
+        &CargoCheckCancellation::default(),
+    );
+    let result: serde_json::Value = serde_json::from_slice(report.output()).unwrap();
+    let diagnostic = &result["semantic"]["diagnostics"][0];
+    assert_eq!(diagnostic["primary_spans"][0]["file"], "src/internal.rs");
+    assert_eq!(
+        diagnostic["related_spans"][0]["file"],
+        "<external>/external.rs"
+    );
+    assert!(!String::from_utf8_lossy(report.output()).contains("PRIVATE_PROFILE_CANARY"));
+}
+
 fn create_executable(directory: &Path) -> PathBuf {
     #[cfg(windows)]
     let path = directory.join("cargo.exe");

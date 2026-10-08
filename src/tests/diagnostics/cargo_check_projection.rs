@@ -22,9 +22,13 @@ fn execution(compiler: CargoCheckCompiler) -> CargoCheckExecution {
         authority: InvocationFacts {
             workspace: "<workspace>",
             workspace_source: AuthoritySource::StartupOption,
+            workspace_environment_present: false,
+            workspace_environment_shadowed: false,
             manifest_identity: identity(),
             cargo: "cargo".into(),
             cargo_source: AuthoritySource::StartupOption,
+            cargo_environment_present: false,
+            cargo_environment_shadowed: false,
             cargo_identity: identity(),
             command: "cargo check --message-format=json",
             environment: EnvironmentFacts::default(),

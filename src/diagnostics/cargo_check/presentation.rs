@@ -37,6 +37,10 @@ impl CargoCheckProjection {
 
 #[derive(Serialize)]
 struct Structured<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cli_outcome: Option<super::CliDisposition>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit_code: Option<u8>,
     authority: &'a super::InvocationFacts,
     root_outcome: Option<super::ProcessOutcome>,
     ownership: &'a super::OwnershipFacts,
@@ -51,8 +55,11 @@ fn view<'a>(
     execution: &'a CargoCheckExecution,
     semantic: &'a CargoCheckSemanticResult,
     text_budget: &'a TextBudgetFacts,
+    disposition: Option<super::CliDisposition>,
 ) -> Structured<'a> {
     Structured {
+        cli_outcome: disposition,
+        exit_code: disposition.map(super::CliDisposition::exit_code),
         authority: &execution.authority,
         root_outcome: execution.root_outcome,
         ownership: &execution.ownership,
@@ -68,20 +75,37 @@ pub fn project_cargo_check(
     execution: &CargoCheckExecution,
     policy: CargoCheckPolicy,
 ) -> Result<CargoCheckProjection, BoundedResultError> {
+    project(execution, policy, None)
+}
+
+pub(crate) fn project_for_cli(
+    execution: &CargoCheckExecution,
+    policy: CargoCheckPolicy,
+    disposition: super::CliDisposition,
+) -> Result<CargoCheckProjection, BoundedResultError> {
+    project(execution, policy, Some(disposition))
+}
+
+fn project(
+    execution: &CargoCheckExecution,
+    policy: CargoCheckPolicy,
+    disposition: Option<super::CliDisposition>,
+) -> Result<CargoCheckProjection, BoundedResultError> {
     let mut semantic = execution.semantic.clone();
     let mut text_facts = TextBudgetFacts::default();
     loop {
         enforce(&mut semantic, policy.structured_content_bytes, |semantic| {
-            serialized_size(&view(execution, semantic, &text_facts))
+            serialized_size(&view(execution, semantic, &text_facts, disposition))
         })?;
-        let (content, facts) = render_text(execution, &semantic, policy)?;
+        let (content, facts) = render_text(execution, &semantic, policy, disposition)?;
         text_facts = facts;
-        let size = serialized_size(&view(execution, &semantic, &text_facts))?;
+        let size = serialized_size(&view(execution, &semantic, &text_facts, disposition))?;
         if size != semantic.result_budget.serialized_bytes {
             continue;
         }
-        let structured_json = serde_json::to_vec(&view(execution, &semantic, &text_facts))
-            .map_err(|_| BoundedResultError::Serialization)?;
+        let structured_json =
+            serde_json::to_vec(&view(execution, &semantic, &text_facts, disposition))
+                .map_err(|_| BoundedResultError::Serialization)?;
         if structured_json.len() > policy.structured_content_bytes {
             return Err(BoundedResultError::MandatoryFacts);
         }
@@ -97,6 +121,7 @@ fn render_text(
     execution: &CargoCheckExecution,
     result: &CargoCheckSemanticResult,
     policy: CargoCheckPolicy,
+    disposition: Option<super::CliDisposition>,
 ) -> Result<(String, TextBudgetFacts), BoundedResultError> {
     let coverage = &result.parser_coverage;
     let capture = &execution.capture;
@@ -159,6 +184,16 @@ fn render_text(
             result.result_budget.fields_reduced
         ),
     ];
+    if let Some(disposition) = disposition {
+        lines.insert(
+            0,
+            format!(
+                "CargoCheck outcome: {} (exit {})",
+                disposition.label(),
+                disposition.exit_code()
+            ),
+        );
+    }
     let available = result.diagnostics.len();
     let footer = |shown, truncated| {
         format!(

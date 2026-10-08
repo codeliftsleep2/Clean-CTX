@@ -5,6 +5,7 @@
 
 mod authority;
 mod budget;
+mod cli;
 mod environment;
 mod evidence;
 mod execution;
@@ -20,6 +21,9 @@ pub use authority::{
     FileIdentity, PathClassification,
 };
 pub use budget::BoundedResultError;
+pub use cli::{
+    CargoCheckCliOptions, CargoCheckCliReport, CliDisposition, cli_disposition, run_cargo_check_cli,
+};
 pub use environment::{CargoCheckEnvironment, EnvironmentFacts};
 pub use execution::{
     CancellationSource, CaptureFacts, CargoCheckCancellation, CargoCheckExecution, CleanupFacts,

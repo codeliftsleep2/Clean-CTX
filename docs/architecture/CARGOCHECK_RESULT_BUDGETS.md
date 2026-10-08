@@ -2,7 +2,7 @@
 
 This phase follows fallback evidence commit `1433e82`. It implements the
 approved 512 KiB serialized structured limit and 24 KiB/240-line text limit.
-CLI dispatch, CLI exit codes, and MCP registration remain subsequent phases.
+CLI dispatch and exit codes are now implemented; see `CARGOCHECK_CLI.md`. Typed MCP registration remains a subsequent phase.
 
 ## Enforced boundaries
 
@@ -118,8 +118,7 @@ the CI gate.
 
 ## Next boundary
 
-Implement CLI projection and the approved exit-code contract around the prepared
-invocation, owned execution, and checked projection. Then integrate the typed MCP
-tool, complete production lifecycle verification, and finally conduct the bundled
-Claude pilot. Startup authority must remain explicit, with no heuristic fallback
+CLI projection and the approved exit-code contract are implemented; see
+`CARGOCHECK_CLI.md`. Next integrate the typed MCP tool, complete production
+lifecycle verification, and finally conduct the bundled Claude pilot. Startup authority must remain explicit, with no heuristic fallback
 or caller-supplied Cargo argument surface.

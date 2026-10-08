@@ -4,7 +4,7 @@
 **Architect:** Agent MaxHeadRoom  
 **Status:** Frozen for a narrow first production slice; all operational policies approved on 2026-10-07.  
 **Operation:** `CargoCheck` only.  
-**Production implementation:** Phases 1–3 are owner-reported GREEN through `6fd30f9`. Phase 4 owned execution/capture (`88118b5`) is Linux-verified and owner-reported GREEN on Windows. Phases 5–7 incremental parsing (`060935c`), semantic retention (`653be25`), and fallback evidence (`1433e82`) are Linux-verified. Phase 8 final result budgets are Linux-verified (87 focused tests and zero-warning package Clippy); see `CARGOCHECK_RESULT_BUDGETS.md`. Windows verification for Phases 5–8 remains owner-run. CLI dispatch/exit codes and MCP registration remain unimplemented.
+**Production implementation:** Phases 1–3 are owner-reported GREEN through `6fd30f9`. Phase 4 owned execution/capture (`88118b5`) is Linux-verified and owner-reported GREEN on Windows. Phases 5–7 incremental parsing (`060935c`), semantic retention (`653be25`), and fallback evidence (`1433e82`) are Linux-verified. Phase 8 final result budgets are Linux-verified (87 focused tests and zero-warning package Clippy); see `CARGOCHECK_RESULT_BUDGETS.md`. Phase 9 CLI dispatch and exit codes are Linux-verified (97 focused library tests, 7 CLI tests, and zero-warning package Clippy); see `CARGOCHECK_CLI.md`. Windows verification for Phases 5–9 remains owner-run. Typed MCP registration remains unimplemented.
 **Phase 1 verification:** Owner reported the focused CargoCheck parser suite GREEN on 2026-10-07.
 **Phase 2 verification:** Owner reported the combined CargoCheck suite and zero-warning check GREEN, then pushed commit `ae03c243` on 2026-10-07.
 **Live-Claude work:** Deferred to one final bundled pilot.

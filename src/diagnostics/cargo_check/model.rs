@@ -43,6 +43,7 @@ pub struct Suggestion {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SanitizedSpan {
     pub file: String,
+    pub file_classification: Option<super::PathClassification>,
     pub line_start: u64,
     pub line_end: u64,
     pub column_start: u64,
@@ -207,6 +208,8 @@ pub struct RetentionFacts {
 pub struct TransformationFacts {
     pub normalization: NormalizationFacts,
     pub redaction: RedactionFacts,
+    pub workspace_paths_mapped: usize,
+    pub external_paths_redacted: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

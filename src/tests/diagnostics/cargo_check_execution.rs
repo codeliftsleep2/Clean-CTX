@@ -33,6 +33,23 @@ fn execution_fixture_entrypoint() {
         }
     }
     match mode.as_str() {
+        "diagnostic-paths" => {
+            let workspace = std::env::current_dir().unwrap();
+            let span = |file: std::path::PathBuf, primary| {
+                serde_json::json!({
+                    "file_name":file.to_string_lossy(),"is_primary":primary,
+                    "line_start":1,"line_end":1,"column_start":1,"column_end":2
+                })
+            };
+            let record = serde_json::json!({"reason":"compiler-message","message":{
+                "message":"synthetic path diagnostic","level":"error","spans":[
+                    span(workspace.join("src/internal.rs"), true),
+                    span(workspace.parent().unwrap().join("PRIVATE_PROFILE_CANARY/external.rs"), false)
+                ]
+            }});
+            println!("{record}");
+            std::process::exit(1);
+        }
         "failure-with-success-evidence" => {
             println!("{{\"reason\":\"build-finished\",\"success\":true}}");
             eprintln!("synthetic producer failure");

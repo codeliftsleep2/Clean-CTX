@@ -67,6 +67,7 @@ pub(super) fn compile_diagnostic(
     level: DiagnosticLevel,
     text: &str,
     policy: CargoCheckPolicy,
+    workspace: Option<&super::super::ApprovedWorkspaceRoot>,
     transformations: &mut TransformationFacts,
 ) -> CargoDiagnostic {
     let spans = array(message, "spans");
@@ -133,7 +134,7 @@ pub(super) fn compile_diagnostic(
             retained_bytes += replacement(span).expect("selected replacement").len();
             machine_retained += usize::from(machine(span));
         }
-        compile_span(span, slot, transformations)
+        compile_span(span, slot, workspace, transformations)
     };
     let mut primary = Vec::new();
     let mut related = Vec::new();
@@ -218,6 +219,7 @@ pub(super) fn compile_diagnostic(
 fn compile_span(
     value: &Value,
     slot: Option<usize>,
+    workspace: Option<&super::super::ApprovedWorkspaceRoot>,
     facts: &mut TransformationFacts,
 ) -> SanitizedSpan {
     let number = |key| {
@@ -226,11 +228,25 @@ fn compile_span(
             .and_then(Value::as_u64)
             .expect("validated span coordinate")
     };
+    let raw_file = value["file_name"].as_str().expect("validated span file");
+    let display = workspace.map(|workspace| workspace.display_path(std::path::Path::new(raw_file)));
+    if let Some(display) = &display {
+        match display.classification {
+            super::super::PathClassification::InsideWorkspace => {
+                facts.workspace_paths_mapped += usize::from(display.value != raw_file)
+            }
+            super::super::PathClassification::External => facts.external_paths_redacted += 1,
+        }
+    }
     SanitizedSpan {
         file: sanitize(
-            value["file_name"].as_str().expect("validated span file"),
+            display
+                .as_ref()
+                .map(|display| display.value.as_str())
+                .unwrap_or(raw_file),
             facts,
         ),
+        file_classification: display.as_ref().map(|display| display.classification),
         line_start: number("line_start"),
         line_end: number("line_end"),
         column_start: number("column_start"),

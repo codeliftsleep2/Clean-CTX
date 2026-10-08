@@ -42,7 +42,9 @@ pub fn execute_cargo_check(
     }
     let started = Instant::now();
     let (mut process, stdout, stderr) = OwnedProcess::start(invocation)?;
-    let compiler = Mutex::new(CargoCheckCompiler::default());
+    let compiler = Mutex::new(CargoCheckCompiler::for_workspace(
+        invocation.workspace_authority().clone(),
+    ));
     let stop = AtomicBool::new(false);
     let mut cleanup = CleanupFacts::default();
     let mut root_outcome = None;

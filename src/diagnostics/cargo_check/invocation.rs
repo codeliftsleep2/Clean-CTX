@@ -11,9 +11,13 @@ use std::path::{Path, PathBuf};
 pub struct InvocationFacts {
     pub workspace: &'static str,
     pub workspace_source: super::AuthoritySource,
+    pub workspace_environment_present: bool,
+    pub workspace_environment_shadowed: bool,
     pub manifest_identity: super::FileIdentity,
     pub cargo: String,
     pub cargo_source: super::AuthoritySource,
+    pub cargo_environment_present: bool,
+    pub cargo_environment_shadowed: bool,
     pub cargo_identity: super::FileIdentity,
     pub command: &'static str,
     pub environment: EnvironmentFacts,
@@ -44,6 +48,8 @@ pub struct CargoCheckInvocation {
     current_directory: PathBuf,
     environment: BTreeMap<OsString, OsString>,
     environment_facts: EnvironmentFacts,
+    workspace_environment_present: bool,
+    cargo_environment_present: bool,
 }
 
 impl CargoCheckInvocation {
@@ -59,7 +65,17 @@ impl CargoCheckInvocation {
     {
         request.workspace.revalidate()?;
         cargo.revalidate()?;
-        let environment = CargoCheckEnvironment::from_snapshot(environment_snapshot);
+        let snapshot: Vec<(OsString, OsString)> = environment_snapshot
+            .into_iter()
+            .map(|(name, value)| (name.into(), value.into()))
+            .collect();
+        let workspace_environment_present = snapshot.iter().any(|(name, _)| {
+            super::environment::authority_name_matches(name, "CLEAN_CTX_PROJECT_ROOT")
+        });
+        let cargo_environment_present = snapshot.iter().any(|(name, _)| {
+            super::environment::authority_name_matches(name, "CLEAN_CTX_CARGO_PATH")
+        });
+        let environment = CargoCheckEnvironment::from_snapshot(snapshot);
         Ok(Self {
             workspace_authority: request.workspace.clone(),
             cargo_authority: cargo.clone(),
@@ -71,6 +87,8 @@ impl CargoCheckInvocation {
             current_directory: request.workspace.canonical_root().to_path_buf(),
             environment: environment.entries().clone(),
             environment_facts: environment.facts().clone(),
+            workspace_environment_present,
+            cargo_environment_present,
         })
     }
 
@@ -90,6 +108,10 @@ impl CargoCheckInvocation {
 
     pub fn current_directory(&self) -> &Path {
         &self.current_directory
+    }
+
+    pub(crate) fn workspace_authority(&self) -> &ApprovedWorkspaceRoot {
+        &self.workspace_authority
     }
 
     pub fn environment(&self) -> &BTreeMap<OsString, OsString> {
@@ -117,6 +139,9 @@ impl CargoCheckInvocation {
         InvocationFacts {
             workspace: "<workspace>",
             workspace_source: self.workspace_authority.source(),
+            workspace_environment_present: self.workspace_environment_present,
+            workspace_environment_shadowed: self.workspace_environment_present
+                && self.workspace_authority.source() != super::AuthoritySource::Environment,
             manifest_identity: self.workspace_authority.manifest_identity().clone(),
             cargo: super::sanitize::sanitize(
                 &self
@@ -127,6 +152,9 @@ impl CargoCheckInvocation {
                 &mut transformations,
             ),
             cargo_source: self.cargo_authority.source(),
+            cargo_environment_present: self.cargo_environment_present,
+            cargo_environment_shadowed: self.cargo_environment_present
+                && self.cargo_authority.source() != super::AuthoritySource::Environment,
             cargo_identity: self.cargo_authority.identity().clone(),
             command: "cargo check --message-format=json",
             environment,

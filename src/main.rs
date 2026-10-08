@@ -15,6 +15,11 @@ use std::io::{Read, Write};
     about = "Token Waste Reducer & Context Compiler",
 )]
 enum Cli {
+    /// Run one owned, bounded Cargo check in an explicitly approved workspace
+    CargoCheck {
+        #[command(flatten)]
+        options: clean_ctx::diagnostics::cargo_check::CargoCheckCliOptions,
+    },
     /// Create default .clean-ctx.json config and .clean-ctx/ directory
     Init,
     /// Check CBM availability and optionally generate config
@@ -62,6 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // automatically dispatched above — no parallel manual whitelist to keep
     // in sync.
     match Cli::try_parse() {
+        Ok(Cli::CargoCheck { options }) => cmd_cargo_check(options),
         Ok(Cli::Init) => cmd_init(),
         Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
         Ok(Cli::ConfigDump) => cmd_config_dump(),
@@ -83,9 +89,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+fn cmd_cargo_check(
+    options: clean_ctx::diagnostics::cargo_check::CargoCheckCliOptions,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use clean_ctx::diagnostics::cargo_check::{
+        CancellationSource, CargoCheckCancellation, CargoCheckCliReport, run_cargo_check_cli,
+    };
+    let snapshot: Vec<_> = std::env::vars_os().collect();
+    let cancellation = CargoCheckCancellation::default();
+    let requested = cancellation.clone();
+    let report = if ctrlc::set_handler(move || requested.request(CancellationSource::User)).is_err()
+    {
+        CargoCheckCliReport::handler_failure(options.json)
+    } else {
+        run_cargo_check_cli(&options, &snapshot, &cancellation)
+    };
+    let code = report.write_to(&mut std::io::stdout().lock());
+    if code != report.disposition.exit_code() {
+        eprintln!("CargoCheck output could not be written");
+    }
+    std::process::exit(i32::from(code));
+}
+
 #[cfg(test)]
 #[path = "tests/claude_native/cli_contract.rs"]
 mod claude_cli_tests;
+
+#[cfg(test)]
+#[path = "tests/diagnostics/cargo_check_main_options.rs"]
+mod cargo_check_cli_options_tests;
 
 fn cmd_claude_post_tool_use(
     drop_persisted_output_pointer: bool,
@@ -479,3 +511,7 @@ fn generate_default_config() -> String {
     }))
     .unwrap_or_else(|_| "{}".to_string())
 }
+
+#[cfg(test)]
+#[path = "tests/diagnostics/cargo_check_main_cli.rs"]
+mod cargo_check_cli_tests;

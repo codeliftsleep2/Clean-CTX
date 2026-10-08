@@ -180,3 +180,13 @@ fn is_credential_name(name: &str) -> bool {
     .iter()
     .any(|marker| name.contains(marker))
 }
+
+pub(crate) fn authority_name_matches(name: &OsStr, expected: &str) -> bool {
+    name.to_str().is_some_and(|name| {
+        if cfg!(windows) {
+            name.eq_ignore_ascii_case(expected)
+        } else {
+            name == expected
+        }
+    })
+}
