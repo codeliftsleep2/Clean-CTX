@@ -143,12 +143,16 @@ forbids source reads and every tool other than the configured diagnostic tool.
         $exeToml = ConvertTo-Json -InputObject $BinaryPath -Compress
         $rootToml = ConvertTo-Json -InputObject $root -Compress
         $cargoToml = ConvertTo-Json -InputObject $cargo -Compress
-        $table = "{clean_ctx_cargo_pilot={command=$exeToml,args=[`"--workspace-root`",$rootToml,`"--cargo-path`",$cargoToml],enabled_tools=[`"cargo_check`"],env_vars=[`"PATH`",`"INCLUDE`",`"LIB`",`"LIBPATH`",`"SystemRoot`",`"TEMP`",`"TMP`",`"USERPROFILE`",`"RUSTUP_HOME`",`"CARGO_HOME`"]}}"
+        # codex exec cannot prompt under approval_policy=never. The operator
+        # authorizes this single closed MCP operation for the pilot; keep the
+        # read-only sandbox and all unrelated tool approval controls intact.
+        $table = "{clean_ctx_cargo_pilot={command=$exeToml,args=[`"--workspace-root`",$rootToml,`"--cargo-path`",$cargoToml],enabled_tools=[`"cargo_check`"],tools={cargo_check={approval_mode=`"approve`"}},env_vars=[`"PATH`",`"INCLUDE`",`"LIB`",`"LIBPATH`",`"SystemRoot`",`"TEMP`",`"TMP`",`"USERPROFILE`",`"RUSTUP_HOME`",`"CARGO_HOME`"]}}"
         $arguments += @('--config', "mcp_servers=$table")
         Save-PilotJson ($Case.name + '-registration') @{
             server = 'clean_ctx_cargo_pilot'; tools = @('cargo_check'); command = $BinaryPath
             workspace = $root; cargo = $cargo; model_working_directory = $caseDir
             inline_configuration = $table
+            tool_approval = 'approve only clean_ctx_cargo_pilot/cargo_check for this operator-owned invocation'
             observation = 'Requested CLI configuration, not proof of connection or model selection.'
         }
     }
@@ -186,7 +190,11 @@ forbids source reads and every tool other than the configured diagnostic tool.
             Assert-Pilot ($call.status -in @('completed', 'failed')) 'Terminal MCP event has an unrecognized status; inspect its raw event.'
             if (-not $call.PSObject.Properties['result'] -or $null -eq $call.result) {
                 if ($call.status -eq 'failed') {
-                    throw 'MCP call ended with failure but no tool result; inspect the saved error for a transport/client failure. This is not an unfinished call.'
+                    if ($call.PSObject.Properties['error'] -and $null -ne $call.error) {
+                        $errorJson = $call.error | ConvertTo-Json -Depth 20 -Compress
+                        throw "MCP call ended before a tool result was returned: $errorJson. This is a client/transport failure, not an unfinished call or a Cargo outcome."
+                    }
+                    throw 'MCP call ended with failure but no tool result; inspect the saved error for a client/transport failure.'
                 }
                 Add-PilotVerdict ($Case.name + '-result-surfaces') 'NOT OBSERVABLE' 'Completed call event did not expose its result.'
                 continue

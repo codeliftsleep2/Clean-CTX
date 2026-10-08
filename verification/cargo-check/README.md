@@ -16,6 +16,23 @@ same candidate stdio server for each fresh model trial. Your normal Codex MCP
 configuration and existing servers are not modified. Existing Codex
 authentication is reused; no credential is requested or copied.
 
+The invocation configuration explicitly approves only
+`mcp_servers.clean_ctx_cargo_pilot.tools.cargo_check` with
+`approval_mode = "approve"`. The owner-run harness authorizes that closed
+diagnostic operation; the read-only sandbox and other approval controls remain
+in place. No global approval/sandbox bypass flag is used, and no approval setting
+is saved to your normal configuration. This is needed because noninteractive
+Codex can otherwise reject the MCP call with “MCP tool call requires approval,
+but approval policy is never” before it reaches the server.
+
+That exact rejection was observed in the owner's original `codex-unavailable`
+JSONL. It proves the MCP tool was discovered and selected in that case, but no
+Cargo admission result was returned. It does not establish a timeout or a missing
+server. The cloud CLI accepts the specific `approve` setting and rejects an
+invalid approval-mode value, confirming the setting is parsed; the live Windows
+call with this correction still needs verification. Guided-case logs remain
+necessary to diagnose the original no-call observations independently.
+
 ## Run
 
 Requirements: PowerShell 7, working Rust/Cargo, and an authenticated Codex CLI
