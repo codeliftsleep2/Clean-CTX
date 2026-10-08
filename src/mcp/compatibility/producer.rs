@@ -54,6 +54,10 @@ impl GenerationCatalog {
                 ProducerKey::CSharpSemanticInput,
                 crate::ir::layers::csharp::SEMANTIC_INPUT_GENERATION,
             );
+            generations.insert(
+                ProducerKey::CSharpSemanticProjection,
+                crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION,
+            );
         }
         #[cfg(feature = "rust")]
         {

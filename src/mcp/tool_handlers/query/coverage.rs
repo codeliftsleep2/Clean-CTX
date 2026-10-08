@@ -65,8 +65,8 @@ pub(super) fn exact_identity_coverage(
             "domain": "builtin",
             "entity_type": "TypeRef",
             "name": identity.name,
-            "relation": "HasConstructorParameterType",
-            "meaning": "C# classes declaring a constructor parameter with this written type"
+            "relation": "HasBaseType",
+            "meaning": "C# classes naming this written type in an unresolved base list"
         });
     }
     coverage

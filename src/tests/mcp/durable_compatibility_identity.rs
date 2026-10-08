@@ -80,6 +80,66 @@ fn unrelated_typescript_generation_does_not_change_csharp_identity() {
     assert_eq!(baseline.semantic_producers, changed.semantic_producers);
 }
 
+#[cfg(all(feature = "csharp", feature = "typescript"))]
+#[test]
+fn csharp_projection_generation_is_semantic_and_language_scoped() {
+    let config = CleanCtxConfig::default();
+    let catalog = GenerationCatalog::current();
+    let changed_catalog =
+        GenerationCatalog::current().with_generation(ProducerKey::CSharpSemanticProjection, 99);
+
+    let csharp = derive_with_catalog(
+        "public class Child : ExternalBase {}",
+        Path::new("Child.cs"),
+        &config,
+        &catalog,
+    )
+    .expect("C# baseline");
+    let changed_csharp = derive_with_catalog(
+        "public class Child : ExternalBase {}",
+        Path::new("Child.cs"),
+        &config,
+        &changed_catalog,
+    )
+    .expect("changed C# projection");
+    assert_eq!(
+        csharp.canonical_producers,
+        changed_csharp.canonical_producers
+    );
+    assert_ne!(csharp.semantic_producers, changed_csharp.semantic_producers);
+    assert!(
+        csharp
+            .semantic_producers
+            .relevant_producers
+            .contains_key(&ProducerKey::CSharpSemanticProjection)
+    );
+
+    let typescript = derive_with_catalog(
+        "export class Child extends ExternalBase {}",
+        Path::new("child.ts"),
+        &config,
+        &catalog,
+    )
+    .expect("TypeScript baseline");
+    let changed_typescript = derive_with_catalog(
+        "export class Child extends ExternalBase {}",
+        Path::new("child.ts"),
+        &config,
+        &changed_catalog,
+    )
+    .expect("changed catalog");
+    assert_eq!(
+        typescript.semantic_producers,
+        changed_typescript.semantic_producers
+    );
+    assert!(
+        !typescript
+            .semantic_producers
+            .relevant_producers
+            .contains_key(&ProducerKey::CSharpSemanticProjection)
+    );
+}
+
 #[test]
 fn marker_only_config_changes_canonical_but_not_semantic_identity() {
     let first = angular_config();

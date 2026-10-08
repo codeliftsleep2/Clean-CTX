@@ -1,7 +1,7 @@
 # Clean-CTX — Future Roadmap
 
-**Last reviewed:** 2026-10-05
-**Current release line:** `0.9.0`
+**Last reviewed:** 2026-10-08
+**Current release line:** `0.9.1`
 
 > **Positioning:** This file is a directional and historical release ledger,
 > not production architecture authority. Current behavior is defined by code,
@@ -17,7 +17,7 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Current** | v0.9.0 | Authority and correctness hardening | Release metadata prepared; final gate/tag pending |
+| **Current** | v0.9.1 | Queryable neutral C# base types | Final gate and live MCP pilot pending |
 | **Previous** | v0.8.0 | Typed IR, exact persistence, batching, and field validation | ✅ Shipped |
 | **Future** | Unscheduled | Demand-driven items retained below | Proposed/deferred |
 

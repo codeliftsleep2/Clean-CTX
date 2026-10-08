@@ -14,6 +14,7 @@
 //   CoreOp::Extends          → SemanticRelation::Extends (Class → Class)
 //   CoreOp::Implements       → SemanticRelation::Implements (Class → Interface)
 //   CoreOp::InterfaceExtends → SemanticRelation::Extends (Interface → Interface)
+//   CoreOp::BaseTypeRef      → HasBaseType (Class → unresolved TypeRef)
 //
 // Identity model (unchanged, Model C): an entity is (domain, entity_type,
 // name). Generic callables are `builtin` / `Method`; a call relationship is
@@ -25,6 +26,11 @@
 /// Generation of the language-agnostic canonical-fact projection. Increment
 /// when identical canonical facts can emit different generic semantic edges.
 pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
+
+/// Generation of C#-specific generic semantic projection. This is separate
+/// from the generic generation so a C#-only edge change does not invalidate
+/// durable semantic snapshots for unrelated languages.
+pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 //
 // A callee that is never declared in the compiled workspace still appears as
 // the OBJECT of a `Calls` edge (it is honestly unresolved); only the caller is
@@ -193,6 +199,13 @@ pub fn project_inheritance(instructions: &[CoreOp], file: &str) -> Vec<SemanticE
                     interface_name(owner)?,
                     INTERFACE_ENTITY_TYPE,
                     interfaces.get(target.as_str()).copied().unwrap_or(target),
+                ),
+                CoreOp::BaseTypeRef(owner, written_type) => (
+                    SemanticRelation::HasBaseType,
+                    CLASS_ENTITY_TYPE,
+                    class_name(owner)?,
+                    TYPE_REF_ENTITY_TYPE,
+                    written_type.as_str(),
                 ),
                 _ => return None,
             };

@@ -180,7 +180,7 @@ fn canonical_inheritance_projects_typed_names_and_written_external_targets() {
     ];
 
     let edges = project_inheritance(&instructions, "C:/repo/Worker.cs");
-    assert_eq!(edges.len(), 4);
+    assert_eq!(edges.len(), 5);
     let facts: Vec<_> = edges
         .iter()
         .map(|edge| {
@@ -224,6 +224,13 @@ fn canonical_inheritance_projects_typed_names_and_written_external_targets() {
                 CLASS_ENTITY_TYPE,
                 "ExternalBase"
             ),
+            (
+                SemanticRelation::HasBaseType,
+                CLASS_ENTITY_TYPE,
+                "Worker",
+                TYPE_REF_ENTITY_TYPE,
+                "UnknownBaseOrContract"
+            ),
         ]
     );
     assert!(edges.iter().all(|edge| {
@@ -232,23 +239,23 @@ fn canonical_inheritance_projects_typed_names_and_written_external_targets() {
             && edge.subject.file.as_deref() == Some("C:/repo/Worker.cs")
             && edge.object.file == edge.subject.file
     }));
-    assert!(edges.iter().all(|edge| {
-        edge.object.name != "UnknownBaseOrContract" && edge.subject.name != "UnknownBaseOrContract"
-    }));
 }
 
 #[test]
-fn base_type_ref_projects_neither_extends_nor_implements() {
+fn base_type_ref_projects_a_neutral_written_type_edge() {
     let instructions = vec![
         CoreOp::DefClass("C1".into(), "AmbiguousOwner".into()),
         CoreOp::BaseTypeRef("C1".into(), "Shared".into()),
     ];
 
     let edges = project_inheritance(&instructions, "C:/repo/Ambiguous.cs");
-    assert!(
-        edges.is_empty(),
-        "canonical uncertainty must not become an Extends or Implements semantic edge"
-    );
+    assert_eq!(edges.len(), 1);
+    let edge = &edges[0];
+    assert_eq!(edge.relation, SemanticRelation::HasBaseType);
+    assert_eq!(edge.subject.entity_type, CLASS_ENTITY_TYPE);
+    assert_eq!(edge.subject.name, "AmbiguousOwner");
+    assert_eq!(edge.object.entity_type, TYPE_REF_ENTITY_TYPE);
+    assert_eq!(edge.object.name, "Shared");
 }
 
 #[test]

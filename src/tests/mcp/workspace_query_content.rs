@@ -89,7 +89,7 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
                 "domain": "builtin",
                 "entity_type": "TypeRef",
                 "name": "IFooService",
-                "relation": "HasConstructorParameterType"
+                "relation": "HasBaseType"
             }
         }
     });

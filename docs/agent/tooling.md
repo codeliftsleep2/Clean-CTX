@@ -144,9 +144,12 @@ the C# form with `reverse_edges` on that exact `TypeRef` identity. It does not
 claim container registration, runtime .NET DI, or a resolved interface/class
 declaration. Consequently, a successful empty reverse-edge lookup for an
 identity whose relation is not projected is not verified absence of consumers.
-For `builtin / Interface / <name>`, reverse coverage returns an
-`alternative_query` naming the same-name `builtin / TypeRef` lookup used by C#
-constructor consumption. Exact edge results remain index-backed lower bounds:
+An unresolved C# base-list entry projects a source-true `HasBaseType` relation
+from `builtin / Class / <child>` to `builtin / TypeRef / <written type>`. For
+`builtin / Interface / <name>`, reverse coverage returns an `alternative_query`
+naming that same-name neutral `TypeRef` lookup. It finds classes that wrote the
+name in a base list without claiming whether the relationship is `Extends` or
+`Implements`. Exact edge results remain index-backed lower bounds:
 when `source_complete` is false, `result_semantics: "lower_bound"` and
 `omitted_possible: true` mean `count` may omit uncompiled source files;
 `discovered_not_compiled_this_cycle`, when present, is the per-cycle

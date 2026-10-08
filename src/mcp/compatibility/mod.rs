@@ -64,6 +64,7 @@ fn derive_with_catalog(
 struct LanguageKeys {
     canonical: ProducerKey,
     semantic_input: ProducerKey,
+    semantic_projection: Option<ProducerKey>,
 }
 
 fn language_keys(path: &Path) -> Result<LanguageKeys, IdentityDerivationError> {
@@ -79,18 +80,22 @@ fn language_keys(path: &Path) -> Result<LanguageKeys, IdentityDerivationError> {
         "typescript" => Ok(LanguageKeys {
             canonical: ProducerKey::TypeScriptCanonical,
             semantic_input: ProducerKey::TypeScriptSemanticInput,
+            semantic_projection: None,
         }),
         "csharp" => Ok(LanguageKeys {
             canonical: ProducerKey::CSharpCanonical,
             semantic_input: ProducerKey::CSharpSemanticInput,
+            semantic_projection: Some(ProducerKey::CSharpSemanticProjection),
         }),
         "rust" => Ok(LanguageKeys {
             canonical: ProducerKey::RustCanonical,
             semantic_input: ProducerKey::RustSemanticInput,
+            semantic_projection: None,
         }),
         "java" => Ok(LanguageKeys {
             canonical: ProducerKey::JavaCanonical,
             semantic_input: ProducerKey::JavaSemanticInput,
+            semantic_projection: None,
         }),
         _ => Err(IdentityDerivationError::UnsupportedSource(
             path.display().to_string(),
@@ -236,6 +241,9 @@ fn semantic_producer_identity(
 ) -> Result<SemanticProducerIdentity, IdentityDerivationError> {
     let mut relevant_producers = BTreeMap::new();
     insert_required(&mut relevant_producers, language.semantic_input, catalog)?;
+    if let Some(projection) = language.semantic_projection {
+        insert_required(&mut relevant_producers, projection, catalog)?;
+    }
     insert_required(
         &mut relevant_producers,
         ProducerKey::BuiltinSemantic,

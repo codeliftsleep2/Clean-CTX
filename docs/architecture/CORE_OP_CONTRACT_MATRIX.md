@@ -217,7 +217,7 @@ all three vocabularies and remains only for legacy unknown payloads;
 | `Flags` | Repeated legacy unknown occurrences under resolved method | `(MethodId, complete values, occurrence)` | Semantic for present operands | Preserve legacy payload and occurrence order |
 | `ClassFlags` | Repeated flag occurrences under resolved class | `(ClassId, complete values, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |
 | `Extends` | Singular parent reference under resolved child | `ClassId` | Lossy: child ID omitted | Encode child and parent |
-| `BaseTypeRef` | Singular neutral written base-type reference under resolved child | `ClassId` | Not defined | Additive opcode 30; preserve owner and written type without semantic projection |
+| `BaseTypeRef` | Singular neutral written base-type reference under resolved child; semantic projection emits `HasBaseType` from the owning Class to an unresolved `TypeRef` | `ClassId` | Not defined | Additive opcode 30; preserve owner and written type without claiming `Extends` or `Implements` |
 | `InterfaceExtends` | Repeated parent references under resolved interface | `(InterfaceId, parent, occurrence)` | Not defined | Additive opcode 29; preserve all occurrences |
 | `Implements` | Repeated interface references under resolved class | `(ClassId, interface, occurrence)` | Lossy: class ID omitted | Encode class and interface |
 | `Injects` | Repeated dependency payloads under resolved class | `(ClassId, complete dependencies, occurrence)` | Semantic for present operands | Preserve payload and occurrence order |

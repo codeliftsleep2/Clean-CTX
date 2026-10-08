@@ -1,0 +1,3 @@
+{"mode": "success", "producer_exit_code": 0, "raw_stderr_contains_marker": true, "raw_stdout_contains_marker": true, "result_contains_marker": false, "sanitized_stderr_contains_marker": false, "sanitized_stdout_contains_marker": false}
+{"mode": "failed_producer", "producer_exit_code": 17, "raw_stderr_contains_marker": true, "raw_stdout_contains_marker": true, "result_contains_marker": false, "sanitized_stderr_contains_marker": false, "sanitized_stdout_contains_marker": false}
+{"mode": "redaction_failure", "raw_evidence_withheld": true, "raw_stderr_contains_marker": true, "raw_stdout_contains_marker": true, "result_contains_marker": false}
