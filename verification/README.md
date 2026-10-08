@@ -13,8 +13,11 @@ authoritative.
 Current packages:
 
 - `cargo-check/` — one-command CargoCheck MCP observations and Codex CLI pilot;
-- `context-compression/` — CONTROL-PROD/CONTROL-FULL capture, measurement, and
+- `context-compression/edge-cases/` — production Binary0x04 capture, aligned
+  semantic snapshots, separate model output, and C#/Angular restore checks;
+- `context-compression/` — historical codec/presentation measurement and
   reasoning-verification definitions;
+- `context-batch/` — TypeScript batch routing, item isolation, and cache checks;
 - `workspace-query/` — registered workspace graph-query capture and model-
   visibility diagnostics;
 - `lifecycle/phase9/` — durable-context lifecycle field harness;

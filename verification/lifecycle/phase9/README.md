@@ -57,3 +57,17 @@ gate separately for verification.
 The recovery seeder directly prepares deterministic SQLite crash states solely
 so the real registered MCP recovery paths can be exercised after restart. It
 does not call Rust internals and is not itself evidence of correctness.
+
+The seeder requires a physical Binary0x04 baseline and preserves the canonical
+and semantic configuration/producer identities from production persistence.
+It refuses a baseline missing those identities rather than creating a legacy
+intent that cannot faithfully exercise current target-byte recovery.
+
+## Focused cloud observation — 2026-10-08
+
+The existing harness completed on Linux against the built production binary:
+`Operator scenarios: PASS (0 failure(s))`. This includes restart restore,
+`dv:2` application, exact structural edits, prior/target-byte recovery,
+irreconcilable recovery isolation, deletion, fallback inspection, and hard-link
+refusal. TypeScript and C# fixture bytes remained isolated. This observation
+does not establish Windows results or replace the CI gate.
