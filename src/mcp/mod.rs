@@ -82,3 +82,11 @@ mod apply_edit_e2e_tests;
 #[cfg(test)]
 #[path = "../tests/mcp/cargo_check_mcp_regression.rs"]
 mod cargo_check_mcp_regression;
+
+#[cfg(test)]
+#[path = "../tests/mcp/cargo_check_lifecycle_harness.rs"]
+mod cargo_check_lifecycle_harness;
+
+#[cfg(test)]
+#[path = "../tests/mcp/cargo_check_lifecycle.rs"]
+mod cargo_check_lifecycle;

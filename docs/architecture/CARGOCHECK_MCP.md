@@ -89,8 +89,9 @@ Final Linux verification also passed all 97 CargoCheck library checks and all 12
 startup/CLI checks. Package Clippy completed with zero warnings.
 
 The full suite remains CI-only. Windows checks remain owner-run. No Claude pilot
-was conducted. Production lifecycle tracing and representative real-workspace
-verification are the next phase, followed by the final bundled Claude pilot.
+was conducted. Production lifecycle tracing and real-Cargo fixture verification are now
+Linux-verified; see `CARGOCHECK_PRODUCTION_LIFECYCLE.md`. Windows owner checks
+and the final bundled Claude pilot remain outstanding.
 
 Focused owner commands:
 
