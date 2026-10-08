@@ -91,7 +91,12 @@ function Structured-Results {
 function Semantic-Json {
     param($Value)
     $copy = $Value | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
-    if ($copy.ContainsKey("discovery")) { $copy.Remove("discovery") }
+    if ($copy.ContainsKey("discovery")) { [void]$copy.Remove("discovery") }
+    # This counter describes work in this invocation, like discovery above.
+    # Keep all edges and semantic coverage/uncertainty fields in the comparison.
+    if ($copy.ContainsKey("coverage")) {
+        [void]$copy.coverage.Remove("discovered_not_compiled_this_cycle")
+    }
     return ($copy | ConvertTo-Json -Depth 100 -Compress)
 }
 

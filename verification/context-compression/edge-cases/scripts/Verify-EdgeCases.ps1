@@ -3,12 +3,25 @@ param([string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..
 $ErrorActionPreference = "Stop"
 $captures = Join-Path $RepositoryRoot "target\context-compression-verification\captures"
 function Require([bool]$condition, [string]$message) { if (-not $condition) { throw "FAIL: $message" } }
+$manifestPath = Join-Path $captures "edge-case-verification.json"
+Require (Test-Path -LiteralPath $manifestPath) "missing completed current capture manifest"
+$manifest = Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json -AsHashtable
+Require ($manifest.physical_version -eq 4) "capture is not Binary0x04"
+foreach ($key in $manifest.hashes.Keys) {
+    $actual = (Get-FileHash -LiteralPath (Join-Path $captures $key) -Algorithm SHA256).Hash
+    Require ($actual -eq $manifest.hashes[$key]) "capture file changed: $key"
+}
 function Payload([string]$id) {
     $text = Get-Content -Raw (Join-Path $captures "$id\control-full.txt")
     $remainder = $text -replace "^[^`r`n]*`r?`n", ""
     $pathmap = $remainder.LastIndexOf("`n§PATHMAP", [StringComparison]::Ordinal)
-    Require ($pathmap -ge 0) "$id missing PATHMAP"
-    return $remainder.Substring(0, $pathmap) | ConvertFrom-Json -Depth 100
+    if ($pathmap -ge 0) { $remainder = $remainder.Substring(0, $pathmap) }
+    $payload = $remainder | ConvertFrom-Json -Depth 100
+    Require ($payload.schema -eq "clean-ctx/control-full" -and $payload.schema_version -eq 2) "$id regenerated oracle schema"
+    $baseline = Get-Content -Raw (Join-Path $captures "$id/baseline.json") | ConvertFrom-Json -Depth 100
+    Require ($payload.file.id -eq $baseline.file_path) "$id durable owner identity"
+    Require (@($baseline.snapshots | Where-Object semantic_version -eq $payload.file.ir_version).Count -eq 1) "$id aligned semantic snapshot"
+    return $payload
 }
 function MethodId($payload, [string]$ownerName, [string]$methodName) {
     $owner = @($payload.classes | Where-Object name -eq $ownerName)
@@ -40,10 +53,18 @@ $runs = @(MethodId $csharp "EdgeController" "Run")
 Require ($runs.Count -eq 2 -and $runs[0] -ne $runs[1]) "C# overload IDs"
 $runMethods = @($csharp.classes | Where-Object name -eq "EdgeController" | ForEach-Object methods | Where-Object name -eq "Run")
 Require (@($runMethods | Where-Object { $null -eq $_.body -or $null -eq $_.body_start -or $null -eq $_.body_end }).Count -eq 0) "C# exact bodies/spans"
+$sourceBytes = [IO.File]::ReadAllBytes($csharp.file.source_path)
+foreach ($method in $runMethods) {
+    $start = [int]$method.body_start
+    $end = [int]$method.body_end
+    Require ($start -ge 0 -and $end -ge $start -and $end -le $sourceBytes.Length) "C# body span outside source"
+    $exact = [Text.Encoding]::UTF8.GetString($sourceBytes, $start, $end - $start)
+    Require ($exact -ceq $method.body) "C# durable body differs from exact source bytes"
+}
 foreach ($callee in @("Normalize","Audit","Notify")) {
     Require (@($csharp.calls | Where-Object { $runs -contains $_.caller_method_id -and $_.callee_written_name -eq $callee }).Count -ge 1) "C# missing lambda call $callee"
 }
 Require (@($csharp.semantic_edges | Where-Object relation -eq "HasRoute").Count -ge 1) "ASP.NET HasRoute edge"
 Require (@($csharp.semantic_edges | Where-Object relation -eq "ControllerAction").Count -ge 1) "ASP.NET ControllerAction edge"
 
-Write-Host "PASS: live TypeScript/Angular and C# edge-case CONTROL-FULL captures are correct."
+Write-Host "PASS: TypeScript/Angular and C# Binary0x04-derived semantic oracles and model/restore boundaries are correct (operator evidence)."

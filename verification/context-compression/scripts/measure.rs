@@ -5,7 +5,7 @@ use clean_ctx::ir::{
     render_hierarchical_for_llm_focused,
 };
 use clean_ctx::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
-use clean_ctx::tokenizer::{create_tokenizer, TokenizerKind};
+use clean_ctx::tokenizer::{TokenizerKind, create_tokenizer};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fs;
@@ -234,6 +234,51 @@ fn render_oracle(args: &[String]) {
     fs::write(&args[6], format!("{payload}\n{footer}")).expect("CONTROL-FULL oracle output");
 }
 
+// Operator evidence from the actual durable binary, never reduced result.ir
+// or model-visible text. Keep using the production codec and oracle renderer.
+fn baseline_oracle(args: &[String]) {
+    let bytes = fs::read(&args[2]).expect("persisted Binary0x04 bytes");
+    assert!(
+        bytes.starts_with(&[0xcc, 0x02, 0x04]),
+        "physical version must be 0x04"
+    );
+    let ir = clean_ctx::ir::binary_wire::decode(&bytes).expect("decode complete durable baseline");
+    let manifest: Value =
+        serde_json::from_str(&fs::read_to_string(&args[3]).expect("aligned snapshot manifest"))
+            .expect("snapshot JSON");
+    assert_eq!(Some(ir.file_id.as_str()), manifest["file_path"].as_str());
+    let snapshot = manifest["snapshots"]
+        .as_array()
+        .expect("snapshot array")
+        .iter()
+        .find(|value| value["semantic_version"].as_u64() == Some(ir.version))
+        .expect("semantic-edge snapshot matching binary IR version");
+    assert_eq!(snapshot["source_hash"], manifest["source_hash"]);
+    assert_eq!(snapshot["file_path"], manifest["file_path"]);
+    let encoded = clean_ctx::ir::binary_wire::encode(&ir);
+    assert_eq!(clean_ctx::ir::binary_wire::decode(&encoded).unwrap(), ir);
+    let durable_snapshot = &snapshot["edges"];
+    assert_eq!(durable_snapshot["file_path"], snapshot["file_path"]);
+    assert_eq!(durable_snapshot["source_hash"], snapshot["source_hash"]);
+    assert_eq!(durable_snapshot["version"].as_u64(), Some(ir.version));
+    let edges = durable_snapshot["edges"]
+        .as_array()
+        .expect("semantic edge array")
+        .iter()
+        .map(edge_from_json)
+        .collect::<Vec<_>>();
+    let hierarchy = try_ir_to_hierarchical(&ir).expect("checked durable hierarchy");
+    let payload = render_control_full(
+        &ir.file_id,
+        &ir.file_id,
+        ir.version,
+        Fidelity::Edit,
+        &hierarchy,
+        &edges,
+    );
+    fs::write(&args[4], payload).expect("regenerated semantic oracle");
+}
+
 fn leaked_str(value: &Value, field: &str) -> &'static str {
     Box::leak(
         value[field]
@@ -279,11 +324,12 @@ fn main() {
         Some("fixed") if args.len() == 4 => fixed_envelope(&args),
         Some("prod") if args.len() == 9 => render_prod(&args),
         Some("oracle") if args.len() == 7 => render_oracle(&args),
+        Some("baseline-oracle") if args.len() == 5 => baseline_oracle(&args),
         Some("a3") if args.len() == 4 => render_a3(&args),
         Some("a3-legend") if args.len() == 3 => write_a3_legend(&args),
         Some("a3-anatomy") if args.len() == 4 => render_a3_anatomy(&args),
         _ => panic!(
-            "usage: measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure a3 <control-full.txt> <output> | measure a3-legend <output> | measure a3-anatomy <control-full.txt> <cl100k|o200k> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
+            "usage: measure baseline-oracle <baseline.bin> <baseline.json> <output> | measure count <cl100k|o200k> <file> | measure fixed <control-full.txt> <output> | measure a3 <control-full.txt> <output> | measure a3-legend <output> | measure a3-anatomy <control-full.txt> <cl100k|o200k> | measure prod <response.json> <source> <fidelity> <focus-csv-or-empty> <selection-tokenizer> <provide-fallback|renderer> <output> | measure oracle <response.json> <source> <fidelity> <focus-csv-or-empty> <output>"
         ),
     }
 }
