@@ -14,6 +14,11 @@ version-history registry lives in
 
 ### Fixed
 
+* Angular `inject(Token)` metadata uses the written dependency token instead
+  of its receiving field name, in both markers and semantic edges. Empty or
+  computed token expressions produce no invented dependency. Angular marker
+  generation advances to 4 and semantic generation to 3; older facts require
+  regeneration.
 * Angular testing metadata now recognizes Jasmine spy factories, method spies,
   and property spies alongside Vitest spies. Comment/string guards, marker
   deduplication, and fidelity gating remain shared. Only the Angular marker

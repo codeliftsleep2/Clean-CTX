@@ -1,4 +1,5 @@
-import { Component, input, output, model } from '@angular/core';
+import { Component, input, output, model, inject } from '@angular/core';
+import { UserService } from './user.service';
 
 @Component({
   selector: 'app-user-card-modern',
@@ -22,7 +23,7 @@ export class UserCardModernComponent {
   // private readonly el = viewChild<ElementRef>('someRef');
 
   // Inject function usage (instead of constructor DI)
-  // private readonly userService = inject(UserService);
+  private readonly userService = inject(UserService);
 
   // Constructor-based DI (legacy style)
   // constructor(private logger: LoggerService) {}

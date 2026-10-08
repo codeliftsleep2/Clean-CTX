@@ -270,7 +270,7 @@ enum SignalKind {
     Inject,
 }
 
-/// A detected signal-function call with its field name and optional alias.
+/// A detected signal call with its field name (or injection token) and alias.
 #[derive(Debug, Clone)]
 struct SignalField {
     kind: SignalKind,
@@ -339,11 +339,28 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     .unwrap_or_default();
                 let alias = parse_first_string_arg(&arg);
 
-                let Some(name) = extract_decl_name(&body[..=i]) else {
+                let Some(mut name) = extract_decl_name(&body[..=i]) else {
                     i += 1;
                     continue;
                 };
 
+                if kind == SignalKind::Inject {
+                    let args = crate::meta_util::split_top_level(&arg, ',');
+                    let token = args.first().map(|arg| arg.trim()).unwrap_or_default();
+                    if token.is_empty()
+                        || !token.split('.').all(|part| {
+                            let mut chars = part.chars();
+                            chars
+                                .next()
+                                .is_some_and(|c| c == '_' || c == '$' || c.is_ascii_alphabetic())
+                                && chars.all(|c| c == '_' || c == '$' || c.is_ascii_alphanumeric())
+                        })
+                    {
+                        i += 1;
+                        continue;
+                    }
+                    name = token.to_owned();
+                }
                 out.push(SignalField { kind, name, alias });
             }
         }

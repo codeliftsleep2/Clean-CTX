@@ -444,3 +444,39 @@ fn extract_decorators_handles_unterminated_decorator_call() {
         "extract_decorators panicked on malformed input"
     );
 }
+
+#[test]
+fn modern_inject_regression_uses_token_in_markers_and_semantics() {
+    let source = r#"@Component({selector: 'di'})
+class DiComponent {
+    private readonly service = inject(UserService);
+    readonly config = inject(APP_CONFIG, { optional: true });
+}"#;
+    let lines = extract_decorators(source, Fidelity::High).unwrap().lines;
+    assert!(
+        lines
+            .iter()
+            .any(|line| line.contains("UserService") && line.contains("APP_CONFIG")),
+        "{lines:?}"
+    );
+    let (_, _, _, injects, _) = super::extract_graph_entries(source).unwrap();
+    assert_eq!(injects, vec!["UserService", "APP_CONFIG"]);
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains(" service") || line.contains(" config"))
+    );
+}
+
+#[test]
+fn modern_inject_regression_does_not_invent_expression_dependencies() {
+    let source = r#"@Component({selector: 'di'})
+class DiComponent {
+    readonly dynamic = inject(resolveToken());
+    readonly empty = inject();
+    // readonly fake = inject(FakeService);
+    readonly text = 'field = inject(QuotedService)';
+}"#;
+    let (_, _, _, injects, _) = super::extract_graph_entries(source).unwrap();
+    assert!(injects.is_empty(), "{injects:?}");
+}

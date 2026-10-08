@@ -129,7 +129,7 @@ pwsh -NoProfile -File verification/native-diagnostics/scripts/Verify-AngularAppM
 This driver preserves the existing Angular fixture tree, including HTML/SCSS
 companions and NgRx/routing relative paths. Its assertions cover legacy
 decorated inputs/outputs and constructor injection, generic signal-based
-inputs/outputs at High fidelity, NgRx dispatch/selection and effect actions,
+inputs/outputs and `inject(UserService)` token metadata at High fidelity, NgRx dispatch/selection and effect actions,
 and route/component/guard/resolver relations. An ordinary TypeScript class
 must not manufacture Angular or NgRx facts. Required edges are scoped to the
 asserting source file, including when fixture classes share a display name.
@@ -153,3 +153,13 @@ This proves the built adapter handles real producer output. It does not prove
 Claude accepts or consumes the replacement, establish VS Code rendering or
 host persistence, constitute tracked regression-test evidence, or replace CI.
 The representative host-consumption gate remains separate.
+
+The injection-token regression now checks both markers and semantic extraction:
+`service = inject(UserService)` names `UserService`, while computed/empty token
+expressions are omitted. Two tracked regressions failed before the fix and
+passed unchanged afterward. The existing modern fixture and app driver require
+`Injects -> UserService` in complete Binary0x04 evidence and restored queries.
+Current Angular marker generation is 4 and semantic generation is 3.
+Focused verification passed 433 Angular tests, 15 compatibility tests, package
+Clippy, and the existing five-case application MCP driver plus its negative
+control. Builds used the locked dependency graph; no full suite was run.
