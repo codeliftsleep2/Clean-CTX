@@ -10,6 +10,35 @@ version-history registry lives in
 
 ---
 
+## [0.9.1] - 2026-10-08
+
+### Queryable neutral C# base types
+
+* **Cross-file C# base-type discovery** — unresolved or cross-file C# base-list
+  entries now project as source-true `HasBaseType` relationships from the
+  owning `builtin / Class` to the written `builtin / TypeRef`. Forward
+  queries can inspect a class's written base types, and reverse queries on the
+  neutral `TypeRef` can find classes that name that type without falsely
+  classifying the relationship as `Extends` or `Implements`.
+* **Scoped durable compatibility** — the changed edge projection is identified
+  by a C#-specific semantic-projection producer generation. Pre-change C#
+  semantic snapshots are rejected with the existing structured compatibility
+  error and must be regenerated; unrelated language snapshots are unaffected.
+* **Query guidance** — unsupported reverse lookup on a same-name
+  `builtin / Interface` now points callers to the neutral
+  `HasBaseType` / `TypeRef` query.
+
+### Verification
+
+* RED was established through tracked production-path forward and reverse
+  `workspace_query` regressions, both returning empty edge sets before the
+  fix. The unchanged regressions and focused projection, compatibility,
+  restore, and coverage suites passed after implementation.
+* The complete release gate and live MCP pilot remain maintainer-run
+  requirements before the `v0.9.1` release tag.
+
+---
+
 ## [0.9.0] - 2026-10-05
 
 `0.9.0` hardens the authority model beneath the correctness-oriented context

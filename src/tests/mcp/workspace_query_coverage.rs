@@ -92,8 +92,5 @@ fn interface_reverse_coverage_points_to_csharp_constructor_type_query() {
     assert_eq!(coverage["alternative_query"]["domain"], "builtin");
     assert_eq!(coverage["alternative_query"]["entity_type"], "TypeRef");
     assert_eq!(coverage["alternative_query"]["name"], "IFooService");
-    assert_eq!(
-        coverage["alternative_query"]["relation"],
-        "HasConstructorParameterType"
-    );
+    assert_eq!(coverage["alternative_query"]["relation"], "HasBaseType");
 }

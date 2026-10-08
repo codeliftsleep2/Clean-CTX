@@ -82,6 +82,12 @@ fn has_edge(
     })
 }
 
+fn has_typed_inheritance_edge(edges: &[serde_json::Value]) -> bool {
+    edges
+        .iter()
+        .any(|edge| matches!(edge["relation"].as_str(), Some("Extends" | "Implements")))
+}
+
 fn assert_forward_and_reverse(
     dir: &tempfile::TempDir,
     state: &crate::mcp::McpState,
@@ -235,12 +241,76 @@ public class Ambiguous : Shared {}
         "IRoot",
     );
     assert!(
-        edges(&dir, &state, "forward_edges", "Class", "Unresolved").is_empty(),
+        !has_typed_inheritance_edge(&edges(&dir, &state, "forward_edges", "Class", "Unresolved")),
         "an unresolved first C# base-list target must not become a false Extends or Implements edge"
     );
     assert!(
-        edges(&dir, &state, "forward_edges", "Class", "Ambiguous").is_empty(),
-        "a class/interface name collision must remain BaseTypeRef and produce no workspace edge"
+        !has_typed_inheritance_edge(&edges(&dir, &state, "forward_edges", "Class", "Ambiguous")),
+        "a class/interface name collision must remain neutral and produce no typed inheritance edge"
+    );
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn csharp_cross_file_base_type_ref_is_queryable_from_the_child() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(
+        &dir,
+        &state,
+        "IFoo.cs",
+        "namespace P { public interface IFoo { void Do(); } }",
+    );
+    publish(
+        &dir,
+        &state,
+        "FooCross.cs",
+        "namespace P { public class FooCross : IFoo { public void Do() {} } }",
+    );
+
+    let forward = edges(&dir, &state, "forward_edges", "Class", "FooCross");
+    assert!(
+        has_edge(
+            &forward,
+            "HasBaseType",
+            "Class",
+            "FooCross",
+            "TypeRef",
+            "IFoo"
+        ),
+        "a cross-file C# base-list reference must remain queryable as a neutral written-type fact: {forward:?}"
+    );
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn csharp_cross_file_base_type_ref_is_queryable_from_the_written_type() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(
+        &dir,
+        &state,
+        "IFoo.cs",
+        "namespace P { public interface IFoo { void Do(); } }",
+    );
+    publish(
+        &dir,
+        &state,
+        "FooCross.cs",
+        "namespace P { public class FooCross : IFoo { public void Do() {} } }",
+    );
+
+    let reverse = edges(&dir, &state, "reverse_edges", "TypeRef", "IFoo");
+    assert!(
+        has_edge(
+            &reverse,
+            "HasBaseType",
+            "Class",
+            "FooCross",
+            "TypeRef",
+            "IFoo"
+        ),
+        "reverse lookup by the neutral written base type must find the cross-file C# child: {reverse:?}"
     );
 }
 

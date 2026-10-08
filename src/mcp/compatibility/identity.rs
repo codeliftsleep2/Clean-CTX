@@ -78,6 +78,7 @@ pub(crate) enum ProducerKey {
     SpringBootMarkers,
     TypeScriptSemanticInput,
     CSharpSemanticInput,
+    CSharpSemanticProjection,
     RustSemanticInput,
     JavaSemanticInput,
     BuiltinSemantic,

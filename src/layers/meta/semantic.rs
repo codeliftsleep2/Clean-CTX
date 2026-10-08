@@ -154,6 +154,10 @@ pub enum SemanticRelation {
     Defines,
     /// One symbol calls another.
     Calls,
+    /// A class names a type in a source-language base list without enough
+    /// local evidence to classify the relationship as `Extends` or
+    /// `Implements`. Its object is an unresolved `builtin / TypeRef`.
+    HasBaseType,
     /// A class declares a constructor parameter with the written type.
     ///
     /// This is a source-signature fact, not proof of runtime dependency

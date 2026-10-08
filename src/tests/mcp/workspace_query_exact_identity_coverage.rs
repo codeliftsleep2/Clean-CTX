@@ -120,8 +120,8 @@ fn workspace_query_exact_identity_coverage_single_results() {
             "domain": "builtin",
             "entity_type": "TypeRef",
             "name": "IFooService",
-            "relation": "HasConstructorParameterType",
-            "meaning": "C# classes declaring a constructor parameter with this written type"
+            "relation": "HasBaseType",
+            "meaning": "C# classes naming this written type in an unresolved base list"
         })
     );
 

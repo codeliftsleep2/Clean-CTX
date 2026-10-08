@@ -1,10 +1,10 @@
 # Clean-CTX — Architecture Overview
 
 > **Owner:** System + module architecture · **Status:** Living reference
-> **Version:** 0.9.0
-> **Last updated:** 2026-10-05 (durable-authority compatibility,
-> owner-scoped publication ordering, current-source reconciliation,
-> edit preconditions, and truthful Git-diff accounting)
+> **Version:** 0.9.1
+> **Last updated:** 2026-10-08 (queryable neutral C# base types,
+> C#-scoped semantic compatibility, durable-authority compatibility,
+> and owner-scoped publication ordering)
 >
 > **Source of truth for:** system diagram, module tree, pipeline stages, design decisions. Feature-specific guides (config, IR, meta-layers, proxy, security) live in their own docs — link, don't duplicate.
 

@@ -1,7 +1,7 @@
 # Clean-CTX — Compiler IR: Structured State Protocol
 
 > **Owner:** Compiler IR spec + delta transport · **Status:** Living reference
-> **Version:** 0.9.0 architecture (Implemented) · **Last updated:** 2026-10-05
+> **Version:** 0.9.1 architecture (Implemented) · **Last updated:** 2026-10-08
 > **Status:** All phases A–H implemented and deployed in production.
 >
 > **Verification:** see `docs/agent/verification.md` for the authoritative gate;

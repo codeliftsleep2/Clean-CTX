@@ -286,6 +286,81 @@ fn restore_rejects_semantic_producer_generation_mismatch() {
     );
 }
 
+#[cfg(feature = "csharp")]
+#[test]
+fn restore_rejects_csharp_semantic_projection_generation_mismatch() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let file = save_baseline(
+        &root,
+        "csharp-semantic-generation.cs",
+        "public class Child : ExternalBase {}\n",
+        |_| {},
+    );
+    let producer = state_with_config(&root, |_| {});
+    rewrite_identity(
+        &producer,
+        &file,
+        3,
+        "semantic_edge_snapshots",
+        "semantic_producer_identity",
+        |json| {
+            json.replace(
+                "\"c_sharp_semantic_projection\":1",
+                "\"c_sharp_semantic_projection\":99",
+            )
+        },
+    );
+    drop(producer);
+    let restarted = state_with_config(&root, |_| {});
+    let rejected = restore(&restarted, &root, &file);
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "semantic_producer_incompatible",
+    );
+}
+
+#[cfg(feature = "csharp")]
+#[test]
+fn restore_rejects_csharp_snapshot_missing_projection_generation() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let file = save_baseline(
+        &root,
+        "csharp-missing-projection-generation.cs",
+        "public class Child : ExternalBase {}\n",
+        |_| {},
+    );
+    let producer = state_with_config(&root, |_| {});
+    rewrite_identity(
+        &producer,
+        &file,
+        3,
+        "semantic_edge_snapshots",
+        "semantic_producer_identity",
+        |json| {
+            let mut identity: Value = serde_json::from_str(&json).expect("semantic identity");
+            let removed = identity["relevant_producers"]
+                .as_object_mut()
+                .expect("producer map")
+                .remove("c_sharp_semantic_projection");
+            assert_eq!(removed, Some(json!(1)));
+            serde_json::to_string(&identity).expect("rewritten semantic identity")
+        },
+    );
+    drop(producer);
+    let restarted = state_with_config(&root, |_| {});
+    let rejected = restore(&restarted, &root, &file);
+    assert_clean_rejection(
+        &restarted,
+        &file,
+        &rejected,
+        "semantic_producer_incompatible",
+    );
+}
+
 #[test]
 fn restore_rejects_persisted_producer_when_current_set_lacks_it() {
     let _serial = crate::protocol::handler_response_serial();

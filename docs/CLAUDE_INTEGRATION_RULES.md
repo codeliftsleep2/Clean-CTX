@@ -182,11 +182,16 @@ registration, prove runtime injection, or answer which implementation .NET DI
 will supply. It also does not cover service-locator calls such as
 `GetRequiredService<T>()`, because those are not constructor parameters.
 
+An unresolved C# base-list entry similarly projects `HasBaseType` from the
+owning `builtin/Class` to the written `builtin/TypeRef`. This makes
+cross-file and otherwise unclassified base references queryable without
+claiming `Extends` or `Implements`.
+
 Query the written type identity, not the declaration identity:
 `reverse_edges(builtin/TypeRef/IFooService)`. A reverse query on
 `builtin/Interface/IFooService` does not own this capability and returns an
-`alternative_query` pointing to the `TypeRef` form. Exact edge-query coverage
-with `source_complete: false` also reports `result_semantics: "lower_bound"`
+`alternative_query` pointing to the `HasBaseType` / `TypeRef` form. Exact
+edge-query coverage with `source_complete: false` also reports `result_semantics: "lower_bound"`
 and `omitted_possible: true`; its `count` is a minimum, not a complete consumer
 count. When discovery found more candidates than it compiled in that cycle,
 `discovered_not_compiled_this_cycle` reports the observed gap; it can include
