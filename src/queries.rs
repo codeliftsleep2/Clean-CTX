@@ -119,6 +119,29 @@ pub const CS_QUERY: &str = r#"
 // Unsupported function shapes (conditional access `a?.Foo()`, parenthesized
 // and cast expressions) are deliberately not matched: an unmatched form
 // produces no fact rather than a guessed one.
+// C#-specific semantic captures consumed only by the IR compiler.
+//
+// This query is deliberately separate from `CS_QUERY`: compression and diff
+// consumers share that base query and must not observe semantic-only capture names.
+// The IR capture walk appends this query and `CS_CALL_QUERY` to the same
+// tree-sitter query, preserving the single-parse production invariant.
+pub const CS_SEMANTIC_QUERY: &str = r#"
+    ; Class/struct/interface base lists expose entries through the type supertype.
+    (base_list (type) @csharp.base_type)
+    ; record_base is aliased to base_list. Capture each direct named child
+    ; without guessing which concrete _name form the grammar selected.
+    (record_declaration
+        (base_list
+            (_) @csharp.record_base_candidate))
+    ; A positional record may invoke its record base constructor. Capture only
+    ; the typed name field. Projection suppresses the enclosing candidate by
+    ; span, so constructor arguments never enter the written type.
+    (record_declaration
+        (base_list
+            (primary_constructor_base_type
+                type: (_) @csharp.base_type)))
+"#;
+
 pub const CS_CALL_QUERY: &str = r#"
     ; --- Generic invocation captures (native call facts) ---
     (invocation_expression

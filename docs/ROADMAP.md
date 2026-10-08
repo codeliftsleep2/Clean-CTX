@@ -17,7 +17,7 @@
 
 | Horizon | Target Release | Theme | Items |
 |---------|----------------|-------|------:|
-| **Current** | v0.9.1 | Queryable neutral C# base types | Final gate and live MCP pilot pending |
+| **Current** | v0.9.1 | Queryable neutral C# class, struct, and record base types | Final gate and live MCP pilot pending |
 | **Previous** | v0.8.0 | Typed IR, exact persistence, batching, and field validation | ✅ Shipped |
 | **Future** | Unscheduled | Demand-driven items retained below | Proposed/deferred |
 

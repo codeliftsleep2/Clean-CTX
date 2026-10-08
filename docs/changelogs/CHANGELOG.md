@@ -12,13 +12,13 @@ version-history registry lives in
 
 ## [0.9.1] - 2026-10-08
 
-### Queryable neutral C# base types
+### Queryable neutral C# class, struct, and record base types
 
-* **Cross-file C# base-type discovery** — unresolved or cross-file C# base-list
+* **Cross-file C# base-type discovery** — unresolved or cross-file C# class, struct, and record base-list
   entries now project as source-true `HasBaseType` relationships from the
-  owning `builtin / Class` to the written `builtin / TypeRef`. Forward
-  queries can inspect a class's written base types, and reverse queries on the
-  neutral `TypeRef` can find classes that name that type without falsely
+  correct `builtin / Class`, `builtin / Struct`, or `builtin / Record` owner to the written `builtin / TypeRef`. Forward
+  queries can inspect written base types, and reverse queries on the
+  neutral `TypeRef` can find declarations that name that type without falsely
   classifying the relationship as `Extends` or `Implements`.
 * **Scoped durable compatibility** — the changed edge projection is identified
   by a C#-specific semantic-projection producer generation. Pre-change C#

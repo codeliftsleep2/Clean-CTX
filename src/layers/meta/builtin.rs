@@ -156,7 +156,7 @@ impl MetaLayer for BuiltinMetaLayer {
 
 /// Extract the bare declaration name using the existing class-name extraction
 /// infrastructure (`src/compaction/class.rs`). No new parsing logic.
-fn declaration_name(capture_name: &str, raw_class: &str) -> String {
+pub(crate) fn declaration_name(capture_name: &str, raw_class: &str) -> String {
     // C-22 class spans are decorator/annotation-inclusive by design. The
     // shared class-name extractors assume the declaration header is
     // reachable from byte 0, so trim any leading `@Decorator(...)` /

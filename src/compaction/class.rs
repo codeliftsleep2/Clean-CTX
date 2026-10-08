@@ -46,6 +46,8 @@ pub fn extract_class_name(text: &str) -> String {
     let rest = rest
         .strip_prefix("class ")
         .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record struct "))
+        .or_else(|| rest.strip_prefix("record class "))
         .or_else(|| rest.strip_prefix("record "))
         .or_else(|| rest.strip_prefix("enum "))
         .or_else(|| rest.strip_prefix("struct "))
@@ -97,6 +99,8 @@ pub fn extract_bare_class_name(text: &str) -> String {
     let rest = rest
         .strip_prefix("class ")
         .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record struct "))
+        .or_else(|| rest.strip_prefix("record class "))
         .or_else(|| rest.strip_prefix("record "))
         .or_else(|| rest.strip_prefix("enum "))
         .or_else(|| rest.strip_prefix("struct "))
@@ -129,6 +133,8 @@ pub fn extract_class_meta(text: &str) -> String {
     let rest = rest
         .strip_prefix("class ")
         .or_else(|| rest.strip_prefix("interface "))
+        .or_else(|| rest.strip_prefix("record struct "))
+        .or_else(|| rest.strip_prefix("record class "))
         .or_else(|| rest.strip_prefix("record "))
         .or_else(|| rest.strip_prefix("enum "))
         .or_else(|| rest.strip_prefix("struct "))

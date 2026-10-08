@@ -54,7 +54,11 @@ impl IRPass for CoreIRPass {
         // ONE tree-sitter parse: the language's invocation-capture query (when a
         // native call producer exists) is compiled into the SAME query, so the
         // call facts are captured by the walk that already parses the file.
-        let capture_query = capture_query(&query_string);
+        let mut capture_query = capture_query(&query_string);
+        if query_string == crate::queries::CS_QUERY {
+            capture_query.push('\n');
+            capture_query.push_str(crate::queries::CS_SEMANTIC_QUERY);
+        }
 
         let captures = run_capture_pipeline_nodes(
             language,
