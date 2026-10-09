@@ -326,10 +326,8 @@ pub fn project_csharp_struct_record_base_types(
                 "record.root" => "Record",
                 _ => return None,
             };
-            let owner_name = crate::layers::meta::builtin::declaration_name(
-                &owner.name,
-                &owner.raw_text,
-            );
+            let owner_name =
+                crate::layers::meta::builtin::declaration_name(&owner.name, &owner.raw_text);
             let written_type = base_type.raw_text.trim();
             if owner_name.is_empty() || written_type.is_empty() {
                 return None;

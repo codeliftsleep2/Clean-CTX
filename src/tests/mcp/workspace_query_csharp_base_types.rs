@@ -106,10 +106,10 @@ fn assert_forward_and_reverse(
 fn assert_no_typed_or_class_owner(edges: &[serde_json::Value], owner_name: &str) {
     assert!(
         edges.iter().all(|edge| {
-            !matches!(edge["relation"].as_str(), Some("Extends" | "Implements"))
-                && !(edge["relation"] == "HasBaseType"
+            !(matches!(edge["relation"].as_str(), Some("Extends" | "Implements"))
+                || (edge["relation"] == "HasBaseType"
                     && edge["subject"]["entity_type"] == "Class"
-                    && edge["subject"]["name"] == owner_name)
+                    && edge["subject"]["name"] == owner_name))
         }),
         "neutral struct/record facts must not fabricate typed inheritance or Class identity: {edges:?}"
     );

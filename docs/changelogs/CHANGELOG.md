@@ -10,22 +10,34 @@ version-history registry lives in
 
 ---
 
-## [0.9.1] - 2026-10-08
+## [0.9.1] - 2026-10-09
 
 ### Queryable neutral C# class, struct, and record base types
 
 * **Cross-file C# base-type discovery** — unresolved or cross-file C# class, struct, and record base-list
   entries now project as source-true `HasBaseType` relationships from the
   correct `builtin / Class`, `builtin / Struct`, or `builtin / Record` owner to the written `builtin / TypeRef`. Forward
-  queries can inspect written base types, and reverse queries on the
-  neutral `TypeRef` can find declarations that name that type without falsely
-  classifying the relationship as `Extends` or `Implements`.
+  queries can inspect written base types, and reverse queries on the neutral
+  `TypeRef` can find declarations that name that type.
+* **Cross-file C# class classification** — exact Class and Interface edge
+  queries now refine neutral Class base-list facts into ephemeral `Extends`
+  or `Implements` results after completed scoped hydration proves exactly one
+  target kind. Cold forward Class queries hydrate each distinct neutral target
+  name before classification. The durable `HasBaseType` fact remains
+  authoritative and queryable; absent or ambiguous targets remain neutral, and
+  Struct/Record facts are never consumed by the Class classifier.
+* **Struct and Record identity preservation** — parser-structured C# base-list
+  captures now publish every written qualified, generic, multiline, and nested
+  base type from the existing `builtin / Struct` or `builtin / Record` owner,
+  never through a fabricated Class identity. Republishing or removing an entry
+  retracts the old fact without duplicates, and no unsupported `Extends` or
+  `Implements` relationship is invented.
 * **Scoped durable compatibility** — the changed edge projection is identified
   by a C#-specific semantic-projection producer generation. Pre-change C#
   semantic snapshots are rejected with the existing structured compatibility
   error and must be regenerated; unrelated language snapshots are unaffected.
 * **Query guidance** — unsupported reverse lookup on a same-name
-  `builtin / Interface` now points callers to the neutral
+  `builtin / Class` or `builtin / Interface` now points callers to the neutral
   `HasBaseType` / `TypeRef` query.
 
 ### Verification
@@ -33,7 +45,9 @@ version-history registry lives in
 * RED was established through tracked production-path forward and reverse
   `workspace_query` regressions, both returning empty edge sets before the
   fix. The unchanged regressions and focused projection, compatibility,
-  restore, and coverage suites passed after implementation.
+  restore, coverage, Struct/Record publication and lifecycle, and cross-file
+  Class classification suites passed after implementation. The final
+  all-target/all-feature Clippy gate also passed with zero warnings.
 * The complete release gate and live MCP pilot remain maintainer-run
   requirements before the `v0.9.1` release tag.
 
