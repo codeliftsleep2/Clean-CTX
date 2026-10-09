@@ -306,7 +306,7 @@ fn restore_rejects_csharp_semantic_projection_generation_mismatch() {
         "semantic_producer_identity",
         |json| {
             json.replace(
-                "\"c_sharp_semantic_projection\":1",
+                "\"c_sharp_semantic_projection\":2",
                 "\"c_sharp_semantic_projection\":99",
             )
         },
@@ -346,7 +346,7 @@ fn restore_rejects_csharp_snapshot_missing_projection_generation() {
                 .as_object_mut()
                 .expect("producer map")
                 .remove("c_sharp_semantic_projection");
-            assert_eq!(removed, Some(json!(1)));
+            assert_eq!(removed, Some(json!(2)));
             serde_json::to_string(&identity).expect("rewritten semantic identity")
         },
     );
