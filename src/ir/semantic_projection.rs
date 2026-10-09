@@ -30,7 +30,7 @@ pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 /// Generation of C#-specific generic semantic projection. This is separate
 /// from the generic generation so a C#-only edge change does not invalidate
 /// durable semantic snapshots for unrelated languages.
-pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 2;
+pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 3;
 //
 // A callee that is never declared in the compiled workspace still appears as
 // the OBJECT of a `Calls` edge (it is honestly unresolved); only the caller is
@@ -326,8 +326,7 @@ pub fn project_csharp_struct_record_base_types(
                 "record.root" => "Record",
                 _ => return None,
             };
-            let owner_name =
-                crate::layers::meta::builtin::declaration_name(&owner.name, &owner.raw_text);
+            let owner_name = owner.text.clone();
             let written_type = base_type.raw_text.trim();
             if owner_name.is_empty() || written_type.is_empty() {
                 return None;

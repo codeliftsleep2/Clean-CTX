@@ -45,6 +45,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/V
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-IdentityResolutionLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-BatchQueriesLive.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass ./verification/workspace-query/scripts/Verify-CSharpConstructorDependenciesLive.ps1
+node ./verification/live-acceptance/csharp_base_type_live_acceptance.mjs
 ```
 
 These are repeatable operator-verification assets, not Rust regression tests or
@@ -76,3 +77,11 @@ claim runtime .NET DI registration or implementation resolution. It also
 verifies that the TypeRef result is explicitly marked as a lower bound and that
 an unsupported same-name `builtin/Interface` reverse lookup points callers to
 the supported `builtin/TypeRef` query.
+
+`csharp_base_type_live_acceptance.mjs` creates an isolated C# workspace and
+drives the production binary over MCP stdio. It verifies structured partial,
+primary-constructor, positional-record, and multiline declaration headers;
+neutral qualified/generic references; exact Class/Interface classification and
+coverage; preserved Struct/Record ownership; and repeated-query stability.
+Generated responses are written beneath
+`target/live-acceptance/csharp-base-types/`.

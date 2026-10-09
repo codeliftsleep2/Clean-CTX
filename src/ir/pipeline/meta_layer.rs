@@ -39,7 +39,18 @@ impl IRPass for MetaLayerPass {
         let path = Path::new(&file_provenance);
         let registry = crate::layers::LayerRegistry::global();
         let lexical_regions = crate::meta_util::LexicalRegions::new(&state.source);
-        let context = crate::layers::meta::MetaLayerContext::new(
+        let structured_declarations: Vec<(String, String)> = state
+            .captures
+            .iter()
+            .filter(|capture| {
+                matches!(
+                    capture.name.as_str(),
+                    "class.root" | "interface.root" | "struct.root" | "enum.root" | "record.root"
+                )
+            })
+            .map(|capture| (capture.name.clone(), capture.text.clone()))
+            .collect();
+        let mut context = crate::layers::meta::MetaLayerContext::new(
             &state.source,
             path,
             &class_captures,
@@ -48,6 +59,9 @@ impl IRPass for MetaLayerPass {
             state.config.as_ref(),
             &lexical_regions,
         );
+        if state.query_string == crate::queries::CS_QUERY {
+            context.structured_declarations = Some(&structured_declarations);
+        }
 
         let (meta_results, mut semantic_edges) = registry.evaluate_meta_layers_context(&context);
         append_marker_aliases(state, &meta_results);

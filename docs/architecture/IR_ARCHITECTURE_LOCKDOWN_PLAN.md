@@ -600,4 +600,4 @@ validation prerequisite without changing hierarchical projection shapes:
 
 ## 13. Verification ownership
 
-Verification follows [`docs/agent/verification.md`](../agent/verification.md); agents hand off long-running gates, and untracked harnesses never replace tests.
+Verification follows [`docs/agent/verification.md`](../agent/verification.md); agents hand off long-running gates, and tracked live-verification harnesses never replace tests.

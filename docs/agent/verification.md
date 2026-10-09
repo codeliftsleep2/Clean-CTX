@@ -98,18 +98,19 @@ the authoritative release-time enforcement.
 
 ## Live acceptance harnesses are not tests
 
-Untracked operator harnesses (for example `target/tmp/*.mjs` or
-`target/tmp/*.ps1`) that drive the built binary over MCP stdio are permitted and
-often useful: they let the operator observe real output from a real binary. They
-are hand-off convenience, and that is their entire role.
+Reusable operator harnesses that drive a built binary over MCP stdio are
+tracked under `verification/**`. Their fixtures, scenarios, oracles, and driver
+scripts are reviewable verification assets. Generated captures, temporary
+workspaces, databases, and other runtime state belong under `target/**`.
 
-- A harness result is NEVER part of this gate, never a substitute for a tracked
-  test, and never a completion criterion.
+- A harness result is operator/live-verification evidence. It is not part of
+  the Rust/CI gate and never substitutes for a tracked regression test.
 - Every required regression MUST be a tracked test under `src/tests/**` (see
   `architecture.md`, Test-file convention) that
   `cargo test --workspace --all-targets --all-features` compiles and runs.
-- Reporting a harness PASS as coverage, or placing a test where the gate does
-  not compile and run it, is a policy violation (engineering rules, §8d).
+- Report a tracked harness PASS as operator/live verification, never as test
+  coverage. Placing a Rust test where the gate does not compile and run it is a
+  policy violation (engineering rules, §8d).
 - A harness cannot repair a red gate. The failing tracked test stays failing
   until the tracked test itself is green.
 
@@ -136,7 +137,8 @@ A task is complete only when:
 - the resulting architecture is coherent,
 - the repository is left in a state consistent with the engineering rules,
 - every required regression is a tracked test in `src/tests/**` that this gate
-  compiles and runs (an untracked live harness outside it is never coverage),
+  compiles and runs, with applicable reusable live verification tracked under
+  `verification/**` and reported separately,
 - the final verification gate passes.
 
 The final state must not merely work; it must also be architecturally

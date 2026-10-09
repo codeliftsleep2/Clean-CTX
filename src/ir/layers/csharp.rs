@@ -29,9 +29,9 @@ use crate::ir::opcodes::{
 use std::collections::HashMap;
 
 /// Increment when identical C# input can emit different canonical IR.
-pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 2;
 /// Increment when C# canonical facts change meaning for projection.
-pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 1;
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 2;
 
 /// True when `head` (a declaration head, never a full body) carries `word`
 /// as a standalone modifier token. Splits on non-identifier characters so
@@ -104,60 +104,6 @@ impl CSharpLayer {
         Self {
             class_semantics: HashMap::new(),
         }
-    }
-
-    /// Extract class inheritance from a C# class declaration.
-    /// Parses: "public class MyClass : BaseClass, IInterface1, IInterface2"
-    fn extract_class_relationships(class_head: &str) -> (Option<String>, Vec<String>) {
-        let mut base: Option<String> = None;
-        let mut interfaces: Vec<String> = Vec::new();
-
-        // Only the declaration HEAD can carry inheritance: the `:` that
-        // introduces a base list lives between the type name and the body
-        // `{`. Scanning the whole declaration node (head + body) let any `:`
-        // inside a member body — a ternary, a label, a named argument —
-        // become the base class, producing a fabricated `X <body expression>`
-        // edge for a class that has no base list. Attribute groups are
-        // stripped first, so a `{` inside an attribute argument
-        // (`[Route("api/{id}")]`) cannot end the head early.
-        let head = strip_csharp_attributes(class_head);
-        let head = head.split('{').next().unwrap_or(head);
-
-        // Find ":" separator (C# uses colon for inheritance)
-        if let Some(colon_pos) = head.find(':') {
-            let after_colon = head[colon_pos + 1..].trim_start();
-            // Split by comma
-            let mut current = String::new();
-            let mut first = true;
-            for ch in after_colon.chars() {
-                if ch == ',' {
-                    let trimmed = current.trim().to_string();
-                    if !trimmed.is_empty() {
-                        if first {
-                            base = Some(trimmed);
-                            first = false;
-                        } else {
-                            interfaces.push(trimmed);
-                        }
-                    }
-                    current.clear();
-                } else if ch == '{' || ch == '\n' || ch == '\r' {
-                    break;
-                } else {
-                    current.push(ch);
-                }
-            }
-            let trimmed = current.trim().to_string();
-            if !trimmed.is_empty() {
-                if first {
-                    base = Some(trimmed);
-                } else {
-                    interfaces.push(trimmed);
-                }
-            }
-        }
-
-        (base, interfaces)
     }
 
     /// Extract class-level flags (public/abstract/static) from a C# type
@@ -344,52 +290,36 @@ impl LanguageLayer for CSharpLayer {
 
         match capture_name {
             "class.root" => {
-                // Extract inheritance from raw text
-                let (base, interfaces) = Self::extract_class_relationships(raw_text);
                 if let Some(class_id) = &context.current_class {
-                    let mut semantics = ClassSemantics::default();
-                    // The first C# base-list entry is syntactically ambiguous:
-                    // it may name either the single base class or the first
-                    // implemented interface. Preserve that uncertainty until
-                    // the post-pass has the complete same-file declarations.
-                    if let Some(base_id) = base.clone() {
-                        ops.push(CoreOp::BaseTypeRef(class_id.clone(), base_id.clone()));
-
-                        // R-43a: Detect SignalR Hub base class in the context
-                        // so per-method ExecutionContext("realtime") ops are
-                        // emitted during method.root processing (fixes E010).
-                        if Self::is_signalr_hub(&base_id) {
-                            semantics.is_signalr_hub = true;
-                        }
-                    }
-                    // Emit Implements for each interface
-                    for iface in &interfaces {
-                        let iface_alias = context
-                            .symbol_table
-                            .alias_for(iface)
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| iface.clone());
-                        ops.push(CoreOp::Implements(class_id.clone(), iface_alias));
-                    }
-
-                    // Emit class-level flags
+                    self.class_semantics
+                        .insert(class_id.clone(), ClassSemantics::default());
                     let modifiers = Self::extract_class_modifiers(raw_text);
                     if !modifiers.is_empty() {
                         ops.push(CoreOp::ClassModifiers(class_id.clone(), modifiers));
                     }
-
-                    // R-43a: Detect IDisposable/IAsyncDisposable class
-                    let implements_disposable = interfaces
-                        .iter()
-                        .any(|i| i.trim() == "IDisposable" || i.trim() == "IAsyncDisposable");
-                    if implements_disposable {
-                        semantics.is_disposable = true;
-                    }
-                    // Class semantics use the same owner identity that the
-                    // pipeline restores after a nested type scope closes.
-                    self.class_semantics.insert(class_id.clone(), semantics);
                 }
             }
+            "csharp.class_base_type" => {
+                if let Some(class_id) = &context.current_class
+                    && Self::is_signalr_hub(raw_text)
+                {
+                    self.class_semantics
+                        .entry(class_id.clone())
+                        .or_default()
+                        .is_signalr_hub = true;
+                }
+            }
+            "csharp.class_interface_type" => {
+                if let Some(class_id) = &context.current_class
+                    && matches!(raw_text.trim(), "IDisposable" | "IAsyncDisposable")
+                {
+                    self.class_semantics
+                        .entry(class_id.clone())
+                        .or_default()
+                        .is_disposable = true;
+                }
+            }
+
             // Nested type roots own their own members but emit no class-level
             // flags through this layer: only `class.root` carries EXPORT/etc.
             // Routing them through the class arm would reset per-class R-43a

@@ -141,17 +141,49 @@ impl MetaLayer for BuiltinMetaLayer {
         #[cfg(test)]
         record_evaluation();
 
-        MetaLayerEvaluation {
-            output: None,
-            semantic_edges: self.extract_semantic_edges_paired_with_path(
+        let semantic_edges = match context.structured_declarations {
+            Some(declarations) => structured_declaration_edges(declarations),
+            None => self.extract_semantic_edges_paired_with_path(
                 context.source,
                 context.path,
                 context.paired_class_captures,
                 context.fidelity,
                 context.config,
             ),
+        };
+
+        MetaLayerEvaluation {
+            output: None,
+            semantic_edges,
         }
     }
+}
+
+fn structured_declaration_edges(declarations: &[(String, String)]) -> Vec<SemanticEdge> {
+    declarations
+        .iter()
+        .filter_map(|(capture_name, name)| {
+            let entity_type = match capture_name.as_str() {
+                "class.root" => "Class",
+                "interface.root" => "Interface",
+                "struct.root" => "Struct",
+                "enum.root" => "Enum",
+                "record.root" => "Record",
+                _ => return None,
+            };
+            if name.is_empty() {
+                return None;
+            }
+            let entity = EntityRef::new("builtin", entity_type, name);
+            Some(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "builtin",
+                call_evidence: None,
+            })
+        })
+        .collect()
 }
 
 /// Extract the bare declaration name using the existing class-name extraction

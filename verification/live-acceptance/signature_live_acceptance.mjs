@@ -1,7 +1,7 @@
 // Live MCP acceptance harness for shared signature-producer fixes
 // (provide_code_context: identities, returns, and canonical parameters).
 //
-// THIS IS A HAND-OFF ARTIFACT, NOT A TEST. It exists so the operator can drive
+// THIS IS A TRACKED OPERATOR-VERIFICATION ASSET, NOT A RUST TEST. It drives
 // a freshly built binary and read real output. The contract for this fix lives
 // in tracked tests under src/tests/**, which the CI gate compiles and runs:
 //
@@ -578,7 +578,7 @@ async function main() {
 
   console.log('\n-- summary --');
   console.log(
-    'Hand-off artifact: these live checks are NOT test evidence. The contract is the\n' +
+    'Tracked live verification: these checks are NOT Rust test evidence. The contract is the\n' +
       'tracked tests under src/tests/** that the CI gate compiles and runs.',
   );
   if (failures.length === 0) {

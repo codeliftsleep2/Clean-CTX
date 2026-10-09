@@ -10,6 +10,47 @@ version-history registry lives in
 
 ---
 
+## [0.9.2] - 2026-10-09
+
+### Structured C# declaration-header authority
+
+* **One parser-owned declaration identity** — C# Class, Interface, Struct, Enum,
+  and Record names now come from structured identifier captures shared by
+  canonical lowering and builtin registration. Partial declarations, primary
+  constructors, and positional records no longer corrupt or truncate the
+  public owner identity.
+* **Structured Class base-list lowering** — canonical C# Class relationships
+  now consume direct parser base-list children. Multiline lists preserve every
+  entry, qualified and generic written references remain intact, and comments
+  or generic constraints cannot be misread as inheritance. The former
+  text-derived Class relationship extractor was removed rather than retained
+  as a competing authority.
+* **Truthful exact-query capability** — an exact edge response containing a
+  derived typed `Extends` or `Implements` edge now establishes that
+  query's capability even when the edge is intentionally ephemeral. Coverage
+  remains a lower bound when hydration is incomplete, and neutral
+  `TypeRef / HasBaseType` alternative-query guidance remains available.
+* **Scoped durable compatibility** — existing `CSharpCanonical`,
+  `CSharpSemanticInput`, and `CSharpSemanticProjection` producer
+  generations were incremented for their changed outputs. No producer key or
+  unrelated-language compatibility identity was added or changed.
+* **Struct/Record preservation** — C# Struct and Record base entries retain the
+  v0.9.1 neutral `HasBaseType` behavior and distinct public owner kinds;
+  this release only unifies their declaration-name authority with the
+  structured C# identity path.
+
+### Verification
+
+* RED was established with seven tracked production-path regressions covering
+  multiline and partial Class headers, constraints and comments, shared
+  canonical/builtin identity, exact-query coverage, and producer generations;
+  the qualified/generic neutral-reference control passed before implementation.
+  The unchanged focused suite passed after implementation.
+* The complete release gate and `cargo pkgid -p clean-ctx` remain
+  maintainer-run requirements before the `v0.9.2` release tag.
+
+---
+
 ## [0.9.1] - 2026-10-09
 
 ### Queryable neutral C# class, struct, and record base types

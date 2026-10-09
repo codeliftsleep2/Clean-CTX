@@ -104,6 +104,7 @@ fn try_prepare_forward_edges(
                 scope.as_ref(),
                 CapabilityDirection::Forward,
                 &hydration,
+                has_typed_inheritance(&edges),
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -177,6 +178,7 @@ fn try_prepare_reverse_edges(
                 scope.as_ref(),
                 CapabilityDirection::Reverse,
                 &hydration,
+                has_typed_inheritance(&edges),
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -196,6 +198,16 @@ fn edge_hydration_requirement(args: &Value) -> HydrationRequirement {
     } else {
         HydrationRequirement::LegacyEdit
     }
+}
+
+fn has_typed_inheritance(edges: &[crate::layers::meta::semantic::SemanticEdge]) -> bool {
+    edges.iter().any(|edge| {
+        matches!(
+            edge.relation,
+            crate::layers::meta::semantic::SemanticRelation::Extends
+                | crate::layers::meta::semantic::SemanticRelation::Implements
+        )
+    })
 }
 
 fn forward_edges<'a>(

@@ -1,8 +1,8 @@
 // Live MCP acceptance harness for the repeated-`Flags` projection fix
 // (`CoreOp::Flags` per method id now accumulates instead of overwriting).
 //
-// THIS IS A HAND-OFF ARTIFACT, NOT A TEST, NOT COVERAGE, NOT RED->GREEN
-// EVIDENCE, AND NOT PART OF THE CI GATE. It exists so the operator can drive a
+// THIS IS A TRACKED OPERATOR-VERIFICATION ASSET, NOT A RUST TEST, COVERAGE,
+// RED->GREEN EVIDENCE, OR PART OF THE CI GATE. It lets the operator drive a
 // freshly built binary over MCP stdio and read the REAL rendered output. The
 // contract for this fix lives in tracked tests under src/tests/**, which the
 // CI gate compiles and runs:

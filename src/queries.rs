@@ -126,6 +126,12 @@ pub const CS_QUERY: &str = r#"
 // The IR capture walk appends this query and `CS_CALL_QUERY` to the same
 // tree-sitter query, preserving the single-parse production invariant.
 pub const CS_SEMANTIC_QUERY: &str = r#"
+    ; Declaration identifiers are the single C# canonical/builtin name authority.
+    (class_declaration name: (identifier) @csharp.class_name)
+    (interface_declaration name: (identifier) @csharp.interface_name)
+    (struct_declaration name: (identifier) @csharp.struct_name)
+    (enum_declaration name: (identifier) @csharp.enum_name)
+    (record_declaration name: (identifier) @csharp.record_name)
     ; Class/struct/interface base lists expose entries through the type supertype.
     (base_list (type) @csharp.base_type)
     ; record_base is aliased to base_list. Capture each direct named child

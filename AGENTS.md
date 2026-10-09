@@ -275,20 +275,21 @@ branch changes.
 ### 8b. Verification artifacts are not tests
 
 A **tracked test under `src/tests/**` is the only artifact that satisfies a
-test requirement or the CI gate.** Untracked scratch and hand-off artifacts
-(`target/tmp/*.mjs`, `target/tmp/*.ps1`, root-level one-off scripts, ad-hoc
-REPL snippets, or anything else outside `src/tests/**`) exist for exactly ONE
-purpose: driving a freshly built binary so the operator can observe live
-behavior. They are output a human reads, never verification.
+test requirement or the CI gate.** Reusable operator-run verification
+definitions — fixtures, scenario manifests, oracles, and live MCP drivers —
+are tracked under `verification/**`. Generated evidence, temporary workspaces,
+databases, and other runtime state belong under `target/**`. Ad-hoc scratch files are not reusable verification definitions.
 
-- A hand-off/live harness may NEVER be the deliverable that makes a task
-  complete, and may never stand in for a regression test.
-- "PASS" from a harness in `target/` (or any other untracked, generated, or
-  ignored location) is NEVER reportable as a test result, as a gate, as
-  RED→GREEN evidence, or as satisfying a regression requirement.
+- A tracked live harness may provide operator-verification evidence, but may
+  never stand in for a regression test or CI gate.
+- "PASS" from a tracked `verification/**` harness is reported as operator/live
+  verification, never as a Rust test result, CI result, RED→GREEN evidence, or
+  regression coverage. Output generated under `target/**` is evidence from the
+  run, not the reusable verification definition.
 - Every required regression MUST be a tracked test in `src/tests/**` that the
   CI gate compiles and runs. Deliver both when a fix warrants both: the tracked
-  test is the contract, the live harness is optional operator convenience.
+  test is the contract; the tracked live harness is the reusable
+  production-boundary verification asset, reported separately from coverage.
 - Writing a real test into `target/`, into generated output, into another
   ignored path, or into any location the gate does not compile and run it — in
   order to avoid the `#[path]` convention, the active-file ceiling, the
@@ -299,7 +300,8 @@ behavior. They are output a human reads, never verification.
 - A live harness can never repair a red gate. A failing tracked test stays
   failing until the tracked test itself is green.
 - Report results by category, never blended: which tracked tests ran and their
-  outcome, versus which untracked artifacts were handed to the user to run.
+  outcome, versus which tracked `verification/**` harness ran and its observed
+  result.
 
 ### 9. Definition of Done
 

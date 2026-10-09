@@ -59,7 +59,7 @@ the regression test detects the unfixed defect:
    production code yet.
 2. Run the focused regression against the unfixed implementation and observe
    RED for the intended behavioral assertion. A compile error, unrelated test
-   failure, or untracked harness result is not valid RED evidence.
+   failure, or live-harness result is not valid RED evidence.
 3. Stash only the regression and any test-module registration needed to compile
    it. Do not include unrelated working-tree changes in that stash.
 4. Implement the production fix while the regression is absent from the
@@ -97,9 +97,10 @@ mod tests;
 
 - A tracked test under `src/tests/**` is the only artifact that satisfies a test
   requirement, the CI gate, or any RED→GREEN claim.
-- Untracked hand-off/live harnesses (for example `target/tmp/*.mjs` driving the
-  built binary over MCP stdio) are operator conveniences: they produce live
-  output for a human to read and are never coverage.
+- Reusable live harnesses are tracked under `verification/**`; generated
+  captures and runtime state belong under `target/**`. Harness results are
+  operator/live-verification evidence and are reported separately from test
+  coverage.
 - Never place a real test in `target/`, in generated output, in another ignored
   path, or anywhere the gate does not compile and run it. Doing so in order to
   avoid the `#[path]` convention, the active-file ceiling, or the retrieval

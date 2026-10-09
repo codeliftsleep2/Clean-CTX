@@ -18,3 +18,6 @@ Current packages:
   visibility diagnostics;
 - `lifecycle/phase9/` — durable-context lifecycle field harness;
 - `live-acceptance/` — focused live MCP acceptance drivers.
+
+Reusable drivers in this tree are tracked verification assets. Generated
+captures and runtime state are written beneath `target/` and remain untracked.

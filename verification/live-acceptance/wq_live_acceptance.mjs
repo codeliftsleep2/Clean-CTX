@@ -13,7 +13,8 @@
 // Usage (after the binary is rebuilt):
 //   node verification/live-acceptance/wq_live_acceptance.mjs [path/to/clean-ctx(.exe)]
 //
-// This file is a handoff artifact; it lives outside the tracked tree.
+// This is a tracked operator-verification asset. Generated runtime state and
+// captures belong under target/, not beside this driver.
 
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';

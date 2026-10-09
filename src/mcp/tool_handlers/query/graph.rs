@@ -105,6 +105,7 @@ fn try_prepare_transitive_dependencies(
                 scope.as_ref(),
                 CapabilityDirection::Forward,
                 &hydration,
+                false,
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {

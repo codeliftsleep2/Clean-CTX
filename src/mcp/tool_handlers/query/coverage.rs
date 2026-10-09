@@ -18,6 +18,7 @@ pub(super) fn exact_identity_coverage(
     scope: Option<&WorkspaceScope>,
     direction: CapabilityDirection,
     hydration: &HydrationReport,
+    response_has_typed_evidence: bool,
 ) -> Value {
     let identity_indexed = index.has_identity_in_scope(
         &identity.domain,
@@ -25,7 +26,7 @@ pub(super) fn exact_identity_coverage(
         &identity.name,
         scope,
     );
-    let capability_established = match direction {
+    let stored_capability_established = match direction {
         CapabilityDirection::Forward => {
             index.has_forward_capability_evidence(&identity.domain, &identity.entity_type, scope)
         }
@@ -33,6 +34,7 @@ pub(super) fn exact_identity_coverage(
             index.has_reverse_capability_evidence(&identity.domain, &identity.entity_type, scope)
         }
     };
+    let capability_established = stored_capability_established || response_has_typed_evidence;
     let status = if !identity_indexed {
         "identity_not_indexed"
     } else if !capability_established {
