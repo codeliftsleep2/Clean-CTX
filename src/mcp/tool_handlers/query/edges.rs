@@ -64,16 +64,32 @@ fn try_prepare_forward_edges(
         );
     }
     let requirement = edge_hydration_requirement(args);
-    let hydration = context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
+    let mut hydration =
+        context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
+    if hydration.is_complete()
+        && let Some(exact) = identity.exact()
+        && exact.domain == "builtin"
+        && exact.entity_type == "Class"
+    {
+        let targets = {
+            let index = state.workspace_index_read();
+            super::classification::neutral_targets_for_forward(&index, &exact, scope.as_ref())
+        };
+        for target in targets {
+            let target_hydration =
+                context.hydrate(state, "reverse_edges", &target, workspace_root, requirement)?;
+            hydration.merge(target_hydration);
+        }
+    }
+    let classification_complete = hydration.is_complete();
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = forward_edges(
+        let edges = super::classification::forward(
             index,
-            &resolved.domain,
-            &resolved.entity_type,
-            &resolved.name,
+            &resolved,
             scope.as_ref(),
+            classification_complete,
         );
         let count = edges.len();
         let mut structured = serde_json::json!({
@@ -88,6 +104,7 @@ fn try_prepare_forward_edges(
                 scope.as_ref(),
                 CapabilityDirection::Forward,
                 &hydration,
+                has_typed_inheritance(&edges),
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -138,15 +155,15 @@ fn try_prepare_reverse_edges(
     }
     let requirement = edge_hydration_requirement(args);
     let hydration = context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    let classification_complete = hydration.is_complete();
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = reverse_edges(
+        let edges = super::classification::reverse(
             index,
-            &resolved.domain,
-            &resolved.entity_type,
-            &resolved.name,
+            &resolved,
             scope.as_ref(),
+            classification_complete,
         );
         let count = edges.len();
         let mut structured = serde_json::json!({
@@ -161,6 +178,7 @@ fn try_prepare_reverse_edges(
                 scope.as_ref(),
                 CapabilityDirection::Reverse,
                 &hydration,
+                has_typed_inheritance(&edges),
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -180,6 +198,16 @@ fn edge_hydration_requirement(args: &Value) -> HydrationRequirement {
     } else {
         HydrationRequirement::LegacyEdit
     }
+}
+
+fn has_typed_inheritance(edges: &[crate::layers::meta::semantic::SemanticEdge]) -> bool {
+    edges.iter().any(|edge| {
+        matches!(
+            edge.relation,
+            crate::layers::meta::semantic::SemanticRelation::Extends
+                | crate::layers::meta::semantic::SemanticRelation::Implements
+        )
+    })
 }
 
 fn forward_edges<'a>(

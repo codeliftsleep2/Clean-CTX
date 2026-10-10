@@ -39,22 +39,75 @@ version-history registry lives in
   evidence. Angular marker and semantic producer generations advance so
   pre-fix durable facts must be regenerated.
 
-## [0.9.1] - 2026-10-08
+## [0.9.2] - 2026-10-09
 
-### Queryable neutral C# base types
+### Structured C# declaration-header authority
 
-* **Cross-file C# base-type discovery** — unresolved or cross-file C# base-list
+* **One parser-owned declaration identity** — C# Class, Interface, Struct, Enum,
+  and Record names now come from structured identifier captures shared by
+  canonical lowering and builtin registration. Partial declarations, primary
+  constructors, and positional records no longer corrupt or truncate the
+  public owner identity.
+* **Structured Class base-list lowering** — canonical C# Class relationships
+  now consume direct parser base-list children. Multiline lists preserve every
+  entry, qualified and generic written references remain intact, and comments
+  or generic constraints cannot be misread as inheritance. The former
+  text-derived Class relationship extractor was removed rather than retained
+  as a competing authority.
+* **Truthful exact-query capability** — an exact edge response containing a
+  derived typed `Extends` or `Implements` edge now establishes that
+  query's capability even when the edge is intentionally ephemeral. Coverage
+  remains a lower bound when hydration is incomplete, and neutral
+  `TypeRef / HasBaseType` alternative-query guidance remains available.
+* **Scoped durable compatibility** — existing `CSharpCanonical`,
+  `CSharpSemanticInput`, and `CSharpSemanticProjection` producer
+  generations were incremented for their changed outputs. No producer key or
+  unrelated-language compatibility identity was added or changed.
+* **Struct/Record preservation** — C# Struct and Record base entries retain the
+  v0.9.1 neutral `HasBaseType` behavior and distinct public owner kinds;
+  this release only unifies their declaration-name authority with the
+  structured C# identity path.
+
+### Verification
+
+* RED was established with seven tracked production-path regressions covering
+  multiline and partial Class headers, constraints and comments, shared
+  canonical/builtin identity, exact-query coverage, and producer generations;
+  the qualified/generic neutral-reference control passed before implementation.
+  The unchanged focused suite passed after implementation.
+* The complete release gate and `cargo pkgid -p clean-ctx` remain
+  maintainer-run requirements before the `v0.9.2` release tag.
+
+---
+
+## [0.9.1] - 2026-10-09
+
+### Queryable neutral C# class, struct, and record base types
+
+* **Cross-file C# base-type discovery** — unresolved or cross-file C# class, struct, and record base-list
   entries now project as source-true `HasBaseType` relationships from the
-  owning `builtin / Class` to the written `builtin / TypeRef`. Forward
-  queries can inspect a class's written base types, and reverse queries on the
-  neutral `TypeRef` can find classes that name that type without falsely
-  classifying the relationship as `Extends` or `Implements`.
+  correct `builtin / Class`, `builtin / Struct`, or `builtin / Record` owner to the written `builtin / TypeRef`. Forward
+  queries can inspect written base types, and reverse queries on the neutral
+  `TypeRef` can find declarations that name that type.
+* **Cross-file C# class classification** — exact Class and Interface edge
+  queries now refine neutral Class base-list facts into ephemeral `Extends`
+  or `Implements` results after completed scoped hydration proves exactly one
+  target kind. Cold forward Class queries hydrate each distinct neutral target
+  name before classification. The durable `HasBaseType` fact remains
+  authoritative and queryable; absent or ambiguous targets remain neutral, and
+  Struct/Record facts are never consumed by the Class classifier.
+* **Struct and Record identity preservation** — parser-structured C# base-list
+  captures now publish every written qualified, generic, multiline, and nested
+  base type from the existing `builtin / Struct` or `builtin / Record` owner,
+  never through a fabricated Class identity. Republishing or removing an entry
+  retracts the old fact without duplicates, and no unsupported `Extends` or
+  `Implements` relationship is invented.
 * **Scoped durable compatibility** — the changed edge projection is identified
   by a C#-specific semantic-projection producer generation. Pre-change C#
   semantic snapshots are rejected with the existing structured compatibility
   error and must be regenerated; unrelated language snapshots are unaffected.
 * **Query guidance** — unsupported reverse lookup on a same-name
-  `builtin / Interface` now points callers to the neutral
+  `builtin / Class` or `builtin / Interface` now points callers to the neutral
   `HasBaseType` / `TypeRef` query.
 
 ### Verification
@@ -62,7 +115,9 @@ version-history registry lives in
 * RED was established through tracked production-path forward and reverse
   `workspace_query` regressions, both returning empty edge sets before the
   fix. The unchanged regressions and focused projection, compatibility,
-  restore, and coverage suites passed after implementation.
+  restore, coverage, Struct/Record publication and lifecycle, and cross-file
+  Class classification suites passed after implementation. The final
+  all-target/all-feature Clippy gate also passed with zero warnings.
 * The complete release gate and live MCP pilot remain maintainer-run
   requirements before the `v0.9.1` release tag.
 

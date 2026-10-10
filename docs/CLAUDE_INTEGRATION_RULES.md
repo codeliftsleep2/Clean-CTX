@@ -182,8 +182,8 @@ registration, prove runtime injection, or answer which implementation .NET DI
 will supply. It also does not cover service-locator calls such as
 `GetRequiredService<T>()`, because those are not constructor parameters.
 
-An unresolved C# base-list entry similarly projects `HasBaseType` from the
-owning `builtin/Class` to the written `builtin/TypeRef`. This makes
+A C# class, struct, or record base-list entry similarly projects `HasBaseType` from the
+correct `builtin/Class`, `builtin/Struct`, or `builtin/Record` owner to the written `builtin/TypeRef`. This makes
 cross-file and otherwise unclassified base references queryable without
 claiming `Extends` or `Implements`.
 

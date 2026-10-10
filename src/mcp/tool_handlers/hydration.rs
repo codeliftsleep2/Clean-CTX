@@ -31,6 +31,7 @@ pub(crate) use invalidation::{
 };
 
 mod publication;
+mod report;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use publication::compile_candidate;
 use publication::{CandidatePublication, compile_candidate_for, select_candidates};

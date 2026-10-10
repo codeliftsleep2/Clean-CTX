@@ -22,6 +22,8 @@ pub struct MetaLayerContext<'a> {
     pub path: &'a Path,
     pub class_captures: &'a [String],
     pub paired_class_captures: &'a [(String, String)],
+    /// Parser-owned declaration identifiers when a language provides them.
+    pub structured_declarations: Option<&'a [(String, String)]>,
     pub fidelity: Fidelity,
     pub config: Option<&'a CleanCtxConfig>,
     pub lexical_regions: &'a LexicalRegions,
@@ -42,6 +44,7 @@ impl<'a> MetaLayerContext<'a> {
             path,
             class_captures,
             paired_class_captures,
+            structured_declarations: None,
             fidelity,
             config,
             lexical_regions,

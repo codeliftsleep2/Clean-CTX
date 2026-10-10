@@ -286,6 +286,18 @@ mod workspace_query_builtin;
 mod workspace_query_inheritance;
 
 #[cfg(feature = "csharp")]
+#[path = "workspace_query_csharp_base_types.rs"]
+mod workspace_query_csharp_base_types;
+
+#[cfg(feature = "csharp")]
+#[path = "workspace_query_csharp_cross_file_classification.rs"]
+mod workspace_query_csharp_cross_file_classification;
+
+#[cfg(feature = "csharp")]
+#[path = "workspace_query_csharp_structured_headers.rs"]
+mod workspace_query_csharp_structured_headers;
+
+#[cfg(feature = "csharp")]
 #[path = "workspace_query_csharp_constructor_types.rs"]
 mod workspace_query_csharp_constructor_types;
 

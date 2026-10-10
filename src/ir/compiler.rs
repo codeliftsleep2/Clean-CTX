@@ -264,6 +264,20 @@ impl IRCompiler {
                 &provenance,
             ));
 
+        // C# structs and records retain distinct public builtin identities,
+        // but the canonical IR intentionally lowers every class-like type to
+        // DefClass. Project their neutral written base types from structured
+        // captures without changing or duplicating the v0.9.1 Class path.
+        #[cfg(feature = "csharp")]
+        if ctx.query_string == crate::queries::CS_QUERY {
+            self.semantic_edges.extend(
+                crate::ir::semantic_projection::project_csharp_struct_record_base_types(
+                    &ctx.captures,
+                    &provenance,
+                ),
+            );
+        }
+
         // Return ownership of language layers and pattern recognizers
         // back to the compiler for reuse in subsequent compilations.
         self.language_layers = std::mem::take(&mut ctx.language_layers);

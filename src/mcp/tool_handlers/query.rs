@@ -56,6 +56,7 @@ use serde_json::Value;
 
 mod batch;
 mod calls;
+mod classification;
 mod content;
 mod coverage;
 mod diagnostics;

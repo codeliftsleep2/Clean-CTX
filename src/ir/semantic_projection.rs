@@ -30,7 +30,7 @@ pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 /// Generation of C#-specific generic semantic projection. This is separate
 /// from the generic generation so a C#-only edge change does not invalidate
 /// durable semantic snapshots for unrelated languages.
-pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
+pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 3;
 //
 // A callee that is never declared in the compiled workspace still appears as
 // the OBJECT of a `Calls` edge (it is honestly unresolved); only the caller is
@@ -40,6 +40,8 @@ pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 use std::collections::HashMap;
 
 use super::opcodes::CoreOp;
+#[cfg(feature = "csharp")]
+use crate::compression::capture_pipeline::CapEntry;
 use crate::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
 
 /// Domain of generic (non-framework) entities.
@@ -269,6 +271,73 @@ pub fn project_constructor_parameter_types(
                 })
             }
             _ => None,
+        })
+        .collect()
+}
+
+/// Project neutral written-base-type facts for C# declarations whose public
+/// owner identity cannot survive the class-shaped canonical IR.
+///
+/// Ownership is selected from the nearest enclosing declaration of ANY C#
+/// type kind. Only Struct and Record owners emit facts. Considering every
+/// declaration kind prevents a nested class or interface from leaking its
+/// base-list capture onto an enclosing struct or record.
+#[cfg(feature = "csharp")]
+pub fn project_csharp_struct_record_base_types(
+    captures: &[CapEntry],
+    file: &str,
+) -> Vec<SemanticEdge> {
+    const TYPE_ROOT_CAPTURES: [&str; 6] = [
+        "class.root",
+        "interface.root",
+        "struct.root",
+        "enum.root",
+        "trait.root",
+        "record.root",
+    ];
+
+    captures
+        .iter()
+        .filter(|capture| {
+            matches!(
+                capture.name.as_str(),
+                "csharp.base_type" | "csharp.record_base_candidate"
+            )
+        })
+        .filter(|capture| {
+            capture.name != "csharp.record_base_candidate"
+                || !captures.iter().any(|nested| {
+                    nested.name == "csharp.base_type"
+                        && capture.start_byte <= nested.start_byte
+                        && nested.end_byte <= capture.end_byte
+                })
+        })
+        .filter_map(|base_type| {
+            let owner = captures
+                .iter()
+                .filter(|candidate| {
+                    TYPE_ROOT_CAPTURES.contains(&candidate.name.as_str())
+                        && candidate.start_byte <= base_type.start_byte
+                        && base_type.end_byte <= candidate.end_byte
+                })
+                .min_by_key(|candidate| candidate.end_byte - candidate.start_byte)?;
+            let owner_type = match owner.name.as_str() {
+                "struct.root" => "Struct",
+                "record.root" => "Record",
+                _ => return None,
+            };
+            let owner_name = owner.text.clone();
+            let written_type = base_type.raw_text.trim();
+            if owner_name.is_empty() || written_type.is_empty() {
+                return None;
+            }
+            Some(SemanticEdge {
+                relation: SemanticRelation::HasBaseType,
+                subject: named_entity(owner_type, &owner_name, file),
+                object: named_entity(TYPE_REF_ENTITY_TYPE, written_type, file),
+                layer: BUILTIN_LAYER,
+                call_evidence: None,
+            })
         })
         .collect()
 }

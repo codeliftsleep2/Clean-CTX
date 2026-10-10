@@ -42,6 +42,7 @@ fn workspace_query_exact_identity_coverage_partial_hydration() {
         None,
         CapabilityDirection::Reverse,
         &hydration,
+        false,
     );
     assert_eq!(coverage["status"], "indexed_evidence_only");
     assert_eq!(coverage["identity_indexed"], true);
@@ -85,6 +86,7 @@ fn interface_reverse_coverage_points_to_csharp_constructor_type_query() {
         None,
         CapabilityDirection::Reverse,
         &hydration,
+        false,
     );
     assert_eq!(coverage["status"], "capability_not_established");
     assert_eq!(coverage["discovered_not_compiled_this_cycle"], 14);

@@ -2,7 +2,7 @@
 
 > **Owner:** System + module architecture · **Status:** Living reference
 > **Version:** 0.9.1
-> **Last updated:** 2026-10-08 (queryable neutral C# base types,
+> **Last updated:** 2026-10-08 (queryable neutral C# class, struct, and record base types,
 > C#-scoped semantic compatibility, durable-authority compatibility,
 > and owner-scoped publication ordering)
 >

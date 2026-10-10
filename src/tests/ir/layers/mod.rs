@@ -150,25 +150,22 @@ fn cs_layer_has_correct_name() {
 }
 
 #[test]
-fn cs_layer_extracts_inheritance_with_colon() {
+fn cs_layer_class_root_does_not_parse_textual_inheritance() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new("public class MyClass : BaseClass", Fidelity::Low);
     ctx.current_class = Some("C1".into());
 
     let ops = layer.process_capture("class.root", "public class MyClass : BaseClass", &mut ctx);
 
-    let has_base_ref = ops
-        .iter()
-        .any(|op| matches!(op, CoreOp::BaseTypeRef(c, b) if c == "C1" && b == "BaseClass"));
     assert!(
-        has_base_ref,
-        "C# layer must preserve an unclassified first base-list target: {:?}",
-        ops
+        ops.iter()
+            .all(|op| !matches!(op, CoreOp::BaseTypeRef(..) | CoreOp::Implements(..))),
+        "structured core lowering is the sole C# Class relationship authority: {ops:?}"
     );
 }
 
 #[test]
-fn cs_layer_extracts_interfaces_from_colon() {
+fn cs_layer_class_root_does_not_parse_textual_interfaces() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new(
         "class MyClass : BaseClass, IInterface1, IInterface2",
@@ -182,25 +179,10 @@ fn cs_layer_extracts_interfaces_from_colon() {
         &mut ctx,
     );
 
-    // The first item remains neutral until complete same-file declarations are
-    // available; later items are interfaces by C# syntax.
-    let has_base_ref = ops
-        .iter()
-        .any(|op| matches!(op, CoreOp::BaseTypeRef(c, b) if c == "C1" && b == "BaseClass"));
     assert!(
-        has_base_ref,
-        "C# should preserve the first base-list target: {:?}",
-        ops
-    );
-
-    let implement_count = ops
-        .iter()
-        .filter(|op| matches!(op, CoreOp::Implements(..)))
-        .count();
-    assert_eq!(
-        implement_count, 2,
-        "C# should emit 2 IMPL ops for interfaces: {:?}",
-        ops
+        ops.iter()
+            .all(|op| !matches!(op, CoreOp::BaseTypeRef(..) | CoreOp::Implements(..))),
+        "retired textual relationship parsing must not coexist with structured lowering: {ops:?}"
     );
 }
 
@@ -327,6 +309,7 @@ fn cs_signalr_hub_class_semantics_apply_to_its_method() {
         "public class ChatHub : Hub<IChatClient>",
         &mut ctx,
     );
+    let _ = layer.process_capture("csharp.class_base_type", "Hub<IChatClient>", &mut ctx);
 
     let has_exec_ctx = ops
         .iter()
@@ -353,6 +336,7 @@ fn cs_signalr_hub_method_emits_realtime_ctx() {
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
     let _ = layer.process_capture("class.root", "public class ChatHub : Hub", &mut ctx);
+    let _ = layer.process_capture("csharp.class_base_type", "Hub", &mut ctx);
 
     let ops = layer.process_capture(
         "method.root",
@@ -390,6 +374,7 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
     ctx.current_class = Some("C1".into());
     ctx.current_method = Some("M5".into());
     let _ = layer.process_capture("class.root", "public class ChatHub : Hub", &mut ctx);
+    let _ = layer.process_capture("csharp.class_base_type", "Hub", &mut ctx);
 
     let ops = layer.process_capture(
         "method.root",
@@ -431,6 +416,7 @@ fn cs_disposable_class_semantics_apply_to_its_method() {
         "public class ResourceHolder : SomeBase, IDisposable",
         &mut ctx,
     );
+    let _ = layer.process_capture("csharp.class_interface_type", "IDisposable", &mut ctx);
 
     let has_bad = ops
         .iter()
@@ -460,6 +446,7 @@ fn cs_disposable_class_method_emits_io_side_effect() {
         "public class ResourceHolder : SomeBase, IDisposable",
         &mut ctx,
     );
+    let _ = layer.process_capture("csharp.class_interface_type", "IDisposable", &mut ctx);
 
     let ops = layer.process_capture("method.root", "public void Dispose()", &mut ctx);
 
@@ -493,6 +480,7 @@ fn cs_signalr_hub_flags_reset_between_classes() {
         "public class ChatHub : Hub<IChatClient>",
         &mut ctx,
     );
+    let _ = layer.process_capture("csharp.class_base_type", "Hub<IChatClient>", &mut ctx);
     ctx.current_method = Some("M1".into());
     let hub_ops = layer.process_capture("method.root", "public void Send()", &mut ctx);
     assert!(hub_ops.iter().any(|op| matches!(

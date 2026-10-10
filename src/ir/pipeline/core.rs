@@ -13,7 +13,10 @@ use crate::ir::calls::{
 };
 use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::symbol_table::SymbolKind;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+
+mod csharp;
+use csharp::{apply_csharp_declaration_names, emit_csharp_class_base_type};
 
 /// Pass 1: Core IR emission from tree-sitter captures.
 pub struct CoreIRPass;
@@ -54,9 +57,13 @@ impl IRPass for CoreIRPass {
         // ONE tree-sitter parse: the language's invocation-capture query (when a
         // native call producer exists) is compiled into the SAME query, so the
         // call facts are captured by the walk that already parses the file.
-        let capture_query = capture_query(&query_string);
+        let mut capture_query = capture_query(&query_string);
+        if query_string == crate::queries::CS_QUERY {
+            capture_query.push('\n');
+            capture_query.push_str(crate::queries::CS_SEMANTIC_QUERY);
+        }
 
-        let captures = run_capture_pipeline_nodes(
+        let mut captures = run_capture_pipeline_nodes(
             language,
             &capture_query,
             &source,
@@ -82,6 +89,10 @@ impl IRPass for CoreIRPass {
             message: format!("capture pipeline error: {error}"),
         })?;
 
+        if query_string == crate::queries::CS_QUERY {
+            apply_csharp_declaration_names(&mut captures);
+        }
+
         // TypeScript places `export` on an `export_statement` wrapper rather
         // than inside the declaration node captured as `class.root` or
         // `interface.root`. Join the structural wrapper capture to its exact
@@ -98,6 +109,7 @@ impl IRPass for CoreIRPass {
             .map(|cap| (cap.start_byte, cap.end_byte))
             .collect();
 
+        let mut csharp_class_owners: HashMap<(usize, usize), String> = HashMap::new();
         for cap in &captures {
             // Callable-scope maintenance is independent of filtering: the walk
             // has advanced past `cap.start_byte` either way, so scopes whose
@@ -142,6 +154,10 @@ impl IRPass for CoreIRPass {
                     state
                         .instructions
                         .push(CoreOp::DefClass(class_id.clone(), cap.text.clone()));
+                    if query_string == crate::queries::CS_QUERY && cap.name == "class.root" {
+                        csharp_class_owners
+                            .insert((cap.start_byte, cap.end_byte), class_id.clone());
+                    }
                     if exported_classes.contains(&(cap.start_byte, cap.end_byte)) {
                         state.instructions.push(CoreOp::ClassModifiers(
                             class_id.clone(),
@@ -254,6 +270,9 @@ impl IRPass for CoreIRPass {
                 "throw.root" => push_control_summary(state, ControlSummary::Throw),
                 "do.root" | "try.root" | "switch.root" | "match.root" => {
                     push_control_summary(state, ControlSummary::Branch);
+                }
+                "csharp.base_type" if query_string == crate::queries::CS_QUERY => {
+                    emit_csharp_class_base_type(state, cap, &captures, &csharp_class_owners);
                 }
                 _ => dispatch_capture(state, cap, false),
             }
