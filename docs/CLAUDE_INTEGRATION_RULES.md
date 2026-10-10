@@ -294,8 +294,10 @@ A CBM project slug and a filesystem path are different namespaces. Only
   identity. Ambiguity returns all canonical candidates; never select the first
   match silently.
 - Use `list_projects` when the authoritative registered identities are needed.
-- Use `index_repository(repo_path, mode: "fast")` after external edits when
-  graph freshness is required. `full` is for explicit rebuild/recovery.
+- Use `refresh_workspace(workspaceRoot)` after external edits when Clean-CTX
+  semantic/query freshness is required. This is independent of CBM.
+- Use `index_repository(repo_path, mode: "fast")` when CBM graph freshness is
+  also required. `full` is for explicit rebuild/recovery.
 
 After a successful Clean-CTX `apply_edit`, the affected project is marked stale
 and the next graph operation performs the supported lazy fast refresh. A manual

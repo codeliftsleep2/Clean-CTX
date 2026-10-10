@@ -400,9 +400,9 @@ fn csharp_structured_headers_derived_edge_establishes_query_capability() {
         reverse["coverage"]["status"], "established_indexed_capability",
         "coverage must not contradict its non-empty typed answer: {reverse:?}"
     );
-    assert_eq!(
-        reverse["coverage"]["alternative_query"]["entity_type"], "TypeRef",
-        "neutral authoritative lookup guidance remains available"
+    assert!(
+        reverse["coverage"].get("alternative_query").is_none(),
+        "a successful typed answer must not suggest an alternative query: {reverse:?}"
     );
 }
 

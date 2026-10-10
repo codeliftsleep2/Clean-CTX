@@ -76,12 +76,26 @@ fn try_prepare_forward_edges(
             super::classification::neutral_targets_for_forward(&index, &exact, scope.as_ref())
         };
         for target in targets {
-            let target_hydration =
-                context.hydrate(state, "reverse_edges", &target, workspace_root, requirement)?;
+            let hydration_name =
+                super::csharp_resolution::terminal_lookup_name(&target).unwrap_or(target);
+            let target_hydration = context.hydrate(
+                state,
+                "reverse_edges",
+                &hydration_name,
+                workspace_root,
+                requirement,
+            )?;
             hydration.merge(target_hydration);
         }
     }
     let classification_complete = hydration.is_complete();
+    let needs_csharp_resolution = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "Class");
+    let resolution_catalog = (classification_complete && needs_csharp_resolution).then(|| {
+        let index = state.workspace_index_read();
+        super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
@@ -90,6 +104,7 @@ fn try_prepare_forward_edges(
             &resolved,
             scope.as_ref(),
             classification_complete,
+            resolution_catalog.as_ref(),
         );
         let count = edges.len();
         let mut structured = serde_json::json!({
@@ -156,6 +171,13 @@ fn try_prepare_reverse_edges(
     let requirement = edge_hydration_requirement(args);
     let hydration = context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
     let classification_complete = hydration.is_complete();
+    let needs_csharp_resolution = identity.exact().is_some_and(|exact| {
+        exact.domain == "builtin" && matches!(exact.entity_type.as_str(), "Class" | "Interface")
+    });
+    let resolution_catalog = (classification_complete && needs_csharp_resolution).then(|| {
+        let index = state.workspace_index_read();
+        super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
@@ -164,6 +186,7 @@ fn try_prepare_reverse_edges(
             &resolved,
             scope.as_ref(),
             classification_complete,
+            resolution_catalog.as_ref(),
         );
         let count = edges.len();
         let mut structured = serde_json::json!({

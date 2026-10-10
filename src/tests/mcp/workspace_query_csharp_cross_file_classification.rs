@@ -248,3 +248,99 @@ fn empty_class_reverse_query_points_to_neutral_type_ref() {
         })
     );
 }
+
+#[test]
+fn qualified_base_resolves_by_structured_namespace_identity() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    write(
+        &dir,
+        "Right.cs",
+        "namespace RightNs { public class QualifiedBase {} }",
+    );
+    write(
+        &dir,
+        "Wrong.cs",
+        "namespace WrongNs { public interface QualifiedBase {} }",
+    );
+    write(
+        &dir,
+        "Child.cs",
+        "namespace ConsumerNs { public class QualifiedChild : RightNs.QualifiedBase {} }",
+    );
+
+    let reverse = query_edges(&dir, &state, "reverse_edges", "Class", "QualifiedBase");
+    assert!(
+        has_edge(
+            &reverse,
+            "Extends",
+            "Class",
+            "QualifiedChild",
+            "Class",
+            "QualifiedBase",
+        ),
+        "the written qualifier must select the declaration in RightNs: {reverse:?}"
+    );
+    assert_neutral(
+        &dir,
+        &state,
+        "Class",
+        "QualifiedChild",
+        "RightNs.QualifiedBase",
+    );
+}
+
+#[test]
+fn constructed_generic_base_resolves_by_name_namespace_and_arity() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    write(
+        &dir,
+        "GenericBase.cs",
+        "namespace GenericNs; public class GenericBase<T> {}",
+    );
+    write(
+        &dir,
+        "GenericChild.cs",
+        "namespace GenericNs; public class GenericChild : GenericBase<int> {}",
+    );
+
+    let reverse = query_edges(&dir, &state, "reverse_edges", "Class", "GenericBase");
+    assert!(
+        has_edge(
+            &reverse,
+            "Extends",
+            "Class",
+            "GenericChild",
+            "Class",
+            "GenericBase",
+        ),
+        "a constructed generic reference must resolve to the arity-one declaration: {reverse:?}"
+    );
+    assert_neutral(&dir, &state, "Class", "GenericChild", "GenericBase<int>");
+}
+
+#[test]
+fn generic_arity_mismatch_remains_neutral() {
+    let dir = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    write(
+        &dir,
+        "GenericBase.cs",
+        "namespace GenericNs; public class GenericBase<TFirst, TSecond> {}",
+    );
+    write(
+        &dir,
+        "GenericChild.cs",
+        "namespace GenericNs; public class GenericChild : GenericBase<int> {}",
+    );
+
+    let reverse = query_edges(&dir, &state, "reverse_edges", "Class", "GenericBase");
+    assert!(
+        reverse["edges"].as_array().is_some_and(|edges| edges
+            .iter()
+            .all(|edge| !matches!(edge["relation"].as_str(), Some("Extends" | "Implements")))),
+        "an arity mismatch must never be guessed into a typed edge: {reverse:?}"
+    );
+    assert_neutral(&dir, &state, "Class", "GenericChild", "GenericBase<int>");
+}

@@ -61,6 +61,7 @@ pub(super) fn exact_identity_coverage(
     if matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"
         && matches!(identity.entity_type.as_str(), "Class" | "Interface")
+        && !response_has_typed_evidence
     {
         coverage["alternative_query"] = json!({
             "type": "reverse_edges",

@@ -59,6 +59,7 @@ mod calls;
 mod classification;
 mod content;
 mod coverage;
+mod csharp_resolution;
 mod diagnostics;
 mod edges;
 mod entities;

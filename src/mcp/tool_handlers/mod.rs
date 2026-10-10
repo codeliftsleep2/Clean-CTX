@@ -19,6 +19,7 @@ pub mod gitdiff;
 pub(crate) mod hydration;
 pub mod persistence;
 pub mod query;
+pub mod refresh;
 pub mod registry;
 pub mod stats;
 pub mod traits;
@@ -76,3 +77,7 @@ pub(crate) mod provide_code_context_batch_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/mcp/provide_code_context_response_mode_economics.rs"]
 pub(crate) mod provide_code_context_response_mode_economics_tests;
+
+#[cfg(all(test, feature = "rust", feature = "csharp"))]
+#[path = "../../tests/mcp/refresh_workspace.rs"]
+pub(crate) mod refresh_workspace_tests;

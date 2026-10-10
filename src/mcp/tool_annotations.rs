@@ -42,6 +42,7 @@ fn effects(name: &str) -> ToolEffects {
         | "context_stats"
         | "diff_commits"
         | "workspace_query"
+        | "refresh_workspace"
         | "graph_search"
         | "graph_query"
         | "graph_trace"

@@ -192,6 +192,16 @@ pub fn create_default_registry() -> HandlerRegistry {
         })
     );
 
+    // refresh_workspace establishes a new Clean-CTX source generation after
+    // edits performed outside this session. It does not depend on CBM.
+    register_tool!(
+        reg,
+        "refresh_workspace",
+        Box::new(|id, params, state| {
+            crate::mcp::tool_handlers::refresh::handle_refresh_workspace(id, params, state);
+        })
+    );
+
     // workspace_query (src/mcp/tool_handlers/query.rs) — read-only semantic
     // queries over the WorkspaceIndex.
     register_tool!(

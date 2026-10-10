@@ -90,6 +90,17 @@ impl McpState {
         result
     }
 
+    /// Return the exact source snapshot already owned by this session without
+    /// consulting filesystem metadata. Query-time semantic refinement must use
+    /// the bytes that produced the indexed facts, never silently mix them with
+    /// an externally edited generation.
+    pub(crate) fn cached_source_snapshot(&self, path: &str) -> Option<Arc<String>> {
+        let cache_key = Self::resolve_cache_key(path);
+        self.source_cache_lock()
+            .get(&cache_key)
+            .map(|entry| Arc::clone(&entry.content))
+    }
+
     /// F-FULL-01/F-FULL-05: Read file content, using the shared source cache.
     /// Returns `Arc<String>` so the cache can be shared across passes
     /// without cloning the underlying string data.

@@ -3,13 +3,13 @@
 // A completed discovery stops being valid when the workspace can contain newly
 // relevant source. Every hook below reuses an existing workspace-lifecycle
 // event — `apply_edit` (via `invalidate_discovery_for_edited_path`) and explicit
-// repository reindexing (via `reconcile_external_refresh_for_root`) — rather than
-// introducing a watcher, timer, TTL, or background worker.
+// explicit workspace refresh (via `reconcile_external_refresh_for_root`) —
+// rather than introducing a watcher, timer, TTL, or background worker.
 //
-// External edits remain the documented Clean-CTX boundary: the host editor's
-// writes are invisible to Clean-CTX (docs/CLAUDE_INTEGRATION_RULES.md), apart
-// from files the session re-reads through the source cache, whose mtime/size
-// staleness path drops the whole discovery cache
+// Host/editor writes are invisible until the operator calls `refresh_workspace`
+// (or a successful CBM repository reindex reuses the same reconciliation),
+// apart from files the session re-reads through the source cache, whose
+// mtime/size staleness path drops the whole discovery cache
 // (`McpState::read_source` → `invalidate_hydration_discovery_all`).
 
 use super::filesystem::{configured_roots, root_key};
@@ -43,9 +43,8 @@ pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: 
 
 /// Establish a new current-source generation for one repository root.
 ///
-/// Called when a repository is explicitly reindexed (`index_repository`, or
-/// `cbm_proxy` with `cbm_tool: "index_repository"`). That tool exists precisely
-/// for external edits Clean-CTX cannot observe. After the refresh succeeds,
+/// Called directly by `refresh_workspace` and reused after a successful CBM
+/// repository reindex. After the refresh succeeds,
 /// both discovery and semantic projections from the previous generation cease
 /// to be current. Fresh hydration may republish eligible owners from canonical
 /// source; durable historical artifacts do not independently regain authority.

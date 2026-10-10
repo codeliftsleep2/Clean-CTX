@@ -4,7 +4,10 @@
 //! view adds Extends/Implements only after completed scoped hydration proves
 //! exactly one target kind. Nothing derived here is written to WorkspaceIndex.
 
-use super::identity::ResolvedIdentity;
+use super::{
+    csharp_resolution::{Catalog, TypeKind},
+    identity::ResolvedIdentity,
+};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
@@ -19,6 +22,7 @@ pub(super) fn forward(
     identity: &ResolvedIdentity,
     scope: Option<&WorkspaceScope>,
     classification_complete: bool,
+    catalog: Option<&Catalog>,
 ) -> Vec<SemanticEdge> {
     let mut edges = stored_forward(index, identity, scope);
     if !classification_complete || !is_builtin_class(identity) {
@@ -27,7 +31,7 @@ pub(super) fn forward(
     let derived: Vec<_> = edges
         .iter()
         .filter(|edge| is_neutral_class_base(edge))
-        .filter_map(|edge| classify(index, edge, scope))
+        .filter_map(|edge| classify(index, edge, scope, catalog))
         .collect();
     append_distinct(&mut edges, derived);
     edges
@@ -38,6 +42,7 @@ pub(super) fn reverse(
     identity: &ResolvedIdentity,
     scope: Option<&WorkspaceScope>,
     classification_complete: bool,
+    catalog: Option<&Catalog>,
 ) -> Vec<SemanticEdge> {
     let mut edges = stored_reverse(index, identity, scope);
     if !classification_complete
@@ -46,11 +51,22 @@ pub(super) fn reverse(
     {
         return edges;
     }
-    let neutral = reverse_by_identity(index, BUILTIN, TYPE_REF, &identity.name, scope);
-    let derived = neutral
-        .into_iter()
+    let target_kind = if identity.entity_type == CLASS {
+        TypeKind::Class
+    } else {
+        TypeKind::Interface
+    };
+    let mut written_names = vec![identity.name.clone()];
+    if let Some(catalog) = catalog {
+        written_names.extend(catalog.written_references_to(target_kind, &identity.name));
+    }
+    written_names.sort();
+    written_names.dedup();
+    let derived = written_names
+        .iter()
+        .flat_map(|written| reverse_by_identity(index, BUILTIN, TYPE_REF, written, scope))
         .filter(|edge| is_neutral_class_base(edge))
-        .filter_map(|edge| classify(index, edge, scope))
+        .filter_map(|edge| classify(index, edge, scope, catalog))
         .filter(|edge| edge.object.entity_type == identity.entity_type)
         .collect();
     append_distinct(&mut edges, derived);
@@ -85,16 +101,31 @@ fn classify(
     index: &WorkspaceIndex,
     neutral: &SemanticEdge,
     scope: Option<&WorkspaceScope>,
+    catalog: Option<&Catalog>,
 ) -> Option<SemanticEdge> {
-    let target = &neutral.object.name;
-    let class_exists = index.has_identity_in_scope(BUILTIN, CLASS, target, scope);
-    let interface_exists = index.has_identity_in_scope(BUILTIN, INTERFACE, target, scope);
-    let (relation, target_type) = match (class_exists, interface_exists) {
-        (true, false) => (SemanticRelation::Extends, CLASS),
-        (false, true) => (SemanticRelation::Implements, INTERFACE),
-        _ => return None,
+    let resolved = catalog.and_then(|catalog| catalog.resolve_edge(neutral));
+    let (target_type, target_name, relation) = if let Some(target) = resolved {
+        let target_type = target.kind.entity_type();
+        let relation = if target.kind == TypeKind::Class {
+            SemanticRelation::Extends
+        } else {
+            SemanticRelation::Implements
+        };
+        (target_type, target.name, relation)
+    } else {
+        if catalog.is_some_and(|catalog| catalog.recognizes_edge(neutral)) {
+            return None;
+        }
+        let target = &neutral.object.name;
+        let class_exists = index.has_identity_in_scope(BUILTIN, CLASS, target, scope);
+        let interface_exists = index.has_identity_in_scope(BUILTIN, INTERFACE, target, scope);
+        match (class_exists, interface_exists) {
+            (true, false) => (CLASS, target.clone(), SemanticRelation::Extends),
+            (false, true) => (INTERFACE, target.clone(), SemanticRelation::Implements),
+            _ => return None,
+        }
     };
-    let mut object = EntityRef::new(BUILTIN, target_type, target);
+    let mut object = EntityRef::new(BUILTIN, target_type, target_name);
     object.file = neutral.object.file.clone();
     Some(SemanticEdge {
         relation,

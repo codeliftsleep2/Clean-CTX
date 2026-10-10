@@ -357,6 +357,29 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             }
         }),
         serde_json::json!({
+            "name": "refresh_workspace",
+            "description": "Reconcile Clean-CTX with source changes made outside this session. Retracts indexed semantic owners and cached discovery/source snapshots below workspaceRoot; the next query or context read hydrates current source. Independent of CBM.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workspaceRoot": {
+                        "type": "string",
+                        "description": "Required workspace directory whose Clean-CTX source generation is stale."
+                    }
+                },
+                "required": ["workspaceRoot"],
+                "additionalProperties": false
+            },
+            "outputSchema": {
+                "type": "object",
+                "properties": {
+                    "refreshed": { "type": "boolean", "const": true },
+                    "workspace_root": { "type": "string" }
+                },
+                "required": ["refreshed", "workspace_root"]
+            }
+        }),
+        serde_json::json!({
             "name": "workspace_query",
             "description": "Run one workspace query or a heterogeneous batch of up to 32 queries with ordered, per-item outcomes. A batch shares workspaceRoot and withinPath, deduplicates equivalent hydration, and isolates item failures. Name-bearing cross-file operations use WorkspaceIndex plus registered hydration; has_cycle remains index-only, and calls_in_file remains a fresh unpublished canonical-file query.",
             "inputSchema": {
