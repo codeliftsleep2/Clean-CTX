@@ -17,6 +17,7 @@ pub(super) fn extract_non_testing_edges(
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&CleanCtxConfig>,
+    declaring_path: Option<&std::path::Path>,
     evidence: ProjectionEvidence<'_>,
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
@@ -55,6 +56,17 @@ pub(super) fn extract_non_testing_edges(
                     fidelity,
                     &decl_types,
                 ));
+                if let Some(path) = declaring_path
+                    && let Some(edge) =
+                        crate::angular_meta::semantic::component_template_edge(
+                            &class_name,
+                            kind,
+                            raw_class,
+                            path,
+                        )
+                {
+                    edges.push(edge);
+                }
             }
         }
     }
@@ -160,6 +172,7 @@ pub(super) fn evaluate(
         &captures,
         context.fidelity,
         context.config,
+        Some(context.path),
         ProjectionEvidence {
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),

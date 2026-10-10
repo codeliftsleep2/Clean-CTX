@@ -156,6 +156,54 @@ pub fn class_to_semantic_edges(
     edges
 }
 
+/// Build the template relationship owned by an Angular Component declaration.
+///
+/// External templates use their canonical physical identity even when the
+/// target is currently missing. Inline templates use a deterministic identity
+/// scoped to the declaring source and Component.
+pub(crate) fn component_template_edge(
+    class_name: &str,
+    kind: ClassKind,
+    raw_class: &str,
+    declaring_file: &std::path::Path,
+) -> Option<SemanticEdge> {
+    if kind != ClassKind::Component || declaring_file.as_os_str().is_empty() {
+        return None;
+    }
+
+    let owner = crate::dictionary::path::canonical_identity_key(
+        &declaring_file.to_string_lossy(),
+    );
+    let template_name =
+        if let Some(written) = crate::angular_meta::decorators::extract_component_template_url(
+            raw_class,
+        ) {
+            let path = crate::angular_meta::template_ownership::resolve_template_path(
+                declaring_file,
+                &written,
+            )?;
+            crate::dictionary::path::canonical_identity_key(&path.to_string_lossy())
+        } else if crate::angular_meta::decorators::extract_decorators(
+            raw_class,
+            Fidelity::Low,
+        )
+        .and_then(|result| result.inline_template)
+        .is_some()
+        {
+            format!("inline:{owner}#component={class_name}")
+        } else {
+            return None;
+        };
+
+    Some(SemanticEdge {
+        relation: SemanticRelation::HasTemplate,
+        subject: EntityRef::new("angular", "Component", class_name),
+        object: EntityRef::new("angular", "Template", template_name),
+        layer: "angular",
+        call_evidence: None,
+    })
+}
+
 /// Build semantic edges from a RouteShape.
 pub fn routes_to_semantic_edges(
     routes: &[crate::angular_meta::routing::RouteDecl],

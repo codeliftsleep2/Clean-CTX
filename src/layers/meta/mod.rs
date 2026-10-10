@@ -33,7 +33,7 @@ use std::path::Path;
 /// Increment marker and semantic generations independently when identical
 /// Angular inputs change that producer's durable markers or semantic edges.
 pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 2;
 
 /// Structured output of a single meta-layer pass.
 ///
@@ -328,6 +328,7 @@ impl MetaLayer for AngularMetaLayer {
             class_captures,
             fidelity,
             config,
+            None,
             Default::default(),
         );
 
@@ -358,6 +359,7 @@ impl MetaLayer for AngularMetaLayer {
             &captures,
             fidelity,
             config,
+            Some(path),
             Default::default(),
         );
         let testing_enabled = config

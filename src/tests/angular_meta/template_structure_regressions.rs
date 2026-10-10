@@ -130,3 +130,88 @@ fn high_fidelity_keeps_visible_text_interpolations_and_accessibility_content() {
         );
     }
 }
+
+#[test]
+fn modern_companion_blocks_defer_triggers_and_let_bindings_remain_ordered() {
+    let source = r#"
+@let total = items.length;
+@if (ready) {
+  <child-ready></child-ready>
+} @else if (loading) {
+  <child-loading></child-loading>
+} @else {
+  <child-empty></child-empty>
+}
+@for (item of items; track item.id) {
+  <child-row [item]="item"></child-row>
+} @empty {
+  <p>No rows.</p>
+}
+@defer (on viewport; prefetch on idle) {
+  <heavy-panel></heavy-panel>
+} @placeholder (minimum 100ms) {
+  <panel-placeholder></panel-placeholder>
+} @loading (after 50ms; minimum 200ms) {
+  <panel-loading></panel-loading>
+} @error {
+  <panel-error></panel-error>
+}
+"#;
+
+    let rendered = compress_template_to_string(source, Fidelity::Medium);
+
+    assert_tokens_in_order(
+        &rendered,
+        &[
+            "@let total = items.length;",
+            "@if(ready)",
+            "<child-ready",
+            "@else if(loading)",
+            "<child-loading",
+            "@else",
+            "<child-empty",
+            "@for(item of items)",
+            "track item.id",
+            "<child-row",
+            "@empty",
+            "No rows.",
+            "@defer(on viewport; prefetch on idle)",
+            "<heavy-panel",
+            "@placeholder (minimum 100ms)",
+            "<panel-placeholder",
+            "@loading (after 50ms; minimum 200ms)",
+            "<panel-loading",
+            "@error",
+            "<panel-error",
+        ],
+    );
+}
+
+#[test]
+fn template_references_pipes_and_i18n_remain_visible_in_structural_output() {
+    let source = r#"
+<ng-template #emptyState let-retry="retry">
+  <p i18n="@@empty-message">No {{ label | titlecase }} found.</p>
+  <button (click)="retry()" i18n>Retry</button>
+</ng-template>
+<ng-container
+  *ngTemplateOutlet="emptyState; context: { retry: reload }">
+</ng-container>
+"#;
+
+    let rendered = compress_template_to_string(source, Fidelity::High);
+
+    for required in [
+        r#"#emptyState"#,
+        r#"let-retry="retry""#,
+        r#"i18n="@@empty-message""#,
+        "{{ label | titlecase }}",
+        r#"(click)="retry()""#,
+        r#"*ngTemplateOutlet="emptyState; context: { retry: reload }""#,
+    ] {
+        assert!(
+            rendered.contains(required),
+            "structural output lost {required:?}:\n{rendered}"
+        );
+    }
+}

@@ -309,3 +309,7 @@ fn insert_required(
 #[cfg(test)]
 #[path = "../../tests/mcp/durable_compatibility_identity.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/angular_template_compatibility.rs"]
+mod angular_template_compatibility_tests;

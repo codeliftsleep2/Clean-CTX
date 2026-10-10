@@ -44,15 +44,35 @@ pub(crate) fn source_owns_external_template(
         })
 }
 
-fn resolve_template_path(declaring_file: &Path, written: &str) -> Option<PathBuf> {
+pub(crate) fn resolve_template_path(declaring_file: &Path, written: &str) -> Option<PathBuf> {
     let written = written.trim();
     if written.is_empty() || written.contains("://") {
         return None;
     }
     let path = Path::new(written);
     if path.is_absolute() {
-        Some(path.to_path_buf())
+        Some(normalize_lexically(path))
     } else {
-        declaring_file.parent().map(|parent| parent.join(path))
+        declaring_file
+            .parent()
+            .map(|parent| normalize_lexically(&parent.join(path)))
     }
+}
+
+fn normalize_lexically(path: &Path) -> PathBuf {
+    use std::path::Component;
+
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push(component.as_os_str());
+                }
+            }
+            _ => normalized.push(component.as_os_str()),
+        }
+    }
+    normalized
 }
