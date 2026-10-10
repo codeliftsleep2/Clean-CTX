@@ -101,3 +101,124 @@ fn unrelated_html_error_explains_that_verbatim_is_raw_uncompressed_content() {
         "error must explain what verbatim returns: {response}"
     );
 }
+
+fn provide_linked_template(source: &str) -> Value {
+    let root = tempfile::tempdir().expect("workspace");
+    let component = root.path().join("migration-host.ts");
+    let template = root.path().join("migration-host.html");
+
+    std::fs::write(
+        &component,
+        r#"
+@Component({
+  selector: 'app-migration-host',
+  templateUrl: './migration-host.html'
+})
+export class MigrationHost {}
+"#,
+    )
+    .expect("component fixture");
+    std::fs::write(
+        &template,
+        format!(
+            "{}
+{source}",
+            "<!-- production-path compression padding -->
+".repeat(300)
+        ),
+    )
+    .expect("template fixture");
+
+    provide(&state(&root), &root, &template)
+}
+
+fn model_visible_text(response: &Value) -> &str {
+    assert!(
+        response.get("error").is_none(),
+        "linked Angular template must use the production template path: {response}"
+    );
+    assert_eq!(response["result"]["_meta"]["is_angular"], true, "{response}");
+    response["result"]["content"][0]["text"]
+        .as_str()
+        .expect("model-visible template")
+}
+
+fn assert_tokens_in_order(rendered: &str, tokens: &[&str]) {
+    let mut previous = 0;
+    for token in tokens {
+        let relative = rendered[previous..]
+            .find(token)
+            .unwrap_or_else(|| panic!("missing {token:?} in:
+{rendered}"));
+        previous += relative + token.len();
+    }
+}
+
+#[test]
+fn linked_legacy_and_modern_templates_expose_equivalent_child_capabilities() {
+    let cases = [
+        (
+            "Angular 15-16 legacy",
+            r#"
+<ng-container *ngIf="ready">
+  <child-row
+    *ngFor="let item of items; trackBy: trackItem"
+    [item]="item">
+  </child-row>
+</ng-container>
+"#,
+            ["@if(ready)", "@for(item of items)"],
+        ),
+        (
+            "Angular 17+ modern",
+            r#"
+@if (ready) {
+  @for (item of items; track item.id) {
+    <child-row [item]="item"></child-row>
+  }
+}
+"#,
+            ["@if(ready)", "@for(item of items)"],
+        ),
+    ];
+
+    for (generation, source, behaviors) in cases {
+        let response = provide_linked_template(source);
+        let rendered = model_visible_text(&response);
+        for expected in [behaviors[0], behaviors[1], "<child-row", r#"[item]="item""#] {
+            assert!(
+                rendered.contains(expected),
+                "{generation} lost {expected:?}: {response}"
+            );
+        }
+    }
+}
+
+#[test]
+fn linked_mixed_migration_template_preserves_cross_syntax_source_order() {
+    let response = provide_linked_template(
+        r#"
+<section *ngIf="ready">
+  @if (selected) {
+    <child-detail [item]="selected"></child-detail>
+  }
+</section>
+@for (item of items; track item.id) {
+  <child-row *ngIf="item.visible" [item]="item"></child-row>
+}
+"#,
+    );
+    let rendered = model_visible_text(&response);
+
+    assert_tokens_in_order(
+        rendered,
+        &[
+            "@if(ready)",
+            "@if(selected)",
+            "<child-detail",
+            "@for(item of items)",
+            "@if(item.visible)",
+            "<child-row",
+        ],
+    );
+}

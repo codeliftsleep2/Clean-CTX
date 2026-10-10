@@ -94,3 +94,7 @@ mod tests;
 #[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/template_structure_regressions.rs"]
 mod structure_regression_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/angular_meta/template_version_equivalence.rs"]
+mod version_equivalence_tests;

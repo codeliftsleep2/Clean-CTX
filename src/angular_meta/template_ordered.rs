@@ -169,6 +169,11 @@ fn push_legacy_headers(
             continue;
         };
         match (name.as_str(), value.as_deref()) {
+            ("[ngSwitch]", Some(expression)) => {
+                template.events.push(TemplateEvent::Content(format!(
+                    "@switch({expression})"
+                )));
+            }
             ("*ngIf", Some(condition)) => {
                 template.events.push(TemplateEvent::Content(format!(
                     "@if({condition})"
@@ -218,16 +223,25 @@ fn attribute_parts(
             }
             "quoted_attribute_value" | "attribute_value" => {
                 value = child.utf8_text(source.as_bytes()).ok().map(|raw| {
-                    raw.trim()
-                        .trim_matches('"')
-                        .trim_matches('\'')
-                        .to_string()
+                    strip_outer_attribute_quotes(raw.trim()).to_string()
                 });
             }
             _ => {}
         }
     }
     name.map(|name| (name, value))
+}
+
+fn strip_outer_attribute_quotes(raw: &str) -> &str {
+    let bytes = raw.as_bytes();
+    if bytes.len() >= 2
+        && matches!(bytes[0], b'"' | b'\'')
+        && bytes.last() == Some(&bytes[0])
+    {
+        &raw[1..raw.len() - 1]
+    } else {
+        raw
+    }
 }
 
 fn legacy_for_parts(expression: &str) -> Option<(&str, &str)> {
