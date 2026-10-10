@@ -12,7 +12,7 @@ pub(super) fn try_evaluate_angular_template(
     resolved_path: &str,
     source: &str,
 ) -> Option<ProvidedContext> {
-    if !resolved_path.to_lowercase().ends_with(".component.html") {
+    if !is_angular_template(params, state, resolved_path) {
         return None;
     }
 
@@ -110,4 +110,41 @@ pub(super) fn try_evaluate_angular_template(
             "degradation": null
         }),
     ))
+}
+
+fn is_angular_template(params: &Value, state: &McpState, resolved_path: &str) -> bool {
+    if resolved_path.to_lowercase().ends_with(".component.html") {
+        return true;
+    }
+    let target = std::path::Path::new(resolved_path);
+    if target.extension().and_then(|extension| extension.to_str()) != Some("html") {
+        return false;
+    }
+    let Some(file_name) = target.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
+    crate::mcp::tool_handlers::hydration::source_candidates_containing(
+        state,
+        workspace_root,
+        file_name,
+    )
+    .into_iter()
+    .filter(|candidate| {
+        matches!(
+            std::path::Path::new(candidate.as_str())
+                .extension()
+                .and_then(|extension| extension.to_str()),
+            Some("ts" | "tsx")
+        )
+    })
+    .any(|candidate| {
+        state.read_source(&candidate).is_ok_and(|source| {
+            crate::angular_meta::template_ownership::source_owns_external_template(
+                &source,
+                std::path::Path::new(candidate.as_str()),
+                target,
+            )
+        })
+    })
 }

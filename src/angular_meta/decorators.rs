@@ -498,6 +498,21 @@ pub(crate) fn extract_module_declarations(
     (Vec::new(), Vec::new(), Vec::new())
 }
 
+/// Extract the deterministic external template URL from a component class.
+///
+/// This reuses the same decorator collection and object-literal parser as the
+/// marker and semantic paths; it is not a second declaration parser.
+pub(crate) fn extract_component_template_url(raw_class: &str) -> Option<String> {
+    let head_end = find_class_head_end(raw_class)?;
+    let decorators = collect_decorators(&raw_class[..head_end]);
+    decorators.into_iter().find_map(|decorator| {
+        (decorator.kind == DecoratorKind::Component)
+            .then(|| parse_object_literal(&decorator.arg).template_url)
+            .flatten()
+            .filter(|url| !url.trim().is_empty())
+    })
+}
+
 /// Extract graph-compatible metadata from the class capture for the
 /// cross-file dependency graph (Phase 3, Tier 3).
 ///

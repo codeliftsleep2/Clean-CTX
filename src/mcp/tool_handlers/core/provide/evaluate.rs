@@ -235,7 +235,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             return Err(ProvideFailure::new(
                 -32603,
                 format!(
-                    "IR compilation unavailable for {resolved_path}: {error}. SCHEMA-vNext structural output cannot be produced for this input; retry with fidelity \"verbatim\" or read the source directly."
+                    "IR compilation unavailable for {resolved_path}: {error}. SCHEMA-vNext structural output cannot be produced for this input; retry with fidelity \"verbatim\" for the raw, uncompressed source or read the source directly."
                 ),
                 Some(json!({
                     "reason": "ir_unavailable",

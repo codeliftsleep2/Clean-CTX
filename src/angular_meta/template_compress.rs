@@ -23,8 +23,10 @@ use crate::compression::Fidelity;
 /// Returns the compressed marker lines. For Low fidelity this is a
 /// single line; for Medium/High it is a multi-line block.
 pub fn compress_template(html: &str, fidelity: Fidelity) -> Vec<String> {
-    let shape = extract_template_shape(html);
-    shape.to_marker_lines(fidelity)
+    if fidelity == Fidelity::Low {
+        return extract_template_shape(html).to_marker_lines(fidelity);
+    }
+    crate::angular_meta::template_ordered::extract(html).render(fidelity)
 }
 
 /// Compress an Angular template and return the joined string form.
@@ -67,9 +69,18 @@ pub fn extract_prime_ng_markers(shape: &TemplateShape) -> Vec<String> {
 /// template compression and appends any PrimeNG component markers as a
 /// trailing line.
 pub fn compress_template_with_prime_ng(html: &str, fidelity: Fidelity) -> Vec<String> {
-    let shape = extract_template_shape(html);
-    let mut lines = shape.to_marker_lines(fidelity);
-    let prime_ng = extract_prime_ng_markers(&shape);
+    if fidelity == Fidelity::Low {
+        let shape = extract_template_shape(html);
+        let mut lines = shape.to_marker_lines(fidelity);
+        let prime_ng = extract_prime_ng_markers(&shape);
+        if !prime_ng.is_empty() {
+            lines.push(prime_ng.join(" "));
+        }
+        return lines;
+    }
+    let ordered = crate::angular_meta::template_ordered::extract(html);
+    let mut lines = ordered.render(fidelity);
+    let prime_ng = ordered.prime_ng_markers();
     if !prime_ng.is_empty() {
         lines.push(prime_ng.join(" "));
     }
@@ -79,3 +90,7 @@ pub fn compress_template_with_prime_ng(html: &str, fidelity: Fidelity) -> Vec<St
 #[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/template_compress.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/angular_meta/template_structure_regressions.rs"]
+mod structure_regression_tests;

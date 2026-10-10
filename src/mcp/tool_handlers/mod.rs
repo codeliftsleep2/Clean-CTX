@@ -78,6 +78,10 @@ pub(crate) mod provide_code_context_batch_tests;
 #[path = "../../tests/mcp/provide_code_context_response_mode_economics.rs"]
 pub(crate) mod provide_code_context_response_mode_economics_tests;
 
+#[cfg(all(test, feature = "angular", feature = "typescript"))]
+#[path = "../../tests/mcp/provide_angular_template_ownership.rs"]
+pub(crate) mod provide_angular_template_ownership_tests;
+
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/refresh_workspace.rs"]
 pub(crate) mod refresh_workspace_tests;

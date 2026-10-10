@@ -42,6 +42,8 @@ pub mod signals;
 pub mod style;
 pub mod template;
 pub mod template_compress;
+mod template_ordered;
+pub mod template_ownership;
 pub mod testing;
 pub mod util;
 
@@ -357,8 +359,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
                         // Fidelity-gated template rendering (ANGULAR_HTML_COMPRESSION_PLAN).
                         // Low → single-line shape summary; Medium/High → multi-line
                         // structural Angular semantics.
-                        let shape = template::extract_template_shape(tpl);
-                        for line in shape.to_marker_lines(fidelity) {
+                        for line in template_compress::compress_template(tpl, fidelity) {
                             if line != "Φtpl:empty" {
                                 block.lines.push(line);
                             }
