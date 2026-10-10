@@ -29,10 +29,12 @@ version-history registry lives in
   were unavailable. Unresolved queries retain the neutral `TypeRef` /
   `HasBaseType` guidance.
 * **Explicit external-source reconciliation** — the new read-only, idempotent
-  `refresh_workspace(workspaceRoot)` MCP tool retracts root-owned semantic
-  state and invalidates source/discovery snapshots after editor, shell, Git, or
-  other out-of-session writes. The next query hydrates current source without
-  requiring CBM; `index_repository` remains the separate CBM graph-refresh
+  `refresh_workspace(workspaceRoot)` MCP tool reconciles the primary and
+  configured additional roots, retracts indexed semantic state, invalidates
+  source/discovery snapshots, and retires stale pending semantic transitions
+  after editor, shell, Git, or other out-of-session writes. It reports affected
+  roots and authority counts while preserving durable history and diff
+  baselines. The next query hydrates current source without requiring CBM; `index_repository` remains the separate CBM graph-refresh
   operation.
 * **Compatibility remains scoped** — canonical IR, durable semantic facts, and
   their C# producer outputs are unchanged, so no producer key or generation was

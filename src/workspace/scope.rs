@@ -80,6 +80,7 @@
 // the graph may legitimately hold `A: Process --Calls--> OrderBy` and
 // `B: SortData --Calls--> OrderBy` at once — each answers its own scoped query.
 
+use super::path_identity::{components_are_within as is_within, components_equal, path_components};
 use std::path::{Path, PathBuf};
 
 /// The effective query scope of one occurrence-returning query: the authorized
@@ -229,12 +230,7 @@ impl WithinPath {
     /// Is this occurrence's path admitted by the narrowing?
     fn admits(&self, file: &[String]) -> bool {
         if self.exact_file {
-            file.len() == self.parts.len()
-                && self
-                    .parts
-                    .iter()
-                    .zip(file.iter())
-                    .all(|(path_part, file_part)| component_eq(path_part, file_part))
+            components_equal(file, &self.parts)
         } else {
             is_within(file, &self.parts)
         }
@@ -258,7 +254,7 @@ fn root_set(primary: &str, additional_roots: &[String]) -> Vec<Vec<String>> {
             .filter(|root| !root.trim().is_empty()),
     ) {
         let parts = path_components(Path::new(&canonical_root(root)));
-        if !parts.is_empty() && !roots.contains(&parts) {
+        if !parts.is_empty() && !roots.iter().any(|root| components_equal(root, &parts)) {
             roots.push(parts);
         }
     }
@@ -290,31 +286,4 @@ fn resolve_against_root(path: &str, declared_root: &str) -> PathBuf {
 /// verbatim).
 fn canonical_root(root: &str) -> String {
     crate::dictionary::path::canonical_identity_key(root)
-}
-
-fn path_components(path: &Path) -> Vec<String> {
-    path.components()
-        .map(|component| component.as_os_str().to_string_lossy().into_owned())
-        .collect()
-}
-
-/// Component-wise ancestry: `file` is inside `root` when `root` is a component
-/// prefix of `file`. A raw string prefix check would wrongly admit
-/// `C:\repo-old` for root `C:\repo`.
-fn is_within(file: &[String], root: &[String]) -> bool {
-    file.len() >= root.len()
-        && root
-            .iter()
-            .zip(file.iter())
-            .all(|(root_part, file_part)| component_eq(root_part, file_part))
-}
-
-#[cfg(windows)]
-fn component_eq(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
-}
-
-#[cfg(not(windows))]
-fn component_eq(a: &str, b: &str) -> bool {
-    a == b
 }

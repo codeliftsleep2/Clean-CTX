@@ -20,4 +20,5 @@
 // regardless of domain (angular, dotnet, spring, ngrx).
 
 pub mod index;
+pub(crate) mod path_identity;
 pub mod scope;

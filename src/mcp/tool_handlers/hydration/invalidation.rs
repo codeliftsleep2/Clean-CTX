@@ -14,7 +14,6 @@
 
 use super::filesystem::{configured_roots, root_key};
 use crate::mcp::McpState;
-use std::path::Path;
 
 /// Invalidate hydration discovery for the configured root containing
 /// `file_path`.
@@ -33,7 +32,7 @@ pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: 
     let matched = configured_roots(state, None)
         .iter()
         .map(|root| root_key(root))
-        .filter(|root| Path::new(&edited).starts_with(Path::new(root)))
+        .filter(|root| crate::workspace::path_identity::is_within_root(&edited, root))
         .max_by_key(String::len);
     match matched {
         Some(root) => state.hydration_discovery_lock().invalidate_root(&root),
@@ -48,11 +47,38 @@ pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: 
 /// both discovery and semantic projections from the previous generation cease
 /// to be current. Fresh hydration may republish eligible owners from canonical
 /// source; durable historical artifacts do not independently regain authority.
-pub(crate) fn reconcile_external_refresh_for_root(state: &McpState, root: &str) {
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct RefreshReconciliation {
+    pub(crate) indexed_owners_retracted: usize,
+    pub(crate) source_snapshots_invalidated: usize,
+    pub(crate) pending_transitions_retired: usize,
+}
+
+impl RefreshReconciliation {
+    pub(crate) fn merge(&mut self, other: Self) {
+        self.indexed_owners_retracted += other.indexed_owners_retracted;
+        self.source_snapshots_invalidated += other.source_snapshots_invalidated;
+        self.pending_transitions_retired += other.pending_transitions_retired;
+    }
+}
+
+pub(crate) fn reconcile_external_refresh_for_root(
+    state: &McpState,
+    root: &str,
+) -> RefreshReconciliation {
     let identity = crate::dictionary::path::canonical_identity_key(root);
+    let reconciliation = RefreshReconciliation {
+        source_snapshots_invalidated: state.invalidate_source_cache_in_root(&identity),
+        indexed_owners_retracted: state.workspace_index_lock().remove_files_in_root(&identity),
+        pending_transitions_retired: state.forget_pending_transitions_in_root(&identity),
+    };
+    // Invalidate discovery last. A concurrent hydration that finishes before
+    // this point is either retracted above or publishes source-current facts;
+    // after this point every new query observes the fresh discovery generation.
+    // Invalidating first could let a query mark that generation complete and
+    // then have its newly published projection removed by this refresh.
     invalidate_discovery_for_root(state, &identity);
-    state.invalidate_source_cache_in_root(&identity);
-    state.workspace_index_lock().remove_files_in_root(&identity);
+    reconciliation
 }
 
 /// Drop completed discovery for one root without changing semantic authority.

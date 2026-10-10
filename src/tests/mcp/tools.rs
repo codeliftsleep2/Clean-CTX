@@ -178,7 +178,7 @@ fn schema_guidance_uses_current_model_workflow_terms() {
 #[test]
 fn every_registered_tool_has_conservative_standard_annotations() {
     let tools = tool_list();
-    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    assert_eq!(tools.len(), 26, "the complete public catalog is classified");
 
     for tool in &tools {
         let name = tool["name"].as_str().expect("registered tool name");
@@ -216,6 +216,7 @@ fn every_registered_tool_has_conservative_standard_annotations() {
         "context_stats",
         "diff_commits",
         "workspace_query",
+        "refresh_workspace",
         "graph_search",
         "graph_query",
         "graph_trace",
@@ -329,7 +330,7 @@ fn supported_languages_is_limited_to_source_processing_tools() {
     .into_iter()
     .collect();
 
-    assert_eq!(tools.len(), 25, "the complete public catalog is classified");
+    assert_eq!(tools.len(), 26, "the complete public catalog is classified");
     for tool in &tools {
         let name = tool["name"].as_str().expect("registered tool name");
         let languages = tool.get("supportedLanguages");

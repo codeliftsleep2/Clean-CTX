@@ -39,6 +39,7 @@ pub(crate) fn handle_refresh_workspace(id: &Value, params: &Value, state: &McpSt
             ));
             return;
         }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => resolved,
         Err(error) => {
             send_response(&crate::mcp::tool_helpers::jsonrpc_error(
                 id.clone(),
@@ -50,11 +51,23 @@ pub(crate) fn handle_refresh_workspace(id: &Value, params: &Value, state: &McpSt
         }
     };
     let canonical = crate::dictionary::path::canonical_identity_key(&canonical.to_string_lossy());
-    super::hydration::reconcile_external_refresh_for_root(state, &canonical);
+    let roots = super::hydration::effective_refresh_roots(state, &canonical);
+    let mut reconciliation = super::hydration::RefreshReconciliation::default();
+    for root in &roots {
+        reconciliation.merge(super::hydration::reconcile_external_refresh_for_root(
+            state, root,
+        ));
+    }
 
+    let roots_refreshed = roots.len();
     let structured = json!({
         "refreshed": true,
         "workspace_root": canonical,
+        "workspace_roots": roots,
+        "roots_refreshed": roots_refreshed,
+        "indexed_owners_retracted": reconciliation.indexed_owners_retracted,
+        "source_snapshots_invalidated": reconciliation.source_snapshots_invalidated,
+        "pending_transitions_retired": reconciliation.pending_transitions_retired,
     });
     send_response(&json!({
         "jsonrpc": "2.0",

@@ -358,7 +358,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "refresh_workspace",
-            "description": "Reconcile Clean-CTX with source changes made outside this session. Retracts indexed semantic owners and cached discovery/source snapshots below workspaceRoot; the next query or context read hydrates current source. Independent of CBM.",
+            "description": "Reconcile Clean-CTX with source changes made outside this session. Reconciles workspaceRoot plus configured additional roots after changes made outside this session. Retracts indexed semantic owners, cached discovery/source snapshots, and stale pending semantic transitions; the next query or context read hydrates current source. Reports the affected roots and authority counts. Independent of CBM.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

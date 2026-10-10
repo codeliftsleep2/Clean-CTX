@@ -13,7 +13,6 @@
 use super::WorkspaceIndex;
 use super::edges::EdgeKey;
 use std::collections::HashSet;
-use std::path::Path;
 
 impl WorkspaceIndex {
     /// Retract every semantic projection owned by a file below `root`.
@@ -24,19 +23,20 @@ impl WorkspaceIndex {
     /// current again; later hydration republishes eligible owners from fresh
     /// canonical source. Retraction is deliberately root-scoped and does not
     /// treat any target-specific discovery result as a repository inventory.
-    pub fn remove_files_in_root(&mut self, root: &str) {
-        let root = Path::new(root);
+    pub fn remove_files_in_root(&mut self, root: &str) -> usize {
         let mut owners: HashSet<String> = self
             .file_map
             .keys()
             .chain(self.file_edges.keys())
             .chain(self.semantic_coverage.keys())
-            .filter(|owner| Path::new(owner.as_str()).starts_with(root))
+            .filter(|owner| crate::workspace::path_identity::is_within_root(owner, root))
             .cloned()
             .collect();
+        let removed = owners.len();
         for owner in owners.drain() {
             self.remove_file(&owner);
         }
+        removed
     }
 
     /// Remove all edge occurrences and entity occurrences originating from the

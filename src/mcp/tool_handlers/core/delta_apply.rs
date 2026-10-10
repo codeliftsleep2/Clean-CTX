@@ -96,6 +96,21 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         }
         _ => None,
     };
+    if let Some(transition) = &pending_transition {
+        let source_is_current = state
+            .read_source(&durable_file)
+            .map(|source| {
+                state.cache_read().compute_hash(source.as_bytes()) == transition.target_source_hash
+            })
+            .unwrap_or(false);
+        if !source_is_current {
+            send_response(&invalid_session_ir_response(
+                id,
+                "pending semantic transition no longer matches current source",
+            ));
+            return;
+        }
+    }
     let persisted_payload = match &delta {
         IncomingDelta::Sequence(delta) => {
             crate::mcp::persistence_ir::PersistedDelta::normalize_sequence(delta, &durable_file)

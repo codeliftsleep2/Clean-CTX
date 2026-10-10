@@ -295,7 +295,9 @@ A CBM project slug and a filesystem path are different namespaces. Only
   match silently.
 - Use `list_projects` when the authoritative registered identities are needed.
 - Use `refresh_workspace(workspaceRoot)` after external edits when Clean-CTX
-  semantic/query freshness is required. This is independent of CBM.
+  semantic/query freshness is required. It reconciles the primary plus configured
+  additional roots, retires stale pending transitions, and reports affected
+  authority counts while preserving durable history. This is independent of CBM.
 - Use `index_repository(repo_path, mode: "fast")` when CBM graph freshness is
   also required. `full` is for explicit rebuild/recovery.
 

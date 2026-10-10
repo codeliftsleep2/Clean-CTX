@@ -27,8 +27,16 @@ mod invalidation;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use invalidation::invalidate_discovery_for_root;
 pub(crate) use invalidation::{
-    invalidate_discovery_for_edited_path, reconcile_external_refresh_for_root,
+    RefreshReconciliation, invalidate_discovery_for_edited_path,
+    reconcile_external_refresh_for_root,
 };
+
+pub(crate) fn effective_refresh_roots(state: &McpState, workspace_root: &str) -> Vec<String> {
+    configured_roots(state, Some(workspace_root))
+        .iter()
+        .map(|root| root_key(root))
+        .collect()
+}
 
 mod publication;
 mod report;

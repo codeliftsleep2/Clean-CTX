@@ -377,6 +377,18 @@ impl super::McpState {
         });
     }
 
+    pub(crate) fn forget_pending_transitions_in_root(&self, root: &str) -> usize {
+        let mut transitions = lock_or_recover!(
+            self.pending_semantic_transitions.lock(),
+            "pending_semantic_transitions"
+        );
+        let before = transitions.len();
+        transitions.retain(|_, transition| {
+            !crate::workspace::path_identity::is_within_root(&transition.durable_file, root)
+        });
+        before - transitions.len()
+    }
+
     pub(crate) fn forget_pending_transitions(&self, alias: &str) {
         lock_or_recover!(
             self.pending_semantic_transitions.lock(),

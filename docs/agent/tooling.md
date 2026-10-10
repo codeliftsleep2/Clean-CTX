@@ -125,7 +125,7 @@ caller to the authoritative structured item errors.
 | Tool | Required | Optional | Semantics |
 |------|----------|----------|-----------|
 | `workspace_query` | `type` (single) or `queries` (batch) | Operation fields; shared `workspaceRoot`, `withinPath` | **READ-ONLY** — Run one legacy operation or up to 32 heterogeneous operations in one ordered batch. A batch requires unique item IDs, shares one top-level scope, deduplicates equivalent hydration, evaluates index-backed items against one final post-preparation view, and returns independent per-item success/error outcomes. The seven operation semantics and authority boundaries are unchanged. |
-| `refresh_workspace` | `workspaceRoot` | — | **READ-ONLY, IDEMPOTENT** — Establish a new Clean-CTX source generation after external edits by retracting root-owned semantic state and invalidating discovery/source snapshots. The next query hydrates current source; CBM is not invoked. |
+| `refresh_workspace` | `workspaceRoot` | — | **READ-ONLY, IDEMPOTENT** — Establish a new Clean-CTX source generation after external edits across `workspaceRoot` plus configured additional roots. Retracts current indexed semantics, source/discovery snapshots, and stale pending semantic transitions while preserving durable history and diff baselines. Reports affected roots and authority counts; the next query hydrates current source. CBM is not invoked. |
 
 The seventh operation, `calls_in_file`, requires `filePath`, `workspaceRoot`,
 `owner: {kind: "class"|"interface", name}`, and `method: {name}`. Optional
@@ -405,7 +405,7 @@ explicit index_repository may be required
 graph query
 ```
 
-Edits performed outside Clean-CTX are not automatically observed. Use `refresh_workspace` to retract stale Clean-CTX semantic state and make the next query hydrate current source. Use `index_repository` separately when CBM graph freshness is required.
+Edits performed outside Clean-CTX are not automatically observed. Use `refresh_workspace` to retract stale current-source authority across the effective workspace root set and make the next query hydrate current source. Use `index_repository` separately when CBM graph freshness is required.
 
 ### Direct Call Comparison
 
