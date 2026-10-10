@@ -88,6 +88,23 @@ fn try_prepare_forward_edges(
             hydration.merge(target_hydration);
         }
     }
+    hydrate_angular_template_owner(
+        state,
+        context,
+        &identity,
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
+    hydrate_angular_selector_candidates(
+        state,
+        context,
+        &identity,
+        scope.as_ref(),
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity
         .exact()
@@ -96,19 +113,36 @@ fn try_prepare_forward_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(
+            state,
+            &index,
+            scope.as_ref(),
+            classification_complete,
+        )
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = super::classification::forward(
+        let stored_edges = super::classification::forward(
             index,
             &resolved,
             scope.as_ref(),
             classification_complete,
             resolution_catalog.as_ref(),
         );
+        let mut edges = serde_json::to_value(&stored_edges)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        let stored_count = edges.len();
+        if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
+            edges.extend(catalog.forward(&exact.domain, &exact.entity_type, &exact.name));
+        }
         let count = edges.len();
         let mut structured = serde_json::json!({
-            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "edges": edges,
             "count": count,
             "resolved_identity": resolved_identity,
         });
@@ -119,7 +153,7 @@ fn try_prepare_forward_edges(
                 scope.as_ref(),
                 CapabilityDirection::Forward,
                 &hydration,
-                has_typed_inheritance(&edges),
+                has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -169,7 +203,25 @@ fn try_prepare_reverse_edges(
         );
     }
     let requirement = edge_hydration_requirement(args);
-    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    let mut hydration =
+        context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    hydrate_angular_template_owner(
+        state,
+        context,
+        &identity,
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
+    hydrate_angular_selector_candidates(
+        state,
+        context,
+        &identity,
+        scope.as_ref(),
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity.exact().is_some_and(|exact| {
         exact.domain == "builtin" && matches!(exact.entity_type.as_str(), "Class" | "Interface")
@@ -178,19 +230,36 @@ fn try_prepare_reverse_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(
+            state,
+            &index,
+            scope.as_ref(),
+            classification_complete,
+        )
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = super::classification::reverse(
+        let stored_edges = super::classification::reverse(
             index,
             &resolved,
             scope.as_ref(),
             classification_complete,
             resolution_catalog.as_ref(),
         );
+        let mut edges = serde_json::to_value(&stored_edges)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        let stored_count = edges.len();
+        if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
+            edges.extend(catalog.reverse(&exact.domain, &exact.entity_type, &exact.name));
+        }
         let count = edges.len();
         let mut structured = serde_json::json!({
-            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "edges": edges,
             "count": count,
             "resolved_identity": resolved_identity,
         });
@@ -201,7 +270,7 @@ fn try_prepare_reverse_edges(
                 scope.as_ref(),
                 CapabilityDirection::Reverse,
                 &hydration,
-                has_typed_inheritance(&edges),
+                has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
         if let Some(discovery) = discovery_field(&hydration) {
@@ -209,6 +278,82 @@ fn try_prepare_reverse_edges(
         }
         Ok(QueryAnswer::new("reverse_edges", structured))
     }))
+}
+
+fn needs_angular_template_resolution(identity: &IdentityRequest) -> bool {
+    identity.exact().is_some_and(|exact| {
+        exact.domain == "angular"
+            && matches!(
+                exact.entity_type.as_str(),
+                "Component" | "Template" | "SelectorRef"
+            )
+    })
+}
+
+fn hydrate_angular_template_owner(
+    state: &McpState,
+    context: &mut PreparationContext,
+    identity: &IdentityRequest,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+    hydration: &mut crate::mcp::tool_handlers::hydration::HydrationReport,
+) -> Result<(), QueryFailure> {
+    let Some(exact) = identity.exact() else {
+        return Ok(());
+    };
+    if exact.domain != "angular" || exact.entity_type != "Template" {
+        return Ok(());
+    }
+    let lookup = if let Some(inline) = exact.name.strip_prefix("inline:") {
+        inline
+            .rsplit_once("#component=")
+            .map(|(_, component)| component.to_string())
+    } else {
+        std::path::Path::new(&exact.name)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+    };
+    if let Some(lookup) = lookup {
+        let owner_hydration = context.hydrate(
+            state,
+            "forward_edges",
+            &lookup,
+            workspace_root,
+            requirement,
+        )?;
+        hydration.merge(owner_hydration);
+    }
+    Ok(())
+}
+
+fn hydrate_angular_selector_candidates(
+    state: &McpState,
+    context: &mut PreparationContext,
+    identity: &IdentityRequest,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+    hydration: &mut crate::mcp::tool_handlers::hydration::HydrationReport,
+) -> Result<(), QueryFailure> {
+    if !hydration.is_complete() || !needs_angular_template_resolution(identity) {
+        return Ok(());
+    }
+    let selectors = {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(state, &index, scope, false).selectors()
+    };
+    for selector in selectors {
+        let selector_hydration = context.hydrate(
+            state,
+            "reverse_edges",
+            &selector,
+            workspace_root,
+            requirement,
+        )?;
+        hydration.merge(selector_hydration);
+    }
+    Ok(())
 }
 
 /// Angular service edges include constructor `Injects`, whose authoritative

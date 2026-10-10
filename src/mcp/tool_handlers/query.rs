@@ -54,6 +54,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod angular_templates;
 mod batch;
 mod calls;
 mod classification;

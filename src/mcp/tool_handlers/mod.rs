@@ -86,6 +86,10 @@ pub(crate) mod provide_angular_template_ownership_tests;
 #[path = "../../tests/mcp/workspace_query_angular_templates.rs"]
 pub(crate) mod workspace_query_angular_template_tests;
 
+#[cfg(all(test, feature = "angular", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_angular_selector_occurrences.rs"]
+pub(crate) mod workspace_query_angular_selector_occurrence_tests;
+
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/refresh_workspace.rs"]
 pub(crate) mod refresh_workspace_tests;

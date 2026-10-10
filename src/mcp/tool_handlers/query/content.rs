@@ -20,7 +20,9 @@ fn occurrences(values: &Value) -> Value {
                         record
                     }
                 };
-                record.insert("occurrence".into(), occurrence.into());
+                record
+                    .entry("occurrence")
+                    .or_insert_with(|| occurrence.into());
                 Value::Object(record)
             })
             .collect(),

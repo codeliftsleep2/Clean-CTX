@@ -17,12 +17,19 @@ enum TemplateEvent {
 pub(crate) struct OrderedTemplate {
     events: Vec<TemplateEvent>,
     custom_elements: Vec<String>,
+    selector_occurrences: Vec<crate::angular_meta::template_occurrences::SelectorOccurrence>,
     interpolation_count: usize,
     parse_failed: bool,
     control_consumed_until: usize,
 }
 
 impl OrderedTemplate {
+    pub(crate) fn selector_occurrences(
+        &self,
+    ) -> &[crate::angular_meta::template_occurrences::SelectorOccurrence] {
+        &self.selector_occurrences
+    }
+
     pub(crate) fn render(&self, fidelity: Fidelity) -> Vec<String> {
         if self.parse_failed {
             return vec!["Φtpl:PARSE_ERROR".to_string()];
@@ -85,6 +92,7 @@ pub(crate) fn extract(html: &str) -> OrderedTemplate {
     };
     let mut template = OrderedTemplate::default();
     walk(tree.root_node(), html, &mut template);
+    template.selector_occurrences = crate::angular_meta::template_occurrences::extract(html);
     template
 }
 

@@ -2,7 +2,7 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Phases 1-4 GREEN; Phase 5 occurrence/API contract pending approval
+**Status:** Phases 1-5 GREEN; Phase 6 pending
 **Source:** Live MCP investigation plus production-code trace  
 **Compatibility floor:** Angular 15 and later
 
@@ -577,9 +577,9 @@ This section supersedes assumptions in the earlier Phase 4-6 outline where the l
 - A child selector change or declaration removal affects the next query-time answer without persisting a stale cross-file edge.
 - Legacy, modern, and mixed nesting use the same selector occurrence model.
 
-### Phase 5 occurrence model/API proposal - review required
+### Phase 5 occurrence model/API contract - approved
 
-No Phase 5 production implementation is authorized by this proposal.
+Phase 5 is authorized only within this Angular template vertical slice. Do not generalize the machinery into a broader semantic-linkage abstraction.
 
 #### Ordered-authority model
 
@@ -626,7 +626,7 @@ pub(crate) struct SelectorOccurrence {
 ```
 
 - `written_selector` is the exact normalized element tag written in the template, not a class name or filename inference.
-- `span` is the tree-sitter element/start-tag byte range and distinguishes repeated same-selector uses.
+- `span` is the custom element opening-tag range (`<child-widget ...>` or `<child-widget .../>`) and distinguishes repeated same-selector uses. Every span is `[start_byte, end_byte)`: zero-based UTF-8 byte offsets, never characters, UTF-16 units, columns, or LSP positions.
 - Occurrence identity is `(Template identity, start_byte, end_byte, written_selector)` within one current source snapshot.
 - Control ancestry is evidence, not identity. Frames are ordered outermost to innermost.
 - Modern control intervals are derived from structured source positions and balanced block boundaries before selector association; rendered event text is never reparsed.
@@ -646,7 +646,7 @@ angular/Template/<canonical-template-id>
 angular/SelectorRef/<written-selector>
 ```
 
-The response edge carries optional occurrence evidence:
+The generic MCP edge schema may omit occurrence evidence for relationships that do not have it. Every Phase 5 occurrence-derived `UsesSelector` and `UsesComponent` result MUST carry `evidence.template_occurrence`; discarding that evidence would collapse distinct same-selector uses. The response edge shape is:
 
 ```json
 {
@@ -682,7 +682,7 @@ angular/Component/<parent-class>
 angular/Component/<unique-child-class>
 ```
 
-The typed edge carries the same occurrence evidence and never replaces the neutral edge.
+The typed edge carries the same required occurrence evidence and never replaces the neutral edge. The authoritative neutral `UsesSelector` result remains queryable and present when `UsesComponent` adds uniquely resolved knowledge.
 
 #### Resolution and diagnostics
 
@@ -704,16 +704,15 @@ Capability may be established for the exact neutral occurrence query when occurr
 - Edit, replacement, deletion, restoration, refresh, selector change, or ambiguity changes are observed from current source/index state; no Phase 5 producer generation is introduced.
 - Response occurrence ordinals are assigned after source-order sorting and are presentation handles only. Byte spans plus Template identity are the within-snapshot occurrence key.
 
-#### Approval decision required
+#### Approved Phase 5 decisions
 
-Approve or revise these externally visible choices before Phase 5 RED tests:
-
-1. public relation names `UsesSelector` and `UsesComponent`;
-2. public `angular/SelectorRef` identity;
-3. optional per-edge `evidence.template_occurrence` response extension;
-4. byte spans as zero-based, half-open UTF-8 byte offsets;
-5. one neutral and, when uniquely resolved, one typed result per source occurrence;
-6. query-time-only lifetime with no new producer key or snapshot state.
+1. Public relations are `UsesSelector` and `UsesComponent`.
+2. Neutral identity is `angular/SelectorRef/<written-selector>`.
+3. Occurrence evidence is optional generically but required on every occurrence-derived Phase 5 edge.
+4. Spans are `[start_byte, end_byte)`, zero-based UTF-8 byte offsets.
+5. Each occurrence retains its neutral result and may add one typed result only after unique, complete resolution.
+6. All Phase 5 relationships are query-time-only: no durable selector edges, producer key, generation change, or snapshot state.
+7. Phase 5 introduces no broader shared abstraction; architectural generalization is deferred to the Meta-Layer Architectural Hardening / Semantic Synthesis investigation.
 
 
 ### Phase 6 contract
@@ -769,11 +768,13 @@ Approve or revise these externally visible choices before Phase 5 RED tests:
 
 ### Review verdict
 
-**PHASE 4 GREEN — PHASE 5 REVIEW REQUIRED.**
+**PHASE 5 GREEN — PHASE 6 PENDING.**
+
+The user-reported focused tracked Phase 5 gate is GREEN. This records tracked regression status only; no live MCP field pilot has been run for Phase 5.
 
 Phase 4 is implemented and the focused tracked regressions were reported GREEN by the user. The canonical physical/semantic-owner Template identity remains authoritative; workspace-relative rendering is presentation-only, and no workspace-root identity is propagated into semantic compilation.
 
-This does not reopen Phases 0-3. The condition-bearing selector occurrence contract still blocks Phase 5, not Phase 4. Phase 5 remains ephemeral and requires a separate occurrence/span/control-ancestry API review after Phase 4 is GREEN.
+This does not reopen Phases 0-4. Phase 5 is authorized only as ephemeral Angular template occurrence extraction and query-time refinement under the approved contract. Durable selector publication and generalized semantic-linkage machinery remain prohibited.
 
 ## Approval checkpoints
 
