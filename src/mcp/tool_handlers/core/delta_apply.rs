@@ -96,21 +96,6 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         }
         _ => None,
     };
-    if let Some(transition) = &pending_transition {
-        let source_is_current = state
-            .read_source(&durable_file)
-            .map(|source| {
-                state.cache_read().compute_hash(source.as_bytes()) == transition.target_source_hash
-            })
-            .unwrap_or(false);
-        if !source_is_current {
-            send_response(&invalid_session_ir_response(
-                id,
-                "pending semantic transition no longer matches current source",
-            ));
-            return;
-        }
-    }
     let persisted_payload = match &delta {
         IncomingDelta::Sequence(delta) => {
             crate::mcp::persistence_ir::PersistedDelta::normalize_sequence(delta, &durable_file)
@@ -161,6 +146,16 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         IncomingDelta::Legacy(_) => "legacy",
     };
     state.with_semantic_authority_update(&durable_file, || {
+    if pending_transition
+        .as_ref()
+        .is_some_and(|transition| transition.is_retired())
+    {
+        send_response(&invalid_session_ir_response(
+            id,
+            "pending semantic transition was retired by workspace refresh",
+        ));
+        return;
+    }
     let mut ir_ctx = state.ir_context_lock();
     let mut candidate = ir_ctx.clone();
     let applied = match &delta {

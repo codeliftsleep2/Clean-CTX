@@ -4,7 +4,10 @@ use crate::ir::delta::SequenceDelta;
 use crate::layers::meta::semantic::{CallEvidence, EntityRef, SemanticEdge, SemanticRelation};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{
+    Arc, Mutex, OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct PendingTransitionKey {
@@ -22,6 +25,13 @@ pub(crate) struct PendingSemanticTransition {
     pub delta_identity: String,
     pub semantic: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
     pub compatibility: crate::mcp::compatibility::identity::CompatibilityIdentities,
+    retired: Arc<AtomicBool>,
+}
+
+impl PendingSemanticTransition {
+    pub(crate) fn is_retired(&self) -> bool {
+        self.retired.load(Ordering::Acquire)
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -324,6 +334,7 @@ impl super::McpState {
             delta_identity: sequence_delta_identity(delta)?,
             semantic,
             compatibility,
+            retired: Arc::new(AtomicBool::new(false)),
         };
         lock_or_recover!(
             self.pending_semantic_transitions.lock(),
@@ -378,15 +389,30 @@ impl super::McpState {
     }
 
     pub(crate) fn forget_pending_transitions_in_root(&self, root: &str) -> usize {
-        let mut transitions = lock_or_recover!(
-            self.pending_semantic_transitions.lock(),
-            "pending_semantic_transitions"
-        );
-        let before = transitions.len();
-        transitions.retain(|_, transition| {
-            !crate::workspace::path_identity::is_within_root(&transition.durable_file, root)
-        });
-        before - transitions.len()
+        let retiring: Vec<_> = {
+            let transitions = lock_or_recover!(
+                self.pending_semantic_transitions.lock(),
+                "pending_semantic_transitions"
+            );
+            transitions
+                .iter()
+                .filter(|(_, transition)| {
+                    crate::workspace::path_identity::is_within_root(&transition.durable_file, root)
+                })
+                .map(|(key, transition)| (key.clone(), transition.clone()))
+                .collect()
+        };
+        for (key, transition) in &retiring {
+            self.with_semantic_authority_update(&transition.durable_file, || {
+                transition.retired.store(true, Ordering::Release);
+                lock_or_recover!(
+                    self.pending_semantic_transitions.lock(),
+                    "pending_semantic_transitions"
+                )
+                .remove(key);
+            });
+        }
+        retiring.len()
     }
 
     pub(crate) fn forget_pending_transitions(&self, alias: &str) {

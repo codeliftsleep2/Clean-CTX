@@ -67,10 +67,13 @@ pub(crate) fn reconcile_external_refresh_for_root(
     root: &str,
 ) -> RefreshReconciliation {
     let identity = crate::dictionary::path::canonical_identity_key(root);
+    let source_snapshots_invalidated = state.invalidate_source_cache_in_root(&identity);
+    let pending_transitions_retired = state.forget_pending_transitions_in_root(&identity);
+    let indexed_owners_retracted = state.workspace_index_lock().remove_files_in_root(&identity);
     let reconciliation = RefreshReconciliation {
-        source_snapshots_invalidated: state.invalidate_source_cache_in_root(&identity),
-        indexed_owners_retracted: state.workspace_index_lock().remove_files_in_root(&identity),
-        pending_transitions_retired: state.forget_pending_transitions_in_root(&identity),
+        indexed_owners_retracted,
+        source_snapshots_invalidated,
+        pending_transitions_retired,
     };
     // Invalidate discovery last. A concurrent hydration that finishes before
     // this point is either retracted above or publishes source-current facts;
