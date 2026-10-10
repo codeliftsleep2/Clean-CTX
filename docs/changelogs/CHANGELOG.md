@@ -10,6 +10,48 @@ version-history registry lives in
 
 ---
 
+## [0.9.3] - 2026-10-10
+
+### Resolved C# generic and qualified base types
+
+* **Structured query-time resolution** — neutral C# Class base-list facts now
+  resolve qualified and constructed-generic references through parser-owned
+  namespace, nesting, terminal-name, and generic-arity identity. A uniquely
+  proven target adds the existing ephemeral `Extends` or `Implements` edge;
+  ambiguous, missing, or arity-incompatible targets remain neutral.
+* **Source-true durable facts** — the written qualified or generic spelling
+  remains queryable as the authoritative `HasBaseType` relationship to its
+  `TypeRef`. Resolution consumes only the exact cached source snapshots that
+  produced the current workspace index, so externally edited bytes cannot be
+  mixed into the active semantic generation.
+* **Truthful query guidance** — successful reverse Class/Interface queries no
+  longer advertise an `alternative_query` as though their typed capability
+  were unavailable. Unresolved queries retain the neutral `TypeRef` /
+  `HasBaseType` guidance.
+* **Explicit external-source reconciliation** — the new read-only, idempotent
+  `refresh_workspace(workspaceRoot)` MCP tool retracts root-owned semantic
+  state and invalidates source/discovery snapshots after editor, shell, Git, or
+  other out-of-session writes. The next query hydrates current source without
+  requiring CBM; `index_repository` remains the separate CBM graph-refresh
+  operation.
+* **Compatibility remains scoped** — canonical IR, durable semantic facts, and
+  their C# producer outputs are unchanged, so no producer key or generation was
+  added or incremented. The behavior change is confined to ephemeral query
+  refinement and the explicit public refresh contract.
+
+### Verification
+
+* RED was established with tracked production-path regressions for qualified
+  namespace selection, constructed-generic arity resolution, arity-mismatch
+  neutrality, conditional alternative-query guidance, and CBM-independent
+  external create/replace/delete reconciliation. The unchanged focused suites
+  passed after implementation.
+* The maintainer reported the complete final verification gate GREEN before
+  release-metadata finalization. The v0.9.3 package-identity and post-changelog
+  encoding checks remain the final release commands.
+
+---
+
 ## [0.9.2] - 2026-10-09
 
 ### Structured C# declaration-header authority
