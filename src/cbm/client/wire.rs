@@ -1,6 +1,6 @@
 //! Typed requests and normalization for the pinned CBM JSON contract.
 
-use super::{CbmClient, CbmError, QueryRows, decoder};
+use super::{CbmClient, CbmError, QueryRows, decoder, observations};
 use serde_json::Value;
 
 impl CbmClient {
@@ -9,7 +9,7 @@ impl CbmClient {
     /// CBM wraps all tool responses in MCP content array format.
     /// The actual data is a JSON string inside `result.content[0].text`.
     /// This helper extracts and parses that inner JSON string.
-    fn parse_cbm_response(&self, response: &Value) -> Result<Value, CbmError> {
+    pub(super) fn parse_cbm_response(&self, response: &Value) -> Result<Value, CbmError> {
         let content = response["content"]
             .as_array()
             .and_then(|a| a.first())
@@ -53,7 +53,9 @@ impl CbmClient {
         let args = Self::build_search_graph_args(name_pattern, project, label);
         let r = self.call_tool("search_graph", args)?;
         let inner = self.parse_cbm_response(&r)?;
-        decoder::search(&inner)
+        let rows = decoder::search(&inner)?;
+        observations::ProviderObservation::page(&inner).require_page("search_graph", rows.len())?;
+        Ok(rows)
     }
 
     /// Trace call paths in the CBM knowledge graph.
@@ -74,7 +76,28 @@ impl CbmClient {
         }
         let r = self.call_tool("trace_path", args)?;
         let inner = self.parse_cbm_response(&r)?;
-        decoder::trace(&inner, function_name, direction)
+        let edges = decoder::trace(&inner, function_name, direction)?;
+        let observation = observations::ProviderObservation::page(&inner);
+        observation.require_page("trace_path", 0)?;
+        for leg in ["callers", "callees"] {
+            if let Some(groups) = inner[leg]["groups"].as_array() {
+                let count: usize = groups
+                    .iter()
+                    .map(|g| g["rows"].as_array().map_or(0, Vec::len))
+                    .sum();
+                observations::ProviderObservation::page(&inner[leg])
+                    .require_page("trace_leg", count)?;
+                if inner[format!("{leg}_total")].as_u64() != Some(count as u64)
+                    || inner[format!("{leg}_total_relation")] != "eq"
+                {
+                    return Err(CbmError::ToolError {
+                        tool: "trace_path".into(),
+                        message: "directional trace completeness unknown or partial".into(),
+                    });
+                }
+            }
+        }
+        Ok(edges)
     }
 
     /// Get architecture overview from CBM.
@@ -85,7 +108,9 @@ impl CbmClient {
                 "project": project, "format": "json", "aspects": ["packages", "boundaries"]
             }),
         )?;
-        decoder::architecture(self.parse_cbm_response(&r)?)
+        let inner = self.parse_cbm_response(&r)?;
+        observations::ProviderObservation::page(&inner).require_page("get_architecture", 0)?;
+        decoder::architecture(inner)
     }
 
     /// Execute a Cypher-like query against the CBM knowledge graph.
@@ -100,7 +125,12 @@ impl CbmClient {
             serde_json::json!({"query": cypher, "project": project, "format": "json"}),
         )?;
         let inner = self.parse_cbm_response(&r)?;
-        decoder::table(&inner, "columns")
+        let mut table = decoder::table(&inner, "columns")?;
+        table.observation = observations::ProviderObservation::page(&inner);
+        table
+            .observation
+            .require_page("query_graph", table.rows.len())?;
+        Ok(table)
     }
 
     /// Get symbol importance (caller count) from CBM via Cypher query.

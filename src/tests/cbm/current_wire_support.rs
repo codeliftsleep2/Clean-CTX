@@ -15,7 +15,7 @@ pub(super) fn fixture_tool(mode: &str, request: &Value) -> bool {
                 "rows":[[0,"run","2-8","Function",3]]}],
             "returned":1,"total":1,"has_more":false,"truncated":false}),
         "b1-empty-search" => json!({"qn_rule":QN_RULE,
-            "cols":["name","label","lines","in","out"],"groups":[],"returned":0}),
+            "cols":["name","label","lines","in","out"],"groups":[],"returned":0,"total":0,"has_more":false,"truncated":false}),
         "b1-missing-group" => json!({"cols":["name","label","lines","in","out"]}),
         "b1-bad-search-row" => json!({"qn_rule":QN_RULE,
             "cols":["name","label","lines","in","out"],
@@ -26,6 +26,7 @@ pub(super) fn fixture_tool(mode: &str, request: &Value) -> bool {
         "b1-bad-query-row" => json!({"columns":["name"],"rows":["invalid"]}),
         "b1-missing-query-table" => json!({"total":0}),
         "b1-trace" => json!({"function":"fixture.run","direction":"both",
+            "callers_total":2,"callers_total_relation":"eq","callees_total":1,"callees_total_relation":"eq",
             "callers":{"qn_rule":QN_RULE,"cols":["hop","name"],"groups":[
                 {"qn_prefix":"fixture","rows":[[1,"caller"],[2,"ancestor"]]}]},
             "callees":{"qn_rule":QN_RULE,"cols":["name","hop"],"groups":[

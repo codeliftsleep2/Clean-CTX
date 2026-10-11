@@ -228,7 +228,8 @@ fn fixture_entry() {
             line.clear();
             continue;
         }
-        if super::b1_support::fixture_tool(&mode, &request)
+        if super::b2_support::fixture_tool(&mode, &request)
+            || super::b1_support::fixture_tool(&mode, &request)
             || super::a4_support::fixture_tool(&mode, &request)
         {
             line.clear();
@@ -244,7 +245,7 @@ fn fixture_entry() {
         };
         println!(
             "{}",
-            serde_json::json!({"jsonrpc":"2.0", "id":id, "result":{"content":[{"type":"text", "text":"{\"columns\":[],\"rows\":[]}"}]}})
+            serde_json::json!({"jsonrpc":"2.0", "id":id, "result":{"content":[{"type":"text", "text":"{\"columns\":[],\"rows\":[],\"returned\":0,\"total\":0,\"total_relation\":\"eq\",\"has_more\":false,\"truncated\":false}"}]}})
         );
         io::stdout().flush().unwrap();
         line.clear();

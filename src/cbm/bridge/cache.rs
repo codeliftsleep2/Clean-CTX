@@ -134,8 +134,10 @@ impl GraphBridge {
 
         let project = self.project_str();
         let result = self.query(|c| {
-            let r = c.call_tool("detect_changes", serde_json::json!({"project": project}))?;
-            Ok(r["graph_version"].as_str().map(|s| s.to_string()))
+            // The pinned diff handler has generation-bound snapshot evidence,
+            // not a graph_version or a native source hash.
+            c.call_tool("detect_changes", serde_json::json!({"project": project}))?;
+            Ok(None)
         });
         match result {
             Ok(version) => Ok(version),

@@ -27,7 +27,11 @@ pub(super) fn table(value: &Value, columns: &str) -> Result<QueryRows, CbmError>
             Ok(row.clone())
         })
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(QueryRows { columns, rows })
+    Ok(QueryRows {
+        columns,
+        rows,
+        ..Default::default()
+    })
 }
 fn grouped(value: &Value, search: bool) -> Result<Vec<Value>, CbmError> {
     if value["qn_rule"] != "qn = qn_prefix == \"\" ? name : qn_prefix + \".\" + name" {
@@ -124,6 +128,8 @@ pub(super) fn architecture(mut value: Value) -> Result<Value, CbmError> {
             continue;
         };
         let table = table(data, "cols")?;
+        super::observations::ProviderObservation::page(data)
+            .require_page("architecture_section", table.rows.len())?;
         let required: &[&str] = if section == "packages" {
             &["name", "nodes", "fan_in", "fan_out"]
         } else {

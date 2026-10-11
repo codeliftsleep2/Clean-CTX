@@ -125,6 +125,7 @@ impl Drop for FrontendSession {
 impl CbmClient {
     /// Retires this transport epoch; only recovery may construct a new epoch.
     pub(super) fn retire_frontend(&mut self, reason: &str) {
+        self.provider_observations.clear();
         self.usable = false;
         self.recovery_pending = false;
         if let Some(mut frontend) = self.frontend.take() {

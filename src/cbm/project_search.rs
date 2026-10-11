@@ -72,7 +72,7 @@ impl GraphBridge {
             format!(".*{query}.*")
         };
 
-        let result = {
+        let result = (|| {
             let mut guard = self
                 .client
                 .lock()
@@ -80,8 +80,19 @@ impl GraphBridge {
             let client = guard
                 .as_mut()
                 .ok_or_else(|| CbmError::LaunchError("CBM not available".into()))?;
-            client.search_graph(&name_pattern, project, None)
-        };
+            let nodes = client.search_graph(&name_pattern, project, None)?;
+            let root = self.project_paths.get(project).ok_or_else(|| {
+                CbmError::CapabilityError("unadmitted native candidate project".into())
+            })?;
+            let mut paths: Vec<String> = nodes
+                .iter()
+                .filter_map(|n| n["file_path"].as_str().map(str::to_owned))
+                .collect();
+            paths.sort();
+            paths.dedup();
+            client.observe_candidate_paths(project, root, &paths)?;
+            Ok(nodes)
+        })();
         self.update_status();
         let nodes = result?;
         Ok(nodes.iter().filter_map(map_search_result).collect())
@@ -98,7 +109,7 @@ impl GraphBridge {
         target_name: &str,
     ) -> Result<Vec<String>, CbmError> {
         let query = inbound_reference_query(target_name);
-        let result = {
+        let result = (|| {
             let mut guard = self
                 .client
                 .lock()
@@ -106,16 +117,24 @@ impl GraphBridge {
             let client = guard
                 .as_mut()
                 .ok_or_else(|| CbmError::LaunchError("CBM not available".into()))?;
-            client.query_graph(&query, project)
-        };
+            let table = client.query_graph(&query, project)?;
+            let paths: Vec<String> = table
+                .rows
+                .iter()
+                .filter_map(|row| filter_inbound_reference_row(row))
+                .filter(|path| !path.is_empty())
+                .collect();
+            let root = self.project_paths.get(project).ok_or_else(|| {
+                CbmError::CapabilityError("unadmitted native candidate project".into())
+            })?;
+            let mut unique = paths.clone();
+            unique.sort();
+            unique.dedup();
+            client.observe_candidate_paths(project, root, &unique)?;
+            Ok(paths)
+        })();
         self.update_status();
-        let table = result?;
-        Ok(table
-            .rows
-            .iter()
-            .filter_map(|row| filter_inbound_reference_row(row))
-            .filter(|path| !path.is_empty())
-            .collect())
+        result
     }
 }
 

@@ -15,6 +15,7 @@ mod lifecycle;
 mod recovery;
 use lifecycle::{FrontendSession, RetirementOutcome};
 mod decoder;
+mod observations;
 mod transport;
 mod wire;
 
@@ -40,6 +41,13 @@ mod b1_support;
 #[cfg(test)]
 #[path = "../tests/cbm/current_wire.rs"]
 mod b1_tests;
+
+#[cfg(test)]
+#[path = "../tests/cbm/provider_state_support.rs"]
+mod b2_support;
+#[cfg(test)]
+#[path = "../tests/cbm/provider_state.rs"]
+mod b2_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
@@ -103,11 +111,13 @@ pub struct QueryRows {
     pub columns: Vec<String>,
     /// Row cells; every cell of a column corresponds to `columns[i]`.
     pub rows: Vec<Vec<Value>>,
+    pub(crate) observation: observations::ProviderObservation,
 }
 
 /// JSON-RPC 2.0 client over stdin/stdout subprocess.
 pub struct CbmClient {
     /// None means this transport epoch is terminal; its resources cannot be reused.
+    provider_observations: observations::Observations,
     frontend: Option<FrontendSession>,
     usable: bool,
     admitted_once: bool,
@@ -348,6 +358,10 @@ impl CbmClient {
     /// Retries proven observational operations at most once after 100 ms.
     /// Terminal failures require a newly constructed and admitted frontend.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
+        if let Some(project) = args["project"].as_str().or_else(|| args["name"].as_str()) {
+            self.provider_observations
+                .remove(&(project.into(), tool_name.into()));
+        }
         self.invoke_with_recovery(tool_name, args, Self::call_tool_inner)
     }
 
@@ -355,7 +369,7 @@ impl CbmClient {
     /// transport pipeline [`send_and_receive_raw`], then parses and
     /// verifies the response. Returns the parsed `result` field.
     fn call_tool_inner(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
-        let buf = self.send_and_receive_raw(tool_name, args)?;
+        let buf = self.send_and_receive_raw(tool_name, args.clone())?;
         let resp: Value =
             serde_json::from_str(buf.trim()).map_err(|e| CbmError::ParseError(e.to_string()))?;
         if let Some(error) = resp.get("error") {
@@ -373,6 +387,7 @@ impl CbmClient {
             .get("result")
             .cloned()
             .ok_or_else(|| CbmError::ParseError("missing result".into()))?;
+        self.retain_observation(tool_name, &args, &result);
         check_soft_error(tool_name, &result)?;
         Ok(result)
     }

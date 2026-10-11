@@ -27,16 +27,13 @@ impl GraphBridge {
         // Call CBM's index_repository tool to trigger indexing
         let repo_path = self.project_root.to_string_lossy().to_string();
         let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
-        let _result = match client_guard.as_ref() {
+        match client_guard.as_ref() {
             Some(_c) => {
                 // We need mut access — drop guard, reacquire as mut
                 drop(client_guard);
                 let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
                 let client = cg.as_mut().unwrap();
-                client.call_tool(
-                    "index_repository",
-                    serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                )
+                client.index_project(&repo_path, "fast", &project)
             }
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         }?;
@@ -143,10 +140,7 @@ impl GraphBridge {
             Some(c) => c,
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         };
-        client.call_tool(
-            "index_repository",
-            serde_json::json!({"repo_path": repo_path, "mode": mode}),
-        )?;
+        client.index_project(&repo_path, mode, &project)?;
         drop(cg);
 
         // On success, advance indexed_generation to the captured dirty_generation.
@@ -197,10 +191,7 @@ impl GraphBridge {
             Some(c) => c,
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         };
-        client.call_tool(
-            "index_repository",
-            serde_json::json!({"repo_path": repo_path, "mode": mode}),
-        )?;
+        client.index_project(&repo_path, mode, &project)?;
         // Release the lock before cache invalidation (no borrow conflict).
         drop(cg);
 
@@ -264,10 +255,7 @@ impl GraphBridge {
                     };
                     match client_guard.as_mut() {
                         Some(client) => {
-                            match client.call_tool(
-                                "index_repository",
-                                serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                            ) {
+                            match client.index_project(&repo_path, "fast", &project_for_spawn) {
                                 Ok(_) => {
                                     eprintln!("[clean-ctx-cbm] Project indexed successfully");
                                     Ok(())
@@ -433,10 +421,7 @@ impl GraphBridge {
                         Some(c) => c,
                         None => return Err(CbmError::LaunchError("CBM not available".into())),
                     };
-                    client.call_tool(
-                        "index_repository",
-                        serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                    )?;
+                    client.index_project(&repo_path, "fast", project)?;
                     drop(cg);
 
                     // On success, advance indexed_generation.

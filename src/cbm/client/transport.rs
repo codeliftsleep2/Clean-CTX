@@ -112,6 +112,7 @@ impl CbmClient {
         );
 
         Ok(Some(Self {
+            provider_observations: Default::default(),
             frontend: Some(frontend),
             usable: false,
             admitted_once: false,

@@ -131,7 +131,7 @@ pub(crate) struct GraphCacheKey {
 
 /// Payload compatibility only; not proof of provider artifact or freshness.
 pub(crate) const ADAPTER_WIRE_CACHE_NAMESPACE: &str =
-    "cbm-wire:82b1ec908f975354ceb4bac8a8bfc594942a9bc4:v1";
+    "cbm-wire:82b1ec908f975354ceb4bac8a8bfc594942a9bc4:v2";
 
 impl GraphCacheKey {
     pub(crate) fn new(project: impl Into<String>, query: impl Into<String>) -> Self {

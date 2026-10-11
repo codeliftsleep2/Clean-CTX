@@ -135,6 +135,21 @@ pub(crate) fn proxy_tool_error(tool_name: &str, raw: &str) -> Option<String> {
     }
 }
 
+/// A transport-successful job admission is not a published index. Preserve
+/// native authority unless the pinned synchronous reply proves publication.
+fn index_reply_published(raw: &str) -> bool {
+    let Ok(response) = serde_json::from_str::<Value>(raw) else {
+        return false;
+    };
+    let Some(text) = response
+        .pointer("/result/content/0/text")
+        .and_then(Value::as_str)
+    else {
+        return false;
+    };
+    serde_json::from_str::<Value>(text).is_ok_and(|body| body["status"] == "indexed")
+}
+
 /// Handle `cbm_proxy` — forward to CBM, intercept raw response, compress it.
 ///
 /// The proxy accepts any CBM tool call, forwards it, catches CBM's
@@ -332,8 +347,10 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
     // CBM establishes graph freshness but remains discovery-only; Clean-CTX
     // retracts the root's previous semantic generation so only canonical-source
     // hydration can publish current WorkspaceIndex authority again. Perform the
-    // transition only after transport and CBM soft-error checks succeed.
+    // transition only after transport/soft-error checks and proven publication.
+    // Running, queued, degraded and unknown outcomes leave native state intact.
     if cbm_tool == "index_repository"
+        && index_reply_published(&raw_response)
         && let Some(repo_path) = args.get("repo_path").and_then(Value::as_str)
     {
         crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(state, repo_path);
