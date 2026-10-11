@@ -79,12 +79,14 @@ pub struct CbmClient {
     /// The thread sends each line through this channel so the main thread
     /// can drain lines with a timeout and honour the per-request deadline
     /// even when `read_line` would otherwise block indefinitely.
-    stdout_rx: std::sync::mpsc::Receiver<Result<String, String>>,
+    stdout_rx: std::sync::mpsc::Receiver<Result<String, std::io::Error>>,
     /// Background thread draining CBM's stdout. Held to keep it alive.
     _stdout_reader: Option<JoinHandle<()>>,
     /// Background thread draining CBM's stderr to avoid pipe-buffer deadlock.
     _stderr_drainer: Option<JoinHandle<()>>,
     request_id: AtomicU64,
+    /// A1 protocol failure is terminal for this frontend; recovery belongs to A2.
+    protocol_failed: bool,
     status: CbmStatus,
     timeout: Duration,
     /// Circuit breaker: consecutive transient failures.
@@ -412,8 +414,6 @@ impl CbmClient {
         check_soft_error(tool_name, &result)?;
         Ok(result)
     }
-
-
 }
 
 impl Drop for CbmClient {
