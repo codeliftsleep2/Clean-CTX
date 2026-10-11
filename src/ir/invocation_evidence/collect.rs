@@ -15,6 +15,7 @@ struct Details {
     terminal: Option<SourceSpan>,
     arguments: BTreeMap<SourceSpan, ArgumentQualifier>,
     type_arguments: BTreeMap<SourceSpan, ()>,
+    argument_names: BTreeMap<SourceSpan, SourceSpan>,
 }
 
 fn span(capture: &CapturedNode) -> Option<SourceSpan> {
@@ -41,6 +42,7 @@ pub(crate) fn collect_invocations(captures: &[CapturedNode]) -> Vec<InvocationOc
             "invoke.declaration.callable" => DeclarationContextKind::Callable,
             "invoke.declaration.variable" => DeclarationContextKind::VariableInitializer,
             "invoke.declaration.field" => DeclarationContextKind::FieldInitializer,
+            "invoke.declaration.property" => DeclarationContextKind::PropertyInitializer,
             _ => continue,
         };
         declarations.insert(capture.match_index, (span, kind));
@@ -49,6 +51,11 @@ pub(crate) fn collect_invocations(captures: &[CapturedNode]) -> Vec<InvocationOc
     let mut details: BTreeMap<SourceSpan, Details> = roots
         .values()
         .map(|root| (*root, Details::default()))
+        .collect();
+    let argument_spans: BTreeMap<_, _> = captures
+        .iter()
+        .filter(|capture| capture.name == "invoke.argument")
+        .filter_map(|capture| span(capture).map(|span| (capture.match_index, span)))
         .collect();
     for capture in captures {
         let Some(root) = roots.get(&capture.match_index) else {
@@ -76,6 +83,13 @@ pub(crate) fn collect_invocations(captures: &[CapturedNode]) -> Vec<InvocationOc
             "invoke.type_argument" => {
                 detail.type_arguments.insert(span, ());
             }
+            "invoke.argument_name" => {
+                if let Some(argument) = argument_spans.get(&capture.match_index)
+                    && argument.contains(span)
+                {
+                    detail.argument_names.insert(*argument, span);
+                }
+            }
             _ => {}
         }
     }
@@ -100,7 +114,12 @@ pub(crate) fn collect_invocations(captures: &[CapturedNode]) -> Vec<InvocationOc
 
     let mut occurrences = details
         .into_iter()
-        .map(|(span, detail)| {
+        .map(|(span, mut detail)| {
+            for (argument, name) in detail.argument_names {
+                detail
+                    .arguments
+                    .insert(argument, ArgumentQualifier::Named { name });
+            }
             let callee = match (detail.receiver, detail.terminal) {
                 (Some(receiver), Some(terminal)) => WrittenCallee::Member { receiver, terminal },
                 (None, Some(terminal)) => WrittenCallee::Free { terminal },

@@ -93,7 +93,7 @@ impl IRPass for CoreIRPass {
             apply_csharp_declaration_names(&mut captures);
         }
 
-        if query_string == crate::queries::TS_QUERY {
+        if query_string == crate::queries::TS_QUERY || query_string == crate::queries::CS_QUERY {
             state.invocation_occurrences =
                 crate::ir::invocation_evidence::collect_invocations(&captures);
         }

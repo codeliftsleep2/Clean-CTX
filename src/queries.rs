@@ -174,6 +174,39 @@ pub const CS_CALL_QUERY: &str = r#"
     (invocation_expression
         function: (member_access_expression name: (generic_name (identifier) @call.callee))
         arguments: (argument_list (argument) @call.argument))
+    ; --- Private source-bound invocation evidence (same parse) ---
+    (invocation_expression) @invoke.root
+    (invocation_expression function: (_) @invoke.function) @invoke.root
+    (invocation_expression function: (identifier) @invoke.terminal) @invoke.root
+    (invocation_expression function: (generic_name
+        (identifier) @invoke.terminal
+        (type_argument_list (type) @invoke.type_argument))) @invoke.root
+    (invocation_expression function: (generic_name
+        (identifier) @invoke.terminal)) @invoke.root
+    (invocation_expression function: (member_access_expression
+        expression: (_) @invoke.receiver
+        name: (identifier) @invoke.terminal)) @invoke.root
+    (invocation_expression function: (member_access_expression
+        expression: (_) @invoke.receiver
+        name: (generic_name (identifier) @invoke.terminal))) @invoke.root
+    (invocation_expression function: (member_access_expression
+        name: (generic_name (type_argument_list (type) @invoke.type_argument)))) @invoke.root
+    (invocation_expression arguments: (argument_list
+        (argument name: (identifier)? @invoke.argument_name) @invoke.argument)) @invoke.root
+    (method_declaration name: (identifier) @invoke.declaration_name)
+        @invoke.declaration @invoke.declaration.callable
+    (constructor_declaration name: (identifier) @invoke.declaration_name)
+        @invoke.declaration @invoke.declaration.callable
+    (local_function_statement name: (identifier) @invoke.declaration_name)
+        @invoke.declaration @invoke.declaration.callable
+    (local_declaration_statement (variable_declaration
+        (variable_declarator name: (identifier) @invoke.declaration_name
+            "=" (_)) @invoke.declaration @invoke.declaration.variable))
+    (field_declaration (variable_declaration
+        (variable_declarator name: (identifier) @invoke.declaration_name
+            "=" (_)) @invoke.declaration @invoke.declaration.field))
+    (property_declaration name: (identifier) @invoke.declaration_name
+        "=" value: (_)) @invoke.declaration @invoke.declaration.property
 "#;
 
 // Generic invocation captures (native call facts) for TypeScript.

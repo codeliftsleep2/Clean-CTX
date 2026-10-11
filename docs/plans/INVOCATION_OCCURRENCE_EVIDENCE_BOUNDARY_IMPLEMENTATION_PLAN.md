@@ -2,7 +2,7 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Phases 0–2 implemented; Phase 2 focused verification recorded below
+**Status:** Phases 0–3 implemented; focused verification recorded below
 
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
@@ -277,7 +277,7 @@ CS_CALL_QUERY gains equivalent private captures for invocation_expression:
 - identifier/generic-name free terminal;
 - member_access_expression receiver expression and identifier/generic terminal;
 - argument nodes in grammar order;
-- name_colon identifier for named arguments;
+- argument name-field identifier for named arguments (tree-sitter-c-sharp 0.23);
 - generic type-argument nodes;
 - direct variable/field/property initializer declaration/name where grammar patterns prove them.
 
@@ -508,6 +508,33 @@ was not run and remains reserved for CI. Phase 3 C# collection is next.
 ### Phase 3 — C# collection
 
 Add C# adapter, named arguments, generic forms, and parity coverage. No Java/Rust expansion.
+
+#### Phase 3 working record — 2026-10-11
+
+The owner authorized C# collection and focused verification. Seven tracked C#
+regressions failed their intended assertions before implementation. Only that
+test module was stashed during production changes and restored unchanged.
+
+The C# adapter extends CS_CALL_QUERY with private structural captures for all
+invocation roots, supported free/member terminals and generic type arguments,
+ordered whole arguments, named-argument names, callable declarations, and direct
+local/field/property initializers. Initializer patterns require the grammar's
+written equals token; property expression bodies are not initializer contexts.
+Wildcard initializer children avoid rejected expression-supertype query patterns
+while retaining the structural equals/name/parent proof. No source-text inference
+is used. Conditional, cast, parenthesized and dynamic targets remain Unsupported.
+
+The existing shared collector joins named arguments by query match and argument
+span, preserving the colon-free name separately from the whole argument. C# now
+uses the same single production parse, root merge, containment sweep, source hash
+binding, and private side output as TypeScript. Canonical producers, generations,
+public schemas, semantic edges and durable state are unchanged.
+
+Verification: all seven unchanged C# evidence regressions passed after the fix;
+six lifecycle, 19 canonical C# call, and ten TypeScript evidence tests passed.
+Package Clippy passed with all targets/all features and warnings denied. The
+single-parse assertion and shared occurrence types establish adapter parity.
+The full suite remains CI-only. Phase 4 generic consumer proof is next.
 
 ### Phase 4 — Generic consumer proof
 
