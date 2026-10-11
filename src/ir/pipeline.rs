@@ -26,6 +26,7 @@
 
 use super::calls::{CallProducer, CallableScope};
 use super::inference_layer::InferenceLayer;
+use super::invocation_evidence::InvocationOccurrence;
 use super::layers::{LanguageLayer, LayerContext, PatternRecognizer};
 use super::opcodes::*;
 use super::program_graph::ProgramGraph;
@@ -134,6 +135,9 @@ pub struct PassContext {
     pub pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
     /// Tree-sitter captures produced by the capture pipeline.
     pub captures: Vec<CapEntry>,
+    /// Ephemeral structural invocation evidence assembled during this compile.
+    /// Phase 1 establishes ownership only; language adapters populate it later.
+    pub(crate) invocation_occurrences: Vec<InvocationOccurrence>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
     /// Current method's accumulated typed control summaries (F-28).
@@ -183,6 +187,7 @@ impl PassContext {
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
+            invocation_occurrences: Vec::new(),
             current_method: None,
             current_control_summaries: Vec::new(),
             current_class: None,

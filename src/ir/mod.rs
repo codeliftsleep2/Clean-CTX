@@ -30,6 +30,10 @@ pub mod delta;
 pub mod focus;
 pub mod hierarchical;
 pub mod identity;
+/// Private, source-bound invocation occurrence evidence.
+// Phase 1 intentionally stages types before language adapters populate them.
+#[allow(dead_code)]
+pub(crate) mod invocation_evidence;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;

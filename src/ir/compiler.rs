@@ -22,6 +22,7 @@
 //   - F-31: `id_counter` is `u64` (not `u32`) to avoid arithmetic overflow
 //           after 4,294,967,295 instructions.
 
+use super::invocation_evidence::InvocationEvidenceSet;
 use super::layers::{LanguageLayer, PatternRecognizer};
 use super::opcodes::CoreOp;
 use super::pipeline::{PassContext, PassPipeline};
@@ -88,6 +89,9 @@ pub struct IRCompiler {
     /// This is the boundary where meta-layer semantic facts survive the
     /// production compilation lifecycle (Phase 4 integration).
     pub semantic_edges: Vec<SemanticEdge>,
+    /// Source-bound invocation evidence from the most recent successful compile.
+    /// This side output is never part of CompiledIR or durable state.
+    pub(crate) invocation_evidence: Option<InvocationEvidenceSet>,
 }
 
 impl IRCompiler {
@@ -98,6 +102,7 @@ impl IRCompiler {
             pattern_recognizers: Vec::new(),
             config: None,
             semantic_edges: Vec::new(),
+            invocation_evidence: None,
         }
     }
 
@@ -217,6 +222,9 @@ impl IRCompiler {
         skip_set: Option<&std::collections::HashSet<String>>,
         focus: Option<&std::collections::HashSet<String>>,
     ) -> Result<CompiledIR, CompileError> {
+        // Clear before fallible work so failure cannot expose stale spans.
+        self.invocation_evidence = None;
+
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
         ctx.config = self.config.clone();
@@ -282,6 +290,12 @@ impl IRCompiler {
         // back to the compiler for reuse in subsequent compilations.
         self.language_layers = std::mem::take(&mut ctx.language_layers);
         self.pattern_recognizers = std::mem::take(&mut ctx.pattern_recognizers);
+
+        self.invocation_evidence = Some(InvocationEvidenceSet::new(
+            provenance,
+            &ctx.source,
+            std::mem::take(&mut ctx.invocation_occurrences),
+        ));
 
         Ok(CompiledIR {
             file_id: file_id.to_string(),
