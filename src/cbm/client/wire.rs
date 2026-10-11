@@ -1,6 +1,6 @@
-//! Existing typed provider wrappers; wire contracts unchanged in Phase A.
+//! Typed requests and normalization for the pinned CBM JSON contract.
 
-use super::{CbmClient, CbmError, QueryRows, extract_trace_edges};
+use super::{CbmClient, CbmError, QueryRows, decoder};
 use serde_json::Value;
 
 impl CbmClient {
@@ -36,7 +36,8 @@ impl CbmClient {
         project: &str,
         label: Option<&str>,
     ) -> Value {
-        let mut args = serde_json::json!({"name_pattern": name_pattern, "project": project});
+        let mut args =
+            serde_json::json!({"name_pattern": name_pattern, "project": project, "format": "json"});
         if let Some(l) = label {
             args["label"] = serde_json::Value::String(l.to_string());
         }
@@ -52,20 +53,14 @@ impl CbmClient {
         let args = Self::build_search_graph_args(name_pattern, project, label);
         let r = self.call_tool("search_graph", args)?;
         let inner = self.parse_cbm_response(&r)?;
-        Ok(inner["results"].as_array().cloned().unwrap_or_default())
+        decoder::search(&inner)
     }
 
     /// Trace call paths in the CBM knowledge graph.
     ///
     /// CBM params: `function_name`, `direction` (inbound|outbound|both), `depth`, `project`
     ///
-    /// Wire contract (2026-08-24): CBM answers with `callers` / `callees`
-    /// arrays — NOT an `edges` key. [`extract_trace_edges`] normalizes that
-    /// real shape into `{"from","to","label"}` objects. A missing function is
-    /// reported by CBM as a soft error (`result.isError` +
-    /// `"error":"function not found"`), which [`check_soft_error`] maps to
-    /// [`CbmError::ToolError`] before this parser runs — failure is never a
-    /// valid empty result (F11 invariant).
+    /// Grouped legs describe distance from the root, not deeper parent edges.
     pub fn trace_path(
         &mut self,
         function_name: &str,
@@ -73,24 +68,24 @@ impl CbmClient {
         project: &str,
         depth: Option<usize>,
     ) -> Result<Vec<Value>, CbmError> {
-        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project});
+        let mut args = serde_json::json!({"function_name": function_name, "direction": direction, "project": project, "format": "json"});
         if let Some(d) = depth {
             args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
         }
         let r = self.call_tool("trace_path", args)?;
         let inner = self.parse_cbm_response(&r)?;
-        Ok(extract_trace_edges(&inner, function_name))
+        decoder::trace(&inner, function_name, direction)
     }
 
     /// Get architecture overview from CBM.
     pub fn get_architecture(&mut self, project: &str) -> Result<Value, CbmError> {
-        let r = self.call_tool("get_architecture", serde_json::json!({"project": project}))?;
-        // get_architecture may or may not wrap in content array — try both
-        if r.get("content").is_some() {
-            self.parse_cbm_response(&r)
-        } else {
-            Ok(r)
-        }
+        let r = self.call_tool(
+            "get_architecture",
+            serde_json::json!({
+                "project": project, "format": "json", "aspects": ["packages", "boundaries"]
+            }),
+        )?;
+        decoder::architecture(self.parse_cbm_response(&r)?)
     }
 
     /// Execute a Cypher-like query against the CBM knowledge graph.
@@ -102,26 +97,10 @@ impl CbmClient {
     pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<QueryRows, CbmError> {
         let r = self.call_tool(
             "query_graph",
-            serde_json::json!({"query": cypher, "project": project}),
+            serde_json::json!({"query": cypher, "project": project, "format": "json"}),
         )?;
         let inner = self.parse_cbm_response(&r)?;
-        let columns = inner["columns"]
-            .as_array()
-            .map(|cs| {
-                cs.iter()
-                    .map(|c| c.as_str().unwrap_or_default().to_string())
-                    .collect()
-            })
-            .unwrap_or_default();
-        let rows = inner["rows"]
-            .as_array()
-            .map(|rows| {
-                rows.iter()
-                    .filter_map(|row| row.as_array().cloned())
-                    .collect()
-            })
-            .unwrap_or_default();
-        Ok(QueryRows { columns, rows })
+        decoder::table(&inner, "columns")
     }
 
     /// Get symbol importance (caller count) from CBM via Cypher query.

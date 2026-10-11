@@ -228,7 +228,9 @@ fn fixture_entry() {
             line.clear();
             continue;
         }
-        if super::a4_support::fixture_tool(&mode, &request) {
+        if super::b1_support::fixture_tool(&mode, &request)
+            || super::a4_support::fixture_tool(&mode, &request)
+        {
             line.clear();
             continue;
         }

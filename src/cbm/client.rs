@@ -14,6 +14,7 @@ mod framing;
 mod lifecycle;
 mod recovery;
 use lifecycle::{FrontendSession, RetirementOutcome};
+mod decoder;
 mod transport;
 mod wire;
 
@@ -32,6 +33,13 @@ mod a4_support;
 #[cfg(test)]
 #[path = "../tests/cbm/frontend_recovery.rs"]
 mod a4_tests;
+
+#[cfg(test)]
+#[path = "../tests/cbm/current_wire_support.rs"]
+mod b1_support;
+#[cfg(test)]
+#[path = "../tests/cbm/current_wire.rs"]
+mod b1_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
