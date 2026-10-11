@@ -4,8 +4,11 @@ Date: 2026-10-11. Owner: Agent MaxHeadRoom.
 Status: original planning record. At authoring, no implementation or verification
 had run. Current local checkpoints are [A0/A1](CBM_A0_A1_IMPLEMENTATION_EVIDENCE.md),
 [A2](CBM_A2_IMPLEMENTATION_EVIDENCE.md), [A3](CBM_A3_IMPLEMENTATION_EVIDENCE.md)
-and [A4](CBM_A4_IMPLEMENTATION_EVIDENCE.md). A5 live acceptance, Phase B and
-Issue 142 remain gated; the design below does not itself prove acceptance.
+and [A4](CBM_A4_IMPLEMENTATION_EVIDENCE.md). [A5](CBM_A5_ENVIRONMENT_RECOVERY_AND_ACCEPTANCE.md)
+is accepted with declared live limitations; A0–A5 are frozen. The owner authorized
+Phase B continuation; B0 is the first implementation slice. B3's collection-policy
+approval point and Issue 142 remain separately gated. The historical design below
+does not itself prove acceptance.
 
 ## 1. Executive implementation verdict
 

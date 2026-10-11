@@ -126,14 +126,24 @@ pub(crate) struct CachedGraphData {
 pub(crate) struct GraphCacheKey {
     project: String,
     query: String,
+    wire_contract: &'static str,
 }
+
+/// Payload compatibility only; not proof of provider artifact or freshness.
+pub(crate) const ADAPTER_WIRE_CACHE_NAMESPACE: &str =
+    "cbm-wire:82b1ec908f975354ceb4bac8a8bfc594942a9bc4:v1";
 
 impl GraphCacheKey {
     pub(crate) fn new(project: impl Into<String>, query: impl Into<String>) -> Self {
         Self {
             project: project.into(),
             query: query.into(),
+            wire_contract: ADAPTER_WIRE_CACHE_NAMESPACE,
         }
+    }
+
+    pub(crate) fn disk_key(project: &str, query: &str) -> String {
+        format!("{project}:{ADAPTER_WIRE_CACHE_NAMESPACE}:{query}")
     }
 
     pub(crate) fn belongs_to(&self, project: &str) -> bool {

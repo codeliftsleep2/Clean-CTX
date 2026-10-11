@@ -206,10 +206,10 @@ impl GraphBridge {
 
     // â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    /// Disk key scope: `{project_name}:{key}` so the existing SQLite schema's
+    /// Disk key scope: `{project_name}:{wire_contract}:{key}` so the existing SQLite schema's
     /// effective owner is `(registered project_root, canonical project)`.
     pub(super) fn disk_key(project: &str, key: &str) -> String {
-        format!("{project}:{key}")
+        GraphCacheKey::disk_key(project, key)
     }
 
     /// Return a valid active-project entry, lazily hydrating it from disk.
