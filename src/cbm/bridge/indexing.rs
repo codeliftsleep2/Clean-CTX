@@ -344,7 +344,7 @@ impl GraphBridge {
         // binary missing, launch failed), return the same error on every call.
         // (AUDIT-9 regression: previously the first call could spawn a doomed
         // background thread when unavailable.)
-        if !self.is_available() {
+        if !self.can_attempt_provider() {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
@@ -403,7 +403,7 @@ impl GraphBridge {
     pub fn ensure_indexed_for(&mut self, project: &str) -> Result<IndexingStatus, CbmError> {
         // Guard before touching any state: when CBM is unavailable, return the
         // same error on every call (AUDIT-9 regression).
-        if !self.is_available() {
+        if !self.can_attempt_provider() {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         if self.project.as_deref() != Some(project) {

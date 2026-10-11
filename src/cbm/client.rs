@@ -12,6 +12,7 @@ use crate::cbm::config::CbmStatus;
 mod admission;
 mod framing;
 mod lifecycle;
+mod recovery;
 use lifecycle::{FrontendSession, RetirementOutcome};
 mod transport;
 mod wire;
@@ -25,6 +26,12 @@ mod a2_tests;
 #[cfg(test)]
 #[path = "../tests/cbm/frontend_admission.rs"]
 mod a3_tests;
+#[cfg(test)]
+#[path = "../tests/cbm/frontend_recovery_support.rs"]
+mod a4_support;
+#[cfg(test)]
+#[path = "../tests/cbm/frontend_recovery.rs"]
+mod a4_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
@@ -92,16 +99,19 @@ pub struct QueryRows {
 
 /// JSON-RPC 2.0 client over stdin/stdout subprocess.
 pub struct CbmClient {
-    /// None means terminal; no pipe or worker may be reused by this client.
+    /// None means this transport epoch is terminal; its resources cannot be reused.
     frontend: Option<FrontendSession>,
     usable: bool,
+    admitted_once: bool,
+    launch_spec: lifecycle::FrontendLaunchSpec,
+    recovery_pending: bool,
     last_retirement: Option<RetirementOutcome>,
     request_id: AtomicU64,
     status: CbmStatus,
     timeout: Duration,
     /// Circuit breaker: consecutive transient failures.
     consecutive_failures: u32,
-    /// When the circuit opened (set to Degraded). None when circuit is closed.
+    /// Start of circuit/repeated-terminal cooldown; recovery is demand-driven.
     degraded_since: Option<Instant>,
     /// Maximum consecutive failures before circuit opens.
     max_consecutive_failures: u32,
@@ -109,8 +119,7 @@ pub struct CbmClient {
     circuit_cooldown_secs: u64,
 }
 
-/// Classifies legacy retryable provider errors. A terminal frontend never
-/// retries its old pipes; replacement/admission remain deferred to A3/A4.
+/// Classifies transient errors; operation replay safety is checked separately.
 ///
 /// Retryable errors:
 /// - `ConnectionLost` — transient pipe failure, CBM may recover
@@ -263,30 +272,11 @@ impl CbmClient {
 
     // ── Circuit breaker ─────────────────────────────────────────
 
-    /// Check if the circuit is open (too many recent failures).
-    /// Returns true if the circuit allows the call, false if it's tripped.
-    ///
-    /// If the circuit is open but the cooldown has elapsed, it resets
-    /// automatically and allows the next call through (half-open state).
-    pub(crate) fn circuit_allows(&mut self) -> bool {
-        if self.frontend.is_none() || !self.usable {
-            return false;
-        }
-        if self.consecutive_failures < self.max_consecutive_failures {
-            return true;
-        }
-        // Circuit is open — check if cooldown has elapsed
-        if let Some(since) = self.degraded_since {
-            if since.elapsed() >= Duration::from_secs(self.circuit_cooldown_secs) {
-                // Cooldown elapsed — reset to half-open, allow one try
-                self.consecutive_failures = 0;
-                self.degraded_since = None;
-                self.status = CbmStatus::Available;
-                eprintln!("[clean-ctx-cbm] Circuit cooldown elapsed, trying again…");
-                return true;
-            }
-        }
-        false
+    /// Half-open is prepared by recovery on a newly admitted frontend.
+    pub(crate) fn circuit_allows(&self) -> bool {
+        self.frontend.is_some()
+            && self.usable
+            && self.consecutive_failures < self.max_consecutive_failures
     }
 
     /// Record a successful query — resets the failure counter.
@@ -328,39 +318,11 @@ impl CbmClient {
     /// (Callers that need parsed JSON should still use `call_tool`.)
     /// Send a JSON-RPC 2.0 request, read the raw response text, with retry.
     ///
-    /// Retries transient errors (timeout, connection lost, internal error)
-    /// once with exponential backoff before giving up. Delegates to
-    /// `call_tool_raw_inner` for the actual pipe I/O.
+    /// Retries proven observational operations at most once after 100 ms.
+    /// Terminal failures require a newly constructed and admitted frontend.
+    /// Delegates to `call_tool_raw_inner` for the actual pipe I/O.
     pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
-        self.ensure_usable()?;
-        if !self.circuit_allows() {
-            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
-        }
-        let max_retries = 1;
-        let mut retry_count = 0;
-        let mut backoff = Duration::from_millis(100);
-
-        loop {
-            // Value::clone() is cheap — a few ref-count bumps for JSON strings/arrays
-            match self.call_tool_raw_inner(tool_name, args.clone()) {
-                Ok(result) => {
-                    self.record_success();
-                    return Ok(result);
-                }
-                Err(e)
-                    if self.frontend.is_some() && retry_count < max_retries && is_retryable(&e) =>
-                {
-                    retry_count += 1;
-                    self.record_failure();
-                    std::thread::sleep(backoff);
-                    backoff *= 2; // Exponential backoff
-                }
-                Err(e) => {
-                    self.record_failure();
-                    return Err(e);
-                }
-            }
-        }
+        self.invoke_with_recovery(tool_name, args, Self::call_tool_raw_inner)
     }
 
     /// Inner implementation of call_tool_raw — delegates to the shared
@@ -375,38 +337,10 @@ impl CbmClient {
     /// For **pipe-level interception** use `call_tool_raw` instead —
     /// it returns the raw text that gets compressed.
     ///
-    /// Retries transient errors (timeout, connection lost, internal error)
-    /// once with exponential backoff before giving up.
+    /// Retries proven observational operations at most once after 100 ms.
+    /// Terminal failures require a newly constructed and admitted frontend.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
-        self.ensure_usable()?;
-        if !self.circuit_allows() {
-            return Err(CbmError::ConnectionLost("circuit breaker open".into()));
-        }
-        let max_retries = 1;
-        let mut retry_count = 0;
-        let mut backoff = Duration::from_millis(100);
-
-        loop {
-            // Value::clone() is cheap (~a few ref-count bumps for JSON strings/arrays)
-            match self.call_tool_inner(tool_name, args.clone()) {
-                Ok(result) => {
-                    self.record_success();
-                    return Ok(result);
-                }
-                Err(e)
-                    if self.frontend.is_some() && retry_count < max_retries && is_retryable(&e) =>
-                {
-                    retry_count += 1;
-                    self.record_failure();
-                    std::thread::sleep(backoff);
-                    backoff *= 2; // Exponential backoff
-                }
-                Err(e) => {
-                    self.record_failure();
-                    return Err(e);
-                }
-            }
-        }
+        self.invoke_with_recovery(tool_name, args, Self::call_tool_inner)
     }
 
     /// Inner implementation of call_tool — delegates to the shared

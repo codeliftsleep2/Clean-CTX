@@ -41,6 +41,16 @@ impl GraphBridge {
             || !self.cache.is_empty()
     }
 
+    /// Explicit provider requests may attempt demand-driven half-open recovery.
+    /// This is eligibility, not Available; native enrichment/status remain passive.
+    pub(crate) fn can_attempt_provider(&self) -> bool {
+        let client = self.client.lock().unwrap_or_else(|p| p.into_inner());
+        match client.as_ref() {
+            Some(client) => client.circuit_allows() || client.recovery_due(),
+            None => self.status.is_available() && !self.cache.is_empty(),
+        }
+    }
+
     pub fn graph_version(&self) -> &str {
         &self.graph_version
     }

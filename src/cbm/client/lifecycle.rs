@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 /// Derived from the bridge's existing primary-root authority, before spawning.
 /// Environment remains inherited, including an explicit account cache override.
+#[derive(Clone)]
 pub(super) struct FrontendLaunchSpec {
     pub binary: PathBuf,
     pub root: PathBuf,
@@ -122,9 +123,10 @@ impl Drop for FrontendSession {
 }
 
 impl CbmClient {
-    /// Terminal transition. Replacement and admission are deliberately absent.
+    /// Retires this transport epoch; only recovery may construct a new epoch.
     pub(super) fn retire_frontend(&mut self, reason: &str) {
         self.usable = false;
+        self.recovery_pending = false;
         if let Some(mut frontend) = self.frontend.take() {
             let outcome = frontend.retire();
             self.last_retirement = Some(outcome);

@@ -116,7 +116,8 @@ fn fixture_entry() {
         return;
     };
     let log = PathBuf::from(log);
-    let mode = std::env::var("CLEAN_CTX_A2_FIXTURE_MODE").unwrap();
+    let mode =
+        super::a4_support::fixture_mode(&std::env::var("CLEAN_CTX_A2_FIXTURE_MODE").unwrap(), &log);
     let cwd = std::env::current_dir().unwrap();
     std::fs::write(
         &log,
@@ -224,6 +225,10 @@ fn fixture_entry() {
                 serde_json::json!({"jsonrpc":"2.0", "id":request["id"], "result":{"tools":tools}})
             );
             io::stdout().flush().unwrap();
+            line.clear();
+            continue;
+        }
+        if super::a4_support::fixture_tool(&mode, &request) {
             line.clear();
             continue;
         }
@@ -353,8 +358,34 @@ pub(super) fn wait_frontend_exit(client: &mut CbmClient) {
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
         let frontend = client.frontend.as_mut().unwrap();
-        if frontend.child.try_wait().unwrap().is_some() && frontend.stdout_reader.as_ref().unwrap().is_finished() { return; }
-        assert!(Instant::now() < deadline, "fixture exit/reader completion was not observed");
+        if frontend.child.try_wait().unwrap().is_some()
+            && frontend.stdout_reader.as_ref().unwrap().is_finished()
+        {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "fixture exit/reader completion was not observed"
+        );
         std::thread::sleep(Duration::from_millis(10));
     }
+}
+
+/// Test-only command environment scoped to one serialized operation/thread.
+pub(super) fn with_options<T>(log: &Path, mode: &str, body: impl FnOnce() -> T) -> T {
+    struct Reset(Options);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            OPTIONS.with(|options| *options.borrow_mut() = self.0.clone());
+        }
+    }
+    let previous = OPTIONS.with(|options| {
+        options.replace(Options {
+            log: log.to_path_buf(),
+            mode: mode.into(),
+            ..Options::default()
+        })
+    });
+    let _reset = Reset(previous);
+    body()
 }

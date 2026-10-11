@@ -114,6 +114,9 @@ impl CbmClient {
         Ok(Some(Self {
             frontend: Some(frontend),
             usable: false,
+            admitted_once: false,
+            launch_spec: spec,
+            recovery_pending: false,
             last_retirement: None,
             request_id: AtomicU64::new(1),
             status: CbmStatus::Degraded("admission_required".into()),

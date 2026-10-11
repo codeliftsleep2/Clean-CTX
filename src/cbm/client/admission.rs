@@ -43,6 +43,7 @@ impl CbmClient {
         match result {
             Ok(()) => {
                 self.usable = true;
+                self.admitted_once = true;
                 self.status = CbmStatus::Available;
                 Ok(())
             }
