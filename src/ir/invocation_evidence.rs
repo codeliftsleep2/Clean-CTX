@@ -1,10 +1,13 @@
 //! Private, source-bound invocation occurrence evidence.
 //!
 //! This side channel is intentionally outside CompiledIR, canonical encodings,
-//! persistence, semantic edges, and public MCP schemas. Phase 1 establishes the
-//! lifecycle and validation boundary only; language adapters populate it later.
+//! persistence, semantic edges, and public MCP schemas. Language adapters populate
+//! these records from the existing parse; consumers validate identity and hash.
 
 use crate::cache::content_hash;
+
+mod collect;
+pub(crate) use collect::collect_invocations;
 
 /// A zero-based, half-open UTF-8 byte range: `[start_byte, end_byte)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -263,8 +266,12 @@ pub(crate) enum EvidenceMismatch {
 impl std::fmt::Display for EvidenceMismatch {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SourceIdentityMismatch => formatter.write_str("invocation evidence source identity mismatch"),
-            Self::SourceHashMismatch => formatter.write_str("invocation evidence source hash mismatch"),
+            Self::SourceIdentityMismatch => {
+                formatter.write_str("invocation evidence source identity mismatch")
+            }
+            Self::SourceHashMismatch => {
+                formatter.write_str("invocation evidence source hash mismatch")
+            }
         }
     }
 }
@@ -284,7 +291,10 @@ impl std::fmt::Display for EvidenceSliceError {
             Self::Reversed {
                 start_byte,
                 end_byte,
-            } => write!(formatter, "reversed evidence span [{start_byte}, {end_byte})"),
+            } => write!(
+                formatter,
+                "reversed evidence span [{start_byte}, {end_byte})"
+            ),
             Self::OutOfBounds { span, source_len } => write!(
                 formatter,
                 "evidence span [{}, {}) exceeds source length {source_len}",

@@ -2,7 +2,8 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Design frozen; production implementation not started  
+**Status:** Phases 0–2 implemented; Phase 2 focused verification recorded below
+
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
 ## 1. Executive design verdict
@@ -466,6 +467,43 @@ Add private types, validated view, shared SHA-256 helper, PassContext storage, a
 ### Phase 2 — TypeScript collection
 
 Extend TS query captures and populate occurrences in the existing parse. Cover T1–T5 and T7–T15. Preserve current call output.
+
+#### Phase 2 working record — 2026-10-11
+
+The owner explicitly authorized beginning Phase 2 on
+`(feat)Semantic_Intelligence_Architecture_Boundaries`. The branch already
+contains the Phase 0 frozen regressions and Phase 1 source-bound lifecycle
+(commits `bbe82e2` and `fbbde3a`). This authorizes the local TypeScript collector,
+not C# collection, RxJS migration, resolution, or durable/public contract changes.
+
+Five additional tracked production-path regressions now live in
+`src/tests/ir/invocation_evidence_typescript.rs`. They pin generic member calls,
+plain/spread arguments, UTF-8 spans and field context; immediate receiver and
+argument parents with variable context; callable/bound-arrow context and one
+production parse; repeated/dynamic calls and lexical decoys; and exact rich
+argument boundaries independently of presentation fidelity.
+
+The owner authorized focused RED/GREEN verification. The TypeScript run observed
+nine assertion failures and one canonical preservation pass. Only the regression
+module was stashed during implementation and restored unchanged: all ten tests
+now pass. Six source-bound lifecycle and 24 canonical TypeScript call tests also
+pass. The later-phase C# and RxJS RED modules remain unchanged and outside scope.
+
+TS_CALL_QUERY now supplies private invoke.* captures. The collector merges roots
+by exact span, retains written callee/argument/type-argument evidence, and assigns
+immediate invocation parents and nearest declaration contexts using containment
+stacks. It consumes the existing capture walk without another parse. Private
+captures bypass canonical emission and scope refresh. No public contract,
+producer generation, semantic edge, or persistent index changed.
+
+The existing arrow preservation comparison now excludes invoke.* alongside
+call.* and arrow.* when projecting base captures; its exact base-capture equality
+assertion is retained. This accounts for the approved private query extension
+without changing the frozen TypeScript evidence assertions.
+
+Final preservation checks: 33 arrow/callback tests passed; package Clippy with
+all targets/all features and warnings denied passed. The full repository suite
+was not run and remains reserved for CI. Phase 3 C# collection is next.
 
 ### Phase 3 — C# collection
 

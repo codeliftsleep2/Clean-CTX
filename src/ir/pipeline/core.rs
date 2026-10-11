@@ -93,6 +93,11 @@ impl IRPass for CoreIRPass {
             apply_csharp_declaration_names(&mut captures);
         }
 
+        if query_string == crate::queries::TS_QUERY {
+            state.invocation_occurrences =
+                crate::ir::invocation_evidence::collect_invocations(&captures);
+        }
+
         // TypeScript places `export` on an `export_statement` wrapper rather
         // than inside the declaration node captured as `class.root` or
         // `interface.root`. Join the structural wrapper capture to its exact
@@ -111,6 +116,11 @@ impl IRPass for CoreIRPass {
 
         let mut csharp_class_owners: HashMap<(usize, usize), String> = HashMap::new();
         for cap in &captures {
+            // Private evidence captures must not affect canonical emission or
+            // the timing of existing callable-scope transitions.
+            if cap.name.starts_with("invoke.") {
+                continue;
+            }
             // Callable-scope maintenance is independent of filtering: the walk
             // has advanced past `cap.start_byte` either way, so scopes whose
             // region closed are popped and their call facts settled.

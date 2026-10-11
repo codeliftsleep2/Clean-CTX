@@ -309,7 +309,7 @@ mod csharp_tests;
 mod typescript_tests;
 
 // Phase 0 preservation freeze for the private invocation-occurrence boundary.
-// The missing invoke.* captures are intentional RED evidence until Phase 2/3.
+// TypeScript captures are populated; C# remains RED until Phase 3.
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../tests/ir/invocation_evidence_typescript.rs"]
 mod invocation_evidence_typescript_tests;

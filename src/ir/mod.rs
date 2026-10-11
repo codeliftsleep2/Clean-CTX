@@ -31,7 +31,7 @@ pub mod focus;
 pub mod hierarchical;
 pub mod identity;
 /// Private, source-bound invocation occurrence evidence.
-// Phase 1 intentionally stages types before language adapters populate them.
+// TypeScript populates evidence; later adapters and consumers remain staged.
 #[allow(dead_code)]
 pub(crate) mod invocation_evidence;
 pub mod layers;

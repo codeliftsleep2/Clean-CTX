@@ -303,6 +303,38 @@ pub const TS_CALL_QUERY: &str = r#"
     (public_field_definition
         name: (property_identifier) @arrow.name
         value: (arrow_function) @arrow.root)
+    ; --- Private source-bound invocation evidence (same parse) ---
+    (call_expression) @invoke.root
+    (call_expression function: (_) @invoke.function) @invoke.root
+    (call_expression function: (identifier) @invoke.terminal) @invoke.root
+    (call_expression function: (member_expression
+        object: (_) @invoke.receiver
+        property: (property_identifier) @invoke.terminal)) @invoke.root
+    (call_expression arguments: (arguments
+        [(expression) (spread_element)] @invoke.argument)) @invoke.root
+    (call_expression arguments: (arguments
+        (spread_element) @invoke.spread)) @invoke.root
+    (call_expression type_arguments: (type_arguments
+        (type) @invoke.type_argument)) @invoke.root
+    (variable_declarator
+        name: (identifier) @invoke.declaration_name
+        value: (_)) @invoke.declaration @invoke.declaration.variable
+    (public_field_definition
+        name: (property_identifier) @invoke.declaration_name
+        value: (_)) @invoke.declaration @invoke.declaration.field
+    (method_definition) @invoke.declaration @invoke.declaration.callable
+    (method_definition
+        name: (property_identifier) @invoke.declaration_name) @invoke.declaration @invoke.declaration.callable
+    (function_declaration) @invoke.declaration @invoke.declaration.callable
+    (function_declaration
+        name: (identifier) @invoke.declaration_name) @invoke.declaration @invoke.declaration.callable
+    (variable_declarator
+        name: (identifier) @invoke.declaration_name
+        value: (arrow_function) @invoke.declaration @invoke.declaration.callable)
+    (public_field_definition
+        name: (property_identifier) @invoke.declaration_name
+        value: (arrow_function) @invoke.declaration @invoke.declaration.callable)
+
 "#;
 
 // Generic invocation captures (native call facts) for Java.
