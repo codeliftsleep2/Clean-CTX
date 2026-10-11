@@ -89,7 +89,10 @@ fn source_specific_loop_details_are_preserved_without_false_equivalence() {
     let legacy = compress_template_to_string(repeated.legacy, Fidelity::Medium);
     let modern = compress_template_to_string(repeated.modern, Fidelity::Medium);
 
-    assert!(legacy.contains("let item of items; trackBy: trackItem"), "{legacy}");
+    assert!(
+        legacy.contains("let item of items; trackBy: trackItem"),
+        "{legacy}"
+    );
     assert!(modern.contains("track item.id"), "{modern}");
     assert!(!legacy.contains("track item.id"), "{legacy}");
     assert!(!modern.contains("trackBy: trackItem"), "{modern}");

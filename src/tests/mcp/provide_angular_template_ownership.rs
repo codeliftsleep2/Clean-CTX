@@ -14,7 +14,11 @@ fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     crate::mcp::McpState::new(config)
 }
 
-fn provide(state: &crate::mcp::McpState, root: &tempfile::TempDir, file: &std::path::Path) -> Value {
+fn provide(
+    state: &crate::mcp::McpState,
+    root: &tempfile::TempDir,
+    file: &std::path::Path,
+) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(
         &json!(1),
@@ -66,10 +70,12 @@ export class DetailPage {}
         response.get("error").is_none(),
         "a structured templateUrl must establish Angular ownership: {response}"
     );
-    assert_eq!(response["result"]["_meta"]["is_angular"], true, "{response}");
     assert_eq!(
-        response["result"]["_meta"]["template_compressed"],
-        true,
+        response["result"]["_meta"]["is_angular"], true,
+        "{response}"
+    );
+    assert_eq!(
+        response["result"]["_meta"]["template_compressed"], true,
         "{response}"
     );
     let text = response["result"]["content"][0]["text"]
@@ -96,8 +102,7 @@ fn unrelated_html_error_explains_that_verbatim_is_raw_uncompressed_content() {
         "error must name the available fallback: {response}"
     );
     assert!(
-        message.to_lowercase().contains("raw")
-            && message.to_lowercase().contains("uncompressed"),
+        message.to_lowercase().contains("raw") && message.to_lowercase().contains("uncompressed"),
         "error must explain what verbatim returns: {response}"
     );
 }
@@ -124,7 +129,8 @@ export class MigrationHost {}
             "{}
 {source}",
             "<!-- production-path compression padding -->
-".repeat(300)
+"
+            .repeat(300)
         ),
     )
     .expect("template fixture");
@@ -137,7 +143,10 @@ fn model_visible_text(response: &Value) -> &str {
         response.get("error").is_none(),
         "linked Angular template must use the production template path: {response}"
     );
-    assert_eq!(response["result"]["_meta"]["is_angular"], true, "{response}");
+    assert_eq!(
+        response["result"]["_meta"]["is_angular"], true,
+        "{response}"
+    );
     response["result"]["content"][0]["text"]
         .as_str()
         .expect("model-visible template")
@@ -146,10 +155,12 @@ fn model_visible_text(response: &Value) -> &str {
 fn assert_tokens_in_order(rendered: &str, tokens: &[&str]) {
     let mut previous = 0;
     for token in tokens {
-        let relative = rendered[previous..]
-            .find(token)
-            .unwrap_or_else(|| panic!("missing {token:?} in:
-{rendered}"));
+        let relative = rendered[previous..].find(token).unwrap_or_else(|| {
+            panic!(
+                "missing {token:?} in:
+{rendered}"
+            )
+        });
         previous += relative + token.len();
     }
 }

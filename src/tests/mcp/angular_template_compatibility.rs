@@ -44,8 +44,7 @@ fn angular_template_semantics_increment_only_the_existing_angular_producer() {
         "generation 1 snapshots must be incompatible with Phase 4 Angular semantics"
     );
     assert_eq!(
-        current.canonical_producers,
-        prior.canonical_producers,
+        current.canonical_producers, prior.canonical_producers,
         "HasTemplate must not change canonical or marker producer identity"
     );
 }

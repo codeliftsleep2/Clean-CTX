@@ -100,6 +100,27 @@ pub(super) fn try_evaluate_angular_template(
     // Gap 5/3/6 contract leak: the LLM would attempt replace_in_file
     // SEARCH against bodies that don't exist in template output).
     let (content_kind, byte_exact) = (ContentKind::Skeleton, Vec::<&'static str>::new());
+    let degradation = if raw_passthrough {
+        Value::Null
+    } else {
+        match fidelity {
+            crate::compression::Fidelity::Low => serde_json::json!({
+                "ordering": "aggregate_unordered",
+                "omits": [
+                    "element_ownership",
+                    "control_ancestry",
+                    "visible_text",
+                    "interpolation_expressions",
+                    "comments"
+                ]
+            }),
+            crate::compression::Fidelity::Medium => serde_json::json!({
+                "ordering": "source_ordered",
+                "omits": ["comments"]
+            }),
+            _ => Value::Null,
+        }
+    };
     Some(ProvidedContext::new(
         body,
         serde_json::json!({
@@ -107,7 +128,7 @@ pub(super) fn try_evaluate_angular_template(
             "is_angular": true, "template_compressed": !raw_passthrough,
             "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
             "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
-            "degradation": null
+            "degradation": degradation
         }),
     ))
 }

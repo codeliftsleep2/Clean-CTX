@@ -171,29 +171,23 @@ pub(crate) fn component_template_edge(
         return None;
     }
 
-    let owner = crate::dictionary::path::canonical_identity_key(
-        &declaring_file.to_string_lossy(),
-    );
-    let template_name =
-        if let Some(written) = crate::angular_meta::decorators::extract_component_template_url(
-            raw_class,
-        ) {
-            let path = crate::angular_meta::template_ownership::resolve_template_path(
-                declaring_file,
-                &written,
-            )?;
-            crate::dictionary::path::canonical_identity_key(&path.to_string_lossy())
-        } else if crate::angular_meta::decorators::extract_decorators(
-            raw_class,
-            Fidelity::Low,
-        )
+    let owner = crate::dictionary::path::canonical_identity_key(&declaring_file.to_string_lossy());
+    let template_name = if let Some(written) =
+        crate::angular_meta::decorators::extract_component_template_url(raw_class)
+    {
+        let path = crate::angular_meta::template_ownership::resolve_template_path(
+            declaring_file,
+            &written,
+        )?;
+        crate::dictionary::path::canonical_identity_key(&path.to_string_lossy())
+    } else if crate::angular_meta::decorators::extract_decorators(raw_class, Fidelity::Low)
         .and_then(|result| result.inline_template)
         .is_some()
-        {
-            format!("inline:{owner}#component={class_name}")
-        } else {
-            return None;
-        };
+    {
+        format!("inline:{owner}#component={class_name}")
+    } else {
+        return None;
+    };
 
     Some(SemanticEdge {
         relation: SemanticRelation::HasTemplate,

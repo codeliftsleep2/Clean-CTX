@@ -46,6 +46,26 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-034: Angular Template Ownership, Structure, and Linkage Were Fragmented (#141 / #142 split)
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-10 |
+| **Environment** | Claude + Clean-CTX live MCP testing against real Angular repositories |
+| **Repository/context** | Angular 15–16, Angular 17+, and mixed-migration templates with conventional and arbitrary external filenames |
+| **Symptom** | Arbitrary linked templates could miss Angular processing; compressed output lost or misattributed control-flow/content; Components, Templates, and child-selector occurrences were not coherently linked; partial results lacked actionable diagnostics. |
+| **Root cause** | Filename convention competed with structured Component ownership, the former flat rendering authority discarded source order/containment, and no identity/lifecycle contract existed for Component-to-Template or occurrence-aware selector refinement. Generic coverage metadata also did not describe template-specific missing, unresolved, or ambiguous evidence. |
+| **Classification** | Semantic / presentation truthfulness / query lifecycle |
+| **Reproducible locally?** | Yes — deterministic ordered-template, Angular-version-equivalence, production routing, linkage, occurrence, lifecycle, and diagnostics regressions |
+| **Local regression** | `src/tests/angular_meta/template_structure_regressions.rs`; `src/tests/angular_meta/template_version_equivalence.rs`; `src/tests/mcp/provide_angular_template_ownership.rs`; `src/tests/mcp/workspace_query_angular_templates.rs`; `src/tests/mcp/workspace_query_angular_selector_occurrences.rs`; `src/tests/mcp/angular_template_phase6_diagnostics.rs` |
+| **Live scenario required?** | Yes — one consolidated final production-binary MCP pilot after the complete local gate |
+| **Architectural invariant** | ANG-TPL-001; ANG-TPL-002; WSC-001; WSC-002; WSC-010 |
+| **Status** | Verified — Phases 1–6, final verification gate, and consolidated live MCP pilot GREEN |
+
+**Verification:** The maintainer reported the complete local gate GREEN. The consolidated production-binary MCP pilot passed all checks; generated evidence is stored under `target/live-acceptance/angular-template-linkage/`.
+
+**Resolution:** Structured Component metadata now owns arbitrary external and inline templates; an ordered source authority preserves Angular 15+, modern, and mixed control flow and content. The existing Angular semantic producer publishes Component-owned `HasTemplate` using canonical physical Template identity. Selector occurrences retain UTF-8 byte spans and control ancestry and are refined ephemerally into additive `UsesComponent` knowledge only for a unique authoritative declaration. Template-specific diagnostics and fidelity degradation metadata distinguish loss, missing sources, incomplete discovery, unresolved selectors, and ambiguity without fabricating absence or completeness.
+
 ## DIS-2026-033: C# Constructor-Injected Interface Consumers Were Not Reliably Discoverable ([#97](https://github.com/codeliftsleep2/Clean-CTX/issues/97))
 
 | Field | Value |

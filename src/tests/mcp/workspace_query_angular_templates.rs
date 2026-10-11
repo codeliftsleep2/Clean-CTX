@@ -15,12 +15,7 @@ fn state() -> crate::mcp::McpState {
 
 fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
     crate::protocol::captured_responses().clear();
-    dispatch_tools_call(
-        &json!(1),
-        tool,
-        &json!({ "arguments": arguments }),
-        state,
-    );
+    dispatch_tools_call(&json!(1), tool, &json!({ "arguments": arguments }), state);
     crate::protocol::captured_responses()
         .pop()
         .expect("MCP response")
@@ -43,14 +38,9 @@ fn publish(state: &crate::mcp::McpState, root: &Path, component: &Path) {
 }
 
 fn refresh(state: &crate::mcp::McpState, root: &Path) {
-    let response = call(
-        state,
-        "refresh_workspace",
-        json!({ "workspaceRoot": root }),
-    );
+    let response = call(state, "refresh_workspace", json!({ "workspaceRoot": root }));
     assert_eq!(
-        response["result"]["structuredContent"]["refreshed"],
-        true,
+        response["result"]["structuredContent"]["refreshed"], true,
         "refresh must succeed: {response}"
     );
 }
@@ -164,10 +154,11 @@ fn external_template_variants_use_canonical_identity_forward_and_reverse() {
         std::fs::create_dir_all(template.parent().expect("template parent"))
             .expect("template directory");
         std::fs::write(&template, "<child-view></child-view>").expect("template fixture");
-        let written = relative_fixture_path(&template, component.parent().expect("component parent"))
-            .expect("relative template path")
-            .to_string_lossy()
-            .replace('\\', "/");
+        let written =
+            relative_fixture_path(&template, component.parent().expect("component parent"))
+                .expect("relative template path")
+                .to_string_lossy()
+                .replace('\\', "/");
         write_component(
             &component,
             class_name,
@@ -277,14 +268,16 @@ fn republish_replacement_and_external_inline_transitions_retract_old_edges() {
         "Component",
         "TransitionHost",
     );
-    assert!(has_template_to(&replaced, &canonical(&second)), "{replaced}");
-    assert!(!has_template_to(&replaced, &canonical(&first)), "{replaced}");
-
-    write_component(
-        &component,
-        "TransitionHost",
-        r#"template: '<p>inline</p>'"#,
+    assert!(
+        has_template_to(&replaced, &canonical(&second)),
+        "{replaced}"
     );
+    assert!(
+        !has_template_to(&replaced, &canonical(&first)),
+        "{replaced}"
+    );
+
+    write_component(&component, "TransitionHost", r#"template: '<p>inline</p>'"#);
     refresh(&state, root.path());
     publish(&state, root.path(), &component);
     let inline = query_edges(
@@ -387,7 +380,6 @@ fn deletion_restoration_and_missing_external_target_follow_typescript_ownership(
         "restoring the assertion owner must restore HasTemplate: {restored}"
     );
 }
-
 
 fn relative_fixture_path(target: &Path, base: &Path) -> Option<PathBuf> {
     let target_parts = target.components().collect::<Vec<_>>();

@@ -24,6 +24,10 @@ pub(crate) struct OrderedTemplate {
 }
 
 impl OrderedTemplate {
+    pub(crate) fn is_supported(&self) -> bool {
+        !self.parse_failed
+    }
+
     pub(crate) fn selector_occurrences(
         &self,
     ) -> &[crate::angular_meta::template_occurrences::SelectorOccurrence] {
@@ -39,15 +43,20 @@ impl OrderedTemplate {
             match event {
                 TemplateEvent::Content(line) => lines.push(line.clone()),
                 TemplateEvent::Comment(line)
-                    if matches!(fidelity, Fidelity::High | Fidelity::Edit | Fidelity::Verbatim) =>
+                    if matches!(
+                        fidelity,
+                        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim
+                    ) =>
                 {
                     lines.push(line.clone());
                 }
                 TemplateEvent::Comment(_) => {}
             }
         }
-        if matches!(fidelity, Fidelity::High | Fidelity::Edit | Fidelity::Verbatim)
-            && self.interpolation_count > 0
+        if matches!(
+            fidelity,
+            Fidelity::High | Fidelity::Edit | Fidelity::Verbatim
+        ) && self.interpolation_count > 0
         {
             lines.push(format!("{{{{}}}}x{}", self.interpolation_count));
         }
@@ -163,11 +172,7 @@ fn push_tag(node: tree_sitter::Node, source: &str, template: &mut OrderedTemplat
 }
 
 #[cfg(feature = "angular")]
-fn push_legacy_headers(
-    tag: tree_sitter::Node,
-    source: &str,
-    template: &mut OrderedTemplate,
-) {
+fn push_legacy_headers(tag: tree_sitter::Node, source: &str, template: &mut OrderedTemplate) {
     let mut cursor = tag.walk();
     for attribute in tag
         .named_children(&mut cursor)
@@ -178,17 +183,17 @@ fn push_legacy_headers(
         };
         match (name.as_str(), value.as_deref()) {
             ("[ngSwitch]", Some(expression)) => {
-                template.events.push(TemplateEvent::Content(format!(
-                    "@switch({expression})"
-                )));
+                template
+                    .events
+                    .push(TemplateEvent::Content(format!("@switch({expression})")));
             }
             ("*ngIf", Some(condition)) => {
-                template.events.push(TemplateEvent::Content(format!(
-                    "@if({condition})"
-                )));
-                template.events.push(TemplateEvent::Content(format!(
-                    "*ngIf({condition})"
-                )));
+                template
+                    .events
+                    .push(TemplateEvent::Content(format!("@if({condition})")));
+                template
+                    .events
+                    .push(TemplateEvent::Content(format!("*ngIf({condition})")));
             }
             ("*ngFor", Some(expression)) => {
                 if let Some((variable, iterable)) = legacy_for_parts(expression) {
@@ -196,14 +201,14 @@ fn push_legacy_headers(
                         "@for({variable} of {iterable})"
                     )));
                 }
-                template.events.push(TemplateEvent::Content(format!(
-                    "*ngFor({expression})"
-                )));
+                template
+                    .events
+                    .push(TemplateEvent::Content(format!("*ngFor({expression})")));
             }
             ("*ngSwitchCase", Some(expression)) => {
-                template.events.push(TemplateEvent::Content(format!(
-                    "@case({expression})"
-                )));
+                template
+                    .events
+                    .push(TemplateEvent::Content(format!("@case({expression})")));
             }
             ("*ngSwitchDefault", _) => template
                 .events
@@ -214,25 +219,20 @@ fn push_legacy_headers(
 }
 
 #[cfg(feature = "angular")]
-fn attribute_parts(
-    attribute: tree_sitter::Node,
-    source: &str,
-) -> Option<(String, Option<String>)> {
+fn attribute_parts(attribute: tree_sitter::Node, source: &str) -> Option<(String, Option<String>)> {
     let mut name = None;
     let mut value = None;
     let mut cursor = attribute.walk();
     for child in attribute.named_children(&mut cursor) {
         match child.kind() {
             "attribute_name" => {
-                name = child
-                    .utf8_text(source.as_bytes())
-                    .ok()
-                    .map(str::to_string);
+                name = child.utf8_text(source.as_bytes()).ok().map(str::to_string);
             }
             "quoted_attribute_value" | "attribute_value" => {
-                value = child.utf8_text(source.as_bytes()).ok().map(|raw| {
-                    strip_outer_attribute_quotes(raw.trim()).to_string()
-                });
+                value = child
+                    .utf8_text(source.as_bytes())
+                    .ok()
+                    .map(|raw| strip_outer_attribute_quotes(raw.trim()).to_string());
             }
             _ => {}
         }
@@ -242,10 +242,7 @@ fn attribute_parts(
 
 fn strip_outer_attribute_quotes(raw: &str) -> &str {
     let bytes = raw.as_bytes();
-    if bytes.len() >= 2
-        && matches!(bytes[0], b'"' | b'\'')
-        && bytes.last() == Some(&bytes[0])
-    {
+    if bytes.len() >= 2 && matches!(bytes[0], b'"' | b'\'') && bytes.last() == Some(&bytes[0]) {
         &raw[1..raw.len() - 1]
     } else {
         raw
@@ -263,20 +260,14 @@ fn legacy_for_parts(expression: &str) -> Option<(&str, &str)> {
 #[cfg(feature = "angular")]
 fn tag_name(node: tree_sitter::Node, source: &str) -> Option<String> {
     let mut cursor = node.walk();
-    let result = node
-        .named_children(&mut cursor)
+    node.named_children(&mut cursor)
         .find(|child| child.kind() == "tag_name")
         .and_then(|child| child.utf8_text(source.as_bytes()).ok())
-        .map(str::to_string);
-    result
+        .map(str::to_string)
 }
 
 #[cfg(feature = "angular")]
-fn push_raw_content(
-    node: tree_sitter::Node,
-    source: &str,
-    template: &mut OrderedTemplate,
-) {
+fn push_raw_content(node: tree_sitter::Node, source: &str, template: &mut OrderedTemplate) {
     if let Ok(raw) = node.utf8_text(source.as_bytes()) {
         let raw = collapse_multiline(raw);
         if !raw.is_empty() {
@@ -286,11 +277,7 @@ fn push_raw_content(
 }
 
 #[cfg(feature = "angular")]
-fn push_text_node(
-    node: tree_sitter::Node,
-    source: &str,
-    template: &mut OrderedTemplate,
-) {
+fn push_text_node(node: tree_sitter::Node, source: &str, template: &mut OrderedTemplate) {
     let mut cursor = node.start_byte().max(template.control_consumed_until);
     let node_end = node.end_byte();
     if cursor >= node_end {
@@ -317,8 +304,19 @@ fn push_text_node(
 
 fn find_control_start(source: &str, start: usize, end: usize) -> Option<usize> {
     const TOKENS: &[&str] = &[
-        "@else if", "@placeholder", "@loading", "@default", "@switch",
-        "@defer", "@empty", "@error", "@case", "@else", "@for", "@let", "@if",
+        "@else if",
+        "@placeholder",
+        "@loading",
+        "@default",
+        "@switch",
+        "@defer",
+        "@empty",
+        "@error",
+        "@case",
+        "@else",
+        "@for",
+        "@let",
+        "@if",
     ];
     let mut best = None;
     for token in TOKENS {
@@ -341,11 +339,17 @@ fn find_control_start(source: &str, start: usize, end: usize) -> Option<usize> {
 fn control_boundary(source: &str, position: usize, token_len: usize) -> bool {
     let bytes = source.as_bytes();
     let before = position == 0
-        || matches!(bytes[position - 1], b' ' | b'\t' | b'\n' | b'\r' | b'{' | b'}');
+        || matches!(
+            bytes[position - 1],
+            b' ' | b'\t' | b'\n' | b'\r' | b'{' | b'}'
+        );
     let after = position + token_len;
     before
         && (after >= bytes.len()
-            || matches!(bytes[after], b' ' | b'\t' | b'\n' | b'\r' | b'(' | b'{' | b';'))
+            || matches!(
+                bytes[after],
+                b' ' | b'\t' | b'\n' | b'\r' | b'(' | b'{' | b';'
+            ))
 }
 
 fn control_header(source: &str, start: usize) -> Option<(String, usize)> {
@@ -388,10 +392,7 @@ fn collapse_multiline(raw: &str) -> String {
 fn normalize_modern_headers(line: &str) -> String {
     let mut normalized = line.to_string();
     for keyword in ["if", "else if", "switch", "case", "defer"] {
-        normalized = normalized.replace(
-            &format!("@{keyword} ("),
-            &format!("@{keyword}("),
-        );
+        normalized = normalized.replace(&format!("@{keyword} ("), &format!("@{keyword}("));
     }
     normalize_for_headers(&normalized)
 }

@@ -8,8 +8,18 @@ pub(crate) struct SourceSpan {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub(crate) enum TemplateControlKind {
-    If, ElseIf, Else, For, Empty, Switch, Case, Default,
-    Defer, Placeholder, Loading, Error,
+    If,
+    ElseIf,
+    Else,
+    For,
+    Empty,
+    Switch,
+    Case,
+    Default,
+    Defer,
+    Placeholder,
+    Loading,
+    Error,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -51,7 +61,13 @@ pub(crate) fn extract(source: &str) -> Vec<SelectorOccurrence> {
     };
     let modern = modern_regions(source);
     let mut occurrences = Vec::new();
-    walk(tree.root_node(), source, &modern, &mut Vec::new(), &mut occurrences);
+    walk(
+        tree.root_node(),
+        source,
+        &modern,
+        &mut Vec::new(),
+        &mut occurrences,
+    );
     occurrences.sort_by_key(|occurrence| occurrence.span.start_byte);
     occurrences
 }
@@ -84,9 +100,11 @@ fn walk_element(
 ) {
     let mut cursor = node.walk();
     let children: Vec<_> = node.named_children(&mut cursor).collect();
-    if let Some(tag) = children.iter().copied().find(|child| {
-        matches!(child.kind(), "start_tag" | "self_closing_tag")
-    }) {
+    if let Some(tag) = children
+        .iter()
+        .copied()
+        .find(|child| matches!(child.kind(), "start_tag" | "self_closing_tag"))
+    {
         let added = push_legacy_frames(tag, node, source, legacy);
         capture_tag(tag, source, modern, legacy, occurrences);
         for child in children {
@@ -105,7 +123,9 @@ fn capture_tag(
     legacy: &[TemplateControlFrame],
     occurrences: &mut Vec<SelectorOccurrence>,
 ) {
-    let Some(name) = tag_name(tag, source) else { return };
+    let Some(name) = tag_name(tag, source) else {
+        return;
+    };
     if !name.contains('-') {
         return;
     }
@@ -114,11 +134,18 @@ fn capture_tag(
         end_byte: tag.end_byte(),
     };
     let mut control_ancestry = legacy.to_vec();
-    control_ancestry.extend(modern.iter().filter(|region| {
-        span.start_byte >= region.body_start && span.end_byte <= region.body_end
-    }).map(|region| region.frame.clone()));
+    control_ancestry.extend(
+        modern
+            .iter()
+            .filter(|region| {
+                span.start_byte >= region.body_start && span.end_byte <= region.body_end
+            })
+            .map(|region| region.frame.clone()),
+    );
     control_ancestry.sort_by(|left, right| {
-        left.span.start_byte.cmp(&right.span.start_byte)
+        left.span
+            .start_byte
+            .cmp(&right.span.start_byte)
             .then_with(|| right.span.end_byte.cmp(&left.span.end_byte))
     });
     occurrences.push(SelectorOccurrence {
@@ -136,10 +163,13 @@ fn push_legacy_frames(
 ) -> usize {
     let before = legacy.len();
     let mut cursor = tag.walk();
-    for attribute in tag.named_children(&mut cursor)
+    for attribute in tag
+        .named_children(&mut cursor)
         .filter(|child| child.kind() == "attribute")
     {
-        let Some((name, value)) = attribute_parts(attribute, source) else { continue };
+        let Some((name, value)) = attribute_parts(attribute, source) else {
+            continue;
+        };
         let kind = match name.as_str() {
             "*ngIf" => Some(TemplateControlKind::If),
             "*ngFor" => Some(TemplateControlKind::For),
@@ -152,10 +182,8 @@ fn push_legacy_frames(
             legacy.push(TemplateControlFrame {
                 kind,
                 syntax: TemplateControlSyntax::Legacy,
-                written_header: value.map_or_else(
-                    || name.clone(),
-                    |value| format!("{name}({value})"),
-                ),
+                written_header: value
+                    .map_or_else(|| name.clone(), |value| format!("{name}({value})")),
                 span: SourceSpan {
                     start_byte: element.start_byte(),
                     end_byte: element.end_byte(),
@@ -174,10 +202,7 @@ fn tag_name(node: tree_sitter::Node, source: &str) -> Option<String> {
         .map(str::to_string)
 }
 
-fn attribute_parts(
-    attribute: tree_sitter::Node,
-    source: &str,
-) -> Option<(String, Option<String>)> {
+fn attribute_parts(attribute: tree_sitter::Node, source: &str) -> Option<(String, Option<String>)> {
     let mut name = None;
     let mut value = None;
     let mut cursor = attribute.walk();
@@ -187,7 +212,9 @@ fn attribute_parts(
                 name = child.utf8_text(source.as_bytes()).ok().map(str::to_string);
             }
             "quoted_attribute_value" | "attribute_value" => {
-                value = child.utf8_text(source.as_bytes()).ok()
+                value = child
+                    .utf8_text(source.as_bytes())
+                    .ok()
                     .map(|raw| strip_quotes(raw.trim()).to_string());
             }
             _ => {}
@@ -198,10 +225,7 @@ fn attribute_parts(
 
 fn strip_quotes(raw: &str) -> &str {
     let bytes = raw.as_bytes();
-    if bytes.len() >= 2
-        && matches!(bytes[0], b'"' | b'\'')
-        && bytes.last() == Some(&bytes[0])
-    {
+    if bytes.len() >= 2 && matches!(bytes[0], b'"' | b'\'') && bytes.last() == Some(&bytes[0]) {
         &raw[1..raw.len() - 1]
     } else {
         raw
@@ -234,7 +258,10 @@ fn modern_regions(source: &str) -> Vec<ModernRegion> {
                 kind,
                 syntax: TemplateControlSyntax::Modern,
                 written_header: collapse(&source[start..=open]),
-                span: SourceSpan { start_byte: start, end_byte: close + 1 },
+                span: SourceSpan {
+                    start_byte: start,
+                    end_byte: close + 1,
+                },
             },
             body_start: open + 1,
             body_end: close,
@@ -259,21 +286,19 @@ fn modern_kind(text: &str) -> Option<(TemplateControlKind, usize)> {
         ("@for", TemplateControlKind::For),
         ("@if", TemplateControlKind::If),
     ];
-    TOKENS.iter().find_map(|(token, kind)| {
-        text.starts_with(token).then_some((*kind, token.len()))
-    })
+    TOKENS
+        .iter()
+        .find_map(|(token, kind)| text.starts_with(token).then_some((*kind, token.len())))
 }
 
 fn control_boundary(source: &str, start: usize, token_len: usize) -> bool {
     let bytes = source.as_bytes();
     let before = start == 0
-        || (!bytes[start - 1].is_ascii_alphanumeric()
-            && !matches!(bytes[start - 1], b'_' | b'$'));
+        || (!bytes[start - 1].is_ascii_alphanumeric() && !matches!(bytes[start - 1], b'_' | b'$'));
     let after = start + token_len;
     before
         && (after >= bytes.len()
-            || (!bytes[after].is_ascii_alphanumeric()
-                && !matches!(bytes[after], b'_' | b'$')))
+            || (!bytes[after].is_ascii_alphanumeric() && !matches!(bytes[after], b'_' | b'$')))
 }
 fn find_open_brace(source: &str, start: usize) -> Option<usize> {
     let bytes = source.as_bytes();
@@ -281,10 +306,18 @@ fn find_open_brace(source: &str, start: usize) -> Option<usize> {
     let mut escaped = false;
     let mut parens = 0usize;
     for (index, byte) in bytes.iter().copied().enumerate().skip(start) {
-        if escaped { escaped = false; continue; }
-        if byte == b'\\' && quote.is_some() { escaped = true; continue; }
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if byte == b'\\' && quote.is_some() {
+            escaped = true;
+            continue;
+        }
         if let Some(active) = quote {
-            if byte == active { quote = None; }
+            if byte == active {
+                quote = None;
+            }
             continue;
         }
         if matches!(byte, b'\'' | b'"') || byte == 96 {
@@ -308,10 +341,18 @@ fn matching_brace(source: &str, open: usize) -> Option<usize> {
     let mut quote = None;
     let mut escaped = false;
     for (index, byte) in bytes.iter().copied().enumerate().skip(open) {
-        if escaped { escaped = false; continue; }
-        if byte == b'\\' && quote.is_some() { escaped = true; continue; }
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if byte == b'\\' && quote.is_some() {
+            escaped = true;
+            continue;
+        }
         if let Some(active) = quote {
-            if byte == active { quote = None; }
+            if byte == active {
+                quote = None;
+            }
             continue;
         }
         if matches!(byte, b'\'' | b'"') || byte == 96 {
@@ -322,7 +363,9 @@ fn matching_brace(source: &str, open: usize) -> Option<usize> {
             b'{' => depth += 1,
             b'}' => {
                 depth = depth.saturating_sub(1);
-                if depth == 0 { return Some(index); }
+                if depth == 0 {
+                    return Some(index);
+                }
             }
             _ => {}
         }

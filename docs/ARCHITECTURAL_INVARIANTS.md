@@ -696,6 +696,32 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### ANG-TPL-001 Angular Template Ownership and Identity
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Component/template linkage must follow structured Angular ownership without filename or basename inference. |
+| **Invariant** | Structured Component metadata exclusively authors `HasTemplate`. External Template identity is its canonical physical/semantic-owner path; inline identity is deterministic and Component-scoped. The declaring TypeScript file owns publication and retraction. |
+| **Enforcement** | Phase 4 production-path identity, forward/reverse, replacement, transition, deduplication, deletion/restoration, refresh, and generation regressions. |
+| **Authority** | `src/angular_meta/semantic.rs`; `src/tests/mcp/workspace_query_angular_templates.rs` |
+| **Type** | ENFORCED (structured producer boundary + tests) |
+| **Gate** | `cargo test --all-features workspace_query_angular_template_tests` |
+
+---
+
+### ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Repeated selector uses and their controlling conditions must survive query-time resolution without inventing durable cross-file ownership. |
+| **Invariant** | Every occurrence-derived `UsesSelector` and `UsesComponent` result carries its Template occurrence evidence: a zero-based half-open UTF-8 byte span and control ancestry. Neutral `UsesSelector` remains present when unique typed refinement is returned. Neither relationship enters WorkspaceIndex, producer generations, or snapshots. |
+| **Enforcement** | Ordered-authority extraction plus production MCP forward/reverse, ambiguity, mixed-syntax, replacement, refresh, deletion/restoration, and producer-generation regressions. |
+| **Authority** | `src/angular_meta/template_occurrences.rs`; `src/mcp/tool_handlers/query/angular_templates.rs`; `src/tests/mcp/workspace_query_angular_selector_occurrences.rs` |
+| **Type** | ENFORCED (request-local type boundary + tests) |
+| **Gate** | `cargo test --all-features workspace_query_angular_selector_occurrence_tests` |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

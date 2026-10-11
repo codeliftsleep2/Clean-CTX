@@ -13,6 +13,14 @@ use std::collections::BTreeSet;
 
 pub(super) struct Catalog {
     edges: Vec<Value>,
+    diagnostics: Vec<Value>,
+    sources: Vec<TemplateSourceStatus>,
+}
+
+struct TemplateSourceStatus {
+    component: EntityRef,
+    template: EntityRef,
+    available: bool,
 }
 
 impl Catalog {
@@ -32,6 +40,8 @@ impl Catalog {
         }
 
         let mut edges = Vec::new();
+        let mut diagnostics = Vec::new();
+        let mut sources = Vec::new();
         let mut seen_links = BTreeSet::new();
         for (_, _, component_name) in component_keys {
             let links = match scope {
@@ -41,11 +51,7 @@ impl Catalog {
                     &component_name,
                     scope,
                 ),
-                None => index.forward_edges_by_identity(
-                    "angular",
-                    "Component",
-                    &component_name,
-                ),
+                None => index.forward_edges_by_identity("angular", "Component", &component_name),
             };
             for link in links
                 .into_iter()
@@ -60,15 +66,36 @@ impl Catalog {
                     continue;
                 }
                 let Some(source) = template_source(state, link) else {
+                    sources.push(TemplateSourceStatus {
+                        component: link.subject.clone(),
+                        template: link.object.clone(),
+                        available: false,
+                    });
+                    diagnostics.push(json!({
+                        "code": "linked_template_missing",
+                        "component": link.subject.clone(),
+                        "template": link.object.clone(),
+                    }));
                     continue;
                 };
                 let ordered = crate::angular_meta::template_ordered::extract(&source);
+                let available = ordered.is_supported();
+                sources.push(TemplateSourceStatus {
+                    component: link.subject.clone(),
+                    template: link.object.clone(),
+                    available,
+                });
+                if !available {
+                    diagnostics.push(json!({
+                        "code": "template_parse_unsupported",
+                        "component": link.subject.clone(),
+                        "template": link.object.clone(),
+                    }));
+                    continue;
+                }
                 for (ordinal, occurrence) in ordered.selector_occurrences().iter().enumerate() {
-                    let candidates = selector_candidates(
-                        index,
-                        scope,
-                        &occurrence.written_selector,
-                    );
+                    let candidates =
+                        selector_candidates(index, scope, &occurrence.written_selector);
                     let status = if !discovery_complete {
                         "incomplete"
                     } else {
@@ -79,6 +106,21 @@ impl Catalog {
                         }
                     };
                     let unique = discovery_complete && candidates.len() == 1;
+                    if status != "unique" {
+                        let code = match status {
+                            "unresolved" => "selector_unresolved",
+                            "ambiguous" => "selector_ambiguous",
+                            _ => "component_discovery_incomplete",
+                        };
+                        diagnostics.push(json!({
+                            "code": code,
+                            "component": link.subject.clone(),
+                            "template": link.object.clone(),
+                            "selector": occurrence.written_selector,
+                            "occurrence": ordinal,
+                            "candidates": candidates.clone(),
+                        }));
+                    }
                     let evidence = json!({
                         "template_occurrence": occurrence,
                         "resolution": {
@@ -112,7 +154,56 @@ impl Catalog {
                 }
             }
         }
-        Self { edges }
+        Self {
+            edges,
+            diagnostics,
+            sources,
+        }
+    }
+
+    pub(super) fn diagnostics(&self, domain: &str, entity_type: &str, name: &str) -> Vec<Value> {
+        if domain != "angular" {
+            return Vec::new();
+        }
+        let field = match entity_type {
+            "Component" => "component",
+            "Template" => "template",
+            "SelectorRef" => "selector",
+            _ => return Vec::new(),
+        };
+        self.diagnostics
+            .iter()
+            .filter(|diagnostic| {
+                if field == "selector" {
+                    diagnostic[field] == name
+                } else {
+                    identity_matches(&diagnostic[field], domain, entity_type, name)
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
+    pub(super) fn source_complete(
+        &self,
+        domain: &str,
+        entity_type: &str,
+        name: &str,
+        discovery_complete: bool,
+    ) -> bool {
+        if !discovery_complete || domain != "angular" {
+            return false;
+        }
+        let matching: Vec<_> = self
+            .sources
+            .iter()
+            .filter(|source| match entity_type {
+                "Component" => identity_ref_matches(&source.component, domain, entity_type, name),
+                "Template" => identity_ref_matches(&source.template, domain, entity_type, name),
+                _ => false,
+            })
+            .collect();
+        !matching.is_empty() && matching.iter().all(|source| source.available)
     }
 
     pub(super) fn selectors(&self) -> BTreeSet<String> {
@@ -144,6 +235,10 @@ fn identity_matches(entity: &Value, domain: &str, entity_type: &str, name: &str)
     entity["domain"] == domain && entity["entity_type"] == entity_type && entity["name"] == name
 }
 
+fn identity_ref_matches(entity: &EntityRef, domain: &str, entity_type: &str, name: &str) -> bool {
+    entity.domain == domain && entity.entity_type == entity_type && entity.name == name
+}
+
 fn selector_candidates(
     index: &WorkspaceIndex,
     scope: Option<&WorkspaceScope>,
@@ -163,9 +258,7 @@ fn selector_candidates(
                         .is_some_and(|file| scope.admits(file))
                 })
         })
-        .filter(|candidate| {
-            seen.insert((candidate.name.clone(), candidate.file.clone()))
-        })
+        .filter(|candidate| seen.insert((candidate.name.clone(), candidate.file.clone())))
         .cloned()
         .collect()
 }

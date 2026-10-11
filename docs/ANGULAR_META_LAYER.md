@@ -496,13 +496,28 @@ Angular HTML templates are not generic HTML — they are a domain-specific langu
 
 ---
 
+## Current Template Correctness and Linkage Contract (Phases 1–6)
+
+The current production template path supersedes the historical flat-rendering description above:
+
+- Structured `@Component` metadata is the ownership authority for external and inline templates. The `.component.html` suffix remains a standalone recognition convention only.
+- Medium and High render from the ordered template authority. It preserves source order, control ownership, element/binding ownership, visible text, and interpolation expressions across Angular 15–16 directives, Angular 17+ blocks, and mixed templates.
+- Low is explicitly aggregate and unordered. Medium explicitly omits comments. The MCP `degradation` field reports those intentional losses; verbatim remains byte-exact raw source.
+- Durable `angular/Component --HasTemplate--> angular/Template` facts come from the existing `AngularSemantic` producer. The declaring TypeScript file owns the assertion and its replacement/deletion lifecycle.
+- External Template identity is the canonical physical/semantic-owner path. Workspace-relative paths are presentation only. Inline identity is deterministic and scoped to the declaring file and Component.
+- Template selector occurrences are extracted from ordered source structure with zero-based, half-open UTF-8 byte spans and enclosing legacy/modern control ancestry.
+- `UsesSelector` and uniquely refined `UsesComponent` results are request-local. Neutral selector evidence is always retained; typed knowledge is additive and is never persisted or restored from snapshots.
+- Template-specific diagnostics distinguish missing linked sources, unsupported parsing, unresolved selectors, ambiguous selectors, and incomplete Component discovery. Exact capability and authorized source completeness are reported separately.
+
+Regression authority: `src/tests/angular_meta/template_structure_regressions.rs`, `src/tests/angular_meta/template_version_equivalence.rs`, `src/tests/mcp/provide_angular_template_ownership.rs`, `src/tests/mcp/workspace_query_angular_templates.rs`, `src/tests/mcp/workspace_query_angular_selector_occurrences.rs`, and `src/tests/mcp/angular_template_phase6_diagnostics.rs`.
+
 ## Cross-Phase Non-Goals (deliberately deferred)
 
 - **Other frameworks** (React  Vue  Svelte) — same `MetaLayer` trait can host them  but each gets its own `src/angular_meta/`-equivalent module. R-22b/c/d in ROADMAP.
 - **Type-checked template binding** (the real value of `ngc`) — deferred behind a `--with-angular-compiler` flag  opt-in.
 - **Cross-file non-DI dependencies** (e.g. utility functions imported across files) — outside the Meta-Layer's scope handled by future R-11 (cross-file symbol resolution).
 - **Hot-reload of the graph** — the graph is rebuilt per workspace call no incremental updates yet.
-- **Persistence** — `AngularGraph` is in-memory only no disk cache.
+- **Durable template-selector edges** — selector occurrences and typed component-use refinement remain request-local; only Component-owned `HasTemplate` is durable semantic output.
 - **Generic HTML compression** — only Angular-specific template compression is in scope (R-44). Generic HTML files without Angular bindings are not compressed.
 
 ---

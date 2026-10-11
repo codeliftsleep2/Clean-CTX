@@ -13,7 +13,7 @@
 use super::{
     coverage::{CapabilityDirection, exact_identity_coverage},
     discovery_field,
-    identity::IdentityRequest,
+    identity::{IdentityRequest, ResolvedIdentity},
     outcome::QueryAnswer,
     outcome::QueryFailure,
     prepare::{PreparationContext, PreparedQuery},
@@ -156,6 +156,13 @@ fn try_prepare_forward_edges(
                 has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
+        apply_angular_template_metadata(
+            &mut structured,
+            &resolved,
+            angular_catalog.as_ref(),
+            classification_complete,
+            CapabilityDirection::Forward,
+        );
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
@@ -273,11 +280,53 @@ fn try_prepare_reverse_edges(
                 has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
+        apply_angular_template_metadata(
+            &mut structured,
+            &resolved,
+            angular_catalog.as_ref(),
+            classification_complete,
+            CapabilityDirection::Reverse,
+        );
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
         Ok(QueryAnswer::new("reverse_edges", structured))
     }))
+}
+
+fn apply_angular_template_metadata(
+    structured: &mut Value,
+    identity: &ResolvedIdentity,
+    catalog: Option<&super::angular_templates::Catalog>,
+    discovery_complete: bool,
+    direction: CapabilityDirection,
+) {
+    let Some(catalog) = catalog else {
+        return;
+    };
+    let diagnostics = catalog.diagnostics(&identity.domain, &identity.entity_type, &identity.name);
+    if !diagnostics.is_empty() {
+        structured["template_diagnostics"] = Value::Array(diagnostics);
+    }
+    let completeness_supported = identity.entity_type == "Template"
+        || (identity.entity_type == "Component"
+            && matches!(direction, CapabilityDirection::Forward));
+    if !completeness_supported {
+        return;
+    }
+    let source_complete = catalog.source_complete(
+        &identity.domain,
+        &identity.entity_type,
+        &identity.name,
+        discovery_complete,
+    );
+    if let Some(coverage) = structured.get_mut("coverage") {
+        coverage["source_complete"] = source_complete.into();
+        coverage["omitted_possible"] = (!source_complete).into();
+        if source_complete {
+            coverage["result_semantics"] = "complete_for_authorized_scope".into();
+        }
+    }
 }
 
 fn needs_angular_template_resolution(identity: &IdentityRequest) -> bool {
@@ -315,13 +364,8 @@ fn hydrate_angular_template_owner(
             .map(str::to_string)
     };
     if let Some(lookup) = lookup {
-        let owner_hydration = context.hydrate(
-            state,
-            "forward_edges",
-            &lookup,
-            workspace_root,
-            requirement,
-        )?;
+        let owner_hydration =
+            context.hydrate(state, "forward_edges", &lookup, workspace_root, requirement)?;
         hydration.merge(owner_hydration);
     }
     Ok(())

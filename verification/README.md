@@ -17,7 +17,7 @@ Current packages:
 - `workspace-query/` — registered workspace graph-query capture and model-
   visibility diagnostics;
 - `lifecycle/phase9/` — durable-context lifecycle field harness;
-- `live-acceptance/` — focused live MCP acceptance drivers.
+- `live-acceptance/` — focused live MCP acceptance drivers, including the comprehensive Angular template ownership/linkage pilot documented in `live-acceptance/ANGULAR_TEMPLATE_README.md`.
 
 Reusable drivers in this tree are tracked verification assets. Generated
 captures and runtime state are written beneath `target/` and remain untracked.

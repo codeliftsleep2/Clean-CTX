@@ -57,13 +57,12 @@ pub(super) fn extract_non_testing_edges(
                     &decl_types,
                 ));
                 if let Some(path) = declaring_path
-                    && let Some(edge) =
-                        crate::angular_meta::semantic::component_template_edge(
-                            &class_name,
-                            kind,
-                            raw_class,
-                            path,
-                        )
+                    && let Some(edge) = crate::angular_meta::semantic::component_template_edge(
+                        &class_name,
+                        kind,
+                        raw_class,
+                        path,
+                    )
                 {
                     edges.push(edge);
                 }
