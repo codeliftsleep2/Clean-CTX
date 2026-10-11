@@ -228,7 +228,8 @@ fn fixture_entry() {
             line.clear();
             continue;
         }
-        if super::b3_support::fixture_tool(&mode, &request)
+        if super::b4_tests::fixture_tool(&mode, &request)
+            || super::b3_support::fixture_tool(&mode, &request)
             || super::b2_support::fixture_tool(&mode, &request)
             || super::b1_support::fixture_tool(&mode, &request)
             || super::a4_support::fixture_tool(&mode, &request)

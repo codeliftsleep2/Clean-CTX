@@ -330,10 +330,16 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         }
     };
     if let Some(error) = proxy_tool_error(cbm_tool, &raw_response) {
+        // Classification/hints remain unchanged, but message-only projection
+        // must not discard RPC codes or additional tool-result evidence.
+        let evidence = compress_cbm_response(&raw_response)
+            .map(|c| c.compressed_text)
+            .unwrap_or_else(|| apply_minimum_compression(&raw_response));
+        let error_text = format!("{error}\n{evidence}");
         send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
             "result": {
-                "content": [{ "type": "text", "text": error }],
+                "content": [{ "type": "text", "text": error_text }],
                 "isError": true,
                 "structuredContent": {
                     "error": error,
@@ -364,8 +370,8 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         &raw_response,
     );
 
-    // RM-1: Single status clone after CBM interaction
-    // state.cbm_status is Arc - cannot mutate
+    // The bridge reflects this interaction; the startup status snapshot may
+    // remain unavailable after recovery and is not provider readiness truth.
 
     // Step 3: Compress the intercepted response with JSON-aware compressor
     // RC-1 fix: JSON compressor handles key shortening, not tree-sitter
@@ -398,7 +404,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
                         "savings_pct": if raw_tokens > 0 {
                             (1.0 - comp_tokens as f64 / raw_tokens as f64) * 100.0
                         } else { 0.0 },
-                        "cbm_status": state.cbm_status.summary(),
+                        "cbm_status": bridge.status().summary(),
                         "cbm_error": compressed.cbm_error,
                     }
                 }
@@ -429,7 +435,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
                         "savings_pct": if raw_tokens > 0 {
                             (1.0 - comp_tokens as f64 / raw_tokens as f64) * 100.0
                         } else { 0.0 },
-                        "cbm_status": state.cbm_status.summary(),
+                        "cbm_status": bridge.status().summary(),
                         "compression_fallback": true,
                     }
                 }

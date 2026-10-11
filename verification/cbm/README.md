@@ -42,3 +42,28 @@ the switch it adds compatible frontends, registered project routing, retirement,
 one safe recovery and controlled admission exit. Verdicts require inspecting the
 captured traces; a successful script exit alone does not establish all A5 claims.
 Mutation uncertainty and incompatible cohort stimulation are intentionally absent.
+
+## Phase B typed/raw live acceptance
+
+The [B1–B4 coverage matrix](PHASE_B_ACCEPTANCE.md) distinguishes unit/module
+contracts from the live model-facing boundary. The portable PowerShell driver
+creates owned TypeScript/C# fixtures and primary/additional Git roots, then
+exposes real registered tools through stdin/stdout MCP sessions. It follows the
+same ProcessStartInfo/stdio pattern as the existing verification scripts.
+It does not invoke Codex, build binaries or run test suites.
+
+Use a current all-feature Clean-CTX binary and the pinned provider artifact.
+Pass the independently verified SHA256 for your platform; the frozen Linux A5
+artifact hash is `6dfaa906ed310795a97ca9b992d4d42b6118a8cf740ea7b4550df6d8146b24f0`.
+A hash pins the artifact, not source provenance by itself; retain build evidence.
+
+```powershell
+pwsh -NoProfile -File ./verification/cbm/scripts/Invoke-PhaseBAcceptance.ps1 -BinaryPath ./target/debug/clean-ctx.exe -ProviderPath 'C:\path\to\codebase-memory-mcp.exe' -ExpectedProviderHash '<verified SHA256>'
+```
+
+On Linux use the corresponding binary paths without `.exe`. Evidence, requests,
+responses, stderr, fixture manifests, provenance and per-phase verdicts are saved
+under `target/cbm-phase-b/`. There is no private CBM cache override or daemon kill.
+Only generated fixtures are indexed. Live execution requires the repository's
+runtime authorization; the standing focused-check authorization does not itself
+claim a successful live run. Scripts are prepared acceptance assets until run.

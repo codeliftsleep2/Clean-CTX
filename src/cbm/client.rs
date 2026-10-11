@@ -57,6 +57,10 @@ mod b3_support;
 #[path = "../tests/cbm/continuation.rs"]
 mod b3_tests;
 
+#[cfg(test)]
+#[path = "../tests/cbm/proxy_truth_boundary.rs"]
+mod b4_tests;
+
 #[derive(Debug)]
 pub enum CbmError {
     LaunchError(String),

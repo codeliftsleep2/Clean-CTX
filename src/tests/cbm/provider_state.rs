@@ -9,7 +9,7 @@ fn with_client(mode: &str, body: impl FnOnce(&mut CbmClient)) {
     client.admit().unwrap();
     body(&mut client);
 }
-fn with_bridge(mode: &str, body: impl FnOnce(&mut GraphBridge)) {
+pub(super) fn with_bridge(mode: &str, body: impl FnOnce(&mut GraphBridge)) {
     let root = tempfile::tempdir().unwrap();
     let mut client =
         fixture::launch_for_admission(root.path(), &root.path().join("wire.json"), mode);
