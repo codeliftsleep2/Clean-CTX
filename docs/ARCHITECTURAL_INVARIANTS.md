@@ -722,6 +722,28 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | TypeScript and C# invocation occurrences retain written UTF-8 byte spans, callee structure, ordered arguments and qualifiers, type arguments, immediate invocation parents, and supported declaration contexts. They contain no resolved target or framework meaning. Source slices require a view bound to the producing source identity and SHA-256. Edits cannot reuse the old set as current evidence. |
+| **Boundary** | Evidence is compilation-local, cleared before compilation and published only after success. It remains outside CompiledIR, canonical formats, semantic edges, WorkspaceIndex, producer generations, and persistence. CoreOp::Call and CallEvidence remain their existing compact canonical authorities. Unsupported targets retain occurrences without invented terminals. |
+| **Enforcement** | Private structural types and validated slicing; same-parse capture assembly; cross-language consumer parity, identity/hash mismatch, edit/empty replacement, and populated-failure regressions. |
+| **Authority** | `src/ir/invocation_evidence.rs`; `src/ir/invocation_evidence/collect.rs`; `src/tests/ir/invocation_generic_consumer.rs`; `src/tests/ir/invocation_evidence_lifecycle.rs` |
+| **Type** | STRUCTURAL + ENFORCED |
+
+### INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | Production RxJS pipe discovery and top-level operator argument boundaries consume the compiler's borrowed validated occurrence view, including authoritative empty evidence. They do not reparse or reconstruct pipe bodies with substring scans or comma splitting. The standalone source API performs one TypeScript capture walk through the same collector because it has no upstream parse. |
+| **Domain boundary** | RxJS retains operator interpretation, textual owner policy, minimum-operator filtering, shape and rendering. Combinator scanning remains outside the migrated slice. Unavailable structural evidence does not fall back to textual pipe discovery. |
+| **Enforcement** | Production and standalone parse-count assertions, spaced/commented syntax regression, frozen shape/operator assertions, lexical-decoy and ownership preservation suites. |
+| **Authority** | `src/ir/pipeline/meta_layer.rs`; `src/layers/meta/context.rs`; `src/angular_meta/rx/pipes.rs`; `src/tests/angular_meta/rx_invocation_evidence.rs` |
+| **Type** | ENFORCED |
+
+---
+
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)

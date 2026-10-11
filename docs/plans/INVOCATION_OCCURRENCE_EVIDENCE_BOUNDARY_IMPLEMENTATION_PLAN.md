@@ -2,7 +2,7 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Phases 0–5 implemented; final readiness checks underway
+**Status:** Phases 0–7 locally implemented and verified; full CI gate pending
 
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
@@ -600,9 +600,56 @@ single-parse assertions passed. No full suite was run.
 
 Exercise edit/delete/hash lifecycle, production one-parse invariant, existing call and RxJS regressions, file-size policy, and architecture audit.
 
+#### Phase 6 working record — 2026-10-11
+
+Fresh-state tests cover populated compile → same-length edit → empty-source
+replacement, and populated compile → failed compile → empty successful compile.
+Evidence and RxJS markers do not survive those replacements; detached snapshots
+reject edited/empty bytes. Nonempty compilations parse once; the existing empty
+source fast path performs zero parses. File deletion has no compiler-owned
+durable occurrence state to retract; workspace deletion machinery is unchanged.
+
+Focused preservation passed: 129 call tests, 15 semantic-projection tests, 34
+RxJS tests, 18 production meta-layer tests, and two new freshness tests. Existing
+source identity/hash and cross-language consumer proofs remain part of the
+invocation evidence suite. Formatting, Clippy, encoding and active-file checks
+are recorded with the final verification results. The active-file validator is
+run relative to the preservation-freeze commit, including all migration changes.
+
+Final checks passed: all 11 evidence/lifecycle/consumer tests, seven encoding
+tests, cargo fmt check, package Clippy with all targets/features and warnings
+denied, nine PowerShell validator behavior tests, the base-relative active-file
+size guard, and the strict UTF-8 guard. One Phase 1 test file received formatting
+cleanup only. No assertions were weakened for the final gate.
+
+The authoritative final-gate procedure was reviewed. The owner's instruction
+reserves the full test suite exclusively for CI, so this record does not claim a
+completed full gate or Windows/live-host verification. No live MCP pilot is
+required for this internal-only boundary. CI remains the final merge gate.
+
 ### Phase 7 — Decision gate
 
 Classify the boundary as PROVEN, PROVEN WITH REVISIONS, TOO BROAD, TOO NARROW, LANGUAGE-LEAKING, or NOT WORTH SHARING. Stop before limited resolution extraction.
+
+#### Phase 7 decision — PROVEN locally, CI gate pending
+
+Two production language adapters and two framework-free/domain consumers use
+the same written-evidence fields without resolved or framework-specific fields.
+Both production paths reuse one parse. RxJS no longer reconstructs the migrated
+pipe structure; its owner policy and operator meaning intentionally remain
+domain-owned. Source identity/hash, fresh-state and canonical preservation proofs
+pass. The implemented boundary therefore survives the locally testable falsifiers.
+
+The accepted invariant decisions are documented in the existing architectural
+invariant catalog as INVOCATION-001 and INVOCATION-002, with structural and test
+authorities. No new invariant framework, durable/public contract, generation,
+global budget, resolution rule, or Java/Rust adapter was introduced. The
+compilation-local cloned vector used to bind the meta view is an ownership cost,
+not a claim of allocation-free consumption. No performance benchmark was run.
+
+Stop here before limited resolution extraction. The full CI gate must pass
+before merge; live-host rendering and future public occurrence fields remain
+outside this decision.
 
 ## 21. File and module change table
 

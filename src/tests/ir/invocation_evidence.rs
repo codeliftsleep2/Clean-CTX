@@ -131,7 +131,10 @@ fn successful_compile_publishes_empty_phase_one_side_output() {
         .as_ref()
         .expect("successful compile publishes its side output");
     assert_eq!(evidence.source_id(), "C:/repo/Example.ts");
-    assert_eq!(evidence.source_hash(), crate::cache::content_hash(source.as_bytes()));
+    assert_eq!(
+        evidence.source_hash(),
+        crate::cache::content_hash(source.as_bytes())
+    );
     assert!(
         evidence
             .view("C:/repo/Example.ts", source)
@@ -159,14 +162,7 @@ fn failed_compile_clears_previous_invocation_evidence() {
         .expect("initial compilation succeeds");
     assert!(compiler.invocation_evidence.is_some());
 
-    let result = compiler.compile(
-        source,
-        "Example.ts",
-        language,
-        "(",
-        Fidelity::Low,
-        None,
-    );
+    let result = compiler.compile(source, "Example.ts", language, "(", Fidelity::Low, None);
     assert!(result.is_err(), "invalid query must fail compilation");
     assert!(
         compiler.invocation_evidence.is_none(),

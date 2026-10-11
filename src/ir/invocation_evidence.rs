@@ -347,3 +347,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/ir/invocation_generic_consumer.rs"]
 mod generic_consumer_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/invocation_evidence_lifecycle.rs"]
+mod lifecycle_tests;
