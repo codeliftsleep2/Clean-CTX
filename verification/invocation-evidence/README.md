@@ -42,20 +42,22 @@ are generated evidence and remain untracked. The temporary workspace is removed
 unless `-KeepWorkspace` is supplied. Configuration restarts affect only the
 server spawned by this script.
 
-| Case | Public production observation |
-| --- | --- |
-| `rxjs-high-structure-and-unicode` | Spaced/commented member-call syntax, three real chains, lexical decoy exclusion, nested comma boundaries, operator order, initializer/method ownership, and UTF-8 summary safety |
-| `rxjs-low-medium-fidelity` | Same chains at Low/Medium; owner-only Low and ordered Medium operators |
-| `typescript-canonical-calls` | Generic/free calls, repeated occurrences, spread qualification, omission of unsupported dynamic targets and field-initializer calls |
-| `csharp-generics-named-nesting-and-overloads` | Generic member call, whole named-argument count, nested receiver/argument calls, repeated occurrences, overload selection |
-| `csharp-file-owner-interface-isolation` | Same-named class across files, sibling class isolation, interface declaration without fabricated body calls |
-| `provide-context-live-projection` | Actual TypeScript/C# context delivery and metadata; truthful raw passthrough if token economics selects it |
-| `angular-karma-testbed-preservation` | Karma/Jasmine source markers, TestBed configuration, and live Tests linkage to the component |
-| `angular-vitest-testbed-preservation` | Vitest/TestBed source markers, vi.fn spy, and the same live Tests linkage |
-| `changed-source-empty-delete-restore` | Same-session edits, empty method/source replacement, refresh after deletion, missing-file error, restoration |
-| `verbatim-byte-exact` | Document content remains exactly the source text, including Unicode and whitespace |
-| `minimum-operators-config` | Restart with four-operator minimum suppresses the fixture's shorter chains |
-| `disabled-rxjs-config` | Restart with RxJS disabled suppresses its markers |
+The expanded run contains **59 cases**, organized by phase. See
+[COVERAGE.md](COVERAGE.md) for every T1–T24 contract, existing verification
+ownership, new MCP cases, cross-file/layer coverage, and internal-only limits.
+
+Run a phase independently with the same binary:
+
+```powershell
+pwsh -NoProfile -File ./verification/invocation-evidence/scripts/Verify-InvocationEvidenceLive.ps1 -Phase 7
+```
+
+The full run is required for complete acceptance; a selected phase is reported
+as selected coverage only. Mixed-layer cases interleave call queries, reactive
+context, and Karma/Vitest Tests linkage, and batch different files/fidelities
+through all three context routes. A mixed query batch asks TypeScript, C#, and
+Angular different questions while isolating a missing-file error and observing
+a same-length edit.
 
 ## What the live tools can prove
 

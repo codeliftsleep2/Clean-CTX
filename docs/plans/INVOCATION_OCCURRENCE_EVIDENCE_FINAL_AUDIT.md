@@ -80,3 +80,27 @@ runner execution is claimed.
 - Full CI and Windows operator results remain separate from this local audit.
 
 Operator entry point: `verification/invocation-evidence/README.md`.
+
+## Expanded MCP boundary acceptance
+
+The original 12-case run was a smoke check, not exhaustive phase acceptance.
+The expanded operator package has 59 cases grouped across phases 0–7, with a
+T1–T24 coverage matrix in `verification/invocation-evidence/COVERAGE.md`. It
+records existing verification ownership instead of duplicating general codec,
+batch transport, identity, DI and template contracts.
+
+Added observations include rich canonical calls in both languages, bound-arrow
+ownership, private-to-public negative controls, same-length edits and recovery,
+Rx import/terminal/nesting policies, all context delivery routes, mixed-file and
+mixed-layer questions, same-source Angular/NgRx/Rx composition, and corrected
+multiline Rx markers surviving durable save/restart/restore. Internal contracts
+remain enforced by tracked tests; no new private fields or tool schema was added.
+The phase selector reports partial coverage explicitly. Full CI and Windows
+operator verification remain separate gates.
+
+Final expanded live run: **59 PASS, 0 FAIL**, PowerShell 7 on Linux, current
+production binary. Phase counts: 0=2, 1=2, 2=9, 3=8, 4=3, 5=13, 6=5, 7=17.
+Evidence: `target/invocation-evidence-verification/20261011-152913-a47bccda/captures/summary.json`.
+Selected Phase 6 and Phase 7 runs also exercised independent selection. File-size
+and strict UTF-8 guards passed. This expansion changed only verification assets
+and documentation; no production code or Rust tests changed or were rerun.

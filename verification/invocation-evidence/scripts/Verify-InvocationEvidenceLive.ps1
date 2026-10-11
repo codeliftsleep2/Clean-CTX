@@ -3,6 +3,7 @@ param(
     [string]$BinaryPath = '',
     [string]$RepositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path,
     [ValidateRange(5, 300)][int]$RequestTimeoutSeconds = 90,
+    [ValidateSet('all','0','1','2','3','4','5','6','7')][string]$Phase = 'all',
     [switch]$KeepWorkspace
 )
 Set-StrictMode -Version Latest
@@ -53,6 +54,8 @@ Copy-Item (Join-Path $fixtureRoot '*') $workspace
 $session = $null
 $script:nextId = 0
 $rows = [Collections.Generic.List[object]]::new()
+$script:planned = 0
+$script:selected = 0
 
 function Write-Utf8([string]$Path, [string]$Text) {
     [IO.File]::WriteAllText($Path, $Text, [Text.UTF8Encoding]::new($false))
@@ -64,13 +67,23 @@ function Assert-Live([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 function Invoke-Case([string]$Name, [scriptblock]$Body) {
-    Write-Host "Running $Name"
+    $script:planned += 1
+    $casePhase = if ($Name -match '^phase([0-7])-') { $Matches[1] } else {
+        switch -Wildcard ($Name) {
+            'typescript-*' { '2' }; 'csharp-*' { '3' }; 'rxjs-*' { '5' }
+            '*config' { '5' }; 'changed-*' { '6' }; 'angular-*' { '0' }
+            default { '7' }
+        }
+    }
+    if ($Phase -ne 'all' -and $Phase -ne $casePhase) { return }
+    $script:selected += 1
+    Write-Host "Running $Name (phase $casePhase)"
     try {
         & $Body
-        $rows.Add([pscustomobject]@{ name = $Name; status = 'PASS'; evidence = 'See captures; live stdio observation.' })
+        $rows.Add([pscustomobject]@{ name = $Name; phase = $casePhase; status = 'PASS'; evidence = 'See captures; live stdio observation.' })
         Write-Host "PASS: $Name"
     } catch {
-        $rows.Add([pscustomobject]@{ name = $Name; status = 'FAIL'; evidence = $_.Exception.Message })
+        $rows.Add([pscustomobject]@{ name = $Name; phase = $casePhase; status = 'FAIL'; evidence = $_.Exception.Message })
         Write-Warning "$Name failed: $($_.Exception.Message)"
     }
 }
@@ -154,6 +167,8 @@ try {
         working_tree = @(& git -C $RepositoryRoot status --porcelain)
         platform = [Environment]::OSVersion.ToString(); workspace = $workspace
     }
+    . (Join-Path $PSScriptRoot 'Verify-PhaseBoundaries.ps1')
+    . (Join-Path $PSScriptRoot 'Verify-CrossLayerBoundaries.ps1')
     Invoke-Case 'rxjs-high-structure-and-unicode' {
         $reply = Compress 'rxjs-high' 'Reactive.ts'
         $pipes = @(Pipes $reply)
@@ -280,7 +295,7 @@ try {
         try { Stop-CleanCtxSession $session }
         catch { $rows.Add([pscustomobject]@{ name = 'server-cleanup'; status = 'FAIL'; evidence = $_.Exception.Message }) }
     }
-    Save-Capture 'summary' @{ cases = @($rows.ToArray()); workspace_retained = [bool]$KeepWorkspace; run_root = $runRoot }
+    Save-Capture 'summary' @{ phase = $Phase; planned = $script:planned; selected = $script:selected; cases = @($rows.ToArray()); workspace_retained = [bool]$KeepWorkspace; run_root = $runRoot }
     if ($KeepWorkspace) { Write-Host "Retained workspace: $workspace" }
     else {
         foreach ($attempt in 1..5) {
@@ -292,4 +307,4 @@ try {
 Write-Host "Evidence: $captures"
 $failed = @($rows | Where-Object { $_.status -eq 'FAIL' })
 Write-Host "Cases: $($rows.Count), failed: $($failed.Count)"
-if ($failed.Count -or $rows.Count -ne 12) { exit 1 }
+if ($failed.Count -or $script:planned -ne 59 -or $rows.Count -ne $script:selected -or $script:selected -eq 0) { exit 1 }
