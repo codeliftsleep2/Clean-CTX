@@ -41,6 +41,12 @@ pub(super) fn is_response(raw: &str, pending: u64) -> Result<bool, CbmError> {
             return Err(invalid("malformed RPC error"));
         }
         if object.get("id").is_some_and(Value::is_null) {
+            if error["code"].as_i64() == Some(-32001) {
+                return Err(CbmError::AdmissionError {
+                    code: Some(-32001),
+                    message: error["message"].as_str().unwrap_or_default().into(),
+                });
+            }
             return Err(invalid(&format!(
                 "uncorrelated startup/lifecycle error: {}",
                 error["message"].as_str().unwrap_or_default()

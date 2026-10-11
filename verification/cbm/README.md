@@ -21,3 +21,8 @@ functions with the same bare name. It verifies that both `graph_trace` and
 canonical candidates, while canonical inputs retain their direct trace paths.
 Generated response evidence is written under `target/`; this field harness does
 not replace the tracked Rust regression.
+
+## Pinned upgrade admission acceptance
+
+[A3 prepared live cases](A3_ACCEPTANCE.md) describe the bounded source/artifact,
+startup, shared-session and refusal checks. They have not been run.

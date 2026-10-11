@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use crate::cbm::config::CbmStatus;
 
+mod admission;
 mod framing;
 mod lifecycle;
 use lifecycle::{FrontendSession, RetirementOutcome};
@@ -21,10 +22,18 @@ mod a2_support;
 #[cfg(test)]
 #[path = "../tests/cbm/frontend_lifecycle.rs"]
 mod a2_tests;
+#[cfg(test)]
+#[path = "../tests/cbm/frontend_admission.rs"]
+mod a3_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
     LaunchError(String),
+    AdmissionError {
+        code: Option<i64>,
+        message: String,
+    },
+    CapabilityError(String),
     ConnectionLost(String),
     RpcError {
         code: i64,
@@ -45,6 +54,10 @@ impl std::fmt::Display for CbmError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CbmError::LaunchError(msg) => write!(f, "CBM launch failed: {msg}"),
+            CbmError::AdmissionError { code, message } => {
+                write!(f, "CBM admission failed ({code:?}): {message}")
+            }
+            CbmError::CapabilityError(msg) => write!(f, "CBM capability mismatch: {msg}"),
             CbmError::ConnectionLost(msg) => write!(f, "CBM connection lost: {msg}"),
             CbmError::RpcError { code, message } => write!(f, "CBM RPC error ({code}): {message}"),
             CbmError::Timeout(d) => write!(f, "CBM query timed out after {d:?}"),
@@ -81,6 +94,7 @@ pub struct QueryRows {
 pub struct CbmClient {
     /// None means terminal; no pipe or worker may be reused by this client.
     frontend: Option<FrontendSession>,
+    usable: bool,
     last_retirement: Option<RetirementOutcome>,
     request_id: AtomicU64,
     status: CbmStatus,
@@ -255,7 +269,7 @@ impl CbmClient {
     /// If the circuit is open but the cooldown has elapsed, it resets
     /// automatically and allows the next call through (half-open state).
     pub(crate) fn circuit_allows(&mut self) -> bool {
-        if self.frontend.is_none() {
+        if self.frontend.is_none() || !self.usable {
             return false;
         }
         if self.consecutive_failures < self.max_consecutive_failures {
@@ -280,7 +294,7 @@ impl CbmClient {
         self.consecutive_failures = 0;
         self.degraded_since = None;
         // Don't overwrite status if it was explicitly set to Available
-        if matches!(self.status, CbmStatus::Degraded(_)) {
+        if self.usable && matches!(self.status, CbmStatus::Degraded(_)) {
             self.status = CbmStatus::Available;
         }
     }
@@ -318,6 +332,7 @@ impl CbmClient {
     /// once with exponential backoff before giving up. Delegates to
     /// `call_tool_raw_inner` for the actual pipe I/O.
     pub fn call_tool_raw(&mut self, tool_name: &str, args: Value) -> Result<String, CbmError> {
+        self.ensure_usable()?;
         if !self.circuit_allows() {
             return Err(CbmError::ConnectionLost("circuit breaker open".into()));
         }
@@ -363,6 +378,7 @@ impl CbmClient {
     /// Retries transient errors (timeout, connection lost, internal error)
     /// once with exponential backoff before giving up.
     pub fn call_tool(&mut self, tool_name: &str, args: Value) -> Result<Value, CbmError> {
+        self.ensure_usable()?;
         if !self.circuit_allows() {
             return Err(CbmError::ConnectionLost("circuit breaker open".into()));
         }

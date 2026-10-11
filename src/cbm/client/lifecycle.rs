@@ -124,6 +124,7 @@ impl Drop for FrontendSession {
 impl CbmClient {
     /// Terminal transition. Replacement and admission are deliberately absent.
     pub(super) fn retire_frontend(&mut self, reason: &str) {
+        self.usable = false;
         if let Some(mut frontend) = self.frontend.take() {
             let outcome = frontend.retire();
             self.last_retirement = Some(outcome);
@@ -138,6 +139,13 @@ impl CbmClient {
     /// Check direct process/reader liveness before allocating or writing a new
     /// request. Serialized &mut access prevents retirement/write ownership races.
     pub(super) fn ensure_frontend(&mut self) -> Result<(), CbmError> {
+        self.ensure_frontend_with_deadline(Instant::now() + self.timeout)
+    }
+
+    pub(super) fn ensure_frontend_with_deadline(
+        &mut self,
+        deadline: Instant,
+    ) -> Result<(), CbmError> {
         let failure = match self.frontend.as_mut() {
             None => return Err(CbmError::ConnectionLost("frontend retired".into())),
             Some(frontend) => match frontend.child.try_wait() {
@@ -155,8 +163,13 @@ impl CbmClient {
             },
         };
         if let Some(failure) = failure {
-            self.retire_frontend(&failure);
-            return Err(CbmError::ConnectionLost(failure));
+            let error = if !self.usable {
+                self.terminal_startup_error(deadline)
+            } else {
+                CbmError::ConnectionLost(failure)
+            };
+            self.retire_frontend(&error.to_string());
+            return Err(error);
         }
         Ok(())
     }

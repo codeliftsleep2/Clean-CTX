@@ -50,13 +50,19 @@ pub(super) fn launch(
             child_id: None,
         }
     });
-    let result = CbmClient::try_launch(
+    let mut result = CbmClient::try_launch(
         &std::env::current_exe().unwrap(),
         root,
         Duration::from_millis(300),
         3,
         0,
     );
+    // A2 tests isolate transport/lifetime contracts with a stub admitted state;
+    // the A3 launch helper below intentionally does not use this stub.
+    if let Ok(Some(client)) = &mut result {
+        client.usable = true;
+        client.status = crate::cbm::config::CbmStatus::Available;
+    }
     if mode == "flood" && result.as_ref().is_ok_and(|client| client.is_some()) {
         wait_file(&log.with_extension("queue-full"));
     }
@@ -127,7 +133,15 @@ fn fixture_entry() {
         .open(log.with_extension("launches"))
         .unwrap();
     writeln!(launches, "{}", std::process::id()).unwrap();
-    if mode == "exit" {
+    if mode == "a3-startup-refusal" || mode == "a3-startup-refusal-exit" {
+        println!(
+            "{}",
+            serde_json::json!({"jsonrpc":"2.0", "id":null,
+            "error":{"code":-32001, "message":"provider admission refused"}})
+        );
+        io::stdout().flush().unwrap();
+    }
+    if mode == "exit" || mode == "a3-startup-refusal-exit" {
         std::process::exit(0);
     }
     if mode == "flood" {
@@ -150,6 +164,69 @@ fn fixture_entry() {
             .open(log.with_extension("requests"))
             .unwrap();
         writeln!(requests, "{}", line.trim()).unwrap();
+        if request["method"] == "notifications/initialized" {
+            line.clear();
+            continue;
+        }
+        if request["method"] == "initialize" {
+            if mode == "a3-exit-init" {
+                std::process::exit(0);
+            }
+            if mode == "a3-notify-only" || mode == "a3-notify-success" {
+                println!(
+                    "{}",
+                    serde_json::json!({"jsonrpc":"2.0", "method":"notifications/message", "params":{}})
+                );
+                io::stdout().flush().unwrap();
+                if mode == "a3-notify-only" {
+                    std::thread::sleep(Duration::from_secs(30));
+                }
+            }
+            let id = if mode == "a3-wrong-id" {
+                serde_json::json!(999)
+            } else {
+                request["id"].clone()
+            };
+            let mut result = serde_json::json!({"protocolVersion":"2024-11-05",
+                "serverInfo":{"name":"codebase-memory-mcp", "version":"0.11.0"},
+                "capabilities":{"tools":{"listChanged":false}, "prompts":{"listChanged":false}}});
+            if mode == "a3-bad-version" {
+                result["protocolVersion"] = serde_json::json!("9999-01-01");
+            }
+            if mode == "a3-no-tools-capability" {
+                result["capabilities"] = serde_json::json!({});
+            }
+            if mode == "a3-bad-identity" {
+                result["serverInfo"]["name"] = serde_json::json!("other");
+            }
+            println!(
+                "{}",
+                serde_json::json!({"jsonrpc":"2.0", "id":id, "result":result})
+            );
+            io::stdout().flush().unwrap();
+            line.clear();
+            continue;
+        }
+        if request["method"] == "tools/list" {
+            let names = [
+                "index_repository",
+                "search_graph",
+                "query_graph",
+                "trace_path",
+                "get_architecture",
+                "list_projects",
+                "detect_changes",
+            ];
+            let tools: Vec<_> = names.into_iter().filter(|name| mode != format!("a3-missing-{name}"))
+                .map(|name| serde_json::json!({"name":name,"description":"fixture", "inputSchema":{"type":"object","properties":{}}})).collect();
+            println!(
+                "{}",
+                serde_json::json!({"jsonrpc":"2.0", "id":request["id"], "result":{"tools":tools}})
+            );
+            io::stdout().flush().unwrap();
+            line.clear();
+            continue;
+        }
         if mode == "stall" {
             std::thread::sleep(Duration::from_secs(30));
         }
@@ -169,10 +246,18 @@ fn fixture_entry() {
 }
 
 pub(super) fn bridge(root: &Path, extras: &[PathBuf], log: &Path) -> crate::cbm::GraphBridge {
+    bridge_with_mode(root, extras, log, "normal")
+}
+pub(super) fn bridge_with_mode(
+    root: &Path,
+    extras: &[PathBuf],
+    log: &Path,
+    mode: &str,
+) -> crate::cbm::GraphBridge {
     OPTIONS.with(|options| {
         *options.borrow_mut() = Options {
             log: log.to_path_buf(),
-            mode: "normal".into(),
+            mode: mode.into(),
             ..Options::default()
         }
     });
@@ -236,5 +321,40 @@ pub(super) fn observe_frame(marker: &Option<PathBuf>, observed: &mut usize) {
         if let Some(marker) = marker {
             std::fs::write(marker, "256 frames queued; next send blocked").unwrap();
         }
+    }
+}
+
+pub(super) fn admit(client: &mut CbmClient) -> Result<(), CbmError> {
+    client.admit()
+}
+pub(super) fn launch_for_admission(root: &Path, log: &Path, mode: &str) -> CbmClient {
+    OPTIONS.with(|options| {
+        *options.borrow_mut() = Options {
+            log: log.to_path_buf(),
+            mode: mode.into(),
+            ..Options::default()
+        }
+    });
+    let result = CbmClient::try_launch(
+        &std::env::current_exe().unwrap(),
+        root,
+        Duration::from_millis(300),
+        3,
+        0,
+    );
+    OPTIONS.with(|options| *options.borrow_mut() = Options::default());
+    result.unwrap().unwrap()
+}
+pub(super) fn child_id(client: &CbmClient) -> u32 {
+    client.frontend.as_ref().unwrap().child.id()
+}
+
+pub(super) fn wait_frontend_exit(client: &mut CbmClient) {
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        let frontend = client.frontend.as_mut().unwrap();
+        if frontend.child.try_wait().unwrap().is_some() && frontend.stdout_reader.as_ref().unwrap().is_finished() { return; }
+        assert!(Instant::now() < deadline, "fixture exit/reader completion was not observed");
+        std::thread::sleep(Duration::from_millis(10));
     }
 }

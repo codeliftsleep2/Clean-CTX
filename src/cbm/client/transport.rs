@@ -9,7 +9,7 @@ use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 impl CbmClient {
     /// Launch an owned frontend transport at the authoritative primary root.
@@ -113,9 +113,10 @@ impl CbmClient {
 
         Ok(Some(Self {
             frontend: Some(frontend),
+            usable: false,
             last_retirement: None,
             request_id: AtomicU64::new(1),
-            status: CbmStatus::Available,
+            status: CbmStatus::Degraded("admission_required".into()),
             timeout,
             consecutive_failures: 0,
             degraded_since: None,
@@ -149,13 +150,25 @@ impl CbmClient {
         tool_name: &str,
         args: Value,
     ) -> Result<String, CbmError> {
-        self.ensure_frontend()?;
+        self.ensure_usable()?;
+        self.send_rpc_request(
+            "tools/call",
+            serde_json::json!({ "name": tool_name, "arguments": args }),
+            self.timeout,
+        )
+    }
+
+    /// Initialization and ordinary calls share the identical A1 receive boundary.
+    pub(super) fn send_rpc_request(
+        &mut self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+    ) -> Result<String, CbmError> {
+        self.ensure_frontend_with_deadline(Instant::now() + timeout)?;
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
-        let request = serde_json::json!({
-            "jsonrpc": "2.0", "id": id,
-            "method": "tools/call",
-            "params": { "name": tool_name, "arguments": args }
-        });
+        let request =
+            serde_json::json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
         let req_line =
             serde_json::to_string(&request).map_err(|e| CbmError::ParseError(e.to_string()))?;
         let write_result = {
@@ -173,12 +186,12 @@ impl CbmClient {
 
         // The frontend mirrors our newline framing. Notifications do not complete
         // this call and never reset its existing receive deadline.
-        let deadline = std::time::Instant::now() + self.timeout;
+        let deadline = std::time::Instant::now() + timeout;
         loop {
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
                 self.retire_frontend("timeout");
-                return Err(CbmError::Timeout(self.timeout));
+                return Err(CbmError::Timeout(timeout));
             }
             let received = self
                 .frontend
@@ -201,7 +214,7 @@ impl CbmClient {
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     self.retire_frontend("timeout");
-                    return Err(CbmError::Timeout(self.timeout));
+                    return Err(CbmError::Timeout(timeout));
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     self.retire_frontend("stdout exited or failed");
@@ -209,6 +222,25 @@ impl CbmClient {
                 }
             }
         }
+    }
+
+    pub(super) fn send_initialized(&mut self, deadline: Instant) -> Result<(), CbmError> {
+        self.ensure_frontend_with_deadline(deadline)?;
+        let stdin = self
+            .frontend
+            .as_mut()
+            .and_then(|frontend| frontend.stdin.as_mut())
+            .ok_or_else(|| CbmError::ConnectionLost("frontend stdin absent".into()))?;
+        let result = writeln!(
+            stdin,
+            "{{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}}"
+        )
+        .and_then(|_| stdin.flush());
+        if let Err(error) = result {
+            self.retire_frontend("initialized notification write failed");
+            return Err(CbmError::ConnectionLost(error.to_string()));
+        }
+        Ok(())
     }
 
     #[cfg(test)]
