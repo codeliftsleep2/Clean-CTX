@@ -99,3 +99,63 @@ const value$ = of(1);
         "parser-proven occurrences must ignore string/comment lookalikes"
     );
 }
+
+#[test]
+fn phase5_structural_pipe_accepts_written_whitespace_and_comments() {
+    let source = "import { map, tap } from 'rxjs/operators';\nconst value$ = source . pipe /* boundary */ (map(x => ({ x, y: [1, 2] })), tap(x => log(x)));";
+    let shape = extract_rx_shape(source, Fidelity::High).unwrap();
+    assert_eq!(shape.pipes.len(), 1);
+    assert_eq!(shape.pipes[0].owner, "value$");
+    assert_eq!(
+        shape.pipes[0]
+            .operators
+            .iter()
+            .map(|o| o.operator_name.as_str())
+            .collect::<Vec<_>>(),
+        ["map", "tap"]
+    );
+}
+
+#[test]
+fn phase5_source_only_collector_parses_once_and_keeps_legacy_shape() {
+    use crate::compression::capture_pipeline::{parse_count, reset_parse_count};
+    let source = "import { map, tap } from 'rxjs/operators';\nconst value$ = source.pipe(map(x => x), tap(log));";
+    reset_parse_count();
+    let shape = extract_rx_shape(source, Fidelity::High).unwrap();
+    assert_eq!(
+        parse_count(),
+        1,
+        "standalone API must use the shared structural collector"
+    );
+    assert_eq!(shape.pipes[0].owner, "value$");
+    assert_eq!(shape.pipes[0].operators.len(), 2);
+}
+
+#[test]
+fn phase5_production_meta_reuses_compiler_parse_for_structural_pipe() {
+    use crate::compression::capture_pipeline::{parse_count, reset_parse_count};
+    use crate::ir::{IRCompiler, opcodes::CoreOp};
+    let source = "import { map, tap } from 'rxjs/operators';\nclass C { value$ = source . pipe (map(x => x), tap(log)); }";
+    let mut compiler = IRCompiler::new();
+    compiler.add_language_layer(Box::new(
+        crate::ir::layers::typescript::TypeScriptLayer::new(),
+    ));
+    reset_parse_count();
+    let ir = compiler
+        .compile(
+            source,
+            "Example.ts",
+            crate::compression::language::safe_typescript_language().unwrap(),
+            TS_QUERY,
+            Fidelity::High,
+            None,
+        )
+        .unwrap();
+    assert_eq!(parse_count(), 1, "production meta must not reparse source");
+    assert!(
+        ir.instructions
+            .iter()
+            .any(|op| matches!(op, CoreOp::TypeAlias(name, _) if name == "@pipeRx")),
+        "structural pipe must reach production markers"
+    );
+}

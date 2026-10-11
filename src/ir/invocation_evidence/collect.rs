@@ -8,6 +8,27 @@ use super::{
 use crate::compression::capture_pipeline::CapturedNode;
 use std::collections::BTreeMap;
 
+/// Compatibility input for callers without an upstream capture walk.
+pub(crate) fn collect_typescript_source(
+    source: &str,
+) -> Result<super::InvocationEvidenceSet, String> {
+    let language = crate::compression::language::safe_typescript_language()
+        .ok_or_else(|| "TypeScript grammar is unavailable".to_string())?;
+    let captures = crate::compression::capture_pipeline::run_capture_pipeline_nodes(
+        language,
+        crate::queries::TS_CALL_QUERY,
+        source,
+        crate::compression::Fidelity::High,
+        |_, _, _| Some(String::new()),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(super::InvocationEvidenceSet::new(
+        "standalone-typescript".into(),
+        source,
+        collect_invocations(&captures),
+    ))
+}
+
 #[derive(Default)]
 struct Details {
     function: Option<SourceSpan>,

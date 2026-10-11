@@ -24,6 +24,27 @@ pub(crate) fn extract_rx_shape_with_regions(
         return None;
     }
 
+    let evidence = match crate::ir::invocation_evidence::collect_typescript_source(source) {
+        Ok(evidence) => evidence,
+        Err(error) => {
+            eprintln!("[clean-ctx] RxJS structural evidence unavailable: {error}");
+            return None;
+        }
+    };
+    let view = evidence
+        .view("standalone-typescript", source)
+        .expect("standalone evidence matches the parsed source");
+    extract_rx_shape_with_evidence(source, lexical_regions, &view)
+}
+
+pub(crate) fn extract_rx_shape_with_evidence(
+    source: &str,
+    lexical_regions: &LexicalRegions,
+    evidence: &crate::ir::invocation_evidence::InvocationEvidenceView<'_>,
+) -> Option<RxShape> {
+    if !has_rxjs_imports(source) {
+        return None;
+    }
     let mut shape = RxShape::default();
 
     // Extract observable field declarations
@@ -33,7 +54,7 @@ pub(crate) fn extract_rx_shape_with_regions(
     extract_subjects(source, &mut shape, lexical_regions);
 
     // Extract pipe chains
-    super::pipes::extract_pipe_chains(source, &mut shape, lexical_regions);
+    super::pipes::extract_pipe_chains(source, &mut shape, lexical_regions, evidence);
 
     // Extract static combinator calls
     super::pipes::extract_combinators(source, &mut shape, lexical_regions);

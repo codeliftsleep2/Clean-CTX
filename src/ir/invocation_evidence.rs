@@ -7,7 +7,7 @@
 use crate::cache::content_hash;
 
 mod collect;
-pub(crate) use collect::collect_invocations;
+pub(crate) use collect::{collect_invocations, collect_typescript_source};
 
 /// A zero-based, half-open UTF-8 byte range: `[start_byte, end_byte)`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

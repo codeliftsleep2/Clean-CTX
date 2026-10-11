@@ -59,6 +59,16 @@ impl IRPass for MetaLayerPass {
             state.config.as_ref(),
             &lexical_regions,
         );
+        let invocation_set = crate::ir::invocation_evidence::InvocationEvidenceSet::new(
+            file_provenance.clone(),
+            &state.source,
+            state.invocation_occurrences.clone(),
+        );
+        let invocation_view = invocation_set
+            .view(&file_provenance, &state.source)
+            .expect("compilation-local evidence matches its source");
+        // Some(empty) is authoritative: never reparse a production source.
+        context.invocation_evidence = Some(&invocation_view);
         if state.query_string == crate::queries::CS_QUERY {
             context.structured_declarations = Some(&structured_declarations);
         }

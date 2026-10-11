@@ -383,6 +383,7 @@ mod extract;
 mod pipes;
 
 pub use extract::extract_rx_shape;
+pub(crate) use extract::extract_rx_shape_with_evidence;
 pub(crate) use extract::extract_rx_shape_with_regions;
 
 // ---------------------------------------------------------------------------

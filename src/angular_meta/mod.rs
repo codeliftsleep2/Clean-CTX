@@ -235,6 +235,7 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
 
 #[derive(Default)]
 pub(crate) struct PrecomputedAngularEvidence {
+    pub rx: Option<Option<rx::RxShape>>,
     pub ngrx: Option<Option<ngrx::NgRxShape>>,
     pub routing: Option<Option<routing::RouteShape>>,
     pub is_angular: Option<bool>,
@@ -266,7 +267,9 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     // Detect RxJS independently — a file may be RxJS without being
     // Angular (e.g. a standalone RxJS service or utility).
     let rx_shape = if rxjs_enabled {
-        rx::extract_rx_shape_with_regions(source_code, fidelity, lexical_regions)
+        precomputed.rx.unwrap_or_else(|| {
+            rx::extract_rx_shape_with_regions(source_code, fidelity, lexical_regions)
+        })
     } else {
         None
     };

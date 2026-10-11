@@ -3,70 +3,56 @@
 use super::{CombinatorDecl, ObservableDecl, PipeChain, PipeOperator, RxJsKind, RxShape};
 use crate::meta_util::LexicalRegions;
 
-/// Extract pipe chains from the source.
-///
-/// Detects `.pipe(operator1(...), operator2(...), ...)` chains.
-/// The pipe must be assigned to a field or variable.
-///
-/// Uses the shared [`collect_call_body`](crate::angular_meta::util::collect_call_body)
-/// primitive for the multi-line, string-aware body scan — the SAME
-/// primitive used by NgRx and the combinator extractor. This is the
-/// single source of truth for bracket-depth + string-literal awareness;
-/// no layer hand-rolls its own scanner (Round-8 structural audit).
+/// Structural pipe discovery and ordered argument boundaries. Owner resolution
+/// remains the existing RxJS textual policy, outside this migrated slice.
 pub(super) fn extract_pipe_chains(
     source: &str,
     shape: &mut RxShape,
     lexical_regions: &LexicalRegions,
+    evidence: &crate::ir::invocation_evidence::InvocationEvidenceView<'_>,
 ) {
-    let mut search_from = 0;
-    while let Some(rel) = source[search_from..].find(".pipe(") {
-        let abs_idx = search_from + rel;
-
-        // Skip matches inside comment lines (`// ...` or `* ...`).
-        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line = &source[line_start..abs_idx];
-        let line_trim = line.trim_start();
-        if line_trim.starts_with("//") || line_trim.starts_with('*') {
-            search_from = abs_idx + ".pipe(".len();
+    use crate::ir::invocation_evidence::WrittenCallee;
+    let mut pipes = evidence
+        .occurrences()
+        .iter()
+        .filter_map(|call| {
+            let WrittenCallee::Member { receiver, terminal } = call.callee() else {
+                return None;
+            };
+            (evidence.slice(*terminal).ok()? == "pipe").then_some((call, *receiver, *terminal))
+        })
+        .collect::<Vec<_>>();
+    pipes.sort_by_key(|(_, _, terminal)| terminal.start_byte());
+    let mut consumed_until = 0;
+    for (call, receiver, terminal) in pipes {
+        // Preserve legacy outer-body advancement: a pipe inside an operator
+        // callback is not separately emitted; receiver chains still are.
+        if terminal.start_byte() < consumed_until {
             continue;
         }
-
-        // Round-11 audit: reject matches inside trailing comments, block
-        // comments, or string literals (e.g. `this.x.pipe(a) // .pipe(b)`).
-        if lexical_regions.contains(abs_idx) {
-            search_from = abs_idx + ".pipe(".len();
+        consumed_until = call.span().end_byte();
+        let owner = pipe_owner(source, receiver.end_byte(), lexical_regions);
+        let operators = call
+            .arguments()
+            .iter()
+            .filter_map(|argument| {
+                evidence
+                    .slice(argument.span())
+                    .ok()
+                    .and_then(parse_operator)
+            })
+            .collect::<Vec<_>>();
+        if operators.is_empty() {
             continue;
         }
-
-        // Resolve ownership only from the current statement or containing
-        // method. Earlier declarations are never evidence for this pipe.
-        let owner = pipe_owner(source, abs_idx, lexical_regions);
-
-        // Collect the full pipe body (which may span multiple lines) using
-        // the shared string-aware primitive. `after_pipe` is the slice
-        // starting just after `.pipe(`.
-        let after_pipe = abs_idx + ".pipe(".len();
-        let (pipe_body, end_offset) =
-            crate::angular_meta::util::collect_call_body(&source[after_pipe..]);
-
-        // Extract operators from the collected body.
-        let operators = extract_operators(&pipe_body);
-
-        if !operators.is_empty() {
-            // The owner (e.g. `users$`) is also an observable field
-            // declaration — register it so Low fidelity emits `Φobs:`.
-            if owner != "?" && !shape.observables.iter().any(|o| o.name == owner) {
-                shape.observables.push(ObservableDecl {
-                    name: owner.clone(),
-                    source: None,
-                    type_param: None,
-                });
-            }
-            shape.pipes.push(PipeChain { owner, operators });
+        if owner != "?" && !shape.observables.iter().any(|o| o.name == owner) {
+            shape.observables.push(ObservableDecl {
+                name: owner.clone(),
+                source: None,
+                type_param: None,
+            });
         }
-
-        // Advance past the whole pipe call (including its close paren).
-        search_from = after_pipe + end_offset;
+        shape.pipes.push(PipeChain { owner, operators });
     }
 }
 
@@ -148,21 +134,6 @@ fn method_name_before_brace(source: &str, brace: usize) -> Option<String> {
         return None;
     }
     Some(parts.bare_name.to_string())
-}
-
-/// Extract operators from inside a `.pipe(...)` call.
-///
-/// Uses the shared [`split_top_level`](crate::angular_meta::util::split_top_level)
-/// primitive: each top-level comma-separated segment is one operator
-/// expression (e.g. `map(x => x * 2)`, `tap(console.log)`). Commas inside
-/// nested parens, object literals, strings, or template interpolations are
-/// NOT treated as operator separators — the SAME depth/string-awareness
-/// used everywhere else in the meta-layer (Round-8 structural audit).
-fn extract_operators(pipe_body: &str) -> Vec<PipeOperator> {
-    crate::angular_meta::util::split_top_level(pipe_body, ',')
-        .iter()
-        .filter_map(|seg| parse_operator(seg))
-        .collect()
 }
 
 /// Parse a single operator expression (e.g. `switchMap(x => x.getUsers())`).

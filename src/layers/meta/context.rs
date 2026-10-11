@@ -27,6 +27,9 @@ pub struct MetaLayerContext<'a> {
     pub fidelity: Fidelity,
     pub config: Option<&'a CleanCtxConfig>,
     pub lexical_regions: &'a LexicalRegions,
+    /// Compiler-owned evidence; absence means no upstream parse was supplied.
+    pub(crate) invocation_evidence:
+        Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
 }
 
 impl<'a> MetaLayerContext<'a> {
@@ -48,6 +51,7 @@ impl<'a> MetaLayerContext<'a> {
             fidelity,
             config,
             lexical_regions,
+            invocation_evidence: None,
         }
     }
 }

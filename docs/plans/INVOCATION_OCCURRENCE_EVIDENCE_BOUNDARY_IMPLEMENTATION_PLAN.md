@@ -2,7 +2,7 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Phases 0–4 implemented; focused verification recorded below
+**Status:** Phases 0–5 implemented; final readiness checks underway
 
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
@@ -568,6 +568,33 @@ run and remains CI-only. Phase 5 RxJS domain proof is next.
 ### Phase 5 — RxJS domain proof
 
 Thread borrowed occurrences through MetaLayerContext, replace pipe discovery/argument splitting, add standalone compatibility collector, compare behavior, then remove migrated text authority.
+
+#### Phase 5 working record — 2026-10-11
+
+The owner approved all remaining tasks and verification. Three new tracked
+regressions observed intended RED: spaced/commented pipe syntax was missed and
+the source-only API did not use the structural collector. Only these tests were
+stashed during implementation, then restored unchanged; all three passed GREEN.
+
+Production MetaLayerContext borrows a validated compilation-local evidence view.
+The view currently binds a cloned occurrence vector to the same source identity
+and bytes; this is ephemeral ownership, not a second parse or persistence.
+Precomputed Angular evidence carries the RxShape through existing dispatch.
+Some(empty) evidence is authoritative and never triggers a production reparse.
+Standalone RxJS uses one TypeScript capture walk and the same occurrence
+collector; absent grammar/query failure reports an internal diagnostic without
+falling back to textual discovery.
+
+Pipe discovery now selects member terminals equal to pipe and slices the
+grammar-owned ordered argument spans. No pipe-chain substring search, body scan,
+or comma splitting remains. Existing textual owner policy, RxJS operator parsing,
+minimum-operator filtering, shape and rendering remain domain-owned. Operator
+callback pipes retain legacy outer-body suppression, while receiver chains remain
+ordered by written terminal position. Other combinator scanners are unchanged.
+
+Verification: all 34 RxJS tests and all 34 invocation-focused tests passed;
+all 18 production meta-layer tests passed. Package Clippy passed with warnings denied. The production and standalone
+single-parse assertions passed. No full suite was run.
 
 ### Phase 6 — Fresh-state and preservation readiness
 

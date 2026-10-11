@@ -148,6 +148,13 @@ pub(super) fn evaluate(
         context.path,
         context.lexical_regions,
         crate::angular_meta::PrecomputedAngularEvidence {
+            rx: context.invocation_evidence.map(|view| {
+                crate::angular_meta::rx::extract_rx_shape_with_evidence(
+                    context.source,
+                    context.lexical_regions,
+                    view,
+                )
+            }),
             ngrx: Some(ngrx_shape.clone()),
             routing: Some(routing_shape.clone()),
             is_angular: precomputed_angular,
