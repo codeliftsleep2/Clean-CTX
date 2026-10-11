@@ -332,8 +332,8 @@ impl McpState {
         project_root: &std::path::Path,
         additional_roots: &[String],
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        // Every configured additional root becomes its own CBM project: one
-        // subprocess, one async index per root, each tracked under its own
+        // All configured roots share one frontend subprocess. Each root gets
+        // its own async index request and is tracked under its own
         // canonical CBM slug (see `GraphBridge::try_create_with_roots`).
         let extras: Vec<std::path::PathBuf> = additional_roots
             .iter()

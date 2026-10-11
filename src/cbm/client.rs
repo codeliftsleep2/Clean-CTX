@@ -4,17 +4,23 @@
 // Self-contained — no knowledge of Clean-CTX internals.
 
 use serde_json::Value;
-use std::io::BufWriter;
-use std::process::{Child, ChildStdin};
 use std::sync::atomic::AtomicU64;
-use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use crate::cbm::config::CbmStatus;
 
 mod framing;
+mod lifecycle;
+use lifecycle::{FrontendSession, RetirementOutcome};
 mod transport;
 mod wire;
+
+#[cfg(test)]
+#[path = "../tests/cbm/frontend_lifecycle_support.rs"]
+mod a2_support;
+#[cfg(test)]
+#[path = "../tests/cbm/frontend_lifecycle.rs"]
+mod a2_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
@@ -73,20 +79,10 @@ pub struct QueryRows {
 
 /// JSON-RPC 2.0 client over stdin/stdout subprocess.
 pub struct CbmClient {
-    child: Child,
-    stdin: BufWriter<ChildStdin>,
-    /// C-2 fix: stdout is read exclusively by a background reader thread.
-    /// The thread sends each line through this channel so the main thread
-    /// can drain lines with a timeout and honour the per-request deadline
-    /// even when `read_line` would otherwise block indefinitely.
-    stdout_rx: std::sync::mpsc::Receiver<Result<String, std::io::Error>>,
-    /// Background thread draining CBM's stdout. Held to keep it alive.
-    _stdout_reader: Option<JoinHandle<()>>,
-    /// Background thread draining CBM's stderr to avoid pipe-buffer deadlock.
-    _stderr_drainer: Option<JoinHandle<()>>,
+    /// None means terminal; no pipe or worker may be reused by this client.
+    frontend: Option<FrontendSession>,
+    last_retirement: Option<RetirementOutcome>,
     request_id: AtomicU64,
-    /// A1 protocol failure is terminal for this frontend; recovery belongs to A2.
-    protocol_failed: bool,
     status: CbmStatus,
     timeout: Duration,
     /// Circuit breaker: consecutive transient failures.
@@ -99,7 +95,8 @@ pub struct CbmClient {
     circuit_cooldown_secs: u64,
 }
 
-/// Determines whether a CBM error is transient and should be retried.
+/// Classifies legacy retryable provider errors. A terminal frontend never
+/// retries its old pipes; replacement/admission remain deferred to A3/A4.
 ///
 /// Retryable errors:
 /// - `ConnectionLost` — transient pipe failure, CBM may recover
@@ -258,6 +255,9 @@ impl CbmClient {
     /// If the circuit is open but the cooldown has elapsed, it resets
     /// automatically and allows the next call through (half-open state).
     pub(crate) fn circuit_allows(&mut self) -> bool {
+        if self.frontend.is_none() {
+            return false;
+        }
         if self.consecutive_failures < self.max_consecutive_failures {
             return true;
         }
@@ -288,7 +288,7 @@ impl CbmClient {
     /// Record a transient failure — increments the counter, degrades if threshold reached.
     pub(crate) fn record_failure(&mut self) {
         self.consecutive_failures += 1;
-        if self.consecutive_failures >= self.max_consecutive_failures {
+        if self.frontend.is_some() && self.consecutive_failures >= self.max_consecutive_failures {
             self.status = CbmStatus::Degraded(format!(
                 "circuit_open_after_{}_failures",
                 self.max_consecutive_failures
@@ -332,7 +332,9 @@ impl CbmClient {
                     self.record_success();
                     return Ok(result);
                 }
-                Err(e) if retry_count < max_retries && is_retryable(&e) => {
+                Err(e)
+                    if self.frontend.is_some() && retry_count < max_retries && is_retryable(&e) =>
+                {
                     retry_count += 1;
                     self.record_failure();
                     std::thread::sleep(backoff);
@@ -375,7 +377,9 @@ impl CbmClient {
                     self.record_success();
                     return Ok(result);
                 }
-                Err(e) if retry_count < max_retries && is_retryable(&e) => {
+                Err(e)
+                    if self.frontend.is_some() && retry_count < max_retries && is_retryable(&e) =>
+                {
                     retry_count += 1;
                     self.record_failure();
                     std::thread::sleep(backoff);
@@ -418,16 +422,6 @@ impl CbmClient {
 
 impl Drop for CbmClient {
     fn drop(&mut self) {
-        let _ = self.child.kill();
-        // L-02 fix: don't hang indefinitely on unresponsive child.
-        // Poll try_wait with a deadline instead of blocking forever.
-        let deadline = Instant::now() + Duration::from_secs(5);
-        loop {
-            match self.child.try_wait() {
-                Ok(Some(_)) | Err(_) => break,
-                Ok(None) if Instant::now() > deadline => break,
-                Ok(None) => std::thread::sleep(Duration::from_millis(50)),
-            }
-        }
+        self.retire_frontend("drop");
     }
 }

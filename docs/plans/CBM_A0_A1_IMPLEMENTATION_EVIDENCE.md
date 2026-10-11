@@ -1,5 +1,8 @@
 # Current CBM upgrade — A0/A1 implementation evidence
 
+Historical A0/A1 checkpoint. Subsequent A2 results are recorded in
+[CBM_A2_IMPLEMENTATION_EVIDENCE.md](CBM_A2_IMPLEMENTATION_EVIDENCE.md).
+
 Branch: `feature/current-cbm-pinned-upgrade`.
 Verified parent: `4c1627fcefe698977447dcee4e88830c20c7f422`.
 Authority source: CBM `82b1ec908f975354ceb4bac8a8bfc594942a9bc4`.

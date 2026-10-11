@@ -71,6 +71,7 @@ impl GraphBridge {
             match binary_path {
                 Some(path) => match CbmClient::try_launch(
                     &path,
+                    &project_root_canon,
                     Duration::from_millis(config.query_timeout_ms),
                     config.max_retries,
                     config.circuit_cooldown_secs,
