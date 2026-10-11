@@ -162,7 +162,11 @@ fn parse_operator(op_text: &str) -> Option<PipeOperator> {
     } else {
         // Truncate long arguments
         let summary = if args.len() > 40 {
-            format!("{}...", &args[..37])
+            let mut end = 37;
+            while !args.is_char_boundary(end) {
+                end -= 1;
+            }
+            format!("{}...", &args[..end])
         } else {
             args.to_string()
         };

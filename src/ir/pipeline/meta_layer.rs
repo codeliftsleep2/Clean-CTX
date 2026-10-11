@@ -118,7 +118,18 @@ fn append_marker_aliases(
     outputs: &[crate::layers::meta::MetaLayerOutput],
 ) {
     for output in outputs {
-        for line in output.rendered.lines() {
+        // Structured marker entries keep domain-owned multiline values intact.
+        let markers = if let Some(block) = &output.angular_block {
+            block
+                .lines
+                .iter()
+                .chain(block.sections.iter().flat_map(|section| &section.lines))
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        } else {
+            output.rendered.lines().collect::<Vec<_>>()
+        };
+        for line in markers {
             let line = line.trim();
             if line.is_empty() || !line.starts_with('Φ') {
                 continue;

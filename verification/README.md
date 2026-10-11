@@ -12,6 +12,9 @@ authoritative.
 
 Current packages:
 
+- `invocation-evidence/` — live MCP checks for TypeScript/C# canonical calls,
+  structural RxJS pipe extraction, fidelity/configuration and source freshness;
+
 - `context-compression/` — CONTROL-PROD/CONTROL-FULL capture, measurement, and
   reasoning-verification definitions;
 - `workspace-query/` — registered workspace graph-query capture and model-

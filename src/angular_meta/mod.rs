@@ -376,26 +376,15 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
 
     // Tier 2 (RxJS): append the RxJS meta block if present.
     if let Some(shape) = rx_shape {
-        let rx_block =
-            shape.render_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators));
-        if !rx_block.is_empty() {
-            // The RxJS block has its own `// --- Φ RxJS Meta ---` header.
-            // Split the rendered block into header + lines and store as
-            // a named section so it renders under the correct header.
-            let mut rx_lines: Vec<String> = rx_block.lines().map(|l| l.to_string()).collect();
-            // First line is the header — pop it off.
-            let header = if rx_lines
-                .first()
-                .map(|l| l.starts_with("// ---"))
-                .unwrap_or(false)
-            {
-                rx_lines.remove(0)
-            } else {
-                "// --- Φ RxJS Meta ---".to_string()
-            };
+        let lines = shape
+            .marker_lines_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators))
+            .into_iter()
+            .map(|marker| marker.trim_end_matches('\n').to_string())
+            .collect::<Vec<_>>();
+        if !lines.is_empty() {
             block.sections.push(MetaSection {
-                header,
-                lines: rx_lines,
+                header: "// --- Φ RxJS Meta ---".to_string(),
+                lines,
             });
         }
     }

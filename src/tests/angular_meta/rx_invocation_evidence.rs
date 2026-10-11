@@ -159,3 +159,53 @@ fn phase5_production_meta_reuses_compiler_parse_for_structural_pipe() {
         "structural pipe must reach production markers"
     );
 }
+
+#[test]
+fn audit_invocation_unicode_operator_summary_keeps_utf8_boundaries() {
+    let prefix = format!("x => \"{}", "a".repeat(30));
+    assert_eq!(prefix.len(), 36);
+    let source = format!(
+        "import {{ map, tap }} from 'rxjs/operators';\nconst value$ = source.pipe(map({prefix}élong-text\"), tap(log));"
+    );
+    let shape = extract_rx_shape(&source, Fidelity::High).unwrap();
+    assert_eq!(
+        shape.pipes[0].operators[0].arg_summary.as_deref(),
+        Some(format!("{prefix}...").as_str())
+    );
+}
+
+#[test]
+fn audit_invocation_high_pipe_operator_details_reach_canonical_ir() {
+    use crate::ir::{IRCompiler, opcodes::CoreOp};
+    let source = "import { map, switchMap, tap } from 'rxjs/operators'; class C { value$ = source.pipe(map(x => x), switchMap(x => load(x)), tap(log)); }";
+    let mut compiler = IRCompiler::new();
+    compiler.add_language_layer(Box::new(
+        crate::ir::layers::typescript::TypeScriptLayer::new(),
+    ));
+    let ir = compiler
+        .compile(
+            source,
+            "Example.ts",
+            crate::compression::language::safe_typescript_language().unwrap(),
+            TS_QUERY,
+            Fidelity::High,
+            None,
+        )
+        .unwrap();
+    let marker = ir
+        .instructions
+        .iter()
+        .find_map(|op| match op {
+            CoreOp::TypeAlias(name, value) if name == "@pipeRx" => Some(value),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        marker.contains("map:x => x"),
+        "High operator arguments must survive the production handoff"
+    );
+    assert!(marker.contains("switchMap:x => load(x"));
+    assert!(marker.contains("tap:log"));
+    assert!(marker.ends_with(')'));
+    assert!(marker.find("map:").unwrap() < marker.find("switchMap:").unwrap());
+}

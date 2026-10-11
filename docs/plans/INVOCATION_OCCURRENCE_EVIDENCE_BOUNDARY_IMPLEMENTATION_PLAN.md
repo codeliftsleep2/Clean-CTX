@@ -4,6 +4,13 @@
 **Date:** 2026-10-10  
 **Status:** Phases 0–7 locally implemented and verified; full CI gate pending
 
+**Final audit:** See [production audit and live MCP verification](INVOCATION_OCCURRENCE_EVIDENCE_FINAL_AUDIT.md).
+The subsequent audit repaired UTF-8 summary truncation and a High-fidelity marker
+handoff gap. That marker repair requires Angular marker generation 2 under the
+existing compatibility rule; the original private-evidence implementation did
+not change producer generations. Semantic generations and Binary0x04 remain
+unchanged. The new operator harness exercises existing public MCP tools.
+
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
 ## 1. Executive design verdict
