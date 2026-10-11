@@ -25,4 +25,20 @@ not replace the tracked Rust regression.
 ## Pinned upgrade admission acceptance
 
 [A3 prepared live cases](A3_ACCEPTANCE.md) describe the bounded source/artifact,
-startup, shared-session and refusal checks. They have not been run.
+startup, shared-session and refusal checks. Linux results and declared limits are
+recorded in the [A5 acceptance report](../../docs/plans/CBM_A5_ENVIRONMENT_RECOVERY_AND_ACCEPTANCE.md).
+
+The tracked PowerShell harness uses the existing stdio-session pattern and Linux
+strace to observe the actual provider admission pipes. It requires a writable
+normal account cache, the frozen provider artifact, and a current Clean-CTX
+binary. Obtain execution authorization under AGENTS.md before running:
+
+```powershell
+pwsh -NoProfile -File ./verification/cbm/scripts/Invoke-A5BootstrapAcceptance.ps1 -BinaryPath ./target/debug/clean-ctx -ContinueMatrix
+```
+
+Without `-ContinueMatrix` it captures only bootstrap/native availability. With
+the switch it adds compatible frontends, registered project routing, retirement,
+one safe recovery and controlled admission exit. Verdicts require inspecting the
+captured traces; a successful script exit alone does not establish all A5 claims.
+Mutation uncertainty and incompatible cohort stimulation are intentionally absent.

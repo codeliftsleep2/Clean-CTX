@@ -1,6 +1,9 @@
 # A3 pinned frontend admission — prepared live acceptance
 
-Status: **NOT RUN**. These cases supplement deterministic admission fixtures;
+Status: live Linux execution is recorded in
+[`CBM_A5_ENVIRONMENT_RECOVERY_AND_ACCEPTANCE.md`](../../docs/plans/CBM_A5_ENVIRONMENT_RECOVERY_AND_ACCEPTANCE.md).
+Mutation uncertainty and incompatible-cohort cases were safety-skipped; Windows
+remains unverified. These cases supplement deterministic admission fixtures;
 they do not establish live acceptance until captured against the pinned artifact.
 Use the existing PowerShell MCP-session pattern documented in this directory and
 `verification/context-compression/scripts/McpSession.ps1`. Do not substitute
