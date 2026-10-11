@@ -343,3 +343,7 @@ impl<'a> InvocationEvidenceView<'a> {
 #[cfg(test)]
 #[path = "../tests/ir/invocation_evidence.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/invocation_generic_consumer.rs"]
+mod generic_consumer_tests;

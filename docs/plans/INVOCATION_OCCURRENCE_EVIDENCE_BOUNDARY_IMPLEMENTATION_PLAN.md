@@ -2,7 +2,7 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-10  
-**Status:** Phases 0–3 implemented; focused verification recorded below
+**Status:** Phases 0–4 implemented; focused verification recorded below
 
 **Authoritative predecessor:** docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
 
@@ -539,6 +539,31 @@ The full suite remains CI-only. Phase 4 generic consumer proof is next.
 ### Phase 4 — Generic consumer proof
 
 Consume the hash-bound set internally and prove stale-source rejection. Do not change MCP.
+
+#### Phase 4 working record — 2026-10-11
+
+The owner authorized the generic consumer proof. The test-only reader in
+src/tests/ir/invocation_generic_consumer.rs accepts a validated evidence view and
+uses checked slices for invocation, callee, receiver, arguments and qualifiers,
+type arguments, parent and declaration context. It contains no language or
+framework interpretation. Both production adapters feed the same reader.
+
+The proof compares shared TypeScript/C# fields, inspects each written callable
+declaration independently, and checks canonical CoreOp::Call and CallEvidence
+alongside the private side output. It also checks wrong identity, same-length
+edits, empty replacement bytes, and fresh recompilation. Detached old evidence
+remains a snapshot that can bind only to its original identity and bytes.
+
+This phase introduces verification only, not a production behavior change or a
+new public consumer. The existing hash/identity guard is the rejection authority;
+there is no intentionally failing regression or implementation repair to stage.
+The owner authorized focused checks under AGENTS.md §1. All three consumer proof
+tests passed; the evidence module run passed all nine tests (the same three
+consumer tests plus six lifecycle tests). Package Clippy passed with all targets,
+all features and warnings denied. The initial test compile caught a borrowed
+snapshot lifetime error; retaining both evidence sets through the comparison
+corrected the test harness without a production change. The full suite was not
+run and remains CI-only. Phase 5 RxJS domain proof is next.
 
 ### Phase 5 — RxJS domain proof
 
