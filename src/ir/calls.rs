@@ -308,6 +308,16 @@ mod csharp_tests;
 #[path = "../tests/ir/calls_typescript.rs"]
 mod typescript_tests;
 
+// Phase 0 preservation freeze for the private invocation-occurrence boundary.
+// The missing invoke.* captures are intentional RED evidence until Phase 2/3.
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/ir/invocation_evidence_typescript.rs"]
+mod invocation_evidence_typescript_tests;
+
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../tests/ir/invocation_evidence_csharp.rs"]
+mod invocation_evidence_csharp_tests;
+
 // Bound-arrow callable identity (TypeScript): the ownership/identity/scope
 // matrix and its callback/realistic-syntax continuation. Both ride the SAME
 // adapter query and the SAME single parse as the invocation captures.

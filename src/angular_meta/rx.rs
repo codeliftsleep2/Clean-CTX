@@ -412,3 +412,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/angular_meta/rx_lexical.rs"]
 mod lexical_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/angular_meta/rx_invocation_evidence.rs"]
+mod invocation_evidence_tests;
