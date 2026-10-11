@@ -14,6 +14,7 @@ mod framing;
 mod lifecycle;
 mod recovery;
 use lifecycle::{FrontendSession, RetirementOutcome};
+mod collection;
 mod decoder;
 mod observations;
 mod transport;
@@ -48,6 +49,13 @@ mod b2_support;
 #[cfg(test)]
 #[path = "../tests/cbm/provider_state.rs"]
 mod b2_tests;
+
+#[cfg(test)]
+#[path = "../tests/cbm/continuation_support.rs"]
+mod b3_support;
+#[cfg(test)]
+#[path = "../tests/cbm/continuation.rs"]
+mod b3_tests;
 
 #[derive(Debug)]
 pub enum CbmError {
@@ -117,6 +125,7 @@ pub struct QueryRows {
 /// JSON-RPC 2.0 client over stdin/stdout subprocess.
 pub struct CbmClient {
     /// None means this transport epoch is terminal; its resources cannot be reused.
+    collection: Option<collection::CollectionState>,
     provider_observations: observations::Observations,
     frontend: Option<FrontendSession>,
     usable: bool,

@@ -30,7 +30,7 @@ impl ProviderObservation {
                 }
             }
         }
-        metadata.insert("pages_consumed".into(), json!(1));
+        metadata.entry("pages_consumed").or_insert(json!(1));
         Self {
             metadata,
             failure: None,
@@ -189,11 +189,10 @@ impl CbmClient {
                     .into(),
             ));
         }
-        let response = self.call_tool(
+        let coverage = self.collect(
             "check_index_coverage",
             json!({"project":project,"paths":paths,"format":"json"}),
         )?;
-        let coverage = self.parse_cbm_response(&response)?;
         if coverage["project"] != project {
             return Err(CbmError::ParseError("coverage project mismatch".into()));
         }

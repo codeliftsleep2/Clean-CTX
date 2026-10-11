@@ -51,8 +51,7 @@ impl CbmClient {
         label: Option<&str>,
     ) -> Result<Vec<Value>, CbmError> {
         let args = Self::build_search_graph_args(name_pattern, project, label);
-        let r = self.call_tool("search_graph", args)?;
-        let inner = self.parse_cbm_response(&r)?;
+        let inner = self.collect("search_graph", args)?;
         let rows = decoder::search(&inner)?;
         observations::ProviderObservation::page(&inner).require_page("search_graph", rows.len())?;
         Ok(rows)
@@ -74,8 +73,7 @@ impl CbmClient {
         if let Some(d) = depth {
             args["depth"] = serde_json::Value::Number(serde_json::Number::from(d));
         }
-        let r = self.call_tool("trace_path", args)?;
-        let inner = self.parse_cbm_response(&r)?;
+        let inner = self.collect("trace_path", args)?;
         let edges = decoder::trace(&inner, function_name, direction)?;
         let observation = observations::ProviderObservation::page(&inner);
         observation.require_page("trace_path", 0)?;
@@ -120,11 +118,10 @@ impl CbmClient {
     /// `columns` carry the semantic projection (e.g. a verbatim `type(r)`
     /// marker) and MUST NOT be discarded by callers that interpret shapes.
     pub fn query_graph(&mut self, cypher: &str, project: &str) -> Result<QueryRows, CbmError> {
-        let r = self.call_tool(
+        let inner = self.collect(
             "query_graph",
-            serde_json::json!({"query": cypher, "project": project, "format": "json"}),
+            serde_json::json!({"query":cypher,"project":project,"format":"json"}),
         )?;
-        let inner = self.parse_cbm_response(&r)?;
         let mut table = decoder::table(&inner, "columns")?;
         table.observation = observations::ProviderObservation::page(&inner);
         table

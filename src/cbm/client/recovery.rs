@@ -53,9 +53,15 @@ impl CbmClient {
     ) -> Result<T, CbmError> {
         // An entry-time half-open replacement consumes this operation's retry
         // budget too. No later error can trigger another launch in this call.
+        self.check_collection_deadline()?;
         let mut retry_spent = self.prepare_call()?;
+        if let Some(state) = self.collection.as_mut() {
+            retry_spent |= state.retry_spent;
+            state.retry_spent |= retry_spent;
+        }
         let mut interrupted = None;
         loop {
+            self.check_collection_deadline()?;
             match attempt(self, tool, args.clone()) {
                 Ok(result) => {
                     self.record_success();
@@ -75,7 +81,7 @@ impl CbmClient {
                     }
                     if !retry_spent && terminal_recoverable {
                         retry_spent = true;
-                        std::thread::sleep(Duration::from_millis(100));
+                        self.retry_pause()?;
                         if let Err(replacement) = self.replace_frontend() {
                             self.status = CbmStatus::Degraded(format!(
                                 "original operation failure: {error}; replacement failed: {replacement}; cleanup: {:?}",
@@ -103,7 +109,7 @@ impl CbmClient {
                         && is_retryable(&error)
                     {
                         retry_spent = true;
-                        std::thread::sleep(Duration::from_millis(100));
+                        self.retry_pause()?;
                         interrupted = Some(error);
                         continue;
                     }
@@ -144,6 +150,7 @@ impl CbmClient {
                 self.circuit_cooldown_secs,
             )?
             .ok_or_else(|| CbmError::LaunchError("replacement executable missing".into()))?;
+            replacement.collection = self.collection.clone();
             if let Err(error) = replacement.admit() {
                 self.status = replacement.status().clone();
                 return Err(error);

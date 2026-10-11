@@ -38,7 +38,10 @@ impl CbmClient {
             return self.ensure_frontend();
         }
         self.status = CbmStatus::Degraded("admitting".into());
-        let deadline = Instant::now() + self.timeout;
+        let deadline = self
+            .collection
+            .as_ref()
+            .map_or(Instant::now() + self.timeout, |state| state.deadline);
         let result = self.admit_inner(deadline);
         match result {
             Ok(()) => {

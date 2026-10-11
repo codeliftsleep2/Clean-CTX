@@ -112,6 +112,7 @@ impl CbmClient {
         );
 
         Ok(Some(Self {
+            collection: None,
             provider_observations: Default::default(),
             frontend: Some(frontend),
             usable: false,
@@ -169,7 +170,12 @@ impl CbmClient {
         params: Value,
         timeout: Duration,
     ) -> Result<String, CbmError> {
-        self.ensure_frontend_with_deadline(Instant::now() + timeout)?;
+        let request_deadline = Instant::now() + timeout;
+        let deadline = self.collection.as_ref().map_or(request_deadline, |state| {
+            state.deadline.min(request_deadline)
+        });
+        self.check_collection_deadline()?;
+        self.ensure_frontend_with_deadline(deadline)?;
         let id = self.request_id.fetch_add(1, Ordering::SeqCst);
         let request =
             serde_json::json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
@@ -190,7 +196,14 @@ impl CbmClient {
 
         // The frontend mirrors our newline framing. Notifications do not complete
         // this call and never reset its existing receive deadline.
-        let deadline = std::time::Instant::now() + timeout;
+        self.check_collection_deadline()?;
+        // Preserve A's ordinary single-response receive budget. Only an
+        // approved collection carries its deadline across writes/pages/retries.
+        let deadline = if self.collection.is_some() {
+            deadline
+        } else {
+            Instant::now() + timeout
+        };
         loop {
             let remaining = deadline.saturating_duration_since(std::time::Instant::now());
             if remaining.is_zero() {
