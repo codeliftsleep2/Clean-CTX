@@ -372,5 +372,7 @@ fn refresh_and_selector_changes_do_not_reuse_stale_results() {
 
 #[test]
 fn ephemeral_phase_5_does_not_change_the_angular_producer_generation() {
-    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 2);
+    // Independent declaration publication advances the durable producer;
+    // ephemeral selector queries still introduce no additional generation.
+    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 3);
 }

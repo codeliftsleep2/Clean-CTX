@@ -45,6 +45,19 @@ pub fn class_to_semantic_edges(
 
     let subject = EntityRef::new("angular", entity_type, class_name);
 
+    // The producer has recognized this declaration independently of DI or
+    // other relationships. Reuse the index's existing registration carrier;
+    // it is normalized into an entity occurrence, never a graph self-edge.
+    if kind == ClassKind::Service {
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Defines,
+            subject: subject.clone(),
+            object: subject.clone(),
+            layer: "angular",
+            call_evidence: None,
+        });
+    }
+
     // Pipe → HasPipeName → pipe-name-string
     if kind == ClassKind::Pipe {
         if let Some(pn) = pipe_name {

@@ -67,7 +67,10 @@ try {
                 $services=@($answer.structuredContent.entities | Where-Object {
                     $_.domain -eq 'angular' -and $_.entity_type -eq 'Service' -and $_.name -eq 'OwnerProbe'
                 })
-                Assert-B ($services.Count -eq 0) 'Framework publication changed outside the owner repair.'
+                # Publication is owned by the subsequent independent-declaration
+                # slice. Preserve this owner's exact identity oracle and record
+                # the separate surface without freezing its historical absence.
+                Save-B "$($case.name)-publication-observation" @{service_occurrences=$services.Count}
             }
         }
         Invoke-BCase '139' "$($case.name)-qualified-edit" {

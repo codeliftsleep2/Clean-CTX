@@ -153,6 +153,20 @@ impl NgRxShape {
 
         let mut edges: Vec<SemanticEdge> = Vec::new();
 
+        // Modern ActionDecl recognition, not a dispatch/reducer/effect edge,
+        // owns publication. Existing index normalization keeps these records
+        // out of the relationship graph and deduplicates file occurrences.
+        for action in &self.actions {
+            let entity = EntityRef::new("ngrx", "Action", &action.name);
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "ngrx",
+                call_evidence: None,
+            });
+        }
+
         // Action → TriggersReducer → Reducer (via `on(action)` handlers).
         if let Some(reducer) = &self.reducer {
             for transition in &reducer.transitions {

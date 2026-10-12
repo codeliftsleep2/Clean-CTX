@@ -1,5 +1,10 @@
 # #139 decorated declaration owner identity repair
 
+The subsequent [independent publication slice](INDEPENDENT_FRAMEWORK_DECLARATION_PUBLICATION_REPAIR.md)
+supersedes this report's isolated Service absence observation. The owner repair
+and its historical evidence below remain frozen; publication is independently
+verified in that later report.
+
 ## Verdict
 
 **#139 DECORATED OWNER IDENTITY SLICE COMPLETE**

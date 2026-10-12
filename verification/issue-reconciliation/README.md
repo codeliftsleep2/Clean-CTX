@@ -149,11 +149,40 @@ Each form requires four live groups: exact qualified focus, builtin class/file
 provenance, a controlled qualified replacement checked against the entire
 expected source, and fresh focused output after editing (32 groups). Alpha's
 same-named body must remain untouched and absent from OwnerProbe's focused
-output. Edge-free Injectable cases also verify that independent Service entity
-publication remains outside this repair. Fixtures, raw requests/responses,
+output. Edge-free Injectable cases record independent Service publication as a
+separate observation; the subsequent publication harness owns that contract.
+Fixtures, raw requests/responses,
 binary hash and verdicts are saved under target/decorated-owner-identity.
 
 See [the owner repair report](../../docs/plans/ISSUE_139_DECORATED_OWNER_IDENTITY_REPAIR.md)
 for permanent regression RED/GREEN, separate earlier-body anomaly, preservation
 results and remaining #139 criteria. This harness builds nothing and invokes
 neither CBM nor a model host. It does not replace tracked tests or the CI gate.
+
+## Independent framework declaration publication
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-FrameworkDeclarationPublication.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit .exe. Rebuild the candidate separately before running. This driver
+reuses the existing Phase B stdio MCP session helper and creates owned Git-root
+fixtures with CBM disabled. It builds nothing and invokes no model host.
+
+All 56 required groups must pass: edge-free Service/modern Action recognition and
+publication; same-file multiple declarations; source-distinct same names; existing
+constructor/dispatch relationships and reference-file occurrences; deduplication;
+registered refresh/rename/removal/re-add/file deletion; and declaration removal
+with an unchanged reference retained. Legacy class Actions remain a negative
+control, not newly supported syntax. Exact declaring-file occurrences are checked
+separately from existing relationship endpoint occurrences.
+
+The public entity schema has no role/span field. Saved fixture roles are source
+oracles, not invented response fields. The driver does not claim declaration-only
+global lookup, cross-file binding or query-history independence. Source manifests,
+every raw request/result, binary hash, mutation evidence and verdicts are saved
+under target/framework-declaration-publication. FAIL is retained and exits 1.
+
+See [the publication repair report](../../docs/plans/INDEPENDENT_FRAMEWORK_DECLARATION_PUBLICATION_REPAIR.md)
+for permanent test RED/GREEN, live baseline/candidate evidence, durable generation
+compatibility, preservation and remaining #139/#140 work.

@@ -18,6 +18,11 @@ supersedes the decorated class-name / qualified-focus finding only. Independent
 framework publication, module/route semantics and the remaining #139 criteria
 retain their separate disposition.
 
+The approved [independent declaration publication repair](INDEPENDENT_FRAMEWORK_DECLARATION_PUBLICATION_REPAIR.md)
+supersedes isolated recognized Angular Service and modern NgRx Action publication
+absence only. Legacy extraction, broader declaration/reference contracts and
+the remaining #139/#140 criteria are not implicitly accepted.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups
