@@ -78,6 +78,10 @@ mod semantic_signature_evidence_tests;
 #[path = "../tests/mcp/di_omission.rs"]
 mod di_omission_tests;
 
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/mcp/decorated_owner_identity.rs"]
+mod decorated_owner_identity_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

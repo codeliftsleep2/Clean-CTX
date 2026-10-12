@@ -16,6 +16,7 @@ use crate::ir::symbol_table::SymbolKind;
 use std::collections::{HashMap, HashSet};
 
 mod csharp;
+mod typescript;
 use csharp::{apply_csharp_declaration_names, emit_csharp_class_base_type};
 
 /// Pass 1: Core IR emission from tree-sitter captures.
@@ -62,6 +63,10 @@ impl IRPass for CoreIRPass {
             capture_query.push('\n');
             capture_query.push_str(crate::queries::CS_SEMANTIC_QUERY);
         }
+        if query_string == crate::queries::TS_QUERY {
+            capture_query.push('\n');
+            capture_query.push_str(typescript::DECLARATION_QUERY);
+        }
 
         let mut captures = run_capture_pipeline_nodes(
             language,
@@ -91,6 +96,10 @@ impl IRPass for CoreIRPass {
 
         if query_string == crate::queries::CS_QUERY {
             apply_csharp_declaration_names(&mut captures);
+        }
+        if query_string == crate::queries::TS_QUERY {
+            typescript::apply_declaration_names(&mut captures);
+            captures.retain(|capture| !capture.name.starts_with("ts.identity."));
         }
 
         if query_string == crate::queries::TS_QUERY || query_string == crate::queries::CS_QUERY {

@@ -13,6 +13,11 @@ The approved [#135 DI retention repair](ISSUE_135_DI_OMISSION_REPAIR.md) superse
 the ten-entry DI truncation finding only. Other caps, conditional activation,
 signature fidelity and the broader #135 criteria retain their separate disposition.
 
+The approved [#139 decorated-owner repair](ISSUE_139_DECORATED_OWNER_IDENTITY_REPAIR.md)
+supersedes the decorated class-name / qualified-focus finding only. Independent
+framework publication, module/route semantics and the remaining #139 criteria
+retain their separate disposition.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups

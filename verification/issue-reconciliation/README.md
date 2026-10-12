@@ -133,3 +133,27 @@ See [the DI repair report](../../docs/plans/ISSUE_135_DI_OMISSION_REPAIR.md) for
 same-source RED/GREEN evidence, producer scope, ordering and remaining #135 work.
 The harness proves recognized written-fact delivery, not an evaluated DI container
 or completeness of unsupported registration forms.
+
+## #139 decorated declaration owner identity
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DecoratedOwnerIdentity.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit .exe. This provider-disabled harness uses the existing stdio MCP
+session helper and preallocates owned Git-root fixtures. Eight declaration
+forms cover export/decorator/layout variations, arbitrary custom decorators,
+basic generics and multiple classes with the same-named member.
+
+Each form requires four live groups: exact qualified focus, builtin class/file
+provenance, a controlled qualified replacement checked against the entire
+expected source, and fresh focused output after editing (32 groups). Alpha's
+same-named body must remain untouched and absent from OwnerProbe's focused
+output. Edge-free Injectable cases also verify that independent Service entity
+publication remains outside this repair. Fixtures, raw requests/responses,
+binary hash and verdicts are saved under target/decorated-owner-identity.
+
+See [the owner repair report](../../docs/plans/ISSUE_139_DECORATED_OWNER_IDENTITY_REPAIR.md)
+for permanent regression RED/GREEN, separate earlier-body anomaly, preservation
+results and remaining #139 criteria. This harness builds nothing and invokes
+neither CBM nor a model host. It does not replace tracked tests or the CI gate.
