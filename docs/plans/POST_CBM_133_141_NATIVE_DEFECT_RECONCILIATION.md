@@ -2,7 +2,9 @@
 
 The approved [#138 Pipe DI admission slice](ISSUE_138_PIPE_DI_ADMISSION_REPAIR.md)
 supersedes the missing Pipe constructor Injects finding only. Functional inject
-token interpretation and other #138 families remain separate, unmodified work.
+token interpretation was subsequently repaired for supported direct property
+initializers by the approved [#138b structured inject repair](ISSUE_138B_STRUCTURED_INJECT_REPAIR.md).
+Other #138 families and whole-issue acceptance remain separate.
 
 This investigation records the baseline at 165cf8f. The subsequent approved
 [#136 insertion repair](ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md) supersedes

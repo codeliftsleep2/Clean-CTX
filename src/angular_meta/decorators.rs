@@ -5,7 +5,7 @@
 // Given the raw text of a `class_declaration` capture, extract every
 // Angular decorator and emit one `Φ` marker line per class.
 // Also detects signal-based function calls (`input()`, `output()`,
-// `model()`, `inject()`) in the class body (Phase 2.5b).
+// `model()`) in the class body. Functional DI requires parser-owned evidence.
 //
 // # Strategy
 //
@@ -76,7 +76,7 @@ pub struct DecoratorsResult {
 /// - `Medium` → add field-level `@Input` / `@Output` markers; skip
 ///   `Φinjects:` (the class summary already shows the class).
 /// - `High`   → emit everything including `Φinjects:` and the
-///   modern `input()`/`output()`/`model()`/`inject()` signal lines.
+///   modern signal lines and evidence-qualified functional DI lines.
 // F-ANG-12: use `?` since the enclosing function returns `Option`
 // (clippy::question_mark prefers `?` over `let-else` when both
 // apply). The pre-audit behaviour was to slice to `raw.len()` and
@@ -86,6 +86,14 @@ pub struct DecoratorsResult {
 // (the audit notes the call site already did this implicitly via
 // the `"(anonymous)"` literal).
 pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<DecoratorsResult> {
+    extract_decorators_with_inject_tokens(raw_class, fidelity, &[])
+}
+
+pub(crate) fn extract_decorators_with_inject_tokens(
+    raw_class: &str,
+    fidelity: Fidelity,
+    inject_tokens: &[String],
+) -> Option<DecoratorsResult> {
     let head_end = find_class_head_end(raw_class)?;
     let head = &raw_class[..head_end];
 
@@ -189,11 +197,10 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
     }
 
     // --- Phase 2.5b: Signal-based function calls ---
-    // Detect `input()`, `output()`, `model()`, and `inject()` function
+    // Detect `input()`, `output()`, and `model()` function
     // calls in the class body (Angular 17.1+ signal API). High
     // fidelity only (F-ANG-23) — these are the most verbose lines.
     // F-ANG-08: skip the body scan if no matching `}` is found.
-    let mut inject_fn_types: Vec<String> = Vec::new();
     if fidelity == Fidelity::High
         && let Some(class_body_start) = find_class_body_open(raw_class)
         && let Some(body_end) =
@@ -220,16 +227,13 @@ pub fn extract_decorators(raw_class: &str, fidelity: Fidelity) -> Option<Decorat
                 SignalKind::Model => {
                     lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
                 }
-                SignalKind::Inject => {
-                    inject_fn_types.push(sf.name.clone());
-                }
             }
         }
     }
 
     // Emit inject() function calls.
-    if !inject_fn_types.is_empty() {
-        let mut sorted = inject_fn_types.clone();
+    if fidelity == Fidelity::High && !inject_tokens.is_empty() {
+        let mut sorted = inject_tokens.to_vec();
         sorted.sort();
         sorted.dedup();
         lines.push(build_injects_line(&sorted));
@@ -265,7 +269,6 @@ enum SignalKind {
     Input,
     Output,
     Model,
-    Inject,
 }
 
 /// A detected signal-function call with its field name and optional alias.
@@ -277,7 +280,7 @@ struct SignalField {
 }
 
 /// Scan the class body for signal-based Angular function calls:
-/// `input()`, `output()`, `model()`, `inject()`.
+/// `input()`, `output()`, `model()`.
 ///
 /// These are `= funcName(...)` assignments at the field level. We scan
 /// for the pattern: `fieldName = funcName(...)`.
@@ -302,12 +305,6 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                         ("model", scan + 5)
                     } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
                         ("output", scan + 6)
-                    } else if scan + 5 < len
-                        && &bytes[scan..scan + 6] == b"inject"
-                        && scan + 6 < len
-                        && bytes[scan + 6] == b'('
-                    {
-                        ("inject", scan + 6)
                     } else {
                         i += 1;
                         continue;
@@ -317,8 +314,7 @@ fn collect_signal_fields(body: &str) -> Vec<SignalField> {
                     "input" => SignalKind::Input,
                     "output" => SignalKind::Output,
                     "model" => SignalKind::Model,
-                    "inject" => SignalKind::Inject,
-                    // This match is exhaustive — the if/else above only matches these four.
+                    // This match is exhaustive — the if/else above only matches these three.
                     // Fallback to `Input` with a debug_assert for development safety.
                     _ => {
                         debug_assert!(false, "Unhandled signal kind: {}", func_name);
@@ -577,21 +573,6 @@ pub fn extract_graph_entries(
     // Extract constructor DI types.
     if let Some(types) = extract_constructor_injects(raw_class) {
         injects = types;
-    }
-
-    // Also check for signal-based inject() calls.
-    // F-ANG-08: skip the body scan if no matching `}` is found.
-    if let Some(class_body_start) = find_class_body_open(raw_class)
-        && let Some(body_end) =
-            crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
-    {
-        let body = &raw_class[class_body_start..];
-        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for sf in collect_signal_fields(body_inner) {
-            if let SignalKind::Inject = sf.kind {
-                injects.push(sf.name.clone());
-            }
-        }
     }
 
     kind.map(|k| (class_name, k, selector, injects, pipe_name))

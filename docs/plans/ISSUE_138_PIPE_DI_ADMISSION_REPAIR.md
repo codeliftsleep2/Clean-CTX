@@ -1,5 +1,7 @@
 # #138 precise Angular DI: Pipe constructor admission
 
+> Historical #138a completion record. The separately authorized [#138b structured inject repair](ISSUE_138B_STRUCTURED_INJECT_REPAIR.md) now resolves the supported direct-property token interpretation; the Pipe constructor-only admission documented here remains frozen.
+
 ## 1. Verdict
 
 **#138 PRECISE ANGULAR DI RELATIONSHIP SLICE PARTIALLY COMPLETE**

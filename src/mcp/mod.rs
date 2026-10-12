@@ -90,6 +90,14 @@ mod framework_declaration_publication_tests;
 #[path = "../tests/mcp/angular_di_pipe.rs"]
 mod angular_di_pipe_tests;
 
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_di_inject_token.rs"]
+mod angular_di_inject_token_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_di_inject_token_matrix.rs"]
+mod angular_di_inject_token_matrix_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

@@ -321,3 +321,7 @@ mod framework_publication_compatibility_tests;
 #[cfg(all(test, feature = "angular"))]
 #[path = "../../tests/mcp/angular_di_pipe_compatibility.rs"]
 mod angular_di_pipe_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/angular_di_inject_token_compatibility.rs"]
+mod angular_di_inject_token_compatibility_tests;

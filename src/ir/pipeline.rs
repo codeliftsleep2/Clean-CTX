@@ -138,6 +138,9 @@ pub struct PassContext {
     /// Ephemeral structural invocation evidence assembled during this compile.
     /// Phase 1 establishes ownership only; language adapters populate it later.
     pub(crate) invocation_occurrences: Vec<InvocationOccurrence>,
+    /// TypeScript-local evidence; consumed only during this compilation.
+    pub(crate) angular_initializers:
+        Vec<crate::angular_meta::inject_evidence::ClassInitializerEvidence>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
     /// Current method's accumulated typed control summaries (F-28).
@@ -188,6 +191,7 @@ impl PassContext {
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
             invocation_occurrences: Vec::new(),
+            angular_initializers: Vec::new(),
             current_method: None,
             current_control_summaries: Vec::new(),
             current_class: None,

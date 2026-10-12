@@ -107,6 +107,15 @@ impl IRPass for CoreIRPass {
                 crate::ir::invocation_evidence::collect_invocations(&captures);
         }
 
+        if query_string == crate::queries::TS_QUERY {
+            state.angular_initializers = crate::angular_meta::inject_evidence::collect(
+                &source,
+                &captures,
+                &state.invocation_occurrences,
+            );
+            captures.retain(|capture| !capture.name.starts_with("angular.initializer."));
+        }
+
         // TypeScript places `export` on an `export_statement` wrapper rather
         // than inside the declaration node captured as `class.root` or
         // `interface.root`. Join the structural wrapper capture to its exact

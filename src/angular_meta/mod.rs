@@ -31,6 +31,7 @@ pub(crate) mod detect;
 #[cfg(test)]
 mod detect_metrics;
 pub mod formly;
+pub(crate) mod inject_evidence;
 pub(crate) mod markers;
 pub mod ngrx;
 pub mod phi;
@@ -234,11 +235,12 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
 }
 
 #[derive(Default)]
-pub(crate) struct PrecomputedAngularEvidence {
+pub(crate) struct PrecomputedAngularEvidence<'a> {
     pub rx: Option<Option<rx::RxShape>>,
     pub ngrx: Option<Option<ngrx::NgRxShape>>,
     pub routing: Option<Option<routing::RouteShape>>,
     pub is_angular: Option<bool>,
+    pub initializers: Option<&'a [inject_evidence::ClassInitializerEvidence]>,
 }
 
 pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
@@ -248,7 +250,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     config: Option<&crate::config::MetaLayerConfig>,
     path: &std::path::Path,
     lexical_regions: &crate::meta_util::LexicalRegions,
-    precomputed: PrecomputedAngularEvidence,
+    precomputed: PrecomputedAngularEvidence<'_>,
 ) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     let is_angular = precomputed
@@ -349,8 +351,20 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     let mut block = MetaBlock::default();
 
     if is_angular {
-        for raw_class in class_captures {
-            if let Some(result) = decorators::extract_decorators(raw_class, fidelity) {
+        let classes: Vec<_> = match precomputed.initializers {
+            Some(classes) => classes
+                .iter()
+                .map(|class| (class.raw_class.as_str(), class.admitted_tokens()))
+                .collect(),
+            None => class_captures
+                .iter()
+                .map(|raw| (raw.as_str(), Vec::new()))
+                .collect(),
+        };
+        for (raw_class, tokens) in classes {
+            if let Some(result) =
+                decorators::extract_decorators_with_inject_tokens(raw_class, fidelity, &tokens)
+            {
                 block.lines.extend(result.lines);
                 // Tier 2.5: run tree-sitter-html on inline templates.
                 // Only for components with `template:` (not `templateUrl:`)

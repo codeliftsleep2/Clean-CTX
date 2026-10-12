@@ -211,3 +211,13 @@ The driver builds nothing and invokes neither CBM nor a model host.
 See [the partial #138 report](../../docs/plans/ISSUE_138_PIPE_DI_ADMISSION_REPAIR.md)
 for permanent RED/GREEN, live evidence, supported constructor boundary, the
 separate token-authority repair and remaining criteria.
+
+### #138b structured inject-token verification
+
+This provider-disabled harness runs 131 bounded MCP assertion groups: declaration/owner evidence, exact token markers and edges, repeated-query deduplication, fidelity controls, symbolic cross-file limits, and refresh/change/remove/delete. See `docs/plans/ISSUE_138B_STRUCTURED_INJECT_REPAIR.md`. The earlier blocked primary probe is retained in the historical evidence-gate report.
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToken.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Use `./target/debug/clean-ctx` on Linux. Generated evidence is retained under `target/angular-inject-token/`; no CBM provider is started.

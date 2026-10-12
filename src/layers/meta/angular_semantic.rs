@@ -10,6 +10,7 @@ pub(super) struct ProjectionEvidence<'a> {
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
     routing: Option<Option<&'a crate::angular_meta::routing::RouteShape>>,
     is_angular: Option<bool>,
+    initializers: Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
 }
 
 pub(super) fn extract_non_testing_edges(
@@ -27,8 +28,24 @@ pub(super) fn extract_non_testing_edges(
         .is_angular
         .unwrap_or_else(|| crate::angular_meta::detect::is_angular_file(source))
     {
+        let classes: Vec<_> = match evidence.initializers {
+            Some(classes) => classes
+                .iter()
+                .map(|class| {
+                    (
+                        Some(class.consumer.as_str()),
+                        class.raw_class.as_str(),
+                        class.admitted_tokens(),
+                    )
+                })
+                .collect(),
+            None => class_captures
+                .iter()
+                .map(|raw| (None, raw.as_str(), Vec::new()))
+                .collect(),
+        };
         let mut decl_types = std::collections::HashMap::new();
-        for raw_class in class_captures {
+        for (owner, raw_class, _) in &classes {
             if let Some((class_name, kind, _, _, _)) =
                 crate::angular_meta::decorators::extract_graph_entries(raw_class)
             {
@@ -39,15 +56,17 @@ pub(super) fn extract_non_testing_edges(
                     crate::angular_meta::decorators::ClassKind::Pipe => "Pipe",
                     crate::angular_meta::decorators::ClassKind::Module => "Module",
                 };
-                decl_types.insert(class_name, entity_type);
+                decl_types.insert(owner.unwrap_or(&class_name).to_string(), entity_type);
             }
         }
-        for raw_class in class_captures {
-            if let Some((class_name, kind, selector, injects, pipe_name)) =
+        for (owner, raw_class, tokens) in classes {
+            if let Some((class_name, kind, selector, mut injects, pipe_name)) =
                 crate::angular_meta::decorators::extract_graph_entries(raw_class)
             {
+                let class_name = owner.unwrap_or(&class_name);
+                injects.extend(tokens);
                 edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
-                    &class_name,
+                    class_name,
                     kind,
                     selector.as_deref(),
                     &injects,
@@ -58,10 +77,7 @@ pub(super) fn extract_non_testing_edges(
                 ));
                 if let Some(path) = declaring_path
                     && let Some(edge) = crate::angular_meta::semantic::component_template_edge(
-                        &class_name,
-                        kind,
-                        raw_class,
-                        path,
+                        class_name, kind, raw_class, path,
                     )
                 {
                     edges.push(edge);
@@ -158,6 +174,7 @@ pub(super) fn evaluate(
             ngrx: Some(ngrx_shape.clone()),
             routing: Some(routing_shape.clone()),
             is_angular: precomputed_angular,
+            initializers: context.angular_initializers,
         },
     );
     let output = block
@@ -184,6 +201,7 @@ pub(super) fn evaluate(
             ngrx: Some(ngrx_shape.as_ref()),
             routing: Some(routing_shape.as_ref()),
             is_angular: precomputed_angular,
+            initializers: context.angular_initializers,
         },
     );
     if meta_config

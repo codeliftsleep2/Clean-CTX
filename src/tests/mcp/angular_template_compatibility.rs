@@ -12,13 +12,13 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        4,
-        "Template, declaration publication and Pipe DI change durable Angular semantic output"
+        5,
+        "Functional inject token identity advances durable Angular semantics"
     );
     assert_eq!(
         crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION,
-        2,
-        "Independent publication preserves the existing Angular marker generation"
+        3,
+        "Structured functional inject tokens advance Angular marker output"
     );
 
     let config = crate::tests::test_config();

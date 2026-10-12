@@ -30,6 +30,8 @@ pub struct MetaLayerContext<'a> {
     /// Compiler-owned evidence; absence means no upstream parse was supplied.
     pub(crate) invocation_evidence:
         Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
+    pub(crate) angular_initializers:
+        Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
 }
 
 impl<'a> MetaLayerContext<'a> {
@@ -52,6 +54,7 @@ impl<'a> MetaLayerContext<'a> {
             config,
             lexical_regions,
             invocation_evidence: None,
+            angular_initializers: None,
         }
     }
 }
