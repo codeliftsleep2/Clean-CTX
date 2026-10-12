@@ -12,6 +12,8 @@ The single consolidated run checks:
 - decorator-owned arbitrary external template filenames;
 - conventional Angular templates and unrelated generic HTML;
 - Angular 15–16 legacy, Angular 17+ modern, and mixed control flow;
+- complete modern else-if/let/track/empty/switch/defer companion delivery at
+  Medium and High, accepting byte-exact fallback when it preserves source;
 - Low, Medium, and verbatim fidelity truthfulness;
 - canonical external and deterministic inline Template identity;
 - forward and reverse `HasTemplate`;
@@ -48,3 +50,6 @@ report a clean pass when that binary predates any relevant Angular production
 source marker. A successful run ends with:
 
 `ALL ANGULAR TEMPLATE LIVE MCP CHECKS PASSED`
+
+The temporary native fixture disables CBM explicitly, so template acceptance
+does not silently admit an unrelated provider binary from the operator PATH.

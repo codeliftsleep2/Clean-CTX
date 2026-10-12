@@ -234,6 +234,8 @@ function padded(source) {
 
 async function run() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'clean-ctx-angular-template-'));
+  // This native template acceptance must not admit an unrelated installed CBM.
+  fs.writeFileSync(path.join(root, '.clean-ctx.json'), JSON.stringify({ cbm: { enabled: false } }));
   const files = {
     parent: path.join(root, 'parent.ts'),
     child: path.join(root, 'child.ts'),
@@ -244,6 +246,7 @@ async function run() {
     modern: path.join(root, 'modern.component.html'),
     mixed: path.join(root, 'mixed.component.html'),
     ordinary: path.join(root, 'ordinary.html'),
+    controls: path.join(root, 'controls.component.html'),
     inline: path.join(root, 'inline.ts'),
     missingOwner: path.join(root, 'missing-owner.ts'),
     missingTemplate: path.join(root, 'missing-template.html'),
@@ -311,6 +314,54 @@ async function run() {
       const text = output.content?.[0]?.text ?? '';
       check('B', label + ' template retains equivalent behavior',
         expected.every((token) => text.includes(token)), text.slice(0, 180));
+    }
+
+    console.log('\n[Case B2] Issue 141 complete modern control header delivery');
+    fs.writeFileSync(files.controls, padded([
+      '@let total = items.length;',
+      '@if (ready) { <child-ready></child-ready> }',
+      '@else if (loading) { <child-loading></child-loading> }',
+      '@else { <child-empty></child-empty> }',
+      '@for (item of items; track item.id) { <child-row [item]="item"></child-row> }',
+      '@empty { <p>No rows.</p> }',
+      '@defer (on viewport; prefetch on idle) { <heavy-panel></heavy-panel> }',
+      '@placeholder (minimum 100ms) { <panel-placeholder></panel-placeholder> }',
+      '@loading (after 50ms; minimum 200ms) { <panel-loading></panel-loading> }',
+      '@error { <panel-error></panel-error> }',
+      "@switch (mode) { @case ('a') { <case-a></case-a> } @default { <case-default></case-default> }",
+    ].join('\n')));
+    const controlTokens = [
+      '@let total = items.length;', '@if(ready)', '<child-ready',
+      '@else if(loading)', '<child-loading', '<child-empty',
+      '@for(item of items)', 'track item.id', '<child-row', '@empty', 'No rows.',
+      '@defer(on viewport; prefetch on idle)', '<heavy-panel',
+      '@placeholder (minimum 100ms)', '<panel-placeholder',
+      '@loading (after 50ms; minimum 200ms)', '<panel-loading', '@error', '<panel-error',
+      '@switch(mode)', "@case('a')", '<case-a', '@default', '<case-default',
+    ];
+    for (const fidelity of ['medium', 'high']) {
+      const output = await publish(client, root, files.controls, fidelity);
+      const text = output.content?.[0]?.text ?? '';
+      // High may legitimately select byte-exact passthrough when preserving
+      // comments gives no compression savings. Verify the actual source form,
+      // rather than require Medium's normalized directive spelling.
+      const byteExact = text === fs.readFileSync(files.controls, 'utf8');
+      const deliveredTokens = byteExact ? controlTokens.map((token) => {
+        if (token === '@for(item of items)') return '@for (item of items; track item.id)';
+        return token.replace(/^@(if|else if|defer|switch|case)\(/, '@$1 (');
+      }) : controlTokens;
+      let cursor = -1;
+      const ordered = deliveredTokens.every((token) => {
+        const next = text.indexOf(token, cursor + 1);
+        if (next < 0) return false;
+        cursor = next;
+        return true;
+      });
+      check('B2', fidelity + ' retains modern headers attached to their ordered children', ordered);
+      check('B2', fidelity + ' each condition/binding appears once',
+        (byteExact ? ['@if (ready)', '@else if (loading)', 'track item.id', '@let total = items.length;']
+          : ['@if(ready)', '@else if(loading)', 'track item.id', '@let total = items.length;'])
+          .every((token) => text.split(token).length - 1 === 1));
     }
 
     console.log('\n[Case C] truthful fidelity degradation');

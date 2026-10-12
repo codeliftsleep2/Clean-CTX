@@ -91,10 +91,10 @@ function Stop-BSession($Session) {
     }
     $Session.Process.Dispose()
 }
-function Invoke-BCase([string]$Phase,[string]$Name,[scriptblock]$Body) {
+function Invoke-BCase([string]$Phase,[string]$Name,[scriptblock]$Action) {
     $script:deadline=[DateTime]::UtcNow.AddSeconds($CaseTimeoutSeconds)
     Write-Host "$Phase / $Name"
-    try { . $Body; $verdicts.Add(@{phase=$Phase;case=$Name;result='PASS'}) }
+    try { . $Action; $verdicts.Add(@{phase=$Phase;case=$Name;result='PASS'}) }
     catch { $verdicts.Add(@{phase=$Phase;case=$Name;result='FAIL';evidence=$_.Exception.Message}); Write-Warning $_.Exception.Message }
     Save-B 'verdicts' @($verdicts.ToArray())
 }
@@ -135,4 +135,44 @@ function Get-BExactQuery([string]$Project,[string]$Query) {
     } while ($body.has_more)
     Assert-B (-not $body.truncated -and $rows.Count -eq $body.total) 'Provider oracle remains partial.'
     return @{columns=$columns;rows=$rows.ToArray();pages=$pages;total=$body.total}
+}
+
+function Convert-BStable($Value) {
+    if ($null -eq $Value) { return $null }
+    if ($Value -is [Collections.IDictionary]) {
+        $ordered=[ordered]@{}
+        foreach ($key in @($Value.Keys | Sort-Object)) { $ordered[$key]=Convert-BStable $Value[$key] }
+        return $ordered
+    }
+    if ($Value -is [pscustomobject]) {
+        $ordered=[ordered]@{}
+        foreach ($property in @($Value.PSObject.Properties | Sort-Object Name)) { $ordered[$property.Name]=Convert-BStable $property.Value }
+        return $ordered
+    }
+    if ($Value -is [array]) {
+        $items=[Collections.Generic.List[object]]::new()
+        foreach ($item in $Value) { $items.Add((Convert-BStable $item)) }
+        return ,$items.ToArray()
+    }
+    return $Value
+}
+function Get-BExactTrace([string]$Project,[string]$Function) {
+    $toolArgs=@{project=$Project;function_name=$Function;direction='both';depth=3;limit=17;format='json'}
+    $rows=[Collections.Generic.List[object]]::new();$seen=[Collections.Generic.HashSet[string]]::new()
+    $pages=0;$bytes=0
+    do {
+        $body=Get-BBody (Get-BResult (Invoke-BTool $provider 'trace_path' $toolArgs))
+        $pages++;$bytes+=[Text.Encoding]::UTF8.GetByteCount(($body | ConvertTo-Json -Depth 100 -Compress))
+        Assert-B ($bytes -le 4MB) 'Trace oracle exceeded 4 MiB.'
+        foreach ($row in (Get-BGroupedRows $body.callees)) { $rows.Add($row) }
+        Assert-B ($body.callees_total_relation -eq 'eq') 'Trace oracle total is lower-bound.'
+        $more=$body.PSObject.Properties['has_more'] -and $body.has_more
+        if ($more) {
+            Assert-B ($body.PSObject.Properties['next_cursor'] -and $body.next_cursor) 'Missing trace cursor.'
+            Assert-B ($seen.Add($body.next_cursor)) 'Trace cursor repeated.'
+            $toolArgs.cursor=$body.next_cursor
+        }
+    } while ($more)
+    Assert-B (-not ($body.PSObject.Properties['truncated'] -and $body.truncated) -and $rows.Count -eq $body.callees_total) 'Trace oracle remains partial.'
+    return @{rows=$rows.ToArray();pages=$pages}
 }

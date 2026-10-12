@@ -10,7 +10,9 @@ whether their observable consequences survive the real provider/adapter boundary
 | --- | --- |
 | B1 wire contracts | Actual provider and Clean tools/list; indexed identity; grouped QN/file → typed graph_search; valid empty search; consumed architecture table counts → existing modules/dependencies |
 | B2 independent state/identity | Index job succeeded separate from serving ready and best-effort coverage; source-root binding; queries do not change the observed job; distinct additional-root identity and explicit primary routing; same-named C# interface/class files in both roots remain reachable through native context |
-| B3 collection | 225 generated functions across nine TS files: provider query cursor oracle at 17 rows/page versus typed graph_query; default-limit typed search reaches every expected name/file on first and cached query; 225-call cross-file hub establishes direct cursor pages and typed direct trace edges without deeper-parent invention |
+| B3 collection | 225 generated functions across nine TS files: provider query cursor oracle at 17 rows/page versus typed graph_query; default-limit typed search reaches every expected name/file on first and cached query; 225-call cross-file hub establishes direct cursor pages and a typed target selected beyond the default first page; deeper-parent invention remains pinned by deterministic tests |
+| B5 native preservation | Explicitly disabled provider; high-fidelity C# and TypeScript context remains reachable through live MCP |
+| B3/B4 snapshot errors | A real emitted query cursor becomes stale after reindexing only the owned fixture; direct provider and raw proxy both retain the error |
 | B4 proxy truth | Single raw page versus direct provider exact JSON facts; current bridge availability; intentional tree whitespace; errors remain errors; private index_status remains excluded from the public proxy whitelist |
 
 The source manifest is an independent oracle for name/file/count truth. The direct
@@ -32,8 +34,9 @@ termination, never shared-daemon/account repair.
   best-effort coverage. It does not sabotage shared jobs to manufacture failure.
 - B3 tests cover stale cursors, repeated cursors, zero progress, changed totals/
   columns, 4 MiB exhaustion, deadlines and shared retry ownership. The live
-  harness establishes real supported paging; deterministic sabotage cases are
-  not a claim of live stale-generation/restart acceptance.
+  harness establishes real supported paging and direct-provider/raw-proxy stale
+  rejection after an owned-fixture generation change. It does not claim live
+  typed mid-collection generation-change/restart acceptance.
 - Private observations not exposed by existing tools are checked through their
   actual consumer consequences or retained direct-provider evidence. No public
   graph schema is added solely to make tests inspect internals.

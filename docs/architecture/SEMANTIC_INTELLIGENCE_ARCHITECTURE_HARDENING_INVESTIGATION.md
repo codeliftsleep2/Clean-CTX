@@ -332,6 +332,11 @@ Performance should reuse request-level hydration deduplication and final-view ca
 
 ## Issue #133–#142 mapping
 
+Historical finding-family mapping below. The current issue bodies and live
+acceptance reconciliation are now available in
+[the post-CBM report](../plans/ISSUES_133_141_POST_CBM_RECONCILIATION.md); that report
+supersedes this table for issue titles and disposition.
+
 The public issue bodies were not retrievable from this environment. This table uses finding families recorded in current plans, invariants, tests, and the supplied brief; it does not invent exact issue wording.
 
 | Issue | Known family | Bucket | Timing | Architectural meaning |

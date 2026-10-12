@@ -46,7 +46,7 @@ try {
     $provider=Start-BSession 'provider' $ProviderPath $primary
     Invoke-BCase 'B1' 'provider-registry-and-indexed-identity' {
         $registry=Get-BResult (Invoke-BRpc $provider 'tools/list' @{})
-        foreach ($name in @('index_repository','search_graph','query_graph','trace_path','get_architecture','index_status','check_index_coverage')) { Assert-B ($name -in $registry.tools.name) "Missing provider tool: $name" }
+        foreach ($name in @('index_repository','search_graph','query_graph','trace_path','get_architecture','list_projects','index_status','check_index_coverage')) { Assert-B ($name -in $registry.tools.name) "Missing provider tool: $name" }
         $indexed=Get-BBody (Get-BResult (Invoke-BTool $provider 'index_repository' @{repo_path=$primary;mode='fast'}))
         Assert-B ($indexed.status -eq 'indexed') 'Primary index is not successfully terminal.';$script:project=$indexed.project
         $indexed=Get-BBody (Get-BResult (Invoke-BTool $provider 'index_repository' @{repo_path=$additional;mode='fast'}))
@@ -66,7 +66,7 @@ try {
         $raw=Get-BBody (Get-BResult (Invoke-BTool $provider 'search_graph' @{project=$project;name_pattern='bProbe000';format='json'}))
         $rows=Get-BGroupedRows $raw;Assert-B ($rows.Count -eq 1 -and $rows[0].file_path -eq 'part0.ts') 'Provider fixture identity mismatch.'
         $answer=Get-BResult (Invoke-BReadyTool $clean 'graph_search' @{project=$project;query='bProbe000'})
-        Assert-B ($answer.PSObject.Properties['structuredContent']) 'Typed response is not ready/structured.'
+        Assert-B ([bool]$answer.PSObject.Properties['structuredContent']) 'Typed response is not ready/structured.'
         $nodes=@($answer.structuredContent.nodes);Assert-B ($nodes.Count -eq 1) 'Typed search lost the grouped row.'
         Assert-B ($nodes[0].id -eq $rows[0].qualified_name -and $nodes[0].file -eq $rows[0].file_path) 'QN/file changed at typed boundary.'
         $empty=Get-BResult (Invoke-BReadyTool $clean 'graph_search' @{project=$project;query='NoSuchPhaseBName'})
@@ -101,13 +101,13 @@ try {
     Invoke-BCase 'B3' 'trace-cross-file-hub-cursor-and-direct-edges' {
         $root=Get-BGroupedRows (Get-BBody (Get-BResult (Invoke-BTool $provider 'search_graph' @{project=$project;name_pattern='bHub';format='json'})))
         Assert-B ($root.Count -eq 1) 'Hub identity ambiguous.';$qn=$root[0].qualified_name
-        $first=Get-BBody (Get-BResult (Invoke-BTool $provider 'trace_path' @{project=$project;function_name=$qn;direction='both';depth=3;limit=17;format='json'}))
-        Assert-B ($first.has_more -and $first.next_cursor) 'Fixture did not exercise trace cursor.'
-        $next=Get-BBody (Get-BResult (Invoke-BTool $provider 'trace_path' @{project=$project;function_name=$qn;direction='both';depth=3;limit=17;format='json';cursor=$first.next_cursor}))
-        Save-B 'B3-trace-pages' @{first=$first;next=$next}
-        $answer=Get-BResult (Invoke-BReadyTool $clean 'graph_trace' @{project=$project;from=$qn})
-        $edges=@($answer.structuredContent.edges);Assert-B ($edges.Count -eq 225) 'Typed trace omitted cross-file direct calls.'
-        foreach ($edge in $edges) {Assert-B ($edge.from -eq $qn -and $edge.label -eq 'calls') 'Trace invented/misoriented an edge.'}
+        $trace=Get-BExactTrace $project $qn
+        Assert-B ($trace.pages -gt 1 -and $trace.rows.Count -eq 225) 'Fixture did not exercise the complete hub traversal.'
+        $target=@($trace.rows | Where-Object hop -eq 1)[-1].qualified_name
+        $answer=Get-BResult (Invoke-BReadyTool $clean 'graph_trace' @{project=$project;from=$qn;to=$target})
+        $edges=@($answer.structuredContent.edges);Assert-B ($edges.Count -eq 1) 'Typed trace lost a direct target beyond the default first page.'
+        Assert-B ($edges[0].from -ceq $qn -and $edges[0].to -ceq $target -and $edges[0].label -eq 'calls') 'Trace invented/misoriented an edge.'
+        Save-B 'B3-trace-oracle' $trace
     }
     Invoke-BCase 'B1' 'architecture-consumed-tables' {
         $raw=Get-BBody (Get-BResult (Invoke-BTool $provider 'get_architecture' @{project=$project;format='json';aspects=@('packages','boundaries')}))
@@ -134,7 +134,7 @@ try {
         $body=Get-BBody $proxy
         Assert-B ($proxy._meta.cbm_status -eq 'available') 'Proxy reported stale startup readiness.'
         Assert-B ($body.returned -eq 17 -and $body.has_more) 'Raw proxy implicitly collected or lost pagination.'
-        Assert-B (($body | ConvertTo-Json -Depth 100 -Compress) -eq ($direct | ConvertTo-Json -Depth 100 -Compress)) 'Raw model-facing body changed protected provider facts.'
+        Assert-B (((Convert-BStable $body) | ConvertTo-Json -Depth 100 -Compress) -ceq ((Convert-BStable $direct) | ConvertTo-Json -Depth 100 -Compress)) 'Raw model-facing body changed protected provider facts.'
     }
     Invoke-BCase 'B4' 'tree-format-is-intentional-and-verbatim' {
         $toolArgs=@{project=$project;name_pattern='bProbe000';format='tree'}
@@ -152,7 +152,69 @@ try {
         $failed=Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='query_graph';parameters=@{project=$project;query='not valid cypher';format='json'}}
         Assert-B ($failed.result.isError -eq $true -and @($failed.result.content).Count -gt 0) 'Provider error was disguised as empty success.'
         $blocked=Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='index_status';parameters=@{project=$project;format='json'}}
-        Assert-B ($blocked.PSObject.Properties['error']) 'Internal status tool leaked into public proxy whitelist.'
+        Assert-B ([bool]$blocked.PSObject.Properties['error']) 'Internal status tool leaked into public proxy whitelist.'
+    }
+    Invoke-BCase 'B1/B4' 'list-projects-single-page-and-identity' {
+        $toolArgs=@{format='json';limit=2;offset=0}
+        $direct=Get-BBody (Get-BResult (Invoke-BTool $provider 'list_projects' $toolArgs))
+        $proxy=Get-BBody (Get-BResult (Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='list_projects';parameters=$toolArgs}))
+        Assert-B (((Convert-BStable $direct) | ConvertTo-Json -Depth 100 -Compress) -ceq ((Convert-BStable $proxy) | ConvertTo-Json -Depth 100 -Compress)) 'Project page/identity/continuation changed at proxy boundary.'
+    }
+    Invoke-BCase 'B4' 'architecture-raw-consumed-aspects-equivalence' {
+        $toolArgs=@{project=$project;format='json';aspects=@('packages','boundaries')}
+        $direct=Get-BBody (Get-BResult (Invoke-BTool $provider 'get_architecture' $toolArgs))
+        $proxy=Get-BBody (Get-BResult (Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='get_architecture';parameters=$toolArgs}))
+        Assert-B (((Convert-BStable $direct) | ConvertTo-Json -Depth 100 -Compress) -ceq ((Convert-BStable $proxy) | ConvertTo-Json -Depth 100 -Compress)) 'Architecture raw metadata/tables changed.'
+    }
+    Invoke-BCase 'B4' 'trace-raw-directional-page-equivalence' {
+        $hub=Get-BGroupedRows (Get-BBody (Get-BResult (Invoke-BTool $provider 'search_graph' @{project=$project;name_pattern='bHub';format='json'})))
+        $toolArgs=@{project=$project;function_name=$hub[0].qualified_name;direction='outbound';depth=3;format='json';limit=17}
+        $direct=Get-BBody (Get-BResult (Invoke-BTool $provider 'trace_path' $toolArgs))
+        $proxy=Get-BBody (Get-BResult (Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='trace_path';parameters=$toolArgs}))
+        Assert-B (((Convert-BStable $direct) | ConvertTo-Json -Depth 100 -Compress) -ceq ((Convert-BStable $proxy) | ConvertTo-Json -Depth 100 -Compress)) 'Trace direction/identity/page metadata changed.'
+    }
+    Invoke-BCase 'B2/B4' 'raw-additional-project-does-not-change-active-wrapper-project' {
+        $null=Get-BResult (Invoke-BReadyTool $clean 'graph_search' @{project=$project;query='bProbe000'})
+        $proxy=Get-BBody (Get-BResult (Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='search_graph';parameters=@{project=$other;name_pattern='bAdditionalOnly';format='json'}}))
+        $additionalRows=Get-BGroupedRows $proxy
+        Assert-B ($additionalRows.Count -eq 1 -and $additionalRows[0].name -eq 'bAdditionalOnly') 'Raw additional-project identity mismatch.'
+        $answer=Get-BResult (Invoke-BReadyTool $clean 'graph_search' @{query='bAdditionalOnly'})
+        Assert-B (@($answer.structuredContent.nodes).Count -eq 0) 'Raw per-call project mutated persistent typed-wrapper project.'
+    }
+    Invoke-BCase 'B2/B4' 'explicit-manual-index-success-reaches-mcp' {
+        $answer=Get-BBody (Get-BResult (Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='index_repository';parameters=@{repo_path=$primary;mode='fast'}}))
+        Assert-B ($answer.status -eq 'indexed' -and $answer.project -eq $project) 'Manual MCP index did not return a bound terminal success.'
+    }
+    Invoke-BCase 'B3/B4' 'stale-provider-cursor-remains-error-through-proxy' {
+        $toolArgs=@{project=$project;query=$query;format='json';max_rows=17}
+        $first=Get-BBody (Get-BResult (Invoke-BTool $provider 'query_graph' $toolArgs))
+        Assert-B ($first.has_more -and $first.next_cursor) 'Stale-cursor probe needs a real continuation.'
+        Write-BText (Join-Path $primary 'cursor-mutated.ts') 'export function bCursorMutation(): number { return 99; }'
+        $indexed=Get-BBody (Get-BResult (Invoke-BTool $provider 'index_repository' @{repo_path=$primary;mode='fast'}))
+        Assert-B ($indexed.status -eq 'indexed') 'Controlled fixture generation change did not publish.'
+        $toolArgs.cursor=$first.next_cursor
+        $stale=Invoke-BTool $provider 'query_graph' $toolArgs
+        Assert-B ($stale.result.isError -eq $true) 'Provider reused a stale result snapshot.'
+        $proxy=Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool='query_graph';parameters=$toolArgs}
+        Assert-B ($proxy.result.isError -eq $true) 'Proxy hid stale-cursor failure or restarted by live offset.'
+        Save-B 'B3-stale-cursor' @{provider=$stale;proxy=$proxy}
+    }
+    Invoke-BCase 'B5' 'native-csharp-typescript-with-provider-disabled' {
+        $nativeRoot=Join-Path $runRoot 'native-only'
+        New-Item -ItemType Directory -Force $nativeRoot | Out-Null
+        & git -C $nativeRoot init --quiet
+        Assert-B ($LASTEXITCODE -eq 0) 'Native fixture Git init failed.'
+        $padding=(1..65 | ForEach-Object { "// native preservation line $_" }) -join "`n"
+        Write-BText (Join-Path $nativeRoot 'Probe.cs') ($padding+"`nnamespace NativePhaseB; public class NativeProbe { public int Read() { return 17; } }")
+        Write-BText (Join-Path $nativeRoot 'probe.ts') ($padding+"`nexport function bNativeOnly(): number { return 17; }")
+        Write-BText (Join-Path $nativeRoot '.clean-ctx.json') '{"cbm":{"enabled":false}}'
+        $native=Start-BSession 'native-only' $BinaryPath $nativeRoot
+        $status=Get-BResult (Invoke-BTool $native 'get_cbm_status' @{})
+        Assert-B ($status._meta.cbm_status -eq 'unavailable') 'Disabled provider was reported available.'
+        foreach ($item in @(@{file='Probe.cs';symbol='NativeProbe'},@{file='probe.ts';symbol='bNativeOnly'})) {
+            $context=Get-BResult (Invoke-BTool $native 'provide_code_context' @{workspaceRoot=$nativeRoot;filePath=$item.file;fidelity='high'})
+            Assert-B (($context | ConvertTo-Json -Depth 100 -Compress).Contains($item.symbol)) 'Native context depends on optional provider availability.'
+        }
     }
 } finally {
     foreach ($session in $sessions) {
