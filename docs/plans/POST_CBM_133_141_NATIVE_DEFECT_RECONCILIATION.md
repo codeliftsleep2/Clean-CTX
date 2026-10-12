@@ -1,5 +1,9 @@
 # Post-CBM native defect reconciliation: #133–#141
 
+The approved [#138 Pipe DI admission slice](ISSUE_138_PIPE_DI_ADMISSION_REPAIR.md)
+supersedes the missing Pipe constructor Injects finding only. Functional inject
+token interpretation and other #138 families remain separate, unmodified work.
+
 This investigation records the baseline at 165cf8f. The subsequent approved
 [#136 insertion repair](ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md) supersedes
 its insertion-position findings only; remaining native slices and whole-issue

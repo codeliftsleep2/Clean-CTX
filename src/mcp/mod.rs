@@ -86,6 +86,10 @@ mod decorated_owner_identity_tests;
 #[path = "../tests/mcp/framework_declaration_publication.rs"]
 mod framework_declaration_publication_tests;
 
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_di_pipe.rs"]
+mod angular_di_pipe_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

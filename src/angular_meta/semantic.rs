@@ -84,9 +84,21 @@ pub fn class_to_semantic_edges(
         }
     }
 
-    // Component → Injects → Service for each injected type
-    if kind == ClassKind::Component || kind == ClassKind::Service || kind == ClassKind::Directive {
-        for injected in injects {
+    // Existing kinds keep their existing evidence contract. Newly admitted
+    // Pipes consume constructor types only: the merged `injects` vector also
+    // contains functional-DI field names, whose token authority is a separate
+    // repair. Reuse the existing constructor producer, never recover a token
+    // from a receiver or a rendered marker.
+    let pipe_constructor_types = (kind == ClassKind::Pipe).then(|| {
+        crate::angular_meta::constructor_injects::extract_constructor_injects(raw_class)
+            .unwrap_or_default()
+    });
+    let admitted = pipe_constructor_types.as_deref().unwrap_or(injects);
+    if matches!(
+        kind,
+        ClassKind::Component | ClassKind::Service | ClassKind::Directive | ClassKind::Pipe
+    ) {
+        for injected in admitted {
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Injects,
                 subject: subject.clone(),

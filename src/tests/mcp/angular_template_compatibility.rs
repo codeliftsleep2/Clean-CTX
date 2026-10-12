@@ -12,8 +12,8 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        3,
-        "HasTemplate and independent declaration publication change durable Angular semantic output"
+        4,
+        "Template, declaration publication and Pipe DI change durable Angular semantic output"
     );
     assert_eq!(
         crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION,

@@ -186,3 +186,28 @@ under target/framework-declaration-publication. FAIL is retained and exits 1.
 See [the publication repair report](../../docs/plans/INDEPENDENT_FRAMEWORK_DECLARATION_PUBLICATION_REPAIR.md)
 for permanent test RED/GREEN, live baseline/candidate evidence, durable generation
 compatibility, preservation and remaining #139/#140 work.
+
+## #138 Pipe constructor DI admission
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-AngularPipeDi.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit .exe and build separately before running. The existing Phase B
+stdio helper drives provider-disabled owned Git-root fixtures. All 56 required
+groups must pass: independent declarations/evidence, exact typed Injects identities,
+repeat/deduplication, existing Service/Component/Directive controls, Pipe constructor
+forms and multiple dependencies, empty/no-constructor and other-kind exclusions,
+unresolved symbolic targets, source-distinct ambiguity, and refresh/change/removal/
+file deletion. A mixed/functional-only Pipe guard prevents newly admitting the
+separate wrong-field-name evidence.
+
+Four inject(...) observations are captured without PASS/FAIL token acceptance.
+That defect is not repaired by this driver or slice. Object.file is asserting
+occurrence provenance, not proof of import-resolved declaration binding. Sources,
+requests/results, hashes, mutations and verdicts stay under target/angular-pipe-di.
+The driver builds nothing and invokes neither CBM nor a model host.
+
+See [the partial #138 report](../../docs/plans/ISSUE_138_PIPE_DI_ADMISSION_REPAIR.md)
+for permanent RED/GREEN, live evidence, supported constructor boundary, the
+separate token-authority repair and remaining criteria.

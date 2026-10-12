@@ -317,3 +317,7 @@ mod angular_template_compatibility_tests;
 #[cfg(all(test, feature = "angular"))]
 #[path = "../../tests/mcp/framework_publication_compatibility.rs"]
 mod framework_publication_compatibility_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/angular_di_pipe_compatibility.rs"]
+mod angular_di_pipe_compatibility_tests;
