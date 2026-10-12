@@ -9,6 +9,10 @@ The subsequent approved [#137 signature-evidence repair](ISSUE_137_SEMANTIC_SIGN
 supersedes the method return/authorization false-unchanged findings only. The
 neighbor-marker attribution finding and other original #137 criteria remain.
 
+The approved [#135 DI retention repair](ISSUE_135_DI_OMISSION_REPAIR.md) supersedes
+the ten-entry DI truncation finding only. Other caps, conditional activation,
+signature fidelity and the broader #135 criteria retain their separate disposition.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups

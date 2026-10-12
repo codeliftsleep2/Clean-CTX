@@ -110,3 +110,26 @@ The body control isolates the existing last-method contract; the separate
 first-method/neighbor-marker defect is retained in
 [the repair report](../../docs/plans/ISSUE_137_SEMANTIC_SIGNATURE_EVIDENCE_REPAIR.md).
 Passing this harness does not close all #137 criteria or establish #135 fidelity.
+
+## #135 DI retention regression
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DiOmission.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit .exe. The provider-disabled live context harness exercises 0/9/10/
+11/40 written registrations at Medium/High, distinct implementations/lifetimes,
+nearby non-DI metadata and preservation of existing conditional written mentions:
+16 required groups. It builds nothing and does not evaluate runtime activation.
+
+Complete delivery may use the existing compact DI markers or existing byte-exact
+source fallback. The latter is accepted only with document byte-exact metadata,
+full source equality and the independent fixture's written-call count. Exact
+marker identity/order assertions remain for compact output. No partial ten-entry
+list is accepted as complete. All fixtures, requests/results, binary provenance
+and verdicts are saved under target/di-omission.
+
+See [the DI repair report](../../docs/plans/ISSUE_135_DI_OMISSION_REPAIR.md) for
+same-source RED/GREEN evidence, producer scope, ordering and remaining #135 work.
+The harness proves recognized written-fact delivery, not an evaluated DI container
+or completeness of unsupported registration forms.

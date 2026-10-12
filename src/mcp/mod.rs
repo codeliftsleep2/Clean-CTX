@@ -74,6 +74,10 @@ mod insert_before_declaration_tests;
 #[path = "../tests/mcp/semantic_signature_evidence.rs"]
 mod semantic_signature_evidence_tests;
 
+#[cfg(all(test, feature = "csharp", feature = "dotnet"))]
+#[path = "../tests/mcp/di_omission.rs"]
+mod di_omission_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]
