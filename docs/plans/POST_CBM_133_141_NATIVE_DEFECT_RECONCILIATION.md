@@ -1,5 +1,10 @@
 # Post-CBM native defect reconciliation: #133–#141
 
+This investigation records the baseline at 165cf8f. The subsequent approved
+[#136 insertion repair](ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md) supersedes
+its insertion-position findings only; remaining native slices and whole-issue
+closure recommendations are not implicitly changed.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups

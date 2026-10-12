@@ -1,5 +1,4 @@
 // src/mcp/tool_handlers/edit.rs
-//
 // `apply_edit` MCP handler — the write-path surface
 // (docs/plans/APPLY_EDIT_PLAN.md Phase 3).
 //
@@ -189,10 +188,12 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             Ok((ir, _, _)) => ir,
             Err(e) => return err_response(id, -32603, e.to_string(), None),
         };
-    let units = if operations
-        .iter()
-        .any(|operation| matches!(operation, EditOperation::Delete { .. }))
-    {
+    let units = if operations.iter().any(|operation| {
+        matches!(
+            operation,
+            EditOperation::Delete { .. } | EditOperation::InsertBefore { .. }
+        )
+    }) {
         let Some((language, query)) =
             crate::compression::language::language_for_extension(extension)
         else {

@@ -60,3 +60,25 @@ for first failing boundaries, issue disposition, implementation proposals and
 remaining original-corpus/platform acceptance. These are investigation harnesses;
 permanent repaired-contract regressions should assert the public truth described
 there, including precise file provenance and disclosure.
+
+## #136 whole-declaration insertion regression
+
+Run against a binary built from the insertion repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-InsertBeforeDeclaration.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit .exe. The harness builds nothing and needs no CBM or model host.
+It checks the advertised apply_edit tool through live stdin/stdout MCP, then
+compares exact file bytes for C#/TypeScript first/middle/metadata-bearing members
+at LF/CRLF, including parseable comments. Unproven leading documentation must
+fail without writing. Replace/delete/after and atomic/syntax/source-authority
+controls are included: 23 case groups, all required to pass for the repaired slice.
+
+All fixture files are allocated before atomic edits to isolate declaration
+placement from independent file-identity reuse. Requests, receipts, exact byte
+oracles, stderr and binary provenance remain under target/insert-before-declaration.
+See [the repair report](../../docs/plans/ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md)
+for RED/GREEN evidence, the separately retained intermediate lifecycle failure,
+and remaining #136 criteria. This does not claim the entire issue is resolved.

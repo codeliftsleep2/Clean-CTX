@@ -66,6 +66,10 @@ mod e2e_server;
 #[path = "../tests/mcp/apply_edit.rs"]
 mod apply_edit_tests;
 
+#[cfg(all(test, feature = "csharp", feature = "typescript"))]
+#[path = "../tests/mcp/insert_before_declaration.rs"]
+mod insert_before_declaration_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

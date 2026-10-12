@@ -173,13 +173,20 @@ pub fn apply(
                 end: record.end_byte,
                 new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
             },
-            EditOperation::InsertBefore { anchor, unit_text } => PlannedEdit {
-                kind: "insert_before",
-                target: anchor.clone(),
-                start: record.start_byte,
-                end: record.start_byte,
-                new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
-            },
+            EditOperation::InsertBefore { anchor, unit_text } => {
+                let start = record.insert_before_byte.ok_or_else(|| {
+                    EditError::Locate(LocateError::NotFound(format!(
+                        "{anchor} (authoritative declaration insertion start unavailable; leading comment ownership may be unsupported)"
+                    )))
+                })?;
+                PlannedEdit {
+                    kind: "insert_before",
+                    target: anchor.clone(),
+                    start,
+                    end: start,
+                    new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
+                }
+            }
         };
         planned.push(planned_edit);
     }

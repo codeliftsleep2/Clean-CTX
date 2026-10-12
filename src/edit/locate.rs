@@ -37,6 +37,9 @@ pub struct UnitRecord {
     /// Full declaration span used only by whole-unit operations such as
     /// delete. Body-based operations continue to use `start_byte..end_byte`.
     pub declaration_span: Option<(u64, u64)>,
+    /// Structured declaration start for insertion. None when leading comment
+    /// ownership cannot be established; never substitutes the body position.
+    pub insert_before_byte: Option<u64>,
     /// Structural fingerprint: containing class + ordered parameter types.
     /// Two units may share a bare name; they must not share a fingerprint
     /// within one class unless they are true overloads (both remain valid,
@@ -180,6 +183,7 @@ impl UnitTable {
                 end_byte: *end,
                 text: text.clone(),
                 declaration_span: None,
+                insert_before_byte: None,
                 fingerprint,
             };
             let slot = table.units.len();
@@ -221,16 +225,20 @@ impl UnitTable {
                 }
                 let end = capture.node.end_byte();
                 let start = declaration_start_with_metadata(capture.node, source);
-                declarations.push((start as u64, end as u64));
+                let insertion_start =
+                    (!has_unowned_leading_comment(capture.node, source)).then_some(start as u64);
+                declarations.push((start as u64, end as u64, insertion_start));
             }
         }
 
         for unit in &mut table.units {
-            unit.declaration_span = declarations
+            let declaration = declarations
                 .iter()
                 .copied()
-                .filter(|(start, end)| *start <= unit.start_byte && *end == unit.end_byte)
-                .min_by_key(|(start, end)| end - start);
+                .filter(|(start, end, _)| *start <= unit.start_byte && *end == unit.end_byte)
+                .min_by_key(|(start, end, _)| end - start);
+            unit.declaration_span = declaration.map(|(start, end, _)| (start, end));
+            unit.insert_before_byte = declaration.and_then(|(_, _, start)| start);
         }
         Ok(table)
     }
@@ -301,4 +309,29 @@ fn is_declaration_metadata(kind: &str) -> bool {
             | "normal_annotation"
             | "single_element_annotation"
     )
+}
+
+/// A sibling comment is not a structured declaration-owned child. Refuse
+/// insertion when it borders the metadata group rather than guessing whether
+/// it is documentation. This does not change deletion or body replacement.
+fn has_unowned_leading_comment(mut node: tree_sitter::Node<'_>, source: &str) -> bool {
+    while let Some(previous) = node.prev_named_sibling() {
+        if !source[previous.end_byte()..node.start_byte()]
+            .trim()
+            .is_empty()
+        {
+            return false;
+        }
+        if matches!(
+            previous.kind(),
+            "comment" | "line_comment" | "block_comment"
+        ) {
+            return true;
+        }
+        if !is_declaration_metadata(previous.kind()) {
+            return false;
+        }
+        node = previous;
+    }
+    false
 }

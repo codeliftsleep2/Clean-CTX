@@ -41,7 +41,9 @@ pub enum EditOperation {
         /// whitespace/newline as desired).
         unit_text: String,
     },
-    /// Insert `unit_text` immediately before the anchor unit's span.
+    /// Insert `unit_text` immediately before the anchor's authoritative
+    /// declaration start (including owned attributes/decorators), not its body.
+    /// Reject when declaration placement or leading comment ownership is unknown.
     InsertBefore {
         /// Anchor unit the new text is placed relative to.
         anchor: String,
