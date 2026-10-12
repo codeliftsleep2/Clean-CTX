@@ -1,5 +1,10 @@
 # Current #133–#141 reconciliation after the pinned CBM upgrade
 
+The subsequent [end-to-end investigation](POST_CBM_133_141_NATIVE_DEFECT_RECONCILIATION.md)
+supersedes closure recommendations below: it expands #133 acceptance and finds
+#141 linked-HTML entities_in_file still returns an unsupported-extension error.
+The 39 passing template assertions remain valid for their tested operations.
+
 ## Authority and evidence
 
 Current issue bodies/state were retrieved from public GitHub issue pages during
