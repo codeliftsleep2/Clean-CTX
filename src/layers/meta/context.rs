@@ -32,6 +32,8 @@ pub struct MetaLayerContext<'a> {
         Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
     pub(crate) angular_initializers:
         Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    pub(crate) ngrx_class_actions:
+        Option<&'a [crate::angular_meta::ngrx::legacy::ClassActionEvidence]>,
 }
 
 impl<'a> MetaLayerContext<'a> {
@@ -55,6 +57,7 @@ impl<'a> MetaLayerContext<'a> {
             lexical_regions,
             invocation_evidence: None,
             angular_initializers: None,
+            ngrx_class_actions: None,
         }
     }
 }

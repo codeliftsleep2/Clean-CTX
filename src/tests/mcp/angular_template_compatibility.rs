@@ -12,13 +12,13 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        5,
-        "Functional inject token identity advances durable Angular semantics"
+        6,
+        "Legacy NgRx class facts advance the existing Angular/NgRx producer cohort"
     );
     assert_eq!(
         crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION,
-        3,
-        "Structured functional inject tokens advance Angular marker output"
+        4,
+        "Legacy class markers advance the existing Angular/NgRx marker cohort"
     );
 
     let config = crate::tests::test_config();

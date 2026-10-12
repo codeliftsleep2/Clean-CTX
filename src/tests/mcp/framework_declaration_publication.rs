@@ -353,13 +353,19 @@ fn framework_declaration_publication_reference_file_is_separate_provenance() {
 }
 
 #[test]
-fn framework_declaration_publication_unsupported_legacy_is_not_fabricated() {
+fn framework_declaration_publication_legacy_class_now_has_independent_authority() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("legacy.ts");
     std::fs::write(&path, "import { Action } from '@ngrx/store';\nexport class LegacyAudit implements Action { readonly type = '[Audit] Legacy'; }").unwrap();
     let state = state(&root);
-    assert!(entities(&state, &root, &path, "ngrx").is_empty());
+    // #140 explicitly supersedes only the earlier unsupported-class guard.
+    // The source is unchanged; modern publication assertions remain frozen.
+    let found = entities(&state, &root, &path, "ngrx");
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0]["entity_type"], "Action");
+    assert_eq!(found[0]["name"], "LegacyAudit");
+    assert_eq!(found[0]["file"], path.to_string_lossy().as_ref());
 }
 
 #[test]

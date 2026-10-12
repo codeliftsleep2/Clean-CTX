@@ -4,10 +4,9 @@
 // semantic-edge projection for an extracted `NgRxShape`.
 //
 // Split out of `src/angular_meta/ngrx.rs` (active-file size policy): the
-// module had exceeded the 615-line ceiling. This is a pure relocation -- the
-// code below is byte-for-byte the previous `impl NgRxShape` block. It
-// references none of the extraction helpers, so it has no cross-module
-// dependencies.
+// module had exceeded the 615-line ceiling. Modern shape behaviour remains
+// preserved; #140 adds an independent class-declaration carrier and marker.
+// Syntax interpretation stays in the NgRx-local producers.
 //
 // Child-module access: a private item of an ancestor module is visible in its
 // descendants, so `use super::*` supplies `NgRxShape` (and its struct fields),
@@ -19,6 +18,7 @@ impl NgRxShape {
     /// Returns `true` if there are no NgRx artifacts to emit.
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
+            && self.class_actions.is_empty()
             && self.reducer.is_none()
             && self.effects.is_empty()
             && self.selectors.is_empty()
@@ -157,6 +157,19 @@ impl NgRxShape {
         // owns publication. Existing index normalization keeps these records
         // out of the relationship graph and deduplicates file occurrences.
         for action in &self.actions {
+            let entity = EntityRef::new("ngrx", "Action", &action.name);
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "ngrx",
+                call_evidence: None,
+            });
+        }
+
+        // Independently recognized class syntax uses the same declaration
+        // carrier without changing modern ActionDecl publication.
+        for action in &self.class_actions {
             let entity = EntityRef::new("ngrx", "Action", &action.name);
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Defines,
@@ -324,6 +337,12 @@ impl NgRxShape {
                     }
                 }
             }
+        }
+
+        // Class declarations are not createAction calls. Keep their marker
+        // truthful and independent of unimplemented reference linkage.
+        for action in &self.class_actions {
+            s.push_str(&format!("  Φaction-class:{}\n", action.name));
         }
 
         // Reducer (Medium+)

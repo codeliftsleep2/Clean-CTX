@@ -29,6 +29,11 @@ supersedes isolated recognized Angular Service and modern NgRx Action publicatio
 absence only. Legacy extraction, broader declaration/reference contracts and
 the remaining #139/#140 criteria are not implicitly accepted.
 
+The approved [#140 class Action declaration slice](ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md)
+supersedes independent top-level class Action extraction/publication absence only.
+String constants, switch handlers, constructor dispatch names, qualified/alias
+resolution and broader #140 acceptance remain separate.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups

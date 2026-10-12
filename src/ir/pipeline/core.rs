@@ -66,6 +66,8 @@ impl IRPass for CoreIRPass {
         if query_string == crate::queries::TS_QUERY {
             capture_query.push('\n');
             capture_query.push_str(typescript::DECLARATION_QUERY);
+            capture_query.push('\n');
+            capture_query.push_str(crate::angular_meta::ngrx::legacy::QUERY);
         }
 
         let mut captures = run_capture_pipeline_nodes(
@@ -114,6 +116,9 @@ impl IRPass for CoreIRPass {
                 &state.invocation_occurrences,
             );
             captures.retain(|capture| !capture.name.starts_with("angular.initializer."));
+            state.ngrx_class_actions =
+                crate::angular_meta::ngrx::legacy::collect(&source, &captures);
+            captures.retain(|capture| !capture.name.starts_with("ngrx.legacy."));
         }
 
         // TypeScript places `export` on an `export_statement` wrapper rather

@@ -169,12 +169,13 @@ On Linux omit .exe. Rebuild the candidate separately before running. This driver
 reuses the existing Phase B stdio MCP session helper and creates owned Git-root
 fixtures with CBM disabled. It builds nothing and invokes no model host.
 
-All 56 required groups must pass: edge-free Service/modern Action recognition and
+All 57 required groups must pass: edge-free Service/modern Action recognition and
 publication; same-file multiple declarations; source-distinct same names; existing
 constructor/dispatch relationships and reference-file occurrences; deduplication;
 registered refresh/rename/removal/re-add/file deletion; and declaration removal
-with an unchanged reference retained. Legacy class Actions remain a negative
-control, not newly supported syntax. Exact declaring-file occurrences are checked
+with an unchanged reference retained. #140 supersedes only the former legacy-class
+absence control: its unchanged source now requires a recognized class Action.
+Modern publication assertions retain their existing oracles. Exact declaring-file occurrences are checked
 separately from existing relationship endpoint occurrences.
 
 The public entity schema has no role/span field. Saved fixture roles are source
@@ -221,3 +222,13 @@ pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToke
 ```
 
 Use `./target/debug/clean-ctx` on Linux. Generated evidence is retained under `target/angular-inject-token/`; no CBM provider is started.
+
+## #140 independent legacy class Action declarations
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxLegacyDeclarations.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux omit `.exe`. This provider-disabled harness uses the established Phase B stdio session helpers. It requires **78 acceptance groups** for top-level class declarations implementing the directly imported NgRx `Action`: exact source occurrences, truthful class markers, no fabricated links, fidelity/repeat controls, source-distinct same names, and declaration rename/removal/deletion.
+
+Seven separate handler/reference/alias/collision probes are recorded as **OBSERVED**, not PASS. They remain unresolved and do not affect the declaration-only acceptance verdict. The driver builds nothing, invokes no model host, and saves source oracles, binary provenance, requests/results and verdicts under `target/ngrx-legacy-declarations/`. See [the #140 class declaration report](../../docs/plans/ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md) for the defect partition and remaining work.

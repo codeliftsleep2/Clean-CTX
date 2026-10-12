@@ -26,6 +26,7 @@ mod extract;
 mod extract_selectors;
 #[cfg(test)]
 mod extraction_metrics;
+pub(crate) mod legacy;
 mod shape;
 
 // Re-exported so the established public path
@@ -44,6 +45,7 @@ pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 pub enum NgRxKind {
     NgRx,
     Action,
+    ClassAction,
     Reducer,
     Effect,
     Selector,
@@ -59,6 +61,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "Φngrx:",
             Self::Action => "Φaction:",
+            Self::ClassAction => "Φaction-class:",
             Self::Reducer => "Φreducer:",
             Self::Effect => "Φeffect:",
             Self::Selector => "Φselector:",
@@ -75,6 +78,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "NgRx",
             Self::Action => "createAction",
+            Self::ClassAction => "NgRx Action class",
             Self::Reducer => "createReducer",
             Self::Effect => "createEffect",
             Self::Selector => "createSelector",
@@ -89,6 +93,7 @@ impl PhiMarker for NgRxKind {
     /// prevent partial-match issues in string replacement).
     fn all_in_expand_order() -> &'static [NgRxKind] {
         &[
+            Self::ClassAction,
             Self::NgRx,     // Φngrx:     (6 chars)
             Self::Action,   // Φaction:   (8 chars)
             Self::Reducer,  // Φreducer:  (9 chars)
@@ -107,6 +112,7 @@ impl PhiMarker for NgRxKind {
         match token {
             "Φngrx" => Some(Self::NgRx),
             "Φaction" => Some(Self::Action),
+            "Φaction-class" => Some(Self::ClassAction),
             "Φreducer" => Some(Self::Reducer),
             "Φeffect" => Some(Self::Effect),
             "Φselector" => Some(Self::Selector),
@@ -123,6 +129,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "Φngrx",
             Self::Action => "Φaction",
+            Self::ClassAction => "Φaction-class",
             Self::Reducer => "Φreducer",
             Self::Effect => "Φeffect",
             Self::Selector => "Φselector",
@@ -191,6 +198,13 @@ pub struct ActionDecl {
     pub name: String,
     pub event_string: String,
     pub props_type: Option<String>,
+}
+
+/// A class implementing the directly imported NgRx Action interface.
+/// Event/payload/provider interpretation is deliberately not inferred.
+#[derive(Debug, Clone)]
+pub struct ClassActionDecl {
+    pub name: String,
 }
 
 /// A single reducer transition (on(action) → state change).
@@ -266,6 +280,7 @@ pub struct NgRxShape {
     /// just the `Φstore:` marker.
     pub component_name: Option<String>,
     pub actions: Vec<ActionDecl>,
+    pub class_actions: Vec<ClassActionDecl>,
     pub reducer: Option<ReducerDecl>,
     pub effects: Vec<EffectDecl>,
     pub selectors: Vec<SelectorDecl>,

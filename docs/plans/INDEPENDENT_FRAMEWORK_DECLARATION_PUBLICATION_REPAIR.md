@@ -1,5 +1,7 @@
 # Independent framework declaration publication repair
 
+> Historical completion record. The approved [#140 class Action declaration slice](ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md) now supersedes only the former unsupported-legacy-class guard. Its source remains unchanged; modern Action and Angular Service publication behavior remains frozen. Historical run counts below describe the original 56-group harness; the updated harness has 57 groups.
+
 ## 1. Verdict and scope
 
 **INDEPENDENT FRAMEWORK DECLARATION PUBLICATION SLICE COMPLETE**

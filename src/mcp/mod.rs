@@ -98,6 +98,14 @@ mod angular_di_inject_token_tests;
 #[path = "../tests/mcp/angular_di_inject_token_matrix.rs"]
 mod angular_di_inject_token_matrix_tests;
 
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_legacy_declaration.rs"]
+mod ngrx_legacy_declaration_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_legacy_declaration_matrix.rs"]
+mod ngrx_legacy_declaration_matrix_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

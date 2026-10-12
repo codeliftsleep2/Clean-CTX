@@ -52,7 +52,7 @@ $cases=@(
     @{name='action-b';domain='ngrx';names=@('sharedAudit');marker='T @action = sharedAudit';role='declaration';source=(Action-Source 'sharedAudit')},
     @{name='service-reference';domain='angular';names=@('SharedService');marker='';role='existing_reference_endpoint';source="import { Component } from '@angular/core';`nimport { SharedService } from './service-a';`n@Component({selector:'x-ref'}) class ReferenceDI { constructor(private owner: SharedService) {} }`n"},
     @{name='action-reference';domain='ngrx';names=@('sharedAudit');marker='';role='existing_reference_endpoint';source="import { Component } from '@angular/core';`nimport { Store } from '@ngrx/store';`nimport { sharedAudit } from './action-a';`n@Component({selector:'x-ref-store'}) class ReferenceStore { constructor(private store: Store) {} run() { this.store.dispatch(sharedAudit()); } }`n"},
-    @{name='legacy-negative';domain='ngrx';names=@();marker='';role='unsupported_not_declared';source="import { Action } from '@ngrx/store';`nexport class LegacyAudit implements Action { readonly type = '[Audit] Legacy'; }`n"}
+    @{name='legacy-class';domain='ngrx';names=@('LegacyAudit');marker='T @action-class = LegacyAudit';role='class_declaration_now_recognized_by_140';source="import { Action } from '@ngrx/store';`nexport class LegacyAudit implements Action { readonly type = '[Audit] Legacy'; }`n"}
 )
 foreach ($case in $cases) {
     $case.file=$case.name+'.ts'

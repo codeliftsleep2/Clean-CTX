@@ -137,10 +137,14 @@ pub(super) fn evaluate(
         .unwrap_or(true);
     let ngrx_shape = ngrx_enabled
         .then(|| {
-            crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
+            let shape = crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
                 context.source,
                 context.fidelity,
                 context.lexical_regions,
+            );
+            crate::angular_meta::ngrx::legacy::include(
+                shape,
+                context.ngrx_class_actions.unwrap_or(&[]),
             )
         })
         .flatten();
