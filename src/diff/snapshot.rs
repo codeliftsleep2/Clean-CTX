@@ -36,6 +36,9 @@ pub struct CapturedClass {
 pub struct CapturedMethod {
     /// The compact signature text (e.g. "process(id:string):boolean").
     pub sig: String,
+    /// Producer-owned comparison facts, independent of compact presentation.
+    /// None for producers that retain their established signature comparison.
+    pub declaration: Option<DeclarationEvidence>,
     /// Behavior markers attached to the method (⊕guard, ⊕loop, etc.).
     pub markers: Vec<String>,
     /// Normalized method body text (whitespace-collapsed). `None` when the
@@ -48,4 +51,12 @@ pub struct CapturedMethod {
     /// `markers`, so a method whose body changed was reported as
     /// `Unchanged` — a false negative for `diff_commits`.
     pub body: Option<String>,
+}
+
+/// Written declaration facts supplied by structured language captures.
+/// The comparator treats these as opaque values; it does not parse type syntax.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeclarationEvidence {
+    pub return_type: String,
+    pub attributes: Vec<String>,
 }

@@ -16,7 +16,7 @@ use crate::compaction::{
     extract_method_sig, extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::capture_pipeline::run_capture_pipeline_nodes;
 use crate::compression::language::detect_language;
 use crate::compression::markers::build_marker;
 use crate::queries;
@@ -202,13 +202,19 @@ fn try_build_with(
     // (capture_name, raw_text) pair to the normalised text the diff
     // path wants stored in the resulting CapEntry. F-08: pass the
     // real `fidelity` through so the per-capture closures honour it.
-    let all_captures = run_capture_pipeline(
+    let comparison_query = if parser_label == "csharp" {
+        format!("{query_string}\n{}", super::csharp_evidence::QUERY)
+    } else {
+        query_string.to_string()
+    };
+    let all_captures = run_capture_pipeline_nodes(
         language.expect("Language must be Some - check feature flags"),
-        query_string,
+        &comparison_query,
         source,
         fidelity,
         |capture_name, raw, f| {
             match capture_name {
+                name if name.starts_with("diff.signature.") => Some(raw.to_string()),
                 "class.root" => Some(extract_class_name(raw)),
                 // C# interfaces and records are distinct AST nodes but
                 // share the same class-like shape. F-01 diff audit.
@@ -238,6 +244,7 @@ fn try_build_with(
             }
         },
     )?;
+    let declarations = super::csharp_evidence::collect(&all_captures);
 
     let mut classes: Vec<CapturedClass> = Vec::new();
     let mut imports: Vec<String> = Vec::new();
@@ -257,6 +264,9 @@ fn try_build_with(
     let mut open_scopes: Vec<(usize, usize)> = Vec::new();
 
     for cap in &all_captures {
+        if cap.name.starts_with("diff.signature.") {
+            continue;
+        }
         match cap.name.as_str() {
             "import.root" => {
                 if !cap.text.is_empty() {
@@ -291,6 +301,7 @@ fn try_build_with(
             "method.root" | "constructor.root" | "func.root" => {
                 let method = CapturedMethod {
                     sig: cap.text.clone(),
+                    declaration: declarations.get(&(cap.start_byte, cap.end_byte)).cloned(),
                     markers: std::mem::take(&mut pending_markers),
                     body: extract_method_body(&cap.raw_text),
                 };

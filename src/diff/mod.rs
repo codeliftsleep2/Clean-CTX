@@ -19,6 +19,7 @@
 
 pub(crate) mod action;
 pub(crate) mod builder;
+mod csharp_evidence;
 pub(crate) mod differ;
 pub(crate) mod formatter;
 pub(crate) mod keys;

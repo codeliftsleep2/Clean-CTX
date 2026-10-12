@@ -54,6 +54,15 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
                     // mislabeled "(body changed)".
                     if action.target == DiffTarget::Method && !action.reason_hint.is_empty() {
                         match action.reason_hint.as_str() {
+                            "declaration" => {
+                                let _ = writeln!(
+                                    out,
+                                    "{}{} {} (declaration changed)",
+                                    indent,
+                                    action.kind.symbol(),
+                                    action.label
+                                );
+                            }
                             "body" => {
                                 let _ = writeln!(
                                     out,

@@ -207,10 +207,16 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                 for i in 0..g1.len().max(g2.len()) {
                     match (g1.get(i), g2.get(i)) {
                         (Some(b), Some(c)) => {
-                            if b.sig == c.sig && b.markers == c.markers && b.body == c.body {
+                            if b.sig == c.sig
+                                && b.declaration == c.declaration
+                                && b.markers == c.markers
+                                && b.body == c.body
+                            {
                                 actions.push(method_action(DiffKind::Unchanged, &key, c, "", ""));
                             } else {
-                                let reason = if b.sig != c.sig {
+                                let reason = if b.declaration != c.declaration {
+                                    "declaration"
+                                } else if b.sig != c.sig {
                                     "sig"
                                 } else if b.markers != c.markers && b.body == c.body {
                                     "markers"

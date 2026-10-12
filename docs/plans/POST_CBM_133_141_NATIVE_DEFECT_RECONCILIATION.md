@@ -5,6 +5,10 @@ This investigation records the baseline at 165cf8f. The subsequent approved
 its insertion-position findings only; remaining native slices and whole-issue
 closure recommendations are not implicitly changed.
 
+The subsequent approved [#137 signature-evidence repair](ISSUE_137_SEMANTIC_SIGNATURE_EVIDENCE_REPAIR.md)
+supersedes the method return/authorization false-unchanged findings only. The
+neighbor-marker attribution finding and other original #137 criteria remain.
+
 ## 1. Executive verdict
 
 **CBM baseline:** A0–B5 remains frozen. The accepted 19/19 provider case groups

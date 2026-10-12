@@ -70,6 +70,10 @@ mod apply_edit_tests;
 #[path = "../tests/mcp/insert_before_declaration.rs"]
 mod insert_before_declaration_tests;
 
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../tests/mcp/semantic_signature_evidence.rs"]
+mod semantic_signature_evidence_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

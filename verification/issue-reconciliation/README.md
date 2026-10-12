@@ -82,3 +82,31 @@ oracles, stderr and binary provenance remain under target/insert-before-declarat
 See [the repair report](../../docs/plans/ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md)
 for RED/GREEN evidence, the separately retained intermediate lifecycle failure,
 and remaining #136 criteria. This does not claim the entire issue is resolved.
+
+## #137 semantic signature evidence regression
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+The harness creates an owned committed C# history, verifies Git/source evidence,
+and checks registered diff_commits results at low/medium/high/edit/verbatim:
+return-type and authorization-only changes, unchanged members, parameter changes,
+the supported last-method body control, and unchanged neighbors. All 25 semantic
+groups must pass. No build, CBM daemon or model host is invoked.
+
+For RED/GREEN investigation, reuse the exact saved history with the candidate:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 -BinaryPath ./target/debug/clean-ctx.exe -HistoryPath <history-path-printed-by-the-RED-run>
+```
+
+Only this harness's target/semantic-signature-evidence histories are admitted for
+reuse; expected committed source is checked before the test. The source history
+is not recommitted during GREEN. On Linux omit .exe. Every run records artifact
+hash, both commits, exact source oracle, raw MCP results and per-case verdicts.
+
+The body control isolates the existing last-method contract; the separate
+first-method/neighbor-marker defect is retained in
+[the repair report](../../docs/plans/ISSUE_137_SEMANTIC_SIGNATURE_EVIDENCE_REPAIR.md).
+Passing this harness does not close all #137 criteria or establish #135 fidelity.

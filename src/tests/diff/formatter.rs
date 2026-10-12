@@ -10,6 +10,7 @@ fn make_class(name: &str, methods: &[&str], fields: &[&str]) -> CapturedClass {
         methods: methods
             .iter()
             .map(|s| CapturedMethod {
+                declaration: None,
                 sig: s.to_string(),
                 markers: vec![],
                 body: None,
@@ -27,6 +28,7 @@ fn make_class_with_bodies(name: &str, methods: &[(&str, Option<&str>)]) -> Captu
         methods: methods
             .iter()
             .map(|(sig, body)| CapturedMethod {
+                declaration: None,
                 sig: sig.to_string(),
                 markers: vec![],
                 body: body.map(|b| b.to_string()),
