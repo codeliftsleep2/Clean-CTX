@@ -145,6 +145,8 @@ pub struct PassContext {
     /// Private compilation-scoped Action/type association; never a public entity.
     pub(crate) ngrx_action_type_bindings:
         Vec<crate::angular_meta::ngrx::type_binding::ActionTypeBinding>,
+    pub(crate) ngrx_legacy_transitions:
+        Vec<crate::angular_meta::ngrx::transitions::LegacyTransition>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
     /// Current method's accumulated typed control summaries (F-28).
@@ -198,6 +200,7 @@ impl PassContext {
             angular_initializers: Vec::new(),
             ngrx_class_actions: Vec::new(),
             ngrx_action_type_bindings: Vec::new(),
+            ngrx_legacy_transitions: Vec::new(),
             current_method: None,
             current_control_summaries: Vec::new(),
             current_class: None,

@@ -111,3 +111,11 @@ mod ngrx_legacy_declaration_matrix_tests;
 #[cfg(test)]
 #[path = "../tests/mcp/apply_edit_e2e.rs"]
 mod apply_edit_e2e_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_legacy_transition.rs"]
+mod ngrx_legacy_transition_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_legacy_transition_matrix.rs"]
+mod ngrx_legacy_transition_matrix_tests;

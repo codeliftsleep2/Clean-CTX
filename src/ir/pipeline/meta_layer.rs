@@ -72,6 +72,7 @@ impl IRPass for MetaLayerPass {
         if state.query_string == crate::queries::TS_QUERY {
             context.angular_initializers = Some(&state.angular_initializers);
             context.ngrx_class_actions = Some(&state.ngrx_class_actions);
+            context.ngrx_legacy_transitions = Some(&state.ngrx_legacy_transitions);
         }
         if state.query_string == crate::queries::CS_QUERY {
             context.structured_declarations = Some(&structured_declarations);

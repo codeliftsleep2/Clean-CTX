@@ -208,6 +208,15 @@ pub(super) fn evaluate(
             initializers: context.angular_initializers,
         },
     );
+    if ngrx_enabled {
+        semantic_edges.extend(
+            context
+                .ngrx_legacy_transitions
+                .unwrap_or(&[])
+                .iter()
+                .map(crate::angular_meta::ngrx::transitions::LegacyTransition::edge),
+        );
+    }
     if meta_config
         .map(|config| config.testing.enabled)
         .unwrap_or(true)

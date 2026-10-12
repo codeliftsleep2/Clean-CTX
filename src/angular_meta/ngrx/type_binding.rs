@@ -5,9 +5,9 @@ use crate::compression::capture_pipeline::CapturedNode;
 use crate::ir::invocation_evidence::SourceSpan;
 use std::collections::{BTreeMap, BTreeSet};
 
-// This prerequisite intentionally establishes private evidence before its
-// separately authorized reducer consumer. Fields preserve exact source identity;
-// none is copied to a durable semantic product or public marker.
+// Compilation-scoped source identity retained for the legacy transition consumer.
+// The record itself is never persisted or made a public entity; the consumer
+// may project an existing relation only after its source-identity join succeeds.
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ActionTypeBinding {

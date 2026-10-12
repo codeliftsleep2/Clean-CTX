@@ -249,3 +249,22 @@ observe that association or establish reducer linkage. Registered
 `ngrx_action_type_binding_` producer tests prove its exact source spans, file/hash
 identity, direct-reference selection and refusal controls. See
 [the binding report](../../docs/plans/ISSUE_140B_PREREQ2_ACTION_TYPE_BINDING.md).
+
+## #140b same-file legacy switch transitions
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyTransitions.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Provider-disabled stdio harness: 20 static forms at High/Medium/Low, three
+same-name/file-occurrence groups, and six refresh lifecycle stages (69 groups).
+Oracles assert exact Action/Reducer identities, relation direction, both source
+files, forward/reverse consistency and independent class declarations. The two
+directions expose the same Action → TriggersReducer → Reducer fact. Constants
+remain private resolution evidence, never public Action declarations.
+
+Only top-level two-parameter typed functions with immediate-body `switch` on the
+Action parameter's `.type` and direct identifier cases are supported. Shared
+constant-to-multiple-Action mappings are refused. Alias/module resolution and
+standalone string/literal Action authority remain separate. See
+[the resumed report](../../docs/plans/ISSUE_140B_LEGACY_TRANSITION_REPAIR.md).

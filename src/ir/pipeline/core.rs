@@ -68,6 +68,7 @@ impl IRPass for CoreIRPass {
             capture_query.push_str(typescript::DECLARATION_QUERY);
             capture_query.push('\n');
             capture_query.push_str(crate::angular_meta::ngrx::legacy::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::transitions::QUERY);
         }
 
         let mut captures = run_capture_pipeline_nodes(
@@ -124,8 +125,16 @@ impl IRPass for CoreIRPass {
                 &captures,
                 &state.ngrx_class_actions,
             );
+            state.ngrx_legacy_transitions = crate::angular_meta::ngrx::transitions::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.ngrx_action_type_bindings,
+            );
             captures.retain(|capture| {
-                !capture.name.starts_with("ngrx.legacy.") && !capture.name.starts_with("ngrx.type.")
+                !capture.name.starts_with("ngrx.transition.")
+                    && !capture.name.starts_with("ngrx.legacy.")
+                    && !capture.name.starts_with("ngrx.type.")
             });
         }
 
