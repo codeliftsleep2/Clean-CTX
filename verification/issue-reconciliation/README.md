@@ -293,3 +293,28 @@ control). Evidence is under
 `target/ngrx-constructor-dispatch/<timestamp-guid>`; a failed
 assertion exits 1. No full suite, model invocation or live CBM is used. See
 [the repair report](../../docs/plans/ISSUE_140C_CONSTRUCTOR_DISPATCH_REPAIR.md).
+
+## #140d Service dispatch ownership
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceDispatch.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Use the current candidate (`./target/debug/clean-ctx` on Linux). Existing
+PhaseBSession starts provider-disabled owned stdio MCP sessions and records all
+RPCs. Exact Service → Dispatches → Action owner/target files and forward/reverse
+agreement are checked alongside independent declaration publication. Controls
+cover Component/fallback preservation, same-target Service plus helper, two
+Services, unknown endpoints, no proximity attribution, nested/callback refusal,
+opt-out, three fidelities, duplicate/file occurrences, same-source reuse and
+refresh/move/qualification/remove/delete lifecycle. It runs 84 groups: 24 static
+forms × three fidelities, three file-occurrence groups, one reuse control and
+eight lifecycle stages. The existing injected Store
+Service reference is distinguished from independently declared owner identities.
+
+Scope uses frozen #140c `Store<T>` parameter-property and same-file constructor
+qualification. Plain Store, imported constructors, modern symbolic Service
+qualification, callbacks and select ownership remain separate. Existing modern
+fallback behavior is tested as preservation. Failures exit 1; evidence is under
+`target/ngrx-service-dispatch/<timestamp-guid>`. See
+[the ownership report](../../docs/plans/ISSUE_140D_SERVICE_DISPATCH_OWNERSHIP.md).

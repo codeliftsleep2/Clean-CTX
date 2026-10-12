@@ -12,7 +12,7 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        8,
+        9,
         "Constructor dispatch facts advance the existing Angular/NgRx producer cohort"
     );
     assert_eq!(

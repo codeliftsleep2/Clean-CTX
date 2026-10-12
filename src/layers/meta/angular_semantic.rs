@@ -8,6 +8,7 @@ use crate::layers::meta::semantic::SemanticEdge;
 pub(super) struct ProjectionEvidence<'a> {
     lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
+    ngrx_edges: Option<&'a [SemanticEdge]>,
     routing: Option<Option<&'a crate::angular_meta::routing::RouteShape>>,
     is_angular: Option<bool>,
     initializers: Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
@@ -100,7 +101,11 @@ pub(super) fn extract_non_testing_edges(
     if meta_config.map(|value| value.ngrx.enabled).unwrap_or(true)
         && let Some(shape) = ngrx_shape
     {
-        edges.extend(shape.to_ngrx_semantic_edges());
+        edges.extend(
+            evidence
+                .ngrx_edges
+                .map_or_else(|| shape.to_ngrx_semantic_edges(), |edges| edges.to_vec()),
+        );
     }
     let routing_shape = match evidence.routing {
         Some(shape) => shape.cloned(),
@@ -135,6 +140,7 @@ pub(super) fn evaluate(
     let ngrx_enabled = meta_config
         .map(|config| config.ngrx.enabled)
         .unwrap_or(true);
+    let mut ngrx_edges = None;
     let ngrx_shape = ngrx_enabled
         .then(|| {
             let (shape, starts) = crate::angular_meta::ngrx::extract_ngrx_shape_with_sites(
@@ -149,6 +155,14 @@ pub(super) fn evaluate(
             );
             shape
                 .map(|shape| {
+                    ngrx_edges = Some(crate::angular_meta::ngrx::service_owners::project(
+                        shape.clone(),
+                        &starts,
+                        context.ngrx_constructor_dispatches.unwrap_or(&[]),
+                        context.ngrx_service_dispatches.unwrap_or(&[]),
+                        context.source,
+                        &context.path.to_string_lossy(),
+                    ));
                     crate::angular_meta::ngrx::constructors::apply(
                         shape,
                         &starts,
@@ -215,6 +229,7 @@ pub(super) fn evaluate(
         ProjectionEvidence {
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),
+            ngrx_edges: ngrx_edges.as_deref(),
             routing: Some(routing_shape.as_ref()),
             is_angular: precomputed_angular,
             initializers: context.angular_initializers,

@@ -145,6 +145,8 @@ pub struct PassContext {
     /// Private compilation-scoped Action/type association; never a public entity.
     pub(crate) ngrx_action_type_bindings:
         Vec<crate::angular_meta::ngrx::type_binding::ActionTypeBinding>,
+    pub(crate) ngrx_service_dispatches:
+        Vec<crate::angular_meta::ngrx::service_owners::ServiceDispatch>,
     pub(crate) ngrx_constructor_dispatches:
         Vec<crate::angular_meta::ngrx::constructors::ConstructorDispatch>,
     pub(crate) ngrx_legacy_transitions:
@@ -204,6 +206,7 @@ impl PassContext {
             ngrx_action_type_bindings: Vec::new(),
             ngrx_legacy_transitions: Vec::new(),
             ngrx_constructor_dispatches: Vec::new(),
+            ngrx_service_dispatches: Vec::new(),
             current_method: None,
             current_control_summaries: Vec::new(),
             current_class: None,

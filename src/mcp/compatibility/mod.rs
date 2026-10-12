@@ -337,3 +337,7 @@ mod ngrx_legacy_transition_compatibility_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../../tests/mcp/ngrx_constructor_dispatch_compatibility.rs"]
 mod ngrx_constructor_dispatch_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/ngrx_service_dispatch_compatibility.rs"]
+mod ngrx_service_dispatch_compatibility_tests;

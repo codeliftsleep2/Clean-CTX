@@ -127,3 +127,11 @@ mod ngrx_constructor_dispatch_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/ngrx_constructor_dispatch_matrix.rs"]
 mod ngrx_constructor_dispatch_matrix_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_service_dispatch.rs"]
+mod ngrx_service_dispatch_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_service_dispatch_matrix.rs"]
+mod ngrx_service_dispatch_matrix_tests;
