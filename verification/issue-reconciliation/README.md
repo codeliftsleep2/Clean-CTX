@@ -232,3 +232,20 @@ pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxLegacyDecla
 On Linux omit `.exe`. This provider-disabled harness uses the established Phase B stdio session helpers. It requires **78 acceptance groups** for top-level class declarations implementing the directly imported NgRx `Action`: exact source occurrences, truthful class markers, no fabricated links, fidelity/repeat controls, source-distinct same names, and declaration rename/removal/deletion.
 
 Seven separate handler/reference/alias/collision probes are recorded as **OBSERVED**, not PASS. They remain unresolved and do not affect the declaration-only acceptance verdict. The driver builds nothing, invokes no model host, and saves source oracles, binary provenance, requests/results and verdicts under `target/ngrx-legacy-declarations/`. See [the #140 class declaration report](../../docs/plans/ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md) for the defect partition and remaining work.
+
+## #140b-Prereq2 private Action/type binding preservation
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxActionTypeBindingPreservation.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This provider-disabled harness uses the existing PhaseBSession stdio driver.
+Nine initializer forms run at High, Medium and Low (27 groups). Each asserts the
+exact admitted class Action identity/file, absence of a duplicate constant Action
+and absence of a new public relation; source bytes must remain unchanged.
+
+The new association is private compilation evidence. The harness does **not**
+observe that association or establish reducer linkage. Registered
+`ngrx_action_type_binding_` producer tests prove its exact source spans, file/hash
+identity, direct-reference selection and refusal controls. See
+[the binding report](../../docs/plans/ISSUE_140B_PREREQ2_ACTION_TYPE_BINDING.md).

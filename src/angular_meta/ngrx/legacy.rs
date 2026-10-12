@@ -40,6 +40,70 @@ pub(crate) const QUERY: &str = r#"
             (enum_declaration name: (identifier) @ngrx.legacy.local_binding)
         ])
     ])
+    (program [(lexical_declaration kind: "const"
+        (variable_declarator name: (identifier) @ngrx.type.const_name
+            value: (_) @ngrx.type.const_value) @ngrx.type.const)
+      (export_statement declaration: (lexical_declaration kind: "const"
+        (variable_declarator name: (identifier) @ngrx.type.const_name
+            value: (_) @ngrx.type.const_value) @ngrx.type.const))])
+    [(class_declaration body: (class_body
+        (public_field_definition "readonly" name: (property_identifier) @ngrx.type.member
+            value: (identifier) @ngrx.type.reference) @ngrx.type.field)) @ngrx.type.owner
+     (abstract_class_declaration body: (class_body
+        (public_field_definition "readonly" name: (property_identifier) @ngrx.type.member
+            value: (identifier) @ngrx.type.reference) @ngrx.type.field)) @ngrx.type.owner]
+    [(class_declaration body: (class_body
+        (public_field_definition name: (property_identifier) @ngrx.type.any_member))) @ngrx.type.any_owner
+     (abstract_class_declaration body: (class_body
+        (public_field_definition name: (property_identifier) @ngrx.type.any_member))) @ngrx.type.any_owner
+     (class_declaration body: (class_body
+        (method_definition name: (property_identifier) @ngrx.type.any_member))) @ngrx.type.any_owner
+     (abstract_class_declaration body: (class_body
+        (method_definition name: (property_identifier) @ngrx.type.any_member))) @ngrx.type.any_owner]
+    [(class_declaration body: (class_body
+        (public_field_definition name: [(computed_property_name) (string) (number)]))) @ngrx.type.unsupported_owner
+     (abstract_class_declaration body: (class_body
+        (public_field_definition name: [(computed_property_name) (string) (number)]))) @ngrx.type.unsupported_owner
+     (class_declaration body: (class_body
+        (method_definition name: [(computed_property_name) (string) (number)]))) @ngrx.type.unsupported_owner
+     (abstract_class_declaration body: (class_body
+        (method_definition name: [(computed_property_name) (string) (number)]))) @ngrx.type.unsupported_owner
+     (class_declaration body: (class_body
+        (method_definition parameters: (formal_parameters
+            (required_parameter (accessibility_modifier)))))) @ngrx.type.unsupported_owner
+     (abstract_class_declaration body: (class_body
+        (method_definition parameters: (formal_parameters
+            (required_parameter (accessibility_modifier)))))) @ngrx.type.unsupported_owner]
+    (public_field_definition "static") @ngrx.type.static_field
+    (variable_declarator name: (_) @ngrx.type.binding_pattern)
+    (variable_declarator name: (identifier) @ngrx.type.binding)
+    [(required_parameter pattern: (_) @ngrx.type.binding_pattern)
+     (optional_parameter pattern: (_) @ngrx.type.binding_pattern)]
+    [(required_parameter pattern: (identifier) @ngrx.type.binding)
+     (optional_parameter pattern: (identifier) @ngrx.type.binding)
+     (required_parameter name: (identifier) @ngrx.type.binding)
+     (optional_parameter name: (identifier) @ngrx.type.binding)]
+    [(class_declaration name: (type_identifier) @ngrx.type.binding)
+     (abstract_class_declaration name: (type_identifier) @ngrx.type.binding)
+     (class name: (type_identifier) @ngrx.type.binding)
+     (function_declaration name: (identifier) @ngrx.type.binding)
+     (function_expression name: (identifier) @ngrx.type.binding)
+     (generator_function_declaration name: (identifier) @ngrx.type.binding)
+     (generator_function name: (identifier) @ngrx.type.binding)
+     (type_parameter name: (type_identifier) @ngrx.type.binding)
+     (enum_declaration name: (identifier) @ngrx.type.binding)
+     (internal_module name: (_) @ngrx.type.binding_pattern)]
+    (arrow_function parameter: (identifier) @ngrx.type.binding)
+    (import_require_clause (identifier) @ngrx.type.binding)
+    (import_alias (identifier) @ngrx.type.binding)
+    (import_clause (identifier) @ngrx.type.binding)
+    (namespace_import (identifier) @ngrx.type.binding)
+    (import_specifier name: (identifier) @ngrx.type.binding !alias)
+    (import_specifier alias: (identifier) @ngrx.type.binding)
+    (catch_clause parameter: (_) @ngrx.type.binding_pattern)
+    (catch_clause parameter: (identifier) @ngrx.type.binding)
+    (ERROR) @ngrx.type.invalid
+
 "#;
 
 #[derive(Debug, Clone)]
@@ -165,3 +229,7 @@ pub(crate) fn include(
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../tests/angular_meta/ngrx_legacy.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/angular_meta/ngrx_action_type_binding_red.rs"]
+mod binding_red;

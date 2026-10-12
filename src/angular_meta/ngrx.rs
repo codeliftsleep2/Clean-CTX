@@ -28,6 +28,7 @@ mod extract_selectors;
 mod extraction_metrics;
 pub(crate) mod legacy;
 mod shape;
+pub(crate) mod type_binding;
 
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.

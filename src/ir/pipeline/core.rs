@@ -118,7 +118,15 @@ impl IRPass for CoreIRPass {
             captures.retain(|capture| !capture.name.starts_with("angular.initializer."));
             state.ngrx_class_actions =
                 crate::angular_meta::ngrx::legacy::collect(&source, &captures);
-            captures.retain(|capture| !capture.name.starts_with("ngrx.legacy."));
+            state.ngrx_action_type_bindings = crate::angular_meta::ngrx::type_binding::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.ngrx_class_actions,
+            );
+            captures.retain(|capture| {
+                !capture.name.starts_with("ngrx.legacy.") && !capture.name.starts_with("ngrx.type.")
+            });
         }
 
         // TypeScript places `export` on an `export_statement` wrapper rather
