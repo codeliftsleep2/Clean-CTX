@@ -32,6 +32,8 @@ pub struct MetaLayerContext<'a> {
         Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
     pub(crate) angular_initializers:
         Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    pub(crate) ngrx_constructor_dispatches:
+        Option<&'a [crate::angular_meta::ngrx::constructors::ConstructorDispatch]>,
     pub(crate) ngrx_legacy_transitions:
         Option<&'a [crate::angular_meta::ngrx::transitions::LegacyTransition]>,
     pub(crate) ngrx_class_actions:
@@ -61,6 +63,7 @@ impl<'a> MetaLayerContext<'a> {
             angular_initializers: None,
             ngrx_class_actions: None,
             ngrx_legacy_transitions: None,
+            ngrx_constructor_dispatches: None,
         }
     }
 }

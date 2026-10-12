@@ -22,6 +22,7 @@
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
+pub(crate) mod constructors;
 mod extract;
 mod extract_selectors;
 #[cfg(test)]
@@ -34,7 +35,7 @@ pub(crate) mod type_binding;
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.
 pub use extract::extract_ngrx_shape;
-pub(crate) use extract::extract_ngrx_shape_with_regions;
+pub(crate) use extract::{extract_ngrx_shape_with_regions, extract_ngrx_shape_with_sites};
 #[cfg(test)]
 pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 

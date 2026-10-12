@@ -137,15 +137,27 @@ pub(super) fn evaluate(
         .unwrap_or(true);
     let ngrx_shape = ngrx_enabled
         .then(|| {
-            let shape = crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
+            let (shape, starts) = crate::angular_meta::ngrx::extract_ngrx_shape_with_sites(
                 context.source,
                 context.fidelity,
                 context.lexical_regions,
-            );
-            crate::angular_meta::ngrx::legacy::include(
+            )
+            .map_or((None, Vec::new()), |(shape, starts)| (Some(shape), starts));
+            let shape = crate::angular_meta::ngrx::legacy::include(
                 shape,
                 context.ngrx_class_actions.unwrap_or(&[]),
-            )
+            );
+            shape
+                .map(|shape| {
+                    crate::angular_meta::ngrx::constructors::apply(
+                        shape,
+                        &starts,
+                        context.ngrx_constructor_dispatches.unwrap_or(&[]),
+                        context.source,
+                        &context.path.to_string_lossy(),
+                    )
+                })
+                .filter(|shape| !shape.is_empty())
         })
         .flatten();
     let routing_enabled = meta_config

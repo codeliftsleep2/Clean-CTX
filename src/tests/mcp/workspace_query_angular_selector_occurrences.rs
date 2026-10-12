@@ -374,5 +374,5 @@ fn refresh_and_selector_changes_do_not_reuse_stale_results() {
 fn ephemeral_phase_5_does_not_change_the_angular_producer_generation() {
     // Declaration publication and Pipe DI advance the durable producer;
     // ephemeral selector queries still introduce no additional generation.
-    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 7);
+    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 8);
 }

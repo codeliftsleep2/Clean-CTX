@@ -22,7 +22,7 @@ fn ngrx_legacy_transition_generations_exclude_pre_transition_products() {
     assert_eq!(current.canonical_producers, prior.canonical_producers);
     assert_eq!(current.canonical_config, prior.canonical_config);
     assert_eq!(current.semantic_config, prior.semantic_config);
-    assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 4);
-    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 7);
+    assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
+    assert_eq!(crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION, 8);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);
 }

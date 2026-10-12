@@ -288,7 +288,8 @@ pub(super) fn extract_call_sites(
     source: &str,
     shape: &mut NgRxShape,
     lexical_regions: &crate::meta_util::LexicalRegions,
-) {
+) -> Vec<usize> {
+    let mut dispatch_starts = Vec::new();
     for (pattern, kind) in [
         ("this.store.dispatch(", SiteKind::Dispatch),
         ("store.dispatch(", SiteKind::Dispatch),
@@ -344,6 +345,7 @@ pub(super) fn extract_call_sites(
             if let Some(name) = site_name {
                 match kind {
                     SiteKind::Dispatch => {
+                        dispatch_starts.push(abs_idx);
                         shape
                             .dispatch_sites
                             .push(DispatchSite { action_name: name });
@@ -359,6 +361,7 @@ pub(super) fn extract_call_sites(
             search_from = after_start + end_offset;
         }
     }
+    dispatch_starts
 }
 
 /// First token of a call body slice under the established site-name split

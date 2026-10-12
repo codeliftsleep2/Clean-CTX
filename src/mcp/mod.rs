@@ -119,3 +119,11 @@ mod ngrx_legacy_transition_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/ngrx_legacy_transition_matrix.rs"]
 mod ngrx_legacy_transition_matrix_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_constructor_dispatch.rs"]
+mod ngrx_constructor_dispatch_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_constructor_dispatch_matrix.rs"]
+mod ngrx_constructor_dispatch_matrix_tests;

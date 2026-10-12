@@ -268,3 +268,28 @@ Action parameter's `.type` and direct identifier cases are supported. Shared
 constant-to-multiple-Action mappings are refused. Alias/module resolution and
 standalone string/literal Action authority remain separate. See
 [the resumed report](../../docs/plans/ISSUE_140B_LEGACY_TRANSITION_REPAIR.md).
+
+## #140c same-file constructor dispatch
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxConstructorDispatch.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Use the freshly built candidate (`./target/debug/clean-ctx` on Linux). The harness
+starts owned provider-disabled stdio MCP sessions using PhaseBSession, persists
+every request/response and tests exact Component → Dispatches → Action forward
+and reverse identities/files. Controls cover same-file constructor resolution,
+Store qualification, shadows, NonAction, imported/qualified refusal, wrappers,
+modern symbolic preservation, opt-out, duplicate/file occurrences, three
+fidelities, refresh/removal/deletion and independent class publication.
+
+Supported constructor qualification uses an accessibility-modified generic
+Store parameter property and a direct instance-method expression statement.
+Imported constructor linkage and Service ownership remain separate. Existing
+symbolic endpoint behavior is preservation evidence, not a constructor binding.
+The harness executes 88 groups (26 static forms × three fidelities, three
+file-occurrence groups, six lifecycle stages and a repeated same-source/fidelity
+control). Evidence is under
+`target/ngrx-constructor-dispatch/<timestamp-guid>`; a failed
+assertion exits 1. No full suite, model invocation or live CBM is used. See
+[the repair report](../../docs/plans/ISSUE_140C_CONSTRUCTOR_DISPATCH_REPAIR.md).
