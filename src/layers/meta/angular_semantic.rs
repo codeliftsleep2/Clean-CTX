@@ -238,6 +238,13 @@ pub(super) fn evaluate(
     if ngrx_enabled {
         semantic_edges.extend(
             context
+                .ngrx_selector_declarations
+                .unwrap_or(&[])
+                .iter()
+                .filter_map(|declaration| declaration.edge()),
+        );
+        semantic_edges.extend(
+            context
                 .ngrx_legacy_transitions
                 .unwrap_or(&[])
                 .iter()

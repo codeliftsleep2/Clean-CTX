@@ -224,7 +224,8 @@ impl WorkspaceIndex {
             // edge, and a non-Defines self-loop (e.g. `Injects(A, A)`) remains
             // a detected cycle (tests::has_cycle_self_loop).
             if edge.relation == SemanticRelation::Defines && subj_key == obj_key {
-                self.register_entity(&subj_key, edge.subject, &mut file_entity_keys);
+                self.register_entity(&subj_key, edge.subject.clone(), &mut file_entity_keys);
+                self.register_declaration(file_path, &subj_key, edge.subject);
                 continue;
             }
 

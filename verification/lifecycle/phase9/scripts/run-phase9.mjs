@@ -194,13 +194,26 @@ async function main() {
       operations: [{ type: 'replace_body', target: 'Unsafe.run', expectedOldText: oldBody, newText: newBody }],
     }), 'apply_edit');
     const afterEdit = fs.readFileSync(primary);
-    const oldBytes = Buffer.from(oldBody);
-    const newBytes = Buffer.from(newBody);
-    const start = beforeEdit.indexOf(oldBytes);
-    check('C', 'bytes before the edit are identical', start >= 0 && beforeEdit.subarray(0, start).equals(afterEdit.subarray(0, start)));
-    check('C', 'replacement bytes are exact', afterEdit.subarray(start, start + newBytes.length).equals(newBytes));
-    check('C', 'bytes after the edit are identical', beforeEdit.subarray(start + oldBytes.length).equals(afterEdit.subarray(start + newBytes.length)));
-    check('C', 'operation returns absolute byte-span information', Number.isInteger(edit.structuredContent?.operations?.[0]?.startByte));
+    const outcome = edit.structuredContent?.operations?.[0];
+    const hasSpan = Number.isInteger(outcome?.startByte) &&
+      Number.isInteger(outcome?.endByte) && Number.isInteger(outcome?.byteDelta);
+    check('C', 'operation returns absolute byte-span information', hasSpan);
+    if (hasSpan) {
+      const start = outcome.startByte;
+      const end = outcome.endByte;
+      const oldEnd = end - outcome.byteDelta;
+      const oldUnit = beforeEdit.subarray(start, oldEnd).toString('utf8');
+      const adaptedNewBody = oldUnit.includes('\r\n')
+        ? newBody.replace(/\r?\n/g, '\r\n')
+        : newBody.replace(/\r\n/g, '\n');
+      const newBytes = Buffer.from(adaptedNewBody);
+      check('C', 'bytes before the edit are identical',
+        beforeEdit.subarray(0, start).equals(afterEdit.subarray(0, start)));
+      check('C', 'replacement bytes are exact',
+        afterEdit.subarray(start, end).equals(newBytes));
+      check('C', 'bytes after the edit are identical',
+        beforeEdit.subarray(oldEnd).equals(afterEdit.subarray(end)));
+    }
 
     const deltaSource = fs.readFileSync(primary, 'utf8');
     const deltaTarget = deltaSource.replace(':READY', ':DELTA-TARGET');

@@ -211,3 +211,86 @@ fn empty_entities_in_file() -> QueryAnswer {
     let structured = serde_json::json!({ "entities": [], "count": 0 });
     QueryAnswer::new("entities_in_file", structured)
 }
+
+/// `declarations_in_file`: source-proven declarations in one trusted file.
+pub(super) fn prepare_declarations_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> PreparedQuery {
+    match try_prepare_declarations_in_file(args, state, context) {
+        Ok(prepared) => prepared,
+        Err(error) => PreparedQuery::failure(error),
+    }
+}
+
+fn try_prepare_declarations_in_file(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> Result<PreparedQuery, QueryFailure> {
+    let file_path = required_str(args, "file_path").ok_or_else(|| {
+        QueryFailure::invalid(
+            "Missing required argument: 'file_path' for declarations_in_file query.",
+        )
+    })?;
+    let workspace_root = args["workspaceRoot"].as_str();
+    let scope = context.scope(state, args)?;
+    let resolved_path = match crate::mcp::tool_helpers::resolve_file_path_checked(
+        file_path,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
+        Ok(path) => path,
+        Err(_) => return Ok(PreparedQuery::answer(empty_declarations_in_file())),
+    };
+    let canonical_path = state.semantic_owner_path(&resolved_path);
+    if scope
+        .as_ref()
+        .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
+    {
+        return Ok(PreparedQuery::answer(empty_declarations_in_file()));
+    }
+    let fidelity = semantic_fidelity(args, state)?;
+    let source = state
+        .read_source(&resolved_path)
+        .map_err(|error| QueryFailure::internal(error.to_string()))?;
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
+    if !state
+        .workspace_index_read()
+        .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
+    {
+        state
+            .preflight_semantic_publication(&resolved_path)
+            .map_err(QueryFailure::internal)?;
+        let (_, semantic_edges, compiled_hash) =
+            crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state)
+                .map_err(|error| QueryFailure::internal(error.to_string()))?;
+        state.workspace_index_lock().replace_semantic_projection(
+            &canonical_path,
+            semantic_edges,
+            workspace_fidelity,
+            compiled_hash,
+        );
+    }
+    Ok(prepared_declarations_in_file(canonical_path))
+}
+
+fn prepared_declarations_in_file(canonical_path: String) -> PreparedQuery {
+    PreparedQuery::indexed(move |index| {
+        let entities = index.declarations_in_file(&canonical_path);
+        let structured = serde_json::json!({
+            "count": entities.len(),
+            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+        });
+        Ok(QueryAnswer::new("declarations_in_file", structured))
+    })
+}
+
+fn empty_declarations_in_file() -> QueryAnswer {
+    QueryAnswer::new(
+        "declarations_in_file",
+        serde_json::json!({ "entities": [], "count": 0 }),
+    )
+}

@@ -68,6 +68,7 @@ impl IRPass for CoreIRPass {
             capture_query.push_str(typescript::DECLARATION_QUERY);
             capture_query.push('\n');
             capture_query.push_str(crate::angular_meta::ngrx::legacy::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::selector_declarations::QUERY);
             capture_query.push_str(crate::angular_meta::ngrx::transitions::QUERY);
             capture_query.push_str(crate::angular_meta::ngrx::constructors::QUERY);
             capture_query.push_str(crate::angular_meta::ngrx::service_owners::QUERY);
@@ -121,6 +122,12 @@ impl IRPass for CoreIRPass {
             captures.retain(|capture| !capture.name.starts_with("angular.initializer."));
             state.ngrx_class_actions =
                 crate::angular_meta::ngrx::legacy::collect(&source, &captures);
+            state.ngrx_selector_declarations =
+                crate::angular_meta::ngrx::selector_declarations::collect(
+                    &source,
+                    state.canonical_path.as_deref(),
+                    &captures,
+                );
             state.ngrx_action_type_bindings = crate::angular_meta::ngrx::type_binding::collect(
                 &source,
                 state.canonical_path.as_deref(),
@@ -153,6 +160,7 @@ impl IRPass for CoreIRPass {
                     && !capture.name.starts_with("ngrx.ctor.")
                     && !capture.name.starts_with("ngrx.transition.")
                     && !capture.name.starts_with("ngrx.legacy.")
+                    && !capture.name.starts_with("ngrx.selector.")
                     && !capture.name.starts_with("ngrx.type.")
             });
         }

@@ -34,7 +34,7 @@ function Invoke-CleanCtxRpc {
 
 if (-not $BinaryPath) {
     $name = if ($IsWindows) { 'clean-ctx.exe' } else { 'clean-ctx' }
-    $BinaryPath = Join-Path $RepositoryRoot "target/debug/$name"
+    $BinaryPath = Join-Path $RepositoryRoot "target/release/$name"
 }
 if (-not (Test-Path -LiteralPath $BinaryPath)) {
     throw 'Build the production binary first: cargo build --locked -p clean-ctx --bin clean-ctx --all-features -j 4'

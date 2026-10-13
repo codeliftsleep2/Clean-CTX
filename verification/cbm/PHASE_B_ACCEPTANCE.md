@@ -8,21 +8,34 @@ whether their observable consequences survive the real provider/adapter boundary
 
 | Phase | Live cases and assertions |
 | --- | --- |
-| B1 wire contracts | Actual provider and Clean tools/list; indexed identity; grouped QN/file → typed graph_search; valid empty search; consumed architecture table counts → existing modules/dependencies |
-| B2 independent state/identity | Index job succeeded separate from serving ready and best-effort coverage; source-root binding; queries do not change the observed job; distinct additional-root identity and explicit primary routing; same-named C# interface/class files in both roots remain reachable through native context |
-| B3 collection | 225 generated functions across nine TS files: provider query cursor oracle at 17 rows/page versus typed graph_query; default-limit typed search reaches every expected name/file on first and cached query; 225-call cross-file hub establishes direct cursor pages and a typed target selected beyond the default first page; deeper-parent invention remains pinned by deterministic tests |
+| B1 wire contracts | Clean tools/list; indexed identity; raw grouped QN/file → typed graph_search; valid empty search; consumed architecture table counts → existing modules/dependencies |
+| B2 independent state/identity | Explicit index admission and project identity through the registered proxy; queries do not change the admitted identity; distinct additional-root identity and explicit primary routing; same-named C# interface/class files in both roots remain reachable through native context |
+| B3 collection | 225 generated functions across nine TS files: raw proxy query cursor oracle at 17 rows/page versus typed graph_query; default-limit typed search reaches every expected name/file on first and cached query; 225-call cross-file hub establishes raw cursor pages and a typed target selected beyond the default first page; deeper-parent invention remains pinned by deterministic tests |
 | B5 native preservation | Explicitly disabled provider; high-fidelity C# and TypeScript context remains reachable through live MCP |
-| B3/B4 snapshot errors | A real emitted query cursor becomes stale after reindexing only the owned fixture; direct provider and raw proxy both retain the error |
-| B4 proxy truth | Single raw page versus direct provider exact JSON facts; current bridge availability; intentional tree whitespace; errors remain errors; private index_status remains excluded from the public proxy whitelist |
+| B3/B4 snapshot errors | A real emitted query cursor becomes stale after reindexing only the owned fixture; the raw proxy retains the error |
+| B4 proxy truth | Repeated raw pages retain exact JSON facts; current bridge availability; intentional tree whitespace; errors remain errors; private index_status remains excluded from the public proxy whitelist |
 
-The source manifest is an independent oracle for name/file/count truth. The direct
-provider is additionally observed for canonical identities, schemas and cursor
-contracts. Failures are saved before assertions; a missing tool/index/body does
+The source manifest is an independent oracle for name/file/count truth. Raw CBM
+responses are observed only through Clean-CTX's registered proxy so one frontend
+owns provider lifecycle, indexing and queries. Failures are saved before
+assertions; a missing tool/index/body does
 not silently become a pass or zero-result verdict. Case deadlines are observation
 bounds, not production policy. Every temporary-index gate attempt is saved;
 compiler/antivirus/admission failures remain distinct from collection failures.
 Cleanup closes only owned sessions via EOF and falls back to their own process
 termination, never shared-daemon/account repair.
+
+Windows is an explicit acceptance platform. Provider startup can auto-index the
+owned working directory before the explicit fast-index admission call. The live
+driver retries only the exact active-job/different-options response within the
+existing case deadline; it does not treat the conflict as success, change index
+mode, kill a daemon, or suppress any other provider failure.
+
+Clean-CTX can start primary and additional-root indexing concurrently. Before
+graph assertions, the driver explicitly establishes both roots through the
+registered `cbm_proxy(index_repository)` boundary, applying the same narrow
+conflict retry. Availability from one completed root is not treated as proof
+that every configured root is ready.
 
 ## What these cases do not establish
 

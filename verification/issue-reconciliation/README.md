@@ -6,6 +6,16 @@ owned C#/TypeScript sources and a small controlled Git history under target/.
 Provider is explicitly disabled; nothing is built, installed, pushed or closed.
 It reuses the existing Phase B ProcessStartInfo/stdio session helper.
 
+The independent NgRx Selector declaration query has a focused provider-disabled
+Windows harness. It verifies declaration-only, use-only, quoted-use,
+declaration-plus-use, ordinary-name, and modern Action controls through the
+registered MCP dispatcher:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxSelectorDeclarations.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
 ```powershell
 pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NativeIssueReconciliation.ps1 -BinaryPath ./target/debug/clean-ctx.exe
 ```
@@ -34,12 +44,15 @@ its own Git root, config, session, source oracle and evidence directory. No buil
 shared-daemon termination or cache override occurs.
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-PostCbmInvestigation.ps1 -BinaryPath ./target/debug/clean-ctx.exe -ProviderPath <approved-pinned-CBM-executable> -ExpectedProviderHash <approved-artifact-SHA256>
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NativeCausalControls.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-PostCbmInvestigation.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NativeCausalControls.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-Use the artifact/hash already verified for the platform; the Linux artifact's hash
-is not the Windows artifact's expected hash. On Linux omit the binary's .exe suffix.
+Both executable hashes and the Windows platform version are recorded automatically
+as generated run evidence; the operator never supplies a hash.
 The first harness accepts `-Scope native`, `provider`, or `controls` for targeted
 reruns. Provider admission failure stops that mode; fallback answers cannot count
 as provider-enabled evidence. Native-only causal controls need no CBM executable.
@@ -66,11 +79,12 @@ there, including precise file provenance and disclosure.
 Run against a binary built from the insertion repair:
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-InsertBeforeDeclaration.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-InsertBeforeDeclaration.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit .exe. The harness builds nothing and needs no CBM or model host.
-It checks the advertised apply_edit tool through live stdin/stdout MCP, then
+The Windows harness builds nothing and needs no CBM or model host. It checks the
+advertised apply_edit tool through live stdin/stdout MCP, then
 compares exact file bytes for C#/TypeScript first/middle/metadata-bearing members
 at LF/CRLF, including parseable comments. Unproven leading documentation must
 fail without writing. Replace/delete/after and atomic/syntax/source-authority
@@ -86,7 +100,8 @@ and remaining #136 criteria. This does not claim the entire issue is resolved.
 ## #137 semantic signature evidence regression
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
 The harness creates an owned committed C# history, verifies Git/source evidence,
@@ -98,13 +113,15 @@ groups must pass. No build, CBM daemon or model host is invoked.
 For RED/GREEN investigation, reuse the exact saved history with the candidate:
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 -BinaryPath ./target/debug/clean-ctx.exe -HistoryPath <history-path-printed-by-the-RED-run>
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe `
+  -HistoryPath <history-path-printed-by-the-RED-run>
 ```
 
 Only this harness's target/semantic-signature-evidence histories are admitted for
 reuse; expected committed source is checked before the test. The source history
-is not recommitted during GREEN. On Linux omit .exe. Every run records artifact
-hash, both commits, exact source oracle, raw MCP results and per-case verdicts.
+is not recommitted during GREEN. Every Windows run records artifact hash, both
+commits, exact source oracle, raw MCP results and per-case verdicts.
 
 The body control isolates the existing last-method contract; the separate
 first-method/neighbor-marker defect is retained in
@@ -114,11 +131,12 @@ Passing this harness does not close all #137 criteria or establish #135 fidelity
 ## #135 DI retention regression
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DiOmission.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DiOmission.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit .exe. The provider-disabled live context harness exercises 0/9/10/
-11/40 written registrations at Medium/High, distinct implementations/lifetimes,
+The provider-disabled Windows live context harness exercises 0/9/10/11/40
+written registrations at Medium/High, distinct implementations/lifetimes,
 nearby non-DI metadata and preservation of existing conditional written mentions:
 16 required groups. It builds nothing and does not evaluate runtime activation.
 
@@ -137,11 +155,12 @@ or completeness of unsupported registration forms.
 ## #139 decorated declaration owner identity
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DecoratedOwnerIdentity.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DecoratedOwnerIdentity.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit .exe. This provider-disabled harness uses the existing stdio MCP
-session helper and preallocates owned Git-root fixtures. Eight declaration
+This provider-disabled Windows harness uses the existing stdio MCP session
+helper and preallocates owned Git-root fixtures. Eight declaration
 forms cover export/decorator/layout variations, arbitrary custom decorators,
 basic generics and multiple classes with the same-named member.
 
@@ -162,11 +181,12 @@ neither CBM nor a model host. It does not replace tracked tests or the CI gate.
 ## Independent framework declaration publication
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-FrameworkDeclarationPublication.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-FrameworkDeclarationPublication.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit .exe. Rebuild the candidate separately before running. This driver
-reuses the existing Phase B stdio MCP session helper and creates owned Git-root
+Rebuild the Windows candidate separately before running. This driver reuses the
+existing Phase B stdio MCP session helper and creates owned Git-root
 fixtures with CBM disabled. It builds nothing and invokes no model host.
 
 All 57 required groups must pass: edge-free Service/modern Action recognition and
@@ -191,11 +211,12 @@ compatibility, preservation and remaining #139/#140 work.
 ## #138 Pipe constructor DI admission
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-AngularPipeDi.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-AngularPipeDi.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit .exe and build separately before running. The existing Phase B
-stdio helper drives provider-disabled owned Git-root fixtures. All 56 required
+Build the Windows candidate separately before running. The existing Phase B stdio
+helper drives provider-disabled owned Git-root fixtures. All 56 required
 groups must pass: independent declarations/evidence, exact typed Injects identities,
 repeat/deduplication, existing Service/Component/Directive controls, Pipe constructor
 forms and multiple dependencies, empty/no-constructor and other-kind exclusions,
@@ -218,25 +239,33 @@ separate token-authority repair and remaining criteria.
 This provider-disabled harness runs 131 bounded MCP assertion groups: declaration/owner evidence, exact token markers and edges, repeated-query deduplication, fidelity controls, symbolic cross-file limits, and refresh/change/remove/delete. See `docs/plans/ISSUE_138B_STRUCTURED_INJECT_REPAIR.md`. The earlier blocked primary probe is retained in the historical evidence-gate report.
 
 ```powershell
-pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToken.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToken.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-Use `./target/debug/clean-ctx` on Linux. Generated evidence is retained under `target/angular-inject-token/`; no CBM provider is started.
+Generated Windows evidence is retained under `target/angular-inject-token/`; no
+CBM provider is started.
 
 ## #140 independent legacy class Action declarations
 
 ```powershell
-pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxLegacyDeclarations.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxLegacyDeclarations.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-On Linux omit `.exe`. This provider-disabled harness uses the established Phase B stdio session helpers. It requires **78 acceptance groups** for top-level class declarations implementing the directly imported NgRx `Action`: exact source occurrences, truthful class markers, no fabricated links, fidelity/repeat controls, source-distinct same names, and declaration rename/removal/deletion.
+This provider-disabled Windows harness uses the established Phase B stdio session
+helpers. It requires **78 acceptance groups** for top-level class declarations
+implementing the directly imported NgRx `Action`: exact source occurrences,
+truthful class markers, no fabricated links, fidelity/repeat controls,
+source-distinct same names, and declaration rename/removal/deletion.
 
 Seven separate handler/reference/alias/collision probes are recorded as **OBSERVED**, not PASS. They remain unresolved and do not affect the declaration-only acceptance verdict. The driver builds nothing, invokes no model host, and saves source oracles, binary provenance, requests/results and verdicts under `target/ngrx-legacy-declarations/`. See [the #140 class declaration report](../../docs/plans/ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md) for the defect partition and remaining work.
 
 ## #140b-Prereq2 private Action/type binding preservation
 
 ```powershell
-pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxActionTypeBindingPreservation.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxActionTypeBindingPreservation.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
 This provider-disabled harness uses the existing PhaseBSession stdio driver.
@@ -253,7 +282,8 @@ identity, direct-reference selection and refusal controls. See
 ## #140b same-file legacy switch transitions
 
 ```powershell
-pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyTransitions.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyTransitions.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
 Provider-disabled stdio harness: 20 static forms at High/Medium/Low, three
@@ -272,11 +302,12 @@ standalone string/literal Action authority remain separate. See
 ## #140c same-file constructor dispatch
 
 ```powershell
-pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxConstructorDispatch.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxConstructorDispatch.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-Use the freshly built candidate (`./target/debug/clean-ctx` on Linux). The harness
-starts owned provider-disabled stdio MCP sessions using PhaseBSession, persists
+Use the freshly built Windows candidate. The harness starts owned
+provider-disabled stdio MCP sessions using PhaseBSession, persists
 every request/response and tests exact Component → Dispatches → Action forward
 and reverse identities/files. Controls cover same-file constructor resolution,
 Store qualification, shadows, NonAction, imported/qualified refusal, wrappers,
@@ -297,12 +328,13 @@ assertion exits 1. No full suite, model invocation or live CBM is used. See
 ## #140d Service dispatch ownership
 
 ```powershell
-pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceDispatch.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceDispatch.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-Use the current candidate (`./target/debug/clean-ctx` on Linux). Existing
-PhaseBSession starts provider-disabled owned stdio MCP sessions and records all
-RPCs. Exact Service → Dispatches → Action owner/target files and forward/reverse
+Use the current Windows candidate. Existing PhaseBSession starts
+provider-disabled owned stdio MCP sessions and records all RPCs. Exact Service →
+Dispatches → Action owner/target files and forward/reverse
 agreement are checked alongside independent declaration publication. Controls
 cover Component/fallback preservation, same-target Service plus helper, two
 Services, unknown endpoints, no proximity attribution, nested/callback refusal,

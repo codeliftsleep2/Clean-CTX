@@ -27,3 +27,27 @@ fn framework_declaration_publication_rejects_prior_semantics_without_changing_ca
         assert_eq!(current.semantic_config, prior.semantic_config);
     }
 }
+
+#[test]
+fn selector_declaration_publication_rejects_generation_nine_semantics_only() {
+    let source = "import { createSelector } from '@ngrx/store'; export const selectAudit = createSelector(selectState, state => state.audit);";
+    let path = Path::new("audit.selectors.ts");
+    let config = crate::tests::test_config();
+    let current =
+        derive_with_catalog(source, path, &config, &GenerationCatalog::current()).unwrap();
+    let prior = derive_with_catalog(
+        source,
+        path,
+        &config,
+        &GenerationCatalog::current().with_generation(ProducerKey::AngularSemantic, 9),
+    )
+    .unwrap();
+    assert!(
+        current
+            .semantic_producers
+            .differs_bidirectionally(&prior.semantic_producers)
+    );
+    assert_eq!(current.canonical_producers, prior.canonical_producers);
+    assert_eq!(current.canonical_config, prior.canonical_config);
+    assert_eq!(current.semantic_config, prior.semantic_config);
+}

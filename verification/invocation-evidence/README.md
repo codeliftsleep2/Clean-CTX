@@ -13,22 +13,25 @@ installation, Karma or Vitest runtime is needed. The fixture source is parsed by
 Clean-CTX; it is not executed. This checks production MCP behavior rather than
 model tool selection. It does not stop or reconfigure your existing MCP server.
 
-From the repository root in PowerShell 7:
+From the repository root in PowerShell 7, using the current Windows release
+binary:
 
 ```powershell
-cargo build --locked -p clean-ctx --bin clean-ctx --all-features -j 4
-pwsh -NoProfile -File ./verification/invocation-evidence/scripts/Verify-InvocationEvidenceLive.ps1
+pwsh -NoProfile -File ./verification/invocation-evidence/scripts/Verify-InvocationEvidenceLive.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
 ```
 
 To use another current binary or retain the fixture workspace:
 
 ```powershell
-pwsh -NoProfile -File ./verification/invocation-evidence/scripts/Verify-InvocationEvidenceLive.ps1 -BinaryPath ./target/release/clean-ctx.exe -KeepWorkspace
+pwsh -NoProfile -File ./verification/invocation-evidence/scripts/Verify-InvocationEvidenceLive.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe `
+  -KeepWorkspace
 ```
 
-The script chooses `.exe` on Windows and the native filename elsewhere. It
-rejects a missing binary or one older than repository Rust sources. It does not
-build for you or run the full suite. `-RequestTimeoutSeconds 90` is the default
+The script defaults to the release executable (`.exe` on Windows). It rejects a
+missing binary or one older than repository Rust sources. It does not build for
+you or run the full suite. `-RequestTimeoutSeconds 90` is the default
 per-request harness deadline, not a production timeout policy.
 
 Each run creates a unique directory under

@@ -106,6 +106,14 @@ mod ngrx_legacy_declaration_tests;
 #[path = "../tests/mcp/ngrx_legacy_declaration_matrix.rs"]
 mod ngrx_legacy_declaration_matrix_tests;
 
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_selector_declaration.rs"]
+mod ngrx_selector_declaration_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/workspace_query_declarations_in_file.rs"]
+mod workspace_query_declarations_in_file_tests;
+
 // Persistent-process scenarios are isolated from the in-process/schema
 // contract suite and remain ignored unless the binary has been built first.
 #[cfg(test)]

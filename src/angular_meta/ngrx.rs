@@ -28,6 +28,7 @@ mod extract_selectors;
 #[cfg(test)]
 mod extraction_metrics;
 pub(crate) mod legacy;
+pub(crate) mod selector_declarations;
 pub(crate) mod service_owners;
 mod shape;
 pub(crate) mod transitions;

@@ -477,4 +477,30 @@ impl GraphBridge {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
     }
+
+    /// Reconcile a successful explicit provider index with Clean-CTX's
+    /// per-root readiness and freshness gates. This is the recovery half of
+    /// the public `index_repository` contract: provider publication must not
+    /// leave a prior startup failure permanently blocking typed graph tools.
+    pub(crate) fn mark_explicit_index_complete(&mut self, repo_path: &Path) -> bool {
+        let root = repo_path
+            .canonicalize()
+            .unwrap_or_else(|_| repo_path.to_path_buf());
+        let Some(project) = self.project_ids.get(&root).cloned() else {
+            return false;
+        };
+
+        self.indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(project.clone(), IndexingState::Complete);
+
+        let mut freshness = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(entry) = freshness.get_mut(&project) {
+            entry.indexed_generation = entry.dirty_generation;
+        }
+        drop(freshness);
+        self.invalidate_project_cache(&project);
+        true
+    }
 }

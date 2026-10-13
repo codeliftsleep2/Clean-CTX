@@ -359,6 +359,7 @@ pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
         && index_reply_published(&raw_response)
         && let Some(repo_path) = args.get("repo_path").and_then(Value::as_str)
     {
+        bridge.mark_explicit_index_complete(std::path::Path::new(repo_path));
         crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(state, repo_path);
     }
     let raw_response = crate::cbm::caller_verify_proxy::verify_proxy_response(

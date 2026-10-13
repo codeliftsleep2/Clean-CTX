@@ -206,6 +206,14 @@ upgrades lower-fidelity projections when required, and replaces stale facts
 even when recompilation yields an empty projection. Edit/Verbatim normalize to
 High semantic compilation because this query returns no source bodies.
 
+### `declarations_in_file`
+
+Pass `file_path`, `workspaceRoot`, and optional `fidelity`. It uses the same
+trusted-path, canonical-file, and semantic-publication lifecycle as
+`entities_in_file`, but returns only identities backed by independent
+declaration authority. Relationship endpoints and use-created entities are not
+declarations, and the query does not resolve uses to declarations.
+
 ### `has_cycle`
 
 `has_cycle` is intentionally index-only. It never discovers or compiles a

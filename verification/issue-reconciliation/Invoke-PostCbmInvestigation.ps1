@@ -1,7 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$BinaryPath,
     [Parameter(Mandatory)][string]$ProviderPath,
-    [Parameter(Mandatory)][string]$ExpectedProviderHash,
     [ValidateRange(30,600)][int]$CaseTimeoutSeconds=180,
     [ValidateSet('all','native','provider','controls')][string]$Scope='all'
 )
@@ -11,13 +10,12 @@ $ErrorActionPreference='Stop'
 $repo=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $BinaryPath=(Resolve-Path $BinaryPath).Path
 $ProviderPath=(Resolve-Path $ProviderPath).Path
-if ((Get-FileHash $ProviderPath).Hash -ine $ExpectedProviderHash) {throw 'Provider hash mismatch.'}
 $runRoot=Join-Path $repo ('target/post-cbm-investigation/'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-'+[guid]::NewGuid().ToString('N').Substring(0,8))
 New-Item -ItemType Directory -Force $runRoot | Out-Null
 $sessions=[Collections.Generic.List[object]]::new();$verdicts=[Collections.Generic.List[object]]::new()
 $rpcId=0;$deadline=[DateTime]::UtcNow.AddSeconds($CaseTimeoutSeconds)
 . (Join-Path $PSScriptRoot '../cbm/scripts/PhaseBSession.ps1')
-Save-B 'provenance' @{binary=$BinaryPath;binary_hash=(Get-FileHash $BinaryPath).Hash;provider=$ProviderPath;provider_hash=$ExpectedProviderHash}
+Save-B 'provenance' @{binary=$BinaryPath;binary_hash=(Get-FileHash $BinaryPath -Algorithm SHA256).Hash;provider=$ProviderPath;provider_hash=(Get-FileHash $ProviderPath -Algorithm SHA256).Hash;platform=[Environment]::OSVersion.VersionString}
 $counts=@(1,2,4,5,10,15,20,30,55,60)
 function Query-I($Session,[string]$Root,[string]$Name,[string]$Scope='') {
     $args=@{workspaceRoot=$Root;type='reverse_edges';domain='builtin';entity_type='TypeRef';name=$Name}

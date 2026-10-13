@@ -34,6 +34,34 @@ function Invoke-BRpc($Session, [string]$Method, [hashtable]$Params) {
 function Invoke-BTool($Session, [string]$Name, [hashtable]$Arguments) {
     Invoke-BRpc $Session 'tools/call' @{name=$Name;arguments=$Arguments}
 }
+function Test-BIndexConflict($Response) {
+    $message=$null
+    if ($Response.PSObject.Properties['error']) {
+        $message=[string]$Response.error.message
+    } elseif ($Response.PSObject.Properties['result'] -and
+        $Response.result.PSObject.Properties['structuredContent'] -and
+        $Response.result.structuredContent.PSObject.Properties['error']) {
+        $message=[string]$Response.result.structuredContent.error
+    }
+    return $null -ne $message -and
+        $message.EndsWith('another index operation for this project is active with different options')
+}
+function Invoke-BCleanIndexRepository($Session, [string]$RepoPath) {
+    do {
+        $response=Invoke-BTool $Session 'cbm_proxy' @{
+            cbm_tool='index_repository';parameters=@{repo_path=$RepoPath;mode='fast'}
+        }
+        $conflict=Test-BIndexConflict $response
+        if ($conflict) {
+            Assert-B ([DateTime]::UtcNow -lt $script:deadline) 'Clean-CTX provider auto-index did not yield before the case deadline.'
+            Start-Sleep -Milliseconds 250
+        }
+    } while ($conflict)
+    return Get-BBody (Get-BResult $response)
+}
+function Invoke-BRawTool([string]$Name, [hashtable]$Arguments) {
+    Invoke-BReadyTool $clean 'cbm_proxy' @{cbm_tool=$Name;parameters=$Arguments}
+}
 function Invoke-BReadyTool($Session, [string]$Name, [hashtable]$Arguments) {
     # An operator startup gate, not a model polling loop or implicit job start.
     # Every attempt is captured separately; only the explicit temporary flag
@@ -61,6 +89,15 @@ function Get-BBody($Result) {
     $body = $Result.content[0].text | ConvertFrom-Json -Depth 100
     if ($body.PSObject.Properties['content']) { return ($body.content[0].text | ConvertFrom-Json -Depth 100) }
     return $body
+}
+function Get-BTextBody($Result) {
+    $text=[string]$Result.content[0].text
+    try {
+        $body=$text | ConvertFrom-Json -Depth 100
+        if ($body.PSObject.Properties['content']) { return [string]$body.content[0].text }
+    } catch { # Intentional non-JSON provider text remains verbatim.
+    }
+    return $text
 }
 function Start-BSession([string]$Name, [string]$Executable, [string]$Root) {
     $info = [Diagnostics.ProcessStartInfo]::new()
@@ -114,13 +151,13 @@ function Get-BGroupedRows($Body) {
     return ,$rows.ToArray()
 }
 function Get-BExactQuery([string]$Project,[string]$Query) {
-    # Independent provider oracle, limited to these owned fixtures; same immutable
-    # semantic args, emitted opaque cursors, no offset fallback or stale restart.
+    # Raw provider-shaped oracle through the sole Clean-CTX session; same
+    # immutable args, emitted opaque cursors, no offset fallback or stale restart.
     $toolArgs=@{project=$Project;query=$Query;format='json';max_rows=17}
     $rows=[Collections.Generic.List[object]]::new();$seen=[Collections.Generic.HashSet[string]]::new()
     $columns=$null;$pages=0;$bytes=0
     do {
-        $body=Get-BBody (Get-BResult (Invoke-BTool $provider 'query_graph' $toolArgs))
+        $body=Get-BBody (Get-BResult (Invoke-BRawTool 'query_graph' $toolArgs))
         $pages++;$bytes+=([Text.Encoding]::UTF8.GetByteCount(($body | ConvertTo-Json -Depth 100 -Compress)))
         Assert-B ($bytes -le 4MB) 'Provider oracle exceeded 4 MiB.'
         if ($null -eq $columns) {$columns=@($body.columns)}
@@ -161,7 +198,7 @@ function Get-BExactTrace([string]$Project,[string]$Function) {
     $rows=[Collections.Generic.List[object]]::new();$seen=[Collections.Generic.HashSet[string]]::new()
     $pages=0;$bytes=0
     do {
-        $body=Get-BBody (Get-BResult (Invoke-BTool $provider 'trace_path' $toolArgs))
+        $body=Get-BBody (Get-BResult (Invoke-BRawTool 'trace_path' $toolArgs))
         $pages++;$bytes+=[Text.Encoding]::UTF8.GetByteCount(($body | ConvertTo-Json -Depth 100 -Compress))
         Assert-B ($bytes -le 4MB) 'Trace oracle exceeded 4 MiB.'
         foreach ($row in (Get-BGroupedRows $body.callees)) { $rows.Add($row) }

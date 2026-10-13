@@ -142,6 +142,8 @@ pub struct PassContext {
     pub(crate) angular_initializers:
         Vec<crate::angular_meta::inject_evidence::ClassInitializerEvidence>,
     pub(crate) ngrx_class_actions: Vec<crate::angular_meta::ngrx::legacy::ClassActionEvidence>,
+    pub(crate) ngrx_selector_declarations:
+        Vec<crate::angular_meta::ngrx::selector_declarations::SelectorDeclarationEvidence>,
     /// Private compilation-scoped Action/type association; never a public entity.
     pub(crate) ngrx_action_type_bindings:
         Vec<crate::angular_meta::ngrx::type_binding::ActionTypeBinding>,
@@ -203,6 +205,7 @@ impl PassContext {
             invocation_occurrences: Vec::new(),
             angular_initializers: Vec::new(),
             ngrx_class_actions: Vec::new(),
+            ngrx_selector_declarations: Vec::new(),
             ngrx_action_type_bindings: Vec::new(),
             ngrx_legacy_transitions: Vec::new(),
             ngrx_constructor_dispatches: Vec::new(),

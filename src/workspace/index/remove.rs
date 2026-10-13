@@ -27,6 +27,7 @@ impl WorkspaceIndex {
         let mut owners: HashSet<String> = self
             .file_map
             .keys()
+            .chain(self.file_declarations.keys())
             .chain(self.file_edges.keys())
             .chain(self.semantic_coverage.keys())
             .filter(|owner| crate::workspace::path_identity::is_within_root(owner, root))
@@ -47,6 +48,7 @@ impl WorkspaceIndex {
     /// other files' edges and entities.
     pub fn remove_file(&mut self, file_path: &str) {
         self.semantic_coverage.remove(file_path);
+        self.remove_declarations_in_file(file_path);
         #[cfg(test)]
         self.name_cleanup_buckets_examined.clear();
 

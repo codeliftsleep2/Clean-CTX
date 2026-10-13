@@ -1,33 +1,23 @@
 param(
     [Parameter(Mandatory)][string]$BinaryPath,
-    [string]$ProviderPath = '/workspace/cbm-authority-source/build/a5-gate0/codebase-memory-mcp',
-    [string]$ExpectedHash = '6dfaa906ed310795a97ca9b992d4d42b6118a8cf740ea7b4550df6d8146b24f0',
+    [Parameter(Mandatory)][string]$ProviderPath,
     [switch]$ContinueMatrix
 )
 
-# Linux A5 bootstrap-stage harness. -ContinueMatrix adds the safe session,
+# Windows A5 bootstrap-stage harness. -ContinueMatrix adds the safe session,
 # routing, recovery and admission-exit cases; mutation/cohort mismatch skip.
-# Uses the existing ProcessStartInfo/stdio MCP
-# session pattern; strace observes the unmodified production provider boundary.
+# Uses the existing ProcessStartInfo/stdio MCP session pattern and Windows
+# process-parent observations against the unmodified production boundary.
 # No provider wrapper, private cache root, daemon kill or account repair.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-if (-not $IsLinux) { throw 'This acceptance harness is Linux-only.' }
+if (-not $IsWindows) { throw 'This acceptance harness is Windows-only.' }
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 $BinaryPath = (Resolve-Path $BinaryPath).Path
 $ProviderPath = (Resolve-Path $ProviderPath).Path
-if ((Get-FileHash $ProviderPath -Algorithm SHA256).Hash.ToLowerInvariant() -ne $ExpectedHash) {
-    throw 'A5 BLOCKED — ACCEPTANCE ARTIFACT CHANGED'
-}
 if ([Environment]::GetEnvironmentVariable('CBM_CACHE_DIR')) {
     throw 'Normal-account acceptance requires no CBM_CACHE_DIR override.'
 }
-# Fail preflight before provider execution if a turn-scoped platform write
-# grant expired. Do not create the actual provider directory manually.
-$cacheParent = Join-Path $HOME '.cache'
-$probe = Join-Path $cacheParent ('a5-writability-' + [guid]::NewGuid())
-try { [IO.File]::WriteAllText($probe, ''); [IO.File]::Delete($probe) }
-catch { throw "Normal account cache is not writable: $($_.Exception.Message)" }
 $runRoot = Join-Path $repo ('target/cbm-a5/' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 $primary = Join-Path $runRoot 'primary'
 $additional = Join-Path $runRoot 'additional'
@@ -47,9 +37,6 @@ function Assert-A5([bool]$Condition, [string]$Message) {
 }
 function Check-A5Budget($Session) {
     if ([DateTime]::UtcNow -ge $script:deadline) { throw '90-second case observation deadline exceeded.' }
-    if ((Test-Path $Session.Trace) -and (Get-Item $Session.Trace).Length -gt 12MB) {
-        throw '12 MiB trace observation budget exceeded.'
-    }
 }
 function Invoke-A5Rpc($Session, [string]$Method, [hashtable]$Params) {
     Check-A5Budget $Session
@@ -74,13 +61,28 @@ function Invoke-A5Rpc($Session, [string]$Method, [hashtable]$Params) {
 function Invoke-A5Tool($Session, [string]$Name, [hashtable]$Arguments) {
     Invoke-A5Rpc $Session 'tools/call' @{name=$Name;arguments=$Arguments}
 }
+function Test-A5IndexConflict($Response) {
+    if ($Response.PSObject.Properties['error']) {
+        return ([string]$Response.error.message).EndsWith('another index operation for this project is active with different options')
+    }
+    return $Response.PSObject.Properties['result'] -and
+        $Response.result.PSObject.Properties['structuredContent'] -and
+        $Response.result.structuredContent.PSObject.Properties['error'] -and
+        ([string]$Response.result.structuredContent.error).EndsWith('another index operation for this project is active with different options')
+}
+function Invoke-A5Index($Session, [string]$Root) {
+    do {
+        $response=Invoke-A5Tool $Session 'cbm_proxy' @{
+            cbm_tool='index_repository';parameters=@{repo_path=$Root;mode='fast'}
+        }
+        $conflict=Test-A5IndexConflict $response
+        if ($conflict) { Check-A5Budget $Session;Start-Sleep -Milliseconds 250 }
+    } while ($conflict)
+    return $response
+}
 function Start-A5Session([string]$Name, [bool]$AbortAdmission = $false) {
     $info = [Diagnostics.ProcessStartInfo]::new()
-    $info.FileName = '/usr/bin/strace'
-    $trace = Join-Path $runRoot "$Name.trace"
-    foreach ($arg in @('-f','-ttt','-s','65536','-e','trace=process,chdir,write','-o',$trace,$BinaryPath)) {
-        $info.ArgumentList.Add($arg)
-    }
+    $info.FileName = $BinaryPath
     $info.WorkingDirectory = $primary
     $info.UseShellExecute = $false
     $info.RedirectStandardInput = $true
@@ -90,27 +92,19 @@ function Start-A5Session([string]$Name, [bool]$AbortAdmission = $false) {
     $info.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
     $process = [Diagnostics.Process]::new()
     $process.StartInfo = $info
-    Assert-A5 ($process.Start()) 'Unable to start traced Clean-CTX.'
-    $session = [pscustomobject]@{Name=$Name;Process=$process;Trace=$trace;Stderr=$process.StandardError.ReadToEndAsync()}
+    Assert-A5 ($process.Start()) 'Unable to start Clean-CTX.'
+    $session = [pscustomobject]@{Name=$Name;Process=$process;Stderr=$process.StandardError.ReadToEndAsync();Stopped=$false}
     $sessions.Add($session)
     if ($AbortAdmission) {
         while ($true) {
             Check-A5Budget $session
-            # Find the actual traced Clean parent from /proc.
-            $clean = @(Get-A5Processes | Where-Object {
-                $_.exe -eq $BinaryPath -and
-                ([IO.File]::ReadAllText("/proc/$($_.pid)/status") -match "PPid:\s+$($process.Id)\s")
+            $children = @(Get-A5Processes | Where-Object {
+                $_.exe -eq $ProviderPath -and $_.parent_pid -eq $process.Id
             })
-            if ($clean.Count -eq 1) {
-                $children = @(Get-A5Processes | Where-Object {
-                    $_.exe -eq $ProviderPath -and $_.cmd.Trim() -eq $ProviderPath -and
-                    ([IO.File]::ReadAllText("/proc/$($_.pid)/status") -match "PPid:\s+$($clean[0].pid)\s")
-                })
-                if ($children.Count -eq 1) {
-                    Save-A5 'case9-owned-front-end' $children[0]
-                    [Diagnostics.Process]::GetProcessById($children[0].pid).Kill()
-                    break
-                }
+            if ($children.Count -eq 1) {
+                Save-A5 'case9-owned-front-end' $children[0]
+                [Diagnostics.Process]::GetProcessById($children[0].pid).Kill()
+                break
             }
             Start-Sleep -Milliseconds 10
         }
@@ -124,10 +118,11 @@ function Start-A5Session([string]$Name, [bool]$AbortAdmission = $false) {
     return $session
 }
 function Stop-A5Session($Session) {
+    if ($Session.Stopped) { return }
+    $Session.Stopped=$true
     if (-not $Session.Process.HasExited) {
         $Session.Process.StandardInput.Close()
-        # EOF is the normal Clean shutdown path. A tracing process may outlive
-        # Clean while observing the provider-owned daemon: detach only strace.
+        # EOF is the normal Clean shutdown path.
         if (-not $Session.Process.WaitForExit(5000)) { $Session.Process.Kill() }
     }
     if ($Session.Stderr.Wait(5000)) {
@@ -135,18 +130,18 @@ function Stop-A5Session($Session) {
         Assert-A5 ($text.Length -le 1MB) 'Stderr evidence exceeded 1 MiB.'
         Write-A5Text (Join-Path $runRoot ($Session.Name + '.stderr')) $text
     }
+    $Session.Process.Dispose()
 }
 function Get-A5Processes {
     $found = @()
-    foreach ($directory in Get-ChildItem /proc -Directory -ErrorAction SilentlyContinue) {
-        if ($directory.Name -notmatch '^\d+$') { continue }
-        try {
-            $exe = [IO.File]::ResolveLinkTarget((Join-Path $directory.FullName 'exe'), $true).FullName
-            if ($exe -notin @($BinaryPath,$ProviderPath)) { continue }
-            $cmd = [IO.File]::ReadAllText((Join-Path $directory.FullName 'cmdline')).Replace([char]0,' ')
-            $cwd = [IO.File]::ResolveLinkTarget((Join-Path $directory.FullName 'cwd'),$true).FullName
-            $found += @{pid=[int]$directory.Name;exe=$exe;cmd=$cmd;cwd=$cwd}
-        } catch { continue }
+    foreach ($process in Get-CimInstance Win32_Process -ErrorAction Stop) {
+        if (-not $process.ExecutablePath) { continue }
+        try { $exe=(Resolve-Path -LiteralPath $process.ExecutablePath).Path } catch { continue }
+        if ($exe -notin @($BinaryPath,$ProviderPath)) { continue }
+        $found += @{
+            pid=[int]$process.ProcessId;parent_pid=[int]$process.ParentProcessId
+            exe=$exe;cmd=[string]$process.CommandLine;created=[string]$process.CreationDate
+        }
     }
     return $found
 }
@@ -163,10 +158,10 @@ Write-A5Text (Join-Path $primary '.clean-ctx.json') (@{
     cbm=@{binary_path=$ProviderPath};additional_roots=@($additional)
 } | ConvertTo-Json -Depth 20)
 Save-A5 'preflight' @{
-    provider=$ProviderPath;provider_sha256=$ExpectedHash;clean_binary=$BinaryPath
+    provider=$ProviderPath;provider_sha256=(Get-FileHash $ProviderPath -Algorithm SHA256).Hash;clean_binary=$BinaryPath
     clean_sha256=(Get-FileHash $BinaryPath).Hash;primary=$primary;additional=$additional
     processes=@(Get-A5Processes);cache_override_present=([bool][Environment]::GetEnvironmentVariable('CBM_CACHE_DIR'))
-    normal_cache_exists=(Test-Path (Join-Path $HOME '.cache/codebase-memory-mcp'))
+    platform=[Environment]::OSVersion.VersionString;pwsh=$PSVersionTable.PSVersion.ToString()
 }
 $result = 'INCOMPLETE'
 try {
@@ -176,10 +171,10 @@ try {
     Save-A5 'case1-status' $status
     Save-A5 'case1-processes' @(Get-A5Processes)
     # Save evidence before interpreting status; failure stops the matrix.
-    Assert-A5 ($status.result._meta.cbm_status -eq 'available') 'Provider did not reach available status; inspect admission trace and stderr.'
+    Assert-A5 ($status.result._meta.cbm_status -eq 'available') 'Provider did not reach available status; inspect process snapshots, MCP frames and stderr.'
     $native = Invoke-A5Tool $a 'provide_code_context' @{workspaceRoot=$primary;filePath='probe.ts'}
     Save-A5 'case1-native' $native
-    $result = 'BOOTSTRAP OBSERVED — REMAINING CASES REQUIRE TRACE REVIEW'
+    $result = 'WINDOWS BOOTSTRAP OBSERVED'
     if ($ContinueMatrix) {
         $script:deadline = [DateTime]::UtcNow.AddSeconds(90)
         $before = @(Get-A5Processes)
@@ -187,14 +182,23 @@ try {
         $b = Start-A5Session 'B'
         Save-A5 'case3-after' @(Get-A5Processes)
         foreach ($s in @($a,$b)) {
-            $projects = Invoke-A5Tool $s 'cbm_proxy' @{cbm_tool='list_projects';parameters=@{}}
+            $projects = Invoke-A5Tool $s 'cbm_proxy' @{cbm_tool='list_projects';parameters=@{format='json';limit=2;offset=0}}
             Save-A5 ('case4-projects-' + $s.Name) $projects
             Assert-A5 (-not $projects.PSObject.Properties['error']) 'Project request returned a protocol error.'
             Assert-A5 (-not ($projects.result.PSObject.Properties['isError'] -and $projects.result.isError)) 'Project request failed.'
         }
         $script:deadline = [DateTime]::UtcNow.AddSeconds(90)
+        $primaryIndex = Invoke-A5Index $a $primary
+        $additionalIndex = Invoke-A5Index $a $additional
+        Assert-A5 (-not ($primaryIndex.result.PSObject.Properties['isError'] -and $primaryIndex.result.isError)) 'Primary fixture indexing failed.'
+        Assert-A5 (-not ($additionalIndex.result.PSObject.Properties['isError'] -and $additionalIndex.result.isError)) 'Additional fixture indexing failed.'
+        $primaryBody=($primaryIndex.result.content[0].text|ConvertFrom-Json -Depth 100)
+        if ($primaryBody.PSObject.Properties['content']) {$primaryBody=$primaryBody.content[0].text|ConvertFrom-Json -Depth 100}
+        $additionalBody=($additionalIndex.result.content[0].text|ConvertFrom-Json -Depth 100)
+        if ($additionalBody.PSObject.Properties['content']) {$additionalBody=$additionalBody.content[0].text|ConvertFrom-Json -Depth 100}
+        $slugs=@($primaryBody.project,$additionalBody.project)
         foreach ($item in @(@{root=$primary;symbol='a5PrimaryProbe'},@{root=$additional;symbol='a5AdditionalProbe'})) {
-            $slug = $item.root.Trim('/').Replace('/','-')
+            $slug = if ($item.root -eq $primary) {$slugs[0]} else {$slugs[1]}
             $answer = Invoke-A5Tool $a 'cbm_proxy' @{
                 cbm_tool='search_graph';parameters=@{project=$slug;name_pattern=$item.symbol;format='json';limit=5}
             }
@@ -203,18 +207,17 @@ try {
         }
         Stop-A5Session $b
         Save-A5 'case6-after-retirement' @(Get-A5Processes)
-        Save-A5 'case6-sibling' (Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='list_projects';parameters=@{}})
+        Save-A5 'case6-sibling' (Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='search_graph';parameters=@{project=$slugs[0];name_pattern='a5PrimaryProbe';format='json';limit=5}})
         $script:deadline = [DateTime]::UtcNow.AddSeconds(90)
-        $clean = @(Get-A5Processes | Where-Object {$_.exe -eq $BinaryPath})
-        Assert-A5 ($clean.Count -eq 1) 'Recovery fixture must have exactly one remaining owned Clean session.'
+        $clean = @(Get-A5Processes | Where-Object {$_.exe -eq $BinaryPath -and $_.pid -eq $a.Process.Id})
+        Assert-A5 ($clean.Count -eq 1) 'Recovery fixture lost its remaining owned Clean session.'
         $frontends = @(Get-A5Processes | Where-Object {
-            $_.exe -eq $ProviderPath -and $_.cmd.Trim() -eq $ProviderPath -and
-            ([IO.File]::ReadAllText("/proc/$($_.pid)/status") -match "PPid:\s+$($clean[0].pid)\s")
+            $_.exe -eq $ProviderPath -and $_.parent_pid -eq $a.Process.Id
         })
         Assert-A5 ($frontends.Count -eq 1) 'Direct frontend ownership not uniquely established.'
         Save-A5 'case7-before' @(Get-A5Processes)
         [Diagnostics.Process]::GetProcessById($frontends[0].pid).Kill()
-        $recovery = Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='list_projects';parameters=@{}}
+        $recovery = Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='search_graph';parameters=@{project=$slugs[0];name_pattern='a5PrimaryProbe';format='json';limit=5}}
         Save-A5 'case7-result' $recovery
         Save-A5 'case7-after' @(Get-A5Processes)
         Assert-A5 (-not $recovery.PSObject.Properties['error']) 'Recovery returned a protocol error.'
@@ -226,8 +229,8 @@ try {
         Save-A5 'case9-status' $admission
         Assert-A5 ($admission.result._meta.cbm_status -ne 'available') 'Killed admission became usable.'
         Save-A5 'case9-native' (Invoke-A5Tool $c 'provide_code_context' @{workspaceRoot=$primary;filePath='probe.ts'})
-        Save-A5 'case9-sibling' (Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='list_projects';parameters=@{}})
-        $result = 'MATRIX OBSERVATIONS CAPTURED — VERDICTS REQUIRE TRACE REVIEW'
+        Save-A5 'case9-sibling' (Invoke-A5Tool $a 'cbm_proxy' @{cbm_tool='search_graph';parameters=@{project=$slugs[0];name_pattern='a5PrimaryProbe';format='json';limit=5}})
+        $result = 'WINDOWS MATRIX OBSERVATIONS CAPTURED'
     }
 } catch {
     $result = 'FAIL: ' + $_.Exception.Message
@@ -235,7 +238,7 @@ try {
 } finally {
     foreach ($session in $sessions) { Stop-A5Session $session }
     Save-A5 'postflight' @{
-        result=$result;provider_sha256=(Get-FileHash $ProviderPath).Hash.ToLowerInvariant()
+        result=$result;provider_sha256=(Get-FileHash $ProviderPath -Algorithm SHA256).Hash
         processes=@(Get-A5Processes);utc=[DateTime]::UtcNow
     }
     Write-Host "A5 evidence: $runRoot"

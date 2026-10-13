@@ -392,7 +392,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "properties": {
                     "entities": {
                         "type": "array",
-                        "description": "Matching entities (find_entities, entities_in_file).",
+                        "description": "Matching entities (find_entities, entities_in_file, declarations_in_file).",
                         "items": { "type": "object" }
                     },
                     "edges": {
