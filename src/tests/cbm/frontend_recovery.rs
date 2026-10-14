@@ -1,5 +1,6 @@
 use super::{CbmClient, CbmError, a2_support as fixture};
 use serde_json::{Value, json};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
@@ -37,6 +38,16 @@ fn tool_count(root: &TempDir, tool: &str) -> usize {
         .count()
 }
 
+fn assert_same_directory(observed: &Value, expected: &Path) {
+    let observed = Path::new(observed.as_str().expect("fixture cwd string"))
+        .canonicalize()
+        .expect("canonical observed fixture cwd");
+    let expected = expected
+        .canonicalize()
+        .expect("canonical expected fixture cwd");
+    assert_eq!(observed, expected);
+}
+
 #[test]
 fn cbm_a4_observational_eof_replaces_once_and_replays_after_full_admission() {
     let root = TempDir::new().unwrap();
@@ -67,7 +78,7 @@ fn cbm_a4_observational_eof_replaces_once_and_replays_after_full_admission() {
         ]
     );
     let cwd: Value = serde_json::from_str(&std::fs::read_to_string(log(&root)).unwrap()).unwrap();
-    assert_eq!(cwd["cwd"], json!(root.path().canonicalize().unwrap()));
+    assert_same_directory(&cwd["cwd"], root.path());
 }
 #[test]
 fn cbm_a4_timeout_read_replaces_but_mutation_returns_original_without_replay() {

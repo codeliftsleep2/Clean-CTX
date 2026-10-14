@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 #[derive(Default)]
 struct ActionBindings {
-    resolved: Vec<(SemanticRelation, String, String)>,
+    resolved: Vec<(SemanticRelation, String, String, String)>,
     imported_names: BTreeSet<String>,
     namespaces: BTreeSet<String>,
 }
@@ -25,11 +25,15 @@ pub(crate) fn refine_candidates(
                 SemanticRelation::TriggersReducer => &mut edge.subject,
                 _ => return Some(edge),
             };
-            if let Some((_, _, module)) = bindings
-                .resolved
-                .iter()
-                .find(|(relation, name, _)| *relation == edge.relation && *name == action.name)
+            if let Some((_, _, imported_name, module)) =
+                bindings
+                    .resolved
+                    .iter()
+                    .find(|(relation, written_name, _, _)| {
+                        *relation == edge.relation && *written_name == action.name
+                    })
             {
+                action.name.clone_from(imported_name);
                 action.file = Some(module.clone());
                 edge.layer = super::direct_imports::REFINEMENT_LAYER;
             } else if bindings.imported_names.contains(&action.name)
@@ -72,8 +76,30 @@ fn action_bindings(source_id: &str, source: &str) -> ActionBindings {
         let Ok(span) = SourceSpan::new(node.start_byte(), node.end_byte()) else {
             continue;
         };
-        let Some(binding) =
+        if let Some(binding) =
             crate::ir::typescript_value_import_binding::bind_direct_named_value_import(
+                source_id, source, span,
+            )
+        {
+            if binding.source_id != source_id
+                || binding.source_hash != crate::cache::content_hash(source.as_bytes())
+                || binding.reference_span != span
+            {
+                continue;
+            }
+            let item = (
+                relation,
+                binding.imported_name.clone(),
+                binding.imported_name,
+                binding.module_specifier,
+            );
+            if !result.resolved.contains(&item) {
+                result.resolved.push(item);
+            }
+            continue;
+        }
+        let Some(binding) =
+            crate::ir::typescript_value_import_binding::bind_direct_namespace_value_import(
                 source_id, source, span,
             )
         else {
@@ -85,7 +111,12 @@ fn action_bindings(source_id: &str, source: &str) -> ActionBindings {
         {
             continue;
         }
-        let item = (relation, binding.imported_name, binding.module_specifier);
+        let item = (
+            relation,
+            format!("{}.{}", binding.namespace_name, binding.imported_name),
+            binding.imported_name,
+            binding.module_specifier,
+        );
         if !result.resolved.contains(&item) {
             result.resolved.push(item);
         }
@@ -128,7 +159,7 @@ fn collect_action_occurrences<'tree>(
     source: &[u8],
     output: &mut Vec<(SemanticRelation, tree_sitter::Node<'tree>)>,
 ) {
-    if node.kind() == "identifier" {
+    if matches!(node.kind(), "identifier" | "member_expression") {
         if let Some(relation) = relation_for(node, source) {
             output.push((relation, node));
         }

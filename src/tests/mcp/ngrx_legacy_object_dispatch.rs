@@ -345,7 +345,7 @@ fn destination_authority_and_file_order_converge_through_refresh() {
 fn import_refinement_advances_only_angular_semantics() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        16
+        17
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);

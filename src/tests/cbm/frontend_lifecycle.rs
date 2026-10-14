@@ -7,6 +7,16 @@ fn launch(root: &Path, log: &Path, mode: &str) -> CbmClient {
     fixture::launch(root, log, mode, None).0.unwrap().unwrap()
 }
 
+fn assert_same_directory(observed: &serde_json::Value, expected: &Path, message: &str) {
+    let observed = Path::new(observed.as_str().expect("fixture cwd string"))
+        .canonicalize()
+        .expect("canonical observed fixture cwd");
+    let expected = expected
+        .canonicalize()
+        .expect("canonical expected fixture cwd");
+    assert_eq!(observed, expected, "{message}");
+}
+
 #[test]
 fn cbm_a2_launch_uses_explicit_root_when_parent_differs() {
     let root = TempDir::new().unwrap();
@@ -17,10 +27,10 @@ fn cbm_a2_launch_uses_explicit_root_when_parent_differs() {
     );
     let _client = launch(root.path(), &log, "normal");
     let observed: serde_json::Value = serde_json::from_str(&fixture::wait_file(&log)).unwrap();
-    assert_eq!(
-        observed["cwd"],
-        json!(root.path().canonicalize().unwrap()),
-        "frontend inherited the parent CWD"
+    assert_same_directory(
+        &observed["cwd"],
+        root.path(),
+        "frontend inherited the parent CWD",
     );
 }
 
@@ -201,10 +211,7 @@ fn cbm_a2_bridge_primary_root_is_frontend_cwd_despite_additional_roots() {
     let log = primary.path().join("launch.json");
     let _bridge = fixture::bridge(primary.path(), &[additional.path().to_path_buf()], &log);
     let observed: serde_json::Value = serde_json::from_str(&fixture::wait_file(&log)).unwrap();
-    assert_eq!(
-        observed["cwd"],
-        json!(primary.path().canonicalize().unwrap())
-    );
+    assert_same_directory(&observed["cwd"], primary.path(), "frontend used wrong root");
 }
 
 #[test]
