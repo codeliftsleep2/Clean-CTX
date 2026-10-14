@@ -153,6 +153,8 @@ pub struct PassContext {
         Vec<crate::angular_meta::ngrx::constructors::ConstructorDispatch>,
     pub(crate) ngrx_legacy_transitions:
         Vec<crate::angular_meta::ngrx::transitions::LegacyTransition>,
+    pub(crate) ngrx_legacy_discriminants:
+        Vec<crate::angular_meta::ngrx::discriminants::LegacyDiscriminantEvidence>,
     /// Current method being processed (F-27: O(1) tracking).
     pub current_method: Option<String>,
     /// Current method's accumulated typed control summaries (F-28).
@@ -208,6 +210,7 @@ impl PassContext {
             ngrx_selector_declarations: Vec::new(),
             ngrx_action_type_bindings: Vec::new(),
             ngrx_legacy_transitions: Vec::new(),
+            ngrx_legacy_discriminants: Vec::new(),
             ngrx_constructor_dispatches: Vec::new(),
             ngrx_service_dispatches: Vec::new(),
             current_method: None,

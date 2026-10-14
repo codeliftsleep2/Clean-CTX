@@ -74,6 +74,7 @@ impl IRPass for MetaLayerPass {
             context.ngrx_class_actions = Some(&state.ngrx_class_actions);
             context.ngrx_selector_declarations = Some(&state.ngrx_selector_declarations);
             context.ngrx_legacy_transitions = Some(&state.ngrx_legacy_transitions);
+            context.ngrx_legacy_discriminants = Some(&state.ngrx_legacy_discriminants);
             context.ngrx_constructor_dispatches = Some(&state.ngrx_constructor_dispatches);
             context.ngrx_service_dispatches = Some(&state.ngrx_service_dispatches);
         }

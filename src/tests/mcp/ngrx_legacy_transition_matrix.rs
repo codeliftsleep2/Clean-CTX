@@ -18,13 +18,21 @@ fn query(
 #[test]
 fn ngrx_legacy_transition_public_falsifiers_and_reverse_identity() {
     let _serial = crate::protocol::handler_response_serial();
-    for (operand, expected) in [
-        ("SET_AUDIT", vec!["AuditAction"]),
-        ("OTHER_AUDIT", vec!["OtherAction"]),
-        ("UNUSED_AUDIT", vec![]),
-        ("'[Audit] Set Audit'", vec![]),
-        ("wrapper(SET_AUDIT)", vec![]),
-        ("Actions.SET_AUDIT", vec![]),
+    for (operand, expected, discriminant) in [
+        (
+            "SET_AUDIT",
+            vec!["AuditAction", "SET_AUDIT"],
+            Some("SET_AUDIT"),
+        ),
+        (
+            "OTHER_AUDIT",
+            vec!["OtherAction", "OTHER_AUDIT"],
+            Some("OTHER_AUDIT"),
+        ),
+        ("UNUSED_AUDIT", vec!["UNUSED_AUDIT"], Some("UNUSED_AUDIT")),
+        ("'[Audit] Set Audit'", vec![], None),
+        ("wrapper(SET_AUDIT)", vec![], None),
+        ("Actions.SET_AUDIT", vec![], None),
     ] {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("actions.ts");
@@ -95,8 +103,16 @@ fn ngrx_legacy_transition_public_falsifiers_and_reverse_identity() {
             .iter()
             .filter(|e| e["domain"] == "ngrx" && e["entity_type"] == "Action")
             .collect();
-        assert_eq!(actions.len(), 2);
-        assert!(!actions.iter().any(|e| e["name"] == "UNUSED_AUDIT"));
+        assert_eq!(actions.len(), if discriminant.is_some() { 3 } else { 2 });
+        if let Some(name) = discriminant {
+            assert!(actions.iter().any(|entity| entity["name"] == name));
+        }
+        assert_eq!(
+            actions
+                .iter()
+                .any(|entity| entity["name"] == "UNUSED_AUDIT"),
+            discriminant == Some("UNUSED_AUDIT")
+        );
     }
 }
 
@@ -114,9 +130,12 @@ fn ngrx_legacy_transition_public_duplicate_and_refresh_lifecycle() {
     for (body, expected) in [
         (
             "case SET_AUDIT: return state; case SET_AUDIT: return state;",
-            vec!["AuditAction"],
+            vec!["AuditAction", "SET_AUDIT"],
         ),
-        ("case OTHER_AUDIT: return state;", vec!["OtherAction"]),
+        (
+            "case OTHER_AUDIT: return state;",
+            vec!["OtherAction", "OTHER_AUDIT"],
+        ),
         ("case '[Audit] Set Audit': return state;", vec![]),
         ("", vec![]),
     ] {

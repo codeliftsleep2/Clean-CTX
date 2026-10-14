@@ -134,6 +134,11 @@ impl IRPass for CoreIRPass {
                 &captures,
                 &state.ngrx_class_actions,
             );
+            state.ngrx_legacy_discriminants = crate::angular_meta::ngrx::discriminants::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+            );
             state.ngrx_legacy_transitions = crate::angular_meta::ngrx::transitions::collect(
                 &source,
                 state.canonical_path.as_deref(),

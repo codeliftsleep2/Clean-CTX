@@ -38,6 +38,8 @@ pub struct MetaLayerContext<'a> {
         Option<&'a [crate::angular_meta::ngrx::constructors::ConstructorDispatch]>,
     pub(crate) ngrx_legacy_transitions:
         Option<&'a [crate::angular_meta::ngrx::transitions::LegacyTransition]>,
+    pub(crate) ngrx_legacy_discriminants:
+        Option<&'a [crate::angular_meta::ngrx::discriminants::LegacyDiscriminantEvidence]>,
     pub(crate) ngrx_class_actions:
         Option<&'a [crate::angular_meta::ngrx::legacy::ClassActionEvidence]>,
     pub(crate) ngrx_selector_declarations:
@@ -68,6 +70,7 @@ impl<'a> MetaLayerContext<'a> {
             ngrx_class_actions: None,
             ngrx_selector_declarations: None,
             ngrx_legacy_transitions: None,
+            ngrx_legacy_discriminants: None,
             ngrx_constructor_dispatches: None,
             ngrx_service_dispatches: None,
         }

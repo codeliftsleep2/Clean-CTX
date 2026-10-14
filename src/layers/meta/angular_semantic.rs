@@ -267,6 +267,12 @@ pub(super) fn evaluate(
                 .iter()
                 .map(crate::angular_meta::ngrx::transitions::LegacyTransition::edge),
         );
+        for discriminant in context.ngrx_legacy_discriminants.unwrap_or(&[]) {
+            if discriminant.matches_source(&context.path.to_string_lossy(), context.source) {
+                semantic_edges.push(discriminant.declaration_edge());
+                semantic_edges.push(discriminant.transition_edge());
+            }
+        }
     }
     if meta_config
         .map(|config| config.testing.enabled)

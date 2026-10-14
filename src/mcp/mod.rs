@@ -137,6 +137,10 @@ mod apply_edit_e2e_tests;
 mod ngrx_legacy_transition_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_legacy_discriminant.rs"]
+mod ngrx_legacy_discriminant_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/ngrx_legacy_transition_matrix.rs"]
 mod ngrx_legacy_transition_matrix_tests;
 

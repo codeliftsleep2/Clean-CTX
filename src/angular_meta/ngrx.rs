@@ -23,11 +23,15 @@ use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
 pub(crate) mod constructors;
+pub(crate) mod discriminants;
 mod extract;
 mod extract_selectors;
 #[cfg(test)]
 mod extraction_metrics;
 pub(crate) mod legacy;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_legacy_discriminant.rs"]
+mod legacy_discriminant_tests;
 pub(crate) mod selector_declarations;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_selector_reference_binding.rs"]

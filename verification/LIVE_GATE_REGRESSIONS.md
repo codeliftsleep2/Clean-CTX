@@ -130,6 +130,7 @@ coverage.
 | #140 legacy NgRx Action declarations | 78 PASS, 7 OBSERVED, 0 FAIL | `target/ngrx-legacy-declarations/20261013-115638-748c175c/` | None; observations are outside this declaration-only contract |
 | #140b-Prereq2 Action/type binding preservation | 27/27 PASS | `target/ngrx-action-type-binding/20261013-115803-cded1271/` | None |
 | #140b legacy switch transitions | 69/69 PASS | `target/ngrx-legacy-transitions/20261013-115907-bb17dedd/` | None |
+| #140 Slice 1 legacy discriminant authority | 80/80 PASS | `target/ngrx-legacy-transitions/20261014-113252-c8a075b4/` | None |
 | #140c constructor dispatch | 88/88 PASS | `target/ngrx-constructor-dispatch/20261013-123224-ed46b446/` | None |
 | #140d Service dispatch ownership | 84/84 PASS | `target/ngrx-service-dispatch/20261013-123804-97dfeaa6/` | None |
 | #140e Service select ownership | 52/52 PASS | `target/ngrx-service-select/20261014-101053-b72f19dd/` | None |

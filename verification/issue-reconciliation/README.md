@@ -286,17 +286,19 @@ pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyTransit
   -BinaryPath ./target/release/clean-ctx.exe
 ```
 
-Provider-disabled stdio harness: 20 static forms at High/Medium/Low, three
-same-name/file-occurrence groups, and six refresh lifecycle stages (69 groups).
-Oracles assert exact Action/Reducer identities, relation direction, both source
-files, forward/reverse consistency and independent class declarations. The two
-directions expose the same Action → TriggersReducer → Reducer fact. Constants
-remain private resolution evidence, never public Action declarations.
+Provider-disabled stdio harness: adversarial static forms at High/Medium/Low,
+same-name/file-occurrence controls, and refresh lifecycle stages. Oracles assert
+exact Action/Reducer identities, relation direction, source files,
+forward/reverse consistency, independent class declarations, and standalone
+legacy discriminant declarations. An exact top-level string constant becomes a
+public Action only when its bound case participates in the supported NgRx
+`Action`-typed `switch(parameter.type)` reducer structure.
 
 Only top-level two-parameter typed functions with immediate-body `switch` on the
-Action parameter's `.type` and direct identifier cases are supported. Shared
-constant-to-multiple-Action mappings are refused. Alias/module resolution and
-standalone string/literal Action authority remain separate. See
+Action parameter's `.type` and direct identifier cases are supported. Class and
+constant Action identities remain distinct even when linked by the same
+discriminant. Alias/module resolution, literal cases, and arbitrary standalone
+string authority remain separate. See
 [the resumed report](../../docs/plans/ISSUE_140B_LEGACY_TRANSITION_REPAIR.md).
 
 ## #140c same-file constructor dispatch
