@@ -287,9 +287,12 @@ fn declarations_in_file_refreshes_rename_removal_and_delete() {
             None => {
                 assert!(entities(&refreshed).is_empty());
                 let occurrences = response(&state, "entities_in_file", root.path(), &path);
-                assert!(entities(&occurrences).iter().any(|entity| {
-                    entity["domain"] == "ngrx" && entity["entity_type"] == "Selector"
-                }));
+                assert!(
+                    entities(&occurrences).iter().all(|entity| {
+                        entity["domain"] != "ngrx" || entity["entity_type"] != "Selector"
+                    }),
+                    "an unbound selector spelling must not fabricate an occurrence: {occurrences}"
+                );
             }
         }
     }

@@ -256,6 +256,11 @@ pub(super) fn evaluate(
         },
     );
     if ngrx_enabled {
+        semantic_edges = crate::angular_meta::ngrx::action_imports::refine_candidates(
+            &context.path.to_string_lossy(),
+            context.source,
+            semantic_edges,
+        );
         if let Some(shape) = ngrx_shape.as_ref() {
             semantic_edges.extend(crate::angular_meta::ngrx::direct_imports::candidates(
                 &context.path.to_string_lossy(),

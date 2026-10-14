@@ -33,7 +33,7 @@ use std::path::Path;
 /// Increment marker and semantic generations independently when identical
 /// Angular inputs change that producer's durable markers or semantic edges.
 pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 5;
-pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 15;
+pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 16;
 
 /// Structured output of a single meta-layer pass.
 ///

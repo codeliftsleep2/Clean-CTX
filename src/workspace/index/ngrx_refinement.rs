@@ -22,28 +22,39 @@ impl WorkspaceIndex {
             .flat_map(|(file, edges)| edges.iter().cloned().map(|edge| (file.clone(), edge)))
             .collect();
         for (asserting_file, mut edge) in candidates {
-            let Some(module) = edge.object.file.as_deref() else {
+            let action_is_subject =
+                edge.relation == crate::layers::meta::semantic::SemanticRelation::TriggersReducer;
+            let action = if action_is_subject {
+                &edge.subject
+            } else {
+                &edge.object
+            };
+            let Some(module) = action.file.as_deref() else {
                 continue;
             };
             let Some(target) = resolve_typescript_module(&asserting_file, module) else {
                 continue;
             };
-            let declarations = self.declarations_by_identity(
-                edge.object.domain,
-                edge.object.entity_type,
-                &edge.object.name,
-            );
+            let declarations =
+                self.declarations_by_identity(action.domain, action.entity_type, &action.name);
             if declarations
                 .iter()
                 .filter(|declaration| declaration.file.as_deref() == Some(target.as_str()))
                 .count()
                 != 1
-                || !exports_const(&target, &edge.object.name)
+                || !exports_const(&target, &action.name)
             {
                 continue;
             }
             edge.subject.file = Some(asserting_file.clone());
-            edge.object.file = Some(target);
+            if action_is_subject {
+                edge.subject.file = Some(target);
+                edge.object
+                    .file
+                    .get_or_insert_with(|| asserting_file.clone());
+            } else {
+                edge.object.file = Some(target);
+            }
             edge.layer = "ngrx";
             self.insert_refined_edge(&asserting_file, edge);
         }

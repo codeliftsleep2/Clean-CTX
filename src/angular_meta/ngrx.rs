@@ -22,6 +22,7 @@
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
+pub(crate) mod action_imports;
 pub(crate) mod constructors;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_direct_import_dispatch.rs"]

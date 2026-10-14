@@ -48,6 +48,7 @@ pub mod symbol_table;
 pub(crate) mod typescript_identifier_binding;
 pub(crate) mod typescript_this_property_binding;
 pub(crate) mod typescript_type_import_binding;
+pub(crate) mod typescript_value_import_binding;
 pub mod wire;
 // R-43b: IR Evolution Phases 2-6
 pub mod inference_layer;

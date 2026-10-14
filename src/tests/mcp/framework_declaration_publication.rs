@@ -317,7 +317,7 @@ fn framework_declaration_publication_relationships_do_not_duplicate() {
 }
 
 #[test]
-fn framework_declaration_publication_reference_file_is_separate_provenance() {
+fn framework_declaration_publication_respects_endpoint_authority() {
     let _serial = crate::protocol::handler_response_serial();
     for (domain, source, name) in [
         (
@@ -340,15 +340,14 @@ fn framework_declaration_publication_reference_file_is_separate_provenance() {
         let reference = entities(&state, &root, &used, domain);
         let declaration = entities(&state, &root, &declared, domain);
         assert_eq!(declaration.len(), 1);
-        assert_eq!(
-            reference.len(),
-            1,
-            "existing endpoint occurrence must survive"
-        );
+        let expected_references = usize::from(domain == "angular");
+        assert_eq!(reference.len(), expected_references);
         assert_eq!(declaration[0]["file"], declared.to_string_lossy().as_ref());
-        assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
         assert_eq!(declaration[0]["name"], name);
-        assert_eq!(reference[0]["name"], name);
+        if domain == "angular" {
+            assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
+            assert_eq!(reference[0]["name"], name);
+        }
     }
 }
 
@@ -369,7 +368,7 @@ fn framework_declaration_publication_legacy_class_now_has_independent_authority(
 }
 
 #[test]
-fn framework_declaration_publication_removal_preserves_reference_occurrences() {
+fn framework_declaration_publication_removal_respects_endpoint_authority() {
     let _serial = crate::protocol::handler_response_serial();
     for (domain, name, source) in [
         (
@@ -390,7 +389,11 @@ fn framework_declaration_publication_removal_preserves_reference_occurrences() {
         std::fs::write(&used, source).unwrap();
         let state = state(&root);
         assert_eq!(entities(&state, &root, &declared, domain).len(), 1);
-        assert_eq!(entities(&state, &root, &used, domain).len(), 1);
+        let expected_references = usize::from(domain == "angular");
+        assert_eq!(
+            entities(&state, &root, &used, domain).len(),
+            expected_references
+        );
         std::fs::write(&declared, "export const noDeclaration = 1;").unwrap();
         dispatch(
             &state,
@@ -399,8 +402,10 @@ fn framework_declaration_publication_removal_preserves_reference_occurrences() {
         );
         assert!(entities(&state, &root, &declared, domain).is_empty());
         let reference = entities(&state, &root, &used, domain);
-        assert_eq!(reference.len(), 1);
-        assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
+        assert_eq!(reference.len(), expected_references);
+        if domain == "angular" {
+            assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
+        }
         let found = dispatch(
             &state,
             "workspace_query",
@@ -416,9 +421,11 @@ fn framework_declaration_publication_removal_preserves_reference_occurrences() {
             .collect();
         assert_eq!(
             occurrences.len(),
-            1,
-            "Only the existing reference occurrence survives: {found}"
+            expected_references,
+            "only independently authoritative reference occurrences survive: {found}"
         );
-        assert_eq!(occurrences[0]["file"], used.to_string_lossy().as_ref());
+        if domain == "angular" {
+            assert_eq!(occurrences[0]["file"], used.to_string_lossy().as_ref());
+        }
     }
 }

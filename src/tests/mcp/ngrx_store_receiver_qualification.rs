@@ -64,7 +64,7 @@ fn public_semantics_require_exact_ngrx_store_receiver_authority() {
 fn receiver_qualification_advances_only_angular_semantics() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        15
+        16
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);
