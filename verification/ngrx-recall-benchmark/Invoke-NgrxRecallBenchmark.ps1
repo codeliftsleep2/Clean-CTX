@@ -60,6 +60,35 @@ function Invoke-BRpc($Session, [string]$Method, [hashtable]$Params) {
     }
 }
 
+# The repo-scale run emits materially more diagnostics than the small Phase B
+# fixtures. Preserve them without allowing cleanup volume to mask the score.
+function Stop-BSession($Session) {
+    if (-not $Session.Process.HasExited) {
+        $Session.Process.StandardInput.Close()
+        if (-not $Session.Process.WaitForExit(5000)) { $Session.Process.Kill() }
+    }
+    if ($Session.Stderr.Wait(5000)) {
+        $stderr = [string]$Session.Stderr.Result
+        $limit = 64MB
+        $truncated = $stderr.Length -gt $limit
+        if ($truncated) {
+            $half = [int]($limit / 2)
+            $stderr = $stderr.Substring(0, $half) +
+                "`n--- STDERR TRUNCATED BY BENCHMARK HARNESS ---`n" +
+                $stderr.Substring($stderr.Length - $half)
+        }
+        Write-BText (Join-Path $runRoot "$($Session.Name).stderr.log") $stderr
+        Save-B 'stderr-metadata' @{
+            truncated = $truncated
+            captured_characters = $stderr.Length
+            limit_characters = $limit
+        }
+    } else {
+        Write-Warning 'MCP stderr did not close within the cleanup deadline.'
+    }
+    $Session.Process.Dispose()
+}
+
 function Invoke-GitText([string[]]$Arguments) {
     $text = & git @Arguments
     if ($LASTEXITCODE -ne 0) { throw "git $($Arguments -join ' ') failed." }
@@ -130,6 +159,7 @@ function Normalize-Edge($Edge) {
 
 function Add-ObservedEdges($Edges, [Collections.Generic.Dictionary[string,object]]$Observed) {
     foreach ($edge in @($Edges)) {
+        if ($null -eq $edge) { continue }
         if ([string]$edge.relation -notin @('Dispatches', 'Selects', 'HandlesAction', 'TriggersReducer')) {
             continue
         }
