@@ -145,3 +145,122 @@ fn ordinary_framework_shaped_name_binds_without_framework_classification() {
     assert_eq!(result.declaration_span(), nth_span(source, "selectAudit", 0));
     assert_eq!(result.declaration_kind(), ValueDeclarationKind::LexicalConst);
 }
+
+#[test]
+fn sibling_blocks_do_not_leak_and_parameter_returns_after_inner_shadow() {
+    let source = concat!(
+        "function sibling(target: number) {\n",
+        "  { const target = 1; use(target); }\n",
+        "  { const target = 2; use(target); }\n",
+        "  use(target);\n",
+        "}\n",
+    );
+
+    assert_eq!(
+        binding(source, nth_span(source, "target", 2)).declaration_span(),
+        nth_span(source, "target", 1)
+    );
+    assert_eq!(
+        binding(source, nth_span(source, "target", 4)).declaration_span(),
+        nth_span(source, "target", 3)
+    );
+    let post_block = binding(source, nth_span(source, "target", 5));
+    assert_eq!(post_block.declaration_span(), nth_span(source, "target", 0));
+    assert_eq!(post_block.declaration_kind(), ValueDeclarationKind::Parameter);
+}
+
+#[test]
+fn differently_named_declarations_bind_only_the_referenced_identity() {
+    let source = "const first = 1; const second = 2; use(second); use(first);";
+    assert_eq!(
+        binding(source, nth_span(source, "second", 1)).declaration_span(),
+        nth_span(source, "second", 0)
+    );
+    assert_eq!(
+        binding(source, nth_span(source, "first", 1)).declaration_span(),
+        nth_span(source, "first", 0)
+    );
+}
+
+#[test]
+fn duplicate_declarations_malformed_source_and_type_positions_fail_closed() {
+    let duplicate = "const target = 1; const target = 2; use(target);";
+    assert!(
+        bind_direct_value_identifier(
+            "Fixture.ts",
+            duplicate,
+            nth_span(duplicate, "target", 2),
+        )
+        .is_none()
+    );
+
+    let malformed = "const target = ; use(target);";
+    assert!(
+        bind_direct_value_identifier(
+            "Fixture.ts",
+            malformed,
+            nth_span(malformed, "target", 1),
+        )
+        .is_none()
+    );
+
+    let type_position = "type Alias = target; const target = 1; use(target);";
+    assert!(
+        bind_direct_value_identifier(
+            "Fixture.ts",
+            type_position,
+            nth_span(type_position, "target", 0),
+        )
+        .is_none()
+    );
+    assert_eq!(
+        binding(type_position, nth_span(type_position, "target", 2)).declaration_span(),
+        nth_span(type_position, "target", 1)
+    );
+}
+
+#[test]
+fn lexical_identity_is_scope_wide_while_tdz_runtime_access_is_out_of_scope() {
+    let source = "function f() { use(target); const target = 1; }";
+    let result = binding(source, nth_span(source, "target", 0));
+    assert_eq!(result.declaration_span(), nth_span(source, "target", 1));
+    assert_eq!(result.declaration_kind(), ValueDeclarationKind::LexicalConst);
+}
+
+#[test]
+fn equivalent_inputs_are_deterministic_and_source_bound() {
+    let source = "const target = 1; use(target);";
+    let reference = nth_span(source, "target", 1);
+    let first = bind_direct_value_identifier("Fixture.ts", source, reference);
+    let unrelated = bind_direct_value_identifier(
+        "Other.ts",
+        "const other = 2; use(other);",
+        SourceSpan::new(21, 26).unwrap(),
+    );
+    let second = bind_direct_value_identifier("Fixture.ts", source, reference);
+
+    assert!(unrelated.is_some());
+    assert_eq!(first, second);
+    assert_eq!(first.unwrap().source_hash(), content_hash(source.as_bytes()));
+}
+
+#[test]
+fn invocation_argument_span_is_directly_compatible_with_the_binder() {
+    let source = "const target = 1; consume(target);";
+    let evidence = crate::ir::invocation_evidence::collect_typescript_source(source).unwrap();
+    let view = evidence.view("standalone-typescript", source).unwrap();
+    let argument_span = view
+        .occurrences()
+        .iter()
+        .flat_map(|occurrence| occurrence.arguments())
+        .find(|argument| view.slice(argument.span()).unwrap() == "target")
+        .expect("consume argument")
+        .span();
+
+    let result = bind_direct_value_identifier("standalone-typescript", source, argument_span)
+        .expect("exact invocation argument span must bind");
+    assert_eq!(result.reference_span(), argument_span);
+    assert_eq!(result.declaration_span(), nth_span(source, "target", 0));
+    assert_eq!(result.source_id(), evidence.source_id());
+    assert_eq!(result.source_hash(), evidence.source_hash());
+}

@@ -213,3 +213,7 @@ fn is_function_like(node: tree_sitter::Node<'_>) -> bool {
 #[cfg(test)]
 #[path = "../tests/ir/typescript_identifier_binding.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/typescript_identifier_binding_fixtures.rs"]
+mod fixture_tests;
