@@ -34,6 +34,7 @@ pub mod identity;
 // TypeScript and C# populate evidence; later consumers remain staged.
 #[allow(dead_code)]
 pub(crate) mod invocation_evidence;
+pub(crate) mod typescript_identifier_binding;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;
