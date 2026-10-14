@@ -35,6 +35,9 @@ mod selector_reference_binding_tests;
 pub(crate) mod selector_references;
 pub(crate) mod service_owners;
 mod shape;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_store_receiver_qualification.rs"]
+mod store_receiver_qualification_tests;
 pub(crate) mod transitions;
 pub(crate) mod type_binding;
 
@@ -277,7 +280,6 @@ pub struct DispatchSite {
 #[derive(Debug, Clone)]
 pub struct SelectSite {
     pub selector_name: String,
-    pub(crate) call_start: usize,
 }
 
 /// The complete NgRx shape extracted from a file.

@@ -72,7 +72,7 @@ fn ngrx_selector_declaration_without_use_is_publicly_reachable() {
 }
 
 #[test]
-fn ngrx_selector_use_endpoints_do_not_gain_declaration_authority() {
+fn unqualified_selector_uses_gain_neither_semantic_nor_declaration_authority() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let identifier_path = root.path().join("identifier-use.ts");
@@ -93,14 +93,8 @@ fn ngrx_selector_use_endpoints_do_not_gain_declaration_authority() {
         .push(root.path().to_string_lossy().into_owned());
     let state = crate::mcp::McpState::new(config);
 
-    assert_eq!(
-        selectors_in_file(&state, root.path(), &identifier_path).len(),
-        1
-    );
-    assert_eq!(
-        selectors_in_file(&state, root.path(), &quoted_path).len(),
-        1
-    );
+    assert!(selectors_in_file(&state, root.path(), &identifier_path).is_empty());
+    assert!(selectors_in_file(&state, root.path(), &quoted_path).is_empty());
     let index = state.workspace_index_read();
     assert!(
         index

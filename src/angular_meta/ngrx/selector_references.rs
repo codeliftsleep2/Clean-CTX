@@ -3,8 +3,8 @@
 use super::{NgRxShape, selector_declarations::SelectorDeclarationEvidence};
 use crate::ir::invocation_evidence::{ArgumentQualifier, InvocationEvidenceView, WrittenCallee};
 
-/// Retain only select occurrences whose one direct identifier argument binds
-/// to the exact declaration independently classified as an NgRx Selector.
+/// Project only direct member `select` invocations whose receiver is an exact
+/// NgRx Store binding and whose direct identifier argument is an exact Selector.
 pub(crate) fn admit(
     mut shape: NgRxShape,
     evidence: &InvocationEvidenceView<'_>,
@@ -12,38 +12,65 @@ pub(crate) fn admit(
     source_id: &str,
     source: &str,
 ) -> NgRxShape {
-    shape.select_sites.retain_mut(|site| {
-        let Some(call) = evidence.occurrences().iter().find(|call| {
-            call.span().start_byte() == site.call_start
-                && matches!(call.callee(), WrittenCallee::Member { terminal, .. }
-                    if evidence.slice(*terminal).ok() == Some("select"))
-        }) else {
-            return false;
+    let source_hash = crate::cache::content_hash(source.as_bytes());
+    shape.select_sites.clear();
+    for call in evidence.occurrences() {
+        let WrittenCallee::Member { receiver, terminal } = call.callee() else {
+            continue;
         };
+        if evidence.slice(*terminal).ok() != Some("select") {
+            continue;
+        }
         let [argument] = call.arguments() else {
-            return false;
+            continue;
         };
         if argument.qualifier() != &ArgumentQualifier::Plain {
-            return false;
+            continue;
+        }
+        let Some(member) = crate::ir::typescript_this_property_binding::bind_this_property(
+            source_id, source, *receiver,
+        ) else {
+            continue;
+        };
+        if member.source_id() != source_id || member.source_hash() != source_hash {
+            continue;
+        }
+        let Some(type_reference) = member.type_reference_span() else {
+            continue;
+        };
+        let Some(import) =
+            crate::ir::typescript_type_import_binding::bind_type_reference_to_named_import(
+                source_id,
+                source,
+                type_reference,
+            )
+        else {
+            continue;
+        };
+        if import.source_id() != source_id
+            || import.source_hash() != source_hash
+            || import.imported_symbol_name() != "Store"
+            || import.module_specifier() != "@ngrx/store"
+        {
+            continue;
         }
         let Some(binding) = crate::ir::typescript_identifier_binding::bind_direct_value_identifier(
             source_id,
             source,
             argument.span(),
         ) else {
-            // Unsupported/unbound forms retain the established occurrence
-            // product. They still acquire no declaration authority.
-            return true;
+            continue;
         };
         let Some(declaration) = declarations.iter().find(|declaration| {
             declaration.file == binding.source_id()
                 && declaration.source_hash == binding.source_hash()
                 && declaration.name_span == binding.declaration_span()
         }) else {
-            return false;
+            continue;
         };
-        site.selector_name.clone_from(&declaration.name);
-        true
-    });
+        shape.select_sites.push(super::SelectSite {
+            selector_name: declaration.name.clone(),
+        });
+    }
     shape
 }

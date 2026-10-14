@@ -133,13 +133,14 @@ export class AuditComponent {
   consume() { return this.store.select(selectAudit); }
 }
 "#;
-    assert_eq!(selector_targets(imported), ["selectAudit"]);
+    assert!(selector_targets(imported).is_empty());
     assert!(
         selector_targets(
             &imported
                 .replace("{ selectAudit }", "{ selectAudit as audit }")
                 .replace("select(selectAudit)", "select(audit)")
-        ) == ["audit"]
+        )
+        .is_empty()
     );
     assert!(
         selector_targets(
@@ -149,10 +150,16 @@ export class AuditComponent {
                     "import * as Selectors from './selectors';"
                 )
                 .replace("select(selectAudit)", "select(Selectors.selectAudit)")
-        ) == ["Selectors.selectAudit"]
+        )
+        .is_empty()
     );
 
     let foreign = selector_source("return this.store.select(selectAudit);");
     assert_eq!(selector_targets(&foreign), ["selectAudit"]);
-    assert_eq!(selector_targets(imported), ["selectAudit"]);
+    assert!(selector_targets(imported).is_empty());
+
+    let occurrences = crate::angular_meta::ngrx::extract_ngrx_shape(imported, Fidelity::High)
+        .expect("legacy candidate occurrence");
+    assert_eq!(occurrences.select_sites.len(), 1);
+    assert_eq!(occurrences.select_sites[0].selector_name, "selectAudit");
 }
