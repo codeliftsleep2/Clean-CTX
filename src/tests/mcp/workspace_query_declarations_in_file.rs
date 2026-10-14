@@ -2,7 +2,12 @@
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 
-fn response(state: &crate::mcp::McpState, query_type: &str, root: &std::path::Path, path: &std::path::Path) -> Value {
+fn response(
+    state: &crate::mcp::McpState,
+    query_type: &str,
+    root: &std::path::Path,
+    path: &std::path::Path,
+) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(
         &json!(140),
@@ -66,8 +71,17 @@ fn declarations_in_file_exposes_authority_without_promoting_use_endpoints() {
     }
     {
         let index = state.workspace_index_read();
-        assert_eq!(index.declarations_in_file(&declaration_path.to_string_lossy()).len(), 1);
-        assert!(index.declarations_in_file(&use_path.to_string_lossy()).is_empty());
+        assert_eq!(
+            index
+                .declarations_in_file(&declaration_path.to_string_lossy())
+                .len(),
+            1
+        );
+        assert!(
+            index
+                .declarations_in_file(&use_path.to_string_lossy())
+                .is_empty()
+        );
     }
 
     let declaration = response(
@@ -82,14 +96,19 @@ fn declarations_in_file_exposes_authority_without_promoting_use_endpoints() {
     assert_eq!(declared[0]["domain"], "ngrx");
     assert_eq!(declared[0]["entity_type"], "Selector");
     assert_eq!(declared[0]["name"], "selectAudit");
-    assert_eq!(declared[0]["file"], declaration_path.to_string_lossy().as_ref());
+    assert_eq!(
+        declared[0]["file"],
+        declaration_path.to_string_lossy().as_ref()
+    );
 
     let use_only = response(&state, "declarations_in_file", root.path(), &use_path);
     assert!(use_only.get("error").is_none(), "{use_only}");
-    assert!(use_only["result"]["structuredContent"]["entities"]
-        .as_array()
-        .unwrap()
-        .is_empty());
+    assert!(
+        use_only["result"]["structuredContent"]["entities"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -117,7 +136,11 @@ fn declarations_in_file_selector_and_action_matrix() {
             "import { Store } from '@ngrx/store'; declare const store: Store<unknown>; store.select('selectAudit');",
             None,
         ),
-        ("ordinary.ts", "export const selectAudit = 'ordinary';", None),
+        (
+            "ordinary.ts",
+            "export const selectAudit = 'ordinary';",
+            None,
+        ),
         (
             "action.ts",
             "import { createAction } from '@ngrx/store'; export const setAudit = createAction('[Audit] Set');",
@@ -160,7 +183,10 @@ fn declarations_in_file_preserves_file_provenance_and_disabled_refusal() {
         let result = response(&enabled, "declarations_in_file", root.path(), &path);
         assert!(result.get("error").is_none(), "{result}");
         assert_eq!(entities(&result).len(), 1);
-        assert_eq!(entities(&result)[0]["file"], path.to_string_lossy().as_ref());
+        assert_eq!(
+            entities(&result)[0]["file"],
+            path.to_string_lossy().as_ref()
+        );
     }
 
     let disabled_path = root.path().join("disabled.ts");
@@ -187,12 +213,7 @@ fn declarations_in_file_selector_factory_qualification_and_multiple_declarations
         "import { createSelector } from '@ngrx/store';\nexport const selectAudit = createSelector(selectState, state => state.audit);\nexport const neighboring = 'ordinary';\nexport function selectHelper() { return 'ordinary'; }\nexport const selectOther = createSelector(selectState, state => state.other);",
     )
     .unwrap();
-    let positive = response(
-        &state,
-        "declarations_in_file",
-        root.path(),
-        &positive_path,
-    );
+    let positive = response(&state, "declarations_in_file", root.path(), &positive_path);
     assert!(positive.get("error").is_none(), "{positive}");
     let selectors = ngrx_selectors(&positive);
     let mut names: Vec<_> = selectors

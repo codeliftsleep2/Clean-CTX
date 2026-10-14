@@ -3,8 +3,8 @@
 //! This module deliberately owns no framework classification and performs no
 //! import, module, member, or type-space resolution.
 
-// Prereq2a intentionally establishes private compilation-local evidence before
-// a separately authorized semantic consumer exists.
+// Some provenance accessors remain reserved for compilation-local consumers
+// and the complete falsification matrix.
 #![allow(dead_code)]
 
 use super::invocation_evidence::SourceSpan;
@@ -61,10 +61,9 @@ pub(crate) fn bind_direct_value_identifier(
     if tree.root_node().has_error() {
         return None;
     }
-    let reference = tree.root_node().named_descendant_for_byte_range(
-        reference_span.start_byte(),
-        reference_span.end_byte(),
-    )?;
+    let reference = tree
+        .root_node()
+        .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())?;
     if reference.kind() != "identifier"
         || reference.start_byte() != reference_span.start_byte()
         || reference.end_byte() != reference_span.end_byte()
@@ -107,9 +106,7 @@ fn is_declaration_name(node: tree_sitter::Node<'_>) -> bool {
         || parent.child_by_field_name("pattern") == Some(node))
 }
 
-fn nearest_lexical_scope(
-    mut node: tree_sitter::Node<'_>,
-) -> Option<tree_sitter::Node<'_>> {
+fn nearest_lexical_scope(mut node: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
     loop {
         if matches!(node.kind(), "program" | "statement_block") {
             return Some(node);
@@ -182,9 +179,7 @@ fn collect_function_parameters(
     for parameter in parameters.named_children(&mut cursor) {
         let identifier = match parameter.kind() {
             "identifier" => Some(parameter),
-            "required_parameter" | "optional_parameter" => {
-                parameter.child_by_field_name("pattern")
-            }
+            "required_parameter" | "optional_parameter" => parameter.child_by_field_name("pattern"),
             _ => None,
         };
         let Some(identifier) = identifier.filter(|node| node.kind() == "identifier") else {

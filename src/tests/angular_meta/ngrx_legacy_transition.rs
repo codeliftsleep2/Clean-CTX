@@ -227,12 +227,19 @@ fn ngrx_legacy_transition_compilation_identity_lifecycle() {
 
 #[test]
 fn ngrx_legacy_transition_for_in_shadow_refuses_outer_identity() {
-    let text = source("case SET_AUDIT: return state;", false)
-        .replace("{switch(action.type)", "{for(var SET_AUDIT of values) {} switch(action.type)");
+    let text = source("case SET_AUDIT: return state;", false).replace(
+        "{switch(action.type)",
+        "{for(var SET_AUDIT of values) {} switch(action.type)",
+    );
     let state = compile(&text, "/a/actions.ts");
     assert_eq!(state.ngrx_class_actions.len(), 1);
-    assert_eq!(state.ngrx_action_type_bindings.len(), 1,
-        "The class initializer remains bound to its outer program const");
-    assert!(state.ngrx_legacy_transitions.is_empty(),
-        "Hoisted loop binding must not let the case resolve to the outer const");
+    assert_eq!(
+        state.ngrx_action_type_bindings.len(),
+        1,
+        "The class initializer remains bound to its outer program const"
+    );
+    assert!(
+        state.ngrx_legacy_transitions.is_empty(),
+        "Hoisted loop binding must not let the case resolve to the outer const"
+    );
 }

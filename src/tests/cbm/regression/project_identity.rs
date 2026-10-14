@@ -219,9 +219,10 @@ fn successful_explicit_index_recovers_failed_tracked_root_readiness() {
     let canonical = primary.canonicalize().unwrap();
     let project = cbm_project_slug(&canonical);
 
-    bridge
-        .indexing_state()
-        .insert(project.clone(), IndexingState::Failed("startup collision".into()));
+    bridge.indexing_state().insert(
+        project.clone(),
+        IndexingState::Failed("startup collision".into()),
+    );
     assert!(bridge.ensure_indexed_for(&project).is_err());
 
     assert!(bridge.mark_explicit_index_complete(&canonical));

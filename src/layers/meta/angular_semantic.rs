@@ -155,8 +155,24 @@ pub(super) fn evaluate(
             );
             shape
                 .map(|shape| {
+                    let semantic_shape = context.invocation_evidence.map_or_else(
+                        || {
+                            let mut unsupported = shape.clone();
+                            unsupported.select_sites.clear();
+                            unsupported
+                        },
+                        |invocations| {
+                            crate::angular_meta::ngrx::selector_references::admit(
+                                shape.clone(),
+                                invocations,
+                                context.ngrx_selector_declarations.unwrap_or(&[]),
+                                &context.path.to_string_lossy(),
+                                context.source,
+                            )
+                        },
+                    );
                     ngrx_edges = Some(crate::angular_meta::ngrx::service_owners::project(
-                        shape.clone(),
+                        semantic_shape,
                         &starts,
                         context.ngrx_constructor_dispatches.unwrap_or(&[]),
                         context.ngrx_service_dispatches.unwrap_or(&[]),

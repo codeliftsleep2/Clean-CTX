@@ -58,10 +58,12 @@ fn ngrx_selector_declaration_without_use_is_publicly_reachable() {
         "source-proven Selector declaration is missing: {selectors:?}"
     );
     assert_eq!(selectors[0]["name"], "selectAudit");
-    assert_eq!(selectors[0]["file"], selector_path.to_string_lossy().as_ref());
+    assert_eq!(
+        selectors[0]["file"],
+        selector_path.to_string_lossy().as_ref()
+    );
     let index = state.workspace_index_read();
-    let declarations =
-        index.declarations_by_identity("ngrx", "Selector", "selectAudit");
+    let declarations = index.declarations_by_identity("ngrx", "Selector", "selectAudit");
     assert_eq!(declarations.len(), 1);
     assert_eq!(
         declarations[0].file.as_deref(),
@@ -91,11 +93,25 @@ fn ngrx_selector_use_endpoints_do_not_gain_declaration_authority() {
         .push(root.path().to_string_lossy().into_owned());
     let state = crate::mcp::McpState::new(config);
 
-    assert_eq!(selectors_in_file(&state, root.path(), &identifier_path).len(), 1);
-    assert_eq!(selectors_in_file(&state, root.path(), &quoted_path).len(), 1);
+    assert_eq!(
+        selectors_in_file(&state, root.path(), &identifier_path).len(),
+        1
+    );
+    assert_eq!(
+        selectors_in_file(&state, root.path(), &quoted_path).len(),
+        1
+    );
     let index = state.workspace_index_read();
-    assert!(index.declarations_in_file(&identifier_path.to_string_lossy()).is_empty());
-    assert!(index.declarations_in_file(&quoted_path.to_string_lossy()).is_empty());
+    assert!(
+        index
+            .declarations_in_file(&identifier_path.to_string_lossy())
+            .is_empty()
+    );
+    assert!(
+        index
+            .declarations_in_file(&quoted_path.to_string_lossy())
+            .is_empty()
+    );
     assert!(
         index
             .declarations_by_identity("ngrx", "Selector", "selectAudit")
@@ -149,13 +165,15 @@ fn declaration_authority_respects_disabled_ngrx_and_preserves_action_publication
         "workspace_query",
         json!({"workspaceRoot": root.path(), "type": "entities_in_file", "file_path": action_path}),
     );
-    assert!(result["structuredContent"]["entities"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .any(|entity| entity["domain"] == "ngrx"
-            && entity["entity_type"] == "Action"
-            && entity["name"] == "setAudit"));
+    assert!(
+        result["structuredContent"]["entities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|entity| entity["domain"] == "ngrx"
+                && entity["entity_type"] == "Action"
+                && entity["name"] == "setAudit")
+    );
     assert_eq!(
         enabled
             .workspace_index_read()

@@ -40,7 +40,10 @@ fn top_level_local_and_parameter_shadowing_bind_exact_declarations() {
 
     let parameter = binding(source, nth_span(source, "target", 5));
     assert_eq!(parameter.declaration_span(), nth_span(source, "target", 4));
-    assert_eq!(parameter.declaration_kind(), ValueDeclarationKind::Parameter);
+    assert_eq!(
+        parameter.declaration_kind(),
+        ValueDeclarationKind::Parameter
+    );
 }
 
 #[test]
@@ -91,12 +94,8 @@ fn only_direct_value_identifier_occurrences_are_admitted() {
         "() => target",
     ] {
         assert!(
-            bind_direct_value_identifier(
-                "Fixture.ts",
-                source,
-                nth_span(source, expression, 0),
-            )
-            .is_none(),
+            bind_direct_value_identifier("Fixture.ts", source, nth_span(source, expression, 0),)
+                .is_none(),
             "a compound expression span is not a direct identifier occurrence"
         );
     }
@@ -118,12 +117,10 @@ fn let_is_supported_while_var_and_import_bindings_fail_closed() {
     assert_eq!(local.declaration_span(), nth_span(source, "local", 0));
     assert_eq!(local.declaration_kind(), ValueDeclarationKind::LexicalLet);
     assert!(
-        bind_direct_value_identifier("Fixture.ts", source, nth_span(source, "legacy", 1))
-            .is_none()
+        bind_direct_value_identifier("Fixture.ts", source, nth_span(source, "legacy", 1)).is_none()
     );
     assert!(
-        bind_direct_value_identifier("Fixture.ts", source, nth_span(source, "remote", 1))
-            .is_none()
+        bind_direct_value_identifier("Fixture.ts", source, nth_span(source, "remote", 1)).is_none()
     );
 }
 
@@ -142,8 +139,14 @@ fn same_text_in_another_file_cannot_supply_a_declaration() {
 fn ordinary_framework_shaped_name_binds_without_framework_classification() {
     let source = "const selectAudit = 123; use(selectAudit);";
     let result = binding(source, nth_span(source, "selectAudit", 1));
-    assert_eq!(result.declaration_span(), nth_span(source, "selectAudit", 0));
-    assert_eq!(result.declaration_kind(), ValueDeclarationKind::LexicalConst);
+    assert_eq!(
+        result.declaration_span(),
+        nth_span(source, "selectAudit", 0)
+    );
+    assert_eq!(
+        result.declaration_kind(),
+        ValueDeclarationKind::LexicalConst
+    );
 }
 
 #[test]
@@ -166,7 +169,10 @@ fn sibling_blocks_do_not_leak_and_parameter_returns_after_inner_shadow() {
     );
     let post_block = binding(source, nth_span(source, "target", 5));
     assert_eq!(post_block.declaration_span(), nth_span(source, "target", 0));
-    assert_eq!(post_block.declaration_kind(), ValueDeclarationKind::Parameter);
+    assert_eq!(
+        post_block.declaration_kind(),
+        ValueDeclarationKind::Parameter
+    );
 }
 
 #[test]
@@ -186,22 +192,14 @@ fn differently_named_declarations_bind_only_the_referenced_identity() {
 fn duplicate_declarations_malformed_source_and_type_positions_fail_closed() {
     let duplicate = "const target = 1; const target = 2; use(target);";
     assert!(
-        bind_direct_value_identifier(
-            "Fixture.ts",
-            duplicate,
-            nth_span(duplicate, "target", 2),
-        )
-        .is_none()
+        bind_direct_value_identifier("Fixture.ts", duplicate, nth_span(duplicate, "target", 2),)
+            .is_none()
     );
 
     let malformed = "const target = ; use(target);";
     assert!(
-        bind_direct_value_identifier(
-            "Fixture.ts",
-            malformed,
-            nth_span(malformed, "target", 1),
-        )
-        .is_none()
+        bind_direct_value_identifier("Fixture.ts", malformed, nth_span(malformed, "target", 1),)
+            .is_none()
     );
 
     let type_position = "type Alias = target; const target = 1; use(target);";
@@ -224,7 +222,10 @@ fn lexical_identity_is_scope_wide_while_tdz_runtime_access_is_out_of_scope() {
     let source = "function f() { use(target); const target = 1; }";
     let result = binding(source, nth_span(source, "target", 0));
     assert_eq!(result.declaration_span(), nth_span(source, "target", 1));
-    assert_eq!(result.declaration_kind(), ValueDeclarationKind::LexicalConst);
+    assert_eq!(
+        result.declaration_kind(),
+        ValueDeclarationKind::LexicalConst
+    );
 }
 
 #[test]
@@ -241,7 +242,10 @@ fn equivalent_inputs_are_deterministic_and_source_bound() {
 
     assert!(unrelated.is_some());
     assert_eq!(first, second);
-    assert_eq!(first.unwrap().source_hash(), content_hash(source.as_bytes()));
+    assert_eq!(
+        first.unwrap().source_hash(),
+        content_hash(source.as_bytes())
+    );
 }
 
 #[test]

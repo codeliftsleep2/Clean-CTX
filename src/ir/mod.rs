@@ -34,7 +34,6 @@ pub mod identity;
 // TypeScript and C# populate evidence; later consumers remain staged.
 #[allow(dead_code)]
 pub(crate) mod invocation_evidence;
-pub(crate) mod typescript_identifier_binding;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;
@@ -46,6 +45,7 @@ pub mod replay;
 pub mod semantic_projection;
 pub mod string_table;
 pub mod symbol_table;
+pub(crate) mod typescript_identifier_binding;
 pub mod wire;
 // R-43b: IR Evolution Phases 2-6
 pub mod inference_layer;

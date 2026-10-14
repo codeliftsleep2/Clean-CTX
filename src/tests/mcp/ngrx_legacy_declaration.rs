@@ -30,11 +30,8 @@ fn ngrx_legacy_declaration_class_without_uses_is_publicly_reachable() {
         |_, raw, _| Some(raw.into()),
     )
     .unwrap();
-    assert!(
-        captures
-            .iter()
-            .any(|capture| capture.name == "class.root" && capture.raw_text == declaration.strip_prefix("export ").unwrap())
-    );
+    assert!(captures.iter().any(|capture| capture.name == "class.root"
+        && capture.raw_text == declaration.strip_prefix("export ").unwrap()));
     std::fs::write(&path, &source).unwrap();
     let mut config = crate::tests::test_config();
     config

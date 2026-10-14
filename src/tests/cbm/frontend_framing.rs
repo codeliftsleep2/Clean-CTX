@@ -15,7 +15,10 @@ fn cbm_a0_matching_response_and_rpc_error_are_frames() {
 fn cbm_a0_newline_frame_keeps_escaped_tree_content() {
     let wire = b"{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"text\":\"a\\nb\"}}\n";
     let mut reader = Cursor::new(wire);
-    assert_eq!(read_frame(&mut reader, 128).unwrap().unwrap().as_bytes(), wire);
+    assert_eq!(
+        read_frame(&mut reader, 128).unwrap().unwrap().as_bytes(),
+        wire
+    );
     assert!(read_frame(&mut reader, 128).unwrap().is_none());
 }
 
@@ -30,18 +33,32 @@ fn cbm_a1_wrong_or_missing_response_identity_is_rejected() {
 
 #[test]
 fn cbm_a1_notification_is_not_pending_completion() {
-    assert!(!is_response(r#"{"jsonrpc":"2.0","method":"notifications/message","params":{}}"#, 7).unwrap());
+    assert!(
+        !is_response(
+            r#"{"jsonrpc":"2.0","method":"notifications/message","params":{}}"#,
+            7
+        )
+        .unwrap()
+    );
 }
 
 #[test]
 fn cbm_a1_startup_error_is_not_a_correlated_reply() {
-    assert!(is_response(r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":"startup failed"}}"#, 7).is_err());
+    assert!(
+        is_response(
+            r#"{"jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":"startup failed"}}"#,
+            7
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn cbm_a1_envelope_and_error_shape_are_validated() {
     for frame in [
-        "[]", "null", "7",
+        "[]",
+        "null",
+        "7",
         r#"{"jsonrpc":"1.0","id":7,"result":{}}"#,
         r#"{"id":7,"result":{}}"#,
         r#"{"jsonrpc":"2.0","id":7}"#,
@@ -59,7 +76,10 @@ fn cbm_a1_envelope_and_error_shape_are_validated() {
 fn cbm_a1_frame_limit_is_checked_before_whole_line_consumption() {
     let mut reader = BufReader::with_capacity(8, Cursor::new(vec![b'x'; 4096]));
     assert!(read_frame(&mut reader, 64).is_err());
-    assert!(reader.into_inner().position() <= 72, "unbounded line read before cap");
+    assert!(
+        reader.into_inner().position() <= 72,
+        "unbounded line read before cap"
+    );
 }
 
 #[test]

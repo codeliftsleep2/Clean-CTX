@@ -4,9 +4,7 @@ use super::{ValueDeclarationKind, bind_direct_value_identifier};
 use crate::cache::content_hash;
 use crate::ir::invocation_evidence::{SourceSpan, collect_typescript_source};
 
-const ORACLE: &str = include_str!(
-    "../../../verification/typescript-identifier-binding/oracle.tsv"
-);
+const ORACLE: &str = include_str!("../../../verification/typescript-identifier-binding/oracle.tsv");
 
 fn fixture(name: &str) -> &'static str {
     match name {
@@ -22,12 +20,12 @@ fn fixture(name: &str) -> &'static str {
         "unsupported.ts" => include_str!(
             "../../../verification/typescript-identifier-binding/fixtures/unsupported.ts"
         ),
-        "file-a.ts" => include_str!(
-            "../../../verification/typescript-identifier-binding/fixtures/file-a.ts"
-        ),
-        "file-b.ts" => include_str!(
-            "../../../verification/typescript-identifier-binding/fixtures/file-b.ts"
-        ),
+        "file-a.ts" => {
+            include_str!("../../../verification/typescript-identifier-binding/fixtures/file-a.ts")
+        }
+        "file-b.ts" => {
+            include_str!("../../../verification/typescript-identifier-binding/fixtures/file-b.ts")
+        }
         _ => panic!("unknown fixture {name}"),
     }
 }
@@ -73,11 +71,20 @@ fn expected_kind(value: &str) -> ValueDeclarationKind {
 
 #[test]
 fn tracked_fixtures_match_independent_oracle_through_real_invocation_spans() {
-    for line in ORACLE.lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
+    for line in ORACLE
+        .lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+    {
         let columns: Vec<_> = line.split('|').collect();
         assert_eq!(columns.len(), 6, "oracle row shape: {line}");
-        let [file, reference_label, argument_text, declaration_label, declaration_name, kind] =
-            columns.as_slice()
+        let [
+            file,
+            reference_label,
+            argument_text,
+            declaration_label,
+            declaration_name,
+            kind,
+        ] = columns.as_slice()
         else {
             unreachable!("column count checked")
         };
@@ -91,7 +98,11 @@ fn tracked_fixtures_match_independent_oracle_through_real_invocation_spans() {
         }
 
         let result = result.unwrap_or_else(|| panic!("{file}:{reference_label} must bind"));
-        assert_eq!(result.reference_span(), reference_span, "{file}:{reference_label}");
+        assert_eq!(
+            result.reference_span(),
+            reference_span,
+            "{file}:{reference_label}"
+        );
         assert_eq!(
             result.declaration_span(),
             marked_name_span(source, declaration_label, declaration_name),
@@ -106,7 +117,10 @@ fn tracked_fixtures_match_independent_oracle_through_real_invocation_spans() {
 #[test]
 fn marked_non_invocation_positions_refuse_through_real_typescript_parse() {
     let source = fixture("unsupported.ts");
-    for (label, name) in [("marked:type", "target"), ("marked:declaration", "declared")] {
+    for (label, name) in [
+        ("marked:type", "target"),
+        ("marked:declaration", "declared"),
+    ] {
         assert!(
             bind_direct_value_identifier(
                 "unsupported.ts",

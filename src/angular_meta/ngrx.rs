@@ -29,6 +29,10 @@ mod extract_selectors;
 mod extraction_metrics;
 pub(crate) mod legacy;
 pub(crate) mod selector_declarations;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_selector_reference_binding.rs"]
+mod selector_reference_binding_tests;
+pub(crate) mod selector_references;
 pub(crate) mod service_owners;
 mod shape;
 pub(crate) mod transitions;
@@ -273,6 +277,7 @@ pub struct DispatchSite {
 #[derive(Debug, Clone)]
 pub struct SelectSite {
     pub selector_name: String,
+    pub(crate) call_start: usize,
 }
 
 /// The complete NgRx shape extracted from a file.

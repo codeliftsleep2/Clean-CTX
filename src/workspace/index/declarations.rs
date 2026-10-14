@@ -70,8 +70,12 @@ impl WorkspaceIndex {
             }
         }
         declarations.sort_by(|a, b| {
-            (&a.domain, &a.entity_type, &a.name, &a.file)
-                .cmp(&(&b.domain, &b.entity_type, &b.name, &b.file))
+            (&a.domain, &a.entity_type, &a.name, &a.file).cmp(&(
+                &b.domain,
+                &b.entity_type,
+                &b.name,
+                &b.file,
+            ))
         });
         declarations
     }
