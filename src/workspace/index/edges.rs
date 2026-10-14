@@ -57,7 +57,7 @@ use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 pub(super) struct EdgeKey {
     /// The source occurrence that asserted the edge (`add_edges` file identity).
     /// Not part of semantic entity identity; not part of the semantic triple.
-    asserting_file: String,
+    pub(super) asserting_file: String,
     relation: SemanticRelation,
     subject_domain: String,
     subject_type: String,
@@ -79,7 +79,7 @@ pub(super) struct EdgeKey {
 
 impl EdgeKey {
     /// Build the occurrence key of `edge` as asserted by `asserting_file`.
-    fn new(asserting_file: &str, edge: &SemanticEdge) -> Self {
+    pub(super) fn new(asserting_file: &str, edge: &SemanticEdge) -> Self {
         Self {
             asserting_file: asserting_file.to_string(),
             relation: edge.relation,
@@ -154,7 +154,7 @@ pub(super) struct StoredEdge {
 }
 
 impl StoredEdge {
-    fn new(asserting_file: &str, edge: SemanticEdge) -> Self {
+    pub(super) fn new(asserting_file: &str, edge: SemanticEdge) -> Self {
         Self {
             asserting_file: asserting_file.to_string(),
             edge,
@@ -198,6 +198,14 @@ impl WorkspaceIndex {
 
         for mut edge in edges {
             self.total_edges_inserted += 1;
+
+            if edge.layer == crate::angular_meta::ngrx::direct_imports::REFINEMENT_LAYER {
+                self.ngrx_refinement_candidates
+                    .entry(file_path.to_string())
+                    .or_default()
+                    .push(edge);
+                continue;
+            }
 
             // Attach file provenance to subject/object if not already set.
             // This happens BEFORE the edge dedup check so entity occurrences
@@ -275,5 +283,6 @@ impl WorkspaceIndex {
                 }
             }
         }
+        self.rebuild_ngrx_import_refinements();
     }
 }

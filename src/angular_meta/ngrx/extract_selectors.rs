@@ -337,6 +337,7 @@ pub(super) fn extract_call_sites(
             //     `TOGGLE_PANEL`
             //   - Select / PipeSelect identifier or quoted literal
             //     (`selectAllUsers` / `'panelState'`) -> semantic value
+            let object_literal = kind == SiteKind::Dispatch && body.trim_start().starts_with('{');
             let site_name = match kind {
                 SiteKind::Dispatch => dispatch_action_name(&body),
                 SiteKind::Select | SiteKind::PipeSelect => select_selector_name(&body),
@@ -346,9 +347,11 @@ pub(super) fn extract_call_sites(
                 match kind {
                     SiteKind::Dispatch => {
                         dispatch_starts.push(abs_idx);
-                        shape
-                            .dispatch_sites
-                            .push(DispatchSite { action_name: name });
+                        shape.dispatch_sites.push(DispatchSite {
+                            action_name: name,
+                            call_start: abs_idx,
+                            object_literal,
+                        });
                     }
                     SiteKind::Select | SiteKind::PipeSelect => {
                         shape.select_sites.push(SelectSite {

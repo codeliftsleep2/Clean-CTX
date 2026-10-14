@@ -301,6 +301,19 @@ discriminant. Alias/module resolution, literal cases, and arbitrary standalone
 string authority remain separate. See
 [the resumed report](../../docs/plans/ISSUE_140B_LEGACY_TRANSITION_REPAIR.md).
 
+## #140 Slice 2 direct-relative legacy object dispatch
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyObjectDispatch.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This provider-disabled stdio MCP harness verifies the exact two-file
+`dispatch({type: SET_AUDIT})` authority chain. It covers ordinary and wrong-source
+constants, unsupported import forms, lexical shadowing, multiple Actions,
+authority/import lifecycle, deletion, and file-order convergence. Evidence is
+written beneath `target/ngrx-legacy-object-dispatch/`.
+
 ## #140c same-file constructor dispatch
 
 ```powershell

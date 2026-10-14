@@ -252,6 +252,8 @@ pub(crate) fn apply(
         {
             shape.dispatch_sites.push(super::DispatchSite {
                 action_name: action.clone(),
+                call_start: record.start_byte,
+                object_literal: false,
             });
         }
     }

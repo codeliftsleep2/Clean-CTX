@@ -47,6 +47,7 @@ use std::collections::{HashMap, HashSet};
 mod coverage;
 mod declarations;
 mod edges;
+mod ngrx_refinement;
 mod remove;
 mod traversal;
 
@@ -213,6 +214,12 @@ pub struct WorkspaceIndex {
     /// File → edge keys originating from that file (for precise edge cleanup
     /// on file recompilation or deletion). Populated alongside edge_set.
     file_edges: HashMap<String, Vec<EdgeKey>>,
+    /// Source-derived unresolved NgRx import carriers, owned by their
+    /// dispatch file. They are never query-visible semantic authority.
+    ngrx_refinement_candidates: HashMap<String, Vec<SemanticEdge>>,
+    /// Materialized occurrences derived from the current candidate and
+    /// declaration sets, rebuilt after every affected publication change.
+    ngrx_refined_edges: Vec<EdgeKey>,
     /// Entity name → entity keys (for name-based lookup across domains/types).
     /// Populated alongside the entities map during registration.
     name_index: HashMap<String, Vec<EntityKey>>,
@@ -240,6 +247,8 @@ impl WorkspaceIndex {
             file_map: HashMap::new(),
             file_declarations: HashMap::new(),
             file_edges: HashMap::new(),
+            ngrx_refinement_candidates: HashMap::new(),
+            ngrx_refined_edges: Vec::new(),
             name_index: HashMap::new(),
             semantic_coverage: HashMap::new(),
             total_edges_inserted: 0,

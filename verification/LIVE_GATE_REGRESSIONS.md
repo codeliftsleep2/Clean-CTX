@@ -134,6 +134,7 @@ coverage.
 | #140c constructor dispatch | 88/88 PASS | `target/ngrx-constructor-dispatch/20261013-123224-ed46b446/` | None |
 | #140d Service dispatch ownership | 84/84 PASS | `target/ngrx-service-dispatch/20261013-123804-97dfeaa6/` | None |
 | #140e Service select ownership | 52/52 PASS | `target/ngrx-service-select/20261014-101053-b72f19dd/` | None |
+| #140 Slice 2 direct-relative legacy object dispatch | 11/11 PASS | `target/ngrx-legacy-object-dispatch/20261014-130121-c2046049/` | None |
 | Invocation-evidence live MCP acceptance | 58/59 PASS | `target/invocation-evidence-verification/20261013-124145-6d1f1e80/` | LGR-003 |
 | Batched `provide_code_context` live acceptance | PASS | `target/provide-context-batch-verification/captures/verification-report.json` | None |
 | Batched `workspace_query` live acceptance | PASS | `target/workspace-query-batch-verification/captures/verification-report.json` | None |

@@ -23,6 +23,10 @@ use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
 pub(crate) mod constructors;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_direct_import_dispatch.rs"]
+mod direct_import_dispatch_tests;
+pub(crate) mod direct_imports;
 pub(crate) mod discriminants;
 mod extract;
 mod extract_selectors;
@@ -281,6 +285,8 @@ pub struct EntityAdapterDecl {
 #[derive(Debug, Clone)]
 pub struct DispatchSite {
     pub action_name: String,
+    pub(crate) call_start: usize,
+    pub(crate) object_literal: bool,
 }
 
 /// A store select call site.

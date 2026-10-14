@@ -155,7 +155,7 @@ pub(super) fn evaluate(
             );
             shape
                 .map(|shape| {
-                    let semantic_shape = context.invocation_evidence.map_or_else(
+                    let mut semantic_shape = context.invocation_evidence.map_or_else(
                         || {
                             let mut unsupported = shape.clone();
                             unsupported.select_sites.clear();
@@ -172,6 +172,9 @@ pub(super) fn evaluate(
                             )
                         },
                     );
+                    semantic_shape
+                        .dispatch_sites
+                        .retain(|site| !site.object_literal);
                     ngrx_edges = Some(crate::angular_meta::ngrx::service_owners::project(
                         semantic_shape,
                         &starts,
@@ -253,6 +256,13 @@ pub(super) fn evaluate(
         },
     );
     if ngrx_enabled {
+        if let Some(shape) = ngrx_shape.as_ref() {
+            semantic_edges.extend(crate::angular_meta::ngrx::direct_imports::candidates(
+                &context.path.to_string_lossy(),
+                context.source,
+                shape,
+            ));
+        }
         semantic_edges.extend(
             context
                 .ngrx_selector_declarations

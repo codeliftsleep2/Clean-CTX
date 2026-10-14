@@ -29,6 +29,7 @@ impl WorkspaceIndex {
             .keys()
             .chain(self.file_declarations.keys())
             .chain(self.file_edges.keys())
+            .chain(self.ngrx_refinement_candidates.keys())
             .chain(self.semantic_coverage.keys())
             .filter(|owner| crate::workspace::path_identity::is_within_root(owner, root))
             .cloned()
@@ -47,6 +48,7 @@ impl WorkspaceIndex {
     /// are inserted) or when a file is deleted from the workspace. Preserves all
     /// other files' edges and entities.
     pub fn remove_file(&mut self, file_path: &str) {
+        self.ngrx_refinement_candidates.remove(file_path);
         self.semantic_coverage.remove(file_path);
         self.remove_declarations_in_file(file_path);
         #[cfg(test)]
@@ -107,6 +109,7 @@ impl WorkspaceIndex {
                 }
             }
         }
+        self.rebuild_ngrx_import_refinements();
     }
 
     /// Drop the stored occurrence identified by `key` from both adjacency
@@ -116,7 +119,7 @@ impl WorkspaceIndex {
     /// file of `key` with the triple of `key` is removed. Entries asserted by
     /// other files, including entries carrying an identical triple, are
     /// preserved.
-    fn drop_occurrence(&mut self, key: &EdgeKey) {
+    pub(super) fn drop_occurrence(&mut self, key: &EdgeKey) {
         let subject_key = key.subject_key();
         if let Some(entries) = self.forward.get_mut(&subject_key) {
             entries.retain(|stored| !key.matches(&stored.asserting_file, &stored.edge));
