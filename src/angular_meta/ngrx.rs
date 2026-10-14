@@ -34,6 +34,9 @@ pub(crate) mod selector_declarations;
 mod selector_reference_binding_tests;
 pub(crate) mod selector_references;
 pub(crate) mod service_owners;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_service_select_ownership.rs"]
+mod service_select_ownership_tests;
 mod shape;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_store_receiver_qualification.rs"]
@@ -280,6 +283,7 @@ pub struct DispatchSite {
 #[derive(Debug, Clone)]
 pub struct SelectSite {
     pub selector_name: String,
+    pub(crate) service_owner: Option<String>,
 }
 
 /// The complete NgRx shape extracted from a file.

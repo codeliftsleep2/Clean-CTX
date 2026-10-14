@@ -6,6 +6,60 @@ use crate::ir::invocation_evidence::{DeclarationContextKind, InvocationOccurrenc
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeMap;
 
+pub(crate) struct AuthoritativeServiceOwner {
+    pub service: String,
+    pub class_span: SourceSpan,
+    pub method_span: SourceSpan,
+}
+
+/// Join exact callable context through syntax to its exact class, then require
+/// independent Angular Service authority for that same class declaration.
+pub(crate) fn authoritative_service_owner(
+    invocation: &InvocationOccurrence,
+    classes: &[ClassInitializerEvidence],
+    source: &str,
+) -> Option<AuthoritativeServiceOwner> {
+    let context = invocation.declaration_context()?;
+    if context.kind() != DeclarationContextKind::Callable {
+        return None;
+    }
+    let language = crate::compression::language::safe_typescript_language()?;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).ok()?;
+    let tree = parser.parse(source, None)?;
+    if tree.root_node().has_error() {
+        return None;
+    }
+    let declaration = context.declaration();
+    let method = tree
+        .root_node()
+        .named_descendant_for_byte_range(declaration.start_byte(), declaration.end_byte())?;
+    if method.kind() != "method_definition"
+        || method.start_byte() != declaration.start_byte()
+        || method.end_byte() != declaration.end_byte()
+    {
+        return None;
+    }
+    let body = method.parent().filter(|node| node.kind() == "class_body")?;
+    let owner = body
+        .parent()
+        .filter(|node| node.kind() == "class_declaration")?;
+    let class_span = SourceSpan::new(owner.start_byte(), owner.end_byte()).ok()?;
+    let class = classes
+        .iter()
+        .find(|class| class.class_span == class_span)?;
+    if crate::angular_meta::decorators::extract_graph_entries(&class.raw_class)?.1
+        != crate::angular_meta::decorators::ClassKind::Service
+    {
+        return None;
+    }
+    Some(AuthoritativeServiceOwner {
+        service: class.consumer.clone(),
+        class_span,
+        method_span: declaration,
+    })
+}
+
 pub(crate) const QUERY: &str = r#"
 (class_declaration body: (class_body (method_definition
     body: (statement_block (expression_statement (call_expression) @ngrx.service.call)))
@@ -62,29 +116,22 @@ pub(crate) fn collect(
             })?;
             let action = endpoint.action_name.as_ref()?;
             let canonical = endpoint.owner_name.as_ref()?;
-            let class = classes
-                .iter()
-                .find(|c| c.class_span == span(owner) && &c.consumer == canonical)?;
-            if crate::angular_meta::decorators::extract_graph_entries(&class.raw_class)?.1
-                != crate::angular_meta::decorators::ClassKind::Service
-            {
-                return None;
-            }
             let invocation = invocations.iter().find(|c| c.span() == span(call))?;
-            let context = invocation.declaration_context()?;
-            if context.kind() != DeclarationContextKind::Callable
-                || context.declaration() != span(method)
+            let service = authoritative_service_owner(invocation, classes, source)?;
+            if service.service.as_str() != canonical.as_str()
+                || service.class_span != span(owner)
+                || service.method_span != span(method)
             {
                 return None;
             }
             Some(ServiceDispatch {
                 start_byte: call.start_byte,
-                service: class.consumer.clone(),
+                service: service.service,
                 action: action.clone(),
                 file: file.into(),
                 source_hash: hash.clone(),
-                class_span: class.class_span,
-                method_span: span(method),
+                class_span: service.class_span,
+                method_span: service.method_span,
             })
         })
         .collect()

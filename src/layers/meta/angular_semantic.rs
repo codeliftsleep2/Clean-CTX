@@ -166,6 +166,7 @@ pub(super) fn evaluate(
                                 shape.clone(),
                                 invocations,
                                 context.ngrx_selector_declarations.unwrap_or(&[]),
+                                context.angular_initializers.unwrap_or(&[]),
                                 &context.path.to_string_lossy(),
                                 context.source,
                             )

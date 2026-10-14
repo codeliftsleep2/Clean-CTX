@@ -1,6 +1,7 @@
 //! Exact same-file Selector reference-to-declaration composition.
 
 use super::{NgRxShape, selector_declarations::SelectorDeclarationEvidence};
+use crate::angular_meta::inject_evidence::ClassInitializerEvidence;
 use crate::ir::invocation_evidence::{ArgumentQualifier, InvocationEvidenceView, WrittenCallee};
 
 /// Project only direct member `select` invocations whose receiver is an exact
@@ -9,6 +10,7 @@ pub(crate) fn admit(
     mut shape: NgRxShape,
     evidence: &InvocationEvidenceView<'_>,
     declarations: &[SelectorDeclarationEvidence],
+    classes: &[ClassInitializerEvidence],
     source_id: &str,
     source: &str,
 ) -> NgRxShape {
@@ -70,6 +72,10 @@ pub(crate) fn admit(
         };
         shape.select_sites.push(super::SelectSite {
             selector_name: declaration.name.clone(),
+            service_owner: super::service_owners::authoritative_service_owner(
+                call, classes, source,
+            )
+            .map(|owner| owner.service),
         });
     }
     shape

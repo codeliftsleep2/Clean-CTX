@@ -350,3 +350,19 @@ qualification, callbacks and select ownership remain separate. Existing modern
 fallback behavior is tested as preservation. Failures exit 1; evidence is under
 `target/ngrx-service-dispatch/<timestamp-guid>`. See
 [the ownership report](../../docs/plans/ISSUE_140D_SERVICE_DISPATCH_OWNERSHIP.md).
+
+## #140e Service select ownership
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceSelect.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+This provider-disabled stdio MCP harness verifies exact Angular Service →
+Selects → NgRx Selector ownership for the supported direct
+`this.<property>.select(<identifier>)` form. It covers independent Service,
+Store, and Selector authority falsifiers; multiple owners and targets;
+deduplication; neighboring classes; nested, callback, and static refusals;
+same-name file isolation; and refresh/removal/restoration/deletion lifecycle.
+Failures exit 1 and evidence is stored under
+`target/ngrx-service-select/<timestamp-guid>`.

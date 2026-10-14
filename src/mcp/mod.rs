@@ -118,6 +118,10 @@ mod ngrx_selector_reference_binding_tests;
 #[path = "../tests/mcp/ngrx_store_receiver_qualification.rs"]
 mod ngrx_store_receiver_qualification_tests;
 
+#[cfg(all(test, feature = "angular", feature = "typescript"))]
+#[path = "../tests/mcp/ngrx_service_select_ownership.rs"]
+mod ngrx_service_select_ownership_tests;
+
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/workspace_query_declarations_in_file.rs"]
 mod workspace_query_declarations_in_file_tests;

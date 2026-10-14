@@ -353,6 +353,7 @@ pub(super) fn extract_call_sites(
                     SiteKind::Select | SiteKind::PipeSelect => {
                         shape.select_sites.push(SelectSite {
                             selector_name: name,
+                            service_owner: None,
                         });
                     }
                 }
