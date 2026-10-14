@@ -111,3 +111,17 @@ the version but must preserve the frozen `oracle.json` hash.
 Do not modify this oracle during a scored run. A genuine oracle omission
 invalidates that run; update, independently review, refreeze as a new version,
 and run again under separate authorization.
+
+## Operator harness
+
+`Invoke-NgrxRecallBenchmark.ps1` implements the frozen provider-disabled public
+MCP protocol. It requires an already-built Clean-CTX binary and a clean Git
+checkout of the pinned corpus commit. The harness refuses a dirty or incorrectly
+pinned corpus, a dirty Clean-CTX checkout, oracle checksum drift, scope-count
+drift, missing public tools, or reused session state. It writes scored evidence
+only under `target/ngrx-recall-benchmark/`.
+
+The harness is intentionally not self-building and does not fetch source. Build
+and corpus acquisition remain explicit operator steps. Run it only after this
+file and the harness are committed, so the recorded Clean-CTX commit identifies
+the exact benchmark driver.
