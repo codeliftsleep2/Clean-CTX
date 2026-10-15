@@ -280,22 +280,23 @@ fn extract_reducer(
                 continue;
             }
             let after_on = &body[abs_on + "on(".len()..];
-            let action_name = after_on
-                .split(',')
-                .next()
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
+            let (on_body, end_offset) = crate::angular_meta::util::collect_call_body(after_on);
+            let arguments = crate::angular_meta::util::split_top_level(&on_body, ',');
 
             // Extract state summary (the handler body)
-            let state_summary = extract_state_summary(after_on);
+            let state_summary = extract_state_summary(&on_body);
 
-            if !action_name.is_empty() {
+            for action_name in arguments
+                .iter()
+                .take(arguments.len().saturating_sub(1))
+                .filter_map(|argument| exact_action_reference(argument))
+            {
                 transitions.push(ReducerTransition {
                     action_name,
-                    state_summary,
+                    state_summary: state_summary.clone(),
                 });
             }
-            on_search = abs_on + "on(".len() + 1;
+            on_search = abs_on + "on(".len() + end_offset;
         }
 
         if !name.is_empty() {
@@ -307,6 +308,28 @@ fn extract_reducer(
         }
         search_from = after_start + end_offset;
     }
+}
+
+fn exact_action_reference(argument: &str) -> Option<String> {
+    let written = argument.trim();
+    let mut parts = written.split('.');
+    let first = parts.next()?;
+    if !typescript_identifier(first) {
+        return None;
+    }
+    match (parts.next(), parts.next()) {
+        (None, None) => Some(first.to_owned()),
+        (Some(member), None) if typescript_identifier(member) => Some(written.to_owned()),
+        _ => None,
+    }
+}
+
+fn typescript_identifier(written: &str) -> bool {
+    let mut chars = written.chars();
+    chars
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || matches!(first, '_' | '$'))
+        && chars.all(|character| character.is_alphanumeric() || matches!(character, '_' | '$'))
 }
 
 /// Extract a state change summary from an `on()` handler.

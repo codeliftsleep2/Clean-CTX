@@ -180,7 +180,15 @@ fn relation_for(node: tree_sitter::Node<'_>, source: &[u8]) -> Option<SemanticRe
         let written = function.utf8_text(source).ok()?;
         return match written {
             "ofType" => Some(SemanticRelation::HandlesAction),
-            "on" if parent.named_child(0) == Some(node) => Some(SemanticRelation::TriggersReducer),
+            "on" if parent
+                .named_child_count()
+                .checked_sub(1)
+                .and_then(|index| u32::try_from(index).ok())
+                .and_then(|index| parent.named_child(index))
+                != Some(node) =>
+            {
+                Some(SemanticRelation::TriggersReducer)
+            }
             _ => None,
         };
     }

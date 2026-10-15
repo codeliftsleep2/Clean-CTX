@@ -474,3 +474,90 @@ fn namespace_member_retarget_revoke_and_restore_rebuilds_authority() {
     }
     assert_eq!(dispatch_count(), 1);
 }
+
+#[test]
+fn multi_action_on_refines_every_exact_action_declaration() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let actions = root.path().join("actions.ts");
+    let reducer = root.path().join("reducer.ts");
+    std::fs::write(
+        &actions,
+        "import { createAction } from '@ngrx/store';\n\
+         export const first = createAction('[Test] First');\n\
+         export const second = createAction('[Test] Second');\n\
+         export const third = createAction('[Test] Third');",
+    )
+    .expect("actions");
+    std::fs::write(
+        &reducer,
+        "import { createReducer, on } from '@ngrx/store';\n\
+         import { first, second, third } from './actions';\n\
+         const reduce = (state: object, action: object) => ({ ...state, ...action });\n\
+         export const auditReducer = createReducer(\n\
+           {},\n\
+           on(first, second, third, reduce)\n\
+         );",
+    )
+    .expect("reducer");
+    let state = state(root.path());
+    for path in [&reducer, &actions] {
+        publish(&state, root.path(), path);
+    }
+    let result = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(), "type": "reverse_edges",
+            "domain": "ngrx", "entity_type": "Reducer", "name": "auditReducer",
+            "file_path": reducer
+        }),
+    );
+    let mut names: Vec<_> = result["edges"]
+        .as_array()
+        .expect("edges")
+        .iter()
+        .filter(|edge| edge["relation"] == "TriggersReducer")
+        .map(|edge| edge["subject"]["name"].as_str().expect("name").to_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, ["first", "second", "third"]);
+    assert!(
+        result["edges"]
+            .as_array()
+            .expect("edges")
+            .iter()
+            .all(|edge| {
+                edge["relation"] != "TriggersReducer"
+                    || edge["subject"]["file"] == json!(actions.to_string_lossy())
+            })
+    );
+    assert!(
+        result["edges"]
+            .as_array()
+            .expect("edges")
+            .iter()
+            .all(|edge| {
+                edge["relation"] != "TriggersReducer" || edge["subject"]["name"] != "reduce"
+            })
+    );
+}
+
+#[test]
+fn unsupported_multi_action_expression_is_skipped_without_guessing() {
+    let source = "import { createReducer, on } from '@ngrx/store';\n\
+                  export const auditReducer = createReducer(\n\
+                    {},\n\
+                    on(first, wrapper(second), third, reduce)\n\
+                  );";
+    let shape =
+        crate::angular_meta::ngrx::extract_ngrx_shape(source, crate::compression::Fidelity::High)
+            .expect("NgRx shape");
+    let reducer = shape.reducer.expect("reducer");
+    let names: Vec<_> = reducer
+        .transitions
+        .iter()
+        .map(|transition| transition.action_name.as_str())
+        .collect();
+    assert_eq!(names, ["first", "third"]);
+}
