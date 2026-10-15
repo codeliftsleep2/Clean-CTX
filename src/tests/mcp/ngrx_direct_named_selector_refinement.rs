@@ -31,6 +31,21 @@ export class ProbeService {
 }
 "#;
 
+const PROPERTY_SERVICE: &str = r#"
+import { Injectable } from '@angular/core';
+import { Store, select } from '@ngrx/store';
+import { createEffect } from '@ngrx/effects';
+import { selectThing } from './selectors';
+@Injectable()
+export class ProbeService {
+  selected = createEffect(
+    () => this.store.pipe(select(selectThing)),
+    { dispatch: false }
+  );
+  constructor(private store: Store<unknown>) {}
+}
+"#;
+
 fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(&json!(140), tool, &json!({"arguments": arguments}), state);
@@ -136,6 +151,116 @@ fn direct_named_selector_import_preserves_exact_service_ownership() {
         edges[0]["object"]["file"],
         json!(selector.to_string_lossy())
     );
+}
+
+#[test]
+fn property_initializer_select_refines_with_exact_same_class_service_authority() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let selector = root.path().join("selectors.ts");
+    let service = root.path().join("service.ts");
+    std::fs::write(&selector, SELECTOR).expect("selector");
+    std::fs::write(&service, PROPERTY_SERVICE).expect("service");
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    publish(&state, root.path(), &service);
+    publish(&state, root.path(), &selector);
+    let edges = selects(&state, root.path(), &service, "Service", "ProbeService");
+    assert_eq!(edges.len(), 1, "{edges:?}");
+    assert_eq!(
+        edges[0]["object"]["file"],
+        json!(selector.to_string_lossy())
+    );
+}
+
+#[test]
+fn component_property_initializer_uses_the_exact_same_class_store() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let selector = root.path().join("selectors.ts");
+    let component = root.path().join("component.ts");
+    let source = CONSUMER.replace(
+        "read() { return this.store.pipe(select(selectThing)); }",
+        "selected = this.store.pipe(select(selectThing));",
+    );
+    std::fs::write(&selector, SELECTOR).expect("selector");
+    std::fs::write(&component, source).expect("component");
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    publish(&state, root.path(), &component);
+    publish(&state, root.path(), &selector);
+    let edges = selects(
+        &state,
+        root.path(),
+        &component,
+        "Component",
+        "ProbeComponent",
+    );
+    assert_eq!(edges.len(), 1, "{edges:?}");
+}
+
+#[test]
+fn unsafe_property_initializer_authority_shapes_fail_closed() {
+    let _serial = crate::protocol::handler_response_serial();
+    for (case, source) in [
+        (
+            "static",
+            PROPERTY_SERVICE.replace("  selected =", "  static selected ="),
+        ),
+        (
+            "undecorated",
+            PROPERTY_SERVICE.replace("@Injectable()\n", ""),
+        ),
+        (
+            "lookalike-store",
+            PROPERTY_SERVICE.replace(
+                "import { Store, select } from '@ngrx/store';",
+                "import { select } from '@ngrx/store';\nimport { Store } from './foreign';",
+            ),
+        ),
+        (
+            "ordinary-function",
+            PROPERTY_SERVICE.replace(
+                "() => this.store.pipe(select(selectThing))",
+                "function () { return this.store.pipe(select(selectThing)); }",
+            ),
+        ),
+        (
+            "other-class-property",
+            PROPERTY_SERVICE
+                .replace(
+                    "export class ProbeService {",
+                    "class StoreOwner { constructor(private store: Store<unknown>) {} }\n\
+                 export class ProbeService {",
+                )
+                .replace("  constructor(private store: Store<unknown>) {}", ""),
+        ),
+    ] {
+        let root = tempfile::tempdir().expect("workspace");
+        let selector = root.path().join("selectors.ts");
+        let service = root.path().join("service.ts");
+        std::fs::write(&selector, SELECTOR).expect("selector");
+        std::fs::write(&service, source).expect("service");
+        std::fs::write(root.path().join("foreign.ts"), "export class Store<T> {}")
+            .expect("foreign");
+        let mut config = crate::tests::test_config();
+        config
+            .additional_roots
+            .push(root.path().to_string_lossy().into_owned());
+        let state = crate::mcp::McpState::new(config);
+        publish(&state, root.path(), &selector);
+        publish(&state, root.path(), &service);
+        assert!(
+            selects(&state, root.path(), &service, "Service", "ProbeService").is_empty(),
+            "{case}",
+        );
+    }
 }
 
 #[test]
