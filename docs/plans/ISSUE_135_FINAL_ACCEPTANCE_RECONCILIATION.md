@@ -14,8 +14,10 @@
 > Exact projection, semantic generation 4, approved all-admitted-C#
 > source-reconstitution reconciliation, and bounded R135-D diagnostics are
 > implemented. The maintainer reported the complete focused command set green
-> after the final repairs. The authoritative final gate remains separate; see
-> `ISSUE_135_COMPLETE_RESIDUAL_REPAIR.md`.
+> after the final repairs, then reported the authoritative final gate and the
+> consolidated provider-disabled Issue #135 stdio harness green. See
+> `ISSUE_135_COMPLETE_RESIDUAL_REPAIR.md` for the completed implementation and
+> verification record.
 
 The DI ten-entry cap is repaired and permanently covered, but material original
 criteria remain unresolved: public C# skeleton fidelity, exact callee ownership,

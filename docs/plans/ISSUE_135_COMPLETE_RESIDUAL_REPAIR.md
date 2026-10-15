@@ -6,7 +6,7 @@
 
 ## 1. Executive verdict
 
-#135 COMPLETE RESIDUAL REPAIR — FOCUSED VERIFICATION GREEN
+#135 COMPLETE RESIDUAL REPAIR — ACCEPTANCE GREEN
 
 R135-C and R135-A are implemented and their focused commands were reported green
 by the maintainer. R135-B now has a C#-scoped owner/signature Method identity
@@ -14,7 +14,8 @@ plus approved source-reconstitution reconciliation across every admitted C#
 caller-bearing file. Additions, removals, signature changes, and ambiguity can
 establish or revoke exact calls independent of file order and warm history.
 Invocation evidence remains ephemeral. R135-D is implemented. The maintainer
-reported every focused command in section 12 green after the final repairs.
+reported every focused command in section 12, the authoritative final gate, and
+the consolidated provider-disabled stdio harness green after the final repairs.
 
 ## 2. Files changed
 
@@ -28,6 +29,8 @@ reported every focused command in section 12 green after the final repairs.
 - `src/mcp/tool_handlers/query.rs`
 - `src/mcp/tool_handlers/query/entities.rs`
 - `src/tests/mcp/workspace_query_file_diagnostics.rs`
+- `verification/issue-reconciliation/Invoke-Issue135Acceptance.ps1`
+- `verification/issue-reconciliation/README.md`
 - R135-D expectation updates in existing workspace-query tests
 - the previously reported R135-A/R135-C production, tests, and documentation
 
@@ -120,8 +123,7 @@ lifecycle. All three decisions are implemented within their approved scopes.
 
 ## 11. Remaining residuals
 
-No known implementation or focused-verification residual remains within
-R135-A/B/C/D. The authoritative final verification gate remains separate.
+No known implementation or verification residual remains within R135-A/B/C/D.
 
 ## 12. Focused verification reported green
 
@@ -138,11 +140,18 @@ The maintainer reported all commands above green on 2026-10-15. These are
 operator-run tracked-test results; the agent did not execute them. Focused
 success does not imply the authoritative final gate.
 
+The consolidated provider-disabled stdio harness covers cross-file exact-call
+order and mutation lifecycle, batch fidelity rejection, degradation
+serialization, and file-query diagnostics. The maintainer reported it PASS on
+2026-10-15. This is operator/live evidence rather than tracked-test authority.
+The maintainer also reported the authoritative final gate green.
+
 ## 13. Commands actually run
 
-Bounded `rg`, `Get-Content`, line counts, `scripts/check-file-sizes.ps1`,
-`git diff --check`, `git status --short`, and patch-based edits. The
-file-size guard passed after reporting only untouched legacy debt.
+Bounded `rg`, `Get-Content`, line counts, PowerShell parser validation,
+`scripts/check-file-sizes.ps1`, `git diff --check`, `git status --short`, and
+patch-based edits. The harness parsed successfully. The file-size guard passed
+after reporting only untouched legacy debt.
 
 Not run: Cargo test/check/build/Clippy/fmt, binaries, MCP servers, live scripts,
 benchmarks, providers/CBM, Claude pilots, final suites, or GitHub mutations.

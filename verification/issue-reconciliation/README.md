@@ -6,6 +6,24 @@ owned C#/TypeScript sources and a small controlled Git history under target/.
 Provider is explicitly disabled; nothing is built, installed, pushed or closed.
 It reuses the existing Phase B ProcessStartInfo/stdio session helper.
 
+## Issue #135 consolidated live acceptance
+
+`Invoke-Issue135Acceptance.ps1` exercises the production stdio MCP boundary for
+the four repaired #135 slices. It verifies C# exact-call reconciliation across
+cold file orders and warm mutation history, including signature changes,
+declaration removal/replacement, and newly introduced ambiguity. It also checks
+batch-level fidelity rejection, serialized C# degradation metadata, and bounded
+file-query diagnostics without unauthorized-path disclosure.
+
+The harness uses a current prebuilt binary and writes generated workspaces and
+captures beneath `target/issue-135-live-verification`. It does not replace the
+tracked Rust regressions or the authoritative final gate.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue135Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
 The independent NgRx Selector declaration query has a focused provider-disabled
 Windows harness. It verifies declaration-only, use-only, quoted-use,
 declaration-plus-use, ordinary-name, and modern Action controls through the
