@@ -1,4 +1,4 @@
-//! Independent top-level `createSelector` declarations; no reference resolution.
+//! Independent top-level NgRx Selector declarations; no reference resolution.
 use crate::compression::capture_pipeline::CapturedNode;
 use crate::ir::invocation_evidence::SourceSpan;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
@@ -56,7 +56,7 @@ pub(crate) fn collect(
             .insert(&capture.name, capture);
     }
     if captures.iter().any(|capture| {
-        capture.name == "ngrx.selector.alias_binding" && capture.raw_text == "createSelector"
+        capture.name == "ngrx.selector.alias_binding" && is_selector_factory(&capture.raw_text)
     }) {
         return Vec::new();
     }
@@ -64,20 +64,15 @@ pub(crate) fn collect(
         .values()
         .filter_map(|matched| {
             let name = matched.get("ngrx.selector.import_name")?;
-            (name.raw_text == "createSelector").then(|| {
+            is_selector_factory(&name.raw_text).then(|| {
                 (
+                    name.raw_text.as_str(),
                     matched.get("ngrx.selector.import_source").copied(),
                     matched.get("ngrx.selector.import").copied(),
                 )
             })
         })
         .collect();
-    let [(Some(module), Some(import))] = imports.as_slice() else {
-        return Vec::new();
-    };
-    if module.raw_text != "@ngrx/store" {
-        return Vec::new();
-    }
     let source_hash = crate::cache::content_hash(source.as_bytes());
     matches
         .values()
@@ -86,7 +81,20 @@ pub(crate) fn collect(
             let factory = matched.get("ngrx.selector.factory")?;
             let declaration = matched.get("ngrx.selector.declaration")?;
             let initializer = matched.get("ngrx.selector.initializer")?;
-            (factory.raw_text == "createSelector").then(|| SelectorDeclarationEvidence {
+            if !is_selector_factory(&factory.raw_text) {
+                return None;
+            }
+            let factory_imports: Vec<_> = imports
+                .iter()
+                .filter(|(imported, module, _)| {
+                    *imported == factory.raw_text
+                        && module.is_some_and(|module| module.raw_text == "@ngrx/store")
+                })
+                .collect();
+            let [(_, _, Some(import))] = factory_imports.as_slice() else {
+                return None;
+            };
+            Some(SelectorDeclarationEvidence {
                 file: file.into(),
                 source_hash: source_hash.clone(),
                 name: name.raw_text.clone(),
@@ -98,6 +106,10 @@ pub(crate) fn collect(
             })
         })
         .collect()
+}
+
+fn is_selector_factory(name: &str) -> bool {
+    matches!(name, "createSelector" | "createFeatureSelector")
 }
 
 impl SelectorDeclarationEvidence {

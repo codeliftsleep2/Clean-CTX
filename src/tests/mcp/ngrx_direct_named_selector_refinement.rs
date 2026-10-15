@@ -46,6 +46,13 @@ export class ProbeService {
 }
 "#;
 
+const FEATURE_SELECTOR: &str = r#"
+import { createFeatureSelector, createSelector } from '@ngrx/store';
+const state = (value: unknown) => value;
+export const selectOther = createSelector(state, value => value);
+export const selectThing = createFeatureSelector<unknown>('thing');
+"#;
+
 fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(&json!(140), tool, &json!({"arguments": arguments}), state);
@@ -177,6 +184,29 @@ fn property_initializer_select_refines_with_exact_same_class_service_authority()
 }
 
 #[test]
+fn direct_named_feature_selector_refines_to_the_exact_declaration() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let selector = root.path().join("selectors.ts");
+    let service = root.path().join("service.ts");
+    std::fs::write(&selector, FEATURE_SELECTOR).expect("selector");
+    std::fs::write(&service, PROPERTY_SERVICE).expect("service");
+    let mut config = crate::tests::test_config();
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    publish(&state, root.path(), &service);
+    publish(&state, root.path(), &selector);
+    let edges = selects(&state, root.path(), &service, "Service", "ProbeService");
+    assert_eq!(edges.len(), 1, "{edges:?}");
+    assert_eq!(
+        edges[0]["object"]["file"],
+        json!(selector.to_string_lossy())
+    );
+}
+
+#[test]
 fn component_property_initializer_uses_the_exact_same_class_store() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
@@ -270,6 +300,24 @@ fn unsupported_selector_imports_and_destinations_fail_closed() {
         (
             "ordinary",
             "export const selectThing = 123;",
+            CONSUMER.to_owned(),
+        ),
+        (
+            "feature-alias",
+            "import { createFeatureSelector as feature } from '@ngrx/store';\n\
+             export const selectThing = feature<unknown>('thing');",
+            CONSUMER.to_owned(),
+        ),
+        (
+            "foreign-feature-factory",
+            "import { createFeatureSelector } from './factory';\n\
+             export const selectThing = createFeatureSelector<unknown>('thing');",
+            CONSUMER.to_owned(),
+        ),
+        (
+            "ordinary-feature-function",
+            "function createFeatureSelector<T>(name: string): T { throw name; }\n\
+             export const selectThing = createFeatureSelector<unknown>('thing');",
             CONSUMER.to_owned(),
         ),
         (

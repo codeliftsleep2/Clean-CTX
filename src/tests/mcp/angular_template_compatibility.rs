@@ -12,8 +12,8 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        19,
-        "Exact one-hop NgRx re-export refinement advances the existing Angular/NgRx producer cohort"
+        20,
+        "Exact createFeatureSelector authority advances the existing Angular/NgRx producer cohort"
     );
     assert_eq!(
         crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION,
