@@ -325,12 +325,30 @@ After Edit/Verbatim context has supplied the exact tracked unit, use
 - `insert_after`; and
 - `insert_before`.
 
-Pass `workspaceRoot` and byte-exact `expectedOldText` where required. A stale
-rejection means the source changed: re-read, reassess, and retry with current
-evidence—never retry blindly.
+Pass `workspaceRoot`. Address an editable declaration with its language-derived
+signature selector, for example `Owner.method(type,...)`, whenever overloads or
+same-named declarations exist. Parameter-type spelling follows the source
+language's canonical syntax. A legacy `Owner.method` or bare name is accepted
+only when exactly one candidate remains; `ambiguous_target` is a refusal, never
+permission to select the first candidate.
 
-Use the host write tool for new files, signatures/renames, cross-file changes,
-or broader edits that do not fit those structural operations.
+For `replace_body`, pass the byte-exact tracked body as `expectedOldText`. For
+`delete`, prefer the byte-exact full declaration; the tracked body remains a
+compatibility guard. `insert_before` and `insert_after` use the same selector
+rules for `anchor`. Set `verify: true` when an exact applied-text receipt is
+useful.
+
+Treat `not_found`, `ambiguous_target`, and `uneditable_target` as distinct.
+An uneditable result means the declaration was found but lacks safe edit
+authority; do not substitute a nearby declaration. Leading documentation is
+included only when structured language evidence proves ownership. If ownership
+is unavailable, accept the refusal and use a host edit only after inspecting
+verbatim source and preserving the intended declaration boundary.
+
+A stale rejection means the source changed: re-read, reassess, and retry with
+current evidence—never retry blindly. Use the host write tool for new files,
+signatures/renames, cross-file changes, or broader edits that do not fit those
+structural operations.
 
 ---
 
