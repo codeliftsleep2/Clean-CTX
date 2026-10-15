@@ -6,17 +6,19 @@
 
 ## 1. Executive verdict
 
-**#137 COMPLETE REPAIR IMPLEMENTED — VERIFICATION REQUIRED**
+**#137 COMPLETE REPAIR — ACCEPTANCE GREEN**
 
 The original issue contract was recovered directly from GitHub. It contains no
 comments or later amendments. Every bounded acceptance residual is implemented
 inside the existing diff acquisition, snapshot, comparison, projection, and ref
 validation boundaries. No architectural approval gate was triggered.
 
-This verdict is not `ACCEPTANCE GREEN`: the operator-run bounded regressions and
-zero-warning Clippy gate are green, but the authoritative final gate has not
-been reported complete. Historical evidence for the unchanged semantic-
-signature slice remains separately identified from the new operator runs.
+The operator-run bounded regressions, zero-warning Clippy gate, and complete
+authoritative local final gate are GREEN. Historical evidence for the unchanged
+semantic-signature slice remains separately identified from the new operator
+runs. No additional live/user harness or Claude/model pilot is required because
+the original acceptance criteria are deterministically covered through the real
+MCP response boundary.
 
 ## 2. Original contract
 
@@ -245,14 +247,17 @@ attribute path only. It does not verify the new residual repairs.
   `cargo test --locked -p clean-ctx --lib --all-features
   semantic_signature_evidence_`. This establishes the wider Git diff surface,
   public #137 MCP loss metadata, and the retained semantic-signature controls.
+- the operator subsequently reported the complete authoritative local final
+  gate GREEN: formatting, all-target/all-feature zero-warning Clippy, workspace
+  tests, file-size validator tests and active-file validation, UTF-8 validation,
+  and the Rust encoding test.
 
 ### Not executed by Agent MaxHeadRoom
 
 Agent MaxHeadRoom did not start Cargo, binaries, servers, or verification
-scripts. The operator-run focused Cargo tests and Clippy results are recorded
-above. No full workspace test gate, formatting gate, file-size script, encoding
-script, Clean-CTX binary, MCP server, live harness, CBM/provider test, model
-pilot, or complete authoritative final gate has been reported.
+scripts. The operator-run focused and final-gate results are recorded above.
+No Clean-CTX binary, MCP server, separate live harness, CBM/provider test, or
+model pilot was run; none is required for this locally reproducible contract.
 
 ## 16. Cross-issue boundary audit
 
@@ -264,21 +269,17 @@ was introduced.
 
 ## 17. Remaining residuals
 
-No known bounded implementation residual from the original #137 acceptance
-contract remains. Verification remains outstanding. Unsupported declarations,
-compiler semantic equivalence, move linking, and full added/deleted source are
-declared non-goals rather than silently represented as complete.
+No known bounded implementation or verification residual from the original
+#137 acceptance contract remains. Unsupported declarations, compiler semantic
+equivalence, move linking, and full added/deleted source are declared non-goals
+rather than silently represented as complete.
 
 ## 18. Closure recommendation
 
-Do not close #137 yet. Run the focused regression commands and authoritative
-gate below. If all are green, the implemented matrix supports:
-
-**#137 COMPLETE REPAIR — ACCEPTANCE GREEN**
-
-No Claude/model-host pilot is currently required: all original acceptance
-criteria have deterministic local regressions and metadata assertions. A live
-pilot remains last-resort only if local MCP behavior diverges unexpectedly.
+#137 is closure-ready as **#137 COMPLETE REPAIR — ACCEPTANCE GREEN**. No
+Claude/model-host pilot or additional user verification harness is required:
+all original acceptance criteria have deterministic local regressions and
+metadata assertions through the real MCP response boundary.
 
 ## 19. Commands run
 
@@ -308,5 +309,5 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test --all-features encoding
 ```
 
-After successful focused and final verification, #137 would be closure-ready.
-Stop before GitHub mutation and before #138.
+Focused and final verification are GREEN; #137 is closure-ready. Stop before
+GitHub mutation and before #138.
