@@ -529,6 +529,7 @@ pub fn build_output_line(field_name: &str, alias: Option<&str>) -> String {
 
 /// Build a `Φmodel:<fieldName> [alias=…]` marker line for a `model()`
 /// signal field (Angular 17.1+).
+#[cfg(test)]
 pub fn build_model_line(field_name: &str, alias: Option<&str>) -> String {
     ModelLine { field_name, alias }.render()
 }

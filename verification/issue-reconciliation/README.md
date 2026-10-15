@@ -281,6 +281,25 @@ pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToke
 Generated Windows evidence is retained under `target/angular-inject-token/`; no
 CBM provider is started.
 
+## #138 consolidated residual acceptance
+
+Run after rebuilding the production binary from the complete #138 repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue138Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This single provider-disabled MCP stdio harness verifies the externally visible
+residual slices added after #138a/#138b: structured `input`, `input.required`,
+`output`, and two-sided `model` relationships; functional guard `inject` ownership;
+classic setter/definite-assignment member identity; distinct provider registration,
+`useClass`, `useFactory`, and `useValue` relations; negative twins; and registered
+refresh removal/replacement. It writes source oracles, binary provenance, raw MCP
+responses, and verdicts beneath `target/issue-138-live-verification`.
+
+The harness builds nothing, starts no CBM provider or model host, and does not
+replace tracked Rust regressions or the CI gate.
 ## #140 independent legacy class Action declarations
 
 ```powershell

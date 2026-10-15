@@ -112,6 +112,43 @@ pub(crate) fn classify_decorator(name: &str) -> DecoratorKind {
     }
 }
 
+fn canonical_member_name(declaration_head: &str) -> Option<String> {
+    let mut tokens = declaration_head.split_whitespace().peekable();
+    while tokens.peek().is_some_and(|token| {
+        matches!(
+            *token,
+            "public"
+                | "private"
+                | "protected"
+                | "readonly"
+                | "static"
+                | "declare"
+                | "abstract"
+                | "override"
+                | "accessor"
+        )
+    }) {
+        tokens.next();
+    }
+    if tokens
+        .peek()
+        .is_some_and(|token| matches!(*token, "get" | "set"))
+    {
+        tokens.next();
+    }
+    let token = tokens
+        .next()?
+        .split('(')
+        .next()?
+        .trim_end_matches(['?', '!']);
+    let mut characters = token.chars();
+    (characters
+        .next()
+        .is_some_and(|character| character.is_alphabetic() || matches!(character, '_' | '$'))
+        && characters
+            .all(|character| character.is_alphanumeric() || matches!(character, '_' | '$')))
+    .then(|| token.to_owned())
+}
 /// True when `c` can be part of a TypeScript identifier word.
 ///
 /// Shared by the scanners that must respect word boundaries — e.g.
@@ -180,15 +217,8 @@ pub(crate) fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option
                 i += 1;
             }
             let field_segment = body[field_start..i].trim();
-            let field_name = field_segment
-                .split_whitespace()
-                .next()
-                .unwrap_or("?")
-                .to_string();
-            let field_name = if field_name.is_empty() {
-                "?".to_string()
-            } else {
-                field_name
+            let Some(field_name) = canonical_member_name(field_segment) else {
+                continue;
             };
             let alias = parse_first_string_arg(&arg);
             out.push((k, alias, field_name));
@@ -196,3 +226,7 @@ pub(crate) fn collect_field_decorators(body: &str) -> Vec<(DecoratorKind, Option
     }
     out
 }
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/decorator_member_identity.rs"]
+mod member_identity_tests;

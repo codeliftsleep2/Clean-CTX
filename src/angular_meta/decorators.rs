@@ -4,8 +4,7 @@
 //
 // Given the raw text of a `class_declaration` capture, extract every
 // Angular decorator and emit one `Φ` marker line per class.
-// Also detects signal-based function calls (`input()`, `output()`,
-// `model()`) in the class body. Functional DI requires parser-owned evidence.
+// Signal/member relationships and functional DI require parser-owned evidence.
 //
 // # Strategy
 //
@@ -25,14 +24,13 @@ use crate::angular_meta::decorator_args::{
     parse_provided_in,
 };
 use crate::angular_meta::decorator_scan::{
-    DecoratorKind, collect_decorators, collect_field_decorators, is_word_byte,
+    DecoratorKind, collect_decorators, collect_field_decorators,
 };
 use crate::angular_meta::markers::{
     build_component_line, build_directive_line, build_injects_line, build_input_line,
-    build_model_line, build_module_line, build_output_line, build_pipe_line, build_service_line,
+    build_module_line, build_output_line, build_pipe_line, build_service_line,
 };
 use crate::compression::Fidelity;
-use crate::meta_util::consume_call_expression;
 
 /// The kind of Angular class that can be extracted from decorators.
 /// Used as a private extraction helper — not a shared architectural type.
@@ -63,7 +61,7 @@ pub struct DecoratorsResult {
 
 /// Extract every Angular decorator on the given class capture and
 /// emit the corresponding `Φ` marker lines. Returns `None` if no
-/// Angular decorator or signal-based API is present.
+/// Angular decorator is present.
 ///
 /// `raw_class` is the text of a `class_declaration` capture as
 /// produced by the TS capture pipeline.
@@ -72,11 +70,11 @@ pub struct DecoratorsResult {
 /// - `Low`    → only class-level summaries (`@Component`,
 ///   `@Injectable`, `@Directive`, `@Pipe`, `@NgModule`). No
 ///   field-level `@Input` / `@Output`, no `Φinjects:`, no
-///   signal-based lines.
+///   structured member semantic edges.
 /// - `Medium` → add field-level `@Input` / `@Output` markers; skip
 ///   `Φinjects:` (the class summary already shows the class).
 /// - `High`   → emit everything including `Φinjects:` and the
-///   modern signal lines and evidence-qualified functional DI lines.
+///   evidence-qualified DI lines.
 // F-ANG-12: use `?` since the enclosing function returns `Option`
 // (clippy::question_mark prefers `?` over `let-else` when both
 // apply). The pre-audit behaviour was to slice to `raw.len()` and
@@ -196,40 +194,7 @@ pub(crate) fn extract_decorators_with_inject_tokens(
         lines.push(line);
     }
 
-    // --- Phase 2.5b: Signal-based function calls ---
-    // Detect `input()`, `output()`, and `model()` function
-    // calls in the class body (Angular 17.1+ signal API). High
-    // fidelity only (F-ANG-23) — these are the most verbose lines.
-    // F-ANG-08: skip the body scan if no matching `}` is found.
-    if fidelity == Fidelity::High
-        && let Some(class_body_start) = find_class_body_open(raw_class)
-        && let Some(body_end) =
-            crate::meta_util::find_matching_brace(&raw_class[class_body_start..], '{')
-    {
-        let body = &raw_class[class_body_start..];
-        let body_inner = &body[..=body_end.min(body.len().saturating_sub(1))];
-        for sf in collect_signal_fields(body_inner) {
-            match sf.kind {
-                SignalKind::Input => {
-                    let mut line = build_input_line(&sf.name, sf.alias.as_deref());
-                    if !line.ends_with(" signal") {
-                        line.push_str(" signal");
-                    }
-                    input_output_lines.push(line);
-                }
-                SignalKind::Output => {
-                    let mut line = build_output_line(&sf.name, sf.alias.as_deref());
-                    if !line.ends_with(" signal") {
-                        line.push_str(" signal");
-                    }
-                    input_output_lines.push(line);
-                }
-                SignalKind::Model => {
-                    lines.push(build_model_line(&sf.name, sf.alias.as_deref()));
-                }
-            }
-        }
-    }
+    // Signal relationships are projected from parser-owned invocation and import evidence.
 
     // Emit inject() function calls.
     if fidelity == Fidelity::High && !inject_tokens.is_empty() {
@@ -260,102 +225,6 @@ pub(crate) fn extract_decorators_with_inject_tokens(
     }
 }
 
-// --- Phase 2.5b: Signal-based function calls ---
-
-/// Kind of signal-based Angular API function call detected in
-/// the class body.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SignalKind {
-    Input,
-    Output,
-    Model,
-}
-
-/// A detected signal-function call with its field name and optional alias.
-#[derive(Debug, Clone)]
-struct SignalField {
-    kind: SignalKind,
-    name: String,
-    alias: Option<String>,
-}
-
-/// Scan the class body for signal-based Angular function calls:
-/// `input()`, `output()`, `model()`.
-///
-/// These are `= funcName(...)` assignments at the field level. We scan
-/// for the pattern: `fieldName = funcName(...)`.
-fn collect_signal_fields(body: &str) -> Vec<SignalField> {
-    let mut out: Vec<SignalField> = Vec::new();
-    let bytes = body.as_bytes();
-    let len = bytes.len();
-    let mut i = 0;
-
-    while i < len {
-        if bytes[i] == b'=' {
-            let after_eq = i + 1;
-            let mut scan = after_eq;
-            while scan < len && (bytes[scan] == b' ' || bytes[scan] == b'\t') {
-                scan += 1;
-            }
-            if scan < len {
-                let (func_name, open_paren) =
-                    if scan + 5 < len && &bytes[scan..scan + 6] == b"input(" {
-                        ("input", scan + 5)
-                    } else if scan + 5 < len && &bytes[scan..scan + 6] == b"model(" {
-                        ("model", scan + 5)
-                    } else if scan + 6 < len && &bytes[scan..scan + 7] == b"output(" {
-                        ("output", scan + 6)
-                    } else {
-                        i += 1;
-                        continue;
-                    };
-
-                let kind = match func_name {
-                    "input" => SignalKind::Input,
-                    "output" => SignalKind::Output,
-                    "model" => SignalKind::Model,
-                    // This match is exhaustive — the if/else above only matches these three.
-                    // Fallback to `Input` with a debug_assert for development safety.
-                    _ => {
-                        debug_assert!(false, "Unhandled signal kind: {}", func_name);
-                        SignalKind::Input
-                    }
-                };
-
-                // F-ANG-09: if the call is unterminated, treat as no alias.
-                let arg = consume_call_expression(body, open_paren)
-                    .map(|(_, arg)| arg)
-                    .unwrap_or_default();
-                let alias = parse_first_string_arg(&arg);
-
-                // Walk backwards from `=` to find the field name.
-                let name_end = if i > 0 { i } else { 0 };
-                let mut name_start = name_end;
-                while name_start > 0 {
-                    if is_word_byte(bytes[name_start - 1]) {
-                        name_start -= 1;
-                    } else {
-                        break;
-                    }
-                }
-                let name = body[name_start..name_end].trim().to_string();
-                let name = if name.is_empty() {
-                    "?".to_string()
-                } else {
-                    name
-                };
-
-                out.push(SignalField { kind, name, alias });
-            }
-        }
-        i += 1;
-    }
-    out
-}
-
-// F-ANG-12: returns `None` if neither `class ` nor `{` is found (was
-// `raw.len()` — silently included the rest of the file as part of
-// the "head").
 fn find_class_head_end(raw: &str) -> Option<usize> {
     if let Some(pos) = raw.find("class ") {
         return Some(pos);
@@ -430,7 +299,7 @@ fn extract_class_name(raw: &str) -> Option<String> {
 /// Reuses the same field-decorator scanning logic as `extract_decorators`
 /// but returns structured data instead of Φ markers. Returns
 /// `Vec<(is_input: bool, field_name: String)>`.
-pub(crate) fn extract_io_fields(raw_class: &str, fidelity: Fidelity) -> Vec<(bool, String)> {
+pub(crate) fn extract_io_fields(raw_class: &str, _fidelity: Fidelity) -> Vec<(bool, String)> {
     let _head_end = match find_class_head_end(raw_class) {
         Some(e) => e,
         None => return Vec::new(),
@@ -455,17 +324,6 @@ pub(crate) fn extract_io_fields(raw_class: &str, fidelity: Fidelity) -> Vec<(boo
             DecoratorKind::Input => fields.push((true, field_name)),
             DecoratorKind::Output => fields.push((false, field_name)),
             _ => {}
-        }
-    }
-
-    // Collect signal-based fields (input(), output() calls) at High fidelity
-    if fidelity == Fidelity::High {
-        for sf in collect_signal_fields(body_inner) {
-            match sf.kind {
-                SignalKind::Input => fields.push((true, sf.name)),
-                SignalKind::Output => fields.push((false, sf.name)),
-                _ => {}
-            }
         }
     }
 

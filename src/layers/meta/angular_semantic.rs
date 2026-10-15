@@ -12,6 +12,7 @@ pub(super) struct ProjectionEvidence<'a> {
     routing: Option<Option<&'a crate::angular_meta::routing::RouteShape>>,
     is_angular: Option<bool>,
     initializers: Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    invocations: Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
 }
 
 pub(super) fn extract_non_testing_edges(
@@ -76,6 +77,12 @@ pub(super) fn extract_non_testing_edges(
                     fidelity,
                     &decl_types,
                 ));
+                let source_id = declaring_path
+                    .map(|path| path.to_string_lossy())
+                    .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
+                edges.extend(crate::angular_meta::provider_semantics::project(
+                    &source_id, source, class_name, kind,
+                ));
                 if let Some(path) = declaring_path
                     && let Some(edge) = crate::angular_meta::semantic::component_template_edge(
                         class_name, kind, raw_class, path,
@@ -85,6 +92,17 @@ pub(super) fn extract_non_testing_edges(
                 }
             }
         }
+    }
+
+    if let Some(invocations) = evidence.invocations {
+        let source_id = declaring_path
+            .map(|path| path.to_string_lossy())
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
+        edges.extend(crate::angular_meta::member_semantics::project(
+            &source_id,
+            source,
+            invocations,
+        ));
     }
 
     let ngrx_shape = match evidence.ngrx {
@@ -262,6 +280,7 @@ pub(super) fn evaluate(
             routing: Some(routing_shape.as_ref()),
             is_angular: precomputed_angular,
             initializers: context.angular_initializers,
+            invocations: context.invocation_evidence,
         },
     );
     if ngrx_enabled {

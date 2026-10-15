@@ -80,6 +80,14 @@ pub enum SemanticRelation {
     // ---- Angular ----
     /// Component injects a Service via constructor/DI.
     Injects,
+    /// An Angular declaration registers a provider token in its own scope.
+    RegistersProvider,
+    /// A proven provider token is implemented by a class reference.
+    ProviderUsesClass,
+    /// A proven provider token is produced by a factory reference.
+    ProviderUsesFactory,
+    /// A proven provider token is backed by a value reference or literal.
+    ProviderUsesValue,
     /// Component declares an `@Input` field.
     HasInput,
     /// Component declares an `@Output` field.

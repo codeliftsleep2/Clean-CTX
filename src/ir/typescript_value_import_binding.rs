@@ -29,6 +29,25 @@ pub(crate) fn bind_direct_named_value_import(
     source: &str,
     reference_span: SourceSpan,
 ) -> Option<ValueImportBinding> {
+    bind_named_value_import_with_scope(source_id, source, reference_span, true)
+}
+
+/// Bind one exact identifier occurrence to one unaliased value-space named
+/// import. Framework consumers interpret the returned module specifier.
+pub(crate) fn bind_named_value_import(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+) -> Option<ValueImportBinding> {
+    bind_named_value_import_with_scope(source_id, source, reference_span, false)
+}
+
+fn bind_named_value_import_with_scope(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+    relative_only: bool,
+) -> Option<ValueImportBinding> {
     let language = crate::compression::language::safe_typescript_language()?;
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&language).ok()?;
@@ -53,7 +72,13 @@ pub(crate) fn bind_direct_named_value_import(
     }
     let name = reference.utf8_text(source.as_bytes()).ok()?;
     let mut matches = Vec::new();
-    collect_imports(tree.root_node(), name, source.as_bytes(), &mut matches);
+    collect_imports(
+        tree.root_node(),
+        name,
+        source.as_bytes(),
+        relative_only,
+        &mut matches,
+    );
     let [module] = matches.as_slice() else {
         return None;
     };
@@ -175,6 +200,7 @@ fn collect_imports(
     node: tree_sitter::Node<'_>,
     name: &str,
     source: &[u8],
+    relative_only: bool,
     output: &mut Vec<String>,
 ) {
     if node.kind() == "import_statement" {
@@ -188,7 +214,9 @@ fn collect_imports(
             .child_by_field_name("source")
             .and_then(|string| string.named_child(0))
             .and_then(|fragment| fragment.utf8_text(source).ok())
-            .filter(|module| module.starts_with("./") || module.starts_with("../"))
+            .filter(|module| {
+                !relative_only || module.starts_with("./") || module.starts_with("../")
+            })
         else {
             return;
         };
@@ -197,7 +225,7 @@ fn collect_imports(
     }
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
-        collect_imports(child, name, source, output);
+        collect_imports(child, name, source, relative_only, output);
     }
 }
 

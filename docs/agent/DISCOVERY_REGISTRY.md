@@ -46,6 +46,24 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-035: Exported Angular Decorators Were Outside the Inner Class Node (#138)
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-15 |
+| **Environment** | Clean-CTX production compiler regressions and consolidated live MCP verification |
+| **Repository/context** | TypeScript Angular source using decorated exported Components and NgModules with signal members and provider registrations |
+| **Symptom** | Direct Angular projector tests were green, but the production compiler and live MCP path emitted no signal or provider edges for `@Component(...) export class ...` and `@NgModule(...) export class ...` declarations. |
+| **Root cause** | tree-sitter TypeScript owns decorators for exported declarations on the enclosing `export_statement`; the new signal and provider projectors inspected only decorators directly under the inner `class_declaration`. Invocation evidence and class identity were correct, but Angular declaration/provider authority was rejected at the final decorator join. |
+| **Classification** | Semantic / production integration |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/angular_meta/member_semantics.rs::structured_signals_reach_the_production_compiler_boundary`; `src/tests/angular_meta/provider_semantics.rs::provider_relations_reach_the_production_compiler_boundary` |
+| **Live scenario required?** | Yes — `verification/issue-reconciliation/Invoke-Issue138Acceptance.ps1` covers exported signals/providers and refresh replacement/removal through the production MCP binary. |
+| **Architectural invariant** | Decorator syntax classifies the declaration through its grammar-owned wrapper; declaration syntax remains the canonical class/member identity authority. |
+| **Status** | Verified — focused production regressions and all five consolidated Issue #138 live cases GREEN |
+
+**Resolution:** Angular provider and member-signal projection now share a structured decorator-owner join that accepts the class itself or its exact enclosing `export_statement`. No proximity scan, second symbol table, or spelling-based signal fallback was introduced. Passing live evidence is stored under `target/issue-138-live-verification/20261015-175047-f887030d`.
+
 ## DIS-2026-034: Angular Template Ownership, Structure, and Linkage Were Fragmented (#141 / #142 split)
 
 | Field | Value |

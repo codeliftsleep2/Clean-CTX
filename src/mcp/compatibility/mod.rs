@@ -331,6 +331,10 @@ mod angular_di_pipe_compatibility_tests;
 mod angular_di_inject_token_compatibility_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/angular_provider_compatibility.rs"]
+mod angular_provider_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../../tests/mcp/ngrx_legacy_declaration_compatibility.rs"]
 mod ngrx_legacy_declaration_compatibility_tests;
 
