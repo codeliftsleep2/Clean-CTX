@@ -40,6 +40,8 @@ pub struct UnitRecord {
     /// Structured declaration start for insertion. None when leading comment
     /// ownership cannot be established; never substitutes the body position.
     pub insert_before_byte: Option<u64>,
+    /// Truthful reason whole-declaration authority is absent.
+    pub declaration_blocker: Option<String>,
     /// Structural fingerprint: containing class + ordered parameter types.
     /// Two units may share a bare name; they must not share a fingerprint
     /// within one class unless they are true overloads (both remain valid,
@@ -57,6 +59,9 @@ pub enum LocateError {
         target: String,
         candidates: Vec<String>,
     },
+    /// Structured syntax proves the declaration exists, but the edit table
+    /// has no authoritative mutation boundary for its declaration kind.
+    Uneditable { target: String, target_kind: String },
 }
 
 impl std::fmt::Display for LocateError {
@@ -74,6 +79,10 @@ impl std::fmt::Display for LocateError {
                     candidates.join(", ")
                 )
             }
+            LocateError::Uneditable {
+                target,
+                target_kind,
+            } => write!(f, "unit `{target}` is not editable: {target_kind}"),
         }
     }
 }
@@ -93,8 +102,17 @@ struct PendingMeta {
 #[derive(Debug, Clone, Default)]
 pub struct UnitTable {
     units: Vec<UnitRecord>,
-    by_qualified: HashMap<String, usize>,
+    by_qualified: HashMap<String, Vec<usize>>,
+    by_signature: HashMap<String, Vec<usize>>,
     by_method_id: HashMap<String, usize>,
+    uneditable: Vec<UneditableRecord>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct UneditableRecord {
+    selector: String,
+    name: String,
+    kind: String,
 }
 
 impl UnitTable {
@@ -184,10 +202,45 @@ impl UnitTable {
                 text: text.clone(),
                 declaration_span: None,
                 insert_before_byte: None,
+                declaration_blocker: Some("declaration_boundary_unavailable".to_string()),
                 fingerprint,
             };
             let slot = table.units.len();
-            table.by_qualified.insert(qualified_name, slot);
+            table
+                .by_qualified
+                .entry(qualified_name.clone())
+                .or_default()
+                .push(slot);
+            table
+                .by_signature
+                .entry(format!(
+                    "{}({})",
+                    qualified_name,
+                    pending.param_types.join(",")
+                ))
+                .or_default()
+                .push(slot);
+            let base_name = method_base_name(&pending.name);
+            if base_name != pending.name {
+                let base_qualified = match &record.class_name {
+                    Some(owner) => format!("{owner}.{base_name}"),
+                    None => base_name.to_string(),
+                };
+                table
+                    .by_qualified
+                    .entry(base_qualified.clone())
+                    .or_default()
+                    .push(slot);
+                table
+                    .by_signature
+                    .entry(format!(
+                        "{}({})",
+                        base_qualified,
+                        pending.param_types.join(",")
+                    ))
+                    .or_default()
+                    .push(slot);
+            }
             table.by_method_id.insert(record.method_id.clone(), slot);
             table.units.push(record);
         }
@@ -213,23 +266,48 @@ impl UnitTable {
         let mut cursor = QueryCursor::new();
         let mut matches = cursor.matches(&compiled_query, tree.root_node(), source.as_bytes());
         let mut declarations = Vec::new();
+        let mut syntax_declarations = Vec::new();
 
         while let Some(query_match) = matches.next() {
             for capture in query_match.captures {
                 let capture_name = capture_names[capture.index as usize];
-                if !matches!(
+                if matches!(
+                    capture_name,
+                    "class.root"
+                        | "interface.root"
+                        | "record.root"
+                        | "struct.root"
+                        | "enum.root"
+                        | "method.root"
+                        | "constructor.root"
+                        | "func.root"
+                        | "field.root"
+                        | "type.root"
+                ) && let Some((selector, name)) = declaration_selector(capture.node, source)
+                {
+                    syntax_declarations.push((
+                        capture.node.start_byte() as u64,
+                        capture.node.end_byte() as u64,
+                        selector,
+                        name,
+                        capture.node.kind().to_string(),
+                    ));
+                }
+                if matches!(
                     capture_name,
                     "method.root" | "constructor.root" | "func.root" | "arrow.root"
                 ) {
-                    continue;
+                    let end = capture.node.end_byte();
+                    let start = declaration_start_with_metadata(capture.node, source);
+                    let insertion_start = (!has_unowned_leading_comment(capture.node, source))
+                        .then_some(start as u64);
+                    declarations.push((start as u64, end as u64, insertion_start));
                 }
-                let end = capture.node.end_byte();
-                let start = declaration_start_with_metadata(capture.node, source);
-                let insertion_start =
-                    (!has_unowned_leading_comment(capture.node, source)).then_some(start as u64);
-                declarations.push((start as u64, end as u64, insertion_start));
             }
         }
+        collect_test_callbacks(tree.root_node(), source, &mut syntax_declarations);
+        syntax_declarations.sort();
+        syntax_declarations.dedup();
 
         for unit in &mut table.units {
             let declaration = declarations
@@ -237,8 +315,33 @@ impl UnitTable {
                 .copied()
                 .filter(|(start, end, _)| *start <= unit.start_byte && *end == unit.end_byte)
                 .min_by_key(|(start, end, _)| end - start);
-            unit.declaration_span = declaration.map(|(start, end, _)| (start, end));
+            unit.declaration_span = declaration
+                .and_then(|(start, end, insertion_start)| insertion_start.map(|_| (start, end)));
             unit.insert_before_byte = declaration.and_then(|(_, _, start)| start);
+            unit.declaration_blocker = match declaration {
+                Some((_, _, Some(_))) => None,
+                Some((_, _, None)) => {
+                    Some("declaration_with_unproven_leading_documentation".to_string())
+                }
+                None => Some("declaration_boundary_unavailable".to_string()),
+            };
+        }
+        for (start, end, selector, name, kind) in syntax_declarations {
+            // A body-backed declaration remains an editable candidate even
+            // when a whole-declaration operation lacks comment ownership.
+            // Resolution selects the unit; the requested operation then
+            // reports its specific missing boundary as uneditable.
+            let editable = table
+                .units
+                .iter()
+                .any(|unit| unit.end_byte == end && unit.start_byte >= start);
+            if !editable {
+                table.uneditable.push(UneditableRecord {
+                    selector,
+                    name,
+                    kind,
+                });
+            }
         }
         Ok(table)
     }
@@ -258,28 +361,146 @@ impl UnitTable {
     /// Resolve a target to exactly one unit.
     ///
     /// Accepted key forms, in priority order:
-    /// 1. Qualified name (`"UserService.processOrder"`)
-    /// 2. Method alias id (`"M3"`)
-    /// 3. Bare name (`"processOrder"`) — only when unambiguous.
+    /// 1. Session-local method alias id (`"M3"`)
+    /// 2. Signature-qualified name (`"UserService.processOrder(string)"`)
+    /// 3. Qualified name (`"UserService.processOrder"`) when unique
+    /// 4. Bare name (`"processOrder"`) when unique.
     pub fn resolve(&self, target: &str) -> Result<&UnitRecord, LocateError> {
-        if let Some(&idx) = self.by_qualified.get(target) {
-            return Ok(&self.units[idx]);
-        }
         if let Some(&idx) = self.by_method_id.get(target) {
             return Ok(&self.units[idx]);
         }
-        let matches: Vec<&UnitRecord> = self.units.iter().filter(|u| u.name == target).collect();
-        match matches.len() {
-            0 => Err(LocateError::NotFound(target.to_string())),
-            1 => Ok(matches[0]),
+        if let Some(indices) = self.by_signature.get(target) {
+            return self.resolve_indices(target, indices);
+        }
+        let editable: Vec<usize> = self.by_qualified.get(target).cloned().unwrap_or_else(|| {
+            self.units
+                .iter()
+                .enumerate()
+                .filter_map(|(index, unit)| {
+                    (unit.name == target || method_base_name(&unit.name) == target).then_some(index)
+                })
+                .collect()
+        });
+        let uneditable: Vec<&UneditableRecord> = self
+            .uneditable
+            .iter()
+            .filter(|record| record.selector == target || record.name == target)
+            .collect();
+        match (editable.as_slice(), uneditable.as_slice()) {
+            ([index], []) => Ok(&self.units[*index]),
+            ([], [record]) => Err(LocateError::Uneditable {
+                target: target.to_string(),
+                target_kind: record.kind.clone(),
+            }),
+            ([], []) => Err(LocateError::NotFound(target.to_string())),
             _ => Err(LocateError::Ambiguous {
                 target: target.to_string(),
-                candidates: matches
+                candidates: editable
                     .iter()
-                    .map(|u| format!("{} [{}]", u.qualified_name, u.fingerprint))
+                    .map(|index| self.units[*index].selector())
+                    .chain(uneditable.iter().map(|record| record.selector.clone()))
                     .collect(),
             }),
         }
+    }
+
+    fn resolve_indices(&self, target: &str, indices: &[usize]) -> Result<&UnitRecord, LocateError> {
+        match indices {
+            [index] => Ok(&self.units[*index]),
+            _ => Err(LocateError::Ambiguous {
+                target: target.to_string(),
+                candidates: indices
+                    .iter()
+                    .map(|index| self.units[*index].selector())
+                    .collect(),
+            }),
+        }
+    }
+}
+impl UnitRecord {
+    fn selector(&self) -> String {
+        let parameters = self
+            .fingerprint
+            .strip_prefix(self.class_name.as_deref().unwrap_or(""))
+            .unwrap_or(&self.fingerprint);
+        format!("{}{}", self.qualified_name, parameters)
+    }
+}
+
+fn declaration_selector(node: tree_sitter::Node<'_>, source: &str) -> Option<(String, String)> {
+    let name = match node.kind() {
+        "operator_declaration" => "operator".to_string(),
+        "conversion_operator_declaration" => "conversion_operator".to_string(),
+        _ => node
+            .child_by_field_name("name")
+            .or_else(|| descendant_name(node))?
+            .utf8_text(source.as_bytes())
+            .ok()?
+            .trim()
+            .to_string(),
+    };
+    if name.is_empty() {
+        return None;
+    }
+    let mut ancestor = node.parent();
+    while let Some(candidate) = ancestor {
+        if matches!(
+            candidate.kind(),
+            "class_declaration"
+                | "abstract_class_declaration"
+                | "interface_declaration"
+                | "record_declaration"
+                | "struct_declaration"
+        ) && let Some(owner_node) = candidate.child_by_field_name("name")
+            && let Ok(owner) = owner_node.utf8_text(source.as_bytes())
+        {
+            return Some((format!("{}.{}", owner.trim(), name), name));
+        }
+        ancestor = candidate.parent();
+    }
+    Some((name.clone(), name))
+}
+
+fn method_base_name(name: &str) -> &str {
+    name.find('<')
+        .filter(|_| name.ends_with('>'))
+        .map_or(name, |index| &name[..index])
+}
+
+fn descendant_name<'tree>(node: tree_sitter::Node<'tree>) -> Option<tree_sitter::Node<'tree>> {
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        if let Some(name) = child.child_by_field_name("name") {
+            return Some(name);
+        }
+        if let Some(name) = descendant_name(child) {
+            return Some(name);
+        }
+    }
+    None
+}
+
+fn collect_test_callbacks(
+    node: tree_sitter::Node<'_>,
+    source: &str,
+    declarations: &mut Vec<(u64, u64, String, String, String)>,
+) {
+    if node.kind() == "call_expression"
+        && let Some(function) = node.child_by_field_name("function")
+        && let Ok(name) = function.utf8_text(source.as_bytes())
+        && matches!(name, "describe" | "it" | "test")
+    {
+        declarations.push((
+            node.start_byte() as u64,
+            node.end_byte() as u64,
+            name.to_string(),
+            name.to_string(),
+            "spec_test_callback".to_string(),
+        ));
+    }
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_test_callbacks(child, source, declarations);
     }
 }
 
@@ -312,8 +533,8 @@ fn is_declaration_metadata(kind: &str) -> bool {
 }
 
 /// A sibling comment is not a structured declaration-owned child. Refuse
-/// insertion when it borders the metadata group rather than guessing whether
-/// it is documentation. This does not change deletion or body replacement.
+/// whole-declaration edits when it borders the metadata group rather than
+/// guessing whether it is documentation. Body replacement remains available.
 fn has_unowned_leading_comment(mut node: tree_sitter::Node<'_>, source: &str) -> bool {
     while let Some(previous) = node.prev_named_sibling() {
         if !source[previous.end_byte()..node.start_byte()]

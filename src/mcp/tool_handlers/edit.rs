@@ -188,12 +188,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             Ok((ir, _, _)) => ir,
             Err(e) => return err_response(id, -32603, e.to_string(), None),
         };
-    let units = if operations.iter().any(|operation| {
-        matches!(
-            operation,
-            EditOperation::Delete { .. } | EditOperation::InsertBefore { .. }
-        )
-    }) {
+    let units = {
         let Some((language, query)) =
             crate::compression::language::language_for_extension(extension)
         else {
@@ -216,16 +211,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
                 );
             }
         }
-    } else {
-        UnitTable::from_instructions(&pre_compiled.instructions)
     };
-    if units.is_empty() {
-        let e = EditError::Locate(crate::edit::locate::LocateError::NotFound(String::from(
-            "no span-addressable units in current compile (file may have changed shape)",
-        )));
-        return err_response(id, -32602, e.to_string(), Some(e.structured()));
-    }
-
     // ── Verify + splice + gate (all in memory) ───────────────────────
     let report = match apply::apply(source, &units, &operations) {
         Ok(r) => r,
@@ -425,18 +411,9 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         })
         .collect();
     if verify {
-        for (entry, op) in ops_report.iter_mut().zip(operations.iter()) {
-            if let EditOperation::ReplaceBody { new_text, .. }
-            | EditOperation::InsertAfter {
-                unit_text: new_text,
-                ..
-            }
-            | EditOperation::InsertBefore {
-                unit_text: new_text,
-                ..
-            } = op
-            {
-                entry["newText"] = Value::String(new_text.clone());
+        for (entry, outcome) in ops_report.iter_mut().zip(report.operations.iter()) {
+            if let Some(applied_text) = &outcome.applied_text {
+                entry["newText"] = Value::String(applied_text.clone());
             }
         }
     }

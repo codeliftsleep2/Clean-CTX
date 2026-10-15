@@ -26,7 +26,8 @@ pub enum EditOperation {
     /// Replace the body of the named unit. `expected_old_text` must match
     /// the unit's current bytes exactly (optimistic-concurrency check).
     ReplaceBody {
-        /// Qualified unit name ("Class.method") or unambiguous bare name.
+        /// Signature-qualified unit name ("Class.method(type,...)") or a
+        /// legacy qualified/bare name that is unique in the current source.
         target: String,
         /// Byte-exact text the caller last saw for this unit's body.
         expected_old_text: String,
@@ -35,7 +36,7 @@ pub enum EditOperation {
     },
     /// Insert `unit_text` immediately after the anchor unit's span.
     InsertAfter {
-        /// Anchor unit the new text is placed relative to.
+        /// Signature-qualified anchor, or a legacy name that is unique.
         anchor: String,
         /// New unit text, spliced verbatim (caller supplies leading
         /// whitespace/newline as desired).
@@ -45,15 +46,16 @@ pub enum EditOperation {
     /// declaration start (including owned attributes/decorators), not its body.
     /// Reject when declaration placement or leading comment ownership is unknown.
     InsertBefore {
-        /// Anchor unit the new text is placed relative to.
+        /// Signature-qualified anchor, or a legacy name that is unique.
         anchor: String,
         /// New unit text, spliced verbatim.
         unit_text: String,
     },
-    /// Remove the named unit entirely. `expected_old_text` must match the
-    /// unit's current bytes exactly.
+    /// Remove the named declaration entirely. `expected_old_text` may match
+    /// the full declaration; the historical body-only form remains accepted
+    /// for compatibility when it matches the same tracked unit.
     Delete {
-        /// Qualified unit name or unambiguous bare name.
+        /// Signature-qualified unit name, or a legacy name that is unique.
         target: String,
         /// Byte-exact text the caller expects to remove.
         expected_old_text: String,
@@ -99,6 +101,10 @@ pub struct EditOutcome {
     /// Signed size change this operation contributed
     /// (new_len - old_len; insertions are positive, deletions negative).
     pub byte_delta: i64,
+    /// Exact bytes inserted by this operation after EOL/separator adaptation.
+    /// Internal receipt authority; omitted from direct serialization.
+    #[serde(skip)]
+    pub applied_text: Option<String>,
 }
 
 /// Upper bound for any single operation batch — keeps rejection paths

@@ -115,6 +115,23 @@ See [the repair report](../../docs/plans/ISSUE_136_INSERT_BEFORE_DECLARATION_REP
 for RED/GREEN evidence, the separately retained intermediate lifecycle failure,
 and remaining #136 criteria. This does not claim the entire issue is resolved.
 
+## #136 consolidated apply-edit acceptance
+
+Run after rebuilding the production binary from the complete #136 repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue136Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This CBM-disabled MCP stdio harness verifies the caller-visible signature selector
+contract for C# and TypeScript, unique legacy targeting, same-owner ambiguity,
+accessor and nested-owner discrimination, structured refusal taxonomy, exact
+verified receipts, insertion separation, full-declaration deletion, structured
+documentation refusal, atomicity, and stale-source no-write behavior. Evidence is
+written beneath `target/issue-136-live-verification`. It is operator/live evidence,
+not a substitute for the tracked Rust regressions or final gate.
+
 ## #137 semantic signature evidence regression
 
 ```powershell

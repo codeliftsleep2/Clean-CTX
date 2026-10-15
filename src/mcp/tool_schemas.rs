@@ -9,7 +9,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "replace_body" },
-                    "target": { "type": "string", "description": "Qualified structural unit to replace." },
+                    "target": { "type": "string", "description": "Signature-qualified structural unit, for example Owner.method(type,...). A legacy qualified or bare name is accepted only when unique." },
                     "expectedOldText": { "type": "string", "description": "Byte-exact unit text previously delivered to this session." },
                     "newText": { "type": "string", "description": "Complete replacement body text." }
                 },
@@ -19,8 +19,8 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "delete" },
-                    "target": { "type": "string", "description": "Qualified structural unit to delete." },
-                    "expectedOldText": { "type": "string", "description": "Byte-exact unit text previously delivered to this session." }
+                    "target": { "type": "string", "description": "Signature-qualified structural unit. A legacy qualified or bare name is accepted only when unique." },
+                    "expectedOldText": { "type": "string", "description": "Byte-exact full declaration text, or the legacy tracked body text for compatibility." }
                 },
                 "required": ["type", "target", "expectedOldText"]
             },
@@ -28,7 +28,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "insert_after" },
-                    "anchor": { "type": "string", "description": "Qualified structural unit after which to insert." },
+                    "anchor": { "type": "string", "description": "Signature-qualified anchor. A legacy qualified or bare name is accepted only when unique." },
                     "unitText": { "type": "string", "description": "Complete structural unit text to insert." }
                 },
                 "required": ["type", "anchor", "unitText"]
@@ -37,7 +37,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "insert_before" },
-                    "anchor": { "type": "string", "description": "Qualified structural unit before which to insert." },
+                    "anchor": { "type": "string", "description": "Signature-qualified anchor. A legacy qualified or bare name is accepted only when unique." },
                     "unitText": { "type": "string", "description": "Complete structural unit text to insert." }
                 },
                 "required": ["type", "anchor", "unitText"]

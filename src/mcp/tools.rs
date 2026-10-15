@@ -213,7 +213,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "filePath": { "type": "string", "description": "Absolute path to a previously-seen .ts, .cs, .rs, or .java file." },
                     "operations": {
                         "type": "array",
-                        "description": "Structural operations applied atomically (all-or-nothing). Each: {\"type\":\"replace_body\",\"target\":\"Class.method\",\"expectedOldText\":\"{...}\",\"newText\":\"{...}\"} | {\"type\":\"delete\",\"target\":..., \"expectedOldText\":...} | {\"type\":\"insert_after\",\"anchor\":\"Class.method\",\"unitText\":...} | {\"type\":\"insert_before\",...}. expectedOldText must byte-match the text this session last delivered for that unit.",
+                        "description": "Structural operations applied atomically (all-or-nothing). Each: {\"type\":\"replace_body\",\"target\":\"Class.method\",\"expectedOldText\":\"{...}\",\"newText\":\"{...}\"} | {\"type\":\"delete\",\"target\":..., \"expectedOldText\":...} | {\"type\":\"insert_after\",\"anchor\":\"Class.method\",\"unitText\":...} | {\"type\":\"insert_before\",...}. Replace-body expectedOldText matches the tracked body. Delete may use the full declaration text; the legacy body-only guard remains accepted for compatibility.",
                         "items": super::tool_schemas::apply_edit_operations()
                     },
                     "verify": { "type": "boolean", "description": "Optional. When true, echoes each replacement's new verbatim text back as a receipt. Default false." },
@@ -237,7 +237,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                                 },
                                 "target": {
                                     "type": "string",
-                                    "description": "Targeted unit name (replace_body/delete) or anchor unit (insert_after/insert_before)."
+                                    "description": "Targeted unit or anchor. Use a language-derived signature-qualified selector such as `Owner.method(type,...)` for overloads. Legacy `Owner.method` and bare names are accepted only when unique in the current source."
                                 },
                                 "startByte": {
                                     "type": "integer",

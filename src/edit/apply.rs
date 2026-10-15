@@ -41,7 +41,7 @@ pub enum EditError {
     /// The unit exists but its current text differs from what the caller
     /// expects. Snippets are bounded to `SNIPPET_BOUND` chars.
     #[error(
-        "unit `{target}` changed since last seen (expected {expected_len} bytes, actual {actual_len} bytes)"
+        "expectedOldText for unit `{target}` does not match its current tracked body (expected {expected_len} bytes, actual {actual_len} bytes)"
     )]
     Mismatch {
         target: String,
@@ -90,6 +90,18 @@ impl EditError {
                     "candidates": candidates,
                 })
             }
+            EditError::Locate(LocateError::Uneditable {
+                target,
+                target_kind,
+            }) => serde_json::json!({
+                "kind": "uneditable_target",
+                "target": target,
+                "targetKind": target_kind,
+            }),
+            EditError::Locate(LocateError::NotFound(target)) => serde_json::json!({
+                "kind": "not_found",
+                "target": target,
+            }),
             other => serde_json::json!({
                 "kind": "edit_rejected",
                 "error": other.to_string(),
@@ -152,12 +164,21 @@ pub fn apply(
                 target,
                 expected_old_text,
             } => {
-                verify_expected(target, &record.text, expected_old_text)?;
                 let (start, end) = record.declaration_span.ok_or_else(|| {
-                    EditError::Locate(LocateError::NotFound(format!(
-                        "{target} (full declaration span unavailable for delete)"
-                    )))
+                    EditError::Locate(LocateError::Uneditable {
+                        target: target.clone(),
+                        target_kind: record
+                            .declaration_blocker
+                            .clone()
+                            .unwrap_or_else(|| "declaration_boundary_unavailable".to_string()),
+                    })
                 })?;
+                let declaration = &source[start as usize..end as usize];
+                if eol_normalized(declaration) != eol_normalized(expected_old_text) {
+                    // Backward compatibility: callers that received the historical
+                    // body-only contract may still guard the same authoritative unit.
+                    verify_expected(target, &record.text, expected_old_text)?;
+                }
                 PlannedEdit {
                     kind: "delete",
                     target: target.clone(),
@@ -171,13 +192,17 @@ pub fn apply(
                 target: anchor.clone(),
                 start: record.end_byte,
                 end: record.end_byte,
-                new_text: to_unit_eol(unit_is_crlf(&record.text, source), unit_text),
+                new_text: insert_after_text(source, record, unit_text),
             },
             EditOperation::InsertBefore { anchor, unit_text } => {
                 let start = record.insert_before_byte.ok_or_else(|| {
-                    EditError::Locate(LocateError::NotFound(format!(
-                        "{anchor} (authoritative declaration insertion start unavailable; leading comment ownership may be unsupported)"
-                    )))
+                    EditError::Locate(LocateError::Uneditable {
+                        target: anchor.clone(),
+                        target_kind: record
+                            .declaration_blocker
+                            .clone()
+                            .unwrap_or_else(|| "declaration_boundary_unavailable".to_string()),
+                    })
                 })?;
                 PlannedEdit {
                     kind: "insert_before",
@@ -213,6 +238,37 @@ fn to_unit_eol(crlf: bool, text: &str) -> String {
         text.replace("\r\n", "\n").replace('\n', "\r\n")
     } else {
         text.replace("\r\n", "\n")
+    }
+}
+
+fn insert_after_text(
+    source: &str,
+    record: &crate::edit::locate::UnitRecord,
+    requested: &str,
+) -> String {
+    let crlf = unit_is_crlf(&record.text, source);
+    let requested = to_unit_eol(crlf, requested);
+    if requested.starts_with('\n') || requested.starts_with('\r') {
+        return requested;
+    }
+    let declaration_start = record
+        .declaration_span
+        .map(|(start, _)| start)
+        .unwrap_or(record.start_byte) as usize;
+    let line_start = source[..declaration_start]
+        .rfind('\n')
+        .map_or(0, |index| index + 1);
+    let prefix = &source[line_start..declaration_start];
+    let indentation = if prefix.chars().all(char::is_whitespace) {
+        prefix
+    } else {
+        ""
+    };
+    let eol = if crlf { "\r\n" } else { "\n" };
+    if requested.starts_with(char::is_whitespace) {
+        format!("{eol}{requested}")
+    } else {
+        format!("{eol}{indentation}{requested}")
     }
 }
 
@@ -301,6 +357,7 @@ fn splice(source: &str, mut planned: Vec<PlannedEdit>) -> Result<ApplyReport, Ed
             start_byte: edit.start,
             end_byte: edit.start + edit.new_text.len() as u64,
             byte_delta: delta,
+            applied_text: (edit.kind != "delete").then(|| edit.new_text.clone()),
         });
     }
 
