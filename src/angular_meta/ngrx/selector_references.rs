@@ -110,12 +110,12 @@ pub(crate) fn admit(
     shape
 }
 
-struct InitializerStoreAuthority {
-    type_reference: SourceSpan,
-    service_owner: Option<String>,
+pub(crate) struct InitializerStoreAuthority {
+    pub(crate) type_reference: SourceSpan,
+    pub(crate) service_owner: Option<String>,
 }
 
-fn initializer_store_authority(
+pub(crate) fn initializer_store_authority(
     call: &crate::ir::invocation_evidence::InvocationOccurrence,
     receiver_span: SourceSpan,
     classes: &[ClassInitializerEvidence],

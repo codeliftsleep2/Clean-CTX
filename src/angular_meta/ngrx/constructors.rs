@@ -254,6 +254,7 @@ pub(crate) fn apply(
                 action_name: action.clone(),
                 call_start: record.start_byte,
                 object_literal: false,
+                service_owner: None,
             });
         }
     }

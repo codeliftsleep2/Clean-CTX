@@ -166,7 +166,7 @@ fn public_authority_tracks_refresh_removal_restore_and_delete() {
 fn discriminant_authority_advances_only_angular_semantics() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        21
+        22
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);

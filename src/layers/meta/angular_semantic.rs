@@ -172,6 +172,15 @@ pub(super) fn evaluate(
                             )
                         },
                     );
+                    if let Some(invocations) = context.invocation_evidence {
+                        crate::angular_meta::ngrx::service_owners::admit_modern_initializer_dispatches(
+                            &mut semantic_shape,
+                            invocations,
+                            context.angular_initializers.unwrap_or(&[]),
+                            &context.path.to_string_lossy(),
+                            context.source,
+                        );
+                    }
                     semantic_shape
                         .dispatch_sites
                         .retain(|site| !site.object_literal);

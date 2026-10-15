@@ -246,10 +246,13 @@ impl NgRxShape {
             }
         }
 
-        // Component → Dispatches → Action (via `this.store.dispatch(...)`).
-        // Uses the actual component class as the subject when available.
+        // Angular owner → Dispatches → Action (via `this.store.dispatch(...)`).
+        // Exact Service authority is occurrence-local; otherwise retain the
+        // frozen Component/fallback projection.
         for site in &self.dispatch_sites {
-            let subject = if let Some(ref component) = self.component_name {
+            let subject = if let Some(ref service) = site.service_owner {
+                EntityRef::new("angular", "Service", service)
+            } else if let Some(ref component) = self.component_name {
                 EntityRef::new("angular", "Component", component)
             } else {
                 EntityRef::new("angular", "DispatchSite", "store")

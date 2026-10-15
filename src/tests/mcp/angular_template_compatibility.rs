@@ -12,8 +12,8 @@ export class HostComponent {}
 fn angular_template_semantics_increment_only_the_existing_angular_producer() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        21,
-        "Exact multi-action reducer enumeration advances the existing Angular/NgRx producer cohort"
+        22,
+        "Exact modern Service dispatch ownership advances the existing Angular/NgRx producer cohort"
     );
     assert_eq!(
         crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION,

@@ -351,6 +351,7 @@ pub(super) fn extract_call_sites(
                             action_name: name,
                             call_start: abs_idx,
                             object_literal,
+                            service_owner: None,
                         });
                     }
                     SiteKind::Select | SiteKind::PipeSelect => {

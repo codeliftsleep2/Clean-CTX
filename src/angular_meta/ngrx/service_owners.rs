@@ -2,7 +2,10 @@
 use super::constructors::ConstructorDispatch;
 use crate::angular_meta::inject_evidence::ClassInitializerEvidence;
 use crate::compression::capture_pipeline::CapturedNode;
-use crate::ir::invocation_evidence::{DeclarationContextKind, InvocationOccurrence, SourceSpan};
+use crate::ir::invocation_evidence::{
+    ArgumentQualifier, DeclarationContextKind, InvocationEvidenceView, InvocationOccurrence,
+    SourceSpan, WrittenCallee,
+};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeMap;
 
@@ -58,6 +61,67 @@ pub(crate) fn authoritative_service_owner(
         class_span,
         method_span: declaration,
     })
+}
+
+/// Attach Service ownership to modern action-creator dispatch occurrences in
+/// non-static property initializers. The generic TypeScript `this` binder
+/// remains method-only; this is the bounded NgRx initializer authority path.
+pub(crate) fn admit_modern_initializer_dispatches(
+    shape: &mut super::NgRxShape,
+    evidence: &InvocationEvidenceView<'_>,
+    classes: &[ClassInitializerEvidence],
+    source_id: &str,
+    source: &str,
+) {
+    let source_hash = crate::cache::content_hash(source.as_bytes());
+    for site in &mut shape.dispatch_sites {
+        if site.object_literal {
+            continue;
+        }
+        let Some(call) = evidence
+            .occurrences()
+            .iter()
+            .find(|call| call.span().start_byte() == site.call_start)
+        else {
+            continue;
+        };
+        let WrittenCallee::Member { receiver, terminal } = call.callee() else {
+            continue;
+        };
+        if evidence.slice(*terminal).ok() != Some("dispatch") {
+            continue;
+        }
+        let [argument] = call.arguments() else {
+            continue;
+        };
+        if argument.qualifier() != &ArgumentQualifier::Plain {
+            continue;
+        }
+        let Some(authority) = super::selector_references::initializer_store_authority(
+            call, *receiver, classes, None, source,
+        ) else {
+            continue;
+        };
+        let Some(service) = authority.service_owner else {
+            continue;
+        };
+        let Some(store_import) =
+            crate::ir::typescript_type_import_binding::bind_type_reference_to_named_import(
+                source_id,
+                source,
+                authority.type_reference,
+            )
+        else {
+            continue;
+        };
+        if store_import.source_id() == source_id
+            && store_import.source_hash() == source_hash
+            && store_import.imported_symbol_name() == "Store"
+            && store_import.module_specifier() == "@ngrx/store"
+        {
+            site.service_owner = Some(service);
+        }
+    }
 }
 
 pub(crate) const QUERY: &str = r#"

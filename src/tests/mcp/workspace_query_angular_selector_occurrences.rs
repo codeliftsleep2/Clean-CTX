@@ -374,7 +374,7 @@ fn refresh_and_selector_changes_do_not_reuse_stale_results() {
 fn exact_selector_binding_advances_only_the_angular_semantic_generation() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        21
+        22
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
 }

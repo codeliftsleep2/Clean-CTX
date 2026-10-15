@@ -288,6 +288,7 @@ pub struct DispatchSite {
     pub action_name: String,
     pub(crate) call_start: usize,
     pub(crate) object_literal: bool,
+    pub(crate) service_owner: Option<String>,
 }
 
 /// A store select call site.
