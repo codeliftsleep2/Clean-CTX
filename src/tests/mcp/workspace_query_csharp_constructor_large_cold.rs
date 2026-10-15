@@ -15,12 +15,7 @@ fn dispatch(
     arguments: serde_json::Value,
 ) -> serde_json::Value {
     crate::protocol::captured_responses().clear();
-    dispatch_tools_call(
-        &json!(1),
-        tool,
-        &json!({ "arguments": arguments }),
-        state,
-    );
+    dispatch_tools_call(&json!(1), tool, &json!({ "arguments": arguments }), state);
     pop_response()
 }
 
@@ -45,14 +40,14 @@ fn issue_133_large_cold_reverse_query_finds_every_constructor_consumer() {
 
     let mut expected = BTreeSet::new();
     for index in 0..CONSUMER_COUNT {
-        let directory = root.path().join(format!("group{}", index % DIRECTORY_COUNT));
+        let directory = root
+            .path()
+            .join(format!("group{}", index % DIRECTORY_COUNT));
         std::fs::create_dir_all(&directory).expect("consumer directory");
         let name = format!("ColdConsumer{index:03}");
         std::fs::write(
             directory.join(format!("{name}.cs")),
-            format!(
-                "public sealed class {name} {{ public {name}({CONTRACT} dependency) {{}} }}\n"
-            ),
+            format!("public sealed class {name} {{ public {name}({CONTRACT} dependency) {{}} }}\n"),
         )
         .expect("consumer fixture");
         expected.insert(name);

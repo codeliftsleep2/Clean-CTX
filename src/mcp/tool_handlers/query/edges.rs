@@ -68,6 +68,26 @@ fn try_prepare_forward_edges(
         context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
     if hydration.is_complete()
         && let Some(exact) = identity.exact()
+        && exact.domain == "dotnet"
+        && exact.entity_type == "TestClass"
+    {
+        let targets = {
+            let index = state.workspace_index_read();
+            super::dotnet_testing::candidate_targets_for_test(
+                state,
+                &index,
+                scope.as_ref(),
+                &exact.name,
+            )
+        };
+        for target in targets {
+            let target_hydration =
+                context.hydrate(state, "reverse_edges", &target, workspace_root, requirement)?;
+            hydration.merge(target_hydration);
+        }
+    }
+    if hydration.is_complete()
+        && let Some(exact) = identity.exact()
         && exact.domain == "builtin"
         && exact.entity_type == "Class"
     {
@@ -113,6 +133,14 @@ fn try_prepare_forward_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let dotnet_testing_catalog = (classification_complete
+        && identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "TestClass"))
+    .then(|| {
+        let index = state.workspace_index_read();
+        super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+    });
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
         super::angular_templates::Catalog::build(
@@ -139,6 +167,18 @@ fn try_prepare_forward_edges(
         let stored_count = edges.len();
         if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
             edges.extend(catalog.forward(&exact.domain, &exact.entity_type, &exact.name));
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), dotnet_testing_catalog.as_ref()) {
+            edges.extend(
+                serde_json::to_value(catalog.forward(
+                    &exact.domain,
+                    &exact.entity_type,
+                    &exact.name,
+                ))
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default(),
+            );
         }
         let count = edges.len();
         let mut structured = serde_json::json!({
@@ -237,6 +277,13 @@ fn try_prepare_reverse_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let dotnet_testing_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "Class")
+        .then(|| {
+            let index = state.workspace_index_read();
+            super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+        });
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
         super::angular_templates::Catalog::build(
@@ -263,6 +310,18 @@ fn try_prepare_reverse_edges(
         let stored_count = edges.len();
         if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
             edges.extend(catalog.reverse(&exact.domain, &exact.entity_type, &exact.name));
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), dotnet_testing_catalog.as_ref()) {
+            edges.extend(
+                serde_json::to_value(catalog.reverse(
+                    &exact.domain,
+                    &exact.entity_type,
+                    &exact.name,
+                ))
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default(),
+            );
         }
         let count = edges.len();
         let mut structured = serde_json::json!({

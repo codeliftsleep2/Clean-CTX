@@ -29,6 +29,7 @@ impl TypeKind {
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct Declaration {
     kind: TypeKind,
+    file: String,
     path: Vec<String>,
     name: String,
     arity: usize,
@@ -80,10 +81,11 @@ impl Catalog {
             catalog.add_file(file, &source);
         }
         catalog.declarations.sort_by(|left, right| {
-            (&left.path, left.arity, left.kind.entity_type()).cmp(&(
+            (&left.path, left.arity, left.kind.entity_type(), &left.file).cmp(&(
                 &right.path,
                 right.arity,
                 right.kind.entity_type(),
+                &right.file,
             ))
         });
         catalog.declarations.dedup();
@@ -128,6 +130,18 @@ impl Catalog {
         written.sort();
         written.dedup();
         written
+    }
+
+    pub(super) fn unique_class_declaration_file(&self, written: &str) -> Option<&str> {
+        let terminal = terminal_lookup_name(written)?;
+        let mut matches = self.declarations.iter().filter(|declaration| {
+            declaration.kind == TypeKind::Class && declaration.name == terminal
+        });
+        let declaration = matches.next()?;
+        matches
+            .next()
+            .is_none()
+            .then_some(declaration.file.as_str())
     }
 
     fn add_file(&mut self, file: &str, source: &str) {
@@ -258,6 +272,7 @@ fn visit_type(
     path.push(name.clone());
     catalog.declarations.push(Declaration {
         kind,
+        file: file.to_string(),
         path,
         name: name.clone(),
         arity,

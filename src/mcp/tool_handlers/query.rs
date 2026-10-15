@@ -62,6 +62,7 @@ mod content;
 mod coverage;
 mod csharp_resolution;
 mod diagnostics;
+mod dotnet_testing;
 mod edges;
 mod entities;
 mod graph;

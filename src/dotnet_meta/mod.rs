@@ -25,7 +25,7 @@
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 2;
 
 pub mod aspnet;
 pub mod automapper;
@@ -238,7 +238,7 @@ fn evaluate_applicable_source(
                 fidelity,
             ));
         }
-        if testing_enabled && let Some(edge) = testing::extract_testing_semantic_edge(raw_class) {
+        if testing_enabled && let Some(edge) = testing::extract_testing_declaration(raw_class) {
             semantic_edges.push(edge);
         }
     }
@@ -336,7 +336,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                 .unwrap_or(true);
             if testing_enabled
                 && let Some(edge) =
-                    crate::dotnet_meta::testing::extract_testing_semantic_edge(raw_class)
+                    crate::dotnet_meta::testing::extract_testing_declaration(raw_class)
             {
                 edges.push(edge);
             }

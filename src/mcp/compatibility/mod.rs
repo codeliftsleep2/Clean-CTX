@@ -314,6 +314,10 @@ mod tests;
 #[path = "../../tests/mcp/angular_template_compatibility.rs"]
 mod angular_template_compatibility_tests;
 
+#[cfg(all(test, feature = "dotnet"))]
+#[path = "../../tests/mcp/dotnet_test_subject_compatibility.rs"]
+mod dotnet_test_subject_compatibility_tests;
+
 #[cfg(all(test, feature = "angular"))]
 #[path = "../../tests/mcp/framework_publication_compatibility.rs"]
 mod framework_publication_compatibility_tests;
