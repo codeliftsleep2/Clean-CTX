@@ -109,7 +109,22 @@ coverage.
 - **Repair requirements:** Change production behavior, add a tracked regression
   under `src/tests/**`, rerun the focused legacy-action gates, and then rerun
   applicable aggregate verification.
-- **Status:** Open; repair deferred until the live-gate sequence is complete.
+- **Tracked regressions:**
+  `src/tests/angular_meta/ngrx_legacy_discriminant.rs`,
+  `src/tests/mcp/ngrx_legacy_transition_matrix.rs`, and
+  `src/tests/mcp/ngrx_legacy_object_dispatch.rs` establish declaration
+  ownership, exact reducer-transition identity, and exact imported
+  discriminant dispatch authority.
+- **Repair evidence:** The focused legacy-transition harness passed 80/80 at
+  `target/ngrx-legacy-transitions/20261014-113252-c8a075b4/`. The committed
+  replacement recall benchmark passed every relation at
+  `target/ngrx-recall-benchmark/20261015-040208-69239c88/`: Dispatches 20/20,
+  Selects 21/21, HandlesAction 22/22, and TriggersReducer 21/21. The frozen
+  oracle checksum remained
+  `64f30ff5eafaab5da0a28ba3aeed8d444e5d1e0daf43a1b11b56784061b35171`.
+- **Status:** Fixed and verified. The original reconciliation capture remains
+  historical RED evidence; tracked regressions, focused operator verification,
+  the complete repository gate, and the frozen recall benchmark are green.
 
 ## Gate record
 
@@ -135,6 +150,7 @@ coverage.
 | #140d Service dispatch ownership | 84/84 PASS | `target/ngrx-service-dispatch/20261013-123804-97dfeaa6/` | None |
 | #140e Service select ownership | 52/52 PASS | `target/ngrx-service-select/20261014-101053-b72f19dd/` | None |
 | #140 Slice 2 direct-relative legacy object dispatch | 11/11 PASS | `target/ngrx-legacy-object-dispatch/20261014-130121-c2046049/` | None |
+| #140 frozen replacement recall benchmark | All relations PASS: Dispatches 20/20, Selects 21/21, HandlesAction 22/22, TriggersReducer 21/21 | `target/ngrx-recall-benchmark/20261015-040208-69239c88/` | None; one additional real Selects relationship is outside the frozen oracle and retained for manual review |
 | Invocation-evidence live MCP acceptance | 58/59 PASS | `target/invocation-evidence-verification/20261013-124145-6d1f1e80/` | LGR-003 |
 | Batched `provide_code_context` live acceptance | PASS | `target/provide-context-batch-verification/captures/verification-report.json` | None |
 | Batched `workspace_query` live acceptance | PASS | `target/workspace-query-batch-verification/captures/verification-report.json` | None |
