@@ -32,21 +32,26 @@ impl WorkspaceIndex {
             let Some(module) = imported_entity.file.as_deref() else {
                 continue;
             };
-            let Some(target) = resolve_typescript_module(&asserting_file, module) else {
+            let Some(import_target) = resolve_typescript_module(&asserting_file, module) else {
                 continue;
             };
-            let declarations = self.declarations_by_identity(
-                imported_entity.domain,
-                imported_entity.entity_type,
-                &imported_entity.name,
-            );
-            if declarations
-                .iter()
-                .filter(|declaration| declaration.file.as_deref() == Some(target.as_str()))
-                .count()
-                != 1
-                || !exports_const(&target, &imported_entity.name)
-            {
+            let target = if self.has_exact_exported_declaration(imported_entity, &import_target) {
+                import_target
+            } else {
+                let Some(next_module) =
+                    one_hop_named_reexport(&import_target, &imported_entity.name)
+                else {
+                    continue;
+                };
+                let Some(target) = resolve_typescript_module(&import_target, &next_module) else {
+                    continue;
+                };
+                if !self.has_exact_exported_declaration(imported_entity, &target) {
+                    continue;
+                }
+                target
+            };
+            if target == asserting_file {
                 continue;
             }
             edge.subject.file = Some(asserting_file.clone());
@@ -61,6 +66,19 @@ impl WorkspaceIndex {
             edge.layer = "ngrx";
             self.insert_refined_edge(&asserting_file, edge);
         }
+    }
+
+    fn has_exact_exported_declaration(
+        &self,
+        entity: &crate::layers::meta::semantic::EntityRef,
+        target: &str,
+    ) -> bool {
+        self.declarations_by_identity(entity.domain, entity.entity_type, &entity.name)
+            .iter()
+            .filter(|declaration| declaration.file.as_deref() == Some(target))
+            .count()
+            == 1
+            && exports_const(target, &entity.name)
     }
 
     fn insert_refined_edge(&mut self, asserting_file: &str, edge: SemanticEdge) {
@@ -85,6 +103,109 @@ impl WorkspaceIndex {
             .push(StoredEdge::new(asserting_file, edge));
         self.ngrx_refined_edges.push(key);
     }
+}
+
+fn one_hop_named_reexport(path: &str, name: &str) -> Option<String> {
+    let source = std::fs::read_to_string(path).ok()?;
+    let language = crate::compression::language::safe_typescript_language()?;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).ok()?;
+    let tree = parser.parse(&source, None)?;
+    if tree.root_node().has_error() {
+        return None;
+    }
+    let root = tree.root_node();
+    let source_bytes = source.as_bytes();
+    if exported_local_occurrences(root, name, source_bytes) != 1 {
+        return None;
+    }
+    let mut modules = Vec::new();
+    collect_named_import_modules(root, name, source_bytes, &mut modules);
+    let [module] = modules.as_slice() else {
+        return None;
+    };
+    Some(module.clone())
+}
+
+fn exported_local_occurrences(node: tree_sitter::Node<'_>, name: &str, source: &[u8]) -> usize {
+    if node.kind() == "export_statement" {
+        if node.child_by_field_name("source").is_some() {
+            return 0;
+        }
+        return count_unaliased_specifiers(node, name, source);
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .map(|child| exported_local_occurrences(child, name, source))
+        .sum()
+}
+
+fn count_unaliased_specifiers(node: tree_sitter::Node<'_>, name: &str, source: &[u8]) -> usize {
+    if node.kind() == "export_specifier" {
+        return usize::from(
+            node.child_by_field_name("alias").is_none()
+                && node
+                    .child_by_field_name("name")
+                    .and_then(|identifier| identifier.utf8_text(source).ok())
+                    == Some(name),
+        );
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .map(|child| count_unaliased_specifiers(child, name, source))
+        .sum()
+}
+
+fn collect_named_import_modules(
+    node: tree_sitter::Node<'_>,
+    name: &str,
+    source: &[u8],
+    modules: &mut Vec<String>,
+) {
+    if node.kind() == "import_statement" {
+        if node
+            .children(&mut node.walk())
+            .any(|child| child.kind() == "type")
+        {
+            return;
+        }
+        let Some(module) = node
+            .child_by_field_name("source")
+            .and_then(|string| string.named_child(0))
+            .and_then(|fragment| fragment.utf8_text(source).ok())
+            .filter(|module| module.starts_with("./") || module.starts_with("../"))
+        else {
+            return;
+        };
+        if count_unaliased_import_specifiers(node, name, source) == 1 {
+            modules.push(module.to_owned());
+        }
+        return;
+    }
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_named_import_modules(child, name, source, modules);
+    }
+}
+
+fn count_unaliased_import_specifiers(
+    node: tree_sitter::Node<'_>,
+    name: &str,
+    source: &[u8],
+) -> usize {
+    if node.kind() == "import_specifier" {
+        return usize::from(
+            node.child_by_field_name("alias").is_none()
+                && node
+                    .child_by_field_name("name")
+                    .and_then(|identifier| identifier.utf8_text(source).ok())
+                    == Some(name),
+        );
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .map(|child| count_unaliased_import_specifiers(child, name, source))
+        .sum()
 }
 
 fn resolve_typescript_module(asserting_file: &str, module: &str) -> Option<String> {
