@@ -12,6 +12,7 @@ $rpcId=0;$deadline=[DateTime]::UtcNow.AddSeconds($CaseTimeoutSeconds)
 New-Item -ItemType Directory -Force $runRoot | Out-Null
 $root=Join-Path $runRoot 'native';New-Item -ItemType Directory -Force $root | Out-Null
 Write-BText (Join-Path $root '.clean-ctx.json') '{"cbm":{"enabled":false}}'
+Write-BText (Join-Path $root 'Audit.csproj') '<Project Sdk="Microsoft.NET.Sdk" />'
 Write-BText (Join-Path $root 'Contract.cs') 'namespace Audit133; public interface IEvidenceContract { int Read(); }'
 for ($i=0;$i -lt 55;$i++) {
     $dir=Join-Path $root ('consumers/group'+[int][Math]::Floor($i/11));New-Item -ItemType Directory -Force $dir | Out-Null
@@ -30,6 +31,17 @@ public class C : D {}
 public class D {}
 public class P { public P(Q value) {} }
 public class Q { public Q(P value) {} }
+'@
+$efConfigurations=(0..9 | ForEach-Object {"public class AuditEntity$_ {} public class AuditConfig$_ : IEntityTypeConfiguration<AuditEntity$_> {}"}) -join "`n"
+Write-BText (Join-Path $root 'EfConfigurations.cs') ("using Microsoft.EntityFrameworkCore; namespace Audit134.Ef;`n"+$efConfigurations)
+Write-BText (Join-Path $root 'EfContext.cs') @'
+using Microsoft.EntityFrameworkCore;
+namespace Audit134.Ef;
+public class AuditDbContext : DbContext {
+ protected override void OnModelCreating(ModelBuilder builder) {
+  builder.ApplyConfigurationsFromAssembly(typeof(AuditDbContext).Assembly);
+ }
+}
 '@
 Write-BText (Join-Path $root 'EditProbe.cs') ($padding+"`npublic class EditProbe {`n public int First() { return 1; }`n public int Second() { return 2; }`n}")
 Write-BText (Join-Path $root 'service.ts') @'
@@ -139,6 +151,16 @@ try {
         Assert-B (@($cycle.cycle | Where-Object { $_.relation -ne 'HasConstructorParameterType' }).Count -eq 0) 'P/Q witness contains a non-constructor relation.'
         Assert-B (@($cycle.cycle | Where-Object { (Split-Path $_.asserting_file -Leaf) -ne 'DependencyGraph.cs' }).Count -eq 0) 'P/Q witness lost fixture provenance.'
         Save-B '134-csharp-dependencies' @{depths=$depthAnswers;cycle=$cycle}
+    }
+    Invoke-BCase '134' 'ten-exact-ef-configuration-registrations' {
+        foreach ($file in @('EfConfigurations.cs','EfContext.cs')) {$null=Publish-Audit $file}
+        $answer=Query-Audit 'forward_edges' 'dotnet' 'DbContext' 'AuditDbContext'
+        $entities=@($answer.edges | Where-Object { $_.relation -eq 'HasEntity' } | ForEach-Object { $_.object.name })
+        $expected=@(0..9 | ForEach-Object {"AuditEntity$_"})
+        Assert-B ($entities.Count -eq 10) "EF assembly registration returned $($entities.Count) HasEntity edges instead of ten."
+        Assert-B ((($entities | Sort-Object) -join ',') -eq (($expected | Sort-Object) -join ',')) "EF assembly registration returned [$($entities -join ',')] instead of the ten exact entities."
+        Assert-B (@($answer.edges | Where-Object { $_.relation -eq 'HasEntity' -and (Split-Path $_.subject.file -Leaf) -ne 'EfContext.cs' }).Count -eq 0) 'EF HasEntity provenance is not owned by EfContext.cs.'
+        Save-B '134-ef-configurations' @{query=$answer;expected=$expected;observed=$entities}
     }
     Invoke-BCase '136' 'insert-before-whole-member-declaration' {
         $null=Publish-Audit 'EditProbe.cs'

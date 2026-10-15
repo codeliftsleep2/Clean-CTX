@@ -171,6 +171,14 @@ fn try_prepare_forward_edges(
         let index = state.workspace_index_read();
         super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
     });
+    let efcore_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "DbContext")
+        .then(|| {
+            let index = state.workspace_index_read();
+            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+        });
     let (aspnet_projection, aspnet_authorized) = if classification_complete
         && identity
             .exact()
@@ -230,6 +238,12 @@ fn try_prepare_forward_edges(
                 .ok()
                 .and_then(|value| value.as_array().cloned())
                 .unwrap_or_default(),
+            );
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
+            super::edge_merge::append_distinct_json_edges(
+                &mut edges,
+                catalog.forward(&exact.domain, &exact.entity_type, &exact.name),
             );
         }
         if let Some(projection) = &aspnet_projection {
@@ -347,6 +361,14 @@ fn try_prepare_reverse_edges(
             let index = state.workspace_index_read();
             super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
         });
+    let efcore_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Entity")
+        .then(|| {
+            let index = state.workspace_index_read();
+            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+        });
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
         super::angular_templates::Catalog::build(
@@ -384,6 +406,12 @@ fn try_prepare_reverse_edges(
                 .ok()
                 .and_then(|value| value.as_array().cloned())
                 .unwrap_or_default(),
+            );
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
+            super::edge_merge::append_distinct_json_edges(
+                &mut edges,
+                catalog.reverse(&exact.domain, &exact.entity_type, &exact.name),
             );
         }
         let count = edges.len();

@@ -316,6 +316,9 @@ mod workspace_query_csharp_constructor_large_cold;
 #[path = "workspace_query_csharp_dependencies.rs"]
 mod workspace_query_csharp_dependencies;
 
+#[path = "workspace_query_dotnet_efcore_configurations.rs"]
+mod workspace_query_dotnet_efcore_configurations;
+
 // Workspace-scope regressions: a query issued FOR a workspace answers with the
 // evidence asserted from inside that workspace only (occurrence provenance, never
 // semantic identity). `workspace_query_scope` owns the fixtures and RED-SCOPE1–8;

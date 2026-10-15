@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 mod dependencies;
-pub(super) use dependencies::DependencyGraph;
+pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(super) enum TypeKind {

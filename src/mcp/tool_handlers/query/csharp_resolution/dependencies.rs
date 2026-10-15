@@ -7,6 +7,9 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 use tree_sitter::Node;
 
+mod efcore;
+pub(in crate::mcp::tool_handlers::query) use efcore::EfCoreCatalog;
+
 const CLASS: &str = "Class";
 const DOMAIN: &str = "builtin";
 
