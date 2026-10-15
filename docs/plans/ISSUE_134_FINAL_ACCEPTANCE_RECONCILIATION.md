@@ -2,10 +2,41 @@
 
 **Author:** Agent MaxHeadRoom  
 **Date:** 2026-10-15  
-**Repository state:** `6a04ace83d59ec358bb2eddc7dcb81ee7f7730f8`  
-**Scope:** Read-only reconciliation and residual design; no implementation or runtime verification
+**Repository state:** `17a4043c` plus this final documentation reconciliation  
+**Scope:** Historical residual design followed by final implementation and acceptance reconciliation
 
-## 1. Executive verdict
+## Final closure addendum
+
+**Final verdict: #134 ACCEPTANCE SATISFIED  CLOSURE-READY**
+
+The four residual slices identified by the baseline investigation were implemented
+as separate checkpoints and verified through tracked Rust tests, the complete
+repository verification gate, and focused provider-disabled native acceptance.
+
+| Acceptance family | Implementation checkpoint | Final evidence | Status |
+| --- | --- | --- | --- |
+| Declaration-proven test subjects | `1d5f1fce` | Tracked test-subject regressions; native `134 / test-target-must-exist` control | SATISFIED |
+| Exact ASP.NET ancestry | `d720de41` | Tracked direct/indirect/negative ancestry matrix; native `134 / controller-two-project-bases-below-framework` | SATISFIED |
+| Exact C# traversal and constructor cycles | `deb297f1` | Tracked depth/cycle/scope guards; `target/issue-reconciliation/20261015-105307-a7ec2d71/` | SATISFIED |
+| Exact EF configuration entities | `17a4043c` | Tracked direct/explicit/assembly/lifecycle matrix; `target/issue-reconciliation/20261015-112550-0e2d3647/` | SATISFIED |
+
+The final native EF artifact contains exactly `AuditEntity0` through
+`AuditEntity9`. The traversal artifact contains the exact depth 1/2/3/0 matrix
+and a closed two-edge P/Q constructor witness. ASP.NET and test-subject focused
+cases remain green in the later consolidated native run.
+
+The maintainer reported the complete Final Verification Gate from
+`docs/agent/verification.md` green on 2026-10-15, including formatting, Clippy
+with `-D warnings`, the full workspace/all-target/all-feature test suite,
+file-size guard tests, active-file validation, UTF-8 validation, and the Rust
+encoding test.
+
+Tracked-test results and native operator evidence remain distinct. The known
+`139 / service-find-is-declaration-only` native failure is unrelated to #134 and
+does not enter this verdict. No #133, #135, or #142 obligation is claimed as
+#134 evidence. No Claude field pilot was required.
+
+## 1. Baseline executive verdict (pre-implementation)
 
 #134 ACCEPTANCE RECONCILED — ADDITIONAL RESIDUALS FOUND
 
@@ -44,7 +75,7 @@ GitHub issue #134 (opened 2026-10-10) defines four families:
 Naming fallback and Moq extraction were discussed as approaches/evidence, not
 separate acceptance requirements. Name resemblance cannot be authority.
 
-## 3. Acceptance matrix
+## 3. Baseline acceptance matrix (pre-implementation)
 
 | Original criterion | Current implementation / evidence | Coverage / live evidence | Status |
 | --- | --- | --- | --- |
@@ -376,6 +407,12 @@ mechanics does not justify sharing framework semantics or rollback boundaries.
 
 ## 16. Closure-readiness conditions
 
+**Final result:** all seven closure-readiness conditions below are satisfied.
+The four implementation checkpoints preserve query-local refinements where
+cross-file meaning is required; no durable semantic generation change was
+introduced. The complete final verification gate and the focused native cases
+are green.
+
 #134 reaches final closure reconciliation only when:
 
 1. LGR-001 and LGR-004 have tracked production regressions and focused live GREEN.
@@ -417,6 +454,12 @@ evidence first; consolidate any genuinely Claude-only questions later.
 - `src/tests/workspace/index_declaration_authority.rs`
 - `src/tests/workspace/index_graph.rs`
 - `src/tests/workspace/index_cycle_policy.rs`
+- `docs/plans/ISSUE_134_LGR001_DECLARATION_PROVEN_TEST_SUBJECTS.md`
+- `docs/plans/ISSUE_134_LGR004_EXACT_ASPNET_ANCESTRY.md`
+- `docs/plans/ISSUE_134_CSHARP_DEPENDENCY_TRAVERSAL.md`
+- `docs/plans/ISSUE_134_EXACT_EF_CONFIGURATION_REGISTRATIONS.md`
+- `target/issue-reconciliation/20261015-105307-a7ec2d71/`
+- `target/issue-reconciliation/20261015-112550-0e2d3647/`
 
 ## 18. Commands actually run
 

@@ -11,7 +11,7 @@ This ledger records live/operator evidence. It is not a substitute for tracked
 Rust regressions under `src/tests/**`, and a live PASS does not establish CI
 coverage.
 
-## Open regressions
+## Regression records
 
 ### LGR-001 — .NET test target is fabricated from the test-class suffix
 
@@ -29,7 +29,11 @@ coverage.
 - **Repair requirements:** Change production behavior, add a tracked regression
   under `src/tests/**`, rerun the focused native gate, and then rerun applicable
   aggregate verification.
-- **Status:** Open; repair deferred until the live-gate sequence is complete.
+- **Repair evidence:** Commit `1d5f1fce`; tracked declaration-proven subject
+  regressions; focused native PASS in
+  `target/native-causal-controls/20261015-092905-a3f7a10a/`; complete final
+  verification gate reported green on 2026-10-15.
+- **Status:** Closed as part of Issue #134 final acceptance reconciliation.
 
 ### LGR-002 — Linked HTML `entities_in_file` dispatches to unsupported language IR
 
@@ -47,7 +51,12 @@ coverage.
 - **Repair requirements:** Change production behavior, add a tracked regression
   under `src/tests/**`, rerun the focused native gate, and then rerun applicable
   aggregate verification.
-- **Status:** Open; repair deferred until the live-gate sequence is complete.
+- **Repair evidence:** Commit `d720de41`; tracked exact-ancestry regression
+  matrix; focused native PASS in
+  `target/issue-reconciliation/20261015-095730-ea6aecbf/` and the later
+  consolidated run `20261015-112550-0e2d3647/`; complete final verification
+  gate reported green on 2026-10-15.
+- **Status:** Closed as part of Issue #134 final acceptance reconciliation.
 
 ### LGR-003 — Angular entity query leaks the builtin class identity
 

@@ -151,11 +151,14 @@ Inspect case `134 / test-target-must-exist`. It must prove both no Ghost target 
 the differently named positive control. After focused GREEN, run the applicable
 user-owned final verification commands from `docs/agent/verification.md`.
 
-## 12. Completion pending verification
+## 12. Verification completion update
 
-Implementation and tracked coverage are complete for LGR-001 only. Static diff
-inspection is complete. Runtime correctness, zero-warning compilation, the focused
-live assertion, and the final gate remain explicitly unverified and user-owned.
+The maintainer subsequently reported the focused tracked tests and zero-warning
+Clippy gate green. The focused native case `134 / test-target-must-exist` passed in
+`target/native-causal-controls/20261015-092905-a3f7a10a/`. The complete repository
+Final Verification Gate was reported green on 2026-10-15 after all four #134
+slices were committed.
 
-LGR-004, EF configuration semantics, C# dependency traversal/cycles, #135, and #142
-were not implemented.
+LGR-001 is closed by commit `1d5f1fce`. Later #134 slices and unrelated issue
+work remain documented separately; no #133, #135, #141, or #142 result is claimed
+as LGR-001 evidence.
