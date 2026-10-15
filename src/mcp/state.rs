@@ -75,6 +75,9 @@ pub(crate) mod physical_identity;
 mod publication;
 mod source_cache;
 
+#[cfg(feature = "csharp")]
+#[path = "csharp_call_reconciliation.rs"]
+mod csharp_call_reconciliation;
 #[path = "durable_semantics.rs"]
 pub(crate) mod durable_semantics;
 

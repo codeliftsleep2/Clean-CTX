@@ -316,6 +316,10 @@ mod tests_batch_preparation;
 #[path = "../../tests/mcp/workspace_query_name_validation.rs"]
 mod tests_name_validation;
 
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_file_diagnostics.rs"]
+mod tests_file_diagnostics;
+
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.
 #[cfg(all(test, feature = "rust", feature = "csharp"))]

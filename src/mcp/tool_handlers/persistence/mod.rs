@@ -300,6 +300,10 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
         alias_removed,
         "validated alias ownership must remain stable"
     );
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_requested) {
+        return send_persistence_error(id, &error);
+    }
 
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,

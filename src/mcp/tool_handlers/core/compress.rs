@@ -193,7 +193,17 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             );
             Ok::<_, String>(())
         });
-        if let Err(error) = published {
+        if let Err(error) = &published {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error.clone(),
+                None,
+            ));
+            return;
+        }
+        #[cfg(feature = "csharp")]
+        if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_path) {
             send_response(&crate::mcp::tool_helpers::jsonrpc_error(
                 id.clone(),
                 -32603,

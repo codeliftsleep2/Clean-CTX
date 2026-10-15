@@ -232,6 +232,8 @@ impl super::McpState {
             self.publish_compatible_semantic_projection(&alias, file_path, semantic);
             self.llm_text_cache_lock().remove(&alias);
         });
+        #[cfg(feature = "csharp")]
+        self.reconcile_csharp_after_authority_change(file_path)?;
         Ok(())
     }
 

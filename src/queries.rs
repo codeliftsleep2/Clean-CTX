@@ -207,6 +207,8 @@ pub const CS_CALL_QUERY: &str = r#"
             "=" (_)) @invoke.declaration @invoke.declaration.field))
     (property_declaration name: (identifier) @invoke.declaration_name
         "=" value: (_)) @invoke.declaration @invoke.declaration.property
+    (property_declaration name: (identifier) @invoke.declaration_name
+        (arrow_expression_clause)) @invoke.declaration @invoke.declaration.property
 "#;
 
 // Generic invocation captures (native call facts) for TypeScript.

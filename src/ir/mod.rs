@@ -26,6 +26,8 @@ pub mod compact_a3;
 pub mod compiler;
 pub(crate) mod compiler_methods;
 pub mod control_full;
+#[cfg(feature = "csharp")]
+pub(crate) mod csharp_exact_calls;
 pub mod delta;
 pub mod focus;
 pub mod hierarchical;

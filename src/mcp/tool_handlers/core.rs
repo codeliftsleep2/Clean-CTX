@@ -56,6 +56,14 @@ mod pattern_fact_ownership_tests;
 #[path = "../../tests/mcp/provide_complete_context.rs"]
 mod provide_complete_context_tests;
 
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/mcp/provide_code_context_batch_fidelity.rs"]
+mod provide_code_context_batch_fidelity_tests;
+
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../../tests/mcp/csharp_skeleton_degradation.rs"]
+mod csharp_skeleton_degradation_tests;
+
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../../tests/mcp/rxjs_meta_presentation.rs"]
 mod rxjs_meta_presentation_tests;

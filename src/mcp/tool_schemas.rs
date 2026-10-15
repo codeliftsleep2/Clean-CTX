@@ -105,7 +105,12 @@ pub(super) fn provide_code_context_request_variants() -> Value {
                 "files": provide_code_context_properties()["files"].clone()
             },
             "required": ["files"],
-            "not": { "required": ["filePath"] }
+            "not": {
+                "anyOf": [
+                    { "required": ["filePath"] },
+                    { "required": ["fidelity"] }
+                ]
+            }
         }
     ])
 }

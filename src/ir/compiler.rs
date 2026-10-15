@@ -92,6 +92,8 @@ pub struct IRCompiler {
     /// Source-bound invocation evidence from the most recent successful compile.
     /// This side output is never part of CompiledIR or durable state.
     pub(crate) invocation_evidence: Option<InvocationEvidenceSet>,
+    #[cfg(feature = "csharp")]
+    csharp_declaration_authority: Option<Vec<crate::ir::csharp_exact_calls::Declaration>>,
 }
 
 impl IRCompiler {
@@ -103,12 +105,22 @@ impl IRCompiler {
             config: None,
             semantic_edges: Vec::new(),
             invocation_evidence: None,
+            #[cfg(feature = "csharp")]
+            csharp_declaration_authority: None,
         }
     }
 
     /// Set the runtime configuration used by framework meta-layers.
     pub fn set_config(&mut self, config: crate::config::CleanCtxConfig) {
         self.config = Some(config);
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn set_csharp_declaration_authority(
+        &mut self,
+        authority: Vec<crate::ir::csharp_exact_calls::Declaration>,
+    ) {
+        self.csharp_declaration_authority = Some(authority);
     }
 
     /// Add a language layer (Layer 2).
@@ -284,6 +296,22 @@ impl IRCompiler {
                     &provenance,
                 ),
             );
+            let exact = match self.csharp_declaration_authority.as_deref() {
+                Some(authority) => crate::ir::csharp_exact_calls::project_with_authority(
+                    &ctx.source,
+                    &ctx.instructions,
+                    &ctx.invocation_occurrences,
+                    &provenance,
+                    authority,
+                ),
+                None => crate::ir::csharp_exact_calls::project(
+                    &ctx.source,
+                    &ctx.instructions,
+                    &ctx.invocation_occurrences,
+                    &provenance,
+                ),
+            };
+            self.semantic_edges.extend(exact);
         }
 
         // Return ownership of language layers and pattern recognizers

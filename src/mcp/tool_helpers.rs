@@ -302,6 +302,32 @@ pub(super) fn compile_source_ir_candidate(
         None,
         &alias,
         previous_version,
+        None,
+    )
+}
+
+#[cfg(feature = "csharp")]
+pub(crate) fn compile_file_ir_candidate_with_csharp_authority(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    authority: &[crate::ir::csharp_exact_calls::Declaration],
+) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
+{
+    let alias = state
+        .alias_for_path(file_path)
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = state.file_version(&alias).unwrap_or(0);
+    let source = state.read_source(file_path)?;
+    compile_source_ir_focused_with_identity(
+        file_path,
+        &source,
+        fidelity,
+        state,
+        None,
+        &alias,
+        previous_version,
+        Some(authority),
     )
 }
 
@@ -352,6 +378,7 @@ fn compile_file_ir_focused_with_identity(
         focus,
         path_alias,
         previous_version,
+        None,
     )
 }
 
@@ -364,6 +391,10 @@ fn compile_source_ir_focused_with_identity(
     focus: Option<&std::collections::HashSet<String>>,
     path_alias: &str,
     previous_version: u64,
+    #[cfg(feature = "csharp")] csharp_authority: Option<
+        &[crate::ir::csharp_exact_calls::Declaration],
+    >,
+    #[cfg(not(feature = "csharp"))] _csharp_authority: Option<&[()]>,
 ) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
 {
     // Test-only production-compiler failure injection applies equally to
@@ -417,6 +448,10 @@ fn compile_source_ir_focused_with_identity(
 
     let mut compiler = IRCompiler::new();
     compiler.set_config(state.config.clone());
+    #[cfg(feature = "csharp")]
+    if let Some(authority) = csharp_authority {
+        compiler.set_csharp_declaration_authority(authority.to_vec());
+    }
 
     // Add language-specific layers (Layer 2)
     match extension {

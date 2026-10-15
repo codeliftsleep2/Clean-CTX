@@ -401,18 +401,18 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         }
         Err(()) => return,
     }
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&resolved_path) {
+        err_response(id, -32603, error, None);
+        return;
+    }
     state.llm_text_cache_lock().remove(&alias);
-    // ── Mark CBM project dirty (lazy reindex) ────────────────────
     if let Some(ref mut bridge) = *state.graph_bridge_lock() {
         if bridge.is_available() {
             bridge.mark_project_dirty(std::path::Path::new(&resolved_path));
         }
     }
-
-    // ── Invalidate hydration discovery for the edited root ───────
     super::hydration::invalidate_discovery_for_edited_path(state, &resolved_path);
-
-    // ── Minimal response (plan step 6) ───────────────────────────────
     let mut ops_report: Vec<Value> = report
         .operations
         .iter()

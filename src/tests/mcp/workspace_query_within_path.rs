@@ -434,11 +434,18 @@ fn entities_in_file_is_validated_against_within_path() {
         2,
         "a file inside the narrowing answers normally"
     );
-    // …and the file outside it is answered with the minimal zero-result shape,
-    // exactly like a file outside the workspace.
-    assert!(
-        file_entities(&state, &shipping, Some(&repo.key()), Some("src/Billing")).is_empty(),
-        "a workspace file outside the narrowing must not be answerable through it"
+    // …and the file outside it receives the bounded scope diagnostic.
+    let excluded = raw_response(
+        &state,
+        scoped(
+            json!({ "type": "entities_in_file", "file_path": shipping }),
+            Some(&repo.key()),
+            Some("src/Billing"),
+        ),
+    );
+    assert_eq!(
+        excluded["error"]["data"]["reason"],
+        "excluded_by_within_path"
     );
     assert_eq!(
         file_entities(&state, &shipping, Some(&repo.key()), Some("src/Shipping")).len(),

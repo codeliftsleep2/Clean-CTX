@@ -347,6 +347,11 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             return;
         }
     };
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_path) {
+        send_response(&invalid_session_ir_response(id, &error));
+        return;
+    }
 
     match delta {
         Some(d) => {

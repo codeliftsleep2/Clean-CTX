@@ -307,8 +307,7 @@ fn declarations_in_file_refreshes_rename_removal_and_delete() {
     let refresh = crate::protocol::captured_responses().pop().unwrap();
     assert!(refresh.get("error").is_none(), "{refresh}");
     let deleted = response(&state, "declarations_in_file", root.path(), &path);
-    assert!(deleted.get("error").is_none(), "{deleted}");
-    assert!(entities(&deleted).is_empty());
+    assert_eq!(deleted["error"]["data"]["reason"], "file_not_found");
     assert!(
         state
             .workspace_index_read()

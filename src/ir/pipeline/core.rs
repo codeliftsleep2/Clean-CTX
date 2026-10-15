@@ -293,7 +293,14 @@ impl IRPass for CoreIRPass {
                 }
                 "impl.root" => process_impl_capture(state, cap),
                 "method.root" | "constructor.root" | "func.root" => {
-                    process_method_capture(state, cap, &file_id, fidelity, focus.as_ref());
+                    process_method_capture(
+                        state,
+                        cap,
+                        &file_id,
+                        fidelity,
+                        focus.as_ref(),
+                        query_string == crate::queries::CS_QUERY,
+                    );
                 }
                 "field.root" => {
                     state.refresh_type_owner(cap.start_byte);
@@ -399,6 +406,7 @@ fn process_method_capture(
     file_id: &str,
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
+    is_csharp: bool,
 ) {
     let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
@@ -413,6 +421,18 @@ fn process_method_capture(
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
     let method_name = state.emit_method_ir(&owner, &method_id, &cap.text);
+    if is_csharp {
+        let raw_signature = extract_method_sig(&cap.raw_text, Fidelity::High);
+        let declared_return = super::parse_method_sig(&raw_signature).return_type;
+        if let Some(CoreOp::Return(_, return_type)) = state
+            .instructions
+            .iter_mut()
+            .rev()
+            .find(|op| matches!(op, CoreOp::Return(owner, _) if owner == &method_id))
+        {
+            *return_type = declared_return;
+        }
+    }
 
     if fidelity == Fidelity::Edit
         && focus.is_none_or(|focused| focused.contains(&method_name))

@@ -25,6 +25,7 @@ use super::{
 use crate::mcp::McpState;
 use serde_json::Value;
 use std::collections::HashSet;
+use std::path::Path;
 
 fn semantic_fidelity(
     args: &Value,
@@ -193,13 +194,7 @@ fn try_prepare_entities_in_file(
         &state.config.additional_roots,
     ) {
         Ok(p) => p,
-        Err(_msg) => {
-            // File does not exist or is outside workspace boundary —
-            // return empty results (the user asked for a file that
-            // hasn't been compiled). This matches the pre-fix behavior
-            // where a non-existent path produced no entities.
-            return Ok(PreparedQuery::answer(empty_entities_in_file()));
-        }
+        Err(message) => return Err(file_resolution_failure(&message)),
     };
     let canonical_path = state.semantic_owner_path(&resolved_path);
     // The optional SECOND layer: when a `withinPath` is present, the explicit file
@@ -211,8 +206,9 @@ fn try_prepare_entities_in_file(
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        return Ok(PreparedQuery::answer(empty_entities_in_file()));
+        return Err(file_scope_failure());
     }
+    ensure_supported_file(&resolved_path)?;
     let fidelity = semantic_fidelity(args, state)?;
     let source = state
         .read_source(&resolved_path)
@@ -245,6 +241,10 @@ fn try_prepare_entities_in_file(
             compiled_hash,
         );
     }
+    #[cfg(feature = "csharp")]
+    state
+        .reconcile_csharp_after_authority_change(&canonical_path)
+        .map_err(QueryFailure::internal)?;
     Ok(prepared_entities_in_file(canonical_path))
 }
 
@@ -258,16 +258,6 @@ fn prepared_entities_in_file(canonical_path: String) -> PreparedQuery {
         });
         Ok(QueryAnswer::new("entities_in_file", structured))
     })
-}
-
-/// The minimal zero-result shape for an `entities_in_file` request whose file is
-/// not answerable inside the effective scope: it does not exist, it lies outside
-/// the workspace roots, or it lies outside the `withinPath` narrowing. The shape
-/// is exactly the pre-`withinPath` one (no hydration metadata at all), so an
-/// out-of-scope path is answered as it always was.
-fn empty_entities_in_file() -> QueryAnswer {
-    let structured = serde_json::json!({ "entities": [], "count": 0 });
-    QueryAnswer::new("entities_in_file", structured)
 }
 
 /// `declarations_in_file`: source-proven declarations in one trusted file.
@@ -300,15 +290,16 @@ fn try_prepare_declarations_in_file(
         &state.config.additional_roots,
     ) {
         Ok(path) => path,
-        Err(_) => return Ok(PreparedQuery::answer(empty_declarations_in_file())),
+        Err(message) => return Err(file_resolution_failure(&message)),
     };
     let canonical_path = state.semantic_owner_path(&resolved_path);
     if scope
         .as_ref()
         .is_some_and(|scope| scope.has_narrowing() && !scope.admits(&canonical_path))
     {
-        return Ok(PreparedQuery::answer(empty_declarations_in_file()));
+        return Err(file_scope_failure());
     }
+    ensure_supported_file(&resolved_path)?;
     let fidelity = semantic_fidelity(args, state)?;
     let source = state
         .read_source(&resolved_path)
@@ -331,6 +322,10 @@ fn try_prepare_declarations_in_file(
             workspace_fidelity,
             compiled_hash,
         );
+        #[cfg(feature = "csharp")]
+        state
+            .reconcile_csharp_after_authority_change(&canonical_path)
+            .map_err(QueryFailure::internal)?;
     }
     Ok(prepared_declarations_in_file(canonical_path))
 }
@@ -346,9 +341,40 @@ fn prepared_declarations_in_file(canonical_path: String) -> PreparedQuery {
     })
 }
 
-fn empty_declarations_in_file() -> QueryAnswer {
-    QueryAnswer::new(
-        "declarations_in_file",
-        serde_json::json!({ "entities": [], "count": 0 }),
+fn file_resolution_failure(message: &str) -> QueryFailure {
+    if message.starts_with("path does not exist:") {
+        return QueryFailure::new(
+            -32004,
+            "Requested file was not found in the authorized workspace.",
+            Some(serde_json::json!({ "reason": "file_not_found" })),
+        );
+    }
+    QueryFailure::new(
+        -32602,
+        "Requested file is outside the authorized workspace roots.",
+        Some(serde_json::json!({ "reason": "outside_authorized_roots" })),
     )
+}
+
+fn file_scope_failure() -> QueryFailure {
+    QueryFailure::new(
+        -32602,
+        "Requested file is excluded by the active withinPath scope.",
+        Some(serde_json::json!({ "reason": "excluded_by_within_path" })),
+    )
+}
+
+fn ensure_supported_file(path: &str) -> Result<(), QueryFailure> {
+    let extension = Path::new(path)
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .unwrap_or_default();
+    if crate::compression::language::language_for_extension(extension).is_some() {
+        return Ok(());
+    }
+    Err(QueryFailure::new(
+        -32602,
+        "Requested file type is not supported by workspace_query.",
+        Some(serde_json::json!({ "reason": "unsupported_file_type" })),
+    ))
 }

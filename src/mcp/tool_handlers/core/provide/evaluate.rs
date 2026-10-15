@@ -323,6 +323,10 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "Context publication was superseded by a newer same-file source snapshot; retry the request",
         ));
     }
+    #[cfg(feature = "csharp")]
+    state
+        .reconcile_csharp_after_authority_change(&canonical_path)
+        .map_err(ProvideFailure::internal)?;
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(
         &canonical_path,
@@ -349,6 +353,11 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         serde_json::to_value(byte_exact).unwrap_or_default()
     };
     let visible_text = economic.text;
+    let degradation = super::super::common::model_facing_degradation(
+        &canonical_path,
+        effective_fidelity,
+        visible_content_kind,
+    );
     let result = ProvidedContext::new(
         visible_text,
         json!({
@@ -359,7 +368,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "decision_summary": decision.summary(),
             "content_kind": visible_content_kind,
             "byte_exact": visible_byte_exact,
-            "degradation": null
+            "degradation": degradation
         }),
     );
     let total_ms = overall_start.elapsed().as_millis() as u64;
