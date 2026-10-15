@@ -22,6 +22,15 @@ $padding=(1..65 | ForEach-Object {"// audit padding $_"}) -join "`n"
 Write-BText (Join-Path $root 'SharedHttpBase.cs') 'using Microsoft.AspNetCore.Mvc; namespace Audit134; public class SharedHttpBase : ControllerBase {}'
 Write-BText (Join-Path $root 'SecondHttpBase.cs') 'namespace Audit134; public class SecondHttpBase : SharedHttpBase {}'
 Write-BText (Join-Path $root 'OrdersEndpoint.cs') ($padding+"`n"+'using Microsoft.AspNetCore.Mvc; namespace Audit134; [Route("orders")] public class OrdersEndpoint : SecondHttpBase { [HttpGet("one")] public int GetOne() { return 1; } }')
+Write-BText (Join-Path $root 'DependencyGraph.cs') @'
+namespace Audit134.Dependencies;
+public class A : B {}
+public class B : C {}
+public class C : D {}
+public class D {}
+public class P { public P(Q value) {} }
+public class Q { public Q(P value) {} }
+'@
 Write-BText (Join-Path $root 'EditProbe.cs') ($padding+"`npublic class EditProbe {`n public int First() { return 1; }`n public int Second() { return 2; }`n}")
 Write-BText (Join-Path $root 'service.ts') @'
 import { Injectable } from '@angular/core';
@@ -111,6 +120,25 @@ try {
         Save-B '134-controller-ancestry' @{entity=$answer;edges=$edges}
         Assert-B (@($edges.edges | Where-Object { $_.relation -eq 'HasRoute' -and $_.object.name -eq 'orders' }).Count -eq 1) 'Indirect controller route was not projected from the original endpoint.'
         Assert-B (@($edges.edges | Where-Object { $_.relation -eq 'ControllerAction' -and $_.object.name -eq 'GetOne' }).Count -eq 1) 'Indirect controller action set was not projected from the original endpoint.'
+    }
+    Invoke-BCase '134' 'exact-csharp-dependency-depths-and-constructor-cycle' {
+        $null=Publish-Audit 'DependencyGraph.cs'
+        $depthAnswers=@{}
+        foreach ($depth in @(1,2,3,0)) {
+            $answer=Get-BResult (Invoke-BTool $native 'workspace_query' @{workspaceRoot=$root;type='transitive_dependencies';domain='builtin';entity_type='Class';name='A';depth=$depth})
+            $body=$answer.structuredContent
+            $observed=@($body.dependencies | ForEach-Object { $_[2] })
+            $expected=switch ($depth) { 1 {@('B')} 2 {@('B','C')} default {@('B','C','D')} }
+            Assert-B (($observed -join ',') -eq ($expected -join ',')) "Depth $depth returned [$($observed -join ',')] instead of [$($expected -join ',')]."
+            $depthAnswers["depth-$depth"]=$body
+        }
+        $cycle=(Get-BResult (Invoke-BTool $native 'workspace_query' @{workspaceRoot=$root;type='has_cycle';kind='dependency'})).structuredContent
+        Assert-B ($cycle.has_cycle -eq $true) 'Exact P/Q constructor cycle was not detected.'
+        Assert-B (@($cycle.cycle).Count -eq 2) 'P/Q cycle witness is not the expected closed two-edge path.'
+        Assert-B ($cycle.cycle[0].subject.name -eq $cycle.cycle[1].object.name -and $cycle.cycle[0].object.name -eq $cycle.cycle[1].subject.name) 'P/Q witness is not closed and ordered.'
+        Assert-B (@($cycle.cycle | Where-Object { $_.relation -ne 'HasConstructorParameterType' }).Count -eq 0) 'P/Q witness contains a non-constructor relation.'
+        Assert-B (@($cycle.cycle | Where-Object { (Split-Path $_.asserting_file -Leaf) -ne 'DependencyGraph.cs' }).Count -eq 0) 'P/Q witness lost fixture provenance.'
+        Save-B '134-csharp-dependencies' @{depths=$depthAnswers;cycle=$cycle}
     }
     Invoke-BCase '136' 'insert-before-whole-member-declaration' {
         $null=Publish-Audit 'EditProbe.cs'

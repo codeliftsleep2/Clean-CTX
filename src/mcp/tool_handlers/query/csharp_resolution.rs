@@ -11,6 +11,9 @@ use crate::workspace::{index::WorkspaceIndex, scope::WorkspaceScope};
 use std::collections::HashSet;
 use tree_sitter::Node;
 
+mod dependencies;
+pub(super) use dependencies::DependencyGraph;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(super) enum TypeKind {
     Class,
@@ -508,6 +511,15 @@ fn visit_type(
             });
         }
     }
+
+    let context = dependencies::ConstructorContext {
+        file,
+        namespace,
+        nesting,
+        imports,
+        owner: &name,
+    };
+    dependencies::collect_constructor_references(node, source, &context, catalog);
 
     if let Some(body) = node.child_by_field_name("body") {
         let mut nested = nesting.to_vec();
