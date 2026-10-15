@@ -78,6 +78,10 @@ mod apply_edit_issue_136_tests;
 #[path = "../tests/mcp/semantic_signature_evidence.rs"]
 mod semantic_signature_evidence_tests;
 
+#[cfg(test)]
+#[path = "../tests/mcp/issue_137_diff_commits.rs"]
+mod issue_137_diff_commits_tests;
+
 #[cfg(all(test, feature = "csharp", feature = "dotnet"))]
 #[path = "../tests/mcp/di_omission.rs"]
 mod di_omission_tests;

@@ -59,4 +59,5 @@ pub struct CapturedMethod {
 pub struct DeclarationEvidence {
     pub return_type: String,
     pub attributes: Vec<String>,
+    pub modifiers: Vec<String>,
 }

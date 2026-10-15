@@ -175,12 +175,22 @@ pub fn collect_changed_files(
 /// Runs `git show <ref>:<path>` and returns the raw content. The ref is
 /// validated and the path is validated to prevent flag injection.
 pub fn show_file(root: &str, reference: &str, path: &str) -> Result<String, CleanCtxError> {
+    let bytes = show_file_bytes(root, reference, path)?;
+    String::from_utf8(bytes).map_err(|e| {
+        CleanCtxError::Internal(format!(
+            "git blob '{reference}:{path}' is binary or non-UTF-8: {e}"
+        ))
+    })
+}
+
+/// Retrieve a blob without decoding it as text.
+pub fn show_file_bytes(root: &str, reference: &str, path: &str) -> Result<Vec<u8>, CleanCtxError> {
     crate::gitdiff::refs::validate_ref(reference)?;
     validate_git_path(path)?;
     let spec = format!("{reference}:{path}");
     // `--end-of-options` after the `show` subcommand prevents the
     // `<ref>:<path>` spec from being parsed as a flag.
-    super::runner::run_git(root, &["show", "--end-of-options", &spec])
+    super::runner::run_git_bytes(root, &["show", "--end-of-options", &spec])
 }
 
 /// Validate a git output path.

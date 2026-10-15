@@ -45,6 +45,12 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
             }
             current_class = Some(action.label.clone());
         } else {
+            // Default projection is change-only. Unchanged child members
+            // remain available to comparison/summary accounting but do not
+            // flood a touched class with misleading `=` noise.
+            if action.kind == DiffKind::Unchanged {
+                continue;
+            }
             let indent = if fidelity == Fidelity::Low { "" } else { "  " };
             match action.kind {
                 DiffKind::Modified => {
@@ -113,9 +119,7 @@ pub fn format_diff(actions: &[DiffAction], fidelity: Fidelity) -> String {
                         }
                     }
                 }
-                DiffKind::Unchanged => {
-                    let _ = writeln!(out, "{}{} {}", indent, action.kind.symbol(), action.detail);
-                }
+                DiffKind::Unchanged => unreachable!("unchanged children are suppressed above"),
                 _ => {
                     let _ = writeln!(
                         out,

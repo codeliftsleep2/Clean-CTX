@@ -35,6 +35,18 @@ use crate::error::CleanCtxError;
 /// Returns stdout on success (exit status 0). Any non-zero exit produces
 /// a structured [`CleanCtxError`] with the captured stderr.
 pub fn run_git(root: &str, args: &[&str]) -> Result<String, CleanCtxError> {
+    let stdout = run_git_bytes(root, args)?;
+    String::from_utf8(stdout).map_err(|e| {
+        CleanCtxError::Internal(format!("git command returned non-UTF-8 text output: {e}"))
+    })
+}
+
+/// Execute Git while preserving stdout bytes exactly.
+///
+/// Content acquisition uses this boundary so a binary blob is never decoded
+/// lossily and then presented as source text. Text-oriented callers continue
+/// through [`run_git`].
+pub fn run_git_bytes(root: &str, args: &[&str]) -> Result<Vec<u8>, CleanCtxError> {
     let mut cmd = Command::new("git");
     cmd.arg("--no-pager");
     // `-C <root>` changes directory; root is always resolved via
@@ -50,7 +62,6 @@ pub fn run_git(root: &str, args: &[&str]) -> Result<String, CleanCtxError> {
         ))
     })?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if !output.status.success() {
@@ -66,7 +77,7 @@ pub fn run_git(root: &str, args: &[&str]) -> Result<String, CleanCtxError> {
         return Err(CleanCtxError::Internal(msg));
     }
 
-    Ok(stdout)
+    Ok(output.stdout)
 }
 
 /// Whether a directory is inside a git work tree (`git rev-parse --is-inside-work-tree`).

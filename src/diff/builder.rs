@@ -251,7 +251,6 @@ fn try_build_with(
     let mut orphan_fields: Vec<String> = Vec::new();
     let mut orphan_methods: Vec<CapturedMethod> = Vec::new();
     let mut pending_fields: Vec<String> = Vec::new();
-    let mut pending_markers: Vec<String> = Vec::new();
     //
     // Nested-type ownership: stack of currently-open declaration scopes
     // as `(index into classes, end_byte of that declaration's span)`.
@@ -296,13 +295,17 @@ fn try_build_with(
                     methods: Vec::new(),
                 });
                 open_scopes.push((idx, cap.end_byte));
-                pending_markers.clear();
             }
             "method.root" | "constructor.root" | "func.root" => {
                 let method = CapturedMethod {
                     sig: cap.text.clone(),
                     declaration: declarations.get(&(cap.start_byte, cap.end_byte)).cloned(),
-                    markers: std::mem::take(&mut pending_markers),
+                    // Marker ownership follows the declaration span. Capture
+                    // order is not ownership: descendant captures commonly
+                    // arrive after `method.root`, so a positional buffer
+                    // credited them to the following method and dropped the
+                    // final member's markers entirely.
+                    markers: markers_owned_by(cap, &all_captures),
                     body: extract_method_body(&cap.raw_text),
                 };
                 // Ownership: the enclosing declaration whose span contains
@@ -319,22 +322,8 @@ fn try_build_with(
                     None => orphan_methods.push(method),
                 }
             }
-            "field.root" => {
-                if !cap.text.is_empty() {
-                    pending_fields.push(cap.text.clone());
-                }
-            }
-            _ => {
-                if fidelity == Fidelity::Low {
-                    continue;
-                }
-                // Delegate marker construction to the SHARED module.
-                if let Some(marker) = build_marker(&cap.name, &cap.text)
-                    && pending_markers.last().map(|m| m != &marker).unwrap_or(true)
-                {
-                    pending_markers.push(marker);
-                }
-            }
+            "field.root" if !cap.text.is_empty() => pending_fields.push(cap.text.clone()),
+            _ => {}
         }
     }
 
@@ -357,6 +346,35 @@ fn try_build_with(
         orphan_fields,
         orphan_methods,
     })
+}
+
+/// Return behavior markers structurally owned by one method declaration.
+///
+/// The capture pipeline is declaration-first, so marker capture order cannot
+/// be used to infer an owner. A marker belongs to a method only when its byte
+/// span is contained by that method's tree-sitter declaration span.
+fn markers_owned_by(
+    method: &crate::compression::capture_pipeline::CapturedNode,
+    captures: &[crate::compression::capture_pipeline::CapturedNode],
+) -> Vec<String> {
+    let mut markers = Vec::new();
+    for capture in captures {
+        if capture.start_byte < method.start_byte
+            || capture.end_byte > method.end_byte
+            || capture.name.starts_with("diff.signature.")
+        {
+            continue;
+        }
+        if let Some(marker) = build_marker(&capture.name, &capture.text)
+            && markers
+                .last()
+                .map(|current| current != &marker)
+                .unwrap_or(true)
+        {
+            markers.push(marker);
+        }
+    }
+    markers
 }
 
 /// Extract a normalized body fingerprint from a method's raw source text.
