@@ -33,6 +33,7 @@ struct Declaration {
     path: Vec<String>,
     name: String,
     arity: usize,
+    source: String,
 }
 
 #[derive(Clone, Debug)]
@@ -43,6 +44,7 @@ struct BaseReference {
     nesting: Vec<String>,
     written: String,
     shape: TypeShape,
+    imports: Vec<Vec<String>>,
 }
 
 #[derive(Clone, Debug)]
@@ -62,6 +64,11 @@ pub(super) struct Catalog {
 pub(super) struct ResolvedTarget {
     pub(super) kind: TypeKind,
     pub(super) name: String,
+}
+
+pub(super) struct AspNetProjection {
+    pub(super) file: String,
+    pub(super) edges: Vec<SemanticEdge>,
 }
 
 impl Catalog {
@@ -144,6 +151,111 @@ impl Catalog {
             .then_some(declaration.file.as_str())
     }
 
+    pub(super) fn aspnet_base_candidate(&self, name: &str) -> Option<String> {
+        let declaration = self.unique_named_class(name)?;
+        self.base_reference(declaration)
+            .map(|reference| reference.shape.name.clone())
+    }
+
+    pub(super) fn aspnet_projection(
+        &self,
+        name: &str,
+        fidelity: crate::compression::Fidelity,
+    ) -> Option<AspNetProjection> {
+        let original = self.unique_named_class(name)?;
+        if original.source.contains("[ApiController]") || original.source.contains("[Controller]") {
+            return None;
+        }
+        let mut current = original;
+        let mut visited = HashSet::new();
+        loop {
+            if !visited.insert((current.file.clone(), current.path.clone(), current.arity)) {
+                return None;
+            }
+            let reference = self.base_reference(current)?;
+            if is_qualified_aspnet_framework_base(reference) {
+                break;
+            }
+            if let Some(declaration) = self.resolve_declaration(reference) {
+                if declaration.kind != TypeKind::Class {
+                    return None;
+                }
+                current = declaration;
+                continue;
+            }
+            if is_imported_aspnet_framework_base(reference) {
+                break;
+            }
+            return None;
+        }
+        let mut analysis =
+            crate::dotnet_meta::aspnet::analyze_authorized_controller(&original.source, fidelity)?;
+        for edge in &mut analysis.semantic_edges {
+            edge.subject.file = Some(original.file.clone());
+            edge.object.file = Some(original.file.clone());
+        }
+        Some(AspNetProjection {
+            file: original.file.clone(),
+            edges: analysis.semantic_edges,
+        })
+    }
+
+    pub(super) fn has_aspnet_controller_authority(&self, name: &str) -> bool {
+        let Some(declaration) = self.unique_named_class(name) else {
+            return false;
+        };
+        declaration.source.contains("[ApiController]")
+            || declaration.source.contains("[Controller]")
+            || self
+                .aspnet_projection(name, crate::compression::Fidelity::High)
+                .is_some()
+    }
+
+    fn unique_named_class(&self, name: &str) -> Option<&Declaration> {
+        let mut matches = self
+            .declarations
+            .iter()
+            .filter(|declaration| declaration.kind == TypeKind::Class && declaration.name == name);
+        let declaration = matches.next()?;
+        matches.next().is_none().then_some(declaration)
+    }
+
+    fn base_reference(&self, declaration: &Declaration) -> Option<&BaseReference> {
+        let owner_parent = &declaration.path[..declaration.path.len().saturating_sub(1)];
+        self.references.iter().find(|reference| {
+            let mut reference_parent = reference.namespace.clone();
+            reference_parent.extend(reference.nesting.iter().cloned());
+            reference.file == declaration.file
+                && reference.owner == declaration.name
+                && owner_parent == reference_parent.as_slice()
+        })
+    }
+
+    fn resolve_declaration(&self, reference: &BaseReference) -> Option<&Declaration> {
+        let mut paths = candidate_paths(reference);
+        if reference.shape.qualifier.is_empty() {
+            for import in &reference.imports {
+                let mut path = import.clone();
+                path.push(reference.shape.name.clone());
+                paths.push(path);
+            }
+        }
+        paths.dedup();
+        for path in paths {
+            let mut matches = self.declarations.iter().filter(|declaration| {
+                declaration.path == path && declaration.arity == reference.shape.arity
+            });
+            let declaration = matches.next();
+            if matches.next().is_some() {
+                return None;
+            }
+            if declaration.is_some() {
+                return declaration;
+            }
+        }
+        None
+    }
+
     fn add_file(&mut self, file: &str, source: &str) {
         let Some(language) = crate::compression::language::safe_csharp_language() else {
             return;
@@ -155,29 +267,20 @@ impl Catalog {
         let Some(tree) = parser.parse(source, None) else {
             return;
         };
-        visit_container(tree.root_node(), source.as_bytes(), file, &[], &[], self);
+        let imports = using_namespaces(tree.root_node(), source.as_bytes());
+        visit_container(
+            tree.root_node(),
+            source.as_bytes(),
+            file,
+            &[],
+            &[],
+            &imports,
+            self,
+        );
     }
 
     fn resolve(&self, reference: &BaseReference) -> Option<ResolvedTarget> {
-        let mut paths = Vec::new();
-        if reference.shape.qualifier.is_empty() {
-            for depth in (0..=reference.nesting.len()).rev() {
-                let mut path = reference.namespace.clone();
-                path.extend(reference.nesting[..depth].iter().cloned());
-                path.push(reference.shape.name.clone());
-                paths.push(path);
-            }
-            paths.push(vec![reference.shape.name.clone()]);
-        } else {
-            let mut relative = reference.namespace.clone();
-            relative.extend(reference.shape.qualifier.iter().cloned());
-            relative.push(reference.shape.name.clone());
-            paths.push(relative);
-
-            let mut absolute = reference.shape.qualifier.clone();
-            absolute.push(reference.shape.name.clone());
-            paths.push(absolute);
-        }
+        let mut paths = candidate_paths(reference);
         paths.dedup();
 
         for path in paths {
@@ -210,12 +313,85 @@ pub(super) fn terminal_lookup_name(written: &str) -> Option<String> {
     find_first_base_shape(tree.root_node(), source.as_bytes()).map(|shape| shape.name)
 }
 
+fn candidate_paths(reference: &BaseReference) -> Vec<Vec<String>> {
+    let mut paths = Vec::new();
+    if reference.shape.qualifier.is_empty() {
+        for depth in (0..=reference.nesting.len()).rev() {
+            let mut path = reference.namespace.clone();
+            path.extend(reference.nesting[..depth].iter().cloned());
+            path.push(reference.shape.name.clone());
+            paths.push(path);
+        }
+        paths.push(vec![reference.shape.name.clone()]);
+    } else {
+        let mut relative = reference.namespace.clone();
+        relative.extend(reference.shape.qualifier.iter().cloned());
+        relative.push(reference.shape.name.clone());
+        paths.push(relative);
+
+        let mut absolute = reference.shape.qualifier.clone();
+        absolute.push(reference.shape.name.clone());
+        paths.push(absolute);
+    }
+    paths
+}
+
+fn is_qualified_aspnet_framework_base(reference: &BaseReference) -> bool {
+    if !matches!(
+        reference.shape.name.as_str(),
+        "ControllerBase" | "Controller"
+    ) {
+        return false;
+    }
+    let written = reference.written.trim_start_matches("global::");
+    written == format!("Microsoft.AspNetCore.Mvc.{}", reference.shape.name)
+}
+
+fn is_imported_aspnet_framework_base(reference: &BaseReference) -> bool {
+    matches!(
+        reference.shape.name.as_str(),
+        "ControllerBase" | "Controller"
+    ) && reference.shape.qualifier.is_empty()
+        && reference
+            .imports
+            .iter()
+            .any(|path| path.join(".") == "Microsoft.AspNetCore.Mvc")
+}
+
+fn using_namespaces(node: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {
+    let mut imports = Vec::new();
+    collect_using_namespaces(node, source, &mut imports);
+    imports.sort();
+    imports.dedup();
+    imports
+}
+
+fn collect_using_namespaces(node: Node<'_>, source: &[u8], imports: &mut Vec<Vec<String>>) {
+    if node.kind() == "using_directive" {
+        let text = node.utf8_text(source).unwrap_or_default();
+        if node.child_by_field_name("name").is_none()
+            && !text.contains("using static ")
+            && let Some(name) = node.named_child(0)
+        {
+            let segments = name_segments(name, source);
+            if !segments.is_empty() {
+                imports.push(segments);
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_using_namespaces(child, source, imports);
+    }
+}
+
 fn visit_container(
     node: Node<'_>,
     source: &[u8],
     file: &str,
     namespace: &[String],
     nesting: &[String],
+    imports: &[Vec<String>],
     catalog: &mut Catalog,
 ) {
     let mut file_namespace = namespace.to_vec();
@@ -233,13 +409,35 @@ fn visit_container(
                     nested_namespace.extend(name_segments(name, source));
                 }
                 if let Some(body) = child.child_by_field_name("body") {
-                    visit_container(body, source, file, &nested_namespace, nesting, catalog);
+                    visit_container(
+                        body,
+                        source,
+                        file,
+                        &nested_namespace,
+                        nesting,
+                        imports,
+                        catalog,
+                    );
                 }
             }
-            "class_declaration" | "interface_declaration" => {
-                visit_type(child, source, file, &file_namespace, nesting, catalog)
-            }
-            _ => visit_container(child, source, file, &file_namespace, nesting, catalog),
+            "class_declaration" | "interface_declaration" => visit_type(
+                child,
+                source,
+                file,
+                &file_namespace,
+                nesting,
+                imports,
+                catalog,
+            ),
+            _ => visit_container(
+                child,
+                source,
+                file,
+                &file_namespace,
+                nesting,
+                imports,
+                catalog,
+            ),
         }
     }
 }
@@ -250,6 +448,7 @@ fn visit_type(
     file: &str,
     namespace: &[String],
     nesting: &[String],
+    imports: &[Vec<String>],
     catalog: &mut Catalog,
 ) {
     let Some(name_node) = node.child_by_field_name("name") else {
@@ -276,6 +475,7 @@ fn visit_type(
         path,
         name: name.clone(),
         arity,
+        source: node.utf8_text(source).unwrap_or_default().to_string(),
     });
 
     if kind == TypeKind::Class
@@ -304,6 +504,7 @@ fn visit_type(
                 nesting: nesting.to_vec(),
                 written: written.trim().to_string(),
                 shape,
+                imports: imports.to_vec(),
             });
         }
     }
@@ -311,7 +512,7 @@ fn visit_type(
     if let Some(body) = node.child_by_field_name("body") {
         let mut nested = nesting.to_vec();
         nested.push(name);
-        visit_container(body, source, file, namespace, &nested, catalog);
+        visit_container(body, source, file, namespace, &nested, imports, catalog);
     }
 }
 

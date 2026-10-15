@@ -297,6 +297,10 @@ mod workspace_query_csharp_cross_file_classification;
 #[path = "workspace_query_dotnet_test_subjects.rs"]
 mod workspace_query_dotnet_test_subjects;
 
+#[cfg(feature = "dotnet")]
+#[path = "workspace_query_dotnet_aspnet_ancestry.rs"]
+mod workspace_query_dotnet_aspnet_ancestry;
+
 #[cfg(feature = "csharp")]
 #[path = "workspace_query_csharp_structured_headers.rs"]
 mod workspace_query_csharp_structured_headers;

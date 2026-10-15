@@ -21,7 +21,7 @@ for ($i=0;$i -lt 55;$i++) {
 $padding=(1..65 | ForEach-Object {"// audit padding $_"}) -join "`n"
 Write-BText (Join-Path $root 'SharedHttpBase.cs') 'using Microsoft.AspNetCore.Mvc; namespace Audit134; public class SharedHttpBase : ControllerBase {}'
 Write-BText (Join-Path $root 'SecondHttpBase.cs') 'namespace Audit134; public class SecondHttpBase : SharedHttpBase {}'
-Write-BText (Join-Path $root 'OrdersEndpoint.cs') ($padding+"`n"+'using Microsoft.AspNetCore.Mvc; namespace Audit134; public class OrdersEndpoint : SecondHttpBase { [HttpGet("one")] public int GetOne() { return 1; } }')
+Write-BText (Join-Path $root 'OrdersEndpoint.cs') ($padding+"`n"+'using Microsoft.AspNetCore.Mvc; namespace Audit134; [Route("orders")] public class OrdersEndpoint : SecondHttpBase { [HttpGet("one")] public int GetOne() { return 1; } }')
 Write-BText (Join-Path $root 'EditProbe.cs') ($padding+"`npublic class EditProbe {`n public int First() { return 1; }`n public int Second() { return 2; }`n}")
 Write-BText (Join-Path $root 'service.ts') @'
 import { Injectable } from '@angular/core';
@@ -107,6 +107,10 @@ try {
         foreach ($file in @('SharedHttpBase.cs','SecondHttpBase.cs','OrdersEndpoint.cs')) {$null=Publish-Audit $file}
         $answer=Query-Audit 'find_entities' 'dotnet' 'Controller' 'OrdersEndpoint'
         Assert-B ($answer.verifier_selected_count -gt 0) 'Indirect framework controller not classified after publishing its whole base chain.'
+        $edges=Query-Audit 'forward_edges' 'dotnet' 'Controller' 'OrdersEndpoint'
+        Save-B '134-controller-ancestry' @{entity=$answer;edges=$edges}
+        Assert-B (@($edges.edges | Where-Object { $_.relation -eq 'HasRoute' -and $_.object.name -eq 'orders' }).Count -eq 1) 'Indirect controller route was not projected from the original endpoint.'
+        Assert-B (@($edges.edges | Where-Object { $_.relation -eq 'ControllerAction' -and $_.object.name -eq 'GetOne' }).Count -eq 1) 'Indirect controller action set was not projected from the original endpoint.'
     }
     Invoke-BCase '136' 'insert-before-whole-member-declaration' {
         $null=Publish-Audit 'EditProbe.cs'

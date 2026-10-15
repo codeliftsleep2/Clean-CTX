@@ -23,6 +23,7 @@ use crate::mcp::McpState;
 use crate::mcp::tool_handlers::hydration::HydrationRequirement;
 use crate::workspace::index::SemanticFidelity;
 use serde_json::Value;
+use std::collections::HashSet;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
@@ -88,6 +89,35 @@ fn try_prepare_forward_edges(
     }
     if hydration.is_complete()
         && let Some(exact) = identity.exact()
+        && exact.domain == "dotnet"
+        && exact.entity_type == "Controller"
+    {
+        let mut current = exact.name.clone();
+        let mut visited = HashSet::new();
+        while visited.insert(current.clone()) {
+            let candidate = {
+                let index = state.workspace_index_read();
+                let catalog =
+                    super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+                catalog.aspnet_base_candidate(&current)
+            };
+            let Some(candidate) = candidate else { break };
+            let next = context.hydrate(
+                state,
+                "find_entities",
+                &candidate,
+                workspace_root,
+                requirement,
+            )?;
+            hydration.merge(next);
+            if !hydration.is_complete() {
+                break;
+            }
+            current = candidate;
+        }
+    }
+    if hydration.is_complete()
+        && let Some(exact) = identity.exact()
         && exact.domain == "builtin"
         && exact.entity_type == "Class"
     {
@@ -141,6 +171,21 @@ fn try_prepare_forward_edges(
         let index = state.workspace_index_read();
         super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
     });
+    let (aspnet_projection, aspnet_authorized) = if classification_complete
+        && identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
+    {
+        let index = state.workspace_index_read();
+        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let exact = identity.exact().expect("checked exact Controller identity");
+        (
+            catalog.aspnet_projection(&exact.name, crate::compression::Fidelity::High),
+            catalog.has_aspnet_controller_authority(&exact.name),
+        )
+    } else {
+        (None, false)
+    };
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
         super::angular_templates::Catalog::build(
@@ -164,6 +209,13 @@ fn try_prepare_forward_edges(
             .ok()
             .and_then(|value| value.as_array().cloned())
             .unwrap_or_default();
+        if identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
+            && !aspnet_authorized
+        {
+            edges.clear();
+        }
         let stored_count = edges.len();
         if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
             edges.extend(catalog.forward(&exact.domain, &exact.entity_type, &exact.name));
@@ -179,6 +231,17 @@ fn try_prepare_forward_edges(
                 .and_then(|value| value.as_array().cloned())
                 .unwrap_or_default(),
             );
+        }
+        if let Some(projection) = &aspnet_projection {
+            for edge in serde_json::to_value(&projection.edges)
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default()
+            {
+                if !edges.contains(&edge) {
+                    edges.push(edge);
+                }
+            }
         }
         let count = edges.len();
         let mut structured = serde_json::json!({

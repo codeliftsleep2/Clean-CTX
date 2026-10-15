@@ -24,6 +24,7 @@ use super::{
 };
 use crate::mcp::McpState;
 use serde_json::Value;
+use std::collections::HashSet;
 
 fn semantic_fidelity(
     args: &Value,
@@ -80,21 +81,78 @@ fn try_prepare_find_entities(
             None => index.find_entities_by_name(&name),
         };
     }
-    let hydration = context.hydrate(
+    let mut hydration = context.hydrate(
         state,
         "find_entities",
         &name,
         workspace_root,
         crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
     )?;
+    if hydration.is_complete() {
+        let mut current = name.clone();
+        let mut visited = HashSet::new();
+        while visited.insert(current.clone()) {
+            let candidate = {
+                let index = state.workspace_index_read();
+                let catalog =
+                    super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+                catalog.aspnet_base_candidate(&current)
+            };
+            let Some(candidate) = candidate else { break };
+            let next = context.hydrate(
+                state,
+                "find_entities",
+                &candidate,
+                workspace_root,
+                crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
+            )?;
+            hydration.merge(next);
+            if !hydration.is_complete() {
+                break;
+            }
+            current = candidate;
+        }
+    }
+    let (aspnet_controller, aspnet_authorized) = if hydration.is_complete() {
+        let index = state.workspace_index_read();
+        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let authorized = catalog.has_aspnet_controller_authority(&name);
+        let controller = catalog
+            .aspnet_projection(&name, crate::compression::Fidelity::High)
+            .map(|projection| {
+                crate::layers::meta::semantic::EntityRef::new("dotnet", "Controller", &name)
+                    .with_file(projection.file)
+            });
+        (controller, authorized)
+    } else {
+        (None, false)
+    };
     Ok(PreparedQuery::indexed(move |index| {
         let entities = match scope.as_ref() {
             Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
             None => index.find_entities_by_name(&name),
         };
-        let count = entities.len();
+        let entities: Vec<_> = entities
+            .into_iter()
+            .filter(|entity| {
+                aspnet_authorized
+                    || !(entity.domain == "dotnet"
+                        && entity.entity_type == "Controller"
+                        && entity.name == name)
+            })
+            .collect();
+        let mut serialized = serde_json::to_value(&entities)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        if let Some(controller) = &aspnet_controller
+            && !entities.iter().any(|entity| **entity == *controller)
+        {
+            serialized.push(serde_json::to_value(controller).unwrap_or_default());
+        }
+        let count = serialized.len();
         let mut structured = serde_json::json!({
-            "entities": serde_json::to_value(&entities).unwrap_or_default(),
+            "entities": serialized,
             "count": count,
         });
         if let Some(discovery) = discovery_field(&hydration) {
