@@ -295,6 +295,7 @@ pub struct DispatchSite {
 pub struct SelectSite {
     pub selector_name: String,
     pub(crate) service_owner: Option<String>,
+    pub(crate) module_specifier: Option<String>,
 }
 
 /// The complete NgRx shape extracted from a file.

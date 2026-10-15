@@ -273,11 +273,19 @@ impl NgRxShape {
             } else {
                 EntityRef::new("angular", "SelectSite", "store")
             };
+            let mut object = EntityRef::new("ngrx", "Selector", &site.selector_name);
+            if let Some(module) = &site.module_specifier {
+                object.file = Some(module.clone());
+            }
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Selects,
                 subject,
-                object: EntityRef::new("ngrx", "Selector", &site.selector_name),
-                layer: "ngrx",
+                object,
+                layer: if site.module_specifier.is_some() {
+                    super::direct_imports::REFINEMENT_LAYER
+                } else {
+                    "ngrx"
+                },
                 call_evidence: None,
             });
         }

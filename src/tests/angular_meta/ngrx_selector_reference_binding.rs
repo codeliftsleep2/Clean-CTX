@@ -26,7 +26,7 @@ fn compile(source: &str) -> Vec<SemanticEdge> {
 fn selector_targets(source: &str) -> Vec<String> {
     compile(source)
         .into_iter()
-        .filter(|edge| edge.relation == SemanticRelation::Selects)
+        .filter(|edge| edge.relation == SemanticRelation::Selects && edge.layer == "ngrx")
         .map(|edge| edge.object.name)
         .collect()
 }

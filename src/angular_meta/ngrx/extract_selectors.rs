@@ -357,6 +357,7 @@ pub(super) fn extract_call_sites(
                         shape.select_sites.push(SelectSite {
                             selector_name: name,
                             service_owner: None,
+                            module_specifier: None,
                         });
                     }
                 }

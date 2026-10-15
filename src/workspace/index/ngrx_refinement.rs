@@ -1,4 +1,4 @@
-//! Workspace-owned refinement of bounded NgRx object-dispatch imports.
+//! Workspace-owned refinement of bounded direct-relative NgRx imports.
 
 use super::edges::{EdgeKey, StoredEdge};
 use super::{WorkspaceIndex, entity_key};
@@ -22,32 +22,35 @@ impl WorkspaceIndex {
             .flat_map(|(file, edges)| edges.iter().cloned().map(|edge| (file.clone(), edge)))
             .collect();
         for (asserting_file, mut edge) in candidates {
-            let action_is_subject =
+            let imported_entity_is_subject =
                 edge.relation == crate::layers::meta::semantic::SemanticRelation::TriggersReducer;
-            let action = if action_is_subject {
+            let imported_entity = if imported_entity_is_subject {
                 &edge.subject
             } else {
                 &edge.object
             };
-            let Some(module) = action.file.as_deref() else {
+            let Some(module) = imported_entity.file.as_deref() else {
                 continue;
             };
             let Some(target) = resolve_typescript_module(&asserting_file, module) else {
                 continue;
             };
-            let declarations =
-                self.declarations_by_identity(action.domain, action.entity_type, &action.name);
+            let declarations = self.declarations_by_identity(
+                imported_entity.domain,
+                imported_entity.entity_type,
+                &imported_entity.name,
+            );
             if declarations
                 .iter()
                 .filter(|declaration| declaration.file.as_deref() == Some(target.as_str()))
                 .count()
                 != 1
-                || !exports_const(&target, &action.name)
+                || !exports_const(&target, &imported_entity.name)
             {
                 continue;
             }
             edge.subject.file = Some(asserting_file.clone());
-            if action_is_subject {
+            if imported_entity_is_subject {
                 edge.subject.file = Some(target);
                 edge.object
                     .file

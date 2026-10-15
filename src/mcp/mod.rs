@@ -113,6 +113,9 @@ mod ngrx_selector_declaration_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/ngrx_direct_named_action_refinement.rs"]
 mod ngrx_direct_named_action_refinement_tests;
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_direct_named_selector_refinement.rs"]
+mod ngrx_direct_named_selector_refinement_tests;
 #[cfg(all(test, feature = "angular", feature = "typescript"))]
 #[path = "../tests/mcp/ngrx_selector_reference_binding.rs"]
 mod ngrx_selector_reference_binding_tests;
