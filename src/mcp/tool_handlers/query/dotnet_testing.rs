@@ -13,9 +13,9 @@ impl Catalog {
         state: &McpState,
         index: &WorkspaceIndex,
         scope: Option<&WorkspaceScope>,
+        declarations: &super::csharp_resolution::Catalog,
     ) -> Self {
         let mut edges = Vec::new();
-        let declarations = super::csharp_resolution::Catalog::build(state, index, scope);
         for file in index.file_map().keys().filter(|file| {
             file.to_ascii_lowercase().ends_with(".cs")
                 && scope.is_none_or(|scope| scope.admits(file))

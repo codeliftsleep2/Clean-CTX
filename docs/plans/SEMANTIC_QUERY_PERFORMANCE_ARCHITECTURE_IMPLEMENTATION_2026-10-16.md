@@ -1,7 +1,7 @@
 # Semantic Query Performance Architecture Implementation Campaign — 2026-10-16
 
 **Agent:** Agent MaxHeadRoom  
-**Campaign status:** Phase 1 GREEN; Phase 2 instrumentation prepared, Angular characterization rerun pending
+**Campaign status:** Phases 1–2 GREEN; Phase 3 request-local reuse implemented, focused verification pending
 
 ## Phase 1 — Static Tree-Sitter Query Reuse
 
@@ -128,7 +128,7 @@ Before production edits, verify target file line counts. `capture_pipeline.rs` i
 
 ## Phase 2 — Structural Work-Count Instrumentation
 
-**STATUS:** IMPLEMENTED — first Angular characterization run corrected; focused rerun pending
+**STATUS:** GREEN — user reported both focused characterizations passing
 
 The current branch still reconstructs C# and Angular derived query catalogs.
 Phase 2 adds a test-only, thread-local work ledger at the constructors and
@@ -162,7 +162,50 @@ between inline and external sources, with identical derived results.
 These are characterization assertions for the uncached implementation, not a
 future cache contract. No production optimization, cache, evidence generation,
 parser pool, parse-tree cache, lookup index, or authority change is included.
-The user-run Angular characterization reached the component-count assertion and
-reported eight rather than the statically assumed four; its remaining counter
-assertions and the C# characterization still require focused execution. The
-agent ran no Cargo command or runtime verification while preparing Phase 2.
+The user-run Angular characterization first corrected the component count from
+four to eight, then both focused Phase 2 characterizations passed. The agent
+ran no Cargo command or runtime verification while preparing Phase 2.
+
+## Phase 3 — Request-Local Semantic Catalog Reuse
+
+**STATUS:** IMPLEMENTED / NOT RUN
+
+`PreparationContext`, already owned by exactly one `workspace_query` request,
+now owns request-local `Arc` values for the C# catalog and the two Angular
+catalog interpretations (`discovery_complete = false | true`). The request has
+one shared validated `WorkspaceScope`, so scope does not require a second cache
+key. The context is dropped after the single query or batch response.
+
+Validity follows existing mutation boundaries rather than a new evidence epoch:
+
+- hydration that publishes candidates invalidates all derived catalogs after
+  its required reconciliation;
+- hydration error invalidates conservatively because partial publication may
+  have preceded the failure;
+- successful hydration with zero publications preserves compatible catalogs;
+- direct `entities_in_file` or `declarations_in_file` publication invalidates
+  immediately before semantic projection replacement;
+- hydration cache hits perform no acquisition and preserve derived views.
+
+All C# consumers in entity, edge, graph, .NET testing, and EF preparation obtain
+the shared request-local C# catalog. Angular selector hydration and final edge
+preparation obtain the appropriate request-local Angular catalog. The catalogs
+remain reconstructable derived machinery and never establish source authority,
+completion, fidelity, or dependency validity.
+
+Expected structural changes from the Phase 2 baseline are:
+
+- two equivalent C# batch items across both preparation passes: catalog builds
+  `4 -> 1`, files considered `4 -> 1`, files parsed `4 -> 1`;
+- two equivalent Angular batch items reuse one incomplete-discovery and one
+  complete-discovery catalog while retaining identical results;
+- direct C# publication between equivalent preparations forces reconstruction:
+  the structural sequence is one build, one reuse, one non-empty invalidation,
+  one rebuild, and one reuse, followed by reuse during second-pass preparation;
+  the two builds process one file before publication and two afterward.
+
+The direct two-build Angular characterization remains intentionally unchanged:
+it calls the constructor twice outside `PreparationContext` and therefore does
+not claim request-local reuse. No reuse survives a request, and no session cache,
+evidence epoch, compatibility fingerprint, parser pool, parse-tree cache, or
+lookup index was introduced.

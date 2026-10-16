@@ -76,7 +76,7 @@ fn try_prepare_transitive_dependencies(
     let csharp_dependencies = identity.exact().and_then(|exact| {
         (exact.domain == "builtin" && exact.entity_type == "Class").then(|| {
             let index = state.workspace_index_read();
-            let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            let catalog = context.csharp_catalog(state, &index, scope.as_ref());
             super::csharp_resolution::DependencyGraph::build(&catalog, &index, scope.as_ref())
         })
     });
@@ -163,7 +163,7 @@ fn try_prepare_has_cycle(
     let scope = context.scope(state, args)?;
     let csharp_dependencies = {
         let index = state.workspace_index_read();
-        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let catalog = context.csharp_catalog(state, &index, scope.as_ref());
         super::csharp_resolution::DependencyGraph::build(&catalog, &index, scope.as_ref())
     };
     Ok(PreparedQuery::indexed(move |index| {

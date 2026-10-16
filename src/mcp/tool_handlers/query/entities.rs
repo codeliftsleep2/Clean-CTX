@@ -106,8 +106,7 @@ fn try_prepare_find_entities(
         while visited.insert(current.clone()) {
             let candidate = {
                 let index = state.workspace_index_read();
-                let catalog =
-                    super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+                let catalog = context.csharp_catalog(state, &index, scope.as_ref());
                 catalog.aspnet_base_candidate(&current)
             };
             let Some(candidate) = candidate else { break };
@@ -127,7 +126,7 @@ fn try_prepare_find_entities(
     }
     let (aspnet_controller, aspnet_authorized) = if !declarations_only {
         let index = state.workspace_index_read();
-        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let catalog = context.csharp_catalog(state, &index, scope.as_ref());
         let direct = super::csharp_resolution::direct_aspnet::projection_for_catalog(
             &catalog,
             &name,
@@ -278,6 +277,7 @@ fn try_prepare_entities_in_file(
             Ok((_, edges, dependencies, hash)) => (edges, dependencies, hash),
             Err(error) => return Err(QueryFailure::internal(error.to_string())),
         };
+    context.invalidate_derived_catalogs();
     {
         let mut idx = state.workspace_index_lock();
         idx.replace_semantic_projection_with_dependencies(
@@ -382,6 +382,7 @@ fn try_prepare_declarations_in_file(
         .workspace_index_read()
         .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
     {
+        context.invalidate_derived_catalogs();
         state
             .preflight_semantic_publication(&resolved_path)
             .map_err(QueryFailure::internal)?;

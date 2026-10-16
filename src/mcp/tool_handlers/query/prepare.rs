@@ -8,6 +8,7 @@ use crate::mcp::tool_handlers::hydration::{
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 type IndexedEvaluator = Box<dyn FnOnce(&WorkspaceIndex) -> QueryResult>;
 
@@ -65,6 +66,8 @@ struct HydrationKey {
 pub(super) struct PreparationContext {
     scope: Option<Result<Option<WorkspaceScope>, String>>,
     hydration: HashMap<HydrationKey, Result<HydrationReport, String>>,
+    csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
+    angular_catalogs: [Option<Arc<super::angular_templates::Catalog>>; 2],
 }
 
 impl PreparationContext {
@@ -72,6 +75,8 @@ impl PreparationContext {
         Self {
             scope: None,
             hydration: HashMap::new(),
+            csharp_catalog: None,
+            angular_catalogs: [None, None],
         }
     }
 
@@ -99,12 +104,75 @@ impl PreparationContext {
             name: name.to_string(),
             requirement,
         };
-        self.hydration
-            .entry(key)
-            .or_insert_with(|| {
-                hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement)
+        if let Some(result) = self.hydration.get(&key) {
+            return result.clone().map_err(QueryFailure::internal);
+        }
+        let result =
+            hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement);
+        // Publication (and its required reconciliation) changes the evidence
+        // from which request-local catalogs are derived. An error may follow a
+        // partial publication, so it also conservatively invalidates. A
+        // successful no-publication acquisition leaves compatible views valid.
+        let evidence_changed = match &result {
+            Ok(report) => report.candidates_compiled > 0,
+            Err(_) => true,
+        };
+        if evidence_changed {
+            self.invalidate_derived_catalogs();
+        }
+        self.hydration.insert(key, result.clone());
+        result.map_err(QueryFailure::internal)
+    }
+
+    pub(super) fn csharp_catalog(
+        &mut self,
+        state: &McpState,
+        index: &WorkspaceIndex,
+        scope: Option<&WorkspaceScope>,
+    ) -> Arc<super::csharp_resolution::Catalog> {
+        if let Some(catalog) = &self.csharp_catalog {
+            #[cfg(test)]
+            super::work_metrics::record_csharp_catalog_reuse();
+            return catalog.clone();
+        }
+        self.csharp_catalog
+            .get_or_insert_with(|| {
+                Arc::new(super::csharp_resolution::Catalog::build(
+                    state, index, scope,
+                ))
             })
             .clone()
-            .map_err(QueryFailure::internal)
+    }
+
+    pub(super) fn angular_catalog(
+        &mut self,
+        state: &McpState,
+        index: &WorkspaceIndex,
+        scope: Option<&WorkspaceScope>,
+        discovery_complete: bool,
+    ) -> Arc<super::angular_templates::Catalog> {
+        let slot = usize::from(discovery_complete);
+        self.angular_catalogs[slot]
+            .get_or_insert_with(|| {
+                Arc::new(super::angular_templates::Catalog::build(
+                    state,
+                    index,
+                    scope,
+                    discovery_complete,
+                ))
+            })
+            .clone()
+    }
+
+    pub(super) fn invalidate_derived_catalogs(&mut self) {
+        #[cfg(test)]
+        let had_catalog =
+            self.csharp_catalog.is_some() || self.angular_catalogs.iter().any(Option::is_some);
+        #[cfg(test)]
+        if had_catalog {
+            super::work_metrics::record_derived_catalog_invalidation();
+        }
+        self.csharp_catalog = None;
+        self.angular_catalogs = [None, None];
     }
 }

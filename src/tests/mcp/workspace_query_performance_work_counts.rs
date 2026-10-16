@@ -39,7 +39,7 @@ fn batch_results(response: &Value) -> &Vec<Value> {
 }
 
 #[test]
-fn equivalent_csharp_batch_items_rebuild_catalogs_in_both_preparation_passes() {
+fn equivalent_csharp_batch_items_reuse_one_request_local_catalog() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
     let file = root.path().join("Derived.cs");
@@ -68,11 +68,11 @@ fn equivalent_csharp_batch_items_rebuild_catalogs_in_both_preparation_passes() {
 
     let counts = work_metrics::snapshot();
     assert_eq!(
-        counts.csharp_catalog_builds, 4,
-        "two equivalent indexed items are each prepared twice today"
+        counts.csharp_catalog_builds, 1,
+        "equivalent consumers over unchanged request evidence must share one catalog"
     );
-    assert_eq!(counts.csharp_files_considered, 4);
-    assert_eq!(counts.csharp_files_parsed, 4);
+    assert_eq!(counts.csharp_files_considered, 1);
+    assert_eq!(counts.csharp_files_parsed, 1);
 }
 
 #[test]
@@ -117,4 +117,107 @@ fn repeated_angular_catalog_builds_reprocess_inline_and_external_templates() {
     assert_eq!(counts.angular_template_sources_processed, 4);
     assert_eq!(counts.angular_inline_templates_processed, 2);
     assert_eq!(counts.angular_external_templates_processed, 2);
+}
+
+#[test]
+fn equivalent_angular_batch_items_reuse_compatible_request_local_catalogs() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let external_component = root.path().join("ExternalHost.ts");
+    let inline_component = root.path().join("InlineHost.ts");
+    std::fs::write(
+        root.path().join("external.html"),
+        "<child-view></child-view>",
+    )
+    .expect("external template");
+    std::fs::write(
+        &external_component,
+        "import { Component } from '@angular/core'; @Component({ selector: 'external-host', templateUrl: './external.html' }) export class ExternalHost {}",
+    )
+    .expect("external component");
+    std::fs::write(
+        &inline_component,
+        "import { Component } from '@angular/core'; @Component({ selector: 'inline-host', template: '<child-view></child-view>' }) export class InlineHost {}",
+    )
+    .expect("inline component");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &external_component);
+    publish(&state, root.path(), &inline_component);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "queries": [
+                { "id": "first", "type": "forward_edges", "domain": "angular", "entity_type": "Component", "name": "ExternalHost" },
+                { "id": "second", "type": "forward_edges", "domain": "angular", "entity_type": "Component", "name": "ExternalHost" }
+            ]
+        }),
+    );
+
+    let results = batch_results(&response);
+    assert_eq!(results.len(), 2, "{response}");
+    assert_eq!(results[0]["status"], "ok", "{response}");
+    assert_eq!(results[1]["status"], "ok", "{response}");
+    assert_eq!(results[0]["result"], results[1]["result"]);
+    let counts = work_metrics::snapshot();
+    assert_eq!(counts.angular_catalog_builds, 2);
+    assert_eq!(counts.angular_components_considered, 8);
+    assert_eq!(counts.angular_template_sources_processed, 4);
+    assert_eq!(counts.angular_inline_templates_processed, 2);
+    assert_eq!(counts.angular_external_templates_processed, 2);
+}
+
+#[test]
+fn csharp_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let derived = root.path().join("Derived.cs");
+    let added = root.path().join("Added.cs");
+    std::fs::write(&derived, "class Base {} class Derived : Base {}").expect("derived fixture");
+    std::fs::write(&added, "class Added {}").expect("added fixture");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &derived);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "queries": [
+                { "id": "before-first", "type": "forward_edges", "domain": "builtin", "entity_type": "Class", "name": "Derived" },
+                { "id": "before-second", "type": "forward_edges", "domain": "builtin", "entity_type": "Class", "name": "Derived" },
+                { "id": "publish", "type": "entities_in_file", "file_path": "Added.cs", "fidelity": "high" },
+                { "id": "after-first", "type": "forward_edges", "domain": "builtin", "entity_type": "Class", "name": "Derived" },
+                { "id": "after-second", "type": "forward_edges", "domain": "builtin", "entity_type": "Class", "name": "Derived" }
+            ]
+        }),
+    );
+
+    let results = batch_results(&response);
+    assert!(
+        results.iter().all(|item| item["status"] == "ok"),
+        "{response}"
+    );
+    assert_eq!(results[0]["result"], results[1]["result"]);
+    assert_eq!(results[0]["result"], results[3]["result"]);
+    assert_eq!(results[0]["result"], results[4]["result"]);
+    let counts = work_metrics::snapshot();
+    assert_eq!(
+        counts.csharp_catalog_builds, 2,
+        "publication must invalidate the catalog built from earlier evidence"
+    );
+    assert_eq!(
+        counts.csharp_catalog_reuses, 6,
+        "one reuse must occur before publication, one after rebuilding, and four in the second preparation pass"
+    );
+    assert_eq!(
+        counts.derived_catalog_invalidations, 1,
+        "the direct publication must invalidate the one non-empty request-local derived state"
+    );
+    assert_eq!(counts.csharp_files_considered, 3);
+    assert_eq!(counts.csharp_files_parsed, 3);
 }

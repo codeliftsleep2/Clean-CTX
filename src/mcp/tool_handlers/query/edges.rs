@@ -97,8 +97,7 @@ fn try_prepare_forward_edges(
         while visited.insert(current.clone()) {
             let candidate = {
                 let index = state.workspace_index_read();
-                let catalog =
-                    super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+                let catalog = context.csharp_catalog(state, &index, scope.as_ref());
                 catalog.aspnet_base_candidate(&current)
             };
             let Some(candidate) = candidate else { break };
@@ -161,7 +160,7 @@ fn try_prepare_forward_edges(
         .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "Class");
     let resolution_catalog = (classification_complete && needs_csharp_resolution).then(|| {
         let index = state.workspace_index_read();
-        super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
+        context.csharp_catalog(state, &index, scope.as_ref())
     });
     let dotnet_testing_catalog = (classification_complete
         && identity
@@ -169,14 +168,15 @@ fn try_prepare_forward_edges(
             .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "TestClass"))
     .then(|| {
         let index = state.workspace_index_read();
-        super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+        let csharp = context.csharp_catalog(state, &index, scope.as_ref());
+        super::dotnet_testing::Catalog::build(state, &index, scope.as_ref(), &csharp)
     });
     let efcore_catalog = identity
         .exact()
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "DbContext")
         .then(|| {
             let index = state.workspace_index_read();
-            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            let csharp = context.csharp_catalog(state, &index, scope.as_ref());
             super::csharp_resolution::EfCoreCatalog::build(&csharp)
         });
     let (aspnet_projection, aspnet_authorized) = if classification_complete
@@ -185,7 +185,7 @@ fn try_prepare_forward_edges(
             .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
     {
         let index = state.workspace_index_read();
-        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let catalog = context.csharp_catalog(state, &index, scope.as_ref());
         let exact = identity.exact().expect("checked exact Controller identity");
         (
             catalog.aspnet_projection(&exact.name, crate::compression::Fidelity::High),
@@ -196,12 +196,7 @@ fn try_prepare_forward_edges(
     };
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
-        super::angular_templates::Catalog::build(
-            state,
-            &index,
-            scope.as_ref(),
-            classification_complete,
-        )
+        context.angular_catalog(state, &index, scope.as_ref(), classification_complete)
     });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
@@ -211,7 +206,7 @@ fn try_prepare_forward_edges(
             &resolved,
             scope.as_ref(),
             classification_complete,
-            resolution_catalog.as_ref(),
+            resolution_catalog.as_deref(),
         );
         let mut edges = serde_json::to_value(&stored_edges)
             .ok()
@@ -276,7 +271,7 @@ fn try_prepare_forward_edges(
         apply_angular_template_metadata(
             &mut structured,
             &resolved,
-            angular_catalog.as_ref(),
+            angular_catalog.as_deref(),
             classification_complete,
             CapabilityDirection::Forward,
         );
@@ -352,31 +347,27 @@ fn try_prepare_reverse_edges(
     });
     let resolution_catalog = (classification_complete && needs_csharp_resolution).then(|| {
         let index = state.workspace_index_read();
-        super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
+        context.csharp_catalog(state, &index, scope.as_ref())
     });
     let dotnet_testing_catalog = identity
         .exact()
         .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "Class")
         .then(|| {
             let index = state.workspace_index_read();
-            super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+            let csharp = context.csharp_catalog(state, &index, scope.as_ref());
+            super::dotnet_testing::Catalog::build(state, &index, scope.as_ref(), &csharp)
         });
     let efcore_catalog = identity
         .exact()
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Entity")
         .then(|| {
             let index = state.workspace_index_read();
-            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            let csharp = context.csharp_catalog(state, &index, scope.as_ref());
             super::csharp_resolution::EfCoreCatalog::build(&csharp)
         });
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
-        super::angular_templates::Catalog::build(
-            state,
-            &index,
-            scope.as_ref(),
-            classification_complete,
-        )
+        context.angular_catalog(state, &index, scope.as_ref(), classification_complete)
     });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
@@ -386,7 +377,7 @@ fn try_prepare_reverse_edges(
             &resolved,
             scope.as_ref(),
             classification_complete,
-            resolution_catalog.as_ref(),
+            resolution_catalog.as_deref(),
         );
         let mut edges = serde_json::to_value(&stored_edges)
             .ok()
@@ -433,7 +424,7 @@ fn try_prepare_reverse_edges(
         apply_angular_template_metadata(
             &mut structured,
             &resolved,
-            angular_catalog.as_ref(),
+            angular_catalog.as_deref(),
             classification_complete,
             CapabilityDirection::Reverse,
         );
@@ -540,7 +531,9 @@ fn hydrate_angular_selector_candidates(
     }
     let selectors = {
         let index = state.workspace_index_read();
-        super::angular_templates::Catalog::build(state, &index, scope, false).selectors()
+        context
+            .angular_catalog(state, &index, scope, false)
+            .selectors()
     };
     for selector in selectors {
         let selector_hydration = context.hydrate(
