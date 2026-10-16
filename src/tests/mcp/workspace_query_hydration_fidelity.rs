@@ -249,14 +249,19 @@ fn legacy_discovery_completion_does_not_suppress_high_angular_hydration() {
         "legacy discovery must complete: {legacy}"
     );
     assert!(
-        !current_at(&state, &path, SemanticFidelity::High),
-        "legacy/Edit hydration must not claim High semantic coverage"
+        current_at(&state, &path, SemanticFidelity::High),
+        "full legacy/Edit hydration must certify its source-current High semantic coverage"
     );
 
     let edges = query_consumer_edges(&state, root.path());
     assert_one_injects_foo(&edges);
+    let discovery = &edges["result"]["structuredContent"]["discovery"];
+    assert!(
+        discovery.get("compiled").is_none() || discovery["compiled"] == 0,
+        "the distinct High discovery may reuse adequate legacy/Edit evidence without recompilation: {edges}"
+    );
     assert!(
         current_at(&state, &path, SemanticFidelity::High),
-        "the distinct High discovery entry must permit coverage upgrade"
+        "the distinct High discovery entry must preserve current adequate coverage"
     );
 }

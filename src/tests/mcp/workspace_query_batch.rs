@@ -7,6 +7,7 @@
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use crate::mcp::tools::{dispatch_tools_call, tool_list};
 use crate::tests::assert_valid_mcp_envelope;
+use crate::workspace::index::SemanticFidelity;
 use serde_json::{Value, json};
 
 fn dispatch(state: &crate::mcp::McpState, arguments: Value) -> Value {
@@ -36,7 +37,13 @@ fn seeded_state(root: &tempfile::TempDir) -> crate::mcp::McpState {
     let b_file = root.path().join("B.rs").to_string_lossy().into_owned();
     std::fs::write(&a_file, "struct A;").expect("A fixture");
     std::fs::write(&b_file, "struct B;").expect("B fixture");
-    state.workspace_index_lock().add_edges(
+    let a_hash = state
+        .cache_read()
+        .compute_hash(std::fs::read(&a_file).expect("A source").as_slice());
+    let b_hash = state
+        .cache_read()
+        .compute_hash(std::fs::read(&b_file).expect("B source").as_slice());
+    state.workspace_index_lock().replace_semantic_projection(
         &a_file,
         vec![SemanticEdge {
             relation: SemanticRelation::ImportsModule,
@@ -45,8 +52,10 @@ fn seeded_state(root: &tempfile::TempDir) -> crate::mcp::McpState {
             layer: "test",
             call_evidence: None,
         }],
+        SemanticFidelity::High,
+        a_hash,
     );
-    state.workspace_index_lock().add_edges(
+    state.workspace_index_lock().replace_semantic_projection(
         &b_file,
         vec![SemanticEdge {
             relation: SemanticRelation::ImportsModule,
@@ -55,6 +64,8 @@ fn seeded_state(root: &tempfile::TempDir) -> crate::mcp::McpState {
             layer: "test",
             call_evidence: None,
         }],
+        SemanticFidelity::High,
+        b_hash,
     );
     state
 }
