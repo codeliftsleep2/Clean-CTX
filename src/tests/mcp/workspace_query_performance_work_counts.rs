@@ -43,8 +43,7 @@ fn equivalent_csharp_batch_items_rebuild_catalogs_in_both_preparation_passes() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
     let file = root.path().join("Derived.cs");
-    std::fs::write(&file, "class Base {} class Derived : Base {}")
-        .expect("C# fixture");
+    std::fs::write(&file, "class Base {} class Derived : Base {}").expect("C# fixture");
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     publish(&state, root.path(), &file);
 
