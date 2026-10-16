@@ -15,10 +15,12 @@
 
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
+use std::path::Path;
 
 mod extract_guards;
 #[cfg(test)]
 mod extraction_metrics;
+mod structured;
 
 // Guard/resolver extraction moved to `routing/extract_guards.rs`; the entry
 // helpers stay module-internal (`pub(super)`) and are used here.
@@ -99,10 +101,27 @@ pub struct RouteDecl {
     pub load_component: Option<String>,
     /// The lazily-loaded children module (e.g. `() => import('./users')`).
     pub load_children: Option<String>,
+    /// A declaration-proven lazy Component target.
+    pub resolved_load_component: Option<LazyRouteTarget>,
+    /// A declaration-proven lazy Module or route-configuration target.
+    pub resolved_load_children: Option<LazyRouteTarget>,
     /// Guard names applied to this route (e.g. `AuthGuard`).
     pub guards: Vec<String>,
     /// Resolver names applied to this route (e.g. `UserResolver`).
     pub resolvers: Vec<String>,
+}
+
+/// A declaration-proven lazy route target.
+#[derive(Debug, Clone)]
+pub struct LazyRouteTarget {
+    pub entity_type: &'static str,
+    pub name: String,
+}
+
+impl LazyRouteTarget {
+    fn new(entity_type: &'static str, name: String) -> Self {
+        Self { entity_type, name }
+    }
 }
 
 /// A standalone guard declaration (class or function).
@@ -125,6 +144,7 @@ pub struct ResolverDecl {
 #[derive(Debug, Clone, Default)]
 pub struct RouteShape {
     pub routes: Vec<RouteDecl>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     pub guards: Vec<GuardDecl>,
     pub resolvers: Vec<ResolverDecl>,
 }
@@ -155,6 +175,26 @@ impl RouteShape {
                     relation: SemanticRelation::RouteMapsTo,
                     subject: route_entity.clone(),
                     object: EntityRef::new("angular", "Component", comp),
+                    layer: "angular",
+                    call_evidence: None,
+                });
+            }
+
+            if let Some(target) = &route.resolved_load_component {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::RouteMapsTo,
+                    subject: route_entity.clone(),
+                    object: EntityRef::new("angular", target.entity_type, &target.name),
+                    layer: "angular",
+                    call_evidence: None,
+                });
+            }
+
+            if let Some(target) = &route.resolved_load_children {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::LoadsChildren,
+                    subject: route_entity.clone(),
+                    object: EntityRef::new("angular", target.entity_type, &target.name),
                     layer: "angular",
                     call_evidence: None,
                 });
@@ -284,15 +324,33 @@ pub fn has_router_imports(source: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Extract the Routing shape from a source file.
-pub fn extract_route_shape(source: &str, _fidelity: Fidelity) -> Option<RouteShape> {
+pub fn extract_route_shape(source: &str, fidelity: Fidelity) -> Option<RouteShape> {
+    extract_route_shape_at(source, fidelity, None)
+}
+
+/// Extract routes with optional declaration-path authority for lazy targets.
+pub fn extract_route_shape_at(
+    source: &str,
+    fidelity: Fidelity,
+    declaring_path: Option<&Path>,
+) -> Option<RouteShape> {
     let lexical_regions = crate::meta_util::LexicalRegions::new(source);
-    extract_route_shape_with_regions(source, _fidelity, &lexical_regions)
+    extract_route_shape_at_with_regions(source, fidelity, &lexical_regions, declaring_path)
 }
 
 pub(crate) fn extract_route_shape_with_regions(
     source: &str,
+    fidelity: Fidelity,
+    lexical_regions: &crate::meta_util::LexicalRegions,
+) -> Option<RouteShape> {
+    extract_route_shape_at_with_regions(source, fidelity, lexical_regions, None)
+}
+
+pub(crate) fn extract_route_shape_at_with_regions(
+    source: &str,
     _fidelity: Fidelity,
     lexical_regions: &crate::meta_util::LexicalRegions,
+    declaring_path: Option<&Path>,
 ) -> Option<RouteShape> {
     #[cfg(test)]
     extraction_metrics::record_extraction();
@@ -300,245 +358,21 @@ pub(crate) fn extract_route_shape_with_regions(
     if !has_router_imports(source) {
         return None;
     }
-    let mut shape = RouteShape::default();
+    let (routes, semantic_dependencies) = structured::extract(source, declaring_path);
+    let mut shape = RouteShape {
+        routes,
+        semantic_dependencies,
+        ..RouteShape::default()
+    };
 
-    // Extract route declarations from `Routes` arrays and
-    // `RouterModule.forRoot(...)` / `forChild(...)` calls.
-    extract_routes(source, &mut shape, lexical_regions);
-
-    // Extract standalone guard declarations.
     extract_guards(source, &mut shape, lexical_regions);
-
-    // Extract standalone resolver declarations.
     extract_resolvers(source, &mut shape, lexical_regions);
 
-    if shape.is_empty() {
-        return None;
-    }
-    Some(shape)
+    (!shape.is_empty()).then_some(shape)
 }
 
 #[cfg(test)]
 pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
-
-/// Extract route objects from `Routes` arrays and `RouterModule` calls.
-fn extract_routes(
-    source: &str,
-    shape: &mut RouteShape,
-    lexical_regions: &crate::meta_util::LexicalRegions,
-) {
-    // Strategy: find `{ path: '...', ... }` objects that appear within
-    // a `Routes` context. We scan for `path:` keys and parse the
-    // enclosing object.
-    let mut search_from = 0;
-    while let Some(idx) = source[search_from..].find("path:") {
-        let abs_idx = search_from + idx;
-
-        // Round-10 audit: skip `path:` matches inside comment lines or
-        // string literals. The global scan would otherwise pick up
-        // `// path: 'ignored'` comments and `{ path: 'users' }` strings
-        // embedded in template literals, producing phantom routes.
-        let line_start = source[..abs_idx].rfind('\n').map(|i| i + 1).unwrap_or(0);
-        let line_trim = source[line_start..abs_idx].trim_start();
-        if line_trim.starts_with("//") || line_trim.starts_with('*') {
-            search_from = abs_idx + "path:".len();
-            continue;
-        }
-
-        // Round-11 audit: reject matches inside trailing comments, block
-        // comments, or string literals (e.g. `{ path: 'x' }, // path: 'y'`).
-        if lexical_regions.contains(abs_idx) {
-            search_from = abs_idx + "path:".len();
-            continue;
-        }
-
-        // Find the enclosing `{ ... }` object by scanning backwards
-        // for the opening brace. We use the shared string-aware
-        // primitive (Round-8 structural audit — same depth/string
-        // awareness as every other meta-layer).
-        let before = &source[..abs_idx];
-        let open_brace = crate::angular_meta::util::find_enclosing_brace(before, before.len());
-        if let Some(open) = open_brace {
-            // Round-11 audit: require the enclosing object to be inside a
-            // genuine `Routes` context (a `Routes = [...]` array or a
-            // `RouterModule.forRoot/forChild([...])` call). A `path:` key
-            // inside an unrelated object literal (`const menu = {
-            // path: '/home' }`) must NOT produce a phantom route.
-            if !is_routes_context(source, open) {
-                search_from = abs_idx + 5;
-                continue;
-            }
-            // Find the matching closing brace, starting from the
-            // opening brace so bracket depth is balanced.
-            let after = &source[open..];
-            if let Some(close_rel) = crate::angular_meta::util::find_matching_brace(after, '{') {
-                let close = open + close_rel;
-                let obj = &source[open..=close];
-
-                // Extract the path value.
-                let path = crate::angular_meta::util::extract_quoted_value(obj, "path")
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "?".to_string());
-
-                // Extract component / loadComponent / loadChildren.
-                let component = extract_ident_value(obj, "component");
-                let load_component = extract_load_value(obj, "loadComponent");
-                let load_children = extract_load_value(obj, "loadChildren");
-
-                // Extract guards.
-                let mut guards: Vec<String> = Vec::new();
-                for key in ["canActivate", "canLoad", "canDeactivate", "canMatch"] {
-                    if let Some(g) = extract_array_idents(obj, key) {
-                        guards.extend(g);
-                    }
-                }
-
-                // Extract resolvers.
-                let mut resolvers: Vec<String> = Vec::new();
-                if let Some(r) = extract_resolve_idents(obj) {
-                    resolvers.extend(r);
-                }
-
-                shape.routes.push(RouteDecl {
-                    path,
-                    component,
-                    load_component,
-                    load_children,
-                    guards,
-                    resolvers,
-                });
-
-                // Advance past this object.
-                search_from = close + 1;
-                continue;
-            }
-        }
-
-        // No enclosing object found — advance past this `path:`.
-        search_from = abs_idx + 5;
-    }
-}
-
-/// Return `true` if byte index `pos` in `source` lies inside a genuine
-/// `Routes` context — a `Routes = [...]` array or a
-/// `RouterModule.forRoot/forChild([...])` call.
-///
-/// Round-11 audit: the global `path:` scan would otherwise treat a
-/// `path:` key inside an unrelated object literal (`const menu = {
-/// path: '/home' }`) as a route, producing a phantom `Φroute:` entry.
-/// This gate requires the nearest preceding `Routes` / `RouterModule`
-/// marker to appear after the last top-level `;` (i.e. we are still
-/// inside the same statement as the Routes declaration).
-fn is_routes_context(source: &str, pos: usize) -> bool {
-    let before = &source[..pos];
-    // Nearest context marker (last occurrence wins).
-    let ctx = before
-        .rfind("RouterModule.forRoot(")
-        .or_else(|| before.rfind("RouterModule.forChild("))
-        .or_else(|| before.rfind("Routes"));
-    let Some(ctx_idx) = ctx else {
-        return false;
-    };
-    // A `;` between the marker and `pos` means we've exited the Routes
-    // statement — the object at `pos` is NOT part of the route array.
-    if let Some(sep) = before.rfind(';') {
-        if sep > ctx_idx {
-            return false;
-        }
-    }
-    true
-}
-
-/// Extract an identifier value for a key in an object literal
-/// (e.g. `component: UserListComponent`).
-fn extract_ident_value(obj: &str, key: &str) -> Option<String> {
-    let pattern = format!("{}:", key);
-    let idx = obj.find(&pattern)?;
-    let after = &obj[idx + pattern.len()..];
-    let after = after.trim_start();
-    let end = after.find([',', '}', '\n']).unwrap_or(after.len());
-    let ident = after[..end].trim();
-    if ident.is_empty() || ident.starts_with('(') {
-        None
-    } else {
-        Some(ident.to_string())
-    }
-}
-
-/// Extract a lazy-load value for a key (e.g. `loadComponent: () => import('./x')`).
-fn extract_load_value(obj: &str, key: &str) -> Option<String> {
-    let pattern = format!("{}:", key);
-    let idx = obj.find(&pattern)?;
-    let after = &obj[idx + pattern.len()..];
-    let after = after.trim_start();
-    // Find the import path in `() => import('./x')`.
-    let import_idx = after.find("import(")?;
-    let import_after = &after[import_idx + "import(".len()..];
-    let import_after = import_after.trim_start();
-    // Escape-aware first-quoted extraction (Round-8 audit): the shared
-    // `extract_first_quoted` handles escaped quotes (`user\'s`), unlike
-    // the old naive `rest.find(quote)` which truncated on the first
-    // backslash-escaped quote.
-    crate::angular_meta::util::extract_first_quoted(import_after)
-}
-
-/// Extract identifier names from an array value for a key
-/// (e.g. `canActivate: [AuthGuard, AdminGuard]`).
-fn extract_array_idents(obj: &str, key: &str) -> Option<Vec<String>> {
-    let pattern = format!("{}:", key);
-    let idx = obj.find(&pattern)?;
-    let after = &obj[idx + pattern.len()..];
-    let after = after.trim_start();
-    if !after.starts_with('[') {
-        return None;
-    }
-    let rest = &after[1..];
-    let end = rest.find(']')?;
-    let idents: Vec<String> = rest[..end]
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    if idents.is_empty() {
-        None
-    } else {
-        Some(idents)
-    }
-}
-
-/// Extract resolver identifiers from a `resolve: { key: Resolver }` object.
-fn extract_resolve_idents(obj: &str) -> Option<Vec<String>> {
-    let idx = obj.find("resolve:")?;
-    let after = &obj[idx + "resolve:".len()..];
-    let after = after.trim_start();
-    if !after.starts_with('{') {
-        return None;
-    }
-    let rest = &after[1..];
-    let end = rest.find('}')?;
-    let idents: Vec<String> = rest[..end]
-        .split(',')
-        .filter_map(|pair| {
-            let pair = pair.trim();
-            if pair.is_empty() {
-                return None;
-            }
-            let colon = pair.find(':')?;
-            let value = pair[colon + 1..].trim();
-            if value.is_empty() {
-                None
-            } else {
-                Some(value.to_string())
-            }
-        })
-        .collect();
-    if idents.is_empty() {
-        None
-    } else {
-        Some(idents)
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Expansion
 // ---------------------------------------------------------------------------
@@ -557,3 +391,7 @@ pub fn expand_phi(token: &str) -> Option<&'static str> {
 #[cfg(test)]
 #[path = "../tests/angular_meta/routing.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/routing_issue_139.rs"]
+mod routing_issue_139;

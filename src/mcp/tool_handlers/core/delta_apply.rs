@@ -214,11 +214,12 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 debug_assert_eq!(transition.to, new_version);
                 if persistence_enabled {
                     let snapshot =
-                        crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new(
+                        crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new_with_dependencies(
                             durable_file.clone(),
                             source_hash.clone(),
                             new_version,
                             &transition.semantic.semantic_edges,
+                            &transition.semantic.semantic_dependencies,
                         );
                     let persisted = persisted_context.as_ref().is_some_and(|context_id| {
                         state

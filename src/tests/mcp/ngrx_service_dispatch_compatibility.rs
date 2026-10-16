@@ -21,6 +21,6 @@ fn ngrx_service_dispatch_generation_changes_only_semantic_products() {
     assert_eq!(current.canonical_producers, prior.canonical_producers);
     assert_eq!(current.semantic_config, prior.semantic_config);
     assert_eq!(current.canonical_config, prior.canonical_config);
-    assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 5);
+    assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 6);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);
 }

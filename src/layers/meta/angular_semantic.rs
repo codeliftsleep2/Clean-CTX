@@ -46,21 +46,6 @@ pub(super) fn extract_non_testing_edges(
                 .map(|raw| (None, raw.as_str(), Vec::new()))
                 .collect(),
         };
-        let mut decl_types = std::collections::HashMap::new();
-        for (owner, raw_class, _) in &classes {
-            if let Some((class_name, kind, _, _, _)) =
-                crate::angular_meta::decorators::extract_graph_entries(raw_class)
-            {
-                let entity_type = match kind {
-                    crate::angular_meta::decorators::ClassKind::Component => "Component",
-                    crate::angular_meta::decorators::ClassKind::Service => "Service",
-                    crate::angular_meta::decorators::ClassKind::Directive => "Directive",
-                    crate::angular_meta::decorators::ClassKind::Pipe => "Pipe",
-                    crate::angular_meta::decorators::ClassKind::Module => "Module",
-                };
-                decl_types.insert(owner.unwrap_or(&class_name).to_string(), entity_type);
-            }
-        }
         for (owner, raw_class, tokens) in classes {
             if let Some((class_name, kind, selector, mut injects, pipe_name)) =
                 crate::angular_meta::decorators::extract_graph_entries(raw_class)
@@ -75,8 +60,19 @@ pub(super) fn extract_non_testing_edges(
                     pipe_name.as_deref(),
                     raw_class,
                     fidelity,
-                    &decl_types,
                 ));
+                if kind == crate::angular_meta::decorators::ClassKind::Module {
+                    edges.extend(
+                        crate::angular_meta::module_metadata::project(
+                            class_name,
+                            raw_class,
+                            source,
+                            declaring_path,
+                            class_captures,
+                        )
+                        .edges,
+                    );
+                }
                 let source_id = declaring_path
                     .map(|path| path.to_string_lossy())
                     .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
@@ -128,10 +124,19 @@ pub(super) fn extract_non_testing_edges(
     let routing_shape = match evidence.routing {
         Some(shape) => shape.cloned(),
         None => evidence.lexical_regions.map_or_else(
-            || crate::angular_meta::routing::extract_route_shape(source, fidelity),
+            || {
+                crate::angular_meta::routing::extract_route_shape_at(
+                    source,
+                    fidelity,
+                    declaring_path,
+                )
+            },
             |regions| {
-                crate::angular_meta::routing::extract_route_shape_with_regions(
-                    source, fidelity, regions,
+                crate::angular_meta::routing::extract_route_shape_at_with_regions(
+                    source,
+                    fidelity,
+                    regions,
+                    declaring_path,
                 )
             },
         ),
@@ -226,10 +231,11 @@ pub(super) fn evaluate(
         .unwrap_or(true);
     let routing_shape = routing_enabled
         .then(|| {
-            crate::angular_meta::routing::extract_route_shape_with_regions(
+            crate::angular_meta::routing::extract_route_shape_at_with_regions(
                 context.source,
                 context.fidelity,
                 context.lexical_regions,
+                Some(context.path),
             )
         })
         .flatten();
@@ -329,9 +335,13 @@ pub(super) fn evaluate(
             ),
         );
     }
+    let semantic_dependencies = routing_shape
+        .map(|shape| shape.semantic_dependencies.clone())
+        .unwrap_or_default();
     super::MetaLayerEvaluation {
         output,
         semantic_edges,
+        semantic_dependencies,
     }
 }
 

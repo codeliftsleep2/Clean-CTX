@@ -479,7 +479,7 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
         .unwrap();
     let prior_version = initial_state.file_version(&alias).unwrap();
     let target_text = std::str::from_utf8(&target).unwrap();
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             target_text,
@@ -501,6 +501,7 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
         target_source: target.clone(),
         target_ir: target_binary,
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

@@ -211,9 +211,17 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         None
     };
     let ir_result = if let Some((instructions, version)) = cached_ir {
-        state.semantic_edges(&alias).map(|semantic_edges| {
-            super::super::common::compiled_from_tuples(alias.clone(), version, instructions)
-                .map(|ir| (ir, semantic_edges, source_hash.clone()))
+        state.semantic_snapshot(&alias).map(|snapshot| {
+            super::super::common::compiled_from_tuples(alias.clone(), version, instructions).map(
+                |ir| {
+                    (
+                        ir,
+                        snapshot.edges,
+                        snapshot.dependencies,
+                        source_hash.clone(),
+                    )
+                },
+            )
         })
     } else {
         None
@@ -224,7 +232,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-    let (mut ir, semantic_edges, source_hash) = match ir_result {
+    let (mut ir, semantic_edges, semantic_dependencies, source_hash) = match ir_result {
         Ok(compiled) => compiled,
         Err(error) => {
             tracing::warn!(
@@ -284,6 +292,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     effective_fidelity,
                     &ir,
                     &semantic_edges,
+                    &semantic_dependencies,
                     &source_hash,
                     source,
                     raw_tokens,
@@ -310,7 +319,11 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                         }
                     }
                 }
-                state.remember_semantic_edges(&ir.file_id, semantic_edges);
+                state.remember_semantic_projection(
+                    &ir.file_id,
+                    semantic_edges,
+                    semantic_dependencies,
+                );
                 state
                     .llm_text_cache_lock()
                     .insert(ir.file_id.clone(), economic.text.clone());

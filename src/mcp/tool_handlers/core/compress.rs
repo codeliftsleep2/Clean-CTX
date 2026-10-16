@@ -121,7 +121,9 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((mut ir, semantic_edges, source_hash)) = ir_result {
+    let mut response = if let Ok((mut ir, semantic_edges, semantic_dependencies, source_hash)) =
+        ir_result
+    {
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
             None => return,
@@ -156,6 +158,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 effective_fidelity,
                 &durable_candidate,
                 &semantic_edges,
+                &semantic_dependencies,
                 &source_hash,
                 source_text,
                 raw_tokens,
@@ -170,7 +173,11 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 idx.remove_file(&canonical_path);
                 idx.add_edges(&canonical_path, semantic_edges.clone());
             }
-            state.remember_semantic_edges(&path_alias, semantic_edges.clone());
+            state.remember_semantic_projection(
+                &path_alias,
+                semantic_edges.clone(),
+                semantic_dependencies.clone(),
+            );
             if state.persistence_store_lock().is_some() {
                 state.remember_persisted_path(&path_alias, &canonical_path);
             }

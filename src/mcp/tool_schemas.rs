@@ -199,9 +199,10 @@ pub(super) fn workspace_query_properties() -> Value {
 fn workspace_query_operation_properties() -> Value {
     json!({
         "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "declarations_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
-        "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, and transitive_dependencies. With entity_type, uses the exact-identity fast path; alone, filters name resolution." },
-        "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, and transitive_dependencies. With domain, uses the exact-identity fast path; alone, filters name resolution." },
+        "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With entity_type, edge queries use the exact-identity fast path; alone, filters name resolution." },
+        "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With domain, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "name": { "type": "string", "minLength": 1, "description": "Exactly one entity name. Required for find_entities, forward_edges, reverse_edges, and transitive_dependencies. For multiple names, use top-level queries with one independently identified item per name; do not pass an array or a names field." },
+        "declarations_only": { "type": "boolean", "description": "find_entities only. When true, return source-proven declaration occurrences and apply optional domain/entity_type filters. Default false preserves occurrence-oriented behavior." },
         "file_path": { "type": "string", "description": "File path for entities_in_file or declarations_in_file query." },
         "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file or declarations_in_file. Edit and verbatim normalize to High because these queries publish no source bodies. Defaults to the configured fidelity." },
         "kind": { "type": "string", "enum": ["dependency"], "description": "Optional cycle policy for has_cycle. Defaults to dependency." },

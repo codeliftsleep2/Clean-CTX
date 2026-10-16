@@ -366,6 +366,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         crate::layers::meta::MetaLayerEvaluation {
             output,
             semantic_edges,
+            semantic_dependencies: Vec::new(),
         }
     }
 

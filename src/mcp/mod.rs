@@ -93,6 +93,12 @@ mod decorated_owner_identity_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/framework_declaration_publication.rs"]
 mod framework_declaration_publication_tests;
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/semantic_dependency_lifecycle_issue_139.rs"]
+mod semantic_dependency_lifecycle_issue_139_tests;
+#[cfg(test)]
+#[path = "../tests/mcp/workspace_query_issue_139.rs"]
+mod workspace_query_issue_139_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_di_pipe.rs"]

@@ -48,7 +48,7 @@ impl McpState {
 
         let mut authority = Vec::new();
         for file in &files {
-            let (compiled, _, _) =
+            let (compiled, _, _, _) =
                 crate::mcp::tool_helpers::compile_file_ir_candidate(file, Fidelity::High, self)
                     .map_err(|error| error.to_string())?;
             authority.extend(crate::ir::csharp_exact_calls::declaration_authority(
@@ -58,7 +58,7 @@ impl McpState {
 
         let mut projections = Vec::with_capacity(files.len());
         for file in files {
-            let (_, edges, source_hash) =
+            let (_, edges, _, source_hash) =
                 crate::mcp::tool_helpers::compile_file_ir_candidate_with_csharp_authority(
                     &file,
                     Fidelity::High,

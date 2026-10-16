@@ -66,6 +66,9 @@ fn try_prepare_find_entities(
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     let name = required_name(args, "find_entities")?.to_string();
+    let declarations_only = args["declarations_only"].as_bool().unwrap_or(false);
+    let domain = args["domain"].as_str().map(str::to_owned);
+    let entity_type = args["entity_type"].as_str().map(str::to_owned);
     let workspace_root = args["workspaceRoot"].as_str();
     // Workspace scope: a query issued FOR a workspace answers with the entity
     // occurrences that workspace's own files declare (`None` = the caller
@@ -77,9 +80,16 @@ fn try_prepare_find_entities(
     // Preserve the established initial-read-before-hydration lifecycle.
     {
         let index = state.workspace_index_read();
-        let _ = match scope.as_ref() {
-            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
-            None => index.find_entities_by_name(&name),
+        let _ = if declarations_only {
+            match scope.as_ref() {
+                Some(scope) => index.declarations_by_name_in_workspace(&name, scope),
+                None => index.declarations_by_name(&name),
+            }
+        } else {
+            match scope.as_ref() {
+                Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+                None => index.find_entities_by_name(&name),
+            }
         };
     }
     let mut hydration = context.hydrate(
@@ -114,7 +124,7 @@ fn try_prepare_find_entities(
             current = candidate;
         }
     }
-    let (aspnet_controller, aspnet_authorized) = if hydration.is_complete() {
+    let (aspnet_controller, aspnet_authorized) = if !declarations_only && hydration.is_complete() {
         let index = state.workspace_index_read();
         let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
         let authorized = catalog.has_aspnet_controller_authority(&name);
@@ -129,14 +139,31 @@ fn try_prepare_find_entities(
         (None, false)
     };
     Ok(PreparedQuery::indexed(move |index| {
-        let entities = match scope.as_ref() {
-            Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
-            None => index.find_entities_by_name(&name),
+        let entities = if declarations_only {
+            match scope.as_ref() {
+                Some(scope) => index.declarations_by_name_in_workspace(&name, scope),
+                None => index.declarations_by_name(&name),
+            }
+        } else {
+            match scope.as_ref() {
+                Some(scope) => index.find_entities_by_name_in_scope(&name, scope),
+                None => index.find_entities_by_name(&name),
+            }
         };
         let entities: Vec<_> = entities
             .into_iter()
             .filter(|entity| {
-                aspnet_authorized
+                !declarations_only || domain.as_deref().is_none_or(|value| entity.domain == value)
+            })
+            .filter(|entity| {
+                !declarations_only
+                    || entity_type
+                        .as_deref()
+                        .is_none_or(|value| entity.entity_type == value)
+            })
+            .filter(|entity| {
+                declarations_only
+                    || aspnet_authorized
                     || !(entity.domain == "dotnet"
                         && entity.entity_type == "Controller"
                         && entity.name == name)
@@ -229,7 +256,7 @@ fn try_prepare_entities_in_file(
         fidelity,
         state,
     ) {
-        Ok((_, edges, hash)) => (edges, hash),
+        Ok((_, edges, _, hash)) => (edges, hash),
         Err(error) => return Err(QueryFailure::internal(error.to_string())),
     };
     {
@@ -313,7 +340,7 @@ fn try_prepare_declarations_in_file(
         state
             .preflight_semantic_publication(&resolved_path)
             .map_err(QueryFailure::internal)?;
-        let (_, semantic_edges, compiled_hash) =
+        let (_, semantic_edges, _, compiled_hash) =
             crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state)
                 .map_err(|error| QueryFailure::internal(error.to_string()))?;
         state.workspace_index_lock().replace_semantic_projection(

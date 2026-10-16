@@ -168,8 +168,7 @@ pub struct McpState {
     /// Exact durable persistence path owned by each session-local IR alias.
     persisted_paths: Mutex<HashMap<String, String>>,
     context_fidelities: Mutex<HashMap<String, Fidelity>>,
-    semantic_edge_snapshots:
-        Mutex<HashMap<String, Vec<crate::layers::meta::semantic::SemanticEdge>>>,
+    semantic_edge_snapshots: Mutex<HashMap<String, durable_semantics::SemanticSnapshot>>,
     pending_semantic_transitions: Mutex<
         HashMap<
             durable_semantics::PendingTransitionKey,

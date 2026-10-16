@@ -14,6 +14,7 @@ use super::MetaLayerOutput;
 pub struct MetaLayerEvaluation {
     pub output: Option<MetaLayerOutput>,
     pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 /// Immutable inputs and shared lexical evidence for one meta-layer pass.

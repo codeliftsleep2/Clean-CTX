@@ -89,6 +89,7 @@ pub struct IRCompiler {
     /// This is the boundary where meta-layer semantic facts survive the
     /// production compilation lifecycle (Phase 4 integration).
     pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     /// Source-bound invocation evidence from the most recent successful compile.
     /// This side output is never part of CompiledIR or durable state.
     pub(crate) invocation_evidence: Option<InvocationEvidenceSet>,
@@ -104,6 +105,7 @@ impl IRCompiler {
             pattern_recognizers: Vec::new(),
             config: None,
             semantic_edges: Vec::new(),
+            semantic_dependencies: Vec::new(),
             invocation_evidence: None,
             #[cfg(feature = "csharp")]
             csharp_declaration_authority: None,
@@ -236,6 +238,8 @@ impl IRCompiler {
     ) -> Result<CompiledIR, CompileError> {
         // Clear before fallible work so failure cannot expose stale spans.
         self.invocation_evidence = None;
+        self.semantic_edges.clear();
+        self.semantic_dependencies.clear();
 
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
@@ -268,6 +272,7 @@ impl IRCompiler {
         // PassContext is dropped. This is the boundary where meta-layer
         // semantic facts survive the production compilation lifecycle.
         self.semantic_edges = std::mem::take(&mut ctx.semantic_edges);
+        self.semantic_dependencies = std::mem::take(&mut ctx.semantic_dependencies);
 
         // Language-agnostic generic facts are projected at the compilation
         // boundary (never inside a language layer), so every producer —

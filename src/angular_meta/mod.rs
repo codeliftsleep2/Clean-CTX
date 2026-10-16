@@ -34,6 +34,7 @@ pub mod formly;
 pub(crate) mod inject_evidence;
 pub(crate) mod markers;
 pub(crate) mod member_semantics;
+pub(crate) mod module_metadata;
 pub mod ngrx;
 pub mod phi;
 pub(crate) mod provider_semantics;
@@ -388,6 +389,18 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
                 }
             }
         }
+    }
+
+    let unresolved_spreads =
+        module_metadata::unresolved_spreads(class_captures, source_code, Some(path));
+    if !unresolved_spreads.is_empty() {
+        block.sections.push(MetaSection {
+            header: "// --- Angular Metadata Evidence ---".to_string(),
+            lines: unresolved_spreads
+                .into_iter()
+                .map(|name| format!("Φmodspread:{name}"))
+                .collect(),
+        });
     }
 
     // Tier 2 (RxJS): append the RxJS meta block if present.

@@ -150,7 +150,7 @@ fn restore_rejects_removed_additional_root_before_recovery_or_publication() {
         .unwrap();
     let prior_version = producer.file_version(&alias).unwrap();
     let target_source = std::str::from_utf8(&target).unwrap();
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             target_source,
@@ -173,6 +173,7 @@ fn restore_rejects_removed_additional_root_before_recovery_or_publication() {
         target_source: target,
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

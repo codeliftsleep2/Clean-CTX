@@ -185,7 +185,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .unwrap_or("");
     let pre_compiled =
         match compile_source_ir_candidate(&resolved_path, source, Fidelity::Edit, state) {
-            Ok((ir, _, _)) => ir,
+            Ok((ir, _, _, _)) => ir,
             Err(e) => return err_response(id, -32603, e.to_string(), None),
         };
     let units = {
@@ -221,15 +221,12 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
-    let (mut target_ir, semantic_edges, new_hash) = match compile_source_ir_candidate(
-        &resolved_path,
-        &report.new_source,
-        Fidelity::Edit,
-        state,
-    ) {
-        Ok(candidate) => candidate,
-        Err(error) => return err_response(id, -32603, error.to_string(), None),
-    };
+    let (mut target_ir, semantic_edges, semantic_dependencies, new_hash) =
+        match compile_source_ir_candidate(&resolved_path, &report.new_source, Fidelity::Edit, state)
+        {
+            Ok(candidate) => candidate,
+            Err(error) => return err_response(id, -32603, error.to_string(), None),
+        };
     if let Err(error) = crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
         return err_response(
             id,
@@ -302,6 +299,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         target_source: target_bytes.to_vec(),
         target_ir: target_binary.clone(),
         target_edges: semantic_edges.clone(),
+        target_dependencies: semantic_dependencies.clone(),
         fidelity: Fidelity::Edit,
         stage_path,
     };
@@ -328,6 +326,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         &new_hash,
         target_ir.version,
         &semantic_edges,
+        &semantic_dependencies,
         &compatibility,
     ) {
         if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
@@ -358,7 +357,11 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .ir_context_lock()
         .load_ir(target_ir, Some(new_hash.clone()));
     state.remember_context_fidelity(&alias, Fidelity::Edit);
-    state.remember_semantic_edges(&alias, semantic_edges.clone());
+    state.remember_semantic_projection(
+        &alias,
+        semantic_edges.clone(),
+        semantic_dependencies,
+    );
     state.forget_pending_transitions(&alias);
     if state.persistence_store_lock().is_some() {
         state.remember_persisted_path(&alias, &resolved_path);
@@ -549,6 +552,7 @@ fn commit_edit_semantics(
     target_hash: &str,
     target_version: u64,
     semantic_edges: &[crate::layers::meta::semantic::SemanticEdge],
+    semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
     compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let guard = state.persistence_store_lock();
@@ -559,7 +563,7 @@ fn commit_edit_semantics(
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
     sqlite
-        .save_context_with_compatibility(
+        .save_context_with_dependency_semantics(
             file_path,
             Fidelity::Edit,
             "",
@@ -567,6 +571,7 @@ fn commit_edit_semantics(
             target_hash,
             target_version,
             semantic_edges,
+            semantic_dependencies,
             0,
             0,
             compatibility,

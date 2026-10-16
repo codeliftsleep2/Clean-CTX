@@ -41,6 +41,7 @@ fn loaded(identities: PersistedCompatibilityIdentities) -> UntrustedDurableConte
             instructions: Vec::new(),
         },
         semantic_edges: Vec::new(),
+        semantic_dependencies: Vec::new(),
         source_hash: format!("{:x}", Sha256::digest(SOURCE.as_bytes())),
         fidelity: Fidelity::High,
         compatibility: identities,

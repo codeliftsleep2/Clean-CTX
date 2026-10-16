@@ -165,7 +165,7 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
     let prior_fidelity = state.context_fidelity(&alias);
 
     let source = std::fs::read(&file).unwrap();
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             std::str::from_utf8(&source).unwrap(),
@@ -185,6 +185,7 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
         target_source: source,
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

@@ -213,6 +213,31 @@ for permanent regression RED/GREEN, separate earlier-body anomaly, preservation
 results and remaining #139 criteria. This harness builds nothing and invokes
 neither CBM nor a model host. It does not replace tracked tests or the CI gate.
 
+## #139 consolidated residual acceptance
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue139Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Rebuild the debug Windows candidate separately before running. This provider-disabled
+driver uses the existing Phase B stdio MCP helper and an owned Git-root fixture.
+It builds nothing and starts neither CBM nor a model host.
+
+Six public-boundary groups verify bounded same-file and one-hop imported
+NgModule composition, declaration-proven endpoint kinds, RouterModule call
+handling, explicit unresolved-spread evidence without a fake entity, structured
+nested-route ownership, lazy Component/Module/route-configuration relations,
+dynamic lazy failure, occurrence-oriented query preservation, declaration-only
+LGR-003 behavior, a genuine declaration named `Class`, and refresh/removal
+lifecycle behavior.
+
+The generic-constraint distinction remains in tracked deterministic Rust tests:
+it is an internal syntax-role invariant rather than a separate live protocol.
+Sources, binary provenance, raw requests/results, mutations, and verdicts are
+retained under `target/issue-139-live-verification/`. This harness is operator
+evidence and does not replace tracked tests or the authoritative final gate.
+
 ## Independent framework declaration publication
 
 ```powershell

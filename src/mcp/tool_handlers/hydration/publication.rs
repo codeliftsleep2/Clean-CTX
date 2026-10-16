@@ -109,7 +109,7 @@ pub(super) fn compile_candidate_for(
     match super::super::super::tool_helpers::compile_file_ir_focused(
         &validated, fidelity, state, None,
     ) {
-        Ok((_, semantic_edges, compiled_hash)) => {
+        Ok((_, semantic_edges, _, compiled_hash)) => {
             let expected_hash = compiled_hash.clone();
             let outcome = publication
                 .commit(

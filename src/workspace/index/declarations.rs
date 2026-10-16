@@ -54,6 +54,49 @@ impl WorkspaceIndex {
             .unwrap_or_default()
     }
 
+    /// Source-proven declarations matching a name, never relationship endpoints.
+    pub fn declarations_by_name(&self, name: &str) -> Vec<&EntityRef> {
+        self.declarations_by_name_in_scope(name, None)
+    }
+
+    /// Workspace-scoped source-proven declarations matching a name.
+    pub fn declarations_by_name_in_workspace(
+        &self,
+        name: &str,
+        scope: &super::WorkspaceScope,
+    ) -> Vec<&EntityRef> {
+        self.declarations_by_name_in_scope(name, Some(scope))
+    }
+
+    fn declarations_by_name_in_scope(
+        &self,
+        name: &str,
+        scope: Option<&super::WorkspaceScope>,
+    ) -> Vec<&EntityRef> {
+        let Some(keys) = self.name_index.get(name) else {
+            return Vec::new();
+        };
+        let mut declarations = Vec::new();
+        for key in keys {
+            if let Some(occurrences) = self.declarations.get(key) {
+                declarations.extend(
+                    occurrences
+                        .iter()
+                        .filter(|entity| super::entity_occurrence_admitted(entity, scope)),
+                );
+            }
+        }
+        declarations.sort_by(|a, b| {
+            (&a.domain, &a.entity_type, &a.name, &a.file).cmp(&(
+                &b.domain,
+                &b.entity_type,
+                &b.name,
+                &b.file,
+            ))
+        });
+        declarations
+    }
+
     /// Source-proven declarations in one file, separate from relationship endpoints.
     pub(crate) fn declarations_in_file(&self, file_path: &str) -> Vec<&EntityRef> {
         let Some(keys) = self.file_declarations.get(file_path) else {

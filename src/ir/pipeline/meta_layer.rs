@@ -82,7 +82,8 @@ impl IRPass for MetaLayerPass {
             context.structured_declarations = Some(&structured_declarations);
         }
 
-        let (meta_results, mut semantic_edges) = registry.evaluate_meta_layers_context(&context);
+        let (meta_results, mut semantic_edges, semantic_dependencies) =
+            registry.evaluate_meta_layers_context(&context);
         append_marker_aliases(state, &meta_results);
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {
@@ -93,6 +94,7 @@ impl IRPass for MetaLayerPass {
             }
         }
         state.semantic_edges.extend(semantic_edges);
+        state.semantic_dependencies.extend(semantic_dependencies);
         Ok(())
     }
 }
