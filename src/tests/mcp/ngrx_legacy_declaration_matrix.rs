@@ -193,5 +193,13 @@ fn ngrx_legacy_declaration_rename_remove_delete_lifecycle() {
         "refresh_workspace",
         json!({"workspaceRoot":root.path()}),
     );
-    assert!(entities(&state, root.path(), &path).is_empty());
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(
+        &json!(141),
+        "workspace_query",
+        &json!({"arguments":{"workspaceRoot":root.path(),"type":"entities_in_file","file_path":path}}),
+        &state,
+    );
+    let missing = crate::protocol::captured_responses().pop().unwrap();
+    assert_eq!(missing["error"]["data"]["reason"], "file_not_found");
 }

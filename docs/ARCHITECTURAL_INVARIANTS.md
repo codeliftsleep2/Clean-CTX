@@ -748,11 +748,27 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 |----------|-------|
 | **Invariant** | A durable C# `Calls` edge to a `csharp/Method` identity is published only when current structured receiver evidence and the complete admitted C# declaration authority select one owner/signature-bearing target. Missing, incompatible, or ambiguous targets publish no exact edge. Generic written-call evidence remains unchanged. |
 | **Lifecycle** | Any admitted C# declaration-authority change reconstitutes authority from current source, recompiles every admitted caller-bearing C# source file, validates all source hashes, and replaces the affected projections. Additions, removals, signature changes, and ambiguity can therefore establish or revoke exact facts independent of file order or warm history. A future dependency index may narrow the affected set only after proving equivalent completeness. |
+| **Fidelity preservation** | Reconciliation may strengthen exact-call evidence, but it must preserve the semantic fidelity of each publication it reconciles. Reconciliation never upgrades a Low or Medium projection to High merely because authority reconstruction itself requires a complete declaration catalog. A later explicit higher-fidelity request remains the only authority for that upgrade. |
 | **Boundary** | Invocation occurrences remain ephemeral under INVOCATION-001. Reconciliation reruns the production compiler and never persists receiver/call candidates, requires no optional provider, and does not alter non-C# call identity. |
+| **Enforcement** | `WorkspaceIndex` retains the current per-file semantic fidelity and `McpState::reconcile_csharp_exact_calls` republishes each projection at that fidelity. `src/tests/mcp/workspace_query_entities_auto_compile.rs::red_reconciliation_preserves_publication_fidelity_until_a_higher_request` is the tracked RED→GREEN regression authority. |
 | **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 4. |
 | **Authority** | `src/ir/csharp_exact_calls.rs`; `src/mcp/csharp_call_reconciliation.rs` |
 | **Type** | ENFORCED |
 | **Gate** | `cargo test --all-features csharp_call_reconciliation` |
+
+---
+
+### WSC-011 Direct Declaration Authority Is Independent of Derived Relationships
+
+| Property | Value |
+|----------|-------|
+| **Intent** | A current, authoritative declaration must remain discoverable even when a derived relationship is absent, replaced, retracted, or recomputed at another lifecycle boundary. |
+| **Invariant** | Direct current declaration evidence must not depend on survival of a derived durable relationship to remain discoverable. A declaration proven directly by current structured source is materialized from that source authority; relationship edges may enrich or connect it but are not its existence certificate. Losing or replacing a derived projection must never erase the independently proven declaration. Optional provider or hydration completeness may change acquisition cost but never suppress declaration evidence already proven by the current admitted source. This rule does not permit inference from names, filenames, proximity, or unresolved ancestry: the direct declaration evidence itself must be authoritative. |
+| **ASP.NET application** | Structured `[ApiController]` or `[Controller]` evidence directly proves a `dotnet/Controller` declaration. Query-time C# resolution may reconstruct that declaration from the current admitted source even when C# call reconciliation replaced the file's derived edge projection. Ancestry-only controller classification remains subject to exact import/qualification and unique-declaration resolution. |
+| **Enforcement** | `src/mcp/tool_handlers/query/csharp_resolution.rs` delegates direct attributed declarations to `csharp_resolution/direct_aspnet.rs`. `src/tests/mcp/workspace_query.rs::red_direct_controller_declaration_survives_derived_edge_replacement` is the tracked RED→GREEN regression authority; `src/tests/mcp/workspace_query_builtin.rs::builtin_framework_coexistence` additionally pins coexistence with the neutral builtin declaration. |
+| **Authority** | Current admitted source snapshots and structured C# declaration catalog; `src/mcp/tool_handlers/query/csharp_resolution.rs`; `src/mcp/tool_handlers/query/csharp_resolution/direct_aspnet.rs` |
+| **Type** | ENFORCED (current-source declaration authority + tests) |
+| **Gate** | Focused workspace-query regressions plus `cargo test --workspace --all-targets --all-features` |
 
 ---
 

@@ -125,12 +125,23 @@ fn try_prepare_find_entities(
             current = candidate;
         }
     }
-    let (aspnet_controller, aspnet_authorized) = if !declarations_only && hydration.is_complete() {
+    let (aspnet_controller, aspnet_authorized) = if !declarations_only {
         let index = state.workspace_index_read();
         let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
-        let authorized = catalog.has_aspnet_controller_authority(&name);
-        let controller = catalog
-            .aspnet_projection(&name, crate::compression::Fidelity::High)
+        let direct = super::csharp_resolution::direct_aspnet::projection_for_catalog(
+            &catalog,
+            &name,
+            crate::compression::Fidelity::High,
+        );
+        let authorized = direct.is_some()
+            || (hydration.is_complete() && catalog.has_aspnet_controller_authority(&name));
+        let controller = direct
+            .or_else(|| {
+                hydration
+                    .is_complete()
+                    .then(|| catalog.aspnet_projection(&name, crate::compression::Fidelity::High))
+                    .flatten()
+            })
             .map(|projection| {
                 crate::layers::meta::semantic::EntityRef::new("dotnet", "Controller", &name)
                     .with_file(projection.file)

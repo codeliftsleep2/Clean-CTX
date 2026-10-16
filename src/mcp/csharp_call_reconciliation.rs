@@ -15,6 +15,15 @@ struct Projection {
     edges: Vec<crate::layers::meta::semantic::SemanticEdge>,
     source_hash: String,
     dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+    fidelity: SemanticFidelity,
+}
+
+fn compilation_fidelity(fidelity: SemanticFidelity) -> Fidelity {
+    match fidelity {
+        SemanticFidelity::Low => Fidelity::Low,
+        SemanticFidelity::Medium => Fidelity::Medium,
+        SemanticFidelity::High => Fidelity::High,
+    }
 }
 
 impl McpState {
@@ -60,10 +69,16 @@ impl McpState {
         let authority_files = files.clone();
         let mut projections = Vec::with_capacity(files.len());
         for file in files {
+            // Reconciliation may strengthen exact-call evidence, but it must
+            // preserve the semantic fidelity of the publication it reconciles.
+            let fidelity = self
+                .workspace_index_read()
+                .semantic_projection_fidelity(&file)
+                .unwrap_or(SemanticFidelity::High);
             let (_, edges, _, source_hash) =
                 crate::mcp::tool_helpers::compile_file_ir_candidate_with_csharp_authority(
                     &file,
-                    Fidelity::High,
+                    compilation_fidelity(fidelity),
                     self,
                     &authority,
                 )
@@ -73,6 +88,7 @@ impl McpState {
                 file,
                 edges,
                 source_hash,
+                fidelity,
             });
         }
 
@@ -95,7 +111,7 @@ impl McpState {
                 index.replace_semantic_projection_with_dependencies(
                     &projection.file,
                     projection.edges.clone(),
-                    SemanticFidelity::High,
+                    projection.fidelity,
                     projection.source_hash.clone(),
                     projection.dependencies.clone(),
                 );

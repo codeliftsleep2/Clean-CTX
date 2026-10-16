@@ -12,6 +12,7 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 
 mod dependencies;
+pub(super) mod direct_aspnet;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -167,7 +168,7 @@ impl Catalog {
     ) -> Option<AspNetProjection> {
         let original = self.unique_named_class(name)?;
         if original.source.contains("[ApiController]") || original.source.contains("[Controller]") {
-            return None;
+            return direct_aspnet::projection(original, fidelity);
         }
         let mut current = original;
         let mut visited = HashSet::new();

@@ -92,6 +92,7 @@ fn cbm_continuation_stale_cursor_is_not_restarted_as_offset() {
 #[test]
 fn cbm_continuation_aggregate_payload_budget_stops_collection() {
     with_client("b3-budget", |c, _| {
+        c.timeout = std::time::Duration::from_secs(1);
         let e = c.query_graph("query", "fixture").unwrap_err();
         assert!(e.to_string().contains("aggregate"), "{e}");
     });

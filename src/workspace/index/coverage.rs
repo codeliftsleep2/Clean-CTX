@@ -101,6 +101,12 @@ impl WorkspaceIndex {
             })
     }
 
+    pub(crate) fn semantic_projection_fidelity(&self, file_path: &str) -> Option<SemanticFidelity> {
+        self.semantic_coverage
+            .get(file_path)
+            .map(|coverage| coverage.fidelity)
+    }
+
     pub fn replace_semantic_projection(
         &mut self,
         file_path: &str,

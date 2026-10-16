@@ -164,6 +164,10 @@ provider while Clean-CTX source evidence owns semantic truth.
 * **ASP.NET ancestry** — controller classification resolves exact declaration
   ancestry through structured C# base evidence. Same-name, ambiguous,
   unresolved, or incompatible candidates remain unclassified.
+* **Direct controller declaration authority** — current structured
+  `[ApiController]`/`[Controller]` evidence remains discoverable independently
+  of derived relationship survival and optional provider or hydration state.
+  Ancestry-only classification still requires exact, unambiguous authority.
 * **Dependency traversal and cycles** — C# dependency traversal uses exact
   declaration catalogs and reports truthful cycle evidence instead of joining
   same-spelled types. The generic semantic-tuple cycle surface separately
@@ -186,6 +190,10 @@ provider while Clean-CTX source evidence owns semantic truth.
   hashes are revalidated before one index replacement, making add/remove,
   signature change, edit/delta, restore/replay, recovery, and deletion
   independent of file order and query history.
+* **Reconciliation fidelity preservation** — exact-call reconciliation may
+  strengthen evidence but republishes each file at its existing semantic
+  fidelity. A Low or Medium publication is never silently upgraded to High;
+  only a later explicit higher-fidelity request can authorize that transition.
 * **C# projection truthfulness** — Low/Medium/High skeletons expose stable
   C#-scoped omission categories and declared semantic loss; Verbatim/raw stays
   exact. The C# canonical and semantic-input producer generations advance to 3

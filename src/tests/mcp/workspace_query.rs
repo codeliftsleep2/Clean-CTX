@@ -185,7 +185,9 @@ fn workspace_query_transitive_deps_missing_args() {
 
 #[test]
 #[cfg(any(feature = "csharp", feature = "dotnet"))]
-fn find_entities_after_control_full_publication() {
+fn red_direct_controller_declaration_survives_derived_edge_replacement() {
+    // RED evidence: the 2026-10-16 release gate returned only builtin Class
+    // after reconciliation replaced the derived framework edge projection.
     use crate::mcp::tools::dispatch_tools_call;
     use serde_json::json;
     use tempfile::TempDir;
