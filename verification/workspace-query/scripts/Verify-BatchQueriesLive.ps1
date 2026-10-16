@@ -22,6 +22,9 @@ $changeMarkers = @(
     (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query\batch.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_handlers\query\content.rs"),
+    (Join-Path $RepositoryRoot "src\mcp\tool_handlers\hydration.rs"),
+    (Join-Path $RepositoryRoot "src\mcp\tool_handlers\hydration\publication.rs"),
+    (Join-Path $RepositoryRoot "src\mcp\csharp_call_reconciliation.rs"),
     (Join-Path $RepositoryRoot "src\mcp\tool_schemas.rs")
 )
 $binaryTime = (Get-Item -LiteralPath $BinaryPath).LastWriteTimeUtc
@@ -48,6 +51,13 @@ export class Alpha {
 '@,
     [Text.UTF8Encoding]::new($false)
 )
+foreach ($controller in @("ControllerA", "ControllerB", "ControllerC")) {
+    [IO.File]::WriteAllText(
+        (Join-Path $workspace "$controller.cs"),
+        "using Microsoft.AspNetCore.Mvc;`n`n[ApiController]`npublic sealed class $controller : ControllerBase {}`n",
+        [Text.UTF8Encoding]::new($false)
+    )
+}
 $config = @{
     additional_roots = @()
     auto_delta = $false
@@ -121,6 +131,16 @@ $items = @(
     @{ id = "invalid"; type = "find_entities" }
 )
 $batchArguments = @{ workspaceRoot = $workspace; queries = $items }
+$controllerItems = @(
+    @{ id = "controller-a"; type = "find_entities"; name = "ControllerA" },
+    @{ id = "controller-b"; type = "find_entities"; name = "ControllerB" },
+    @{ id = "controller-c"; type = "find_entities"; name = "ControllerC" },
+    @{
+        id = "controller-file"; type = "entities_in_file"
+        file_path = "ControllerA.cs"; fidelity = "high"
+    }
+)
+$controllerBatchArguments = @{ workspaceRoot = $workspace; queries = $controllerItems }
 $session = $null
 
 try {
@@ -166,6 +186,32 @@ try {
     }
     Write-Host "PASS: repeated execution reuses discovery completion without changing semantics."
 
+    $controllerCold = Invoke-CleanCtxTool $session 8 "workspace_query" $controllerBatchArguments
+    Save-Capture "controller-batch-cold" $controllerCold
+    $controllerColdResults = Structured-Results $controllerCold "cold controller batch"
+    Assert-True ($controllerColdResults.Count -eq 4) "Cold controller batch did not return four outcomes."
+    Assert-True (($controllerColdResults.id -join ",") -eq "controller-a,controller-b,controller-c,controller-file") "Cold controller batch did not preserve input order and IDs."
+    Assert-True (@($controllerColdResults | Where-Object { $_.status -ne "ok" }).Count -eq 0) "Cold controller batch contained a failed item."
+    for ($index = 0; $index -lt 3; $index += 1) {
+        $expectedName = "Controller$([char]([int][char]'A' + $index))"
+        $controllers = @($controllerColdResults[$index].result.entities | Where-Object {
+            $_.domain -eq "dotnet" -and $_.entity_type -eq "Controller" -and $_.name -eq $expectedName
+        })
+        Assert-True ($controllers.Count -eq 1) "Cold controller batch omitted dotnet/Controller/$expectedName."
+    }
+    Assert-True (@($controllerColdResults[3].result.entities | Where-Object { $_.name -eq "ControllerA" }).Count -ge 1) "entities_in_file omitted ControllerA."
+    Write-Host "PASS: cold controller batch completes with all controller and file-local results."
+
+    $controllerWarm = Invoke-CleanCtxTool $session 9 "workspace_query" $controllerBatchArguments
+    Save-Capture "controller-batch-warm" $controllerWarm
+    $controllerWarmResults = Structured-Results $controllerWarm "warm controller batch"
+    Assert-True ($controllerWarmResults.Count -eq 4) "Warm controller batch did not return four outcomes."
+    foreach ($item in $controllerWarmResults) { Assert-NoRepeatedDiscoveryWork $item }
+    for ($index = 0; $index -lt 4; $index += 1) {
+        Assert-True ((Semantic-Json $controllerColdResults[$index].result) -eq (Semantic-Json $controllerWarmResults[$index].result)) "Warm controller batch changed semantic result at index $index."
+    }
+    Write-Host "PASS: warm controller batch performs no reported discovery work and preserves semantics."
+
     $singleArguments = @(
         @{ type = "find_entities"; name = "Alpha"; workspaceRoot = $workspace },
         @{
@@ -204,6 +250,8 @@ try {
         workspace = $workspace
         ordered_ids = @($firstResults.id)
         repeated_discovery_reused = $true
+        controller_batch_completed = $true
+        controller_batch_warm_semantics_matched = $true
         single_query_semantics_matched = $true
         invalid_array_name_rejected = $true
         isolated_error_code = $firstResults[3].error.code

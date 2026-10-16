@@ -1,5 +1,11 @@
 # Final Release-Blocker Audit — 2026-10-16
 
+> **Status: INVESTIGATION / EVIDENCE — POINT-IN-TIME RELEASE RECORD**
+>
+> This audit records the inspected release-candidate state and is not current
+> production authority. See `docs/README.md` for the normative documentation
+> spine.
+
 **Agent:** Agent MaxHeadRoom  
 **Verdict:** **RELEASE READY — NO SERIOUS BLOCKERS FOUND**
 

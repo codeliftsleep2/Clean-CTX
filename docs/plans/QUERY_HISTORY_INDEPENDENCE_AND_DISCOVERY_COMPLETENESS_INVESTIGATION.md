@@ -1,5 +1,12 @@
 # Query-history independence and discovery completeness investigation
 
+> **Status: SUPERSEDED — HISTORICAL INVESTIGATION**
+>
+> This document preserves the pre-approval investigation and alternatives.
+> Decisions A-C were later approved and implemented under Issue #142. Current
+> authority is `docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md`; acceptance
+> evidence is `docs/plans/ISSUE_142_FINAL_CROSS_CUTTING_ACCEPTANCE.md`.
+
 Date: 2026-10-11. Investigator: Agent MaxHeadRoom.
 Baseline: `abf8a51543cbbb0eb8a4799ce6a2d6037caf5c70`, branch
 `(feat)Semantic_Intelligence_Architecture_Boundaries`.

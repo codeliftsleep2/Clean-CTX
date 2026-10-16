@@ -32,8 +32,8 @@ Clean-CTX understands code as more than text:
 
 * **Language-aware parsing** - tree-sitter grammars extract structure, not just tokens, for TypeScript, C#, Rust, and Java.
 * **Semantic Intermediate Representation (SIR)** - source compiles into a typed compiler IR (`DefClass`, `DefMethod`, `DefField`, patterns, scopes), from which meta-layers extract a semantic model of entities with identity, provenance, and relationships.
-* **Entity identity** - every class, service, component, action, and selector is identified by `(domain, entity_type, name)` with file provenance, so the same entity referenced from multiple files compares equal.
-* **Semantic relationships** - typed edges between entities: `Injects`, `HasSelector`, `Dispatches`, `Selects`, `HandlesAction`, `RouteMapsTo`, `Autowired`, `ControllerAction`, `HasEntity`, and 20+ more, each with confidence 1.0 and layer provenance.
+* **Semantic identity and provenance** - `(domain, entity_type, name)` is the WorkspaceIndex semantic tuple. Multiple declaration occurrences may share it; file/span provenance and language-specific binding establish exact declaration identity when a consumer needs it.
+* **Semantic relationships** - typed, producer-owned edges such as `Injects`, `HasSelector`, `Dispatches`, `Selects`, `HandlesAction`, `RouteMapsTo`, `Autowired`, `ControllerAction`, and `HasEntity`, with source provenance. An edge is authoritative only within its producer's supported domain and current evidence generation.
 * **Provenance tracking** - every semantic edge records which meta-layer discovered it.
 
 ### Workspace semantic indexing
@@ -41,9 +41,9 @@ Clean-CTX understands code as more than text:
 A cross-file semantic graph that survives beyond single-file compression:
 
 * **WorkspaceIndex** - framework-agnostic index of entities and semantic edges across an entire workspace.
-* **Identity-based lookup** - `(domain, entity_type, name)` is the canonical identity; a separate convenience lookup finds entity occurrences by bare name across all domains and types.
+* **Semantic-tuple lookup** - `(domain, entity_type, name)` groups semantic occurrences; it is not a universally unique declaration key. A separate convenience lookup finds occurrences by bare name across all domains and types.
 * **Forward/reverse relationship traversal** - follow `Injects`, `Dispatches`, `Selects`, and other edges in either direction.
-* **Selector resolution** - resolve a CSS selector (`app-widget`, `[app-widget]`, `.app-widget`) to the component that exposes it.
+* **Selector resolution** - retain structured selector occurrences and refine to a component only when current exact selector authority yields one unique candidate; zero or multiple candidates remain unresolved.
 * **Injection discovery** - resolve an injected type to all workspace entities referenced as `Injects`/`Autowired` targets (reference occurrences; ambiguity preserved).
 * **Transitive dependencies** - BFS traversal through DI and routing relationships, with cycle detection.
 
@@ -51,11 +51,11 @@ A cross-file semantic graph that survives beyond single-file compression:
 
 Task-relevant context rather than indiscriminate source dumping:
 
-* **Compiles source into LLM-optimized representations** - three fidelity levels (Low/Medium/High) plus Edit and Verbatim, each preserving the semantics appropriate to the task.
-* **Semantic compression** - reduces representation size while preserving the relationships downstream consumers depend on.
+* **Compiles source into LLM-optimized representations** - Low/Medium/High are bounded presentations; Edit and Verbatim add separate exact-source guarantees. Canonical semantic authority and model-facing projection are distinct contracts.
+* **Declared projection loss** - bounded presentations may omit supported semantic categories only when the response declares that loss machine-readably. Stronger internal acquisition does not silently upgrade the published fidelity.
 * **Single-pass framework evaluation** - one compilation-scoped lexical/capture context is reused across applicability, markers, and semantic-edge extraction, eliminating redundant tree-sitter parses and repeated prefix scans.
 * **Layered cache reuse** - unchanged files reuse canonical IR and tokenizer counts, while CBM graph entries and disk partitions remain isolated by canonical project identity.
-* **Explicit IR-level delta transport** - `delta_code_context` computes an instruction-level transition and `apply_delta` acknowledges it through a code-side protocol (up to 53% CPU/latency savings in measured delta workflows). Ordinary context reads remain complete and never silently switch to deltas.
+* **Explicit IR-level delta transport** - `delta_code_context` computes an instruction-level transition and `apply_delta` acknowledges it through a code-side protocol. Ordinary context reads remain complete responses and never silently switch to deltas. Historical benchmark results are retained in [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md), not presented as a universal current guarantee.
 * **Structural edits** - `apply_edit` performs byte-exact edits on previously-seen files using the semantic model.
   The exact physical source precondition is revalidated at commit, so an
   externally superseded file is never overwritten merely because replacement
@@ -92,7 +92,7 @@ This is the key differentiator. Clean-CTX is **not** doing textual minification:
 
 * **Architectural invariant (IRPAT-001)** - consumptive IR transformations must never consume a `DefMethod` while leaving surviving operations that reference it orphaned. The compiler validates every transformation so compression does not silently destroy relationships.
 * **Deterministic, validated** - the IR validator (E001-E011) catches dangling references, orphaned methods/callers, and inconsistent annotations before output reaches the consumer.
-* **Identity survives transformation** - entity identity and semantic edges persist through compression, delta transport, and edits.
+* **Authority survives only compatible transitions** - semantic state is admitted or restored only when current source, canonical compatibility, semantic dependencies, and the owning lifecycle permit it.
 
 ### Token and context efficiency
 
@@ -100,11 +100,11 @@ A major benefit - but a *consequence* of better context compilation, not the who
 
 | Mechanism | What it affects |
 |-----------|-----------------|
-| **Semantic compression** (Low/Medium/High/Edit/Verbatim) | 61-97% smaller representations vs raw source |
-| **Delta transport** | Up to 53% CPU/latency savings on repeat calls |
-| **CBM symbol filtering** | Queries the separate CBM (codebase-memory-mcp) server for symbol-importance scores and filters its output before it reaches the LLM |
-| **Tool output filtering** (26 filters) | Compresses build/lint/test CLI output |
-| **Prompt caching** (proxy) | ~90% API cost savings on repeated turns |
+| **Semantic projection** (Low/Medium/High/Edit/Verbatim) | Trades presentation size for explicitly declared detail; results vary by source shape and requested fidelity |
+| **Delta transport** | Avoids resending an unchanged full IR when a compatible consumer explicitly owns the delta lifecycle |
+| **CBM integration** | Optionally narrows acquisition work; it does not decide Clean-CTX semantic truth or completeness |
+| **Tool-output filtering** | Applies configured filters to supported CLI output |
+| **Prompt caching** (proxy) | Adds provider cache hints where the configured provider path supports them |
 
 ---
 
@@ -133,6 +133,12 @@ Compact IR      Semantic edges      Φ markers
    An authoritative source refresh retracts evidence owned by sources no longer
    present; CBM assists discovery but does not determine semantic truth.
 5. **Serve** - MCP tools expose context compilation and semantic queries to AI agents.
+
+For authoritative semantics, the pipeline is more precise: acquire evidence
+broadly, validate it against one compatible source generation, freeze that
+generation, interpret each domain using only its producer-owned authority, earn
+any completeness certificate, and only then project at the requested fidelity.
+Warm caches may reduce cost; they must not improve truth.
 
 ---
 
@@ -383,15 +389,13 @@ Standard server block (Continue.dev adapts it to its array form):
 
 | Metric | Status |
 |--------|--------|
-| Build | OK: `cargo check` clean |
-| Linting | OK: `cargo clippy --all-targets -- -D warnings` - **0 warnings, 0 errors** |
-| Tests | OK: **All tests passing** - includes live-CBM semantic probes and a self-contained multilingual fixture suite |
+| Release candidate | Package version `0.10.0`; verification evidence is recorded in the release/acceptance documents and CI, not asserted as a timeless README property |
 | Languages | OK: TypeScript, C#, Rust, Java with Angular/Spring Boot/.NET meta-layers |
-| Semantic intelligence | OK: Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; 30+ relation types; WorkspaceIndex with forward/reverse traversal, selector/injection resolution, transitive deps, cycle detection |
+| Semantic intelligence | Typed `SemanticEdge`/`EntityRef`/`SemanticRelation` model; WorkspaceIndex occurrence storage with forward/reverse traversal and bounded domain refinement |
 | Workspace queries | OK: single or ordered failure-isolated batch calls across `find_entities`, `forward_edges`, `reverse_edges`, `entities_in_file`, `transitive_dependencies`, `has_cycle`, and `calls_in_file` |
 | Transport | OK: Explicit occurrence-aware `dv:2` IR generation/application with complete ordinary context reads |
 | Pass Architecture | OK: Composable IRPass pipeline (Core → Language → Meta → Pattern* → Validation), IR validator (E001–E011), query engine, semantic delta intents |
-| CBM Integration | OK: CBM (codebase-memory-mcp) runs as a separate local server; Clean-CTX launches it as a subprocess, indexes the repo + additional roots, captures its graph output, and filters/compresses it (filter-first) before it reaches the LLM |
+| CBM Integration | Optional. Clean-CTX owns one spawned thin MCP frontend/session and its private pipes; CBM coordinates that frontend with a shared account-local daemon. Clean-CTX does not own the daemon or use CBM as core semantic authority. |
 | Persistence | OK: SQLite cross-session persistence with three-tier reliability |
 | Proxy | OK: Multi-platform proxy (Anthropic/OpenAI/Generic) with auto-cache + tool filters |
 | Filters | OK: 26 built-in TOML filters - cargo, npm, eslint, docker, go, and more |
@@ -407,7 +411,10 @@ Unsafe code is test-only (environment-variable manipulation).
 | [`README.md`](README.md) | **Users** | What Clean-CTX is, features, quick start, usage |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Contributors | Overview, process, quick links to detailed docs |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Users | **Configuration source of truth** - `.clean-ctx.json` schema, env vars, precedence, resource limits, persistence, heuristics, meta-layers, cache, proxy lifecycle |
-| [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) | Architects | System design, module structure, pipeline stages, design decisions |
+| [`docs/ARCHITECTURAL_INVARIANTS.md`](docs/ARCHITECTURAL_INVARIANTS.md) | Architects | Enforced current invariants and their authority |
+| [`docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md`](docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md) | Architects | Current semantic identity, acquisition, completeness, dependency, refinement, CBM, and fidelity contracts |
+| [`docs/README.md`](docs/README.md) | Everyone | Normative documentation index and historical classification |
+| [`docs/ARCHITECTURE_OVERVIEW.md`](docs/ARCHITECTURE_OVERVIEW.md) | Architects | Broad subsystem overview; defer to the two current-authority documents above on semantic authority |
 | [`docs/DEVELOPER_DOCUMENTATION.md`](docs/DEVELOPER_DOCUMENTATION.md) | Contributors | Building, testing, adding languages/tools/opcodes, code quality gates |
 | [`docs/COMPILER_IR.md`](docs/COMPILER_IR.md) | Architects | Compiler IR protocol, delta state transport, wire format, phase implementation |
 | [`docs/ANGULAR_META_LAYER.md`](docs/ANGULAR_META_LAYER.md) | Developers | Angular Meta-Layer design, marker vocabulary, template extraction, graph |

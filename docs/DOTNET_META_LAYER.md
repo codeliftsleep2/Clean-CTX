@@ -1,5 +1,13 @@
 # .NET / C# Meta-Layer
 
+> **Status: CURRENT MARKER REFERENCE WITH HISTORICAL PHASE RECORDS**
+>
+> Marker vocabulary remains useful, but phase schedules and completion criteria
+> are historical. Current declaration/binding, exact-call, dependency, and
+> completeness authority is defined by
+> [`architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md`](architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md)
+> and [`ARCHITECTURAL_INVARIANTS.md`](ARCHITECTURAL_INVARIANTS.md).
+
 > **Owner:** .NET/C# Meta-Layer design (R-35  R-41/R-42) · **Status:** Living per-layer reference (shipped)
 >
 > **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core  EF Core  SignalR  AutoMapper  and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).

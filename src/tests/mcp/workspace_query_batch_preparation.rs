@@ -245,3 +245,74 @@ fn red_batch_calls_in_file_stays_fresh_and_unpublished() {
         "calls_in_file must not publish WorkspaceIndex facts"
     );
 }
+
+#[cfg(feature = "csharp")]
+#[test]
+fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let files: Vec<_> = ["ControllerA", "ControllerB", "ControllerC"]
+        .into_iter()
+        .map(|name| {
+            let path = root.path().join(format!("{name}.cs"));
+            std::fs::write(
+                &path,
+                format!(
+                    "using Microsoft.AspNetCore.Mvc; [ApiController] class {name} : ControllerBase {{}}\n"
+                ),
+            )
+            .expect("controller fixture");
+            path
+        })
+        .collect();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    *crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
+        .lock()
+        .expect("hydration candidates") = Some(
+        files
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect(),
+    );
+    let arguments = json!({
+        "workspaceRoot": root.path(),
+        "queries": [
+            { "id": "a", "type": "find_entities", "name": "ControllerA" },
+            { "id": "b", "type": "find_entities", "name": "ControllerB" },
+            { "id": "c", "type": "find_entities", "name": "ControllerC" },
+            { "id": "file", "type": "entities_in_file", "file_path": "ControllerA.cs", "fidelity": "high" }
+        ],
+    });
+
+    state.reset_test_csharp_reconciliation_count();
+    let cold = dispatch(&state, arguments.clone());
+    assert!(
+        results(&cold).iter().all(|item| item["status"] == "ok"),
+        "{cold}"
+    );
+    assert_eq!(
+        state.test_csharp_reconciliation_count(),
+        1,
+        "one acquisition cycle must reconcile once after publishing all relevant C# candidates"
+    );
+
+    state.reset_test_csharp_reconciliation_count();
+    let warm = dispatch(&state, arguments);
+    assert!(
+        results(&warm).iter().all(|item| item["status"] == "ok"),
+        "{warm}"
+    );
+    assert_eq!(
+        state.test_csharp_reconciliation_count(),
+        0,
+        "a cycle with zero relevant publications must not reconcile"
+    );
+
+    crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
+        .lock()
+        .expect("hydration candidates")
+        .take();
+}

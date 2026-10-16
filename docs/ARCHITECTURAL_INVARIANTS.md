@@ -668,6 +668,99 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ---
 
+### AUTH-001 Refinement Joins Authority; It Never Manufactures It
+
+**Status:** ENFORCED
+
+Framework/domain classification, exact declaration binding, and source
+occurrence evidence retain their own producers. A refinement stage may publish
+a joined fact only when every required authority is current and compatible.
+Name, spelling, proximity, or shared storage never supplies a missing authority.
+
+**Enforcement:** producer-specific extraction plus exact Angular/C# refinement.
+
+### WSC-012 Workspace Tuple Identity Is Not Exact Declaration Identity
+
+**Status:** ENFORCED
+
+The (domain, entity_type, name) tuple groups WorkspaceIndex occurrences.
+Multiple declarations may share that tuple. Consumers needing exact
+declaration/member/overload identity must establish it independently from
+current source evidence.
+
+**Enforcement:** occurrence-preserving WorkspaceIndex storage, declaration
+authority, and language-specific resolvers.
+
+### WSC-013 Authoritative Query Truth Is History-Independent
+
+**Status:** ENFORCED FOR CERTIFIED DOMAINS; LOWER-BOUND FAMILIES EXPLICIT
+
+Warm state may reduce acquisition cost but may not improve semantic truth.
+Authoritative batch items union acquisition requirements before final
+interpretation and use one compatible post-acquisition generation. Generic
+indexed graph families remain explicitly lower-bound where closure is unproved.
+
+**Enforcement:** query preparation, batch coordination, and coverage projection.
+
+### WSC-014 Completeness Is Earned from Evidence, Not Population
+
+**Status:** ENFORCED
+
+Completeness requires declared scope, satisfied evidence requirements, a
+compatible source generation, producer support, and valid dependencies.
+Populated caches/indexes, provider success, or stable empty results never grant
+exhaustiveness. Lack of a certificate means “not authorized to claim complete,”
+not “the returned facts are false.”
+
+**Enforcement:** CompletenessCertificate and producer-owned exact/lower-bound
+projection in the workspace-query coverage path.
+
+### SEMDEP-001 Semantic Validity Follows Dependencies
+
+**Status:** ENFORCED
+
+Source-cache, canonical-IR, and derived-semantic validity are separate. The file
+owning an assertion need not be the full set of files proving it. Refresh,
+restore, and publication validate/retract semantic dependencies rather than
+assuming storage ownership proves current meaning.
+
+**Enforcement:** WorkspaceIndex dependency projection, compatibility validation,
+durable semantics, hydration invalidation, and refresh.
+
+### PROJ-001 Acquisition Strength Does Not Upgrade Publication Fidelity
+
+**Status:** ENFORCED
+
+Reconciliation may acquire stronger internal evidence than the requested
+presentation, but Low/Medium/High output retains its requested bounded contract.
+Omitted supported semantic categories are declared; Edit and Verbatim exactness
+remain separate guarantees.
+
+**Enforcement:** context projection metadata and framework bounded projections.
+
+### CBM-OPTIONAL-001 Optional Providers Change Cost, Not Core Truth
+
+**Status:** ENFORCED
+
+CBM may discover or narrow candidates, but it neither authors Clean-CTX
+semantics nor certifies WorkspaceIndex completeness. Filesystem acquisition and
+Clean compilation remain the correctness path when CBM is absent or degraded.
+Clean-CTX owns its frontend/session transport, not the shared account daemon.
+
+**Enforcement:** hydration fallback, provider-state handling, WSC-002, and the
+CBM frontend lifecycle boundary.
+
+### REFINE-001 Reconciliation Ownership Is Domain-Local
+
+**Status:** ENFORCED
+
+A reconciler may replace/refine only facts in the semantic domain it owns.
+Sharing WorkspaceIndex, caches, or durable storage does not grant authority over
+unrelated producer-owned facts.
+
+**Enforcement:** domain-specific Angular template, NgRx, C#, and ASP.NET
+reconciliation paths plus occurrence-preserving publication.
+
 ## Concurrent Authority
 
 ### PUB-001 Same-Owner Semantic Publication Is Source-Ordered

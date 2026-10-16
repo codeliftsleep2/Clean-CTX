@@ -1,5 +1,12 @@
 # Issue #142 Final Cross-Cutting Acceptance
 
+> **Status: IMPLEMENTED — HISTORICAL ACCEPTANCE EVIDENCE**
+>
+> This document records the Issue #142 closure evidence and approved decisions.
+> It is not the current normative contract. See
+> `docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md` and
+> `docs/ARCHITECTURAL_INVARIANTS.md`.
+
 Date: 2026-10-15. Investigator: Agent MaxHeadRoom.
 
 ## 1. Executive verdict

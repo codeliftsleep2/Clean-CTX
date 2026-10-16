@@ -62,7 +62,13 @@ published batch schema, mixed ordered results, item-local failure isolation,
 discovery-completion reuse on a repeated batch, and semantic parity with the
 equivalent legacy single calls. It also verifies that `name` remains a singular
 non-empty string and that an array is rejected with guidance to use top-level
-`queries`. Generated captures are written beneath
+`queries`. The same session creates three attributed ASP.NET controllers and
+runs the release-blocker workload of three `find_entities` items plus one
+`entities_in_file` item cold and warm. It requires complete ordered results,
+direct `dotnet/Controller` authority, unchanged warm semantics, and no reported
+warm discovery/compilation work. The harness deadline is only an operator
+safety boundary; the tracked Rust regression owns the structural reconciliation
+count assertion. Generated captures are written beneath
 `target/workspace-query-batch-verification/`; they are operator evidence only.
 
 `Verify-CSharpConstructorDependenciesLive.ps1` creates an isolated multi-file

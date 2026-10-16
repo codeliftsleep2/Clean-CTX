@@ -10,6 +10,11 @@ use crate::mcp::McpState;
 use crate::workspace::index::SemanticFidelity;
 use std::path::Path;
 
+#[cfg(test)]
+thread_local! {
+    static TEST_RECONCILIATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 struct Projection {
     file: String,
     edges: Vec<crate::layers::meta::semantic::SemanticEdge>,
@@ -27,6 +32,16 @@ fn compilation_fidelity(fidelity: SemanticFidelity) -> Fidelity {
 }
 
 impl McpState {
+    #[cfg(test)]
+    pub(crate) fn reset_test_csharp_reconciliation_count(&self) {
+        TEST_RECONCILIATION_COUNT.set(0);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_csharp_reconciliation_count(&self) -> usize {
+        TEST_RECONCILIATION_COUNT.get()
+    }
+
     pub(crate) fn reconcile_csharp_after_authority_change(
         &self,
         changed_file: &str,
@@ -43,6 +58,9 @@ impl McpState {
     }
 
     pub(crate) fn reconcile_csharp_exact_calls(&self) -> Result<(), String> {
+        #[cfg(test)]
+        TEST_RECONCILIATION_COUNT.set(TEST_RECONCILIATION_COUNT.get() + 1);
+
         let mut files: Vec<_> = self
             .workspace_index_read()
             .file_map()

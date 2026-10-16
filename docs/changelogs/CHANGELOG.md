@@ -322,6 +322,10 @@ provider while Clean-CTX source evidence owns semantic truth.
 
 ### Compatibility and explicit non-changes
 
+* **QUIC security remediation** — the proxy's transitive `quinn-proto`
+  dependency is updated from 0.11.15 to 0.11.18, addressing
+  RUSTSEC-2026-0338 through RUSTSEC-2026-0342. The update is lockfile-scoped;
+  proxy manifests and public behavior are unchanged.
 * This minor-version release intentionally includes new public query/envelope
   behavior, exact semantic producers, producer-generation changes, and the
   pinned provider frontend contract. Consumers should rebuild the binary and

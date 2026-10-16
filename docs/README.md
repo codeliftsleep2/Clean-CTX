@@ -1,54 +1,78 @@
-# Clean-CTX documentation map
+# Clean-CTX documentation index
 
-This index separates current architectural authority from operational guides,
-historical evidence, and proposals. A document's age does not determine its
-authority; its category and status do.
+> **Status: CURRENT DOCUMENTATION INDEX**
+>
+> This page classifies authority. A dated plan, investigation, benchmark, or
+> acceptance report never overrides a current-authority document merely because
+> it is longer or more detailed.
 
-## Current architecture and contracts
+## Normative documentation spine
 
-- [`ARCHITECTURE_OVERVIEW.md`](ARCHITECTURE_OVERVIEW.md) — current system and
-  module boundaries.
-- [`ARCHITECTURAL_INVARIANTS.md`](ARCHITECTURAL_INVARIANTS.md) — authoritative
-  durable architectural contracts and their enforcement.
-- [`COMPILER_IR.md`](COMPILER_IR.md) — canonical IR, persistence, delta, and
-  SCHEMA-vNext presentation contracts.
-- [`CONFIGURATION.md`](CONFIGURATION.md) — configuration schema and precedence.
-- [`SECURITY.md`](SECURITY.md) — trust and security boundaries.
+Read these in order:
 
-## Developer and operator guides
+1. [Public README](../README.md) — current product and tool surface.
+2. [Architectural invariants](ARCHITECTURAL_INVARIANTS.md) — enforced durable rules.
+3. [Semantic authority architecture](architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md)
+   — identity, acquisition, refinement, completeness, dependencies, optional
+   providers, and projection.
+4. [Agent tooling](agent/tooling.md) — current code-context workflow.
+5. Framework references — domain-specific producers and projections.
 
-- [`DEVELOPER_DOCUMENTATION.md`](DEVELOPER_DOCUMENTATION.md) — extension and
-  development entry point; defer to `agent/verification.md` for the exact gate.
-- [`agent/tooling.md`](agent/tooling.md) — MCP and code-intelligence tool use.
-- [`CLAUDE_INTEGRATION_RULES.md`](CLAUDE_INTEGRATION_RULES.md) — compact
-  Claude-facing projection for using Clean-CTX with or without CBM.
-- [`agent/verification.md`](agent/verification.md) — single authoritative final
-  verification command list.
-- [`TROUBLESHOOTING.md`](TROUBLESHOOTING.md), [`PROXY.md`](PROXY.md), and
-  [`PERFORMANCE.md`](PERFORMANCE.md) — focused operational references.
+If current documents appear to conflict, production code plus the invariant
+catalog governs; reconcile the prose rather than selecting the stronger claim.
 
-## Framework references
+## Current authority
 
-- [`ANGULAR_META_LAYER.md`](ANGULAR_META_LAYER.md)
-- [`ANGULAR_ECOSYSTEM_DEEPENING.md`](ANGULAR_ECOSYSTEM_DEEPENING.md)
-- [`DOTNET_META_LAYER.md`](DOTNET_META_LAYER.md)
-- [`SPRING_META_LAYER.md`](SPRING_META_LAYER.md)
+| Document | Role |
+| --- | --- |
+| [ARCHITECTURAL_INVARIANTS.md](ARCHITECTURAL_INVARIANTS.md) | Normative invariant catalog |
+| [SEMANTIC_AUTHORITY_ARCHITECTURE.md](architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md) | Normative semantic-authority composition |
+| [agent/tooling.md](agent/tooling.md) | Normative MCP/code-context workflow |
+| [agent/verification.md](agent/verification.md) | Normative final verification gate |
+| [ENCODING_POLICY.md](ENCODING_POLICY.md) | Encoding contract |
+| [CONFIGURATION.md](CONFIGURATION.md) | Configuration reference |
+| [COMPILER_IR.md](COMPILER_IR.md) | Canonical IR and notation contract |
+| [BINARY_V04_CONTRACT.md](architecture/BINARY_V04_CONTRACT.md) | Binary format contract |
+| [CORE_OP_CONTRACT_MATRIX.md](architecture/CORE_OP_CONTRACT_MATRIX.md) | Core opcode matrix |
 
-## Proposals, audits, and historical evidence
+## Current user and operator guides
 
-Documents under [`architecture/`](architecture/) and [`plans/`](plans/) record
-decisions, investigations, migrations, and measurements. They are not current
-production authority unless their header explicitly says so. Completed
-proposals should point to the resulting invariant and production owners;
-superseded measurements remain historical evidence rather than being silently
-rewritten as current benchmarks.
+[Troubleshooting](TROUBLESHOOTING.md), [Claude integration](CLAUDE_INTEGRATION_RULES.md),
+[diff guide](DIFF_COMMITS_GUIDE.md), [edit types](EDIT_TYPE.md),
+[proxy](PROXY.md), [security](SECURITY.md), [developer guide](DEVELOPER_DOCUMENTATION.md),
+and the guides under docs/agent are current for their named surface. They do
+not independently grant semantic authority or completeness.
 
-The active phased meta-layer performance migration is documented in
-[`architecture/META_LAYER_SINGLE_PASS_MIGRATION_PLAN_2026-09-28.md`](architecture/META_LAYER_SINGLE_PASS_MIGRATION_PLAN_2026-09-28.md).
+## Framework architecture
 
-The chronological release ledger is
-[`changelogs/CHANGELOG.md`](changelogs/CHANGELOG.md). The roadmap is directional;
-implemented behavior is determined by production code and the invariant catalog.
+| Document | Classification |
+| --- | --- |
+| [ANGULAR_META_LAYER.md](ANGULAR_META_LAYER.md) | Current reference with historical phases |
+| [ANGULAR_ECOSYSTEM_DEEPENING.md](ANGULAR_ECOSYSTEM_DEEPENING.md) | Current marker/reference material with history |
+| [DOTNET_META_LAYER.md](DOTNET_META_LAYER.md) | Current marker reference with historical phases |
+| [SPRING_META_LAYER.md](SPRING_META_LAYER.md) | Current framework reference |
 
-The completed 2026-09-27 reconciliation record is
-[`DOCUMENTATION_AUDIT_2026-09-27.md`](DOCUMENTATION_AUDIT_2026-09-27.md).
+## Historical and evidence collections
+
+| Path | Default classification | Treatment |
+| --- | --- | --- |
+| docs/plans/** | Implemented/superseded plan, investigation, or proposal | Preserve chronology; not normative |
+| docs/architecture/*PLAN*, *AUDIT*, *INVESTIGATION*, *PROPOSAL*, *RECONNAISSANCE* | Migration history, evidence, or future proposal | Not normative unless listed above |
+| docs/changelogs/** | Historical release records | Preserve dated claims |
+| verification/** | Reusable operator definitions/evidence docs | Never substitutes for tracked tests |
+| docs/PERFORMANCE.md | Superseded benchmark baseline | Dated evidence, not a universal guarantee |
+| docs/agent/DISCOVERY_REGISTRY.md | Append-only discovery ledger | Evidence ledger |
+| handoff documents | Point-in-time operational record | Historical after the session |
+
+Plans may contain approved decisions and useful rationale. Once implemented,
+their role is evidence/history; current contracts are distilled into the spine.
+
+## Evidence classes
+
+- Static architecture audit: inspection evidence.
+- Tracked regression under src/tests/**: executable CI contract.
+- Operator/live harness under verification/**: production-boundary evidence.
+- Final gate/CI: release verification at a named revision.
+
+One class does not silently stand in for another. Evergreen public docs avoid
+undated “all tests pass” or benchmark guarantees.

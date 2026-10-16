@@ -1,5 +1,12 @@
 # Angular Meta-Layer — Design & Marker Vocabulary
 
+> **Status: CURRENT FRAMEWORK REFERENCE WITH HISTORICAL PHASE RECORDS**
+>
+> The "Current Template Correctness and Linkage Contract" section is current.
+> Earlier phase plans and completion evidence are historical implementation
+> records. Normative cross-domain authority rules live in
+> [`architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md`](architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md).
+
 > **Owner:** Angular Meta-Layer design (Phases 1–4) · **Status:** Living per-layer reference (shipped)
 >
 > **Ship status:** see `docs/ROADMAP.md` (R-22 ✅). **Release record:** see `docs/changelogs/CHANGELOG.md`. **Ecosystem Deepening (RxJS/NgRx/Signals/Routing):** see `docs/ANGULAR_ECOSYSTEM_DEEPENING.md`.

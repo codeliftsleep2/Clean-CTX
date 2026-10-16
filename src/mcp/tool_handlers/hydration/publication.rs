@@ -7,6 +7,7 @@ use std::collections::HashSet;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CandidatePublication {
     Published,
+    PublishedCSharp,
     Current,
     Failed,
 }
@@ -53,13 +54,18 @@ pub(crate) fn compile_candidate(
     resolved_path: &str,
     workspace_root: Option<&str>,
 ) -> bool {
-    compile_candidate_for(
+    match compile_candidate_for(
         state,
         resolved_path,
         workspace_root,
         HydrationRequirement::LegacyEdit,
-    )
-    .is_ok_and(|outcome| outcome == CandidatePublication::Published)
+    ) {
+        Ok(CandidatePublication::Published) => true,
+        Ok(CandidatePublication::PublishedCSharp) => state
+            .reconcile_csharp_after_authority_change(resolved_path)
+            .is_ok(),
+        Ok(CandidatePublication::Current | CandidatePublication::Failed) | Err(_) => false,
+    }
 }
 
 pub(super) fn compile_candidate_for(
@@ -77,6 +83,16 @@ pub(super) fn compile_candidate_for(
         Err(_) => return Ok(CandidatePublication::Failed),
     };
     let canonical = state.semantic_owner_path(&validated);
+    let published_outcome = if cfg!(feature = "csharp")
+        && std::path::Path::new(&canonical)
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("cs"))
+    {
+        CandidatePublication::PublishedCSharp
+    } else {
+        CandidatePublication::Published
+    };
     let publication = state.begin_semantic_publication(&canonical);
     let (fidelity, coverage) = match requirement {
         HydrationRequirement::LegacyEdit => (Fidelity::Edit, None),
@@ -135,14 +151,10 @@ pub(super) fn compile_candidate_for(
                             index.remove_file(&canonical);
                             index.add_edges(&canonical, semantic_edges);
                         }
-                        Ok::<_, String>(CandidatePublication::Published)
+                        Ok::<_, String>(published_outcome)
                     },
                 )
                 .map(|published| published.unwrap_or(CandidatePublication::Failed))?;
-            #[cfg(feature = "csharp")]
-            if outcome == CandidatePublication::Published {
-                state.reconcile_csharp_after_authority_change(&canonical)?;
-            }
             Ok(outcome)
         }
         Err(_) => Ok(CandidatePublication::Failed),

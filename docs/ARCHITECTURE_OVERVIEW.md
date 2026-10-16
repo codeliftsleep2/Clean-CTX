@@ -1,5 +1,7 @@
 # Clean-CTX — Architecture Overview
 
+> **Status: CURRENT SUBSYSTEM OVERVIEW — NOT THE SEMANTIC-AUTHORITY ROOT**
+
 > **Owner:** System + module architecture · **Status:** Living reference
 > **Version:** 0.9.1
 > **Last updated:** 2026-10-08 (queryable neutral C# class, struct, and record base types,
