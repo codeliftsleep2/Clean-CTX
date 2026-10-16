@@ -455,3 +455,130 @@ fn ef_reference_scans_scale_multiplicatively_after_catalog_reuse() {
         "repeated configuration-file lookups must reuse the build-local result"
     );
 }
+
+fn measure_csharp_dependency_chain(
+    declaration_count: usize,
+) -> (work_metrics::QueryWorkCounts, Vec<String>) {
+    let root = tempfile::tempdir().expect("workspace");
+    let file = root.path().join("Chain.cs");
+    let mut source = String::from("namespace Measured;\npublic class C0 {}\n");
+    for index in 1..declaration_count {
+        source.push_str(&format!("public class C{index} : C{} {{}}\n", index - 1));
+    }
+    std::fs::write(&file, source).expect("C# dependency fixture");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &file);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "type": "transitive_dependencies",
+            "domain": "builtin",
+            "entity_type": "Class",
+            "name": format!("C{}", declaration_count - 1),
+            "depth": declaration_count
+        }),
+    );
+    assert!(response.get("error").is_none(), "{response}");
+    let dependencies = response["result"]["structuredContent"]["dependencies"]
+        .as_array()
+        .expect("dependency results");
+    let names = dependencies
+        .iter()
+        .map(|dependency| dependency[2].as_str().expect("dependency name").to_owned())
+        .collect();
+    (work_metrics::snapshot(), names)
+}
+
+#[test]
+fn residual_csharp_dependency_graph_scans_are_structurally_characterized() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (small, small_names) = measure_csharp_dependency_chain(4);
+    let (large, large_names) = measure_csharp_dependency_chain(16);
+    eprintln!("residual C# dependency work: small={small:#?} large={large:#?}");
+
+    assert_eq!(small_names.len(), 3);
+    assert_eq!(large_names.len(), 15);
+    assert_eq!(
+        small_names
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        small_names.len(),
+        "small traversal must preserve distinct dependency identities"
+    );
+    assert_eq!(
+        large_names
+            .iter()
+            .collect::<std::collections::BTreeSet<_>>()
+            .len(),
+        large_names.len(),
+        "large traversal must preserve distinct dependency identities"
+    );
+    assert_eq!(small.dependency_graph_edges_considered, 3);
+    assert_eq!(large.dependency_graph_edges_considered, 15);
+    assert_eq!(
+        (
+            small.dependency_graph_reference_comparisons,
+            large.dependency_graph_reference_comparisons,
+        ),
+        (3, 15),
+        "each dependency edge must inspect only its ordered file/owner candidate bucket"
+    );
+    assert_eq!(
+        (
+            small.dependency_graph_target_position_comparisons,
+            large.dependency_graph_target_position_comparisons,
+        ),
+        (0, 0),
+        "resolved declarations must not trigger a second linear position scan"
+    );
+    assert_eq!(
+        (
+            small.dependency_graph_target_index_entries,
+            large.dependency_graph_target_index_entries,
+        ),
+        (4, 16),
+        "the build-local position map must retain every exact class occurrence"
+    );
+    assert_eq!(
+        (
+            small.dependency_graph_target_index_lookups,
+            large.dependency_graph_target_index_lookups,
+        ),
+        (3, 15),
+        "each resolved dependency edge must perform one exact position lookup"
+    );
+    assert_eq!(
+        (
+            small.csharp_declaration_resolution_comparisons,
+            large.csharp_declaration_resolution_comparisons,
+        ),
+        (3, 15),
+        "each dependency edge must inspect only its exact path/arity declaration bucket"
+    );
+    assert_eq!(
+        (
+            small.declaration_candidate_index_builds,
+            large.declaration_candidate_index_builds,
+        ),
+        (1, 1)
+    );
+    assert_eq!(
+        (
+            small.declaration_candidate_indexed_declarations,
+            large.declaration_candidate_indexed_declarations,
+        ),
+        (4, 16)
+    );
+    assert_eq!(
+        (
+            small.declaration_candidate_max_bucket_size,
+            large.declaration_candidate_max_bucket_size,
+        ),
+        (1, 1)
+    );
+}

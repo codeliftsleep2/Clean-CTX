@@ -10,6 +10,7 @@ use crate::mcp::McpState;
 use crate::workspace::{index::WorkspaceIndex, scope::WorkspaceScope};
 use std::collections::HashSet;
 use tree_sitter::Node;
+mod declaration_candidates;
 mod dependencies;
 pub(super) mod direct_aspnet;
 mod reference_candidates;
@@ -58,6 +59,7 @@ struct TypeShape {
 pub(super) struct Catalog {
     declarations: Vec<Declaration>,
     references: Vec<BaseReference>,
+    declaration_candidates: declaration_candidates::DeclarationCandidateIndex,
     reference_candidates: reference_candidates::ReferenceCandidateIndex,
 }
 
@@ -101,6 +103,8 @@ impl Catalog {
             ))
         });
         catalog.declarations.dedup();
+        catalog.declaration_candidates =
+            declaration_candidates::DeclarationCandidateIndex::build(&catalog.declarations);
         catalog.reference_candidates =
             reference_candidates::ReferenceCandidateIndex::build(&catalog.references);
         catalog
@@ -116,7 +120,6 @@ impl Catalog {
             })
         })
     }
-
     pub(super) fn resolve_edge(&self, edge: &SemanticEdge) -> Option<ResolvedTarget> {
         let file = edge
             .subject
@@ -130,7 +133,6 @@ impl Catalog {
         })?;
         self.resolve(reference)
     }
-
     pub(super) fn written_references_to(&self, kind: TypeKind, name: &str) -> Vec<String> {
         let mut written: Vec<_> = self
             .references
@@ -236,31 +238,6 @@ impl Catalog {
                 && reference.owner == declaration.name
                 && owner_parent == reference_parent.as_slice()
         })
-    }
-
-    fn resolve_declaration(&self, reference: &BaseReference) -> Option<&Declaration> {
-        let mut paths = candidate_paths(reference);
-        if reference.shape.qualifier.is_empty() {
-            for import in &reference.imports {
-                let mut path = import.clone();
-                path.push(reference.shape.name.clone());
-                paths.push(path);
-            }
-        }
-        paths.dedup();
-        for path in paths {
-            let mut matches = self.declarations.iter().filter(|declaration| {
-                declaration.path == path && declaration.arity == reference.shape.arity
-            });
-            let declaration = matches.next();
-            if matches.next().is_some() {
-                return None;
-            }
-            if declaration.is_some() {
-                return declaration;
-            }
-        }
-        None
     }
 
     fn add_file(&mut self, file: &str, source: &str) {

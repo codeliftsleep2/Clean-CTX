@@ -32,6 +32,16 @@ pub(crate) struct QueryWorkCounts {
     pub(crate) reference_candidate_index_keys: usize,
     pub(crate) reference_candidate_indexed_references: usize,
     pub(crate) reference_candidate_max_bucket_size: usize,
+    pub(crate) csharp_declaration_resolution_comparisons: usize,
+    pub(crate) dependency_graph_edges_considered: usize,
+    pub(crate) dependency_graph_reference_comparisons: usize,
+    pub(crate) dependency_graph_target_position_comparisons: usize,
+    pub(crate) dependency_graph_target_index_entries: usize,
+    pub(crate) dependency_graph_target_index_lookups: usize,
+    pub(crate) declaration_candidate_index_builds: usize,
+    pub(crate) declaration_candidate_index_keys: usize,
+    pub(crate) declaration_candidate_indexed_declarations: usize,
+    pub(crate) declaration_candidate_max_bucket_size: usize,
 }
 
 thread_local! {
@@ -64,6 +74,16 @@ thread_local! {
             reference_candidate_index_keys: 0,
             reference_candidate_indexed_references: 0,
             reference_candidate_max_bucket_size: 0,
+            csharp_declaration_resolution_comparisons: 0,
+            dependency_graph_edges_considered: 0,
+            dependency_graph_reference_comparisons: 0,
+            dependency_graph_target_position_comparisons: 0,
+            dependency_graph_target_index_entries: 0,
+            dependency_graph_target_index_lookups: 0,
+            declaration_candidate_index_builds: 0,
+            declaration_candidate_index_keys: 0,
+            declaration_candidate_indexed_declarations: 0,
+            declaration_candidate_max_bucket_size: 0,
         }) };
 }
 
@@ -164,6 +184,26 @@ counter!(
     ef_project_root_filesystem_resolutions
 );
 counter!(record_ef_project_root_cache_hit, ef_project_root_cache_hits);
+counter!(
+    record_csharp_declaration_resolution_comparison,
+    csharp_declaration_resolution_comparisons
+);
+counter!(
+    record_dependency_graph_edge,
+    dependency_graph_edges_considered
+);
+counter!(
+    record_dependency_graph_reference_comparison,
+    dependency_graph_reference_comparisons
+);
+counter!(
+    record_dependency_graph_target_index_entry,
+    dependency_graph_target_index_entries
+);
+counter!(
+    record_dependency_graph_target_index_lookup,
+    dependency_graph_target_index_lookups
+);
 
 pub(crate) fn record_reference_candidate_index(keys: usize, indexed: usize, maximum: usize) {
     update(|counts| {
@@ -172,5 +212,15 @@ pub(crate) fn record_reference_candidate_index(keys: usize, indexed: usize, maxi
         counts.reference_candidate_indexed_references += indexed;
         counts.reference_candidate_max_bucket_size =
             counts.reference_candidate_max_bucket_size.max(maximum);
+    });
+}
+
+pub(crate) fn record_declaration_candidate_index(keys: usize, indexed: usize, maximum: usize) {
+    update(|counts| {
+        counts.declaration_candidate_index_builds += 1;
+        counts.declaration_candidate_index_keys += keys;
+        counts.declaration_candidate_indexed_declarations += indexed;
+        counts.declaration_candidate_max_bucket_size =
+            counts.declaration_candidate_max_bucket_size.max(maximum);
     });
 }

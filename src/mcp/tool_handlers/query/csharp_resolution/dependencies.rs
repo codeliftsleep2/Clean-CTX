@@ -4,7 +4,7 @@ use super::{BaseReference, Catalog, Declaration, TypeKind, type_shape};
 use crate::layers::meta::semantic::SemanticRelation;
 use crate::workspace::{index::WorkspaceIndex, scope::WorkspaceScope};
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use tree_sitter::Node;
 
 mod efcore;
@@ -72,6 +72,15 @@ impl DependencyGraph {
                 file: declaration.file.clone(),
             })
             .collect();
+        let target_positions: HashMap<*const Declaration, usize> = declarations
+            .iter()
+            .enumerate()
+            .map(|(position, declaration)| {
+                #[cfg(test)]
+                super::super::work_metrics::record_dependency_graph_target_index_entry();
+                (*declaration as *const Declaration, position)
+            })
+            .collect();
         let mut adjacency = vec![Vec::new(); declarations.len()];
         for (source, declaration) in declarations.iter().enumerate() {
             let edges = match scope {
@@ -92,11 +101,16 @@ impl DependencyGraph {
                             | SemanticRelation::HasConstructorParameterType
                     )
             }) {
-                let Some(reference) = catalog.references.iter().find(|reference| {
-                    reference.file == declaration.file
-                        && reference.owner == declaration.name
-                        && reference.written == edge.object.name
-                }) else {
+                #[cfg(test)]
+                super::super::work_metrics::record_dependency_graph_edge();
+                let Some(reference) = catalog
+                    .references_for_owner(&declaration.file, &declaration.name)
+                    .find(|reference| {
+                        #[cfg(test)]
+                        super::super::work_metrics::record_dependency_graph_reference_comparison();
+                        reference.written == edge.object.name
+                    })
+                else {
                     continue;
                 };
                 let Some(target) = catalog.resolve_declaration(reference) else {
@@ -105,10 +119,9 @@ impl DependencyGraph {
                 if target.kind != TypeKind::Class {
                     continue;
                 }
-                let Some(target) = declarations
-                    .iter()
-                    .position(|candidate| *candidate == target)
-                else {
+                #[cfg(test)]
+                super::super::work_metrics::record_dependency_graph_target_index_lookup();
+                let Some(&target) = target_positions.get(&(target as *const Declaration)) else {
                     continue;
                 };
                 adjacency[source].push(DependencyArc {
