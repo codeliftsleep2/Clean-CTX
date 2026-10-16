@@ -277,6 +277,11 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     #[cfg(test)]
     super::publication_race_test_support::pause_after_compile(&resolved_path);
     let canonical_path = semantic_owner;
+    let previous_semantic_fidelity = state
+        .workspace_index_read()
+        .semantic_projection_fidelity(&canonical_path);
+    let published_semantic_fidelity =
+        crate::workspace::index::SemanticFidelity::from_compilation(effective_fidelity);
     let expected_source_hash = source_hash.clone();
     let published = publication
         .commit(
@@ -337,6 +342,14 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         return Err(ProvideFailure::internal(
             "Context publication was superseded by a newer same-file source snapshot; retry the request",
         ));
+    }
+    if previous_semantic_fidelity.is_some_and(|previous| {
+        published_semantic_fidelity.is_none_or(|published| published < previous)
+    }) {
+        super::super::super::hydration::invalidate_discovery_for_edited_path(
+            state,
+            &canonical_path,
+        );
     }
     #[cfg(feature = "csharp")]
     state

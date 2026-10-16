@@ -24,17 +24,29 @@ pub(super) fn select_candidates(
         .filter(|path| current_source_candidate_is_eligible(state, path))
         .filter(|path| seen.insert(path.clone()))
         .collect();
-    let indexed = state.workspace_index_read();
     let mut selected: Vec<_> = resolved
         .into_iter()
         .filter(|path| match requirement {
-            HydrationRequirement::LegacyEdit => !indexed.file_map().contains_key(path),
+            HydrationRequirement::LegacyEdit => {
+                !has_current_legacy_edit_projection(state, path)
+            }
             HydrationRequirement::Semantic(_) => true,
         })
         .collect();
-    drop(indexed);
     selected.sort();
     selected
+}
+
+fn has_current_legacy_edit_projection(state: &McpState, path: &str) -> bool {
+    let Ok(source) = state.read_source(path) else {
+        return false;
+    };
+    let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    state.workspace_index_read().has_current_semantic_projection(
+        path,
+        SemanticFidelity::High,
+        &source_hash,
+    )
 }
 
 fn current_source_candidate_is_eligible(state: &McpState, path: &str) -> bool {
@@ -95,7 +107,12 @@ pub(super) fn compile_candidate_for(
     };
     let publication = state.begin_semantic_publication(&canonical);
     let (fidelity, coverage) = match requirement {
-        HydrationRequirement::LegacyEdit => (Fidelity::Edit, None),
+        HydrationRequirement::LegacyEdit => {
+            if has_current_legacy_edit_projection(state, &canonical) {
+                return Ok(CandidatePublication::Current);
+            }
+            (Fidelity::Edit, SemanticFidelity::High)
+        }
         HydrationRequirement::Semantic(coverage) => {
             let source = state
                 .read_source(&validated)
@@ -112,7 +129,7 @@ pub(super) fn compile_candidate_for(
                 SemanticFidelity::Medium => Fidelity::Medium,
                 SemanticFidelity::High => Fidelity::High,
             };
-            (fidelity, Some(coverage))
+            (fidelity, coverage)
         }
     };
 
@@ -139,18 +156,13 @@ pub(super) fn compile_candidate_for(
                     },
                     || {
                         let mut index = state.workspace_index_lock();
-                        if let Some(coverage) = coverage {
-                            index.replace_semantic_projection_with_dependencies(
-                                &canonical,
-                                semantic_edges,
-                                coverage,
-                                compiled_hash,
-                                semantic_dependencies,
-                            );
-                        } else if !semantic_edges.is_empty() {
-                            index.remove_file(&canonical);
-                            index.add_edges(&canonical, semantic_edges);
-                        }
+                        index.replace_semantic_projection_with_dependencies(
+                            &canonical,
+                            semantic_edges,
+                            coverage,
+                            compiled_hash,
+                            semantic_dependencies,
+                        );
                         Ok::<_, String>(published_outcome)
                     },
                 )

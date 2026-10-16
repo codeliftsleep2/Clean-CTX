@@ -9,7 +9,7 @@
 
 Two production defects are proven:
 
-1. `HydrationRequirement::LegacyEdit` treats any `WorkspaceIndex::file_map()` entry as sufficient. It does not prove current source hash, adequate fidelity, valid dependencies, or satisfaction of the interpreting domain's evidence requirement.
+1. `HydrationRequirement::LegacyEdit` treated any `WorkspaceIndex::file_map()` entry as sufficient. The narrow adequacy repair is implemented but its focused GREEN is not yet authorized.
 2. A successful non-ready CBM search was treated as root coverage, suppressing authoritative Clean-owned fallback. Provider success could therefore influence truth despite not being cached as complete.
 
 Neither is yet proven to have caused the live `ProjectContext` asymmetry. Exact structured identities, paths, candidate outcomes, projection hashes/fidelities, and provider readiness were not supplied.
@@ -76,7 +76,7 @@ model separates provider usability from provider coverage: non-ready hints are
 retained, but only completed Clean-owned acquisition and downstream processing
 may establish authority.
 
-`HydrationRequirement::Semantic` validates hash and fidelity. `LegacyEdit` checks only absence from `file_map()`. Population is substituted for adequate current evidence.
+`HydrationRequirement::Semantic` validates hash and fidelity. The repaired `LegacyEdit` path now requires source-current High semantic coverage with current dependencies before suppressing its full Edit acquisition.
 
 `CompletenessCertificate` is file-local. Generic graph coverage remains lower-bound except for explicitly upgraded domain cases.
 
@@ -231,17 +231,52 @@ Close the blocker only after a causal RED or proof of contract-only behavior, an
 ### Legacy adequacy / history dependence
 
 **TEST NAME:** production-reachable legacy adequacy history RED  
-**STATUS:** BLOCKED — NOT PREPARED, NOT RUN  
+**STATUS:** CAUSAL RED CONFIRMED — user-run focused test failed at the intended truth-invariance assertion
+**STATUS UPDATE:** Narrow production repair and controls implemented; focused GREEN not yet authorized.
 **PROVEN DEFECT TARGET:** `LegacyEdit` population-only candidate selection  
-**FIXTURE:** intended single-file semantic producer with a production-reachable weaker prior projection  
-**PRECONDITION:** a prior valid lifecycle must leave the file indexed while inadequate for a later LegacyEdit-backed interpretation  
-**QUERY HISTORY:** weak/partial publication, then authoritative query, compared with cold authoritative query over identical final bytes  
+**FIXTURE:** one Spring `OrdersController.java` with a method-level `@GetMapping("/orders")`
+**PRECONDITION:** supported `provide_code_context(fidelity="low")` publishes the file and populates `file_map()` while Low intentionally omits method-level `EndpointMapsTo`
+**QUERY HISTORY:** Low publication followed by `forward_edges(spring/Controller/OrdersController)`, compared with a fresh cold query over identical bytes
 **EXPECTED AUTHORITY:** identical truth and completeness  
-**CURRENT EXPECTED FAILURE:** candidate is discovered but suppressed solely by `file_map()` membership  
-**INSTRUMENTATION:** candidate outcome ledger remains required if a valid producer path is found  
-**PRODUCTION PATH EXERCISED:** must use public production publication and workspace-query preparation  
-**WHY THIS IS PRODUCTION-REACHABLE:** not yet established for a semantic divergence. Angular Service already uses `Semantic(High)`; C#/EF catalog interpretation parses cached source independently of stored projection fidelity. External edits without `refresh_workspace` would bypass the documented lifecycle and are not accepted as a causal fixture.  
-**EXACT FQN:** none until a valid state transition is proven
+**CURRENT EXPECTED FAILURE:** warm discovery finds the file but `LegacyEdit` rejects it solely because `file_map()` is populated, preserving the Low projection without `GET /orders`; cold LegacyEdit compiles at Edit and exposes the mapping
+**INSTRUMENTATION:** public MCP responses plus an assertion that the supported Low publication populated `file_map()`
+**PRODUCTION PATH EXERCISED:** registered `provide_code_context` publication followed by registered `workspace_query` preparation, hydration, candidate selection, compilation/publication, and edge evaluation
+**WHY THIS IS PRODUCTION-REACHABLE:** both operations are supported public tools. No out-of-band mutation, stale bytes, unsupported lifecycle, custom index seeding, or test-only semantic publication is used. Spring semantic extraction intentionally omits method mappings at Low and includes them at Edit (`fidelity != Low`).
+**EXACT FQN:** `mcp::tool_handlers::query::tests_legacy_edit_adequacy::red_legacy_edit_low_projection_cannot_suppress_required_reacquisition`
+
+**OUTCOME:** **A — PRODUCTION DEFECT PROVEN; CAUSAL RED CONFIRMED.**
+Refresh and supported external-change handling retract indexed owners before
+reacquisition. `apply_edit` republishes current semantics and invalidates
+discovery. Semantic requirements validate source hash, fidelity, and dependency
+currentness. The surviving causal boundary is a same-source supported fidelity
+transition: Low evidence remains current and valid as Low evidence, but
+`LegacyEdit` substitutes population for the stronger evidence its cold Edit
+path would acquire.
+
+**USER-RUN RED EVIDENCE:** The focused test was discovered and executed. It
+failed at `src/tests/mcp/workspace_query_legacy_edit_adequacy.rs:129`, where the
+cold query returned the expected Spring
+`EndpointMapsTo(OrdersController, GET /orders)` edge and the supported warm
+history returned `[]`. The preceding assertions established that the Low
+publication succeeded and populated `file_map()`. This is the first causal
+divergence: identical current source and query produce different truth solely
+because `LegacyEdit` treats prior population as adequate evidence.
+
+**IMPLEMENTED REPAIR:** Legacy candidate selection and the compile-time
+currentness guard now require `has_current_semantic_projection(file,
+SemanticFidelity::High, current_source_hash)`. This reuses the existing
+coverage certificate, including dependency-currentness validation. Successful
+full Edit hydration publishes its semantic edges, source hash, dependencies,
+and High coverage atomically. A later public context publication that
+downgrades or removes that coverage invalidates discovery for the containing
+root, preventing a stale completion entry from bypassing reacquisition.
+
+**CONTROLS PREPARED:** adequate warm evidence suppresses redundant compilation;
+Low evidence forces compilation; forced required-publication failure remains
+partial and retryable; and query-then-Low-then-query history preserves the same
+Spring mapping truth. No query, relation, framework, controller, or endpoint is
+special-cased in production. No GREEN is claimed until the user runs the
+focused commands.
 
 ### Provider readiness / aggregate completeness
 

@@ -292,6 +292,15 @@ mod tests_provider_readiness;
 #[path = "../../tests/mcp/workspace_query_warm_state_authority.rs"]
 mod tests_warm_state_authority;
 
+#[cfg(all(
+    test,
+    feature = "rust",
+    feature = "java",
+    feature = "spring_boot"
+))]
+#[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
+mod tests_legacy_edit_adequacy;
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_publication_retry.rs"]
 mod tests_publication_retry;
