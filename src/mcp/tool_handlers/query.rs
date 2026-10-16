@@ -285,6 +285,10 @@ mod tests_hydration_discovery_cache;
 mod tests_filesystem_discovery_cache;
 
 #[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_provider_readiness.rs"]
+mod tests_provider_readiness;
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_publication_retry.rs"]
 mod tests_publication_retry;
 

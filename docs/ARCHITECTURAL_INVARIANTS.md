@@ -742,13 +742,37 @@ remain separate guarantees.
 
 **Status:** ENFORCED
 
-CBM may discover or narrow candidates, but it neither authors Clean-CTX
-semantics nor certifies WorkspaceIndex completeness. Filesystem acquisition and
-Clean compilation remain the correctness path when CBM is absent or degraded.
-Clean-CTX owns its frontend/session transport, not the shared account daemon.
+Clean-CTX's core semantic graph must be independently sufficient to establish
+every core query contract. CBM may discover or narrow candidates, but it neither
+authors Clean-CTX semantics nor certifies WorkspaceIndex completeness. External
+providers may accelerate or enrich graph construction, but their readiness must
+never gate core correctness, availability, or completion. Optional acceleration
+must not become optional correctness.
 
-**Enforcement:** hydration fallback, provider-state handling, WSC-002, and the
-CBM frontend lifecycle boundary.
+Provider evidence may be usable before provider coverage is authoritative. A
+successful provider operation is not proof of complete provider coverage:
+successful `StillIndexing` paths remain advisory inputs, do not cover their
+root, and cannot suppress Clean-owned filesystem acquisition. Ready successful
+discovery may cover the root, but readiness alone does not establish semantic
+completion. Filesystem discovery, required compilation/publication,
+reconciliation, and refinement establish Clean authority. A query may report
+complete only after every required Clean-owned acquisition and semantic-
+processing dependency reaches a terminal successful state. Conversely, optional
+provider work need not finish once Clean independently establishes equivalent
+truth; CBM readiness is neither necessary nor sufficient for core completion.
+
+Warm state may improve performance. It must never improve truth. Clean-CTX owns
+its frontend/session transport, not the shared account daemon.
+
+**Enforcement:** `src/mcp/tool_handlers/hydration.rs` keeps provider search
+success distinct from root coverage and commits completion only after candidate
+publication; `src/tests/mcp/workspace_query_provider_readiness.rs` covers
+non-ready provider retry, failed Clean publication, successful Clean fallback,
+advisory-candidate union/deduplication, and ready-provider fallback suppression;
+existing search/readiness failure controls remain in
+`src/tests/mcp/workspace_query_8.rs` and `workspace_query_9.rs`; WSC-002,
+WSC-003, WSC-014, and the CBM frontend lifecycle boundary retain their existing
+authority.
 
 ### REFINE-001 Reconciliation Ownership Is Domain-Local
 

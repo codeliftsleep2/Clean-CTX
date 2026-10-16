@@ -283,6 +283,7 @@ fn discover_candidate_paths(
     let mut cbm_attempted = false;
     let mut saw_unavailable = false;
     let mut saw_search_failure = false;
+    let mut saw_search_success = false;
     let mut completions = Vec::new();
 
     for configured_root in &state.config.additional_roots {
@@ -346,20 +347,17 @@ fn discover_candidate_paths(
             match result {
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
-                    successful_roots.insert(root_key(&root));
+                    saw_search_success = true;
+                    if readiness == "ready" {
+                        successful_roots.insert(root_key(&root));
+                        completions.push(scope);
+                    }
                     coverage.push(ProjectCoverage {
                         project,
                         status: "searched",
                         readiness: Some(readiness),
                         reason: None,
                     });
-                    // Only a *completed* discovery is recorded: a project that
-                    // is still indexing, or that has not yet finished, may
-                    // return an incomplete candidate set and must stay
-                    // retryable instead of being cached as "searched".
-                    if readiness == "ready" {
-                        completions.push(scope);
-                    }
                 }
                 Err(_) => {
                     saw_search_failure = true;
@@ -403,19 +401,17 @@ fn discover_candidate_paths(
         match discovered {
             Ok(paths) => {
                 append_rooted_paths(&mut candidates, &root, paths);
-                successful_roots.insert(root_key(&root));
+                saw_search_success = true;
+                if readiness == "ready" {
+                    successful_roots.insert(root_key(&root));
+                    completions.push(scope);
+                }
                 coverage.push(ProjectCoverage {
                     project,
                     status: "searched",
                     readiness: Some(readiness),
                     reason: None,
                 });
-                // Successful discovery only — including discovery that found
-                // zero candidates. Failed or not-yet-ready discovery is never
-                // recorded, so it stays eligible for retry.
-                if readiness == "ready" {
-                    completions.push(scope);
-                }
             }
             Err(_) => {
                 saw_search_failure = true;
@@ -470,7 +466,7 @@ fn discover_candidate_paths(
         // Every fallback root is already discovered for this generation, so no
         // scan runs: the previously discovered (and compiled) candidates are
         // still the complete answer for this target.
-        let any_cbm_success = !successful_roots.is_empty();
+        let any_cbm_success = saw_search_success;
         return DiscoveryOutcome {
             candidates,
             project_coverage: coverage,
@@ -491,7 +487,7 @@ fn discover_candidate_paths(
         completions.extend(discovery_scopes_for_roots(&pending_roots));
     }
     candidates.extend(scan.candidates);
-    let any_cbm_success = !successful_roots.is_empty();
+    let any_cbm_success = saw_search_success;
     let attempted = cbm_attempted || scan.attempted || cached_roots > 0;
     let filesystem_covers = scan.attempted || cached_roots > 0;
     let provider = match (any_cbm_success, filesystem_covers) {
