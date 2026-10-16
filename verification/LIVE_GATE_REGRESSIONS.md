@@ -51,12 +51,30 @@ coverage.
 - **Repair requirements:** Change production behavior, add a tracked regression
   under `src/tests/**`, rerun the focused native gate, and then rerun applicable
   aggregate verification.
-- **Repair evidence:** Commit `d720de41`; tracked exact-ancestry regression
-  matrix; focused native PASS in
-  `target/issue-reconciliation/20261015-095730-ea6aecbf/` and the later
-  consolidated run `20261015-112550-0e2d3647/`; complete final verification
-  gate reported green on 2026-10-15.
-- **Status:** Closed as part of Issue #134 final acceptance reconciliation.
+- **Historical-evidence correction (2026-10-15):** The former repair entry
+  cited Issue #134 commit `d720de41` and ASP.NET ancestry runs. Those artifacts
+  do not exercise linked HTML and are not LGR-002 evidence. The original RED
+  capture remains authoritative historical evidence.
+- **Implemented repair:** `entities_in_file` now shares the same conventional-
+  filename/structured-`templateUrl` ownership authority as
+  `provide_code_context` and returns the existing canonical
+  `angular/Template` representation request-locally. It does not publish fake
+  raw entities or move durable assertion ownership away from the declaring
+  Component source.
+- **Tracked regression:**
+  `src/tests/mcp/provide_angular_template_ownership.rs::entities_in_file_uses_the_same_template_authority_for_conventional_and_linked_html`
+  covers conventional and arbitrary linked HTML, canonical Template identity,
+  and the unrelated-HTML negative guard.
+- **Focused live evidence:** User-run native causal controls passed on
+  2026-10-15 at
+  `target/native-causal-controls/20261015-225232-eb0a7fb0/`. Both #141 cases
+  are GREEN: `same-content-filename-and-nested-condition` and
+  `linked-html-entities-in-file`. The latter includes canonical identity and
+  provenance, conventional/linked equivalence, unowned HTML rejection, and
+  refresh-driven owner change/deletion/restoration. Generated captures retain
+  the negative and lifecycle evidence without replacing the tracked test.
+- **Status:** Focused native repair verification GREEN. Keep open until the
+  tracked Rust gate and applicable authoritative final repository gate pass.
 
 ### LGR-003 — Angular entity query leaks the builtin class identity
 

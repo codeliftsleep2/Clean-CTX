@@ -20,6 +20,14 @@ Write-BText (Join-Path $root 'Registrations.cs') ($padding+"`nusing Microsoft.Ex
 Write-BText (Join-Path $root 'Edit.cs') ($padding+"`npublic class EditProbe { public int First() { return 1; } }")
 Write-BText (Join-Path $root 'GhostTests.cs') ($padding+"`nusing Microsoft.VisualStudio.TestTools.UnitTesting; [TestClass] public class GhostTests { [TestMethod] public void Verify() {} }")
 Save-B 'provenance' @{binary=$BinaryPath;hash=(Get-FileHash $BinaryPath).Hash;provider_enabled=$false;registrations=40;broken_read='UnreadableEncoding.cs'}
+function Assert-UnsupportedHtml($Response,[string]$Label) {
+    Save-B $Label $Response
+    $topLevelError=$Response.PSObject.Properties['error']
+    $toolError=$Response.PSObject.Properties['result'] -and
+        $Response.result.PSObject.Properties['isError'] -and $Response.result.isError
+    Assert-B ($topLevelError -or $toolError) "$Label unexpectedly admitted unowned HTML."
+    Assert-B (($Response | ConvertTo-Json -Depth 100 -Compress) -match 'unsupported') "$Label did not report unsupported HTML truthfully."
+}
 try {
     $session=Start-BSession 'causal' $BinaryPath $root
     Invoke-BCase '133' 'read-failure-partial-disclosure' {
@@ -89,9 +97,39 @@ try {
         }
     }
     Invoke-BCase '141' 'linked-html-entities-in-file' {
-        $answer=Get-BResult (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'})
-        Save-B '141-linked-entities' $answer
-        Assert-B (@($answer.structuredContent.entities | Where-Object { $_.domain -eq 'angular' -and $_.entity_type -eq 'Template' }).Count -gt 0) 'Linked HTML does not deliver a Template entity through entities_in_file.'
+        $conventional=Get-BResult (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='same.component.html'})
+        $linked=Get-BResult (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'})
+        Save-B '141-linked-entities' @{conventional=$conventional;linked=$linked}
+        $conventionalEntity=@($conventional.structuredContent.entities | Where-Object { $_.domain -eq 'angular' -and $_.entity_type -eq 'Template' })
+        $linkedEntity=@($linked.structuredContent.entities | Where-Object { $_.domain -eq 'angular' -and $_.entity_type -eq 'Template' })
+        Assert-B ($conventionalEntity.Count -eq 1 -and $linkedEntity.Count -eq 1) 'Conventional and linked HTML must each deliver exactly one Template entity.'
+        foreach ($case in @(@{entity=$conventionalEntity[0];file='same.component.html'},@{entity=$linkedEntity[0];file='arbitrary-view.html'})) {
+            $canonical=(Resolve-Path (Join-Path $root $case.file)).Path
+            Assert-B ($case.entity.name -eq $canonical -and $case.entity.file -eq $canonical) "Template identity/provenance is not canonical for $($case.file)."
+        }
+
+        Write-BText (Join-Path $root 'notes.html') '<ordinary-html></ordinary-html>'
+        Assert-UnsupportedHtml (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='notes.html'}) '141-unowned-html'
+
+        Write-BText (Join-Path $root 'other-view.html') '<other-view></other-view>'
+        $ownerSource=[IO.File]::ReadAllText((Join-Path $root 'template-owner.ts'))
+        Write-BText (Join-Path $root 'template-owner.ts') ($ownerSource.Replace('./arbitrary-view.html','./other-view.html'))
+        $null=Get-BResult (Invoke-BTool $session 'refresh_workspace' @{workspaceRoot=$root})
+        Assert-UnsupportedHtml (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'}) '141-owner-changed'
+
+        Write-BText (Join-Path $root 'template-owner.ts') $ownerSource
+        $null=Get-BResult (Invoke-BTool $session 'refresh_workspace' @{workspaceRoot=$root})
+        $restored=Get-BResult (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'})
+        Assert-B (@($restored.structuredContent.entities | Where-Object { $_.domain -eq 'angular' -and $_.entity_type -eq 'Template' }).Count -eq 1) 'Restored template owner did not restore Template authority.'
+
+        Remove-Item -LiteralPath (Join-Path $root 'template-owner.ts')
+        $null=Get-BResult (Invoke-BTool $session 'refresh_workspace' @{workspaceRoot=$root})
+        Assert-UnsupportedHtml (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'}) '141-owner-deleted'
+
+        Write-BText (Join-Path $root 'template-owner.ts') $ownerSource
+        $null=Get-BResult (Invoke-BTool $session 'refresh_workspace' @{workspaceRoot=$root})
+        $restoredAfterDelete=Get-BResult (Invoke-BTool $session 'workspace_query' @{workspaceRoot=$root;type='entities_in_file';file_path='arbitrary-view.html'})
+        Assert-B (@($restoredAfterDelete.structuredContent.entities | Where-Object { $_.domain -eq 'angular' -and $_.entity_type -eq 'Template' }).Count -eq 1) 'Restored owner did not re-establish Template authority after deletion.'
     }
 } finally {
     foreach ($session in $sessions) {Stop-BSession $session}

@@ -2,8 +2,8 @@
 
 use super::compiled_from_tuples;
 use crate::ir::compiler::CompiledIR;
-use crate::mcp::state::durable_semantics::SemanticSnapshot;
 use crate::mcp::McpState;
+use crate::mcp::state::durable_semantics::SemanticSnapshot;
 
 pub(super) fn persist_baseline(
     state: &McpState,

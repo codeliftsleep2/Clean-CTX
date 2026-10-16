@@ -37,6 +37,29 @@ fn provide(
         .expect("provide_code_context response")
 }
 
+fn entities_in_file(
+    state: &crate::mcp::McpState,
+    root: &tempfile::TempDir,
+    file: &std::path::Path,
+) -> Value {
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(
+        &json!(1),
+        "workspace_query",
+        &json!({
+            "arguments": {
+                "workspaceRoot": root.path(),
+                "type": "entities_in_file",
+                "file_path": file
+            }
+        }),
+        state,
+    );
+    crate::protocol::captured_responses()
+        .pop()
+        .expect("entities_in_file response")
+}
+
 #[test]
 fn decorator_linked_nonstandard_html_uses_angular_template_processing() {
     let _serial = crate::protocol::handler_response_serial();
@@ -83,6 +106,50 @@ export class DetailPage {}
         .expect("model-visible template");
     assert!(text.contains("<app-detail"), "{response}");
     assert!(text.contains("[item]=\"selected\""), "{response}");
+}
+
+#[test]
+fn entities_in_file_uses_the_same_template_authority_for_conventional_and_linked_html() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let component = root.path().join("template-owner.ts");
+    let conventional = root.path().join("same.component.html");
+    let linked = root.path().join("arbitrary-view.html");
+    let unrelated = root.path().join("notes.html");
+    std::fs::write(
+        &component,
+        r#"import { Component } from '@angular/core';
+@Component({ selector: 'template-control', templateUrl: './arbitrary-view.html' })
+export class TemplateControl {}"#,
+    )
+    .expect("component fixture");
+    for template in [&conventional, &linked, &unrelated] {
+        std::fs::write(template, "<child-row></child-row>").expect("template fixture");
+    }
+    let state = state(&root);
+
+    for template in [&conventional, &linked] {
+        let response = entities_in_file(&state, &root, template);
+        assert!(response.get("error").is_none(), "{response}");
+        let entities = response["result"]["structuredContent"]["entities"]
+            .as_array()
+            .expect("template entities");
+        assert_eq!(entities.len(), 1, "{response}");
+        assert_eq!(entities[0]["domain"], "angular", "{response}");
+        assert_eq!(entities[0]["entity_type"], "Template", "{response}");
+        assert_eq!(
+            entities[0]["name"],
+            crate::dictionary::path::canonical_identity_key(&template.to_string_lossy()),
+            "{response}"
+        );
+        assert_eq!(entities[0]["file"], entities[0]["name"], "{response}");
+    }
+
+    let response = entities_in_file(&state, &root, &unrelated);
+    assert_eq!(
+        response["error"]["data"]["reason"], "unsupported_file_type",
+        "unowned HTML must not gain Angular authority: {response}"
+    );
 }
 
 #[test]

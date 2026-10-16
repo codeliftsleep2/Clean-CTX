@@ -12,7 +12,8 @@ pub(super) fn try_evaluate_angular_template(
     resolved_path: &str,
     source: &str,
 ) -> Option<ProvidedContext> {
-    if !is_angular_template(params, state, resolved_path) {
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
+    if !is_angular_template(state, workspace_root, resolved_path) {
         return None;
     }
 
@@ -133,7 +134,17 @@ pub(super) fn try_evaluate_angular_template(
     ))
 }
 
-fn is_angular_template(params: &Value, state: &McpState, resolved_path: &str) -> bool {
+/// Return whether a physical HTML source has Angular template authority.
+///
+/// The conventional suffix is a direct-request hint. For every other HTML
+/// filename, structured `Component.templateUrl` metadata is the authority.
+/// This helper is shared with `entities_in_file` so both public surfaces use
+/// exactly the same admission rule without publishing template-owned state.
+pub(crate) fn is_angular_template(
+    state: &McpState,
+    workspace_root: Option<&str>,
+    resolved_path: &str,
+) -> bool {
     if resolved_path.to_lowercase().ends_with(".component.html") {
         return true;
     }
@@ -144,7 +155,6 @@ fn is_angular_template(params: &Value, state: &McpState, resolved_path: &str) ->
     let Some(file_name) = target.file_name().and_then(|name| name.to_str()) else {
         return false;
     };
-    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
     crate::mcp::tool_handlers::hydration::source_candidates_containing(
         state,
         workspace_root,

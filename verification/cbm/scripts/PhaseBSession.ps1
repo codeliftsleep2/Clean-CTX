@@ -25,7 +25,7 @@ function Invoke-BRpc($Session, [string]$Method, [hashtable]$Params) {
         $line = $read.Result
         if ($null -eq $line) { $Session.Terminal=$true; throw "Session $($Session.Name) closed stdout." }
         Assert-B ([Text.Encoding]::UTF8.GetByteCount($line) -le 8MB) 'Harness response capture exceeded 8 MiB.'
-        $response = $line | ConvertFrom-Json -Depth 100
+        $response = $line | ConvertFrom-Json
         Save-B ("$($Session.Name)-frame-$rpcId") $response
         if ($response.PSObject.Properties['id'] -and $response.id -eq $rpcId) { return $response }
         Assert-B ([DateTime]::UtcNow -lt $script:deadline) 'Notification stream exhausted the case deadline.'
@@ -86,14 +86,14 @@ function Get-BResult($Response) {
 function Get-BBody($Result) {
     # B4 unwraps only sole unannotated text. Additional provider channels remain
     # a compact JSON result envelope in the existing Clean text channel.
-    $body = $Result.content[0].text | ConvertFrom-Json -Depth 100
-    if ($body.PSObject.Properties['content']) { return ($body.content[0].text | ConvertFrom-Json -Depth 100) }
+    $body = $Result.content[0].text | ConvertFrom-Json
+    if ($body.PSObject.Properties['content']) { return ($body.content[0].text | ConvertFrom-Json) }
     return $body
 }
 function Get-BTextBody($Result) {
     $text=[string]$Result.content[0].text
     try {
-        $body=$text | ConvertFrom-Json -Depth 100
+        $body=$text | ConvertFrom-Json
         if ($body.PSObject.Properties['content']) { return [string]$body.content[0].text }
     } catch { # Intentional non-JSON provider text remains verbatim.
     }
@@ -104,8 +104,17 @@ function Start-BSession([string]$Name, [string]$Executable, [string]$Root) {
     $info.FileName=$Executable; $info.WorkingDirectory=$Root
     $info.UseShellExecute=$false; $info.RedirectStandardInput=$true
     $info.RedirectStandardOutput=$true; $info.RedirectStandardError=$true
-    $info.StandardInputEncoding=[Text.UTF8Encoding]::new($false)
-    $info.StandardOutputEncoding=[Text.UTF8Encoding]::new($false)
+    # Windows PowerShell 5.1 runs on .NET Framework, whose ProcessStartInfo
+    # lacks StandardInputEncoding. PowerShell 7/.NET exposes both properties.
+    # Preserve explicit UTF-8 where supported without preventing the shared
+    # verification harnesses from starting on the older maintained host.
+    $utf8=[Text.UTF8Encoding]::new($false)
+    if ($info.PSObject.Properties['StandardInputEncoding']) {
+        $info.StandardInputEncoding=$utf8
+    }
+    if ($info.PSObject.Properties['StandardOutputEncoding']) {
+        $info.StandardOutputEncoding=$utf8
+    }
     $process=[Diagnostics.Process]::new(); $process.StartInfo=$info
     Assert-B ($process.Start()) "Could not launch $Executable"
     $session=[pscustomobject]@{Name=$Name;Process=$process;Stderr=$process.StandardError.ReadToEndAsync();Terminal=$false}

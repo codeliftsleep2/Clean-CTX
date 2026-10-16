@@ -8,6 +8,7 @@ mod delta_apply;
 mod provide;
 #[cfg(feature = "angular")]
 mod provide_angular;
+pub(crate) use provide_angular::is_angular_template;
 mod provide_persistence;
 mod restore;
 

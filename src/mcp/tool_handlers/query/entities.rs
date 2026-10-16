@@ -235,6 +235,9 @@ fn try_prepare_entities_in_file(
     {
         return Err(file_scope_failure());
     }
+    if crate::mcp::tool_handlers::core::is_angular_template(state, workspace_root, &resolved_path) {
+        return Ok(prepared_angular_template_in_file(canonical_path));
+    }
     ensure_supported_file(&resolved_path)?;
     let fidelity = semantic_fidelity(args, state)?;
     let source = state
@@ -273,6 +276,22 @@ fn try_prepare_entities_in_file(
         .reconcile_csharp_after_authority_change(&canonical_path)
         .map_err(QueryFailure::internal)?;
     Ok(prepared_entities_in_file(canonical_path))
+}
+
+fn prepared_angular_template_in_file(canonical_path: String) -> PreparedQuery {
+    let template = crate::layers::meta::semantic::EntityRef::new(
+        "angular",
+        "Template",
+        canonical_path.clone(),
+    )
+    .with_file(canonical_path);
+    PreparedQuery::answer(QueryAnswer::new(
+        "entities_in_file",
+        serde_json::json!({
+            "entities": [template],
+            "count": 1,
+        }),
+    ))
 }
 
 fn prepared_entities_in_file(canonical_path: String) -> PreparedQuery {

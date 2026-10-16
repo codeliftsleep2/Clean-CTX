@@ -11,6 +11,9 @@ The single consolidated run checks:
 
 - decorator-owned arbitrary external template filenames;
 - conventional Angular templates and unrelated generic HTML;
+- linked-HTML `entities_in_file` canonical identity, unowned negative behavior,
+  and refresh-driven owner change/deletion/restoration (through the companion
+  native causal-control harness);
 - Angular 15–16 legacy, Angular 17+ modern, and mixed control flow;
 - complete modern else-if/let/track/empty/switch/defer companion delivery at
   Medium and High, accepting byte-exact fallback when it preserves source;
