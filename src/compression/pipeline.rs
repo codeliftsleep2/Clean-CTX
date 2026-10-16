@@ -46,8 +46,7 @@ use crate::compaction::{
 };
 use crate::compression::CapEntry;
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::run_capture_pipeline;
-use crate::compression::language::language_for_extension;
+use crate::compression::capture_pipeline::run_registered_capture_pipeline;
 use crate::compression::micro_opcodes::apply_micro_opcodes;
 pub(crate) use crate::compression::output::{assemble_body, build_output_lines, combine_footers};
 use crate::compression::report::{format_compacted_body, format_final_output};
@@ -155,12 +154,11 @@ pub fn compress_file_with_source(
     }
 
     let extension = file.extension().and_then(|ext| ext.to_str()).unwrap_or("");
-    let (language, query_string) = language_for_extension(extension)
+    let query_identity = crate::compression::language::registered_language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let all_captures: Vec<CapEntry> = run_capture_pipeline(
-        language,
-        query_string,
+    let all_captures: Vec<CapEntry> = run_registered_capture_pipeline(
+        query_identity,
         &source_code,
         fidelity,
         |capture_name, raw, f| match capture_name {
@@ -234,12 +232,11 @@ pub fn compress_text(
     path_alias: &str,
     aliases: Option<&BTreeMap<String, String>>,
 ) -> Result<(Vec<String>, String), Box<dyn std::error::Error>> {
-    let (language, query_string) = language_for_extension(extension)
+    let query_identity = crate::compression::language::registered_language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let all_captures: Vec<CapEntry> = run_capture_pipeline(
-        language,
-        query_string,
+    let all_captures: Vec<CapEntry> = run_registered_capture_pipeline(
+        query_identity,
         source_code,
         fidelity,
         |capture_name, raw, f| match capture_name {
@@ -401,12 +398,11 @@ pub fn compress_source(
         .extension()
         .and_then(|ext| ext.to_str())
         .unwrap_or("");
-    let (language, query_string) = crate::compression::language::language_for_extension(extension)
+    let query_identity = crate::compression::language::registered_language_for_extension(extension)
         .ok_or_else(|| format!("Unsupported file extension: .{}", extension))?;
 
-    let all_captures: Vec<CapEntry> = run_capture_pipeline(
-        language,
-        query_string,
+    let all_captures: Vec<CapEntry> = run_registered_capture_pipeline(
+        query_identity,
         source_code,
         fidelity,
         |capture_name, raw, f| match capture_name {

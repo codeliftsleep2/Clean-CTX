@@ -12,11 +12,8 @@ use std::collections::BTreeMap;
 pub(crate) fn collect_typescript_source(
     source: &str,
 ) -> Result<super::InvocationEvidenceSet, String> {
-    let language = crate::compression::language::safe_typescript_language()
-        .ok_or_else(|| "TypeScript grammar is unavailable".to_string())?;
-    let captures = crate::compression::capture_pipeline::run_capture_pipeline_nodes(
-        language,
-        crate::queries::TS_CALL_QUERY,
+    let captures = crate::compression::capture_pipeline::run_registered_capture_pipeline_nodes(
+        crate::compression::capture_pipeline::RegisteredQuery::TypeScriptCalls,
         source,
         crate::compression::Fidelity::High,
         |_, _, _| Some(String::new()),

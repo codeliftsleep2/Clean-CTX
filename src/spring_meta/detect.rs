@@ -27,6 +27,9 @@ use crate::compression::language::safe_java_language;
 const SPRING_ANNOTATION_QUERY: &str = r#"
     (annotation) @annotation
 "#;
+static COMPILED_SPRING_ANNOTATION_QUERY: std::sync::OnceLock<
+    Result<Query, tree_sitter::QueryError>,
+> = std::sync::OnceLock::new();
 
 /// Spring-specific annotation names that we treat as a strong signal
 /// of a Spring Boot file. A single match anywhere in the source is enough
@@ -144,13 +147,15 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
         None => return AstResult::ParseFailed,
     };
 
-    let query = match Query::new(&language, SPRING_ANNOTATION_QUERY) {
-        Ok(q) => q,
+    let query = match COMPILED_SPRING_ANNOTATION_QUERY
+        .get_or_init(|| Query::new(&language, SPRING_ANNOTATION_QUERY))
+    {
+        Ok(query) => query,
         Err(_) => return AstResult::ParseFailed,
     };
 
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut matches = cursor.matches(query, tree.root_node(), source.as_bytes());
 
     while let Some(mat) = matches.next() {
         for capture in mat.captures.iter() {

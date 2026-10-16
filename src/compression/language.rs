@@ -299,6 +299,28 @@ pub fn language_for_extension(extension: &str) -> Option<(Language, &'static str
         })
 }
 
+pub(crate) fn registered_language_for_extension(
+    extension: &str,
+) -> Option<crate::compression::capture_pipeline::RegisteredQuery> {
+    let registry = crate::layers::LayerRegistry::global();
+    registry
+        .language_layer_for_extension(extension)
+        .and_then(|layer| {
+            layer.language_ptr().and_then(|_| {
+                let query = match layer.name() {
+                    "typescript" => {
+                        crate::compression::capture_pipeline::RegisteredQuery::TypeScript
+                    }
+                    "csharp" => crate::compression::capture_pipeline::RegisteredQuery::CSharp,
+                    "rust" => crate::compression::capture_pipeline::RegisteredQuery::Rust,
+                    "java" => crate::compression::capture_pipeline::RegisteredQuery::Java,
+                    _ => return None,
+                };
+                Some(query)
+            })
+        })
+}
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/compression/language.rs"]
 mod tests;

@@ -280,10 +280,8 @@ fn template_source(
 }
 
 fn inline_template(source: &str, component_name: &str) -> Option<String> {
-    let language = crate::compression::language::safe_typescript_language()?;
-    let captures = crate::compression::capture_pipeline::run_capture_pipeline_nodes(
-        language,
-        crate::queries::TS_QUERY,
+    let captures = crate::compression::capture_pipeline::run_registered_capture_pipeline_nodes(
+        crate::compression::capture_pipeline::RegisteredQuery::TypeScript,
         source,
         Fidelity::Low,
         |_, raw, _| Some(raw.to_string()),

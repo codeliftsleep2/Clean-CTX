@@ -39,6 +39,8 @@ use crate::compression::Fidelity;
 ))]
 thread_local! {
     static PARSE_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static QUERY_COMPILATION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    static QUERY_CURSOR_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Test-only: parses performed on this thread since the last reset.
@@ -57,6 +59,103 @@ pub(crate) fn parse_count() -> usize {
 ))]
 pub(crate) fn reset_parse_count() {
     PARSE_COUNT.with(|count| count.set(0));
+}
+
+/// Test-only: tree-sitter query compilations performed on this thread.
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
+pub(crate) fn query_compilation_count() -> usize {
+    QUERY_COMPILATION_COUNT.with(|count| count.get())
+}
+
+/// Test-only: query cursors constructed on this thread.
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
+pub(crate) fn query_cursor_count() -> usize {
+    QUERY_CURSOR_COUNT.with(|count| count.get())
+}
+
+/// Test-only: reset query compilation and cursor counts on this thread.
+#[cfg(all(
+    test,
+    any(feature = "csharp", feature = "typescript", feature = "java")
+))]
+pub(crate) fn reset_query_work_counts() {
+    QUERY_COMPILATION_COUNT.with(|count| count.set(0));
+    QUERY_CURSOR_COUNT.with(|count| count.set(0));
+}
+
+/// Closed identities for binary-owned capture queries that are safe to reuse.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum RegisteredQuery {
+    TypeScript,
+    CSharp,
+    Rust,
+    Java,
+    TypeScriptCalls,
+    #[cfg(test)]
+    TestProbe,
+}
+
+impl RegisteredQuery {
+    fn language(self) -> Option<Language> {
+        match self {
+            Self::TypeScript | Self::TypeScriptCalls => {
+                crate::compression::language::safe_typescript_language()
+            }
+            #[cfg(test)]
+            Self::TestProbe => crate::compression::language::safe_typescript_language(),
+            Self::CSharp => crate::compression::language::safe_csharp_language(),
+            Self::Rust => crate::compression::language::safe_rust_language(),
+            Self::Java => crate::compression::language::safe_java_language(),
+        }
+    }
+}
+
+static TYPESCRIPT_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+static CSHARP_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+static RUST_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+static JAVA_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+static TYPESCRIPT_CALL_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+#[cfg(test)]
+static TEST_PROBE_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+
+fn registered_query(
+    identity: RegisteredQuery,
+) -> Result<&'static Query, &'static tree_sitter::QueryError> {
+    let (cell, query_text) = match identity {
+        RegisteredQuery::TypeScript => (&TYPESCRIPT_QUERY, crate::queries::TS_QUERY),
+        RegisteredQuery::CSharp => (&CSHARP_QUERY, crate::queries::CS_QUERY),
+        RegisteredQuery::Rust => (&RUST_QUERY, crate::queries::RS_QUERY),
+        RegisteredQuery::Java => (&JAVA_QUERY, crate::queries::JAVA_QUERY),
+        RegisteredQuery::TypeScriptCalls => (&TYPESCRIPT_CALL_QUERY, crate::queries::TS_CALL_QUERY),
+        #[cfg(test)]
+        RegisteredQuery::TestProbe => (&TEST_PROBE_QUERY, crate::queries::TS_QUERY),
+    };
+    cell.get_or_init(|| {
+        #[cfg(all(
+            test,
+            any(feature = "csharp", feature = "typescript", feature = "java")
+        ))]
+        QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
+        Query::new(
+            &identity
+                .language()
+                .expect("registered query language feature must be enabled"),
+            query_text,
+        )
+    })
+    .as_ref()
 }
 
 /// A single tree-sitter capture, with the text already sliced from the
@@ -138,6 +237,7 @@ impl CapturedNode {
 // `compress_code_context` with `fidelity: "high"` still produced
 // Low-fidelity method/field signatures. The function now takes a
 // real `Fidelity` argument and threads it through to `process`.
+#[cfg(test)]
 pub fn run_capture_pipeline<F>(
     language: Language,
     query_string: &str,
@@ -156,6 +256,51 @@ where
     )
 }
 
+pub(crate) fn run_registered_capture_pipeline<F>(
+    identity: RegisteredQuery,
+    source: &str,
+    fidelity: Fidelity,
+    process: F,
+) -> Result<Vec<CapEntry>, Box<dyn std::error::Error>>
+where
+    F: FnMut(&str, &str, Fidelity) -> Option<String>,
+{
+    let language = identity
+        .language()
+        .ok_or("registered query language feature is unavailable")?;
+    Ok(run_capture_pipeline_nodes_selected(
+        language,
+        QuerySelection::Registered(identity),
+        source,
+        fidelity,
+        process,
+    )?
+    .iter()
+    .map(CapturedNode::to_entry)
+    .collect())
+}
+
+pub(crate) fn run_registered_capture_pipeline_nodes<F>(
+    identity: RegisteredQuery,
+    source: &str,
+    fidelity: Fidelity,
+    process: F,
+) -> Result<Vec<CapturedNode>, Box<dyn std::error::Error>>
+where
+    F: FnMut(&str, &str, Fidelity) -> Option<String>,
+{
+    let language = identity
+        .language()
+        .ok_or("registered query language feature is unavailable")?;
+    run_capture_pipeline_nodes_selected(
+        language,
+        QuerySelection::Registered(identity),
+        source,
+        fidelity,
+        process,
+    )
+}
+
 /// Walk `query_string` over ONE tree-sitter parse of `source` and return every
 /// capture with its query-match identity.
 ///
@@ -166,6 +311,30 @@ where
 pub fn run_capture_pipeline_nodes<F>(
     language: Language,
     query_string: &str,
+    source: &str,
+    fidelity: Fidelity,
+    process: F,
+) -> Result<Vec<CapturedNode>, Box<dyn std::error::Error>>
+where
+    F: FnMut(&str, &str, Fidelity) -> Option<String>,
+{
+    run_capture_pipeline_nodes_selected(
+        language,
+        QuerySelection::Dynamic(query_string),
+        source,
+        fidelity,
+        process,
+    )
+}
+
+enum QuerySelection<'a> {
+    Dynamic(&'a str),
+    Registered(RegisteredQuery),
+}
+
+fn run_capture_pipeline_nodes_selected<F>(
+    language: Language,
+    query_selection: QuerySelection<'_>,
     source: &str,
     fidelity: Fidelity,
     mut process: F,
@@ -185,10 +354,28 @@ where
     tracing::debug!("[run_capture_pipeline] parsed, {} bytes", source.len());
     let source_bytes = source.as_bytes();
 
-    let query = Query::new(&language, query_string)?;
+    let dynamic_query;
+    let query = match query_selection {
+        QuerySelection::Dynamic(query_string) => {
+            #[cfg(all(
+                test,
+                any(feature = "csharp", feature = "typescript", feature = "java")
+            ))]
+            QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
+            dynamic_query = Query::new(&language, query_string)?;
+            &dynamic_query
+        }
+        QuerySelection::Registered(identity) => registered_query(identity)
+            .map_err(|error| format!("registered query compilation failed: {error}"))?,
+    };
     tracing::debug!("[run_capture_pipeline] query compiled");
+    #[cfg(all(
+        test,
+        any(feature = "csharp", feature = "typescript", feature = "java")
+    ))]
+    QUERY_CURSOR_COUNT.with(|count| count.set(count.get() + 1));
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source_bytes);
+    let mut matches = cursor.matches(query, tree.root_node(), source_bytes);
 
     let mut all_captures: Vec<CapturedNode> = Vec::new();
     let mut match_index: usize = 0;

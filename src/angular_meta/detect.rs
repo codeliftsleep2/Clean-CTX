@@ -45,6 +45,10 @@ const ANGULAR_DECORATOR_QUERY: &str = r#"
     (decorator) @decorator
 "#;
 
+static COMPILED_ANGULAR_DECORATOR_QUERY: std::sync::OnceLock<
+    Result<Query, tree_sitter::QueryError>,
+> = std::sync::OnceLock::new();
+
 /// Angular-specific decorator names that are NOT unique to Angular
 /// (e.g. `@Input` is also used by MobX, `@Output` by Vue). These count
 /// as weak signals and must be paired with a strong signal to trigger
@@ -134,13 +138,15 @@ fn ast_based_angular_detect(source: &str) -> bool {
         None => return false,
     };
 
-    let query = match Query::new(&language, ANGULAR_DECORATOR_QUERY) {
-        Ok(q) => q,
+    let query = match COMPILED_ANGULAR_DECORATOR_QUERY
+        .get_or_init(|| Query::new(&language, ANGULAR_DECORATOR_QUERY))
+    {
+        Ok(query) => query,
         Err(_) => return false,
     };
 
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut matches = cursor.matches(query, tree.root_node(), source.as_bytes());
 
     while let Some(mat) = matches.next() {
         for capture in mat.captures.iter() {

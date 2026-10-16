@@ -13,12 +13,8 @@ pub(crate) fn source_owns_external_template(
     declaring_file: &Path,
     target: &Path,
 ) -> bool {
-    let Some(language) = crate::compression::language::safe_typescript_language() else {
-        return false;
-    };
-    let Ok(captures) = crate::compression::capture_pipeline::run_capture_pipeline_nodes(
-        language,
-        crate::queries::TS_QUERY,
+    let Ok(captures) = crate::compression::capture_pipeline::run_registered_capture_pipeline_nodes(
+        crate::compression::capture_pipeline::RegisteredQuery::TypeScript,
         source,
         crate::compression::Fidelity::Low,
         |_, raw, _| Some(raw.to_string()),

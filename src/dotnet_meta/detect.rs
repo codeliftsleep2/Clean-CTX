@@ -120,6 +120,8 @@ const CS_ATTRIBUTE_QUERY: &str = r#"
     (attribute
         name: (identifier) @attr_name)
 "#;
+static COMPILED_CS_ATTRIBUTE_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
 
 /// .NET-specific base class signals that we treat as strong indicators
 /// of a .NET framework file.
@@ -140,6 +142,8 @@ const CS_BASE_CLASS_QUERY: &str = r#"
             (simple_base_type
                 name: (identifier) @base_name)))
 "#;
+static COMPILED_CS_BASE_CLASS_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
 
 /// Decide whether the given source code is from a .NET framework file.
 ///
@@ -229,13 +233,15 @@ fn ast_based_dotnet_detect(source: &str) -> bool {
     };
 
     // Query 1: Check for .NET-specific attributes
-    let query = match Query::new(&language, CS_ATTRIBUTE_QUERY) {
-        Ok(q) => q,
+    let query = match COMPILED_CS_ATTRIBUTE_QUERY
+        .get_or_init(|| Query::new(&language, CS_ATTRIBUTE_QUERY))
+    {
+        Ok(query) => query,
         Err(_) => return false,
     };
 
     let mut cursor = QueryCursor::new();
-    let mut matches = cursor.matches(&query, tree.root_node(), source.as_bytes());
+    let mut matches = cursor.matches(query, tree.root_node(), source.as_bytes());
 
     while let Some(mat) = matches.next() {
         for capture in mat.captures.iter() {
@@ -250,13 +256,15 @@ fn ast_based_dotnet_detect(source: &str) -> bool {
     }
 
     // Query 2: Check for .NET-specific base classes
-    let base_query = match Query::new(&language, CS_BASE_CLASS_QUERY) {
-        Ok(q) => q,
+    let base_query = match COMPILED_CS_BASE_CLASS_QUERY
+        .get_or_init(|| Query::new(&language, CS_BASE_CLASS_QUERY))
+    {
+        Ok(query) => query,
         Err(_) => return false, // If the query failed, rely on fallback
     };
 
     let mut cursor2 = QueryCursor::new();
-    let mut base_matches = cursor2.matches(&base_query, tree.root_node(), source.as_bytes());
+    let mut base_matches = cursor2.matches(base_query, tree.root_node(), source.as_bytes());
 
     while let Some(mat) = base_matches.next() {
         for capture in mat.captures.iter() {

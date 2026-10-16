@@ -1,5 +1,50 @@
 use super::*;
 use crate::queries;
+
+#[cfg(feature = "typescript")]
+#[test]
+fn registered_static_query_compiles_once_across_observations() {
+    reset_query_work_counts();
+    let source = "class StaticQueryReuseProbe {}";
+    let mut observations = Vec::new();
+
+    for _ in 0..3 {
+        let captures = run_registered_capture_pipeline(
+            RegisteredQuery::TestProbe,
+            source,
+            Fidelity::Low,
+            |name, raw, _| Some(format!("{name}:{raw}")),
+        )
+        .expect("registered static query observation should succeed");
+        observations.push(
+            captures
+                .into_iter()
+                .map(|capture| {
+                    (
+                        capture.name,
+                        capture.text,
+                        capture.start_byte,
+                        capture.end_byte,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    assert_eq!(observations[0], observations[1]);
+    assert_eq!(observations[1], observations[2]);
+    assert_eq!(
+        query_cursor_count(),
+        3,
+        "each semantic observation must retain its own stateful query cursor"
+    );
+    assert_eq!(
+        query_compilation_count(),
+        1,
+        "one registered static query must compile once across equivalent observations"
+    );
+}
+
 #[test]
 fn empty_source_yields_no_captures() {
     let captures = run_capture_pipeline(
