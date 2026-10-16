@@ -30,6 +30,8 @@ impl Catalog {
         scope: Option<&WorkspaceScope>,
         discovery_complete: bool,
     ) -> Self {
+        #[cfg(test)]
+        super::work_metrics::record_angular_catalog_build();
         let mut component_keys = BTreeSet::new();
         for keys in index.file_map().values() {
             for key in keys {
@@ -44,6 +46,8 @@ impl Catalog {
         let mut sources = Vec::new();
         let mut seen_links = BTreeSet::new();
         for (_, _, component_name) in component_keys {
+            #[cfg(test)]
+            super::work_metrics::record_angular_component_considered();
             let links = match scope {
                 Some(scope) => index.forward_edges_by_identity_in_scope(
                     "angular",
@@ -78,6 +82,10 @@ impl Catalog {
                     }));
                     continue;
                 };
+                #[cfg(test)]
+                super::work_metrics::record_angular_template_processed(
+                    link.object.name.starts_with("inline:"),
+                );
                 let ordered = crate::angular_meta::template_ordered::extract(&source);
                 let available = ordered.is_supported();
                 sources.push(TemplateSourceStatus {

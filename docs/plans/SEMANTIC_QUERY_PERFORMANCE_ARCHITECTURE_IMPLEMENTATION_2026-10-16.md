@@ -1,7 +1,7 @@
 # Semantic Query Performance Architecture Implementation Campaign — 2026-10-16
 
 **Agent:** Agent MaxHeadRoom  
-**Campaign status:** Phase 1 bounded implementation and adjacent verification GREEN; Phase 2 not authorized
+**Campaign status:** Phase 1 GREEN; Phase 2 instrumentation prepared, Angular characterization rerun pending
 
 ## Phase 1 — Static Tree-Sitter Query Reuse
 
@@ -125,3 +125,44 @@ Before production edits, verify target file line counts. `capture_pipeline.rs` i
 **BOUNDED GREEN COMMAND REQUIRING AUTHORIZATION:** `cargo test -p clean-ctx --all-features compression::capture_pipeline::tests::registered_static_query_compiles_once_across_observations -- --exact`  
 **REMAINING RISKS:** the authoritative repository-wide final gate has not run, so Phase 1 is not release-certified. No live MCP verification was required for this internal execution-machinery lifetime change.  
 **NEXT PHASE:** stop at the Phase 1 boundary. Phase 2 structural work instrumentation requires separate authorization; alternatively run the authoritative final gate if release certification is desired before continuing the campaign.
+
+## Phase 2 — Structural Work-Count Instrumentation
+
+**STATUS:** IMPLEMENTED — first Angular characterization run corrected; focused rerun pending
+
+The current branch still reconstructs C# and Angular derived query catalogs.
+Phase 2 adds a test-only, thread-local work ledger at the constructors and
+successful source-processing boundaries. It does not enter `McpState`, the
+WorkspaceIndex, production caches, completeness, or query results.
+
+Observed work units are:
+
+- C# catalog constructions;
+- admitted C# files considered by a construction;
+- C# source snapshots successfully parsed by a construction;
+- Angular catalog constructions;
+- Angular component identities considered by a construction;
+- successfully acquired Angular template sources processed, split into inline
+  and external sources.
+
+The prepared C# characterization uses two equivalent indexed batch items over
+one current High-fidelity source. Current orchestration prepares each indexed
+item before and after shared acquisition, so the expected current baseline is
+four catalog constructions and four parses with identical item results.
+
+The prepared Angular characterization explicitly builds the current ephemeral
+catalog twice over one inline and one external template. The executed RED
+corrected the static assumption about component enumeration: each build sees
+the two declaration identities plus the two `HasSelector` endpoint identities,
+because all four are indexed as `angular/Component`. The characterized current
+baseline is therefore two catalog constructions, eight component-identity
+considerations, and four template-source processing operations, split evenly
+between inline and external sources, with identical derived results.
+
+These are characterization assertions for the uncached implementation, not a
+future cache contract. No production optimization, cache, evidence generation,
+parser pool, parse-tree cache, lookup index, or authority change is included.
+The user-run Angular characterization reached the component-count assertion and
+reported eight rather than the statically assumed four; its remaining counter
+assertions and the C# characterization still require focused execution. The
+agent ran no Cargo command or runtime verification while preparing Phase 2.

@@ -43,6 +43,45 @@ fn registered_static_query_compiles_once_across_observations() {
         1,
         "one registered static query must compile once across equivalent observations"
     );
+
+    let mut dynamic_observations = Vec::new();
+    for _ in 0..2 {
+        let captures = run_capture_pipeline(
+            crate::compression::language::safe_typescript_language()
+                .expect("typescript feature should be enabled in tests"),
+            queries::TS_QUERY,
+            source,
+            Fidelity::Low,
+            |name, raw, _| Some(format!("{name}:{raw}")),
+        )
+        .expect("equivalent dynamic query observation should succeed");
+        dynamic_observations.push(
+            captures
+                .into_iter()
+                .map(|capture| {
+                    (
+                        capture.name,
+                        capture.text,
+                        capture.start_byte,
+                        capture.end_byte,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+    }
+
+    assert_eq!(dynamic_observations[0], observations[0]);
+    assert_eq!(dynamic_observations[1], observations[0]);
+    assert_eq!(
+        query_cursor_count(),
+        5,
+        "registered and dynamic observations must each own an independent cursor"
+    );
+    assert_eq!(
+        query_compilation_count(),
+        3,
+        "two dynamic observations must each compile in addition to the one registered compilation"
+    );
 }
 
 #[test]

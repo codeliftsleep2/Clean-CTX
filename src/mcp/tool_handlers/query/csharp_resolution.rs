@@ -10,7 +10,6 @@ use crate::mcp::McpState;
 use crate::workspace::{index::WorkspaceIndex, scope::WorkspaceScope};
 use std::collections::HashSet;
 use tree_sitter::Node;
-
 mod dependencies;
 pub(super) mod direct_aspnet;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
@@ -20,7 +19,6 @@ pub(super) enum TypeKind {
     Class,
     Interface,
 }
-
 impl TypeKind {
     pub(super) fn entity_type(self) -> &'static str {
         match self {
@@ -29,7 +27,6 @@ impl TypeKind {
         }
     }
 }
-
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 struct Declaration {
     kind: TypeKind,
@@ -39,7 +36,6 @@ struct Declaration {
     arity: usize,
     source: String,
 }
-
 #[derive(Clone, Debug)]
 struct BaseReference {
     file: String,
@@ -50,14 +46,12 @@ struct BaseReference {
     shape: TypeShape,
     imports: Vec<Vec<String>>,
 }
-
 #[derive(Clone, Debug)]
 struct TypeShape {
     qualifier: Vec<String>,
     name: String,
     arity: usize,
 }
-
 #[derive(Default)]
 pub(super) struct Catalog {
     declarations: Vec<Declaration>,
@@ -81,11 +75,15 @@ impl Catalog {
         index: &WorkspaceIndex,
         scope: Option<&WorkspaceScope>,
     ) -> Self {
+        #[cfg(test)]
+        super::work_metrics::record_csharp_catalog_build();
         let mut catalog = Self::default();
         for file in index.file_map().keys().filter(|file| {
             file.to_ascii_lowercase().ends_with(".cs")
                 && scope.is_none_or(|scope| scope.admits(file))
         }) {
+            #[cfg(test)]
+            super::work_metrics::record_csharp_file_considered();
             let Some(source) = state.cached_source_snapshot(file) else {
                 continue;
             };
@@ -271,6 +269,8 @@ impl Catalog {
         let Some(tree) = parser.parse(source, None) else {
             return;
         };
+        #[cfg(test)]
+        super::work_metrics::record_csharp_file_parsed();
         let imports = using_namespaces(tree.root_node(), source.as_bytes());
         visit_container(
             tree.root_node(),

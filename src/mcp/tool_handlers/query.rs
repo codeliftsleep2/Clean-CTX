@@ -71,6 +71,8 @@ mod identity;
 mod outcome;
 mod prepare;
 mod request;
+#[cfg(test)]
+mod work_metrics;
 
 pub(super) use diagnostics::discovery_field;
 
@@ -323,6 +325,16 @@ mod tests_batch;
 #[cfg(all(test, feature = "rust", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_batch_preparation.rs"]
 mod tests_batch_preparation;
+
+#[cfg(all(
+    test,
+    feature = "rust",
+    feature = "csharp",
+    feature = "typescript",
+    feature = "angular"
+))]
+#[path = "../../tests/mcp/workspace_query_performance_work_counts.rs"]
+mod tests_performance_work_counts;
 
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_name_validation.rs"]
