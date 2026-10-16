@@ -27,9 +27,7 @@ pub(super) fn select_candidates(
     let mut selected: Vec<_> = resolved
         .into_iter()
         .filter(|path| match requirement {
-            HydrationRequirement::LegacyEdit => {
-                !has_current_legacy_edit_projection(state, path)
-            }
+            HydrationRequirement::LegacyEdit => !has_current_legacy_edit_projection(state, path),
             HydrationRequirement::Semantic(_) => true,
         })
         .collect();
@@ -42,11 +40,9 @@ fn has_current_legacy_edit_projection(state: &McpState, path: &str) -> bool {
         return false;
     };
     let source_hash = state.cache_read().compute_hash(source.as_bytes());
-    state.workspace_index_read().has_current_semantic_projection(
-        path,
-        SemanticFidelity::High,
-        &source_hash,
-    )
+    state
+        .workspace_index_read()
+        .has_current_semantic_projection(path, SemanticFidelity::High, &source_hash)
 }
 
 fn current_source_candidate_is_eligible(state: &McpState, path: &str) -> bool {

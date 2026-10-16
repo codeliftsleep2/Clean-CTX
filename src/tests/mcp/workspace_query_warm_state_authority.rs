@@ -94,11 +94,7 @@ fn configure_provider(primary: &Path, additional: &Path, provider: ProviderState
             Vec::new(),
             TestProjectReadiness::StillIndexing,
         ),
-        ProviderState::Unavailable => (
-            Vec::new(),
-            Vec::new(),
-            TestProjectReadiness::Unavailable,
-        ),
+        ProviderState::Unavailable => (Vec::new(), Vec::new(), TestProjectReadiness::Unavailable),
     };
     set_test_project_search_results(HashMap::from([
         (primary_slug.clone(), Ok(primary_nodes)),
@@ -132,12 +128,8 @@ fn assert_authority(
         &state.config.additional_roots,
     )
     .expect("workspace scope");
-    let neutral = index.forward_edges_by_identity_in_scope(
-        "builtin",
-        "Class",
-        "ProjectContext",
-        &scope,
-    );
+    let neutral =
+        index.forward_edges_by_identity_in_scope("builtin", "Class", "ProjectContext", &scope);
     let base_files: BTreeSet<_> = neutral
         .iter()
         .filter(|edge| {
@@ -156,13 +148,8 @@ fn assert_authority(
         entity_type: "Class".into(),
         name: "ProjectContext".into(),
     };
-    let query_visible = classification::forward(
-        &index,
-        &identity,
-        Some(&scope),
-        true,
-        Some(&catalog),
-    );
+    let query_visible =
+        classification::forward(&index, &identity, Some(&scope), true, Some(&catalog));
     let visible_base_files: BTreeSet<_> = query_visible
         .iter()
         .filter(|edge| edge.relation == SemanticRelation::HasBaseType)

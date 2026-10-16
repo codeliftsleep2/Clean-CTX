@@ -5,11 +5,11 @@
 //! Low intentionally omits Spring method mappings, while the cold LegacyEdit
 //! path compiles at Edit and can produce them.
 
-use crate::mcp::tools::dispatch_tools_call;
 use crate::mcp::tool_handlers::hydration::{
     TEST_PROJECT_HYDRATION_SERIALIZE, fail_test_publication_once, hydrate_workspace_index,
     invalidate_discovery_for_root,
 };
+use crate::mcp::tools::dispatch_tools_call;
 use crate::tests::assert_valid_mcp_envelope;
 use crate::workspace::index::SemanticFidelity;
 use serde_json::json;
@@ -28,12 +28,7 @@ fn call(
     arguments: serde_json::Value,
 ) -> serde_json::Value {
     crate::protocol::captured_responses().clear();
-    dispatch_tools_call(
-        &json!(id),
-        tool,
-        &json!({ "arguments": arguments }),
-        state,
-    );
+    dispatch_tools_call(&json!(id), tool, &json!({ "arguments": arguments }), state);
     pop_response()
 }
 
@@ -54,10 +49,7 @@ fn low_publish(state: &crate::mcp::McpState, root: &std::path::Path) {
     );
 }
 
-fn forward_edges(
-    state: &crate::mcp::McpState,
-    root: &std::path::Path,
-) -> Vec<serde_json::Value> {
+fn forward_edges(state: &crate::mcp::McpState, root: &std::path::Path) -> Vec<serde_json::Value> {
     let response = call(
         state,
         2,
@@ -121,11 +113,9 @@ fn current_high_projection(state: &crate::mcp::McpState, file: &std::path::Path)
     let canonical = state.semantic_owner_path(&file.to_string_lossy());
     let source = state.read_source(&canonical).expect("current source");
     let hash = state.cache_read().compute_hash(source.as_bytes());
-    state.workspace_index_read().has_current_semantic_projection(
-        &canonical,
-        SemanticFidelity::High,
-        &hash,
-    )
+    state
+        .workspace_index_read()
+        .has_current_semantic_projection(&canonical, SemanticFidelity::High, &hash)
 }
 
 #[test]
@@ -146,7 +136,9 @@ fn red_legacy_edit_low_projection_cannot_suppress_required_reacquisition() {
     low_publish(&warm, root.path());
     let canonical = warm.semantic_owner_path(&file.to_string_lossy());
     assert!(
-        warm.workspace_index_read().file_map().contains_key(&canonical),
+        warm.workspace_index_read()
+            .file_map()
+            .contains_key(&canonical),
         "the supported Low publication must establish the populated state"
     );
     let warm_edges = forward_edges(&warm, root.path());
