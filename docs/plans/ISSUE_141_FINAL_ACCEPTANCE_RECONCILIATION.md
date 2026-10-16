@@ -3,7 +3,7 @@
 **Agent:** Agent MaxHeadRoom  
 **Date:** 2026-10-15  
 **Issue:** GitHub #141, “Angular templates (supersedes the earlier template-only report)”  
-**Verdict:** **#141 COMPLETE REPAIR IMPLEMENTED — VERIFICATION REQUIRED**
+**Verdict:** **#141 COMPLETE REPAIR — ACCEPTANCE GREEN**
 
 ## 1. Executive verdict
 
@@ -15,8 +15,10 @@ ownership. The bounded repair now makes it use the same ownership authority as
 `provide_code_context` and return the existing canonical `angular/Template`
 representation. No prohibited architecture expansion was required.
 
-Acceptance is not yet green because this session did not run Cargo, test
-binaries, the MCP process, live scripts, or the authoritative final gate.
+The maintainer subsequently reports every required tracked, live, preservation,
+zero-warning, and authoritative final repository gate GREEN against the current
+tree/binary. Acceptance is therefore green. This report still distinguishes
+the agent's static checks from maintainer-run verification.
 
 ## 2. Original contract
 
@@ -66,8 +68,8 @@ completeness, admission, refresh, query-history, and coverage work to #142.
 | Errors | Owned/unowned HTML truthfulness | SATISFIED | Owned HTML uses Angular semantics; generic HTML explains raw uncompressed verbatim fallback. |
 | Preservation | Non-HTML and #138/#139/#140 | SATISFIED | Repair branches only for proven Angular HTML and does not alter other compilation paths. |
 
-No row is `UNSATISFIED`. “SATISFIED” records implemented contract and tracked
-authority; it does not claim the unrun verification gates passed.
+No row is `UNSATISFIED`. “SATISFIED” records implemented contract, tracked
+authority, and the maintainer-reported green verification result.
 
 ## 4. Current template authority chain
 
@@ -248,6 +250,12 @@ conventional and arbitrary linked recognition, unowned HTML rejection, and
 owner change/deletion/restoration after refresh. This is operator/live evidence,
 not a Rust test or authoritative final-gate result.
 
+The maintainer subsequently reported all remaining gates GREEN: focused tracked
+regressions, Angular live MCP acceptance, preservation coverage, formatting,
+zero-warning Clippy, workspace tests, file-size/encoding enforcement, and the
+authoritative final repository gate. Those results are maintainer-run evidence;
+the agent did not rerun or independently capture their console output.
+
 This session ran only read-only inspection, `git diff --check`, diff/status,
 history, GitHub issue read, and static file-size inspection. `git diff --check`
 reported no whitespace errors. No tracked test, binary, build, check, Clippy,
@@ -262,9 +270,8 @@ does not alter global HTML admission or generic query semantics.
 
 ## 23. Remaining residuals
 
-There is no known implementation or harness-definition residual inside #141
-acceptance. Remaining work is executing the tracked and live verification.
-Broader defer trigger variants, exhaustive i18n,
+There is no known implementation, harness-definition, or verification residual
+inside #141 acceptance. Broader defer trigger variants, exhaustive i18n,
 general CSS selectors, expression evaluation, singular `includeTemplate`, and
 global diagnostics/coverage are non-goals, not hidden completeness claims.
 
@@ -274,10 +281,10 @@ current evidence.
 
 ## 24. Closure recommendation
 
-Do not close #141 yet. The focused native LGR-002 case is GREEN. After the
-focused tracked test, Angular live MCP acceptance, preservation tests, and
-authoritative final gate pass against the current tree/binary, change the
-verdict to `#141 COMPLETE REPAIR — ACCEPTANCE GREEN`.
+#141 is ready to close. Every original acceptance row is satisfied, LGR-002 has
+a tracked production repair plus focused live evidence, and the maintainer
+reports all remaining gates GREEN. This reconciliation does not mutate or close
+the GitHub issue; closure remains a maintainer action.
 
 No architecture approval is required for the implemented repair: it reuses the
 already approved Template kind, source identity, and request-local projection.
@@ -293,17 +300,8 @@ Not run: Cargo tests/check/build/Clippy/fmt, direct test binaries, Clean-CTX
 runtime, MCP/live scripts, model pilots, benchmarks, authoritative final gate,
 GitHub mutation, commit, or push.
 
-Recommended user-run verification, in order:
+Verification is complete per the maintainer's report. Future reruns continue to
+use the focused commands documented by the tracked harnesses and the single
+authoritative Final Verification Gate in `docs/agent/verification.md`.
 
-```powershell
-cargo test --all-features provide_angular_template_ownership
-cargo build --all-features --bin clean-ctx
-powershell -NoProfile -ExecutionPolicy Bypass -File verification/issue-reconciliation/Invoke-NativeCausalControls.ps1 -BinaryPath ./target/debug/clean-ctx.exe
-node verification/live-acceptance/angular_template_linkage_live_acceptance.mjs ./target/debug/clean-ctx.exe
-```
-
-Then run every user-run command in the single authoritative Final Verification
-Gate at `docs/agent/verification.md` § “Final Verification Gate”. Its list is
-the command authority and is intentionally not duplicated here.
-
-**Final verdict: #141 COMPLETE REPAIR IMPLEMENTED — VERIFICATION REQUIRED**
+**Final verdict: #141 COMPLETE REPAIR — ACCEPTANCE GREEN**

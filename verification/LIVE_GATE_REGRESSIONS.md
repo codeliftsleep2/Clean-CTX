@@ -73,8 +73,11 @@ coverage.
   provenance, conventional/linked equivalence, unowned HTML rejection, and
   refresh-driven owner change/deletion/restoration. Generated captures retain
   the negative and lifecycle evidence without replacing the tracked test.
-- **Status:** Focused native repair verification GREEN. Keep open until the
-  tracked Rust gate and applicable authoritative final repository gate pass.
+- **Final verification:** The maintainer reports the tracked Rust gates,
+  Angular live acceptance, preservation checks, zero-warning checks, and the
+  authoritative final repository gate GREEN on 2026-10-15.
+- **Status:** Fixed and verified. Closed as part of Issue #141 final acceptance
+  reconciliation; historical RED evidence remains preserved above.
 
 ### LGR-003 — Angular entity query leaks the builtin class identity
 
@@ -162,6 +165,7 @@ coverage.
 | Duplicate bare-name trace identity | PASS | `target/cbm-duplicate-trace-verification/20261013-113450.json` | None |
 | Post-CBM causal investigation | 64/64 PASS | `target/post-cbm-investigation/20261013-113641-426fdf62/` | None |
 | Independent native causal controls | 5/7 PASS | `target/native-causal-controls/20261013-114555-7b27f06e/` | LGR-001, LGR-002 |
+| Repaired native causal controls | 7/7 PASS | `target/native-causal-controls/20261015-225232-eb0a7fb0/` | LGR-002 fixed; both #141 cases PASS |
 | #136 whole-declaration insertion | 23/23 PASS | `target/insert-before-declaration/20261013-114843-33e29bb8/` | None |
 | #137 semantic signature evidence | 25/25 PASS | `target/semantic-signature-evidence/20261013-115026-99b7df08/` | None |
 | #135 DI retention | 16/16 PASS | `target/di-omission/20261013-115210-850b1e84/` | None |
