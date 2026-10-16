@@ -15,7 +15,6 @@ fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
         .pop()
         .expect("MCP response")
 }
-
 fn publish(state: &crate::mcp::McpState, root: &Path, file: &Path) {
     let response = call(
         state,
@@ -220,4 +219,222 @@ fn csharp_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
     );
     assert_eq!(counts.csharp_files_considered, 3);
     assert_eq!(counts.csharp_files_parsed, 3);
+}
+
+#[test]
+fn equivalent_ef_batch_items_reuse_one_request_local_catalog() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let file = root.path().join("EfModel.cs");
+    std::fs::write(
+        &file,
+        r#"using Microsoft.EntityFrameworkCore;
+public class Entity {}
+public class Config : IEntityTypeConfiguration<Entity> {}
+public class AppDbContext : DbContext {
+ protected override void OnModelCreating(ModelBuilder builder) {
+  builder.ApplyConfiguration(new Config());
+ }
+}"#,
+    )
+    .expect("EF fixture");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &file);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "queries": [
+                { "id": "first", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
+                { "id": "second", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" }
+            ]
+        }),
+    );
+
+    let results = batch_results(&response);
+    assert_eq!(results.len(), 2, "{response}");
+    assert!(
+        results.iter().all(|item| item["status"] == "ok"),
+        "{response}"
+    );
+    assert_eq!(results[0]["result"], results[1]["result"]);
+    let counts = work_metrics::snapshot();
+    eprintln!("post-reuse EF work counts: {counts:#?}");
+    assert_eq!(counts.csharp_catalog_builds, 1);
+    assert_eq!(
+        counts.ef_catalog_builds, 1,
+        "equivalent items across both preparation passes must share EF derivation"
+    );
+    assert_eq!(counts.ef_catalog_reuses, 3);
+    assert!(counts.ef_configuration_declarations_examined > 0);
+    assert!(counts.ef_configuration_reference_comparisons > 0);
+    assert!(counts.ef_context_declarations_examined > 0);
+    assert!(counts.ef_context_reference_comparisons > 0);
+    assert!(counts.ef_owner_reference_comparisons > 0);
+    assert!(counts.ef_synthetic_type_parses > 0);
+    assert_eq!(counts.ef_model_occurrences_processed, 1);
+    assert_eq!(counts.ef_assembly_configuration_comparisons, 0);
+    assert_eq!(counts.ef_project_root_lookups, 0);
+}
+
+#[test]
+fn ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let model = root.path().join("EfModel.cs");
+    let added = root.path().join("Added.cs");
+    std::fs::write(
+        root.path().join("App.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\" />",
+    )
+    .expect("project fixture");
+    std::fs::write(
+        &model,
+        "using Microsoft.EntityFrameworkCore; public class Entity {} public class Config : IEntityTypeConfiguration<Entity> {} public class AppDbContext : DbContext { protected override void OnModelCreating(ModelBuilder builder) { builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly); } }",
+    )
+    .expect("EF fixture");
+    std::fs::write(
+        &added,
+        "using Microsoft.EntityFrameworkCore; public class AddedEntity {} public class AddedConfig : IEntityTypeConfiguration<AddedEntity> {}",
+    )
+    .expect("added fixture");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &model);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "queries": [
+                { "id": "before-first", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
+                { "id": "before-second", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
+                { "id": "publish", "type": "entities_in_file", "file_path": "Added.cs", "fidelity": "high" },
+                { "id": "after-first", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
+                { "id": "after-second", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" }
+            ]
+        }),
+    );
+
+    let results = batch_results(&response);
+    assert!(
+        results.iter().all(|item| item["status"] == "ok"),
+        "{response}"
+    );
+    for result in [&results[0], &results[1], &results[3], &results[4]] {
+        let rendered = result["result"].to_string();
+        assert!(rendered.contains("Entity"), "{response}");
+        assert!(
+            rendered.contains("AddedEntity"),
+            "publication must be visible after invalidation and second-pass rebuild: {response}"
+        );
+    }
+    let counts = work_metrics::snapshot();
+    assert_eq!(counts.ef_catalog_builds, 2);
+    assert_eq!(counts.ef_catalog_reuses, 6);
+    assert_eq!(counts.derived_catalog_invalidations, 1);
+}
+
+fn measure_ef_assembly_work(configuration_count: usize) -> work_metrics::QueryWorkCounts {
+    let root = tempfile::tempdir().expect("workspace");
+    std::fs::write(
+        root.path().join("App.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\" />",
+    )
+    .expect("project fixture");
+    let mut configurations = String::from("using Microsoft.EntityFrameworkCore; namespace App;\n");
+    for index in 0..configuration_count {
+        configurations.push_str(&format!(
+            "public class Entity{index} {{}} public class Config{index} : IEntityTypeConfiguration<Entity{index}> {{}}\n"
+        ));
+    }
+    let configuration_file = root.path().join("Configurations.cs");
+    let context_file = root.path().join("AppDbContext.cs");
+    std::fs::write(&configuration_file, configurations).expect("configuration fixture");
+    std::fs::write(
+        &context_file,
+        r#"using Microsoft.EntityFrameworkCore;
+namespace App;
+public class AppDbContext : DbContext {
+ protected override void OnModelCreating(ModelBuilder builder) {
+  builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+ }
+}"#,
+    )
+    .expect("context fixture");
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    publish(&state, root.path(), &configuration_file);
+    publish(&state, root.path(), &context_file);
+
+    work_metrics::reset();
+    let response = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "type": "forward_edges",
+            "domain": "dotnet",
+            "entity_type": "DbContext",
+            "name": "AppDbContext"
+        }),
+    );
+    assert!(response.get("error").is_none(), "{response}");
+    let edges = response["result"]["structuredContent"]["edges"]
+        .as_array()
+        .expect("EF edges");
+    assert_eq!(
+        edges
+            .iter()
+            .filter(|edge| edge["relation"] == "HasEntity")
+            .count(),
+        configuration_count,
+        "{response}"
+    );
+    work_metrics::snapshot()
+}
+
+#[test]
+fn ef_reference_scans_scale_multiplicatively_after_catalog_reuse() {
+    let _serial = crate::protocol::handler_response_serial();
+    let small = measure_ef_assembly_work(4);
+    let large = measure_ef_assembly_work(16);
+    eprintln!("scaled EF work counts: small={small:#?} large={large:#?}");
+
+    assert_eq!(small.csharp_catalog_builds, 1);
+    assert_eq!(small.ef_catalog_builds, 1);
+    assert_eq!(large.csharp_catalog_builds, 1);
+    assert_eq!(large.ef_catalog_builds, 1);
+    assert_eq!(
+        small.ef_configuration_reference_comparisons, 5,
+        "each class declaration must inspect only its ordered owner bucket"
+    );
+    assert_eq!(large.ef_configuration_reference_comparisons, 17);
+    assert_eq!(small.ef_context_reference_comparisons, 5);
+    assert_eq!(large.ef_context_reference_comparisons, 17);
+    assert_eq!(small.ef_owner_reference_comparisons, 1);
+    assert_eq!(large.ef_owner_reference_comparisons, 1);
+    assert_eq!(small.reference_candidate_index_builds, 1);
+    assert_eq!(large.reference_candidate_index_builds, 1);
+    assert_eq!(small.reference_candidate_index_keys, 5);
+    assert_eq!(large.reference_candidate_index_keys, 17);
+    assert_eq!(small.reference_candidate_indexed_references, 5);
+    assert_eq!(large.reference_candidate_indexed_references, 17);
+    assert_eq!(small.reference_candidate_max_bucket_size, 1);
+    assert_eq!(large.reference_candidate_max_bucket_size, 1);
+    assert_eq!(
+        large.ef_assembly_configuration_comparisons,
+        small.ef_assembly_configuration_comparisons * 4
+    );
+    assert_eq!(
+        large.ef_synthetic_type_parses,
+        small.ef_synthetic_type_parses + 12
+    );
+    assert_eq!(
+        large.ef_project_root_lookups,
+        small.ef_project_root_lookups + 12
+    );
 }

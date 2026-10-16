@@ -67,6 +67,7 @@ pub(super) struct PreparationContext {
     scope: Option<Result<Option<WorkspaceScope>, String>>,
     hydration: HashMap<HydrationKey, Result<HydrationReport, String>>,
     csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
+    efcore_catalog: Option<Arc<super::csharp_resolution::EfCoreCatalog>>,
     angular_catalogs: [Option<Arc<super::angular_templates::Catalog>>; 2],
 }
 
@@ -76,6 +77,7 @@ impl PreparationContext {
             scope: None,
             hydration: HashMap::new(),
             csharp_catalog: None,
+            efcore_catalog: None,
             angular_catalogs: [None, None],
         }
     }
@@ -164,15 +166,36 @@ impl PreparationContext {
             .clone()
     }
 
+    pub(super) fn efcore_catalog(
+        &mut self,
+        state: &McpState,
+        index: &WorkspaceIndex,
+        scope: Option<&WorkspaceScope>,
+    ) -> Arc<super::csharp_resolution::EfCoreCatalog> {
+        if let Some(catalog) = &self.efcore_catalog {
+            #[cfg(test)]
+            super::work_metrics::record_ef_catalog_reuse();
+            return catalog.clone();
+        }
+        let csharp = self.csharp_catalog(state, index, scope);
+        self.efcore_catalog
+            .get_or_insert_with(|| {
+                Arc::new(super::csharp_resolution::EfCoreCatalog::build(&csharp))
+            })
+            .clone()
+    }
+
     pub(super) fn invalidate_derived_catalogs(&mut self) {
         #[cfg(test)]
-        let had_catalog =
-            self.csharp_catalog.is_some() || self.angular_catalogs.iter().any(Option::is_some);
+        let had_catalog = self.csharp_catalog.is_some()
+            || self.efcore_catalog.is_some()
+            || self.angular_catalogs.iter().any(Option::is_some);
         #[cfg(test)]
         if had_catalog {
             super::work_metrics::record_derived_catalog_invalidation();
         }
         self.csharp_catalog = None;
+        self.efcore_catalog = None;
         self.angular_catalogs = [None, None];
     }
 }

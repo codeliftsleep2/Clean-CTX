@@ -1,7 +1,7 @@
 # Semantic Query Performance Architecture Implementation Campaign — 2026-10-16
 
 **Agent:** Agent MaxHeadRoom  
-**Campaign status:** Phases 1–2 GREEN; Phase 3 request-local reuse implemented, focused verification pending
+**Campaign status:** Phases 1–3 GREEN; Phase 4 cross-request reuse investigation complete — DEFER
 
 ## Phase 1 — Static Tree-Sitter Query Reuse
 
@@ -168,7 +168,7 @@ ran no Cargo command or runtime verification while preparing Phase 2.
 
 ## Phase 3 — Request-Local Semantic Catalog Reuse
 
-**STATUS:** IMPLEMENTED / NOT RUN
+**STATUS:** GREEN — user reported all focused Phase 3 gates passing
 
 `PreparationContext`, already owned by exactly one `workspace_query` request,
 now owns request-local `Arc` values for the C# catalog and the two Angular
@@ -209,3 +209,473 @@ it calls the constructor twice outside `PreparationContext` and therefore does
 not claim request-local reuse. No reuse survives a request, and no session cache,
 evidence epoch, compatibility fingerprint, parser pool, parse-tree cache, or
 lookup index was introduced.
+
+## Phase 4 — Compatible-Evidence Identity for Cross-Request Catalog Reuse
+
+**STATUS:** INVESTIGATION COMPLETE — DEFER; no production cache implemented
+
+### Decision and Remaining Work
+
+Cross-request reuse is technically possible, but the repository does not own a
+single identity proving the complete evidence compatibility required by either
+catalog. Implementing a cache now would create a new durable validity contract
+across source, publication, dependency, discovery, and reconciliation
+lifecycles. That risk is not justified by measured post-Phase-3 payoff.
+
+**RECOMMENDATION: DEFER.** Keep request-local reuse. Measure representative
+cross-request workloads first; if residual cost is material, introduce an
+observational domain evidence identity before introducing a cache.
+
+Phase 2 counters prove constructor, admitted-source, and template work. Phase 3
+reduced equivalent C# batch work from four builds/parses to one, and Angular to
+one build per required `discovery_complete` interpretation. After a relevant
+in-request mutation it rebuilds once and then reuses. Because the context dies
+with the response, two compatible requests still build twice. No representative
+cross-request frequency or latency payoff has been measured, and the former
+within-request multiplication has already been removed.
+
+### Existing Generations and Authorities
+
+There is no general `WorkspaceIndex` generation. The index owns entities,
+declarations, edges, file projections, and file-local semantic coverage without
+one mutation sequence for the aggregate state.
+
+`HydrationDiscoveryCache` generations are per provider/canonical root. They
+prove only that a discovery key completed under the current discovery
+invalidation generation. They do not identify source bytes, projections,
+dependencies, reconciliation, or interpretation. Equal generations do not
+prove equal semantic truth; different generations do not prove catalog inputs
+changed.
+
+`SemanticCoverage` proves exact owner source hash, minimum fidelity, and current
+hashes for recorded external dependencies for one published projection. It is
+not a workspace-set identity and is not exposed as an enumerable catalog
+fingerprint. `SemanticProducerIdentity` and configuration identities prove
+whether unchanged inputs have compatible producers/configuration; they do not
+prove unchanged inputs. Durable file versions and response completeness
+certificates are also local authorities. None may serve alone as a cache key.
+
+### C# Compatible-Evidence Dependencies
+
+The C# catalog enumerates scoped `.cs` entries in `file_map`, obtains cached
+source snapshots, and parses declarations, bases, and references.
+
+| Dependency | Classification |
+| --- | --- |
+| Normalized semantic scope/root set | Necessary; determines admission and ambiguity. |
+| Sorted canonical admitted C# file set | Necessary; entry/exit changes resolution. |
+| Current source hash for every admitted file | Necessary; catalog facts come from these bytes. |
+| C# grammar/query/catalog producer identity | Necessary; binds interpretation. |
+| Interpretation-changing configuration | Necessary cache partition. |
+| Fidelity/semantic coverage | Live use gate; not sufficient content identity. |
+| Dependency currentness | Live use gate; owner hash cannot prove another file current. |
+| Declaration/relationship authority | Consumer dependency; must remain live rather than frozen into catalog authority. |
+| Reconciliation state | Required live gate for consumers of reconciled calls. |
+| Discovery completeness | Consumer interpretation/use gate, not parsed content. |
+
+Owner currentness is derivable from source hashes. Dependency currentness,
+publication success, reconciliation, and discovery completeness are not.
+Computing the sorted file/hash set is precise but preserves traversal and
+hashing cost and still needs all live authority gates.
+
+### Angular Compatible-Evidence Dependencies
+
+Angular construction enumerates components and `HasTemplate` ownership, reads
+declaring TypeScript for inline templates, reads external templates, extracts
+template facts, and resolves selectors against index evidence.
+
+| Dependency | Classification |
+| --- | --- |
+| Normalized semantic scope/root set | Necessary. |
+| Component declaration identity and provenance | Necessary; name is not identity. |
+| Current `HasTemplate` ownership | Necessary. |
+| Declaring component source hash | Necessary for decorator/inline content. |
+| External template canonical path and current hash | Necessary; independent of owner source. |
+| Selector/declaration evidence set | Necessary for endpoint resolution. |
+| Angular/TypeScript/template producer and config identity | Necessary. |
+| Dependency currentness | Necessary. |
+| `discovery_complete` interpretation | Necessary partition/use gate. |
+
+Inline content is derivable from declaring-source hash plus producer identity;
+external template state is not. Angular therefore cannot safely share C#
+validity semantics merely because both could use the same cache container.
+
+### Candidate Designs
+
+1. **Exact compatible-evidence fingerprint:** hash normalized scope, sorted
+   domain evidence records, source/dependency hashes, producers, and
+   interpretation keys. Precise and preserves reuse across unrelated mutation,
+   but fingerprint construction may approach catalog cost, especially for
+   Angular selector/template enumeration.
+2. **Global semantic mutation generation plus scope/producers:** cheap lookup,
+   but safe only after every relevant mutation is centralized. It over-invalidates
+   and still needs special handling for external files and partial publication.
+3. **Domain evidence epochs:** separate C# and Angular generations with hooks
+   for source, publication, removal, restore, reconciliation, dependency, and
+   template changes. Better precision, but creates a cross-cutting authority
+   contract vulnerable to a missed mutation path.
+4. **Hybrid epoch plus exact verification:** strongest eventual design, but the
+   most machinery and duplicates some work.
+
+A future bounded cache owner, immutable `Arc` entries, concurrency, metrics,
+and eviction mechanics may be shared. Evidence extraction, keys, invalidation,
+and authority use gates must be domain-specific.
+
+### Required Failure Matrix
+
+| Failure case | Exact fingerprint | Fully audited domain epoch | Existing discovery generation |
+| --- | --- | --- | --- |
+| Owner contents change | Hash invalidates | Mutation must advance | Not guaranteed |
+| File enters/leaves scope | Set/scope invalidates | Membership must advance | Not guaranteed |
+| Dependency-only change | Dependency hash invalidates | Dependency hook required | No |
+| External Angular template changes | Template hash invalidates | External-source hook required | No |
+| Partial discovery becomes complete | Partition/gate changes | Separate discovery gate required | Partial signal only |
+| Producer/grammar/config changes | Identity invalidates | Producer partition required | No |
+| Fidelity/coverage changes | Authority gate changes | Publication hook required | No |
+| Failed/partial acquisition | Cannot install complete entry | Must not publish reusable epoch | No |
+| Publication leaves dependency stale | Dependency check rejects | Epoch alone is insufficient | No |
+| Similar warm states via different histories | Safe only if normalized evidence matches | Safe only with total hook coverage | Unsafe |
+| Unrelated mutation | Reuses | Conservatively invalidates | May invalidate accidentally |
+
+“Fully audited” is a prerequisite, not a fact established by the current code.
+
+### Future Structural Verification
+
+Use tracked tests and Phase 2 work counts, never timing:
+
+1. request A builds once; compatible request B adds zero builds with identical
+   ordered results;
+2. owner mutation, scope entry/exit, dependency-only mutation, external-template
+   mutation, fidelity transition, producer/config partition, and
+   partial-to-complete discovery each cause their required rebuild/partition;
+3. failed/partial acquisition never installs reusable authority;
+4. publication with stale dependencies rejects reuse;
+5. an unrelated mutation documents the selected precision policy;
+6. cold, warm, reversed-history, provider-state, and batch variants retain
+   identical truth and completeness;
+7. concurrency proves single construction or benign duplicate construction
+   without publishing incompatible state.
+
+The decisive cross-request sequence is `build -> reuse -> relevant mutation ->
+reject -> rebuild -> reuse`, with separate assertions for work counts and
+semantic equivalence.
+
+### Risk and Conditional Smallest Slice
+
+Risk is high. A cross-request cache makes persistent warm state depend on
+correct invalidation across source caching, publication/removal, durable
+restore, refresh, external dependencies, reconciliation, discovery, and
+producer versions. A missed edge can make warm truth differ from cold truth.
+
+If later measurement justifies proceeding, the smallest safe slice is **C#
+only and observational**:
+
+1. derive an immutable identity from normalized scope, sorted admitted
+   canonical file/source hashes, and C# producer/config identity;
+2. retain live fidelity, dependency, reconciliation, and discovery checks as
+   use gates; the identity must not authorize them;
+3. expose test-only comparisons and counters without retaining catalogs;
+4. prove all C# mutation/history controls;
+5. only then add a bounded session-owned C# catalog cache.
+
+Angular remains deferred until external-template and selector-evidence identity
+can be produced completely and cheaply. Do not add a global `WorkspaceIndex`
+generation merely to make caching convenient.
+
+No production or test code changed. No Cargo command, test, build, check,
+Clippy, binary, MCP, CBM, benchmark, or live verification was run. Phase 4 ends
+at this design freeze and does not reopen the GREEN Phase 1–3 contracts.
+
+## Next Target Selection — EF/C# Lookup Work Measurement
+
+**STATUS:** MEASUREMENT GREEN; REQUEST-LOCAL EF REUSE IMPLEMENTED / NOT RUN
+
+### Phase 4 Decision Freeze
+
+Cross-request semantic catalog caching remains **DEFERRED** until representative
+measurement proves residual reconstruction cost material. No global
+`WorkspaceIndex` generation, persistent cache, or new invalidation authority may
+be introduced for convenience. Re-entry remains C#-only observational identity
+first, exactly as specified above. Angular remains deferred.
+
+### Current Performance Topology
+
+After Phases 1–3, production work separates as follows:
+
+1. source acquisition and hydration establish authoritative candidates;
+2. canonical compilation/publication occurs only when evidence is not current
+   and adequate;
+3. one required C# reconciliation runs after a publishing hydration cycle;
+4. one request-local C# catalog parses each admitted C# source, then is reused
+   until relevant publication invalidates it;
+5. one request-local Angular catalog exists per required completeness
+   interpretation and evidence interval;
+6. consumers still perform linear resolution over the immutable C# catalog;
+7. every applicable EF preparation independently constructs `EfCoreCatalog`
+   from that shared C# catalog.
+
+Static query compilation and within-request C#/Angular reconstruction
+amplification are amortized. Consumer lookup and EF derivation are not.
+
+### Remaining C# Provenance/Reference Work
+
+The current C# catalog stores declarations and base references in vectors.
+Repeated operations remain:
+
+- `recognizes_edge` and `resolve_edge` scan all references for
+  `(file, owner spelling, written type)`;
+- `base_reference` scans references for file, owner, namespace, and nesting;
+- `resolve_declaration` and `resolve` scan declarations for every candidate
+  qualified path and arity;
+- unique-name/file helpers scan declarations and intentionally reject multiple
+  matches;
+- `written_references_to` scans every reference and may resolve each against
+  declaration scans;
+- dependency graph construction performs per-edge reference lookup,
+  declaration resolution, and a linear declaration-position lookup.
+
+Phase 3 eliminates repeated catalog construction but does not amortize these
+scans inside a build or across consumers. A safe mechanical index must use
+existing provenance, not invent ownership. Candidate keys include canonical
+file plus namespace/nesting owner path, written/reference shape, and declaration
+path plus generic arity. Values must preserve ambiguity sets; a lookup may
+accelerate the existing “zero, unique, or ambiguous” decision but may not choose
+among duplicates. `(file, owner name)` alone remains insufficient.
+
+### Remaining EF Multiplication
+
+`EfCoreCatalog::build` remains uncached request-local derived work. Forward and
+reverse EF preparations each invoke it from the shared C# catalog; equivalent
+batch items and the second preparation pass can therefore repeat the entire EF
+derivation even though C# parsing is shared.
+
+The current crossed collections remain:
+
+- configuration class declarations × all references (`D × R`) to locate
+  `IEntityTypeConfiguration<T>`;
+- candidate context declarations × all references (`D × R`) to establish
+  `DbContext` ancestry;
+- model/configuration occurrences × references (`O × R`) to recover an owner
+  reference context;
+- each resolved written type × declarations/candidate paths (`O × D`);
+- assembly markers × configuration mappings (`A × K`), including repeated
+  nearest-project discovery/comparison;
+- EF model contexts are reparsed, and written type probes construct parsers and
+  trees independently.
+
+These are scans over already-derived request-local facts. Mechanical indexes in
+the owning C# catalog could serve EF and non-EF consumers without becoming a
+new semantic authority. However, the repository currently counts catalog
+builds/parses, not EF builds, scan candidates, type probes, or project lookups.
+
+### Reconstruction and Batch Audit
+
+Remaining required parsing is now distinguishable:
+
+- canonical acquisition parses when current adequate evidence is absent;
+- one C# catalog parse per admitted source/evidence interval remains necessary
+  for query-time declarations/references;
+- EF reparses each selected context source for `OnModelCreating` and parses
+  synthetic written-type probes;
+- Angular processes templates once per required request-local interpretation;
+- dynamic IR/diff/edit Tree-sitter queries still compile dynamically by design.
+
+No current evidence shows accidental duplicate C# or Angular construction after
+the Phase 3 lifecycle controls. Required partial/complete Angular partitions and
+mutation-driven rebuilds are not defects. The remaining proven batch candidate
+is repeated `EfCoreCatalog` derivation per applicable item/pass; existing
+instrumentation cannot yet state its exact work multiplier.
+
+Parser pooling remains **DEFERRED**. Higher-level reuse removed most parser
+construction, while EF-specific residual parsing has not been structurally
+counted. Pooling would save setup, not tree construction or scan complexity.
+
+Parse-tree caching remains **DEFERRED**. It would add source-hash, grammar,
+lifetime, memory, eviction, and concurrency authority while duplicating parts
+of canonical and derived state. The nearer problem is repeated EF derivation
+and linear lookup over an already-owned immutable catalog.
+
+### Measurement Gap and Selected Campaign
+
+The next action is exactly **MEASURE FIRST**. Add test-only observational
+counters at the EF/C# work boundaries for:
+
+- `EfCoreCatalog` constructions;
+- configuration declarations examined and reference comparisons;
+- context declarations examined and reference comparisons;
+- model occurrences and owner-reference comparisons;
+- declaration candidates examined during written-type resolution;
+- synthetic written-type parses;
+- assembly-marker/configuration comparisons and project-root lookups;
+- optionally, shared C# lookup comparisons used outside EF, separated by lookup
+  kind.
+
+Counters remain thread-local test instrumentation. They must not enter cache
+keys, production responses, semantic decisions, or authority.
+
+### Ranked Candidates
+
+| Rank | Candidate | Classification | Proof/amplification | Risk and scope |
+| --- | --- | --- | --- | --- |
+| 1 | Measure repeated EF derivation and lookup comparisons | **MEASURE FIRST** | Static `D×R`, `O×R`, `O×D`, `A×K` loops remain; batch multiplier not counted | Test-only, deterministic, low risk |
+| 2 | C# catalog-owned provenance/declaration indexes consumed by EF | **PROCEED only after counts** | Repeated vector scans remain and scale with `R`/`D` | Mechanical if ambiguity sets are preserved; moderate identity risk |
+| 3 | Request-local `EfCoreCatalog` reuse | **MEASURE FIRST** | Build is invoked per applicable preparation | Same evidence lifecycle as C# catalog, but reduction unknown |
+| 4 | Other C# consumer lookup indexes | **MEASURE FIRST** | Linear scans are visible but frequency is uncounted | Low authority risk with exact provenance keys |
+| 5 | Canonical/derived parse elimination | **DEFER** | Remaining parses mix required canonical work and EF-local work | Boundary must be measured first |
+| 6 | Parser pooling | **DEFER** | Setup cost not measured material | Saves setup only |
+| 7 | Parse-tree caching | **DEFER** | No post-Phase-3 materiality proof | High lifetime/memory/validity cost |
+| 8 | Cross-request catalog caching | **DEFER/FROZEN** | Residual cost not measured | Highest authority risk |
+| 9 | Static-query/catalog reconstruction defects from Phases 1–3 | **OBSOLETE / ALREADY AMORTIZED** | GREEN structural controls | Reopen only on contradictory evidence |
+
+### Structural RED/GREEN Strategy
+
+Prepare one focused EF fixture with controlled cardinalities: multiple ordinary
+classes, contexts, configuration declarations, model occurrences, and an
+assembly marker. Exercise equivalent forward/reverse EF items in one batch.
+
+The characterization RED must assert current exact structural counts and
+identical semantic results across items/passes. It should expose both:
+
+```text
+shared C# catalog builds = 1
+EF catalog builds > 1
+reference/declaration comparisons grow by the crossed collection sizes
+```
+
+The later production GREEN, under separate authorization, should preserve
+edges, provenance, ambiguity refusal, ordering, and completeness while proving
+the selected redundant counts collapse. If indexes are selected, comparisons
+must scale with matched provenance buckets rather than global `R`/`D`. If
+request-local EF reuse is selected, equivalent preparations build once per
+compatible evidence interval and mutation forces rebuild then reuse.
+
+### Frozen Semantic Invariants
+
+- An index accelerates retrieval of established facts; it never decides their
+  meaning or authority.
+- Name is not identity. Proximity is not ownership.
+- Duplicate declaration/reference matches remain ambiguous unless existing
+  provenance already establishes uniqueness.
+- Warm state and query order cannot change truth, completeness, provenance, or
+  ordering.
+- Fidelity, dependency currentness, discovery, publication, and reconciliation
+  remain live authority gates.
+- Optimization eliminates redundant work, never required work.
+
+### Commands Requiring Separate Authorization
+
+Test-only instrumentation and the structural characterization are now prepared
+in the existing performance-work-count module. No Cargo command was run. The
+focused user-owned command is:
+
+```text
+cargo test --all-features "mcp::tool_handlers::query::tests_performance_work_counts::equivalent_ef_batch_items_reuse_one_request_local_catalog" -- --exact --nocapture
+cargo test --all-features "mcp::tool_handlers::query::tests_performance_work_counts::ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence" -- --exact --nocapture
+```
+
+Any adjacent suite, build, Clippy invocation, benchmark, binary, MCP/CBM run, or
+release gate requires its own authorization. No production optimization begins
+until the structural characterization is GREEN and selects the smallest proven
+removal boundary.
+
+The user reported the unchanged structural characterization GREEN, proving one
+shared C# catalog but four repeated EF constructions. The narrow repair now
+stores one `Arc<EfCoreCatalog>` beside the C# catalog in `PreparationContext`.
+Forward and reverse EF consumers obtain it through that context. Existing
+derived-catalog invalidation clears both values after publication or a possibly
+partial acquisition failure. No value survives the request.
+
+Expected GREEN work counts are `C# builds = 1`, `EF builds = 1`, and
+`EF reuses = 3` for two equivalent items across both preparation passes. The mutation
+control proves `build -> reuse -> invalidate -> rebuild -> reuse`, with two EF
+builds, six reuses, one invalidation, and identical results before and after an
+unrelated authoritative publication. EF interpretation, scans inside the one
+required build, provenance, ambiguity, fidelity, discovery, and completeness
+are unchanged.
+
+Both focused request-local EF reuse regressions were reported GREEN. The
+post-reuse single-build ledger was: three configuration declarations and five
+configuration/reference comparisons; three context declarations and six
+context/reference comparisons; one model occurrence; two owner/reference
+comparisons; and two synthetic type parses.
+
+A scaled characterization is now prepared, not run. It compares four and
+sixteen `IEntityTypeConfiguration<T>` mappings under one assembly-scanning
+context. Both cases must retain one C# build and one EF build. Reference scan
+comparisons must grow by more than eight times when cardinality grows four
+times, while assembly/configuration comparisons grow exactly four times and
+synthetic parses/project lookups grow by the twelve added mappings. This
+separates residual multiplicative scans from
+required linear semantic work without authorizing an index.
+
+```text
+cargo test --all-features "mcp::tool_handlers::query::tests_performance_work_counts::ef_reference_scans_scale_multiplicatively_after_catalog_reuse" -- --exact --nocapture
+```
+
+## Request-Local C# Reference Candidate Index for EF Lookups
+
+**STATUS:** IMPLEMENTED / NOT RUN
+
+The GREEN scaled characterization proved the residual global-reference
+amplification: four-to-sixteen configurations increased configuration/reference
+comparisons `35 -> 425` and context/reference comparisons `45 -> 561`, while
+the enclosing C# and EF catalogs each built once.
+
+The C# catalog now owns a mechanical index from exact existing `(file, owner
+spelling)` fields to ordered positions in its existing reference vector. It is
+built once after source admission, has the same lifetime as the request-local
+C# catalog, and rebuilds naturally with that catalog after invalidation. It
+does not store answers, declaration identities, ownership decisions, namespace
+inference, nesting inference, or framework classification.
+
+Only the three measured EF consumers use the candidate buckets:
+
+- configuration discovery obtains the file/owner bucket and retains the full
+  `IEntityTypeConfiguration<T>` framework/shape check;
+- context discovery obtains the file/owner bucket and retains the full
+  `DbContext` framework/shape check;
+- written-class owner context obtains the same ordered bucket and retains the
+  existing first-candidate behavior and subsequent declaration resolution.
+
+Empty buckets yield no candidates, matching the prior global scan. Bucket
+construction walks the reference vector in existing order, appends every
+position, and performs no sorting or deduplication. A dedicated negative
+regression supplies the same owner spelling in multiple files and multiple
+same-file candidates with distinct namespace/nesting provenance. It proves the
+same-file bucket returns all candidates in original order, preserves their
+provenance, excludes other file/owner buckets, and returns empty for missing
+keys. The bucket is a candidate prefilter, not authority.
+
+Test-only counters now report index builds, key count, total indexed references,
+and maximum bucket size. For the scaled fixtures the mathematically expected
+post-index counts are:
+
+| Work | 4 configurations | 16 configurations |
+| --- | ---: | ---: |
+| C# catalog builds | 1 | 1 |
+| EF catalog builds | 1 | 1 |
+| candidate-index builds | 1 | 1 |
+| index keys / indexed references | 5 / 5 | 17 / 17 |
+| maximum bucket | 1 | 1 |
+| configuration/reference comparisons | 5 | 17 |
+| context/reference comparisons | 5 | 17 |
+| owner/reference comparisons | 1 | 1 |
+| assembly/configuration comparisons | 4 | 16 |
+| synthetic parses | 5 | 17 |
+| project-root lookups | 5 | 17 |
+
+Thus the phase targets only global reference comparisons. Assembly scanning,
+synthetic parsing, project lookup, declaration resolution, ambiguity,
+provenance, fidelity, discovery, reconciliation, and completion are unchanged.
+No state crosses requests and no new invalidation protocol exists.
+
+Focused commands requiring authorization:
+
+```text
+cargo test --all-features "mcp::tool_handlers::query::csharp_resolution::tests_reference_candidates::same_file_owner_bucket_preserves_all_candidates_and_original_order" -- --exact --nocapture
+cargo test --all-features "mcp::tool_handlers::query::tests_performance_work_counts::ef_reference_scans_scale_multiplicatively_after_catalog_reuse" -- --exact --nocapture
+```
+
+No Cargo command, build, Clippy, binary, MCP, CBM, benchmark, or live
+verification was run. Do not select the next optimization until the observed
+post-index ledger is available.

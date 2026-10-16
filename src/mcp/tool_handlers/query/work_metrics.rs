@@ -15,6 +15,21 @@ pub(crate) struct QueryWorkCounts {
     pub(crate) angular_template_sources_processed: usize,
     pub(crate) angular_inline_templates_processed: usize,
     pub(crate) angular_external_templates_processed: usize,
+    pub(crate) ef_catalog_builds: usize,
+    pub(crate) ef_catalog_reuses: usize,
+    pub(crate) ef_configuration_declarations_examined: usize,
+    pub(crate) ef_configuration_reference_comparisons: usize,
+    pub(crate) ef_context_declarations_examined: usize,
+    pub(crate) ef_context_reference_comparisons: usize,
+    pub(crate) ef_model_occurrences_processed: usize,
+    pub(crate) ef_owner_reference_comparisons: usize,
+    pub(crate) ef_synthetic_type_parses: usize,
+    pub(crate) ef_assembly_configuration_comparisons: usize,
+    pub(crate) ef_project_root_lookups: usize,
+    pub(crate) reference_candidate_index_builds: usize,
+    pub(crate) reference_candidate_index_keys: usize,
+    pub(crate) reference_candidate_indexed_references: usize,
+    pub(crate) reference_candidate_max_bucket_size: usize,
 }
 
 thread_local! {
@@ -30,6 +45,21 @@ thread_local! {
             angular_template_sources_processed: 0,
             angular_inline_templates_processed: 0,
             angular_external_templates_processed: 0,
+            ef_catalog_builds: 0,
+            ef_catalog_reuses: 0,
+            ef_configuration_declarations_examined: 0,
+            ef_configuration_reference_comparisons: 0,
+            ef_context_declarations_examined: 0,
+            ef_context_reference_comparisons: 0,
+            ef_model_occurrences_processed: 0,
+            ef_owner_reference_comparisons: 0,
+            ef_synthetic_type_parses: 0,
+            ef_assembly_configuration_comparisons: 0,
+            ef_project_root_lookups: 0,
+            reference_candidate_index_builds: 0,
+            reference_candidate_index_keys: 0,
+            reference_candidate_indexed_references: 0,
+            reference_candidate_max_bucket_size: 0,
         }) };
 }
 
@@ -85,5 +115,53 @@ pub(crate) fn record_angular_template_processed(inline: bool) {
         } else {
             counts.angular_external_templates_processed += 1;
         }
+    });
+}
+
+macro_rules! counter {
+    ($name:ident, $field:ident) => {
+        pub(crate) fn $name() {
+            update(|counts| counts.$field += 1);
+        }
+    };
+}
+
+counter!(record_ef_catalog_build, ef_catalog_builds);
+counter!(record_ef_catalog_reuse, ef_catalog_reuses);
+counter!(
+    record_ef_configuration_declaration,
+    ef_configuration_declarations_examined
+);
+counter!(
+    record_ef_configuration_reference_comparison,
+    ef_configuration_reference_comparisons
+);
+counter!(
+    record_ef_context_declaration,
+    ef_context_declarations_examined
+);
+counter!(
+    record_ef_context_reference_comparison,
+    ef_context_reference_comparisons
+);
+counter!(record_ef_model_occurrence, ef_model_occurrences_processed);
+counter!(
+    record_ef_owner_reference_comparison,
+    ef_owner_reference_comparisons
+);
+counter!(record_ef_synthetic_type_parse, ef_synthetic_type_parses);
+counter!(
+    record_ef_assembly_configuration_comparison,
+    ef_assembly_configuration_comparisons
+);
+counter!(record_ef_project_root_lookup, ef_project_root_lookups);
+
+pub(crate) fn record_reference_candidate_index(keys: usize, indexed: usize, maximum: usize) {
+    update(|counts| {
+        counts.reference_candidate_index_builds += 1;
+        counts.reference_candidate_index_keys += keys;
+        counts.reference_candidate_indexed_references += indexed;
+        counts.reference_candidate_max_bucket_size =
+            counts.reference_candidate_max_bucket_size.max(maximum);
     });
 }

@@ -176,8 +176,7 @@ fn try_prepare_forward_edges(
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "DbContext")
         .then(|| {
             let index = state.workspace_index_read();
-            let csharp = context.csharp_catalog(state, &index, scope.as_ref());
-            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+            context.efcore_catalog(state, &index, scope.as_ref())
         });
     let (aspnet_projection, aspnet_authorized) = if classification_complete
         && identity
@@ -362,8 +361,7 @@ fn try_prepare_reverse_edges(
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Entity")
         .then(|| {
             let index = state.workspace_index_read();
-            let csharp = context.csharp_catalog(state, &index, scope.as_ref());
-            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+            context.efcore_catalog(state, &index, scope.as_ref())
         });
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();

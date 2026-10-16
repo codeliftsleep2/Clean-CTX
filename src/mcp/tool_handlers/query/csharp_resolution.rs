@@ -12,7 +12,9 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 mod dependencies;
 pub(super) mod direct_aspnet;
+mod reference_candidates;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
+pub(super) use reference_candidates::terminal_lookup_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(super) enum TypeKind {
@@ -56,6 +58,7 @@ struct TypeShape {
 pub(super) struct Catalog {
     declarations: Vec<Declaration>,
     references: Vec<BaseReference>,
+    reference_candidates: reference_candidates::ReferenceCandidateIndex,
 }
 
 #[derive(Clone, Debug)]
@@ -98,6 +101,8 @@ impl Catalog {
             ))
         });
         catalog.declarations.dedup();
+        catalog.reference_candidates =
+            reference_candidates::ReferenceCandidateIndex::build(&catalog.references);
         catalog
     }
 
@@ -306,15 +311,6 @@ impl Catalog {
         }
         None
     }
-}
-
-pub(super) fn terminal_lookup_name(written: &str) -> Option<String> {
-    let source = format!("class __CleanCtxProbe : {written} {{}}");
-    let language = crate::compression::language::safe_csharp_language()?;
-    let mut parser = tree_sitter::Parser::new();
-    parser.set_language(&language).ok()?;
-    let tree = parser.parse(&source, None)?;
-    find_first_base_shape(tree.root_node(), source.as_bytes()).map(|shape| shape.name)
 }
 
 fn candidate_paths(reference: &BaseReference) -> Vec<Vec<String>> {
@@ -613,3 +609,7 @@ fn named_child_count(node: Node<'_>, kind: &str) -> usize {
         .filter(|child| child.kind() == kind)
         .count()
 }
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/workspace_query_csharp_reference_candidates.rs"]
+mod tests_reference_candidates;

@@ -8,6 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
 
+#[cfg(test)]
+use crate::mcp::tool_handlers::query::work_metrics;
+
 const DOTNET: &str = "dotnet";
 const DB_CONTEXT: &str = "DbContext";
 const ENTITY: &str = "Entity";
@@ -18,9 +21,13 @@ pub(in crate::mcp::tool_handlers::query) struct EfCoreCatalog {
 
 impl EfCoreCatalog {
     pub(in crate::mcp::tool_handlers::query) fn build(catalog: &Catalog) -> Self {
+        #[cfg(test)]
+        work_metrics::record_ef_catalog_build();
         let configurations = configuration_entities(catalog);
         let mut edges = Vec::new();
         for context in catalog.declarations.iter().filter(|declaration| {
+            #[cfg(test)]
+            work_metrics::record_ef_context_declaration();
             declaration.kind == TypeKind::Class && is_ef_db_context(catalog, declaration)
         }) {
             let Some(model) = OnModelCreating::parse(&context.source) else {
@@ -28,11 +35,15 @@ impl EfCoreCatalog {
             };
             let mut entities = BTreeMap::new();
             for written in model.direct_entities {
+                #[cfg(test)]
+                work_metrics::record_ef_model_occurrence();
                 if let Some(entity) = resolve_written_class(catalog, context, &written) {
                     entities.insert(entity_key(entity), entity);
                 }
             }
             for written in model.explicit_configurations {
+                #[cfg(test)]
+                work_metrics::record_ef_model_occurrence();
                 let Some(configuration) = resolve_written_class(catalog, context, &written) else {
                     continue;
                 };
@@ -41,13 +52,21 @@ impl EfCoreCatalog {
                 }
             }
             for marker in model.assembly_markers {
+                #[cfg(test)]
+                work_metrics::record_ef_model_occurrence();
                 let Some(marker) = resolve_written_class(catalog, context, &marker) else {
                     continue;
                 };
+                #[cfg(test)]
+                work_metrics::record_ef_project_root_lookup();
                 let Some(project) = common_project(&context.file, &marker.file) else {
                     continue;
                 };
                 for (configuration, entity) in &configurations {
+                    #[cfg(test)]
+                    work_metrics::record_ef_assembly_configuration_comparison();
+                    #[cfg(test)]
+                    work_metrics::record_ef_project_root_lookup();
                     if nearest_project(&configuration.file).as_ref() == Some(&project) {
                         entities.insert(entity_key(entity), *entity);
                     }
@@ -109,13 +128,15 @@ impl EfCoreCatalog {
 }
 
 fn is_ef_db_context(catalog: &Catalog, declaration: &Declaration) -> bool {
-    catalog.references.iter().any(|reference| {
-        reference.file == declaration.file
-            && reference.owner == declaration.name
-            && reference.shape.name == DB_CONTEXT
-            && reference.shape.arity == 0
-            && is_ef_framework_type(reference, DB_CONTEXT)
-    })
+    catalog
+        .references_for_owner(&declaration.file, &declaration.name)
+        .any(|reference| {
+            #[cfg(test)]
+            work_metrics::record_ef_context_reference_comparison();
+            reference.shape.name == DB_CONTEXT
+                && reference.shape.arity == 0
+                && is_ef_framework_type(reference, DB_CONTEXT)
+        })
 }
 
 fn is_ef_framework_type(reference: &BaseReference, name: &str) -> bool {
@@ -254,11 +275,16 @@ fn configuration_entities(catalog: &Catalog) -> BTreeMap<DeclarationKey, &Declar
         .iter()
         .filter(|declaration| declaration.kind == TypeKind::Class)
     {
-        let Some(reference) = catalog.references.iter().find(|reference| {
-            reference.file == configuration.file
-                && reference.owner == configuration.name
-                && is_ef_configuration_interface(reference)
-        }) else {
+        #[cfg(test)]
+        work_metrics::record_ef_configuration_declaration();
+        let Some(reference) = catalog
+            .references_for_owner(&configuration.file, &configuration.name)
+            .find(|reference| {
+                #[cfg(test)]
+                work_metrics::record_ef_configuration_reference_comparison();
+                is_ef_configuration_interface(reference)
+            })
+        else {
             continue;
         };
         let Some(written) = first_generic_argument(&reference.written) else {
@@ -294,9 +320,12 @@ fn resolve_written_class<'a>(
     written: &str,
 ) -> Option<&'a Declaration> {
     let reference = catalog
-        .references
-        .iter()
-        .find(|reference| reference.file == owner.file && reference.owner == owner.name)?;
+        .references_for_owner(&owner.file, &owner.name)
+        .find(|_| {
+            #[cfg(test)]
+            work_metrics::record_ef_owner_reference_comparison();
+            true
+        })?;
     resolve_with_reference(catalog, reference, written)
 }
 
@@ -319,6 +348,8 @@ fn resolve_with_reference<'a>(
 }
 
 fn parse_type_shape(written: &str) -> Option<TypeShape> {
+    #[cfg(test)]
+    work_metrics::record_ef_synthetic_type_parse();
     let source = format!("class __CleanCtxProbe : {written} {{}}");
     let language = crate::compression::language::safe_csharp_language()?;
     let mut parser = tree_sitter::Parser::new();
