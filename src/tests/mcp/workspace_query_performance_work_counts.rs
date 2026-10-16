@@ -434,7 +434,24 @@ fn ef_reference_scans_scale_multiplicatively_after_catalog_reuse() {
         small.ef_synthetic_type_parses + 12
     );
     assert_eq!(
-        large.ef_project_root_lookups,
-        small.ef_project_root_lookups + 12
+        (small.ef_project_root_lookups, large.ef_project_root_lookups),
+        (5, 17),
+        "logical assembly project-membership work remains unchanged"
+    );
+    assert_eq!(
+        (
+            small.ef_project_root_filesystem_resolutions,
+            large.ef_project_root_filesystem_resolutions,
+        ),
+        (2, 2),
+        "each distinct participating file must resolve its project only once per EF build"
+    );
+    assert_eq!(
+        (
+            small.ef_project_root_cache_hits,
+            large.ef_project_root_cache_hits,
+        ),
+        (3, 15),
+        "repeated configuration-file lookups must reuse the build-local result"
     );
 }

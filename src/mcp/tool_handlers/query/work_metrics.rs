@@ -26,6 +26,8 @@ pub(crate) struct QueryWorkCounts {
     pub(crate) ef_synthetic_type_parses: usize,
     pub(crate) ef_assembly_configuration_comparisons: usize,
     pub(crate) ef_project_root_lookups: usize,
+    pub(crate) ef_project_root_filesystem_resolutions: usize,
+    pub(crate) ef_project_root_cache_hits: usize,
     pub(crate) reference_candidate_index_builds: usize,
     pub(crate) reference_candidate_index_keys: usize,
     pub(crate) reference_candidate_indexed_references: usize,
@@ -56,6 +58,8 @@ thread_local! {
             ef_synthetic_type_parses: 0,
             ef_assembly_configuration_comparisons: 0,
             ef_project_root_lookups: 0,
+            ef_project_root_filesystem_resolutions: 0,
+            ef_project_root_cache_hits: 0,
             reference_candidate_index_builds: 0,
             reference_candidate_index_keys: 0,
             reference_candidate_indexed_references: 0,
@@ -155,6 +159,11 @@ counter!(
     ef_assembly_configuration_comparisons
 );
 counter!(record_ef_project_root_lookup, ef_project_root_lookups);
+counter!(
+    record_ef_project_root_filesystem_resolution,
+    ef_project_root_filesystem_resolutions
+);
+counter!(record_ef_project_root_cache_hit, ef_project_root_cache_hits);
 
 pub(crate) fn record_reference_candidate_index(keys: usize, indexed: usize, maximum: usize) {
     update(|counts| {

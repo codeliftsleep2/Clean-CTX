@@ -25,6 +25,7 @@ impl EfCoreCatalog {
         work_metrics::record_ef_catalog_build();
         let configurations = configuration_entities(catalog);
         let mut edges = Vec::new();
+        let mut project_lookup = ProjectLookup::default();
         for context in catalog.declarations.iter().filter(|declaration| {
             #[cfg(test)]
             work_metrics::record_ef_context_declaration();
@@ -57,17 +58,16 @@ impl EfCoreCatalog {
                 let Some(marker) = resolve_written_class(catalog, context, &marker) else {
                     continue;
                 };
-                #[cfg(test)]
-                work_metrics::record_ef_project_root_lookup();
-                let Some(project) = common_project(&context.file, &marker.file) else {
+                let Some(project) = project_lookup.common_project(&context.file, &marker.file)
+                else {
                     continue;
                 };
                 for (configuration, entity) in &configurations {
                     #[cfg(test)]
                     work_metrics::record_ef_assembly_configuration_comparison();
-                    #[cfg(test)]
-                    work_metrics::record_ef_project_root_lookup();
-                    if nearest_project(&configuration.file).as_ref() == Some(&project) {
+                    if project_lookup.nearest_project(&configuration.file).as_ref()
+                        == Some(&project)
+                    {
                         entities.insert(entity_key(entity), *entity);
                     }
                 }
@@ -395,9 +395,41 @@ fn entity_key(declaration: &Declaration) -> (Vec<String>, usize, String) {
     )
 }
 
-fn common_project(left: &str, right: &str) -> Option<PathBuf> {
-    let left = nearest_project(left)?;
-    (nearest_project(right).as_ref() == Some(&left)).then_some(left)
+#[derive(Default)]
+struct ProjectLookup {
+    by_file: BTreeMap<String, Option<PathBuf>>,
+}
+
+impl ProjectLookup {
+    fn common_project(&mut self, left: &str, right: &str) -> Option<PathBuf> {
+        #[cfg(test)]
+        work_metrics::record_ef_project_root_lookup();
+        let left_project = self.resolve(left, false)?;
+        (self.resolve(right, false).as_ref() == Some(&left_project)).then_some(left_project)
+    }
+
+    fn nearest_project(&mut self, file: &str) -> Option<PathBuf> {
+        #[cfg(test)]
+        work_metrics::record_ef_project_root_lookup();
+        self.resolve(file, true)
+    }
+
+    fn resolve(&mut self, file: &str, observe_hit: bool) -> Option<PathBuf> {
+        if let Some(project) = self.by_file.get(file) {
+            #[cfg(test)]
+            if observe_hit {
+                work_metrics::record_ef_project_root_cache_hit();
+            }
+            #[cfg(not(test))]
+            let _ = observe_hit;
+            return project.clone();
+        }
+        #[cfg(test)]
+        work_metrics::record_ef_project_root_filesystem_resolution();
+        let project = nearest_project(file);
+        self.by_file.insert(file.to_owned(), project.clone());
+        project
+    }
 }
 
 fn nearest_project(file: &str) -> Option<PathBuf> {
@@ -422,3 +454,7 @@ fn nearest_project(file: &str) -> Option<PathBuf> {
         directory = directory.parent()?;
     }
 }
+
+#[cfg(test)]
+#[path = "../../../../../tests/mcp/ef_project_lookup.rs"]
+mod tests_project_lookup;
