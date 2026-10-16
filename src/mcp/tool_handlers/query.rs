@@ -288,6 +288,10 @@ mod tests_filesystem_discovery_cache;
 #[path = "../../tests/mcp/workspace_query_provider_readiness.rs"]
 mod tests_provider_readiness;
 
+#[cfg(all(test, feature = "rust", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_warm_state_authority.rs"]
+mod tests_warm_state_authority;
+
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_publication_retry.rs"]
 mod tests_publication_retry;

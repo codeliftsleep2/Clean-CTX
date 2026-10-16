@@ -275,17 +275,29 @@ filesystem fallback control.
 ### Two-root ProjectContext identity
 
 **TEST NAME:** two-root duplicate-name provenance/history matrix  
-**STATUS:** PREPARED DESIGN — NOT CODED, NOT RUN  
+**STATUS:** GREEN — user reported the focused two-root matrix passed
 **PROVEN DEFECT TARGET:** unresolved live root asymmetry  
 **FIXTURE:** primary and additional roots each declaring `ProjectContext : DbContext`  
 **PRECONDITION:** independent canonical files and neutral base-type facts  
-**QUERY HISTORY:** cold, primary warm, additional warm, and reversed order  
+**QUERY HISTORY:** cold and warm repeat in both primary/additional root orders
 **EXPECTED AUTHORITY:** both declaration occurrences and both neutral `HasBaseType` facts survive with physical provenance; name-only derived classification may refuse ambiguity  
-**CURRENT EXPECTED FAILURE:** none asserted until the readiness RED establishes the first causal boundary  
-**INSTRUMENTATION:** candidate outcome ledger and per-root discovery calls  
+**CURRENT EXPECTED FAILURE:** none manufactured; the fixture falsifies occurrence loss, base-fact loss, reconciliation omission, history dependence, and provider-state dependence
+**INSTRUMENTATION:** candidate publication counts, C# reconciliation counter, declaration occurrence files, neutral base-fact occurrence files, and query-time classification output
 **PRODUCTION PATH EXERCISED:** configured-root discovery, publication, declaration storage, scope filtering, and C# catalog ambiguity  
 **WHY THIS IS PRODUCTION-REACHABLE:** ordinary configured primary/additional roots and source files  
-**EXACT FQN:** reserved: `mcp::tool_handlers::query::tests_warm_state_authority::two_root_projectcontext_preserves_independent_source_authority`
+**EXACT FQN:** `mcp::tool_handlers::query::tests_warm_state_authority::two_root_projectcontext_preserves_independent_source_authority`
+
+The verified matrix runs fresh states for CBM `Ready`, CBM `StillIndexing` with
+Clean filesystem fallback, and CBM unavailable with Clean filesystem fallback,
+then repeats each with primary/additional roles reversed. Every case asserts a
+cold publication of both C# files, exactly one aggregated C# reconciliation,
+two independent `builtin/Class/ProjectContext` declaration occurrences, two
+file-provenanced `HasBaseType -> builtin/TypeRef/DbContext` facts, an equivalent
+warm result without recompilation, and no fabricated local `Extends` target or
+`dotnet/DbContext` source declaration. The user reported the focused matrix
+GREEN. The original root asymmetry did not reproduce across these deterministic
+provider, history, and root-order variants; no additional production repair is
+authorized by this path.
 
 ### Declaration contract control
 
