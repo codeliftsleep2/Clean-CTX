@@ -309,7 +309,8 @@ fn extract_di_registrations(class_source: &str) -> Vec<String> {
     }
 
     registrations.dedup();
-    registrations.truncate(10);
+    // Keep the complete recognized written-fact set. Presentation economics
+    // must not silently discard registrations before downstream rendering.
     registrations
 }
 

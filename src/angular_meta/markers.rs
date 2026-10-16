@@ -61,6 +61,7 @@ pub enum PhiLineKind {
     Component,
     Service,
     Module,
+    ModuleUnresolvedSpread,
     Directive,
     Pipe,
     Input,
@@ -90,6 +91,7 @@ impl PhiLineKind {
             Self::Component => "Φcmp:",
             Self::Service => "Φsvc:",
             Self::Module => "Φmod:",
+            Self::ModuleUnresolvedSpread => "Φmodspread:",
             Self::Directive => "Φdir:",
             Self::Pipe => "Φpipe:",
             Self::Input => "Φin:",
@@ -114,6 +116,7 @@ impl PhiLineKind {
             Self::Component => "@Component",
             Self::Service => "@Injectable",
             Self::Module => "@NgModule",
+            Self::ModuleUnresolvedSpread => "@NgModuleUnresolvedSpread",
             Self::Directive => "@Directive",
             Self::Pipe => "@Pipe",
             Self::Input => "@Input",
@@ -138,23 +141,24 @@ impl PhiLineKind {
     #[allow(dead_code)]
     pub fn all_in_expand_order() -> &'static [PhiLineKind] {
         &[
-            Self::Injects,           // Φinjects:  (9 chars)
-            Self::Component,         // Φcmp:      (5 chars)
-            Self::Directive,         // Φdir:      (5 chars)
-            Self::Module,            // Φmod:      (5 chars)
-            Self::Pipe,              // Φpipe:     (6 chars)
-            Self::Service,           // Φsvc:      (5 chars)
-            Self::Model,             // Φmodel:    (7 chars)
-            Self::Input,             // Φin:       (4 chars)
-            Self::Output,            // Φout:      (5 chars)
-            Self::Graph,             // Φgraph:    (7 chars)
-            Self::Template,          // Φtpl:      (5 chars)
-            Self::Style,             // Φsty:      (5 chars)
-            Self::TemplateBinding,   // Φtbind:    (7 chars)
-            Self::TemplateDirective, // Φtdir:    (6 chars)
-            Self::TemplateComponent, // Φtcmp:    (6 chars)
-            Self::Bundle,            // ΦBUNDLE    (8 chars)
-            Self::Map,               // ΦMAP       (5 chars)
+            Self::Injects,                // Φinjects:  (9 chars)
+            Self::Component,              // Φcmp:      (5 chars)
+            Self::Directive,              // Φdir:      (5 chars)
+            Self::ModuleUnresolvedSpread, // Φmodspread: (11 chars)
+            Self::Module,                 // Φmod:      (5 chars)
+            Self::Pipe,                   // Φpipe:     (6 chars)
+            Self::Service,                // Φsvc:      (5 chars)
+            Self::Model,                  // Φmodel:    (7 chars)
+            Self::Input,                  // Φin:       (4 chars)
+            Self::Output,                 // Φout:      (5 chars)
+            Self::Graph,                  // Φgraph:    (7 chars)
+            Self::Template,               // Φtpl:      (5 chars)
+            Self::Style,                  // Φsty:      (5 chars)
+            Self::TemplateBinding,        // Φtbind:    (7 chars)
+            Self::TemplateDirective,      // Φtdir:    (6 chars)
+            Self::TemplateComponent,      // Φtcmp:    (6 chars)
+            Self::Bundle,                 // ΦBUNDLE    (8 chars)
+            Self::Map,                    // ΦMAP       (5 chars)
         ]
     }
 
@@ -167,6 +171,7 @@ impl PhiLineKind {
             "Φpipe" => Some(Self::Pipe),
             "Φsvc" => Some(Self::Service),
             "Φmod" => Some(Self::Module),
+            "Φmodspread" => Some(Self::ModuleUnresolvedSpread),
             "Φin" => Some(Self::Input),
             "Φout" => Some(Self::Output),
             "Φmodel" => Some(Self::Model),
@@ -191,6 +196,7 @@ impl PhiLineKind {
             Self::Component => "Φcmp",
             Self::Service => "Φsvc",
             Self::Module => "Φmod",
+            Self::ModuleUnresolvedSpread => "Φmodspread",
             Self::Directive => "Φdir",
             Self::Pipe => "Φpipe",
             Self::Input => "Φin",
@@ -529,6 +535,7 @@ pub fn build_output_line(field_name: &str, alias: Option<&str>) -> String {
 
 /// Build a `Φmodel:<fieldName> [alias=…]` marker line for a `model()`
 /// signal field (Angular 17.1+).
+#[cfg(test)]
 pub fn build_model_line(field_name: &str, alias: Option<&str>) -> String {
     ModelLine { field_name, alias }.render()
 }

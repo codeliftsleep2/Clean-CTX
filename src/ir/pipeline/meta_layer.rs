@@ -59,11 +59,31 @@ impl IRPass for MetaLayerPass {
             state.config.as_ref(),
             &lexical_regions,
         );
+        let invocation_set = crate::ir::invocation_evidence::InvocationEvidenceSet::new(
+            file_provenance.clone(),
+            &state.source,
+            state.invocation_occurrences.clone(),
+        );
+        let invocation_view = invocation_set
+            .view(&file_provenance, &state.source)
+            .expect("compilation-local evidence matches its source");
+        // Some(empty) is authoritative: never reparse a production source.
+        context.invocation_evidence = Some(&invocation_view);
+        if state.query_string == crate::queries::TS_QUERY {
+            context.angular_initializers = Some(&state.angular_initializers);
+            context.ngrx_class_actions = Some(&state.ngrx_class_actions);
+            context.ngrx_selector_declarations = Some(&state.ngrx_selector_declarations);
+            context.ngrx_legacy_transitions = Some(&state.ngrx_legacy_transitions);
+            context.ngrx_legacy_discriminants = Some(&state.ngrx_legacy_discriminants);
+            context.ngrx_constructor_dispatches = Some(&state.ngrx_constructor_dispatches);
+            context.ngrx_service_dispatches = Some(&state.ngrx_service_dispatches);
+        }
         if state.query_string == crate::queries::CS_QUERY {
             context.structured_declarations = Some(&structured_declarations);
         }
 
-        let (meta_results, mut semantic_edges) = registry.evaluate_meta_layers_context(&context);
+        let (meta_results, mut semantic_edges, semantic_dependencies) =
+            registry.evaluate_meta_layers_context(&context);
         append_marker_aliases(state, &meta_results);
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {
@@ -74,6 +94,7 @@ impl IRPass for MetaLayerPass {
             }
         }
         state.semantic_edges.extend(semantic_edges);
+        state.semantic_dependencies.extend(semantic_dependencies);
         Ok(())
     }
 }
@@ -108,7 +129,18 @@ fn append_marker_aliases(
     outputs: &[crate::layers::meta::MetaLayerOutput],
 ) {
     for output in outputs {
-        for line in output.rendered.lines() {
+        // Structured marker entries keep domain-owned multiline values intact.
+        let markers = if let Some(block) = &output.angular_block {
+            block
+                .lines
+                .iter()
+                .chain(block.sections.iter().flat_map(|section| &section.lines))
+                .map(String::as_str)
+                .collect::<Vec<_>>()
+        } else {
+            output.rendered.lines().collect::<Vec<_>>()
+        };
+        for line in markers {
             let line = line.trim();
             if line.is_empty() || !line.starts_with('Φ') {
                 continue;

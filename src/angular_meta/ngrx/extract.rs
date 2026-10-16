@@ -23,66 +23,9 @@ use super::*;
 // Extraction
 // ---------------------------------------------------------------------------
 
-/// Extract the NgRx shape from a source file.
-///
-/// Returns `None` when the file has no NgRx imports (zero overhead).
-/// Returns `Some(NgRxShape)` with detected actions, reducers, effects,
-/// selectors, entity adapters, and store usage.
-pub fn extract_ngrx_shape(source: &str, _fidelity: Fidelity) -> Option<NgRxShape> {
-    let lexical_regions = crate::meta_util::LexicalRegions::new(source);
-    extract_ngrx_shape_with_regions(source, _fidelity, &lexical_regions)
-}
-
-pub(crate) fn extract_ngrx_shape_with_regions(
-    source: &str,
-    _fidelity: Fidelity,
-    lexical_regions: &crate::meta_util::LexicalRegions,
-) -> Option<NgRxShape> {
-    #[cfg(test)]
-    super::extraction_metrics::record_extraction();
-
-    // Import gate: skip non-NgRx files
-    if !has_ngrx_imports(source) {
-        return None;
-    }
-
-    let mut shape = NgRxShape::default();
-
-    // Extract feature name from createFeature or StoreModule.forFeature
-    extract_feature_name(source, &mut shape, lexical_regions);
-
-    // Extract action creators
-    extract_actions(source, &mut shape, lexical_regions);
-
-    // Extract reducer
-    extract_reducer(source, &mut shape, lexical_regions);
-
-    // Extract effects
-    extract_effects(source, &mut shape, lexical_regions);
-
-    // Extract selectors
-    extract_selectors(source, &mut shape, lexical_regions);
-
-    // Extract entity adapter
-    extract_entity_adapter(source, &mut shape, lexical_regions);
-
-    // Extract the enclosing component class name (for Component -> Store
-    // graph edges). Must run before `extract_store_injections` so the
-    // component name is available when wiring the edge.
-    extract_component_name(source, &mut shape, lexical_regions);
-
-    // Extract store injections
-    extract_store_injections(source, &mut shape, lexical_regions);
-
-    // Extract dispatch/select call sites
-    extract_call_sites(source, &mut shape, lexical_regions);
-
-    if shape.is_empty() {
-        return None;
-    }
-
-    Some(shape)
-}
+mod orchestration;
+pub use orchestration::extract_ngrx_shape;
+pub(crate) use orchestration::{extract_ngrx_shape_with_regions, extract_ngrx_shape_with_sites};
 
 /// Extract the feature name from `createFeature({name: '...'})` or
 /// `StoreModule.forFeature('...', ...)`.
@@ -337,22 +280,23 @@ fn extract_reducer(
                 continue;
             }
             let after_on = &body[abs_on + "on(".len()..];
-            let action_name = after_on
-                .split(',')
-                .next()
-                .map(|s| s.trim().to_string())
-                .unwrap_or_default();
+            let (on_body, end_offset) = crate::angular_meta::util::collect_call_body(after_on);
+            let arguments = crate::angular_meta::util::split_top_level(&on_body, ',');
 
             // Extract state summary (the handler body)
-            let state_summary = extract_state_summary(after_on);
+            let state_summary = extract_state_summary(&on_body);
 
-            if !action_name.is_empty() {
+            for action_name in arguments
+                .iter()
+                .take(arguments.len().saturating_sub(1))
+                .filter_map(|argument| exact_action_reference(argument))
+            {
                 transitions.push(ReducerTransition {
                     action_name,
-                    state_summary,
+                    state_summary: state_summary.clone(),
                 });
             }
-            on_search = abs_on + "on(".len() + 1;
+            on_search = abs_on + "on(".len() + end_offset;
         }
 
         if !name.is_empty() {
@@ -364,6 +308,28 @@ fn extract_reducer(
         }
         search_from = after_start + end_offset;
     }
+}
+
+fn exact_action_reference(argument: &str) -> Option<String> {
+    let written = argument.trim();
+    let mut parts = written.split('.');
+    let first = parts.next()?;
+    if !typescript_identifier(first) {
+        return None;
+    }
+    match (parts.next(), parts.next()) {
+        (None, None) => Some(first.to_owned()),
+        (Some(member), None) if typescript_identifier(member) => Some(written.to_owned()),
+        _ => None,
+    }
+}
+
+fn typescript_identifier(written: &str) -> bool {
+    let mut chars = written.chars();
+    chars
+        .next()
+        .is_some_and(|first| first.is_alphabetic() || matches!(first, '_' | '$'))
+        && chars.all(|character| character.is_alphanumeric() || matches!(character, '_' | '$'))
 }
 
 /// Extract a state change summary from an `on()` handler.

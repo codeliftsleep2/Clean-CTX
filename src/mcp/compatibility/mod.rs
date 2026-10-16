@@ -309,3 +309,43 @@ fn insert_required(
 #[cfg(test)]
 #[path = "../../tests/mcp/durable_compatibility_identity.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/angular_template_compatibility.rs"]
+mod angular_template_compatibility_tests;
+
+#[cfg(all(test, feature = "dotnet"))]
+#[path = "../../tests/mcp/dotnet_test_subject_compatibility.rs"]
+mod dotnet_test_subject_compatibility_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/framework_publication_compatibility.rs"]
+mod framework_publication_compatibility_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/angular_di_pipe_compatibility.rs"]
+mod angular_di_pipe_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/angular_di_inject_token_compatibility.rs"]
+mod angular_di_inject_token_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/angular_provider_compatibility.rs"]
+mod angular_provider_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/ngrx_legacy_declaration_compatibility.rs"]
+mod ngrx_legacy_declaration_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/ngrx_legacy_transition_compatibility.rs"]
+mod ngrx_legacy_transition_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/ngrx_constructor_dispatch_compatibility.rs"]
+mod ngrx_constructor_dispatch_compatibility_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../../tests/mcp/ngrx_service_dispatch_compatibility.rs"]
+mod ngrx_service_dispatch_compatibility_tests;

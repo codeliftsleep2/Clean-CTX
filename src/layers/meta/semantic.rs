@@ -22,6 +22,31 @@
 // imports from here, never the reverse (import-cycle mitigation in the
 // semantic plan).
 
+/// External source state consulted while deriving a semantic projection.
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct SemanticDependency {
+    pub file_path: String,
+    pub source_hash: Option<String>,
+}
+
+impl SemanticDependency {
+    pub fn current(file_path: String) -> Self {
+        let source_hash = std::fs::read(&file_path)
+            .ok()
+            .map(|bytes| crate::cache::content_hash(&bytes));
+        Self {
+            file_path,
+            source_hash,
+        }
+    }
+
+    pub fn is_current(&self) -> bool {
+        std::fs::read(&self.file_path)
+            .ok()
+            .map(|bytes| crate::cache::content_hash(&bytes))
+            == self.source_hash
+    }
+}
 /// A structured reference to a framework entity.
 ///
 /// `PartialEq`/`Hash` cover only (domain, entity_type, name) -- `file` is
@@ -80,6 +105,14 @@ pub enum SemanticRelation {
     // ---- Angular ----
     /// Component injects a Service via constructor/DI.
     Injects,
+    /// An Angular declaration registers a provider token in its own scope.
+    RegistersProvider,
+    /// A proven provider token is implemented by a class reference.
+    ProviderUsesClass,
+    /// A proven provider token is produced by a factory reference.
+    ProviderUsesFactory,
+    /// A proven provider token is backed by a value reference or literal.
+    ProviderUsesValue,
     /// Component declares an `@Input` field.
     HasInput,
     /// Component declares an `@Output` field.
@@ -100,6 +133,8 @@ pub enum SemanticRelation {
     ExportsFromModule,
     /// A route maps to a component.
     RouteMapsTo,
+    /// A route lazily loads a declaration-proven Module or route configuration.
+    LoadsChildren,
     /// A route is guarded by a guard class.
     GuardedBy,
     /// A route is resolved by a resolver class.

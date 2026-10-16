@@ -204,6 +204,37 @@ fn ensure_indexed_for_is_per_project_and_untracked_never_dead_ends() {
 }
 
 #[test]
+fn successful_explicit_index_recovers_failed_tracked_root_readiness() {
+    use crate::cbm::GraphBridge;
+    use crate::cbm::bridge::{IndexingState, cbm_project_slug};
+    use crate::cbm::config::CbmConfig;
+
+    let primary = make_temp_root("explicit_recovery");
+    let config = CbmConfig {
+        enabled: false,
+        ..Default::default()
+    };
+    let mut bridge = GraphBridge::try_create(&config, &primary);
+    prime_available(&mut bridge);
+    let canonical = primary.canonicalize().unwrap();
+    let project = cbm_project_slug(&canonical);
+
+    bridge.indexing_state().insert(
+        project.clone(),
+        IndexingState::Failed("startup collision".into()),
+    );
+    assert!(bridge.ensure_indexed_for(&project).is_err());
+
+    assert!(bridge.mark_explicit_index_complete(&canonical));
+    assert!(matches!(
+        bridge.indexing_state().get(&project),
+        Some(IndexingState::Complete)
+    ));
+
+    let _ = std::fs::remove_dir_all(&primary);
+}
+
+#[test]
 fn try_create_without_additional_roots_preserves_single_root_behavior() {
     use crate::cbm::GraphBridge;
     use crate::cbm::bridge::cbm_project_slug;

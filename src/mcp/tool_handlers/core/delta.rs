@@ -220,7 +220,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     drop(ir_ctx); // Release lock before expensive compile
 
     // Source changed or no baseline - compile
-    let (mut compiled, semantic_edges, source_hash) =
+    let (mut compiled, semantic_edges, semantic_dependencies, source_hash) =
         match compile_file_ir_candidate(&resolved_path, fidelity, state) {
             Ok(c) => c,
             Err(e) => {
@@ -293,8 +293,9 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     &durable_owner,
                     delta,
                     source_hash.clone(),
-                    crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation(
+                    crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation_with_dependencies(
                         semantic_edges.clone(),
+                        semantic_dependencies.clone(),
                         source_hash.clone(),
                         fidelity,
                     ),
@@ -306,13 +307,17 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 let checkpoint_required =
                     super::provide_persistence::read_checkpoint_required(state, fidelity);
                 if checkpoint_required {
+                    let semantic = crate::mcp::state::durable_semantics::SemanticSnapshot {
+                        edges: semantic_edges.clone(),
+                        dependencies: semantic_dependencies.clone(),
+                    };
                     persist_baseline(
                         state,
                         &durable_owner,
                         fidelity,
                         &compiled,
                         &source_hash,
-                        &semantic_edges,
+                        &semantic,
                         &source,
                     )?;
                 }
@@ -325,7 +330,11 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     idx.remove_file(&canonical_path);
                     idx.add_edges(&canonical_path, semantic_edges.clone());
                 }
-                state.remember_semantic_edges(&committed_alias, semantic_edges.clone());
+                state.remember_semantic_projection(
+                    &committed_alias,
+                    semantic_edges.clone(),
+                    semantic_dependencies.clone(),
+                );
                 if state.persistence_store_lock().is_some() {
                     state.remember_persisted_path(&committed_alias, &resolved_path);
                 }
@@ -347,6 +356,11 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             return;
         }
     };
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_path) {
+        send_response(&invalid_session_ir_response(id, &error));
+        return;
+    }
 
     match delta {
         Some(d) => {

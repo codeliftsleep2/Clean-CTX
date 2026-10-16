@@ -51,7 +51,22 @@ pub(crate) fn handle_refresh_workspace(id: &Value, params: &Value, state: &McpSt
         }
     };
     let canonical = crate::dictionary::path::canonical_identity_key(&canonical.to_string_lossy());
-    let roots = super::hydration::effective_refresh_roots(state, &canonical);
+    let scope = params["arguments"]["scope"]
+        .as_str()
+        .unwrap_or("configured_roots");
+    let roots = match scope {
+        "configured_roots" => super::hydration::effective_refresh_roots(state, &canonical),
+        "requested_root" => vec![canonical.clone()],
+        _ => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                "Invalid 'scope': expected 'requested_root' or 'configured_roots'.",
+                None,
+            ));
+            return;
+        }
+    };
     let mut reconciliation = super::hydration::RefreshReconciliation::default();
     for root in &roots {
         reconciliation.merge(super::hydration::reconcile_external_refresh_for_root(
@@ -65,9 +80,11 @@ pub(crate) fn handle_refresh_workspace(id: &Value, params: &Value, state: &McpSt
         "workspace_root": canonical,
         "workspace_roots": roots,
         "roots_refreshed": roots_refreshed,
+        "scope": scope,
         "indexed_owners_retracted": reconciliation.indexed_owners_retracted,
         "source_snapshots_invalidated": reconciliation.source_snapshots_invalidated,
         "pending_transitions_retired": reconciliation.pending_transitions_retired,
+        "dependent_owners_retracted": reconciliation.dependent_owners_retracted,
     });
     send_response(&json!({
         "jsonrpc": "2.0",

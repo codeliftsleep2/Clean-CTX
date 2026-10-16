@@ -14,6 +14,7 @@ use std::path::Path;
 pub(crate) struct UntrustedDurableContext {
     pub ir: CompiledIR,
     pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     pub source_hash: String,
     pub fidelity: Fidelity,
     pub compatibility: PersistedCompatibilityIdentities,
@@ -29,18 +30,21 @@ pub(crate) struct CompatibleCanonicalState {
 #[derive(Debug, Clone)]
 pub(crate) struct CompatibleSemanticProjection {
     pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     pub source_hash: String,
     pub fidelity: Fidelity,
 }
 
 impl CompatibleSemanticProjection {
-    pub(crate) fn from_current_compilation(
+    pub(crate) fn from_current_compilation_with_dependencies(
         semantic_edges: Vec<SemanticEdge>,
+        semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
         source_hash: String,
         fidelity: Fidelity,
     ) -> Self {
         Self {
             semantic_edges,
+            semantic_dependencies,
             source_hash,
             fidelity,
         }
@@ -82,6 +86,8 @@ pub(crate) enum CompatibilityFailure {
     CanonicalProducerIncompatible,
     #[error("semantic producer set or generation is incompatible")]
     SemanticProducerIncompatible,
+    #[error("semantic dependency source is no longer current")]
+    SemanticDependencyStale,
     #[error("legacy persistence is missing {component:?} identity")]
     MissingLegacyIdentity { component: CompatibilityComponent },
     #[error("historical source is not current: historical={historical}, current={current}")]
@@ -102,6 +108,7 @@ impl CompatibilityFailure {
             Self::SemanticConfigurationIncompatible => "semantic_configuration_incompatible",
             Self::CanonicalProducerIncompatible => "canonical_producer_incompatible",
             Self::SemanticProducerIncompatible => "semantic_producer_incompatible",
+            Self::SemanticDependencyStale => "semantic_dependency_stale",
             Self::MissingLegacyIdentity { .. } => "missing_legacy_identity",
             Self::HistoricalSourceNotCurrent { .. } => "historical_source_not_current",
         }
@@ -117,6 +124,7 @@ impl CompatibilityFailure {
             Self::SemanticConfigurationIncompatible => "semantic_configuration",
             Self::CanonicalProducerIncompatible => "canonical_producers",
             Self::SemanticProducerIncompatible => "semantic_producers",
+            Self::SemanticDependencyStale => "semantic_dependencies",
             Self::MissingLegacyIdentity { component } => match component {
                 CompatibilityComponent::CanonicalConfiguration => "canonical_configuration",
                 CompatibilityComponent::CanonicalProducers => "canonical_producers",
@@ -230,8 +238,16 @@ pub(crate) fn validate_semantic(
     if persisted_producers != &current.semantic_producers {
         return Err(CompatibilityFailure::SemanticProducerIncompatible);
     }
+    if !loaded
+        .semantic_dependencies
+        .iter()
+        .all(|dependency| dependency.is_current())
+    {
+        return Err(CompatibilityFailure::SemanticDependencyStale);
+    }
     Ok(CompatibleSemanticProjection {
         semantic_edges: loaded.semantic_edges.clone(),
+        semantic_dependencies: loaded.semantic_dependencies.clone(),
         source_hash: loaded.source_hash.clone(),
         fidelity: loaded.fidelity,
     })

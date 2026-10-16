@@ -1,5 +1,4 @@
 // src/mcp/tool_handlers/edit.rs
-//
 // `apply_edit` MCP handler — the write-path surface
 // (docs/plans/APPLY_EDIT_PLAN.md Phase 3).
 //
@@ -186,13 +185,10 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .unwrap_or("");
     let pre_compiled =
         match compile_source_ir_candidate(&resolved_path, source, Fidelity::Edit, state) {
-            Ok((ir, _, _)) => ir,
+            Ok((ir, _, _, _)) => ir,
             Err(e) => return err_response(id, -32603, e.to_string(), None),
         };
-    let units = if operations
-        .iter()
-        .any(|operation| matches!(operation, EditOperation::Delete { .. }))
-    {
+    let units = {
         let Some((language, query)) =
             crate::compression::language::language_for_extension(extension)
         else {
@@ -215,16 +211,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
                 );
             }
         }
-    } else {
-        UnitTable::from_instructions(&pre_compiled.instructions)
     };
-    if units.is_empty() {
-        let e = EditError::Locate(crate::edit::locate::LocateError::NotFound(String::from(
-            "no span-addressable units in current compile (file may have changed shape)",
-        )));
-        return err_response(id, -32602, e.to_string(), Some(e.structured()));
-    }
-
     // ── Verify + splice + gate (all in memory) ───────────────────────
     let report = match apply::apply(source, &units, &operations) {
         Ok(r) => r,
@@ -234,15 +221,12 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
-    let (mut target_ir, semantic_edges, new_hash) = match compile_source_ir_candidate(
-        &resolved_path,
-        &report.new_source,
-        Fidelity::Edit,
-        state,
-    ) {
-        Ok(candidate) => candidate,
-        Err(error) => return err_response(id, -32603, error.to_string(), None),
-    };
+    let (mut target_ir, semantic_edges, semantic_dependencies, new_hash) =
+        match compile_source_ir_candidate(&resolved_path, &report.new_source, Fidelity::Edit, state)
+        {
+            Ok(candidate) => candidate,
+            Err(error) => return err_response(id, -32603, error.to_string(), None),
+        };
     if let Err(error) = crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
         return err_response(
             id,
@@ -315,6 +299,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         target_source: target_bytes.to_vec(),
         target_ir: target_binary.clone(),
         target_edges: semantic_edges.clone(),
+        target_dependencies: semantic_dependencies.clone(),
         fidelity: Fidelity::Edit,
         stage_path,
     };
@@ -341,6 +326,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         &new_hash,
         target_ir.version,
         &semantic_edges,
+        &semantic_dependencies,
         &compatibility,
     ) {
         if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
@@ -371,7 +357,11 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .ir_context_lock()
         .load_ir(target_ir, Some(new_hash.clone()));
     state.remember_context_fidelity(&alias, Fidelity::Edit);
-    state.remember_semantic_edges(&alias, semantic_edges.clone());
+    state.remember_semantic_projection(
+        &alias,
+        semantic_edges.clone(),
+        semantic_dependencies,
+    );
     state.forget_pending_transitions(&alias);
     if state.persistence_store_lock().is_some() {
         state.remember_persisted_path(&alias, &resolved_path);
@@ -400,18 +390,18 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         }
         Err(()) => return,
     }
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&resolved_path) {
+        err_response(id, -32603, error, None);
+        return;
+    }
     state.llm_text_cache_lock().remove(&alias);
-    // ── Mark CBM project dirty (lazy reindex) ────────────────────
     if let Some(ref mut bridge) = *state.graph_bridge_lock() {
         if bridge.is_available() {
             bridge.mark_project_dirty(std::path::Path::new(&resolved_path));
         }
     }
-
-    // ── Invalidate hydration discovery for the edited root ───────
     super::hydration::invalidate_discovery_for_edited_path(state, &resolved_path);
-
-    // ── Minimal response (plan step 6) ───────────────────────────────
     let mut ops_report: Vec<Value> = report
         .operations
         .iter()
@@ -424,18 +414,9 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         })
         .collect();
     if verify {
-        for (entry, op) in ops_report.iter_mut().zip(operations.iter()) {
-            if let EditOperation::ReplaceBody { new_text, .. }
-            | EditOperation::InsertAfter {
-                unit_text: new_text,
-                ..
-            }
-            | EditOperation::InsertBefore {
-                unit_text: new_text,
-                ..
-            } = op
-            {
-                entry["newText"] = Value::String(new_text.clone());
+        for (entry, outcome) in ops_report.iter_mut().zip(report.operations.iter()) {
+            if let Some(applied_text) = &outcome.applied_text {
+                entry["newText"] = Value::String(applied_text.clone());
             }
         }
     }
@@ -571,6 +552,7 @@ fn commit_edit_semantics(
     target_hash: &str,
     target_version: u64,
     semantic_edges: &[crate::layers::meta::semantic::SemanticEdge],
+    semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
     compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let guard = state.persistence_store_lock();
@@ -581,7 +563,7 @@ fn commit_edit_semantics(
         .sqlite()
         .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
     sqlite
-        .save_context_with_compatibility(
+        .save_context_with_dependency_semantics(
             file_path,
             Fidelity::Edit,
             "",
@@ -589,6 +571,7 @@ fn commit_edit_semantics(
             target_hash,
             target_version,
             semantic_edges,
+            semantic_dependencies,
             0,
             0,
             compatibility,

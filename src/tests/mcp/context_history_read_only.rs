@@ -143,7 +143,7 @@ fn history_does_not_resolve_a_pending_edit_intent() {
         .cloned()
         .unwrap();
     let prior_version = initial.file_version(&alias).unwrap();
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             std::str::from_utf8(target).unwrap(),
@@ -163,6 +163,7 @@ fn history_does_not_resolve_a_pending_edit_intent() {
         target_source: target.to_vec(),
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

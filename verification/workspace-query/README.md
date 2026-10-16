@@ -75,8 +75,8 @@ source replacement. The relation is the source-signature fact
 `HasConstructorParameterType` targeting `builtin/TypeRef`; the harness does not
 claim runtime .NET DI registration or implementation resolution. It also
 verifies that the TypeRef result is explicitly marked as a lower bound and that
-an unsupported same-name `builtin/Interface` reverse lookup points callers to
-the supported `builtin/TypeRef` query.
+a same-name `builtin/Interface` reverse lookup exposes its legitimate
+`Implements` relationship without masquerading as constructor consumption.
 
 `csharp_base_type_live_acceptance.mjs` creates an isolated C# workspace and
 drives the production binary over MCP stdio. It verifies structured partial,

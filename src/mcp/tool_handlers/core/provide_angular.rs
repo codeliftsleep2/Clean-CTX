@@ -12,7 +12,8 @@ pub(super) fn try_evaluate_angular_template(
     resolved_path: &str,
     source: &str,
 ) -> Option<ProvidedContext> {
-    if !resolved_path.to_lowercase().ends_with(".component.html") {
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
+    if !is_angular_template(state, workspace_root, resolved_path) {
         return None;
     }
 
@@ -100,6 +101,27 @@ pub(super) fn try_evaluate_angular_template(
     // Gap 5/3/6 contract leak: the LLM would attempt replace_in_file
     // SEARCH against bodies that don't exist in template output).
     let (content_kind, byte_exact) = (ContentKind::Skeleton, Vec::<&'static str>::new());
+    let degradation = if raw_passthrough {
+        Value::Null
+    } else {
+        match fidelity {
+            crate::compression::Fidelity::Low => serde_json::json!({
+                "ordering": "aggregate_unordered",
+                "omits": [
+                    "element_ownership",
+                    "control_ancestry",
+                    "visible_text",
+                    "interpolation_expressions",
+                    "comments"
+                ]
+            }),
+            crate::compression::Fidelity::Medium => serde_json::json!({
+                "ordering": "source_ordered",
+                "omits": ["comments"]
+            }),
+            _ => Value::Null,
+        }
+    };
     Some(ProvidedContext::new(
         body,
         serde_json::json!({
@@ -107,7 +129,53 @@ pub(super) fn try_evaluate_angular_template(
             "is_angular": true, "template_compressed": !raw_passthrough,
             "content_kind": if raw_passthrough { ContentKind::RawPassthrough } else { content_kind },
             "byte_exact": if raw_passthrough { serde_json::json!(["document"]) } else { serde_json::to_value(byte_exact).unwrap_or_default() },
-            "degradation": null
+            "degradation": degradation
         }),
     ))
+}
+
+/// Return whether a physical HTML source has Angular template authority.
+///
+/// The conventional suffix is a direct-request hint. For every other HTML
+/// filename, structured `Component.templateUrl` metadata is the authority.
+/// This helper is shared with `entities_in_file` so both public surfaces use
+/// exactly the same admission rule without publishing template-owned state.
+pub(crate) fn is_angular_template(
+    state: &McpState,
+    workspace_root: Option<&str>,
+    resolved_path: &str,
+) -> bool {
+    if resolved_path.to_lowercase().ends_with(".component.html") {
+        return true;
+    }
+    let target = std::path::Path::new(resolved_path);
+    if target.extension().and_then(|extension| extension.to_str()) != Some("html") {
+        return false;
+    }
+    let Some(file_name) = target.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    crate::mcp::tool_handlers::hydration::source_candidates_containing(
+        state,
+        workspace_root,
+        file_name,
+    )
+    .into_iter()
+    .filter(|candidate| {
+        matches!(
+            std::path::Path::new(candidate.as_str())
+                .extension()
+                .and_then(|extension| extension.to_str()),
+            Some("ts" | "tsx")
+        )
+    })
+    .any(|candidate| {
+        state.read_source(&candidate).is_ok_and(|source| {
+            crate::angular_meta::template_ownership::source_owns_external_template(
+                &source,
+                std::path::Path::new(candidate.as_str()),
+                target,
+            )
+        })
+    })
 }

@@ -29,20 +29,30 @@ def main() -> None:
     actual = args.source.read_bytes()
     connection = sqlite3.connect(args.db)
     context = connection.execute(
-        "SELECT id, fidelity, ir_binary, source_hash FROM contexts WHERE file_path = ?",
+        "SELECT id, fidelity, ir_binary, source_hash, "
+        "canonical_config_identity, canonical_producer_identity "
+        "FROM contexts WHERE file_path = ?",
         (source_path,),
     ).fetchone()
     if context is None:
         raise SystemExit(f"no persisted context for {source_path}")
-    context_id, fidelity, ir_binary, persisted_hash = context
+    (
+        context_id,
+        fidelity,
+        ir_binary,
+        persisted_hash,
+        canonical_config_identity,
+        canonical_producer_identity,
+    ) = context
     snapshot = connection.execute(
-        "SELECT semantic_version, edges_json FROM semantic_edge_snapshots "
+        "SELECT semantic_version, edges_json, semantic_config_identity, "
+        "semantic_producer_identity FROM semantic_edge_snapshots "
         "WHERE context_id = ? ORDER BY semantic_version DESC LIMIT 1",
         (context_id,),
     ).fetchone()
     if snapshot is None:
         raise SystemExit(f"no semantic-edge snapshot for {source_path}")
-    version, edges_json = snapshot
+    version, edges_json, semantic_config_identity, semantic_producer_identity = snapshot
 
     if digest(actual) != persisted_hash:
         raise SystemExit("fixture source and persisted baseline are not aligned")
@@ -72,8 +82,10 @@ def main() -> None:
         INSERT INTO edit_intents (
             file_path, transition_id, prior_hash, target_hash,
             prior_version, target_version, prior_source, target_source,
-            target_ir, target_edges_json, fidelity, stage_path
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            target_ir, target_edges_json, fidelity, stage_path,
+            canonical_config_identity, canonical_producer_identity,
+            semantic_config_identity, semantic_producer_identity
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             source_path,
@@ -88,6 +100,10 @@ def main() -> None:
             edges_json,
             fidelity,
             str(args.stage.resolve()),
+            canonical_config_identity,
+            canonical_producer_identity,
+            semantic_config_identity,
+            semantic_producer_identity,
         ),
     )
     connection.commit()

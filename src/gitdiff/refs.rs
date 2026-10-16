@@ -11,7 +11,8 @@
 // Rules:
 //   - First char must be `[A-Za-z0-9]` (never `-`, which would allow
 //     flag injection).
-//   - Remaining chars must be `[A-Za-z0-9._/\-~]` (git refname chars).
+//   - Base chars must be `[A-Za-z0-9._/\-]`.
+//   - Optional revision suffixes are `~N` or `^N`, where N is decimal.
 //   - No whitespace, no shell metacharacters (`;`, `|`, `&`, `$`, `` ` ``,
 //     `(`, `)`, `<`, `>`, `'`, `"`, `\`, `*`, `?`, `[`, `]`, `{`, `}`).
 //   - Empty refs are rejected.
@@ -27,30 +28,46 @@ use crate::error::CleanCtxError;
 /// Returns `Ok(())` if the ref is safe to pass to `git` as a positional
 /// argument, or `Err` with a human-readable reason.
 pub fn validate_ref(reference: &str) -> Result<(), CleanCtxError> {
+    const GRAMMAR: &str = "<name-or-sha>[~N|^N ...] (for example HEAD~2, HEAD^1, or abc123^2)";
     if reference.is_empty() {
-        return Err(CleanCtxError::Config(
-            "git ref must not be empty".to_string(),
-        ));
+        return Err(CleanCtxError::Config(format!(
+            "git ref must not be empty; supported grammar: {GRAMMAR}"
+        )));
     }
     let bytes = reference.as_bytes();
     // First char must be alphanumeric — never `-` (flag injection).
     if !bytes[0].is_ascii_alphanumeric() {
         return Err(CleanCtxError::Config(format!(
-            "invalid git ref '{reference}': must start with an alphanumeric character"
+            "invalid git ref '{reference}': must start with an alphanumeric character; supported grammar: {GRAMMAR}"
         )));
     }
-    // Remaining chars must be in the git refname allowlist.
-    for &b in &bytes[1..] {
-        let ok = b.is_ascii_alphanumeric()
-            || b == b'.'
-            || b == b'_'
-            || b == b'/'
-            || b == b'-'
-            || b == b'~';
+
+    let suffix_start = reference.find(['~', '^']).unwrap_or(reference.len());
+    for &b in &bytes[1..suffix_start] {
+        let ok = b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'/' | b'-');
         if !ok {
             return Err(CleanCtxError::Config(format!(
-                "invalid git ref '{reference}': contains disallowed character '{}'",
-                b as char
+                "invalid git ref '{reference}': contains disallowed character '{}'; supported grammar: {GRAMMAR}",
+                b as char,
+            )));
+        }
+    }
+
+    let mut suffix = &reference[suffix_start..];
+    while !suffix.is_empty() {
+        let selector = suffix.as_bytes()[0];
+        debug_assert!(selector == b'~' || selector == b'^');
+        suffix = &suffix[1..];
+        let digits = suffix.bytes().take_while(u8::is_ascii_digit).count();
+        if digits == 0 {
+            return Err(CleanCtxError::Config(format!(
+                "invalid git ref '{reference}': revision selectors require a decimal number; supported grammar: {GRAMMAR}"
+            )));
+        }
+        suffix = &suffix[digits..];
+        if !suffix.is_empty() && !matches!(suffix.as_bytes()[0], b'~' | b'^') {
+            return Err(CleanCtxError::Config(format!(
+                "invalid git ref '{reference}': unsupported revision syntax; supported grammar: {GRAMMAR}"
             )));
         }
     }

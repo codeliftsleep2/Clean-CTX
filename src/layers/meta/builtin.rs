@@ -155,6 +155,7 @@ impl MetaLayer for BuiltinMetaLayer {
         MetaLayerEvaluation {
             output: None,
             semantic_edges,
+            semantic_dependencies: Vec::new(),
         }
     }
 }

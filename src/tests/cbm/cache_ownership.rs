@@ -6,7 +6,7 @@
 // invalidation targets that project rather than unrelated active bridge state.
 
 use crate::cbm::bridge::test_helpers::new_mock;
-use crate::cbm::bridge::{GraphBridge, SymbolImportance, cbm_project_slug};
+use crate::cbm::bridge::{GraphBridge, GraphCacheKey, SymbolImportance, cbm_project_slug};
 use crate::cbm::cache_store::GraphCacheStore;
 use crate::cbm::config::CbmConfig;
 use std::collections::HashMap;
@@ -40,14 +40,17 @@ fn seed_symbol_partition(
 ) {
     store.put(
         &root.to_string_lossy(),
-        &format!("{project}:{SYMBOL_KEY}"),
+        &GraphCacheKey::disk_key(project, SYMBOL_KEY),
         &payload.to_string(),
         FAR_FUTURE_EPOCH_MS,
     );
 }
 
 fn read_symbol_partition(store: &GraphCacheStore, root: &Path, project: &str) -> Option<String> {
-    store.get(&root.to_string_lossy(), &format!("{project}:{SYMBOL_KEY}"))
+    store.get(
+        &root.to_string_lossy(),
+        &GraphCacheKey::disk_key(project, SYMBOL_KEY),
+    )
 }
 
 #[test]

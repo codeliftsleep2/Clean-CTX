@@ -41,6 +41,16 @@ impl GraphBridge {
             || !self.cache.is_empty()
     }
 
+    /// Explicit provider requests may attempt demand-driven half-open recovery.
+    /// This is eligibility, not Available; native enrichment/status remain passive.
+    pub(crate) fn can_attempt_provider(&self) -> bool {
+        let client = self.client.lock().unwrap_or_else(|p| p.into_inner());
+        match client.as_ref() {
+            Some(client) => client.circuit_allows() || client.recovery_due(),
+            None => self.status.is_available() && !self.cache.is_empty(),
+        }
+    }
+
     pub fn graph_version(&self) -> &str {
         &self.graph_version
     }
@@ -124,8 +134,10 @@ impl GraphBridge {
 
         let project = self.project_str();
         let result = self.query(|c| {
-            let r = c.call_tool("detect_changes", serde_json::json!({"project": project}))?;
-            Ok(r["graph_version"].as_str().map(|s| s.to_string()))
+            // The pinned diff handler has generation-bound snapshot evidence,
+            // not a graph_version or a native source hash.
+            c.call_tool("detect_changes", serde_json::json!({"project": project}))?;
+            Ok(None)
         });
         match result {
             Ok(version) => Ok(version),
@@ -196,10 +208,10 @@ impl GraphBridge {
 
     // â”€â”€ Internal helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    /// Disk key scope: `{project_name}:{key}` so the existing SQLite schema's
+    /// Disk key scope: `{project_name}:{wire_contract}:{key}` so the existing SQLite schema's
     /// effective owner is `(registered project_root, canonical project)`.
     pub(super) fn disk_key(project: &str, key: &str) -> String {
-        format!("{project}:{key}")
+        GraphCacheKey::disk_key(project, key)
     }
 
     /// Return a valid active-project entry, lazily hydrating it from disk.

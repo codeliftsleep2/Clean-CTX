@@ -1,0 +1,483 @@
+# Native issue reconciliation over live MCP
+
+This read-only investigation harness exercises current #133/#134/#136–#140
+acceptance probes against a current all-feature Clean-CTX binary. It creates
+owned C#/TypeScript sources and a small controlled Git history under target/.
+Provider is explicitly disabled; nothing is built, installed, pushed or closed.
+It reuses the existing Phase B ProcessStartInfo/stdio session helper.
+
+## Issue #135 consolidated live acceptance
+
+`Invoke-Issue135Acceptance.ps1` exercises the production stdio MCP boundary for
+the four repaired #135 slices. It verifies C# exact-call reconciliation across
+cold file orders and warm mutation history, including signature changes,
+declaration removal/replacement, and newly introduced ambiguity. It also checks
+batch-level fidelity rejection, serialized C# degradation metadata, and bounded
+file-query diagnostics without unauthorized-path disclosure.
+
+The harness uses a current prebuilt binary and writes generated workspaces and
+captures beneath `target/issue-135-live-verification`. It does not replace the
+tracked Rust regressions or the authoritative final gate.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue135Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+The independent NgRx Selector declaration query has a focused provider-disabled
+Windows harness. It verifies declaration-only, use-only, quoted-use,
+declaration-plus-use, ordinary-name, and modern Action controls through the
+registered MCP dispatcher:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxSelectorDeclarations.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NativeIssueReconciliation.ps1 -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+On Linux pass `./target/debug/clean-ctx`. Run the existing Angular template harness
+for #141, as documented in verification/live-acceptance/ANGULAR_TEMPLATE_README.md.
+#135 DI truncation is additionally traced in the current production code report.
+
+PASS means that specific acceptance probe passed. FAIL means the original issue
+criterion still failed in the controlled scenario; it is intentionally retained
+as evidence and the process exits 1. There are no expected-failure suppressions.
+Find-entities identity/provenance is checked in returned data; a cross-domain count
+or an entity at a use site does not pass a declaration criterion. Every RPC and
+source fixture is retained under target/issue-reconciliation/.
+
+See [the reconciliation report](../../docs/plans/ISSUES_133_141_POST_CBM_RECONCILIATION.md)
+for current results, limitations and closure recommendations. No full test suite
+or native production repair is part of this audit.
+
+## Post-CBM causal investigation
+
+The expanded investigation keeps native and provider-enabled cold/warm controls
+separate, verifies provider admission before dependent checks, and compares exact
+constructor subject sets for ten interfaces in five directories. Each mode creates
+its own Git root, config, session, source oracle and evidence directory. No build,
+shared-daemon termination or cache override occurs.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-PostCbmInvestigation.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NativeCausalControls.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Both executable hashes and the Windows platform version are recorded automatically
+as generated run evidence; the operator never supplies a hash.
+The first harness accepts `-Scope native`, `provider`, or `controls` for targeted
+reruns. Provider admission failure stops that mode; fallback answers cannot count
+as provider-enabled evidence. Native-only causal controls need no CBM executable.
+
+Capture cases record observed surfaces; a capture PASS proves protocol completion,
+not semantic acceptance. Cases asserting feature truth remain FAIL when a defect
+is reproduced. In the current baseline both harnesses intentionally exit 1 because
+unresolved native criteria fail; the #133 recall groups themselves pass. Do not
+convert these failures to expected-pass suppressions or omit them in summaries.
+
+New evidence covers failed-read partial disclosure, DI40, accepted misplaced edit
+comments, nonexistent test targets, return/attribute/body/parameter diff controls,
+isolated Service/Action declarations, Pipe/inject targets, export-owner controls,
+same-content template filename/nesting, and linked HTML entities_in_file.
+
+See [the causal report](../../docs/plans/POST_CBM_133_141_NATIVE_DEFECT_RECONCILIATION.md)
+for first failing boundaries, issue disposition, implementation proposals and
+remaining original-corpus/platform acceptance. These are investigation harnesses;
+permanent repaired-contract regressions should assert the public truth described
+there, including precise file provenance and disclosure.
+
+## #136 whole-declaration insertion regression
+
+Run against a binary built from the insertion repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-InsertBeforeDeclaration.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+The Windows harness builds nothing and needs no CBM or model host. It checks the
+advertised apply_edit tool through live stdin/stdout MCP, then
+compares exact file bytes for C#/TypeScript first/middle/metadata-bearing members
+at LF/CRLF, including parseable comments. Unproven leading documentation must
+fail without writing. Replace/delete/after and atomic/syntax/source-authority
+controls are included: 23 case groups, all required to pass for the repaired slice.
+
+All fixture files are allocated before atomic edits to isolate declaration
+placement from independent file-identity reuse. Requests, receipts, exact byte
+oracles, stderr and binary provenance remain under target/insert-before-declaration.
+See [the repair report](../../docs/plans/ISSUE_136_INSERT_BEFORE_DECLARATION_REPAIR.md)
+for RED/GREEN evidence, the separately retained intermediate lifecycle failure,
+and remaining #136 criteria. This does not claim the entire issue is resolved.
+
+## #136 consolidated apply-edit acceptance
+
+Run after rebuilding the production binary from the complete #136 repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue136Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This CBM-disabled MCP stdio harness verifies the caller-visible signature selector
+contract for C# and TypeScript, unique legacy targeting, same-owner ambiguity,
+accessor and nested-owner discrimination, structured refusal taxonomy, exact
+verified receipts, insertion separation, full-declaration deletion, structured
+documentation refusal, atomicity, and stale-source no-write behavior. Evidence is
+written beneath `target/issue-136-live-verification`. It is operator/live evidence,
+not a substitute for the tracked Rust regressions or final gate.
+
+## #137 semantic signature evidence regression
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+The harness creates an owned committed C# history, verifies Git/source evidence,
+and checks registered diff_commits results at low/medium/high/edit/verbatim:
+return-type and authorization-only changes, unchanged members, parameter changes,
+the supported last-method body control, and unchanged neighbors. All 25 semantic
+groups must pass. No build, CBM daemon or model host is invoked.
+
+For RED/GREEN investigation, reuse the exact saved history with the candidate:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-SemanticSignatureEvidence.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe `
+  -HistoryPath <history-path-printed-by-the-RED-run>
+```
+
+Only this harness's target/semantic-signature-evidence histories are admitted for
+reuse; expected committed source is checked before the test. The source history
+is not recommitted during GREEN. Every Windows run records artifact hash, both
+commits, exact source oracle, raw MCP results and per-case verdicts.
+
+The body control isolates the existing last-method contract; the separate
+first-method/neighbor-marker defect is retained in
+[the repair report](../../docs/plans/ISSUE_137_SEMANTIC_SIGNATURE_EVIDENCE_REPAIR.md).
+Passing this harness does not close all #137 criteria or establish #135 fidelity.
+
+## #135 DI retention regression
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DiOmission.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+The provider-disabled Windows live context harness exercises 0/9/10/11/40
+written registrations at Medium/High, distinct implementations/lifetimes,
+nearby non-DI metadata and preservation of existing conditional written mentions:
+16 required groups. It builds nothing and does not evaluate runtime activation.
+
+Complete delivery may use the existing compact DI markers or existing byte-exact
+source fallback. The latter is accepted only with document byte-exact metadata,
+full source equality and the independent fixture's written-call count. Exact
+marker identity/order assertions remain for compact output. No partial ten-entry
+list is accepted as complete. All fixtures, requests/results, binary provenance
+and verdicts are saved under target/di-omission.
+
+See [the DI repair report](../../docs/plans/ISSUE_135_DI_OMISSION_REPAIR.md) for
+same-source RED/GREEN evidence, producer scope, ordering and remaining #135 work.
+The harness proves recognized written-fact delivery, not an evaluated DI container
+or completeness of unsupported registration forms.
+
+## #139 decorated declaration owner identity
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-DecoratedOwnerIdentity.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+This provider-disabled Windows harness uses the existing stdio MCP session
+helper and preallocates owned Git-root fixtures. Eight declaration
+forms cover export/decorator/layout variations, arbitrary custom decorators,
+basic generics and multiple classes with the same-named member.
+
+Each form requires four live groups: exact qualified focus, builtin class/file
+provenance, a controlled qualified replacement checked against the entire
+expected source, and fresh focused output after editing (32 groups). Alpha's
+same-named body must remain untouched and absent from OwnerProbe's focused
+output. Edge-free Injectable cases record independent Service publication as a
+separate observation; the subsequent publication harness owns that contract.
+Fixtures, raw requests/responses,
+binary hash and verdicts are saved under target/decorated-owner-identity.
+
+See [the owner repair report](../../docs/plans/ISSUE_139_DECORATED_OWNER_IDENTITY_REPAIR.md)
+for permanent regression RED/GREEN, separate earlier-body anomaly, preservation
+results and remaining #139 criteria. This harness builds nothing and invokes
+neither CBM nor a model host. It does not replace tracked tests or the CI gate.
+
+## #139 consolidated residual acceptance
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue139Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Rebuild the debug Windows candidate separately before running. This provider-disabled
+driver uses the existing Phase B stdio MCP helper and an owned Git-root fixture.
+It builds nothing and starts neither CBM nor a model host.
+
+Six public-boundary groups verify bounded same-file and one-hop imported
+NgModule composition, declaration-proven endpoint kinds, RouterModule call
+handling, explicit unresolved-spread evidence without a fake entity, structured
+nested-route ownership, lazy Component/Module/route-configuration relations,
+dynamic lazy failure, occurrence-oriented query preservation, declaration-only
+LGR-003 behavior, a genuine declaration named `Class`, and refresh/removal
+lifecycle behavior.
+
+The generic-constraint distinction remains in tracked deterministic Rust tests:
+it is an internal syntax-role invariant rather than a separate live protocol.
+Sources, binary provenance, raw requests/results, mutations, and verdicts are
+retained under `target/issue-139-live-verification/`. This harness is operator
+evidence and does not replace tracked tests or the authoritative final gate.
+
+## #142 cross-cutting authority acceptance
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue142Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Rebuild the all-feature Windows candidate separately before running. This
+provider-disabled driver builds nothing and starts neither CBM nor a model
+host. It exercises the registered production binary through stdio MCP and
+retains source fixtures, binary provenance, raw requests/results, mutations,
+and verdicts under `target/issue-142-live-verification/`.
+
+Five public-boundary groups verify cold/repeated/unrelated-warm exact file
+coverage; batch-order independence and shared authoritative preparation;
+preservation of explicit lower-bound families; requested-root isolation with
+proven cross-root dependent retraction; and restart separation of session,
+persisted, and combined statistics. Provider lifecycle states remain owned by
+the dedicated `verification/cbm` acceptance drivers. This harness is live
+operator evidence, not a Rust test or replacement for the final gate.
+
+## Independent framework declaration publication
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-FrameworkDeclarationPublication.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Rebuild the Windows candidate separately before running. This driver reuses the
+existing Phase B stdio MCP session helper and creates owned Git-root
+fixtures with CBM disabled. It builds nothing and invokes no model host.
+
+All 57 required groups must pass: edge-free Service/modern Action recognition and
+publication; same-file multiple declarations; source-distinct same names; existing
+constructor/dispatch relationships and reference-file occurrences; deduplication;
+registered refresh/rename/removal/re-add/file deletion; and declaration removal
+with an unchanged reference retained. #140 supersedes only the former legacy-class
+absence control: its unchanged source now requires a recognized class Action.
+Modern publication assertions retain their existing oracles. Exact declaring-file occurrences are checked
+separately from existing relationship endpoint occurrences.
+
+The public entity schema has no role/span field. Saved fixture roles are source
+oracles, not invented response fields. The driver does not claim declaration-only
+global lookup, cross-file binding or query-history independence. Source manifests,
+every raw request/result, binary hash, mutation evidence and verdicts are saved
+under target/framework-declaration-publication. FAIL is retained and exits 1.
+
+See [the publication repair report](../../docs/plans/INDEPENDENT_FRAMEWORK_DECLARATION_PUBLICATION_REPAIR.md)
+for permanent test RED/GREEN, live baseline/candidate evidence, durable generation
+compatibility, preservation and remaining #139/#140 work.
+
+## #138 Pipe constructor DI admission
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-AngularPipeDi.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Build the Windows candidate separately before running. The existing Phase B stdio
+helper drives provider-disabled owned Git-root fixtures. All 56 required
+groups must pass: independent declarations/evidence, exact typed Injects identities,
+repeat/deduplication, existing Service/Component/Directive controls, Pipe constructor
+forms and multiple dependencies, empty/no-constructor and other-kind exclusions,
+unresolved symbolic targets, source-distinct ambiguity, and refresh/change/removal/
+file deletion. A mixed/functional-only Pipe guard prevents newly admitting the
+separate wrong-field-name evidence.
+
+Four inject(...) observations are captured without PASS/FAIL token acceptance.
+That defect is not repaired by this driver or slice. Object.file is asserting
+occurrence provenance, not proof of import-resolved declaration binding. Sources,
+requests/results, hashes, mutations and verdicts stay under target/angular-pipe-di.
+The driver builds nothing and invokes neither CBM nor a model host.
+
+See [the partial #138 report](../../docs/plans/ISSUE_138_PIPE_DI_ADMISSION_REPAIR.md)
+for permanent RED/GREEN, live evidence, supported constructor boundary, the
+separate token-authority repair and remaining criteria.
+
+### #138b structured inject-token verification
+
+This provider-disabled harness runs 131 bounded MCP assertion groups: declaration/owner evidence, exact token markers and edges, repeated-query deduplication, fidelity controls, symbolic cross-file limits, and refresh/change/remove/delete. See `docs/plans/ISSUE_138B_STRUCTURED_INJECT_REPAIR.md`. The earlier blocked primary probe is retained in the historical evidence-gate report.
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-AngularInjectToken.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Generated Windows evidence is retained under `target/angular-inject-token/`; no
+CBM provider is started.
+
+## #138 consolidated residual acceptance
+
+Run after rebuilding the production binary from the complete #138 repair:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue138Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This single provider-disabled MCP stdio harness verifies the externally visible
+residual slices added after #138a/#138b: structured `input`, `input.required`,
+`output`, and two-sided `model` relationships; functional guard `inject` ownership;
+classic setter/definite-assignment member identity; distinct provider registration,
+`useClass`, `useFactory`, and `useValue` relations; negative twins; and registered
+refresh removal/replacement. It writes source oracles, binary provenance, raw MCP
+responses, and verdicts beneath `target/issue-138-live-verification`.
+
+The harness builds nothing, starts no CBM provider or model host, and does not
+replace tracked Rust regressions or the CI gate.
+## #140 independent legacy class Action declarations
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-NgrxLegacyDeclarations.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+This provider-disabled Windows harness uses the established Phase B stdio session
+helpers. It requires **78 acceptance groups** for top-level class declarations
+implementing the directly imported NgRx `Action`: exact source occurrences,
+truthful class markers, no fabricated links, fidelity/repeat controls,
+source-distinct same names, and declaration rename/removal/deletion.
+
+Seven separate handler/reference/alias/collision probes are recorded as **OBSERVED**, not PASS. They remain unresolved and do not affect the declaration-only acceptance verdict. The driver builds nothing, invokes no model host, and saves source oracles, binary provenance, requests/results and verdicts under `target/ngrx-legacy-declarations/`. See [the #140 class declaration report](../../docs/plans/ISSUE_140_LEGACY_CLASS_ACTION_DECLARATION_REPAIR.md) for the defect partition and remaining work.
+
+## #140b-Prereq2 private Action/type binding preservation
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxActionTypeBindingPreservation.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+This provider-disabled harness uses the existing PhaseBSession stdio driver.
+Nine initializer forms run at High, Medium and Low (27 groups). Each asserts the
+exact admitted class Action identity/file, absence of a duplicate constant Action
+and absence of a new public relation; source bytes must remain unchanged.
+
+The new association is private compilation evidence. The harness does **not**
+observe that association or establish reducer linkage. Registered
+`ngrx_action_type_binding_` producer tests prove its exact source spans, file/hash
+identity, direct-reference selection and refusal controls. See
+[the binding report](../../docs/plans/ISSUE_140B_PREREQ2_ACTION_TYPE_BINDING.md).
+
+## #140b same-file legacy switch transitions
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyTransitions.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Provider-disabled stdio harness: adversarial static forms at High/Medium/Low,
+same-name/file-occurrence controls, and refresh lifecycle stages. Oracles assert
+exact Action/Reducer identities, relation direction, source files,
+forward/reverse consistency, independent class declarations, and standalone
+legacy discriminant declarations. An exact top-level string constant becomes a
+public Action only when its bound case participates in the supported NgRx
+`Action`-typed `switch(parameter.type)` reducer structure.
+
+Only top-level two-parameter typed functions with immediate-body `switch` on the
+Action parameter's `.type` and direct identifier cases are supported. Class and
+constant Action identities remain distinct even when linked by the same
+discriminant. Alias/module resolution, literal cases, and arbitrary standalone
+string authority remain separate. See
+[the resumed report](../../docs/plans/ISSUE_140B_LEGACY_TRANSITION_REPAIR.md).
+
+## #140 Slice 2 direct-relative legacy object dispatch
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxLegacyObjectDispatch.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+This provider-disabled stdio MCP harness verifies the exact two-file
+`dispatch({type: SET_AUDIT})` authority chain. It covers ordinary and wrong-source
+constants, unsupported import forms, lexical shadowing, multiple Actions,
+authority/import lifecycle, deletion, and file-order convergence. Evidence is
+written beneath `target/ngrx-legacy-object-dispatch/`.
+
+## #140c same-file constructor dispatch
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxConstructorDispatch.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Use the freshly built Windows candidate. The harness starts owned
+provider-disabled stdio MCP sessions using PhaseBSession, persists
+every request/response and tests exact Component → Dispatches → Action forward
+and reverse identities/files. Controls cover same-file constructor resolution,
+Store qualification, shadows, NonAction, imported/qualified refusal, wrappers,
+modern symbolic preservation, opt-out, duplicate/file occurrences, three
+fidelities, refresh/removal/deletion and independent class publication.
+
+Supported constructor qualification uses an accessibility-modified generic
+Store parameter property and a direct instance-method expression statement.
+Imported constructor linkage and Service ownership remain separate. Existing
+symbolic endpoint behavior is preservation evidence, not a constructor binding.
+The harness executes 88 groups (26 static forms × three fidelities, three
+file-occurrence groups, six lifecycle stages and a repeated same-source/fidelity
+control). Evidence is under
+`target/ngrx-constructor-dispatch/<timestamp-guid>`; a failed
+assertion exits 1. No full suite, model invocation or live CBM is used. See
+[the repair report](../../docs/plans/ISSUE_140C_CONSTRUCTOR_DISPATCH_REPAIR.md).
+
+## #140d Service dispatch ownership
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceDispatch.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+Use the current Windows candidate. Existing PhaseBSession starts
+provider-disabled owned stdio MCP sessions and records all RPCs. Exact Service →
+Dispatches → Action owner/target files and forward/reverse
+agreement are checked alongside independent declaration publication. Controls
+cover Component/fallback preservation, same-target Service plus helper, two
+Services, unknown endpoints, no proximity attribution, nested/callback refusal,
+opt-out, three fidelities, duplicate/file occurrences, same-source reuse and
+refresh/move/qualification/remove/delete lifecycle. It runs 84 groups: 24 static
+forms × three fidelities, three file-occurrence groups, one reuse control and
+eight lifecycle stages. The existing injected Store
+Service reference is distinguished from independently declared owner identities.
+
+Scope uses frozen #140c `Store<T>` parameter-property and same-file constructor
+qualification. Plain Store, imported constructors, modern symbolic Service
+qualification, callbacks and select ownership remain separate. Existing modern
+fallback behavior is tested as preservation. Failures exit 1; evidence is under
+`target/ngrx-service-dispatch/<timestamp-guid>`. See
+[the ownership report](../../docs/plans/ISSUE_140D_SERVICE_DISPATCH_OWNERSHIP.md).
+
+## #140e Service select ownership
+
+```powershell
+pwsh -NoProfile -File verification/issue-reconciliation/Invoke-NgrxServiceSelect.ps1 `
+  -BinaryPath ./target/release/clean-ctx.exe
+```
+
+This provider-disabled stdio MCP harness verifies exact Angular Service →
+Selects → NgRx Selector ownership for the supported direct
+`this.<property>.select(<identifier>)` form. It covers independent Service,
+Store, and Selector authority falsifiers; multiple owners and targets;
+deduplication; neighboring classes; nested, callback, and static refusals;
+same-name file isolation; and refresh/removal/restoration/deletion lifecycle.
+Failures exit 1 and evidence is stored under
+`target/ngrx-service-select/<timestamp-guid>`.

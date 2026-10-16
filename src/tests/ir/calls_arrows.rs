@@ -568,7 +568,11 @@ fn red_arrow26_arrow_captures_do_not_touch_the_base_query_consumers() {
         .collect();
     let mut composed_base: Vec<(String, String)> = composed
         .iter()
-        .filter(|capture| !capture.name.starts_with("call.") && !capture.name.starts_with("arrow."))
+        .filter(|capture| {
+            !capture.name.starts_with("call.")
+                && !capture.name.starts_with("arrow.")
+                && !capture.name.starts_with("invoke.")
+        })
         .map(|capture| (capture.name.clone(), capture.text.clone()))
         .collect();
     base_set.sort();

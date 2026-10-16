@@ -54,6 +54,7 @@ use crate::mcp::McpState;
 use crate::protocol::send_response;
 use serde_json::Value;
 
+mod angular_templates;
 mod batch;
 mod calls;
 mod classification;
@@ -61,6 +62,8 @@ mod content;
 mod coverage;
 mod csharp_resolution;
 mod diagnostics;
+mod dotnet_testing;
+mod edge_merge;
 mod edges;
 mod entities;
 mod graph;
@@ -86,7 +89,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                 "error": {
                     "code": -32602,
                     "message": "Missing required argument: 'type'. Supported values: \
-                     find_entities, forward_edges, reverse_edges, entities_in_file, \
+                     find_entities, forward_edges, reverse_edges, entities_in_file, declarations_in_file, \
                      transitive_dependencies, has_cycle, calls_in_file.".to_string()
                 }
             }));
@@ -103,7 +106,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "code": -32602,
                     "message": format!(
                         "Unknown query type: '{}'. Supported values: find_entities, \
-                         forward_edges, reverse_edges, entities_in_file, \
+                         forward_edges, reverse_edges, entities_in_file, declarations_in_file, \
                          transitive_dependencies, has_cycle, calls_in_file.",
                         query_type
                     )
@@ -312,6 +315,10 @@ mod tests_batch_preparation;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_name_validation.rs"]
 mod tests_name_validation;
+
+#[cfg(all(test, feature = "rust", feature = "typescript"))]
+#[path = "../../tests/mcp/workspace_query_file_diagnostics.rs"]
+mod tests_file_diagnostics;
 
 // Native call facts (`SemanticRelation::Calls`) end-to-end: cross-file,
 // cross-project, and the repeated-query discovery cache.

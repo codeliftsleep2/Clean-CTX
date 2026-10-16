@@ -16,7 +16,14 @@ pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
 #[cfg(test)]
 pub(crate) static TEST_INJECTED_SOURCE_FAILURE: std::sync::Mutex<Option<String>> =
     std::sync::Mutex::new(None);
-use crate::layers::meta::semantic::SemanticEdge;
+use crate::layers::meta::semantic::{SemanticDependency, SemanticEdge};
+
+type CompiledSemantic = (
+    crate::ir::compiler::CompiledIR,
+    Vec<SemanticEdge>,
+    Vec<SemanticDependency>,
+    String,
+);
 use crate::mcp::McpState;
 use std::path::PathBuf;
 
@@ -262,8 +269,7 @@ pub(super) fn compile_file_ir_candidate(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
-{
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
     let existing_alias = state.alias_for_path(file_path);
     let candidate_id = existing_alias
         .clone()
@@ -288,8 +294,7 @@ pub(super) fn compile_source_ir_candidate(
     source: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
-{
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
     let alias = state
         .alias_for_path(file_path)
         .unwrap_or_else(|| file_path.to_string());
@@ -302,6 +307,31 @@ pub(super) fn compile_source_ir_candidate(
         None,
         &alias,
         previous_version,
+        None,
+    )
+}
+
+#[cfg(feature = "csharp")]
+pub(crate) fn compile_file_ir_candidate_with_csharp_authority(
+    file_path: &str,
+    fidelity: Fidelity,
+    state: &McpState,
+    authority: &[crate::ir::csharp_exact_calls::Declaration],
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+    let alias = state
+        .alias_for_path(file_path)
+        .unwrap_or_else(|| file_path.to_string());
+    let previous_version = state.file_version(&alias).unwrap_or(0);
+    let source = state.read_source(file_path)?;
+    compile_source_ir_focused_with_identity(
+        file_path,
+        &source,
+        fidelity,
+        state,
+        None,
+        &alias,
+        previous_version,
+        Some(authority),
     )
 }
 
@@ -320,8 +350,7 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
-) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
-{
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
     let path_alias = state.get_or_create_alias(file_path.to_string());
     let previous_version = state.file_version(&path_alias).unwrap_or(0);
     compile_file_ir_focused_with_identity(
@@ -341,8 +370,7 @@ fn compile_file_ir_focused_with_identity(
     focus: Option<&std::collections::HashSet<String>>,
     path_alias: &str,
     previous_version: u64,
-) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
-{
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
     let source_arc = state.read_source(file_path)?;
     compile_source_ir_focused_with_identity(
         file_path,
@@ -352,6 +380,7 @@ fn compile_file_ir_focused_with_identity(
         focus,
         path_alias,
         previous_version,
+        None,
     )
 }
 
@@ -364,8 +393,11 @@ fn compile_source_ir_focused_with_identity(
     focus: Option<&std::collections::HashSet<String>>,
     path_alias: &str,
     previous_version: u64,
-) -> Result<(crate::ir::compiler::CompiledIR, Vec<SemanticEdge>, String), crate::error::CleanCtxError>
-{
+    #[cfg(feature = "csharp")] csharp_authority: Option<
+        &[crate::ir::csharp_exact_calls::Declaration],
+    >,
+    #[cfg(not(feature = "csharp"))] _csharp_authority: Option<&[()]>,
+) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
     // Test-only production-compiler failure injection applies equally to
     // on-disk and exact in-memory candidate compilation.
     #[cfg(test)]
@@ -417,6 +449,10 @@ fn compile_source_ir_focused_with_identity(
 
     let mut compiler = IRCompiler::new();
     compiler.set_config(state.config.clone());
+    #[cfg(feature = "csharp")]
+    if let Some(authority) = csharp_authority {
+        compiler.set_csharp_declaration_authority(authority.to_vec());
+    }
 
     // Add language-specific layers (Layer 2)
     match extension {
@@ -484,13 +520,14 @@ fn compile_source_ir_focused_with_identity(
     // next compilation. These edges were produced by MetaLayerPass (Pass 3)
     // during the production pipeline and survived through compile_inner().
     let semantic_edges = std::mem::take(&mut compiler.semantic_edges);
+    let semantic_dependencies = std::mem::take(&mut compiler.semantic_dependencies);
 
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.
     compiled.version = previous_version.saturating_add(1);
 
     // A-08: Return source hash along with compiled IR and semantic edges
-    Ok((compiled, semantic_edges, source_hash))
+    Ok((compiled, semantic_edges, semantic_dependencies, source_hash))
 }
 
 /// Compute an AST-level diff between the file's in-session baseline and

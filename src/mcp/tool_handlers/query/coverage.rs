@@ -12,6 +12,49 @@ pub(super) enum CapabilityDirection {
     Reverse,
 }
 
+/// Proof that one authoritative operation satisfied its declared evidence
+/// requirement against a compatible current-source generation. Construction is
+/// intentionally narrow: callers cannot toggle public completeness fields.
+#[derive(Clone)]
+pub(super) struct CompletenessCertificate {
+    scope_kind: &'static str,
+    scope_value: String,
+    source_generation: String,
+    evidence_requirements: &'static [&'static str],
+}
+
+impl CompletenessCertificate {
+    pub(super) fn current_file(path: String, source_generation: String) -> Self {
+        Self {
+            scope_kind: "file",
+            scope_value: path,
+            source_generation,
+            evidence_requirements: &[
+                "authorized_source_acquired",
+                "producer_supported",
+                "semantic_projection_current",
+                "dependencies_current",
+            ],
+        }
+    }
+
+    pub(super) fn project(&self) -> Value {
+        json!({
+            "status": "authoritative_complete",
+            "scope": {
+                "kind": self.scope_kind,
+                "value": self.scope_value,
+            },
+            "source_generation": self.source_generation,
+            "evidence_requirements": self.evidence_requirements,
+            "source_complete": true,
+            "result_semantics": "exact",
+            "omitted_possible": false,
+            "reasons": [],
+        })
+    }
+}
+
 pub(super) fn exact_identity_coverage(
     index: &WorkspaceIndex,
     identity: &ResolvedIdentity,

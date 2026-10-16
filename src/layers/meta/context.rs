@@ -14,6 +14,7 @@ use super::MetaLayerOutput;
 pub struct MetaLayerEvaluation {
     pub output: Option<MetaLayerOutput>,
     pub semantic_edges: Vec<SemanticEdge>,
+    pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 /// Immutable inputs and shared lexical evidence for one meta-layer pass.
@@ -27,6 +28,23 @@ pub struct MetaLayerContext<'a> {
     pub fidelity: Fidelity,
     pub config: Option<&'a CleanCtxConfig>,
     pub lexical_regions: &'a LexicalRegions,
+    /// Compiler-owned evidence; absence means no upstream parse was supplied.
+    pub(crate) invocation_evidence:
+        Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
+    pub(crate) angular_initializers:
+        Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    pub(crate) ngrx_service_dispatches:
+        Option<&'a [crate::angular_meta::ngrx::service_owners::ServiceDispatch]>,
+    pub(crate) ngrx_constructor_dispatches:
+        Option<&'a [crate::angular_meta::ngrx::constructors::ConstructorDispatch]>,
+    pub(crate) ngrx_legacy_transitions:
+        Option<&'a [crate::angular_meta::ngrx::transitions::LegacyTransition]>,
+    pub(crate) ngrx_legacy_discriminants:
+        Option<&'a [crate::angular_meta::ngrx::discriminants::LegacyDiscriminantEvidence]>,
+    pub(crate) ngrx_class_actions:
+        Option<&'a [crate::angular_meta::ngrx::legacy::ClassActionEvidence]>,
+    pub(crate) ngrx_selector_declarations:
+        Option<&'a [crate::angular_meta::ngrx::selector_declarations::SelectorDeclarationEvidence]>,
 }
 
 impl<'a> MetaLayerContext<'a> {
@@ -48,6 +66,14 @@ impl<'a> MetaLayerContext<'a> {
             fidelity,
             config,
             lexical_regions,
+            invocation_evidence: None,
+            angular_initializers: None,
+            ngrx_class_actions: None,
+            ngrx_selector_declarations: None,
+            ngrx_legacy_transitions: None,
+            ngrx_legacy_discriminants: None,
+            ngrx_constructor_dispatches: None,
+            ngrx_service_dispatches: None,
         }
     }
 }

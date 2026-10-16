@@ -13,6 +13,7 @@ pub(crate) const WORKFLOW_INSTRUCTIONS: &str = r#"# Clean-CTX Tool Workflow
 - Use `cbm_proxy` only when compact or explicitly fresh raw CBM output is preferable to a typed structured result. Never bypass Clean-CTX to call CBM directly.
 - Use `delta_code_context`, `apply_delta`, and persistence tools only when the caller intentionally owns their version, acknowledgement, or durable-state lifecycle.
 - Read Edit or Verbatim context before `apply_edit`, and edit only byte-exact regions supplied by the current session.
+- For `apply_edit`, use the language-derived signature selector `Owner.method(type,...)` when same-named candidates exist. Legacy qualified or bare names are valid only when unique; ambiguity and found-but-uneditable declarations fail closed. Never substitute a neighboring declaration or infer documentation ownership from proximity.
 - Do not call `index_repository` after `apply_edit`; the next graph operation performs the lazy refresh. Use explicit indexing only after external edits when graph freshness is required.
 - Treat CBM indexing responses as temporary state, not as authoritative empty results; retry in a bounded way or use the documented fallback.
 - Use native file reads for unsupported or non-code files and for exact known ranges when structured context is insufficient.

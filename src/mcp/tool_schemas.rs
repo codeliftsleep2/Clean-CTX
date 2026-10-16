@@ -9,7 +9,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "replace_body" },
-                    "target": { "type": "string", "description": "Qualified structural unit to replace." },
+                    "target": { "type": "string", "description": "Signature-qualified structural unit, for example Owner.method(type,...). A legacy qualified or bare name is accepted only when unique." },
                     "expectedOldText": { "type": "string", "description": "Byte-exact unit text previously delivered to this session." },
                     "newText": { "type": "string", "description": "Complete replacement body text." }
                 },
@@ -19,8 +19,8 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "delete" },
-                    "target": { "type": "string", "description": "Qualified structural unit to delete." },
-                    "expectedOldText": { "type": "string", "description": "Byte-exact unit text previously delivered to this session." }
+                    "target": { "type": "string", "description": "Signature-qualified structural unit. A legacy qualified or bare name is accepted only when unique." },
+                    "expectedOldText": { "type": "string", "description": "Byte-exact full declaration text, or the legacy tracked body text for compatibility." }
                 },
                 "required": ["type", "target", "expectedOldText"]
             },
@@ -28,7 +28,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "insert_after" },
-                    "anchor": { "type": "string", "description": "Qualified structural unit after which to insert." },
+                    "anchor": { "type": "string", "description": "Signature-qualified anchor. A legacy qualified or bare name is accepted only when unique." },
                     "unitText": { "type": "string", "description": "Complete structural unit text to insert." }
                 },
                 "required": ["type", "anchor", "unitText"]
@@ -37,7 +37,7 @@ pub(super) fn apply_edit_operations() -> Value {
                 "type": "object",
                 "properties": {
                     "type": { "const": "insert_before" },
-                    "anchor": { "type": "string", "description": "Qualified structural unit before which to insert." },
+                    "anchor": { "type": "string", "description": "Signature-qualified anchor. A legacy qualified or bare name is accepted only when unique." },
                     "unitText": { "type": "string", "description": "Complete structural unit text to insert." }
                 },
                 "required": ["type", "anchor", "unitText"]
@@ -105,7 +105,12 @@ pub(super) fn provide_code_context_request_variants() -> Value {
                 "files": provide_code_context_properties()["files"].clone()
             },
             "required": ["files"],
-            "not": { "required": ["filePath"] }
+            "not": {
+                "anyOf": [
+                    { "required": ["filePath"] },
+                    { "required": ["fidelity"] }
+                ]
+            }
         }
     ])
 }
@@ -193,12 +198,13 @@ pub(super) fn workspace_query_properties() -> Value {
 
 fn workspace_query_operation_properties() -> Value {
     json!({
-        "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
-        "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, and transitive_dependencies. With entity_type, uses the exact-identity fast path; alone, filters name resolution." },
-        "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, and transitive_dependencies. With domain, uses the exact-identity fast path; alone, filters name resolution." },
+        "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "declarations_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
+        "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With entity_type, edge queries use the exact-identity fast path; alone, filters name resolution." },
+        "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With domain, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "name": { "type": "string", "minLength": 1, "description": "Exactly one entity name. Required for find_entities, forward_edges, reverse_edges, and transitive_dependencies. For multiple names, use top-level queries with one independently identified item per name; do not pass an array or a names field." },
-        "file_path": { "type": "string", "description": "File path for entities_in_file query." },
-        "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file. Edit and verbatim normalize to High because this query publishes no source bodies. Defaults to the configured fidelity." },
+        "declarations_only": { "type": "boolean", "description": "find_entities only. When true, return source-proven declaration occurrences and apply optional domain/entity_type filters. Default false preserves occurrence-oriented behavior." },
+        "file_path": { "type": "string", "description": "File path for entities_in_file or declarations_in_file query." },
+        "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file or declarations_in_file. Edit and verbatim normalize to High because these queries publish no source bodies. Defaults to the configured fidelity." },
         "kind": { "type": "string", "enum": ["dependency"], "description": "Optional cycle policy for has_cycle. Defaults to dependency." },
         "filePath": { "type": "string", "description": "Trusted source file for calls_in_file." },
         "owner": { "type": "object", "description": "Typed caller owner for calls_in_file.", "properties": { "kind": { "type": "string", "enum": ["class", "interface"] }, "name": { "type": "string" } }, "required": ["kind", "name"] },
@@ -234,6 +240,7 @@ fn workspace_query_variants(require_calls_root: bool) -> Value {
         query_variant("forward_edges", &["name"]),
         query_variant("reverse_edges", &["name"]),
         query_variant("entities_in_file", &["file_path"]),
+        query_variant("declarations_in_file", &["file_path"]),
         query_variant("transitive_dependencies", &["name"]),
         query_variant("has_cycle", &[]),
         query_variant("calls_in_file", calls_required)

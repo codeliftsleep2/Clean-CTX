@@ -13,7 +13,7 @@
 use super::{
     coverage::{CapabilityDirection, exact_identity_coverage},
     discovery_field,
-    identity::IdentityRequest,
+    identity::{IdentityRequest, ResolvedIdentity},
     outcome::QueryAnswer,
     outcome::QueryFailure,
     prepare::{PreparationContext, PreparedQuery},
@@ -23,6 +23,7 @@ use crate::mcp::McpState;
 use crate::mcp::tool_handlers::hydration::HydrationRequirement;
 use crate::workspace::index::SemanticFidelity;
 use serde_json::Value;
+use std::collections::HashSet;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
@@ -68,6 +69,55 @@ fn try_prepare_forward_edges(
         context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
     if hydration.is_complete()
         && let Some(exact) = identity.exact()
+        && exact.domain == "dotnet"
+        && exact.entity_type == "TestClass"
+    {
+        let targets = {
+            let index = state.workspace_index_read();
+            super::dotnet_testing::candidate_targets_for_test(
+                state,
+                &index,
+                scope.as_ref(),
+                &exact.name,
+            )
+        };
+        for target in targets {
+            let target_hydration =
+                context.hydrate(state, "reverse_edges", &target, workspace_root, requirement)?;
+            hydration.merge(target_hydration);
+        }
+    }
+    if hydration.is_complete()
+        && let Some(exact) = identity.exact()
+        && exact.domain == "dotnet"
+        && exact.entity_type == "Controller"
+    {
+        let mut current = exact.name.clone();
+        let mut visited = HashSet::new();
+        while visited.insert(current.clone()) {
+            let candidate = {
+                let index = state.workspace_index_read();
+                let catalog =
+                    super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+                catalog.aspnet_base_candidate(&current)
+            };
+            let Some(candidate) = candidate else { break };
+            let next = context.hydrate(
+                state,
+                "find_entities",
+                &candidate,
+                workspace_root,
+                requirement,
+            )?;
+            hydration.merge(next);
+            if !hydration.is_complete() {
+                break;
+            }
+            current = candidate;
+        }
+    }
+    if hydration.is_complete()
+        && let Some(exact) = identity.exact()
         && exact.domain == "builtin"
         && exact.entity_type == "Class"
     {
@@ -88,6 +138,23 @@ fn try_prepare_forward_edges(
             hydration.merge(target_hydration);
         }
     }
+    hydrate_angular_template_owner(
+        state,
+        context,
+        &identity,
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
+    hydrate_angular_selector_candidates(
+        state,
+        context,
+        &identity,
+        scope.as_ref(),
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity
         .exact()
@@ -96,19 +163,103 @@ fn try_prepare_forward_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let dotnet_testing_catalog = (classification_complete
+        && identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "TestClass"))
+    .then(|| {
+        let index = state.workspace_index_read();
+        super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+    });
+    let efcore_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "DbContext")
+        .then(|| {
+            let index = state.workspace_index_read();
+            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+        });
+    let (aspnet_projection, aspnet_authorized) = if classification_complete
+        && identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
+    {
+        let index = state.workspace_index_read();
+        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        let exact = identity.exact().expect("checked exact Controller identity");
+        (
+            catalog.aspnet_projection(&exact.name, crate::compression::Fidelity::High),
+            catalog.has_aspnet_controller_authority(&exact.name),
+        )
+    } else {
+        (None, false)
+    };
+    let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(
+            state,
+            &index,
+            scope.as_ref(),
+            classification_complete,
+        )
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = super::classification::forward(
+        let stored_edges = super::classification::forward(
             index,
             &resolved,
             scope.as_ref(),
             classification_complete,
             resolution_catalog.as_ref(),
         );
+        let mut edges = serde_json::to_value(&stored_edges)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        if identity
+            .exact()
+            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
+            && !aspnet_authorized
+        {
+            edges.clear();
+        }
+        let stored_count = edges.len();
+        if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
+            edges.extend(catalog.forward(&exact.domain, &exact.entity_type, &exact.name));
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), dotnet_testing_catalog.as_ref()) {
+            edges.extend(
+                serde_json::to_value(catalog.forward(
+                    &exact.domain,
+                    &exact.entity_type,
+                    &exact.name,
+                ))
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default(),
+            );
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
+            super::edge_merge::append_distinct_json_edges(
+                &mut edges,
+                catalog.forward(&exact.domain, &exact.entity_type, &exact.name),
+            );
+        }
+        if let Some(projection) = &aspnet_projection {
+            for edge in serde_json::to_value(&projection.edges)
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default()
+            {
+                if !edges.contains(&edge) {
+                    edges.push(edge);
+                }
+            }
+        }
         let count = edges.len();
         let mut structured = serde_json::json!({
-            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "edges": edges,
             "count": count,
             "resolved_identity": resolved_identity,
         });
@@ -119,9 +270,16 @@ fn try_prepare_forward_edges(
                 scope.as_ref(),
                 CapabilityDirection::Forward,
                 &hydration,
-                has_typed_inheritance(&edges),
+                has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
+        apply_angular_template_metadata(
+            &mut structured,
+            &resolved,
+            angular_catalog.as_ref(),
+            classification_complete,
+            CapabilityDirection::Forward,
+        );
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
@@ -169,7 +327,25 @@ fn try_prepare_reverse_edges(
         );
     }
     let requirement = edge_hydration_requirement(args);
-    let hydration = context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    let mut hydration =
+        context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    hydrate_angular_template_owner(
+        state,
+        context,
+        &identity,
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
+    hydrate_angular_selector_candidates(
+        state,
+        context,
+        &identity,
+        scope.as_ref(),
+        workspace_root,
+        requirement,
+        &mut hydration,
+    )?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity.exact().is_some_and(|exact| {
         exact.domain == "builtin" && matches!(exact.entity_type.as_str(), "Class" | "Interface")
@@ -178,19 +354,69 @@ fn try_prepare_reverse_edges(
         let index = state.workspace_index_read();
         super::csharp_resolution::Catalog::build(state, &index, scope.as_ref())
     });
+    let dotnet_testing_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "Class")
+        .then(|| {
+            let index = state.workspace_index_read();
+            super::dotnet_testing::Catalog::build(state, &index, scope.as_ref())
+        });
+    let efcore_catalog = identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Entity")
+        .then(|| {
+            let index = state.workspace_index_read();
+            let csharp = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            super::csharp_resolution::EfCoreCatalog::build(&csharp)
+        });
+    let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(
+            state,
+            &index,
+            scope.as_ref(),
+            classification_complete,
+        )
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let edges = super::classification::reverse(
+        let stored_edges = super::classification::reverse(
             index,
             &resolved,
             scope.as_ref(),
             classification_complete,
             resolution_catalog.as_ref(),
         );
+        let mut edges = serde_json::to_value(&stored_edges)
+            .ok()
+            .and_then(|value| value.as_array().cloned())
+            .unwrap_or_default();
+        let stored_count = edges.len();
+        if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
+            edges.extend(catalog.reverse(&exact.domain, &exact.entity_type, &exact.name));
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), dotnet_testing_catalog.as_ref()) {
+            edges.extend(
+                serde_json::to_value(catalog.reverse(
+                    &exact.domain,
+                    &exact.entity_type,
+                    &exact.name,
+                ))
+                .ok()
+                .and_then(|value| value.as_array().cloned())
+                .unwrap_or_default(),
+            );
+        }
+        if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
+            super::edge_merge::append_distinct_json_edges(
+                &mut edges,
+                catalog.reverse(&exact.domain, &exact.entity_type, &exact.name),
+            );
+        }
         let count = edges.len();
         let mut structured = serde_json::json!({
-            "edges": serde_json::to_value(&edges).unwrap_or_default(),
+            "edges": edges,
             "count": count,
             "resolved_identity": resolved_identity,
         });
@@ -201,14 +427,132 @@ fn try_prepare_reverse_edges(
                 scope.as_ref(),
                 CapabilityDirection::Reverse,
                 &hydration,
-                has_typed_inheritance(&edges),
+                has_typed_inheritance(&stored_edges) || count > stored_count,
             );
         }
+        apply_angular_template_metadata(
+            &mut structured,
+            &resolved,
+            angular_catalog.as_ref(),
+            classification_complete,
+            CapabilityDirection::Reverse,
+        );
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
         Ok(QueryAnswer::new("reverse_edges", structured))
     }))
+}
+
+fn apply_angular_template_metadata(
+    structured: &mut Value,
+    identity: &ResolvedIdentity,
+    catalog: Option<&super::angular_templates::Catalog>,
+    discovery_complete: bool,
+    direction: CapabilityDirection,
+) {
+    let Some(catalog) = catalog else {
+        return;
+    };
+    let diagnostics = catalog.diagnostics(&identity.domain, &identity.entity_type, &identity.name);
+    if !diagnostics.is_empty() {
+        structured["template_diagnostics"] = Value::Array(diagnostics.clone());
+        if let Some(coverage) = structured.get_mut("coverage") {
+            coverage["reasons"] = Value::Array(diagnostics);
+        }
+    }
+    let completeness_supported = identity.entity_type == "Template"
+        || (identity.entity_type == "Component"
+            && matches!(direction, CapabilityDirection::Forward));
+    if !completeness_supported {
+        return;
+    }
+    let source_complete = catalog.source_complete(
+        &identity.domain,
+        &identity.entity_type,
+        &identity.name,
+        discovery_complete,
+    );
+    if let Some(coverage) = structured.get_mut("coverage") {
+        coverage["source_complete"] = source_complete.into();
+        coverage["omitted_possible"] = (!source_complete).into();
+        if source_complete {
+            coverage["status"] = "authoritative_complete".into();
+            coverage["result_semantics"] = "exact".into();
+            coverage["reasons"] = Value::Array(Vec::new());
+        }
+    }
+}
+
+fn needs_angular_template_resolution(identity: &IdentityRequest) -> bool {
+    identity.exact().is_some_and(|exact| {
+        exact.domain == "angular"
+            && matches!(
+                exact.entity_type.as_str(),
+                "Component" | "Template" | "SelectorRef"
+            )
+    })
+}
+
+fn hydrate_angular_template_owner(
+    state: &McpState,
+    context: &mut PreparationContext,
+    identity: &IdentityRequest,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+    hydration: &mut crate::mcp::tool_handlers::hydration::HydrationReport,
+) -> Result<(), QueryFailure> {
+    let Some(exact) = identity.exact() else {
+        return Ok(());
+    };
+    if exact.domain != "angular" || exact.entity_type != "Template" {
+        return Ok(());
+    }
+    let lookup = if let Some(inline) = exact.name.strip_prefix("inline:") {
+        inline
+            .rsplit_once("#component=")
+            .map(|(_, component)| component.to_string())
+    } else {
+        std::path::Path::new(&exact.name)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+    };
+    if let Some(lookup) = lookup {
+        let owner_hydration =
+            context.hydrate(state, "forward_edges", &lookup, workspace_root, requirement)?;
+        hydration.merge(owner_hydration);
+    }
+    Ok(())
+}
+
+fn hydrate_angular_selector_candidates(
+    state: &McpState,
+    context: &mut PreparationContext,
+    identity: &IdentityRequest,
+    scope: Option<&crate::workspace::scope::WorkspaceScope>,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+    hydration: &mut crate::mcp::tool_handlers::hydration::HydrationReport,
+) -> Result<(), QueryFailure> {
+    if !hydration.is_complete() || !needs_angular_template_resolution(identity) {
+        return Ok(());
+    }
+    let selectors = {
+        let index = state.workspace_index_read();
+        super::angular_templates::Catalog::build(state, &index, scope, false).selectors()
+    };
+    for selector in selectors {
+        let selector_hydration = context.hydrate(
+            state,
+            "reverse_edges",
+            &selector,
+            workspace_root,
+            requirement,
+        )?;
+        hydration.merge(selector_hydration);
+    }
+    Ok(())
 }
 
 /// Angular service edges include constructor `Injects`, whose authoritative

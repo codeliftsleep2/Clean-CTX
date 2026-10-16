@@ -16,6 +16,7 @@ use crate::ir::symbol_table::SymbolKind;
 use std::collections::{HashMap, HashSet};
 
 mod csharp;
+mod typescript;
 use csharp::{apply_csharp_declaration_names, emit_csharp_class_base_type};
 
 /// Pass 1: Core IR emission from tree-sitter captures.
@@ -62,6 +63,16 @@ impl IRPass for CoreIRPass {
             capture_query.push('\n');
             capture_query.push_str(crate::queries::CS_SEMANTIC_QUERY);
         }
+        if query_string == crate::queries::TS_QUERY {
+            capture_query.push('\n');
+            capture_query.push_str(typescript::DECLARATION_QUERY);
+            capture_query.push('\n');
+            capture_query.push_str(crate::angular_meta::ngrx::legacy::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::selector_declarations::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::transitions::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::constructors::QUERY);
+            capture_query.push_str(crate::angular_meta::ngrx::service_owners::QUERY);
+        }
 
         let mut captures = run_capture_pipeline_nodes(
             language,
@@ -92,6 +103,72 @@ impl IRPass for CoreIRPass {
         if query_string == crate::queries::CS_QUERY {
             apply_csharp_declaration_names(&mut captures);
         }
+        if query_string == crate::queries::TS_QUERY {
+            typescript::apply_declaration_names(&mut captures);
+            captures.retain(|capture| !capture.name.starts_with("ts.identity."));
+        }
+
+        if query_string == crate::queries::TS_QUERY || query_string == crate::queries::CS_QUERY {
+            state.invocation_occurrences =
+                crate::ir::invocation_evidence::collect_invocations(&captures);
+        }
+
+        if query_string == crate::queries::TS_QUERY {
+            state.angular_initializers = crate::angular_meta::inject_evidence::collect(
+                &source,
+                &captures,
+                &state.invocation_occurrences,
+            );
+            captures.retain(|capture| !capture.name.starts_with("angular.initializer."));
+            state.ngrx_class_actions =
+                crate::angular_meta::ngrx::legacy::collect(&source, &captures);
+            state.ngrx_selector_declarations =
+                crate::angular_meta::ngrx::selector_declarations::collect(
+                    &source,
+                    state.canonical_path.as_deref(),
+                    &captures,
+                );
+            state.ngrx_action_type_bindings = crate::angular_meta::ngrx::type_binding::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.ngrx_class_actions,
+            );
+            state.ngrx_legacy_discriminants = crate::angular_meta::ngrx::discriminants::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+            );
+            state.ngrx_legacy_transitions = crate::angular_meta::ngrx::transitions::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.ngrx_action_type_bindings,
+            );
+            state.ngrx_constructor_dispatches = crate::angular_meta::ngrx::constructors::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.ngrx_class_actions,
+                &state.invocation_occurrences,
+            );
+            state.ngrx_service_dispatches = crate::angular_meta::ngrx::service_owners::collect(
+                &source,
+                state.canonical_path.as_deref(),
+                &captures,
+                &state.invocation_occurrences,
+                &state.angular_initializers,
+                &state.ngrx_constructor_dispatches,
+            );
+            captures.retain(|capture| {
+                !capture.name.starts_with("ngrx.service.")
+                    && !capture.name.starts_with("ngrx.ctor.")
+                    && !capture.name.starts_with("ngrx.transition.")
+                    && !capture.name.starts_with("ngrx.legacy.")
+                    && !capture.name.starts_with("ngrx.selector.")
+                    && !capture.name.starts_with("ngrx.type.")
+            });
+        }
 
         // TypeScript places `export` on an `export_statement` wrapper rather
         // than inside the declaration node captured as `class.root` or
@@ -111,6 +188,11 @@ impl IRPass for CoreIRPass {
 
         let mut csharp_class_owners: HashMap<(usize, usize), String> = HashMap::new();
         for cap in &captures {
+            // Private evidence captures must not affect canonical emission or
+            // the timing of existing callable-scope transitions.
+            if cap.name.starts_with("invoke.") {
+                continue;
+            }
             // Callable-scope maintenance is independent of filtering: the walk
             // has advanced past `cap.start_byte` either way, so scopes whose
             // region closed are popped and their call facts settled.
@@ -211,7 +293,14 @@ impl IRPass for CoreIRPass {
                 }
                 "impl.root" => process_impl_capture(state, cap),
                 "method.root" | "constructor.root" | "func.root" => {
-                    process_method_capture(state, cap, &file_id, fidelity, focus.as_ref());
+                    process_method_capture(
+                        state,
+                        cap,
+                        &file_id,
+                        fidelity,
+                        focus.as_ref(),
+                        query_string == crate::queries::CS_QUERY,
+                    );
                 }
                 "field.root" => {
                     state.refresh_type_owner(cap.start_byte);
@@ -317,6 +406,7 @@ fn process_method_capture(
     file_id: &str,
     fidelity: Fidelity,
     focus: Option<&std::collections::HashSet<String>>,
+    is_csharp: bool,
 ) {
     let Some(owner) = resolve_callable_owner(state, cap, file_id) else {
         return;
@@ -331,6 +421,18 @@ fn process_method_capture(
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
     let method_name = state.emit_method_ir(&owner, &method_id, &cap.text);
+    if is_csharp {
+        let raw_signature = extract_method_sig(&cap.raw_text, Fidelity::High);
+        let declared_return = super::parse_method_sig(&raw_signature).return_type;
+        if let Some(CoreOp::Return(_, return_type)) = state
+            .instructions
+            .iter_mut()
+            .rev()
+            .find(|op| matches!(op, CoreOp::Return(owner, _) if owner == &method_id))
+        {
+            *return_type = declared_return;
+        }
+    }
 
     if fidelity == Fidelity::Edit
         && focus.is_none_or(|focused| focused.contains(&method_name))

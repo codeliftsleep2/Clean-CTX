@@ -127,6 +127,22 @@ fn insert_after_lands_at_unit_end() {
 }
 
 #[test]
+fn issue_136_insert_after_adds_a_safe_separator_and_anchor_indentation() {
+    let (source, units) = fixture();
+    let report = apply::apply(
+        &source,
+        &units,
+        &[crate::edit::ops::EditOperation::InsertAfter {
+            anchor: "Svc.run".into(),
+            unit_text: "helper() {}".into(),
+        }],
+    )
+    .unwrap();
+    assert!(report.new_source.contains("\n  }\n  helper() {}\n}"));
+    assert!(!report.new_source.contains("}helper"));
+}
+
+#[test]
 fn overlapping_replacements_are_rejected() {
     let source = "class A {\n  x() {\n    return 1;\n  }\n  y() {\n    return 2;\n  }\n}\n";
     // Real captures never intersect, so hand-craft two Body ops whose

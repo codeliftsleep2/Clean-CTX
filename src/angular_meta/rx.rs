@@ -264,23 +264,38 @@ impl RxShape {
         if self.is_empty() {
             return String::new();
         }
+        let mut rendered = String::from("// --- Φ RxJS Meta ---\n");
+        for marker in self.marker_lines_with_config(fidelity, min_pipe_operators) {
+            rendered.push_str(&marker);
+        }
+        rendered
+    }
+
+    /// One complete marker per entry, including multiline pipe details.
+    pub(crate) fn marker_lines_with_config(
+        &self,
+        fidelity: Fidelity,
+        min_pipe_operators: Option<usize>,
+    ) -> Vec<String> {
+        if self.is_empty() {
+            return Vec::new();
+        }
 
         let min_ops = min_pipe_operators.unwrap_or(2);
 
-        let mut s = String::new();
-        s.push_str("// --- Φ RxJS Meta ---\n");
+        let mut s = Vec::new();
 
         // Observable fields (all fidelities)
         for obs in &self.observables {
             match fidelity {
                 Fidelity::Low => {
-                    s.push_str(&format!("  Φobs:{}\n", obs.name));
+                    s.push(format!("  Φobs:{}\n", obs.name));
                 }
                 Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref src) = obs.source {
-                        s.push_str(&format!("  Φobs:{} → {}\n", obs.name, src));
+                        s.push(format!("  Φobs:{} → {}\n", obs.name, src));
                     } else {
-                        s.push_str(&format!("  Φobs:{}\n", obs.name));
+                        s.push(format!("  Φobs:{}\n", obs.name));
                     }
                 }
             }
@@ -290,16 +305,16 @@ impl RxShape {
         for subj in &self.subjects {
             match fidelity {
                 Fidelity::Low => {
-                    s.push_str(&format!("  Φsubject:{}\n", subj.name));
+                    s.push(format!("  Φsubject:{}\n", subj.name));
                 }
                 Fidelity::Medium | Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     if let Some(ref iv) = subj.initial_value {
-                        s.push_str(&format!(
+                        s.push(format!(
                             "  Φsubject:{} = new {}({})\n",
                             subj.name, subj.kind, iv
                         ));
                     } else {
-                        s.push_str(&format!(
+                        s.push(format!(
                             "  Φsubject:{} = new {}<{}>()\n",
                             subj.name,
                             subj.kind,
@@ -317,7 +332,7 @@ impl RxShape {
             }
             match fidelity {
                 Fidelity::Low => {
-                    s.push_str(&format!("  ΦpipeRx:{}\n", pipe.owner));
+                    s.push(format!("  ΦpipeRx:{}\n", pipe.owner));
                 }
                 Fidelity::Medium => {
                     let ops: Vec<&str> = pipe
@@ -325,7 +340,7 @@ impl RxShape {
                         .iter()
                         .map(|op| op.operator_name.as_str())
                         .collect();
-                    s.push_str(&format!("  ΦpipeRx:{} = {}\n", pipe.owner, ops.join(" → ")));
+                    s.push(format!("  ΦpipeRx:{} = {}\n", pipe.owner, ops.join(" → ")));
                 }
                 Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => {
                     let mut pipe_line = format!("  ΦpipeRx:{} = pipe(\n", pipe.owner);
@@ -343,15 +358,14 @@ impl RxShape {
                         }
                     }
                     pipe_line.push_str("  )");
-                    s.push_str(&pipe_line);
-                    s.push('\n');
+                    s.push(format!("{pipe_line}\n"));
                 }
             }
         }
 
         // Static combinators
         for comb in &self.combinators {
-            s.push_str(&format!(
+            s.push(format!(
                 "  Φcombine:{} {}\n",
                 comb.name,
                 comb.args.join(", ")
@@ -383,6 +397,7 @@ mod extract;
 mod pipes;
 
 pub use extract::extract_rx_shape;
+pub(crate) use extract::extract_rx_shape_with_evidence;
 pub(crate) use extract::extract_rx_shape_with_regions;
 
 // ---------------------------------------------------------------------------
@@ -412,3 +427,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/angular_meta/rx_lexical.rs"]
 mod lexical_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/angular_meta/rx_invocation_evidence.rs"]
+mod invocation_evidence_tests;

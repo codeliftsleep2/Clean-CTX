@@ -52,6 +52,7 @@ pub(crate) struct RefreshReconciliation {
     pub(crate) indexed_owners_retracted: usize,
     pub(crate) source_snapshots_invalidated: usize,
     pub(crate) pending_transitions_retired: usize,
+    pub(crate) dependent_owners_retracted: usize,
 }
 
 impl RefreshReconciliation {
@@ -59,6 +60,7 @@ impl RefreshReconciliation {
         self.indexed_owners_retracted += other.indexed_owners_retracted;
         self.source_snapshots_invalidated += other.source_snapshots_invalidated;
         self.pending_transitions_retired += other.pending_transitions_retired;
+        self.dependent_owners_retracted += other.dependent_owners_retracted;
     }
 }
 
@@ -67,6 +69,9 @@ pub(crate) fn reconcile_external_refresh_for_root(
     root: &str,
 ) -> RefreshReconciliation {
     let identity = crate::dictionary::path::canonical_identity_key(root);
+    let dependent_owners = state
+        .workspace_index_read()
+        .semantic_dependents_of_root(&identity);
     let source_snapshots_invalidated = state.invalidate_source_cache_in_root(&identity);
     let pending_transitions_retired = state.forget_pending_transitions_in_root(&identity);
     let indexed_owners_retracted = state.workspace_index_lock().remove_files_in_root(&identity);
@@ -74,7 +79,12 @@ pub(crate) fn reconcile_external_refresh_for_root(
         indexed_owners_retracted,
         source_snapshots_invalidated,
         pending_transitions_retired,
+        dependent_owners_retracted: dependent_owners.len(),
     };
+    for owner in dependent_owners {
+        state.workspace_index_lock().remove_file(&owner);
+        invalidate_discovery_for_edited_path(state, &owner);
+    }
     // Invalidate discovery last. A concurrent hydration that finishes before
     // this point is either retracted above or publishes source-current facts;
     // after this point every new query observes the fresh discovery generation.

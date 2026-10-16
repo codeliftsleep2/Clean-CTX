@@ -20,6 +20,7 @@ pub struct DiffAction {
     ///   `"body"`    — signature + markers identical, body fingerprint changed
     ///   `"markers"` — signature identical, behavior markers changed
     ///   `"sig"`     — signature changed
+    ///   `"declaration"` — producer comparison facts changed
     ///   `""`        — not a method modification.
     /// G2-5 audit: previously the formatter couldn't distinguish a
     /// body-only change from a markers-only change (both kept the same

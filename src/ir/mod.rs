@@ -26,10 +26,16 @@ pub mod compact_a3;
 pub mod compiler;
 pub(crate) mod compiler_methods;
 pub mod control_full;
+#[cfg(feature = "csharp")]
+pub(crate) mod csharp_exact_calls;
 pub mod delta;
 pub mod focus;
 pub mod hierarchical;
 pub mod identity;
+/// Private, source-bound invocation occurrence evidence.
+// TypeScript and C# populate evidence; later consumers remain staged.
+#[allow(dead_code)]
+pub(crate) mod invocation_evidence;
 pub mod layers;
 pub mod opcodes;
 pub mod patterns;
@@ -41,6 +47,10 @@ pub mod replay;
 pub mod semantic_projection;
 pub mod string_table;
 pub mod symbol_table;
+pub(crate) mod typescript_identifier_binding;
+pub(crate) mod typescript_this_property_binding;
+pub(crate) mod typescript_type_import_binding;
+pub(crate) mod typescript_value_import_binding;
 pub mod wire;
 // R-43b: IR Evolution Phases 2-6
 pub mod inference_layer;

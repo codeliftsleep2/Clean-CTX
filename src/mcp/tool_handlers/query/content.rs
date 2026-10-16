@@ -20,7 +20,9 @@ fn occurrences(values: &Value) -> Value {
                         record
                     }
                 };
-                record.insert("occurrence".into(), occurrence.into());
+                record
+                    .entry("occurrence")
+                    .or_insert_with(|| occurrence.into());
                 Value::Object(record)
             })
             .collect(),
@@ -33,7 +35,7 @@ fn model_result(query_type: &str, structured: &Value) -> Value {
         return result;
     };
     let family = match query_type {
-        "find_entities" | "entities_in_file" => Some("entities"),
+        "find_entities" | "entities_in_file" | "declarations_in_file" => Some("entities"),
         "forward_edges" | "reverse_edges" => Some("edges"),
         "transitive_dependencies" => Some("dependencies"),
         _ => None,

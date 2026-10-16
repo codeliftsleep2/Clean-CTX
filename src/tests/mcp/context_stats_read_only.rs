@@ -54,6 +54,44 @@ fn domain_stats(state: &crate::mcp::McpState) -> Value {
 }
 
 #[test]
+fn persisted_history_is_separate_from_the_new_session_accounting() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let file = root
+        .path()
+        .join("persisted.ts")
+        .to_string_lossy()
+        .into_owned();
+    std::fs::write(&file, "export class Persisted {}\n").unwrap();
+    {
+        let first = state(&root);
+        compile(&first, &root, &file);
+        let _ = first.flush_persistence();
+        let store = first.persistence_store_lock();
+        let sqlite = store
+            .as_ref()
+            .expect("persistence")
+            .sqlite()
+            .expect("SQLite");
+        assert!(sqlite.has_context(&file), "fixture must be durable");
+    }
+
+    let restarted = state(&root);
+    assert_eq!(restarted.session_stats_lock().summary().total_files, 0);
+    let response = dispatch(&restarted, 30, json!({ "format": "json" }));
+    let json: Value =
+        serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(json["accounting"]["session"]["session"]["total_files"], 0);
+    assert!(
+        json["accounting"]["persisted"]["session"]["total_files"]
+            .as_u64()
+            .is_some_and(|count| count > 0),
+        "{json}"
+    );
+    assert_eq!(json["accounting"]["compatibility_scope"], "combined");
+}
+
+#[test]
 fn registered_description_declares_observational_behavior() {
     let tool = crate::mcp::tools::tool_list()
         .into_iter()
@@ -165,7 +203,7 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
     let prior_fidelity = state.context_fidelity(&alias);
 
     let source = std::fs::read(&file).unwrap();
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             std::str::from_utf8(&source).unwrap(),
@@ -185,6 +223,7 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
         target_source: source,
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

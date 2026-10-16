@@ -4,10 +4,10 @@ use super::*;
 fn csharp_where_clause_is_not_the_canonical_return_type() {
     const SOURCE: &str =
         "public class Factory { public T Create<T>() where T : new() { return new T(); } }";
-    for (fidelity, expected_return) in [(Fidelity::Medium, "$v"), (Fidelity::High, "T")] {
+    for fidelity in [Fidelity::Medium, Fidelity::High] {
         let ir = compile_cs(SOURCE, fidelity);
         let facts = method(&ir, "Create<T>");
-        assert_eq!(facts.return_type, expected_return, "{fidelity:?}");
+        assert_eq!(facts.return_type, "T", "{fidelity:?}");
         assert!(facts.params.is_empty());
     }
 }

@@ -10,6 +10,7 @@ pub(super) enum WorkspaceQueryOperation {
     ForwardEdges,
     ReverseEdges,
     EntitiesInFile,
+    DeclarationsInFile,
     TransitiveDependencies,
     HasCycle,
     CallsInFile,
@@ -22,6 +23,7 @@ impl WorkspaceQueryOperation {
             "forward_edges" => Some(Self::ForwardEdges),
             "reverse_edges" => Some(Self::ReverseEdges),
             "entities_in_file" => Some(Self::EntitiesInFile),
+            "declarations_in_file" => Some(Self::DeclarationsInFile),
             "transitive_dependencies" => Some(Self::TransitiveDependencies),
             "has_cycle" => Some(Self::HasCycle),
             "calls_in_file" => Some(Self::CallsInFile),
@@ -40,6 +42,9 @@ impl WorkspaceQueryOperation {
             Self::ForwardEdges => super::edges::prepare_forward_edges(args, state, context),
             Self::ReverseEdges => super::edges::prepare_reverse_edges(args, state, context),
             Self::EntitiesInFile => super::entities::prepare_entities_in_file(args, state, context),
+            Self::DeclarationsInFile => {
+                super::entities::prepare_declarations_in_file(args, state, context)
+            }
             Self::TransitiveDependencies => {
                 super::graph::prepare_transitive_dependencies(args, state, context)
             }

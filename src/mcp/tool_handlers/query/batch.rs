@@ -88,6 +88,21 @@ fn try_execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Que
         });
     }
 
+    // The first pass unions and satisfies every item's acquisition work. Any
+    // index-backed item is then prepared again from that common evidence
+    // generation so query-local C#/Angular refinement catalogs cannot depend
+    // on batch order. Ready file-local answers retain their first preparation:
+    // they already own a current explicit-file snapshot and may be intentionally
+    // unpublished (for example calls_in_file).
+    for item in &mut pending {
+        if !item.prepared.is_indexed() {
+            continue;
+        }
+        let operation = WorkspaceQueryOperation::parse(&item.query_type)
+            .expect("an indexed prepared item has a registered operation");
+        item.prepared = operation.prepare(&item.args, state, &mut context);
+    }
+
     // Every index-backed evaluator observes this one post-preparation guard.
     let index = state.workspace_index_read();
     Ok(pending
