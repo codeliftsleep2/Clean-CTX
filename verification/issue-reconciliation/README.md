@@ -238,6 +238,27 @@ Sources, binary provenance, raw requests/results, mutations, and verdicts are
 retained under `target/issue-139-live-verification/`. This harness is operator
 evidence and does not replace tracked tests or the authoritative final gate.
 
+## #142 cross-cutting authority acceptance
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue142Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe
+```
+
+Rebuild the all-feature Windows candidate separately before running. This
+provider-disabled driver builds nothing and starts neither CBM nor a model
+host. It exercises the registered production binary through stdio MCP and
+retains source fixtures, binary provenance, raw requests/results, mutations,
+and verdicts under `target/issue-142-live-verification/`.
+
+Five public-boundary groups verify cold/repeated/unrelated-warm exact file
+coverage; batch-order independence and shared authoritative preparation;
+preservation of explicit lower-bound families; requested-root isolation with
+proven cross-root dependent retraction; and restart separation of session,
+persisted, and combined statistics. Provider lifecycle states remain owned by
+the dedicated `verification/cbm` acceptance drivers. This harness is live
+operator evidence, not a Rust test or replacement for the final gate.
+
 ## Independent framework declaration publication
 
 ```powershell

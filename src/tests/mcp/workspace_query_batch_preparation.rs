@@ -161,6 +161,48 @@ fn red_batch_index_queries_share_the_final_post_preparation_snapshot() {
 }
 
 #[test]
+fn batch_permutation_preserves_each_items_semantic_truth() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    std::fs::write(
+        root.path().join("Permutation.ts"),
+        "export class PermutationEntity {}\n",
+    )
+    .expect("fixture");
+
+    let run = |queries: Value| {
+        let (project, state) = state(root.path());
+        configure(&project);
+        let response = dispatch(
+            &state,
+            json!({ "workspaceRoot": root.path(), "queries": queries }),
+        );
+        clear_test_project_search_results();
+        response
+    };
+    let first = run(json!([
+        { "id": "find", "type": "find_entities", "name": "PermutationEntity" },
+        { "id": "file", "type": "entities_in_file", "file_path": "Permutation.ts", "fidelity": "high" }
+    ]));
+    let second = run(json!([
+        { "id": "file", "type": "entities_in_file", "file_path": "Permutation.ts", "fidelity": "high" },
+        { "id": "find", "type": "find_entities", "name": "PermutationEntity" }
+    ]));
+    let by_id = |response: &Value, id: &str| {
+        results(response)
+            .iter()
+            .find(|item| item["id"] == id)
+            .unwrap()["result"]
+            .clone()
+    };
+    assert_eq!(by_id(&first, "find"), by_id(&second, "find"));
+    assert_eq!(by_id(&first, "file"), by_id(&second, "file"));
+}
+
+#[test]
 fn red_batch_calls_in_file_stays_fresh_and_unpublished() {
     let _response_serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");

@@ -109,7 +109,7 @@ pub(super) fn compile_candidate_for(
     match super::super::super::tool_helpers::compile_file_ir_focused(
         &validated, fidelity, state, None,
     ) {
-        Ok((_, semantic_edges, _, compiled_hash)) => {
+        Ok((_, semantic_edges, semantic_dependencies, compiled_hash)) => {
             let expected_hash = compiled_hash.clone();
             let outcome = publication
                 .commit(
@@ -124,11 +124,12 @@ pub(super) fn compile_candidate_for(
                     || {
                         let mut index = state.workspace_index_lock();
                         if let Some(coverage) = coverage {
-                            index.replace_semantic_projection(
+                            index.replace_semantic_projection_with_dependencies(
                                 &canonical,
                                 semantic_edges,
                                 coverage,
                                 compiled_hash,
+                                semantic_dependencies,
                             );
                         } else if !semantic_edges.is_empty() {
                             index.remove_file(&canonical);

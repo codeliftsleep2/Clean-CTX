@@ -456,7 +456,10 @@ fn apply_angular_template_metadata(
     };
     let diagnostics = catalog.diagnostics(&identity.domain, &identity.entity_type, &identity.name);
     if !diagnostics.is_empty() {
-        structured["template_diagnostics"] = Value::Array(diagnostics);
+        structured["template_diagnostics"] = Value::Array(diagnostics.clone());
+        if let Some(coverage) = structured.get_mut("coverage") {
+            coverage["reasons"] = Value::Array(diagnostics);
+        }
     }
     let completeness_supported = identity.entity_type == "Template"
         || (identity.entity_type == "Component"
@@ -474,7 +477,9 @@ fn apply_angular_template_metadata(
         coverage["source_complete"] = source_complete.into();
         coverage["omitted_possible"] = (!source_complete).into();
         if source_complete {
-            coverage["result_semantics"] = "complete_for_authorized_scope".into();
+            coverage["status"] = "authoritative_complete".into();
+            coverage["result_semantics"] = "exact".into();
+            coverage["reasons"] = Value::Array(Vec::new());
         }
     }
 }

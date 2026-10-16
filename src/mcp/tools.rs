@@ -333,7 +333,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "context_stats",
-            "description": "Read the Clean-CTX dashboard without flushing persistence or mutating lifecycle state: token savings, compression stats, and session metrics.",
+            "description": "Read the Clean-CTX dashboard without flushing persistence or mutating lifecycle state. JSON separates current-session, persisted, and combined accounting; compatibility aggregates are explicitly labeled combined.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -358,13 +358,19 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
         }),
         serde_json::json!({
             "name": "refresh_workspace",
-            "description": "Reconcile Clean-CTX with source changes made outside this session. Reconciles workspaceRoot plus configured additional roots after changes made outside this session. Retracts indexed semantic owners, cached discovery/source snapshots, and stale pending semantic transitions; the next query or context read hydrates current source. Reports the affected roots and authority counts. Independent of CBM.",
+            "description": "Reconcile Clean-CTX with source changes made outside this session. Defaults to workspaceRoot plus configured additional roots for compatibility; scope=requested_root limits direct refresh to workspaceRoot while still retracting cross-root semantic dependents proven by recorded dependency evidence. Reports affected roots and authority counts. Independent of CBM.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "workspaceRoot": {
                         "type": "string",
                         "description": "Required workspace directory whose Clean-CTX source generation is stale."
+                    },
+                    "scope": {
+                        "type": "string",
+                        "enum": ["requested_root", "configured_roots"],
+                        "default": "configured_roots",
+                        "description": "Direct refresh scope. configured_roots preserves historical behavior."
                     }
                 },
                 "required": ["workspaceRoot"],
@@ -374,7 +380,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                 "type": "object",
                 "properties": {
                     "refreshed": { "type": "boolean", "const": true },
-                    "workspace_root": { "type": "string" }
+                    "workspace_root": { "type": "string" },
+                    "scope": { "type": "string", "enum": ["requested_root", "configured_roots"] }
                 },
                 "required": ["refreshed", "workspace_root"]
             }
@@ -416,20 +423,24 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "cycle": workspace_query_cycle_schema(),
                     "coverage": {
                         "type": "object",
-                        "description": "Structured index-evidence and semantic-capability coverage for exact-identity edge/traversal queries and has_cycle.",
+                        "description": "Truthfulness metadata. Graph lower bounds retain their existing contract; authoritative file-scoped operations may project an earned exact certificate.",
                         "properties": {
                             "status": {
                                 "type": "string",
-                                "enum": ["established_indexed_capability", "identity_not_indexed", "capability_not_established", "indexed_evidence_only"]
+                                "enum": ["authoritative_complete", "established_indexed_capability", "identity_not_indexed", "capability_not_established", "indexed_evidence_only"]
                             },
                             "identity_indexed": { "type": "boolean" },
                             "capability_established": { "type": "boolean" },
                             "source_complete": { "type": "boolean" },
                             "result_semantics": {
                                 "type": "string",
-                                "enum": ["lower_bound"]
+                                "enum": ["exact", "lower_bound"]
                             },
                             "omitted_possible": { "type": "boolean" },
+                            "scope": { "type": "object" },
+                            "source_generation": { "type": "string" },
+                            "evidence_requirements": { "type": "array", "items": { "type": "string" } },
+                            "reasons": { "type": "array", "items": { "type": "object" } },
                             "discovered_not_compiled_this_cycle": {
                                 "type": "integer",
                                 "minimum": 0

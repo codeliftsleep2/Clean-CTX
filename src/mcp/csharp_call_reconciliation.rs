@@ -14,6 +14,7 @@ struct Projection {
     file: String,
     edges: Vec<crate::layers::meta::semantic::SemanticEdge>,
     source_hash: String,
+    dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 impl McpState {
@@ -56,6 +57,7 @@ impl McpState {
             ));
         }
 
+        let authority_files = files.clone();
         let mut projections = Vec::with_capacity(files.len());
         for file in files {
             let (_, edges, _, source_hash) =
@@ -67,6 +69,7 @@ impl McpState {
                 )
                 .map_err(|error| error.to_string())?;
             projections.push(Projection {
+                dependencies: authority_dependencies(&file, &authority_files, &edges),
                 file,
                 edges,
                 source_hash,
@@ -89,21 +92,51 @@ impl McpState {
         {
             let mut index = self.workspace_index_lock();
             for projection in &projections {
-                index.replace_semantic_projection(
+                index.replace_semantic_projection_with_dependencies(
                     &projection.file,
                     projection.edges.clone(),
                     SemanticFidelity::High,
                     projection.source_hash.clone(),
+                    projection.dependencies.clone(),
                 );
             }
         }
         for projection in projections {
             if let Some(alias) = self.alias_for_path(&projection.file) {
-                self.remember_semantic_edges(&alias, projection.edges);
+                self.remember_semantic_projection(
+                    &alias,
+                    projection.edges,
+                    projection.dependencies,
+                );
             }
         }
         Ok(())
     }
+}
+
+fn authority_dependencies(
+    owner: &str,
+    authority_files: &[String],
+    edges: &[crate::layers::meta::semantic::SemanticEdge],
+) -> Vec<crate::layers::meta::semantic::SemanticDependency> {
+    if !edges
+        .iter()
+        .any(|edge| edge.relation == crate::layers::meta::semantic::SemanticRelation::Calls)
+    {
+        return Vec::new();
+    }
+    let mut files: Vec<_> = authority_files
+        .iter()
+        .map(String::as_str)
+        .filter(|file| *file != owner)
+        .map(str::to_owned)
+        .collect();
+    files.sort();
+    files.dedup();
+    files
+        .into_iter()
+        .map(crate::layers::meta::semantic::SemanticDependency::current)
+        .collect()
 }
 
 fn is_admitted_csharp_source(state: &McpState, file: &str) -> bool {

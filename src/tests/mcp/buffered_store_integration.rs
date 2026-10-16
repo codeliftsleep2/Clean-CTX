@@ -130,23 +130,38 @@ fn test_integration_simulate_restart_stats_recovery() {
         config.persistence.db_path = db_path.to_string_lossy().to_string();
         let state = crate::mcp::McpState::new(config);
 
-        // McpState::new() should have called rebuild_stats and loaded the stats
-        // from the DB created in session 1.
+        // A new process owns a genuinely empty session accumulator. Durable
+        // history remains available only through the persisted projection.
         let summary = state.session_stats_lock().summary();
         assert_eq!(
-            summary.total_files, 1,
-            "Session 2: should recover 1 file from DB, got {}",
+            summary.total_files, 0,
+            "Session 2 must not relabel persisted files as session files, got {}",
             summary.total_files
         );
         assert_eq!(
-            summary.full_compress_count, 1,
-            "Session 2: should recover 1 full compress from DB"
+            summary.full_compress_count, 0,
+            "Session 2 must begin with zero session operations"
         );
 
-        // Also verify via context_stats handler
+        // context_stats exposes the durable history under an explicit scope.
+        crate::protocol::captured_responses().clear();
         let stats_id = serde_json::json!(2);
-        let stats_params = serde_json::json!({ "arguments": {} });
+        let stats_params = serde_json::json!({ "arguments": { "format": "json" } });
         crate::mcp::tools::dispatch_tools_call(&stats_id, "context_stats", &stats_params, &state);
+        let response = crate::protocol::captured_responses()
+            .pop()
+            .expect("context_stats response");
+        let dashboard: serde_json::Value =
+            serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap())
+                .unwrap();
+        assert_eq!(
+            dashboard["accounting"]["session"]["session"]["total_files"],
+            0
+        );
+        assert_eq!(
+            dashboard["accounting"]["persisted"]["session"]["total_files"],
+            1
+        );
     }
 }
 

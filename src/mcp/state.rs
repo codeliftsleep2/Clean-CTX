@@ -256,22 +256,14 @@ impl McpState {
             None
         };
 
-        // Rehydrate session stats and register durable physical owners before
-        // any caller spelling can claim session identity.
-        let mut session_stats = SessionStats::new();
+        // Session accounting starts empty even when durable history exists.
+        // Persisted statistics are projected separately by `context_stats`;
+        // loading them here would mislabel prior-process work as this session.
+        let session_stats = SessionStats::new();
         let mut physical_identities = physical_identity::PhysicalIdentityRegistry::default();
         if let Some(ref store) = persistence_store {
             // Rebuild only from already committed durable state.
             if let Some(guard) = store.sqlite() {
-                match guard.rebuild_stats() {
-                    Ok(stats) => {
-                        session_stats = stats;
-                        eprintln!("[clean-ctx] Loaded persisted session stats.");
-                    }
-                    Err(e) => {
-                        eprintln!("[clean-ctx] WARNING: Failed to rebuild stats from DB: {e}");
-                    }
-                }
                 if let Ok(contexts) = guard.list_contexts(i64::MAX as usize) {
                     for context in contexts {
                         physical_identities.register_durable_owner(&context.file_path);

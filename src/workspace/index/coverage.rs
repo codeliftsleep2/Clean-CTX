@@ -40,6 +40,7 @@ impl SemanticFidelity {
 pub(super) struct SemanticCoverage {
     pub(super) fidelity: SemanticFidelity,
     pub(super) source_hash: String,
+    pub(super) dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 impl WorkspaceIndex {
@@ -91,7 +92,12 @@ impl WorkspaceIndex {
         self.semantic_coverage
             .get(file_path)
             .is_some_and(|coverage| {
-                coverage.source_hash == source_hash && coverage.fidelity >= fidelity
+                coverage.source_hash == source_hash
+                    && coverage.fidelity >= fidelity
+                    && coverage
+                        .dependencies
+                        .iter()
+                        .all(|dependency| dependency.is_current())
             })
     }
 
@@ -102,6 +108,23 @@ impl WorkspaceIndex {
         fidelity: SemanticFidelity,
         source_hash: String,
     ) {
+        self.replace_semantic_projection_with_dependencies(
+            file_path,
+            edges,
+            fidelity,
+            source_hash,
+            Vec::new(),
+        );
+    }
+
+    pub fn replace_semantic_projection_with_dependencies(
+        &mut self,
+        file_path: &str,
+        edges: Vec<SemanticEdge>,
+        fidelity: SemanticFidelity,
+        source_hash: String,
+        dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+    ) {
         self.remove_file(file_path);
         self.add_edges(file_path, edges);
         self.semantic_coverage.insert(
@@ -109,8 +132,25 @@ impl WorkspaceIndex {
             SemanticCoverage {
                 fidelity,
                 source_hash,
+                dependencies,
             },
         );
+    }
+
+    pub fn semantic_dependents_of_root(&self, root: &str) -> Vec<String> {
+        self.semantic_coverage
+            .iter()
+            .filter(|(owner, coverage)| {
+                !crate::workspace::path_identity::is_within_root(owner, root)
+                    && coverage.dependencies.iter().any(|dependency| {
+                        crate::workspace::path_identity::is_within_root(
+                            &crate::dictionary::path::canonical_identity_key(&dependency.file_path),
+                            root,
+                        )
+                    })
+            })
+            .map(|(owner, _)| owner.clone())
+            .collect()
     }
 }
 

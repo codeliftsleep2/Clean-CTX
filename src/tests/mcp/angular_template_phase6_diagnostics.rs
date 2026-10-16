@@ -173,6 +173,14 @@ fn missing_linked_template_retains_reference_and_reports_partiality() {
     );
     assert_eq!(result["coverage"]["source_complete"], false);
     assert_eq!(result["coverage"]["omitted_possible"], true);
+    assert!(
+        result["coverage"]["reasons"]
+            .as_array()
+            .is_some_and(|reasons| reasons
+                .iter()
+                .any(|reason| reason["code"] == "linked_template_missing")),
+        "producer-proven partiality must propagate into coverage reasons: {result}"
+    );
 }
 
 #[test]
@@ -296,6 +304,9 @@ fn complete_template_discovery_establishes_exact_capability_and_completeness() {
         result["coverage"]["source_complete"], true,
         "completed authorized Component and Template discovery may establish completeness: {result}"
     );
+    assert_eq!(result["coverage"]["status"], "authoritative_complete");
+    assert_eq!(result["coverage"]["result_semantics"], "exact");
+    assert_eq!(result["coverage"]["reasons"], json!([]));
     assert_eq!(result["coverage"]["omitted_possible"], false, "{result}");
     assert!(
         result["coverage"].get("alternative_query").is_none(),

@@ -17,6 +17,10 @@ pub(super) enum PreparedQuery {
 }
 
 impl PreparedQuery {
+    pub(super) fn is_indexed(&self) -> bool {
+        matches!(self, Self::Indexed(_))
+    }
+
     pub(super) fn indexed(
         evaluator: impl FnOnce(&WorkspaceIndex) -> QueryResult + 'static,
     ) -> Self {

@@ -295,6 +295,7 @@ impl super::McpState {
             .retain(|path, _| crate::dictionary::path::canonical_identity_key(path) != canonical);
     }
 
+    #[cfg(test)]
     pub(crate) fn remember_semantic_edges(&self, alias: &str, edges: Vec<SemanticEdge>) {
         self.remember_semantic_projection(alias, edges, Vec::new());
     }
@@ -331,11 +332,12 @@ impl super::McpState {
         let canonical_path = self.semantic_owner_path(file_path);
         let mut index = self.workspace_index_lock();
         match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
-            Some(fidelity) => index.replace_semantic_projection(
+            Some(fidelity) => index.replace_semantic_projection_with_dependencies(
                 &canonical_path,
                 projection.semantic_edges,
                 fidelity,
                 projection.source_hash,
+                projection.semantic_dependencies,
             ),
             None => {
                 index.remove_file(&canonical_path);

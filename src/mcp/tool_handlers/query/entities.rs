@@ -16,6 +16,7 @@
 // filter is added.
 
 use super::{
+    coverage::CompletenessCertificate,
     discovery_field,
     outcome::QueryAnswer,
     outcome::QueryFailure,
@@ -235,50 +236,59 @@ fn try_prepare_entities_in_file(
     {
         return Err(file_scope_failure());
     }
-    if crate::mcp::tool_handlers::core::is_angular_template(state, workspace_root, &resolved_path) {
-        return Ok(prepared_angular_template_in_file(canonical_path));
-    }
-    ensure_supported_file(&resolved_path)?;
-    let fidelity = semantic_fidelity(args, state)?;
     let source = state
         .read_source(&resolved_path)
         .map_err(|error| QueryFailure::internal(error.to_string()))?;
     let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    if crate::mcp::tool_handlers::core::is_angular_template(state, workspace_root, &resolved_path) {
+        let certificate =
+            CompletenessCertificate::current_file(canonical_path.clone(), source_hash);
+        return Ok(prepared_angular_template_in_file(
+            canonical_path,
+            certificate,
+        ));
+    }
+    ensure_supported_file(&resolved_path)?;
+    let fidelity = semantic_fidelity(args, state)?;
     let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
     if state
         .workspace_index_read()
         .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
     {
-        return Ok(prepared_entities_in_file(canonical_path));
+        let certificate =
+            CompletenessCertificate::current_file(canonical_path.clone(), source_hash);
+        return Ok(prepared_entities_in_file(canonical_path, certificate));
     }
     state
         .preflight_semantic_publication(&resolved_path)
         .map_err(QueryFailure::internal)?;
-    let (semantic_edges, compiled_hash) = match crate::mcp::tool_helpers::compile_file_ir_candidate(
-        &resolved_path,
-        fidelity,
-        state,
-    ) {
-        Ok((_, edges, _, hash)) => (edges, hash),
-        Err(error) => return Err(QueryFailure::internal(error.to_string())),
-    };
+    let (semantic_edges, semantic_dependencies, compiled_hash) =
+        match crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state) {
+            Ok((_, edges, dependencies, hash)) => (edges, dependencies, hash),
+            Err(error) => return Err(QueryFailure::internal(error.to_string())),
+        };
     {
         let mut idx = state.workspace_index_lock();
-        idx.replace_semantic_projection(
+        idx.replace_semantic_projection_with_dependencies(
             &canonical_path,
             semantic_edges,
             workspace_fidelity,
-            compiled_hash,
+            compiled_hash.clone(),
+            semantic_dependencies,
         );
     }
     #[cfg(feature = "csharp")]
     state
         .reconcile_csharp_after_authority_change(&canonical_path)
         .map_err(QueryFailure::internal)?;
-    Ok(prepared_entities_in_file(canonical_path))
+    let certificate = CompletenessCertificate::current_file(canonical_path.clone(), compiled_hash);
+    Ok(prepared_entities_in_file(canonical_path, certificate))
 }
 
-fn prepared_angular_template_in_file(canonical_path: String) -> PreparedQuery {
+fn prepared_angular_template_in_file(
+    canonical_path: String,
+    certificate: CompletenessCertificate,
+) -> PreparedQuery {
     let template = crate::layers::meta::semantic::EntityRef::new(
         "angular",
         "Template",
@@ -290,17 +300,22 @@ fn prepared_angular_template_in_file(canonical_path: String) -> PreparedQuery {
         serde_json::json!({
             "entities": [template],
             "count": 1,
+            "coverage": certificate.project(),
         }),
     ))
 }
 
-fn prepared_entities_in_file(canonical_path: String) -> PreparedQuery {
+fn prepared_entities_in_file(
+    canonical_path: String,
+    certificate: CompletenessCertificate,
+) -> PreparedQuery {
     PreparedQuery::indexed(move |index| {
         let entities = index.entities_in_file(&canonical_path);
         let count = entities.len();
         let structured = serde_json::json!({
             "entities": serde_json::to_value(&entities).unwrap_or_default(),
             "count": count,
+            "coverage": certificate.project(),
         });
         Ok(QueryAnswer::new("entities_in_file", structured))
     })
@@ -359,15 +374,18 @@ fn try_prepare_declarations_in_file(
         state
             .preflight_semantic_publication(&resolved_path)
             .map_err(QueryFailure::internal)?;
-        let (_, semantic_edges, _, compiled_hash) =
+        let (_, semantic_edges, semantic_dependencies, compiled_hash) =
             crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state)
                 .map_err(|error| QueryFailure::internal(error.to_string()))?;
-        state.workspace_index_lock().replace_semantic_projection(
-            &canonical_path,
-            semantic_edges,
-            workspace_fidelity,
-            compiled_hash,
-        );
+        state
+            .workspace_index_lock()
+            .replace_semantic_projection_with_dependencies(
+                &canonical_path,
+                semantic_edges,
+                workspace_fidelity,
+                compiled_hash,
+                semantic_dependencies,
+            );
         #[cfg(feature = "csharp")]
         state
             .reconcile_csharp_after_authority_change(&canonical_path)

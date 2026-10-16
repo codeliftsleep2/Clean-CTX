@@ -307,12 +307,14 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     match crate::workspace::index::SemanticFidelity::from_compilation(
                         effective_fidelity,
                     ) {
-                        Some(semantic_fidelity) => index.replace_semantic_projection(
-                            &canonical_path,
-                            semantic_edges.clone(),
-                            semantic_fidelity,
-                            source_hash,
-                        ),
+                        Some(semantic_fidelity) => index
+                            .replace_semantic_projection_with_dependencies(
+                                &canonical_path,
+                                semantic_edges.clone(),
+                                semantic_fidelity,
+                                source_hash,
+                                semantic_dependencies.clone(),
+                            ),
                         None => {
                             index.remove_file(&canonical_path);
                             index.add_edges(&canonical_path, semantic_edges.clone());
