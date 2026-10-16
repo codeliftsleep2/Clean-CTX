@@ -311,6 +311,10 @@ provider while Clean-CTX source evidence owns semantic truth.
   `verification/**`, including issue-reconciliation drivers, invocation
   evidence, Angular template linkage, CBM lifecycle, workspace-query behavior,
   TypeScript binding, lifecycle refresh, and NgRx recall.
+* Test-only JSON-RPC responses now use libtest capture: successful handler
+  tests remain quiet, while failed tests retain their complete model-facing
+  response. Production stdout serialization, framing, and flushing are
+  unchanged.
 * Updated architectural invariants, tool schemas, runtime prompts, Claude
   integration guidance, discovery records, and verification ledgers to match
   the production architecture. No live harness is represented as a Rust test

@@ -19,6 +19,7 @@ use std::sync::{LazyLock, LockResult, MutexGuard, PoisonError};
 
 /// Global stdout mutex to prevent interleaved JSON-RPC responses
 /// from concurrent worker threads.
+#[cfg(not(test))]
 static STDOUT_MUTEX: Mutex<()> = Mutex::new(());
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -32,6 +33,7 @@ pub struct JsonRpcRequest {
 /// P0-5: Lock recovery macro for protocol-level mutexes.
 /// Applied to STDOUT_MUTEX to prevent poisoned-lock panics from
 /// crashing all future responses.
+#[cfg(not(test))]
 macro_rules! lock_or_recover_protocol {
     ($lock:expr, $name:expr) => {
         match $lock {
@@ -55,23 +57,28 @@ macro_rules! lock_or_recover_protocol {
 ///
 /// P0-5: Uses lock_or_recover_protocol! to handle poisoned locks gracefully.
 pub fn send_response(val: &serde_json::Value) {
-    use std::io::{self, Write};
-    // P0-5: Lock the global stdout mutex with poison recovery
-    let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
-    let mut stdout = io::stdout().lock();
-    if let Ok(payload) = serde_json::to_string(val) {
-        // Phase A retirement tests: record every outbound response so
-        // handler tests can assert on payload CONTENT (the handlers
-        // otherwise only write to stdout, which libtest cannot inspect).
-        // Test-only — release builds never allocate this sink.
-        #[cfg(test)]
-        {
-            if let Ok(mut q) = CAPTURED_RESPONSES.lock() {
-                q.push(val.clone());
-            }
+    #[cfg(test)]
+    {
+        if let Ok(mut q) = CAPTURED_RESPONSES.lock() {
+            q.push(val.clone());
         }
-        let _ = writeln!(stdout, "{}", payload);
-        let _ = stdout.flush();
+        if let Ok(payload) = serde_json::to_string(val) {
+            // Route diagnostics through libtest capture: successful tests stay
+            // quiet, while failures retain the complete model-facing response.
+            println!("{payload}");
+        }
+    }
+
+    #[cfg(not(test))]
+    {
+        use std::io::{self, Write};
+        // P0-5: Lock the global stdout mutex with poison recovery.
+        let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
+        let mut stdout = io::stdout().lock();
+        if let Ok(payload) = serde_json::to_string(val) {
+            let _ = writeln!(stdout, "{payload}");
+            let _ = stdout.flush();
+        }
     }
 }
 
