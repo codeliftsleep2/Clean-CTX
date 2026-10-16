@@ -267,3 +267,19 @@ generic arity separation, candidate-path fallthrough, imports,
 namespace/nesting reasoning, multiple-file occurrence preservation, dependency
 traversal, cycle behavior, ordering, and provenance. The performance campaign
 entered and exits this phase with an authoritative GREEN release baseline.
+
+## Semantic Query Performance Baseline — FROZEN
+
+Current evidence demonstrates bounded acquisition, request-local derived
+semantic reuse, bounded semantic resolution, and proportional dependency-graph
+work. Remaining apparent repetition either corresponds to distinct
+semantic/authority work, lacks evidence of material amplification, or requires
+lifecycle/authority machinery whose cost and risk are not justified.
+
+No further semantic-query optimization is authorized by current evidence.
+
+Reopen only upon new structural measurement, representative workload evidence,
+or field evidence demonstrating material repeated equivalent authoritative
+work.
+
+All gates are GREEN.
