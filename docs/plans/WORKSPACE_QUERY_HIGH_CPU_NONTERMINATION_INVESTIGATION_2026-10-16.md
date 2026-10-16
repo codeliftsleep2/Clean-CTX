@@ -51,7 +51,7 @@ Controller refinement still calls `Catalog::build()`, which reparses indexed C# 
 
 ## Windows Edit-Safety Status
 
-The initial workspace context used the non-canonical spelling `C:\USers\MNasty\DEsktop\RustContextLayerAI`. Windows `Get-Item` and `fsutil reparsepoint query` found no reparse point on the Desktop or repository path, but the approved patch helper rejected the resolved path. After the workspace was reopened as `C:\Users\MNasty\Desktop\RustContextLayerAI`, the same approved patch mechanism succeeded. No reparse safety was disabled or bypassed.
+The initial workspace context used the non-canonical spelling Windows `Get-Item` and `fsutil reparsepoint query` found no reparse point on the Desktop or repository path, but the approved patch helper rejected the resolved path. After the workspace was reopened, the same approved patch mechanism succeeded. No reparse safety was disabled or bypassed.
 
 ## Timeout/Cancellation Status
 
