@@ -59,7 +59,7 @@ Run one consolidated field acceptance after rebuilding the all-feature binary:
 
 ```powershell
 pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue144Acceptance.ps1 `
-  -BinaryPath ./target/debug/clean-ctx.exe `
+  -BinaryPath ./target/release/clean-ctx.exe `
   -ProviderPath "$env:LOCALAPPDATA/Programs/codebase-memory-mcp/codebase-memory-mcp.exe"
 ```
 
@@ -76,7 +76,10 @@ invalidation, and provider/native semantic parity. Provider admission must pass;
 a fallback answer is not counted as provider-enabled evidence.
 
 Every fixture, request, response, stderr stream, binary/provider hash, oracle,
-and verdict is retained beneath `target/issue-144-live-verification/`. This is
+timing, and verdict is retained beneath `target/issue-144-live-verification/`.
+Every single or batched workspace query containing a reverse-edge request must
+finish within 10 seconds by default; `-MaxReverseSeconds` may make the operator
+gate stricter but must not be raised for Issue #144 acceptance. This is
 operator/live evidence, not a Rust test or substitute for the final gate.
 
 ## Post-CBM causal investigation

@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)][string]$BinaryPath,
     [Parameter(Mandatory)][string]$ProviderPath,
-    [ValidateRange(60, 900)][int]$CaseTimeoutSeconds = 300
+    [ValidateRange(60, 900)][int]$CaseTimeoutSeconds = 300,
+    [ValidateRange(1, 10)][double]$MaxReverseSeconds = 10
 )
 
 # Consolidated Issue #144 field acceptance. Builds nothing. Every fixture,
@@ -17,6 +18,7 @@ $primary = Join-Path $runRoot 'workspace'
 $additional = Join-Path $runRoot 'additional'
 $sessions = [Collections.Generic.List[object]]::new()
 $verdicts = [Collections.Generic.List[object]]::new()
+$timings = [Collections.Generic.List[object]]::new()
 $rpcId = 0
 $deadline = [DateTime]::UtcNow.AddSeconds($CaseTimeoutSeconds)
 . (Join-Path $PSScriptRoot '../cbm/scripts/PhaseBSession.ps1')
@@ -120,8 +122,26 @@ function Tool($Session, [string]$Name, [hashtable]$Arguments, [string]$Evidence)
 }
 
 function Query($Session, [hashtable]$Arguments, [string]$Evidence) {
+    $containsReverse = $Arguments.type -eq 'reverse_edges' -or @(
+        $Arguments.queries | Where-Object { $_.type -eq 'reverse_edges' }
+    ).Count -gt 0
+    $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     $result = Tool $Session 'workspace_query' $Arguments $Evidence
+    $stopwatch.Stop()
+    if ($containsReverse) {
+        $timings.Add(@{
+            evidence = $Evidence
+            seconds = $stopwatch.Elapsed.TotalSeconds
+            ceiling_seconds = $MaxReverseSeconds
+        })
+    }
     Assert-B ([bool]$result.PSObject.Properties['structuredContent']) 'workspace_query omitted structuredContent.'
+    if ($containsReverse) {
+        Assert-B ($stopwatch.Elapsed.TotalSeconds -le $MaxReverseSeconds) (
+            "$Evidence exceeded the reverse-edge latency ceiling: " +
+            "$($stopwatch.Elapsed.TotalSeconds.ToString('F3'))s > $($MaxReverseSeconds.ToString('F3'))s."
+        )
+    }
     return $result.structuredContent
 }
 
@@ -204,6 +224,7 @@ Save-B 'provenance' @{
     primary_root = $primary
     additional_root = $additional
     contract = 'Issue #144 provider-neutral reverse-edge completeness'
+    max_reverse_seconds = $MaxReverseSeconds
 }
 
 $bulkConsumers = @(0..36 | ForEach-Object { 'BulkConsumer' + $_.ToString('D2') })
@@ -403,6 +424,7 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
         try { Stop-BSession $openSession }
         catch { $verdicts.Add(@{ phase = 'cleanup'; case = $openSession.Name; result = 'FAIL'; evidence = $_.Exception.Message }) }
     }
+    Save-B 'timings' @($timings.ToArray())
     Save-B 'verdicts' @($verdicts.ToArray())
     Write-Host "Issue #144 live evidence: $runRoot"
 }
