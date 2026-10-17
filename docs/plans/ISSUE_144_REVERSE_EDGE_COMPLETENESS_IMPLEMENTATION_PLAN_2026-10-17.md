@@ -4,7 +4,15 @@
 
 **Phase:** approved architecture translated to implementation plan
 
-**Production implementation:** not authorized
+**Production implementation:** authorized and implemented through Phase 6;
+Phase 7 final verification pending
+
+**Implemented GREEN baselines:**
+
+- `14eda02b` — provider-neutral acquisition authority (Phases 1–3)
+- `00e6aa44` — Clean acquisition proof (Phase 4)
+- `42f320a0` — proof-backed completion cache (Phase 5)
+- `a23ca0a4` — earned exact reverse TypeRef coverage (Phase 6)
 
 **Approved design:**
 `docs/plans/ISSUE_144_REVERSE_EDGE_COMPLETENESS_DESIGN_1_2026-10-17.md`

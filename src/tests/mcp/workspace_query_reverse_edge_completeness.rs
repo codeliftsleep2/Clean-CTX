@@ -321,3 +321,42 @@ fn issue_144_publication_failure_remains_lower_bound() {
     assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
     assert_eq!(coverage["omitted_possible"], true, "{coverage}");
 }
+
+#[test]
+fn issue_144_unscoped_session_view_cannot_claim_workspace_completeness() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    crate::protocol::captured_responses().clear();
+
+    dispatch_tools_call(
+        &json!(144),
+        "workspace_query",
+        &json!({
+            "arguments": {
+                "type": "reverse_edges",
+                "domain": "builtin",
+                "entity_type": "TypeRef",
+                "name": TARGET
+            }
+        }),
+        &state,
+    );
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("workspace_query response");
+    let coverage = &structured(&response)["coverage"];
+
+    assert_eq!(coverage["source_complete"], false, "{coverage}");
+    assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
+    assert_eq!(coverage["omitted_possible"], true, "{coverage}");
+}

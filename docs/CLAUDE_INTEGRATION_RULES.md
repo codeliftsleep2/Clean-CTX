@@ -190,10 +190,19 @@ claiming `Extends` or `Implements`.
 Query the written type identity, not the declaration identity:
 `reverse_edges(builtin/TypeRef/IFooService)`. A reverse query on
 `builtin/Interface/IFooService` does not own this capability and returns an
-`alternative_query` pointing to the `HasBaseType` / `TypeRef` form. Exact
-edge-query coverage with `source_complete: false` also reports `result_semantics: "lower_bound"`
-and `omitted_possible: true`; its `count` is a minimum, not a complete consumer
-count. When discovery found more candidates than it compiled in that cycle,
+`alternative_query` pointing to the `HasBaseType` / `TypeRef` form. An exact
+`reverse_edges(builtin/TypeRef/<name>)` query reports
+`status: "authoritative_complete"`, `source_complete: true`,
+`result_semantics: "exact"`, and `omitted_possible: false` only when Clean-CTX
+has proof-backed acquisition coverage for every admitted source-producer unit
+and all required semantic publication succeeded. Current CBM results are
+candidate hints and supply no such proof. Clean-owned acquisition can currently
+certify C# TypeRef units; an admitted source kind without a certified candidate
+predicate keeps the whole result lower-bound. All other exact edge results, and
+any incomplete TypeRef acquisition, report `source_complete: false`,
+`result_semantics: "lower_bound"`, and `omitted_possible: true`; their `count`
+is a minimum, not a complete consumer count. When discovery found more
+candidates than it compiled in that cycle,
 `discovered_not_compiled_this_cycle` reports the observed gap; it can include
 already-indexed or deduplicated candidates and is not itself an omitted-file
 count.

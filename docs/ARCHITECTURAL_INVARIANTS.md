@@ -533,6 +533,15 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+For exact incoming builtin TypeRef acquisition, the provider-bearing discovery
+cache above is only an execution optimization. It cannot satisfy a coverage
+unit or suppress authoritative Clean acquisition. The provider-neutral
+`AcquisitionCompletionCache` separately keys and retains proof-backed unit
+satisfaction after successful publication; its root generations share the edit,
+delete, restore, refresh, and external-change invalidation lifecycle. Current
+CBM searches contribute hints only because CBM exposes no compatible inventory,
+generation, producer, or exhaustiveness proof.
+
 ---
 
 ### WSC-004 Workspace Queries Respect Declared Workspace Scope
@@ -699,21 +708,29 @@ Warm state may reduce acquisition cost but may not improve semantic truth.
 Authoritative batch items union acquisition requirements before final
 interpretation and use one compatible post-acquisition generation. Generic
 indexed graph families remain explicitly lower-bound where closure is unproved.
+Exact reverse builtin TypeRef queries may become authoritative only through the
+proof-backed acquisition lifecycle for every active producer unit.
 
-**Enforcement:** query preparation, batch coordination, and coverage projection.
+**Enforcement:** query preparation, batch coordination, proof-backed acquisition
+cache, and coverage projection; `workspace_query_reverse_edge_completeness.rs`
+pins exact/partial and cold/warm equivalence.
 
 ### WSC-014 Completeness Is Earned from Evidence, Not Population
 
 **Status:** ENFORCED
 
-Completeness requires declared scope, satisfied evidence requirements, a
-compatible source generation, producer support, and valid dependencies.
+Completeness requires declared scope, complete proof coverage of every required
+provider-neutral coverage unit, satisfied evidence requirements, a compatible
+source generation, producer support, and valid dependencies.
 Populated caches/indexes, provider success, or stable empty results never grant
 exhaustiveness. Lack of a certificate means “not authorized to claim complete,”
 not “the returned facts are false.”
 
-**Enforcement:** CompletenessCertificate and producer-owned exact/lower-bound
-projection in the workspace-query coverage path.
+**Enforcement:** `AcquisitionRequirement`, `CoverageUnit`, validated acquisition
+proofs, `AcquisitionSatisfaction`, the proof-backed completion cache,
+`CompletenessCertificate`, and producer-owned exact/lower-bound projection in
+the workspace-query coverage path. Acquisition/cache/hydration tests and
+`workspace_query_reverse_edge_completeness.rs` are the test authorities.
 
 ### SEMDEP-001 Semantic Validity Follows Dependencies
 
@@ -751,28 +768,26 @@ must not become optional correctness.
 
 Provider evidence may be usable before provider coverage is authoritative. A
 successful provider operation is not proof of complete provider coverage:
-successful `StillIndexing` paths remain advisory inputs, do not cover their
-root, and cannot suppress Clean-owned filesystem acquisition. Ready successful
-discovery may cover the root, but readiness alone does not establish semantic
-completion. Filesystem discovery, required compilation/publication,
-reconciliation, and refinement establish Clean authority. A query may report
-complete only after every required Clean-owned acquisition and semantic-
-processing dependency reaches a terminal successful state. Conversely, optional
-provider work need not finish once Clean independently establishes equivalent
-truth; CBM readiness is neither necessary nor sufficient for core completion.
+`StillIndexing`, Ready, successful search, and an empty result remain advisory
+unless the provider supplies a validated proof for exact compatible coverage
+units. Current CBM supplies no proof, so it cannot suppress Clean-owned incoming
+TypeRef acquisition. Clean inventory, certified producer-specific candidate
+selection, required compilation/publication, reconciliation, and final
+proof-set evaluation establish Clean authority. A future optional provider may
+substitute only the exact units it proves; Clean acquires the residual. CBM
+readiness is neither necessary nor sufficient for core completion.
 
 Warm state may improve performance. It must never improve truth. Clean-CTX owns
 its frontend/session transport, not the shared account daemon.
 
-**Enforcement:** `src/mcp/tool_handlers/hydration.rs` keeps provider search
-success distinct from root coverage and commits completion only after candidate
-publication; `src/tests/mcp/workspace_query_provider_readiness.rs` covers
-non-ready provider retry, failed Clean publication, successful Clean fallback,
-advisory-candidate union/deduplication, and ready-provider fallback suppression;
-existing search/readiness failure controls remain in
-`src/tests/mcp/workspace_query_8.rs` and `workspace_query_9.rs`; WSC-002,
-WSC-003, WSC-014, and the CBM frontend lifecycle boundary retain their existing
-authority.
+**Enforcement:** `src/mcp/acquisition/**` owns provider-neutral requirements,
+proof validation, satisfaction, and cache identity;
+`src/mcp/tool_handlers/hydration/**` unions provider hints with Clean residual
+acquisition and commits satisfaction only after publication. The acquisition
+test suites and `workspace_query_reverse_edge_completeness.rs` cover no-proof,
+empty, mixed-unit, failure, invalidation, cold/warm, and exact-result behavior;
+existing search/readiness controls remain in `workspace_query_8.rs`,
+`workspace_query_9.rs`, and `workspace_query_provider_readiness.rs`.
 
 ### REFINE-001 Reconciliation Ownership Is Domain-Local
 

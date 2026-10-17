@@ -95,7 +95,8 @@ pub(super) fn exact_identity_coverage(
     let capability_established = stored_capability_established || response_has_typed_evidence;
     let exact_incoming_type_ref = matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"
-        && identity.entity_type == "TypeRef";
+        && identity.entity_type == "TypeRef"
+        && scope.is_some();
     if exact_incoming_type_ref
         && let Some(certificate) = hydration
             .acquisition_satisfaction
