@@ -53,6 +53,32 @@ See [the reconciliation report](../../docs/plans/ISSUES_133_141_POST_CBM_RECONCI
 for current results, limitations and closure recommendations. No full test suite
 or native production repair is part of this audit.
 
+## Issue #144 provider-neutral reverse-edge completeness
+
+Run one consolidated field acceptance after rebuilding the all-feature binary:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue144Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA/Programs/codebase-memory-mcp/codebase-memory-mcp.exe"
+```
+
+The harness drives owned provider-disabled, provider-unavailable, and
+provider-enabled MCP stdio sessions. It verifies exact nonempty and zero reverse
+TypeRef results, cold/warm equivalence, no warm semantic recompilation,
+additional-root and `withinPath` scope, exclusions, a 37-consumer cardinality
+control crossing historical/common candidate limits, duplicate semantic owners
+in distinct files, constructor and
+base-TypeRef relations, method/comment/string negative controls, written
+nullable/array/generic/qualified/alias forms, batch/single equivalence,
+unscoped and unsupported-producer lower bounds, edit/delete/restore/rename
+invalidation, and provider/native semantic parity. Provider admission must pass;
+a fallback answer is not counted as provider-enabled evidence.
+
+Every fixture, request, response, stderr stream, binary/provider hash, oracle,
+and verdict is retained beneath `target/issue-144-live-verification/`. This is
+operator/live evidence, not a Rust test or substitute for the final gate.
+
 ## Post-CBM causal investigation
 
 The expanded investigation keeps native and provider-enabled cold/warm controls
