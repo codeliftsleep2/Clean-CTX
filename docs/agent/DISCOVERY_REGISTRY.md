@@ -46,6 +46,31 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-036: Exact-Call Reconciliation Multiplied Reverse-TypeRef Compilation Work
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-17 |
+| **Environment** | Clean-CTX Issue #144 production-binary MCP acceptance harness |
+| **Repository/context** | Owned C# fixture with approximately 50 admitted files, 37 bulk consumers, an additional root, provider-disabled/unavailable/enabled controls, and lifecycle invalidation |
+| **Symptom** | Semantically correct cold and reacquisition reverse TypeRef requests took 79–88 seconds in the debug field run, while the unchanged warm request took 13 ms. |
+| **Root cause** | Hydration sequentially compiles K candidates, then eager C# exact-call reconciliation compiles every admitted indexed C# owner twice more. Exact callers can also depend on every authority file, making currentness validation O(N²). Reverse TypeRef does not consume exact Calls, but pays this work after any C# publication. |
+| **Classification** | Emergent performance / architectural coupling |
+| **Reproducible locally?** | Yes — algorithm is explicit in `hydration/execution.rs` and `csharp_call_reconciliation.rs`; deterministic work-count regression is required before repair. |
+| **Local regression** | Planned under `src/tests/mcp/**`: K-only reverse-TypeRef compilation, lazy single exact-call reconciliation, artifact reuse, deterministic bounded parallelism, and linear dependency validation. |
+| **Live scenario required?** | Yes — `Invoke-Issue144Acceptance.ps1` now enforces a maximum 10-second release response for every single/batched reverse-edge request. |
+| **Architectural invariant** | Expensive semantic work is proportional to absent/stale/inadequate evidence; capability-specific reconciliation is paid only before that capability is consumed. |
+| **Status** | Open — design recommendation recorded; production implementation not yet authorized. |
+
+**Recommended repair:** retain one source-bound C# compilation artifact per
+current owner, merge declaration authority without reparsing, project exact
+calls from retained invocation evidence, reconcile exact Calls lazily at their
+central consumption gate, replace all-file dependencies with an authority
+fingerprint, and parallelize pure compilation/projection stages through one
+bounded Rayon pool. Crossbeam remains the request-dispatch/backpressure layer.
+
+---
+
 ## DIS-2026-035: Exported Angular Decorators Were Outside the Inner Class Node (#138)
 
 | Field | Value |
