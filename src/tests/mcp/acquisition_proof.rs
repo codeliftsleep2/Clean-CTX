@@ -1,6 +1,7 @@
 use super::{
     AcquisitionProofClaim, AcquisitionRequirement, AcquisitionSatisfaction, CoverageUnit,
-    ProofContext, ProofProvenance, ProofRejection, SourceKind, validate_proof_claim,
+    ProofContext, ProofProvenance, ProofRejection, SemanticPublicationStatus, SourceKind,
+    validate_proof_claim,
 };
 
 fn unit() -> CoverageUnit {
@@ -43,8 +44,21 @@ fn acquisition_proof_validation_accepts_only_an_exact_current_claim() {
     assert_eq!(proof.candidate_owners, vec!["a.cs", "b.cs"]);
 
     let mut satisfaction = AcquisitionSatisfaction::new(&requirement());
-    assert!(satisfaction.record(proof));
+    assert!(satisfaction.record_after_publication(proof, SemanticPublicationStatus::Complete));
     assert!(satisfaction.is_source_complete());
+}
+
+#[test]
+fn validated_proof_cannot_satisfy_a_unit_after_publication_failure() {
+    let proof = validate_proof_claim(&requirement(), &context(), claim()).expect("valid proof");
+    let mut satisfaction = AcquisitionSatisfaction::new(&requirement());
+
+    assert!(!satisfaction.record_after_publication(proof, SemanticPublicationStatus::Failed));
+    assert!(!satisfaction.is_source_complete());
+    assert_eq!(
+        satisfaction.residual_units(),
+        [unit()].into_iter().collect()
+    );
 }
 
 #[test]
@@ -53,11 +67,8 @@ fn acquisition_proof_validation_fails_closed_for_every_authority_dimension() {
         (
             {
                 let mut value = claim();
-                value.unit = CoverageUnit::builtin_type_ref(
-                    "root-b",
-                    SourceKind::CSharp,
-                    "producer-1",
-                );
+                value.unit =
+                    CoverageUnit::builtin_type_ref("root-b", SourceKind::CSharp, "producer-1");
                 value
             },
             ProofRejection::UnitNotRequired,

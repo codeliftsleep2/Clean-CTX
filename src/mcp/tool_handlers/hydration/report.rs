@@ -27,6 +27,9 @@ impl HydrationReport {
             .candidates_compiled
             .saturating_add(other.candidates_compiled);
         self.project_coverage.extend(other.project_coverage);
+        if self.acquisition_satisfaction.is_none() {
+            self.acquisition_satisfaction = other.acquisition_satisfaction;
+        }
     }
 }
 

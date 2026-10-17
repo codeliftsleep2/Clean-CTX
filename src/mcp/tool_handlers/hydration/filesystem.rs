@@ -1,4 +1,7 @@
 use crate::mcp::McpState;
+use crate::mcp::acquisition::{
+    InventoryEntry, InventoryManifest, SourceKind, type_ref_candidate_owners,
+};
 use ignore::{DirEntry, WalkBuilder};
 use rayon::prelude::*;
 use std::collections::HashSet;
@@ -25,6 +28,12 @@ pub(super) struct FilesystemScan {
     pub(super) candidates: Vec<String>,
     pub(super) attempted: bool,
     pub(super) completed: bool,
+    pub(super) inventories: Vec<RootInventoryManifest>,
+}
+
+pub(super) struct RootInventoryManifest {
+    pub(super) root: String,
+    pub(super) manifest: InventoryManifest,
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -109,6 +118,25 @@ pub(super) fn root_key(root: &Path) -> String {
     crate::dictionary::path::canonical_identity_key(&root.to_string_lossy())
 }
 
+/// Discover supported source files containing a literal in the effective roots.
+/// Angular ownership uses this only to narrow TypeScript files that are then
+/// verified by structured decorator extraction.
+pub(crate) fn source_candidates_containing(
+    state: &McpState,
+    workspace_root: Option<&str>,
+    literal: &str,
+) -> Vec<String> {
+    let roots = configured_roots(state, workspace_root);
+    scan(state, &roots, literal).candidates
+}
+
+pub(crate) fn effective_refresh_roots(state: &McpState, workspace_root: &str) -> Vec<String> {
+    configured_roots(state, Some(workspace_root))
+        .iter()
+        .map(|root| root_key(root))
+        .collect()
+}
+
 pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> FilesystemScan {
     #[cfg(all(test, feature = "rust"))]
     TEST_SCAN_CALLS.set(TEST_SCAN_CALLS.get() + 1);
@@ -116,12 +144,69 @@ pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> Fil
     let total_started = std::time::Instant::now();
     #[cfg(all(test, feature = "rust"))]
     let traversal_started = std::time::Instant::now();
+    #[cfg(all(test, feature = "rust"))]
+    let mut stats = TraversalStats::default();
+    let (source_paths, attempted, traversal_completed, _directories_entered) =
+        enumerate_source_paths(state, roots);
+    #[cfg(all(test, feature = "rust"))]
+    {
+        stats.directories_entered = _directories_entered;
+        stats.supported_files_considered = source_paths.len();
+        stats.files_read = source_paths.len();
+        stats.traversal_elapsed = traversal_started.elapsed();
+    }
+    #[cfg(all(test, feature = "rust"))]
+    let read_match_started = std::time::Instant::now();
+    let manifest = build_inventory(state, source_paths, attempted, traversal_completed);
+    #[cfg(all(test, feature = "rust"))]
+    {
+        stats.read_match_elapsed = read_match_started.elapsed();
+    }
+    let candidates = type_ref_candidate_owners(&manifest, query_name);
+    let inventories = root_inventories(roots, &manifest);
+    #[cfg(all(test, feature = "rust"))]
+    {
+        stats.total_elapsed = total_started.elapsed();
+        TEST_TRAVERSAL_STATS.set(stats);
+    }
+    FilesystemScan {
+        candidates,
+        attempted: manifest.attempted,
+        completed: manifest.complete,
+        inventories,
+    }
+}
+
+fn root_inventories(roots: &[PathBuf], combined: &InventoryManifest) -> Vec<RootInventoryManifest> {
+    roots
+        .iter()
+        .map(|root| {
+            let root = root_key(root);
+            let entries = combined
+                .entries
+                .iter()
+                .filter(|entry| Path::new(&entry.owner).starts_with(Path::new(&root)))
+                .cloned()
+                .collect();
+            RootInventoryManifest {
+                root,
+                manifest: InventoryManifest::new(entries, combined.attempted, combined.complete),
+            }
+        })
+        .collect()
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn source_inventory(state: &McpState, roots: &[PathBuf]) -> InventoryManifest {
+    let (paths, attempted, traversal_completed, _) = enumerate_source_paths(state, roots);
+    build_inventory(state, paths, attempted, traversal_completed)
+}
+
+fn enumerate_source_paths(state: &McpState, roots: &[PathBuf]) -> (Vec<String>, bool, bool, usize) {
     let mut source_paths = Vec::new();
     let mut attempted = false;
     let mut completed = true;
-    #[cfg(all(test, feature = "rust"))]
-    let mut stats = TraversalStats::default();
-
+    let mut directories_entered = 0;
     for configured_root in roots {
         let root = match configured_root.canonicalize() {
             Ok(root) if root.is_dir() => root,
@@ -155,64 +240,54 @@ pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> Fil
                     continue;
                 }
             };
-            #[cfg(all(test, feature = "rust"))]
             if entry
                 .file_type()
                 .is_some_and(|file_type| file_type.is_dir())
             {
-                stats.directories_entered += 1;
+                directories_entered += 1;
             }
-            if !entry
+            if entry
                 .file_type()
                 .is_some_and(|file_type| file_type.is_file())
-                || !is_supported_source(entry.path())
+                && is_supported_source(entry.path())
             {
-                continue;
+                source_paths.push(root_key(entry.path()));
             }
-            source_paths.push(root_key(entry.path()));
         }
     }
-
     source_paths.sort();
     source_paths.dedup();
-    #[cfg(all(test, feature = "rust"))]
-    {
-        stats.supported_files_considered = source_paths.len();
-        stats.files_read = source_paths.len();
-        stats.traversal_elapsed = traversal_started.elapsed();
-    }
-    #[cfg(all(test, feature = "rust"))]
-    let read_match_started = std::time::Instant::now();
+    (source_paths, attempted, completed, directories_entered)
+}
+
+fn build_inventory(
+    state: &McpState,
+    source_paths: Vec<String>,
+    attempted: bool,
+    traversal_completed: bool,
+) -> InventoryManifest {
     let outcomes: Vec<_> = source_paths
         .par_iter()
-        .map(|path| match state.read_source(path) {
-            Ok(source) => (source.contains(query_name).then(|| path.clone()), true),
-            Err(_) => (None, false),
+        .map(|owner| {
+            let source_kind = SourceKind::from_path(Path::new(owner));
+            let source = state.read_source(owner);
+            match (source_kind, source) {
+                (Some(source_kind), Ok(source)) => Some(InventoryEntry {
+                    owner: state.semantic_owner_path(owner),
+                    source_kind,
+                    source_hash: crate::cache::content_hash(source.as_bytes()),
+                    source,
+                }),
+                _ => None,
+            }
         })
         .collect();
-    #[cfg(all(test, feature = "rust"))]
-    {
-        stats.read_match_elapsed = read_match_started.elapsed();
-    }
-    let mut candidates = Vec::new();
-    for (candidate, read_succeeded) in outcomes {
-        completed &= read_succeeded;
-        if let Some(candidate) = candidate {
-            candidates.push(candidate);
-        }
-    }
-    candidates.sort();
-    candidates.dedup();
-    #[cfg(all(test, feature = "rust"))]
-    {
-        stats.total_elapsed = total_started.elapsed();
-        TEST_TRAVERSAL_STATS.set(stats);
-    }
-    FilesystemScan {
-        candidates,
+    let complete = traversal_completed && outcomes.iter().all(Option::is_some);
+    InventoryManifest::new(
+        outcomes.into_iter().flatten().collect(),
         attempted,
-        completed: attempted && completed,
-    }
+        complete,
+    )
 }
 
 fn is_built_in_excluded_directory(entry: &DirEntry) -> bool {

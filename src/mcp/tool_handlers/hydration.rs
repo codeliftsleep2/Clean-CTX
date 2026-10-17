@@ -7,6 +7,7 @@
 //   test_support.rs  — test-only discovery instrumentation (cfg(test,rust))
 
 use crate::mcp::McpState;
+use crate::mcp::acquisition::AcquisitionSatisfaction;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
 #[cfg(all(test, feature = "rust"))]
@@ -15,13 +16,19 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 mod cache;
-use cache::{
-    discovery_is_complete, discovery_scopes_for_roots, mark_discovery_complete,
-    pending_discovery_roots,
-};
+use cache::{discovery_is_complete, discovery_scopes_for_roots, pending_discovery_roots};
+
+mod acquisition;
+mod execution;
+#[cfg(all(test, feature = "rust"))]
+pub(super) use execution::hydrate_workspace_index;
+pub(super) use execution::{hydrate_workspace_index_for, hydrate_workspace_index_for_acquisition};
 
 mod filesystem;
-use filesystem::{configured_roots, deduplicate_roots, root_key, scan};
+#[cfg(all(test, feature = "rust"))]
+pub(crate) use filesystem::source_inventory;
+use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key, scan};
+pub(crate) use filesystem::{effective_refresh_roots, source_candidates_containing};
 
 mod invalidation;
 #[cfg(all(test, feature = "rust"))]
@@ -31,30 +38,10 @@ pub(crate) use invalidation::{
     reconcile_external_refresh_for_root,
 };
 
-/// Discover supported source files containing a literal in the effective roots.
-/// Angular ownership uses this only to narrow TypeScript files that are then
-/// verified by structured decorator extraction.
-pub(crate) fn source_candidates_containing(
-    state: &McpState,
-    workspace_root: Option<&str>,
-    literal: &str,
-) -> Vec<String> {
-    let roots = configured_roots(state, workspace_root);
-    scan(state, &roots, literal).candidates
-}
-
-pub(crate) fn effective_refresh_roots(state: &McpState, workspace_root: &str) -> Vec<String> {
-    configured_roots(state, Some(workspace_root))
-        .iter()
-        .map(|root| root_key(root))
-        .collect()
-}
-
 mod publication;
 mod report;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use publication::compile_candidate;
-use publication::{CandidatePublication, compile_candidate_for, select_candidates};
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use filesystem::{
@@ -73,6 +60,10 @@ mod test_support;
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use test_support::*;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/acquisition_hydration.rs"]
+mod acquisition_tests;
 
 /// Diagnostic bound for the LLM-facing project-coverage projection.
 ///
@@ -117,6 +108,7 @@ pub(super) struct HydrationReport {
     pub(super) candidates_discovered: usize,
     pub(super) candidates_compiled: usize,
     pub(super) project_coverage: Vec<ProjectCoverage>,
+    pub(super) acquisition_satisfaction: Option<AcquisitionSatisfaction>,
 }
 
 #[derive(Clone, Serialize)]
@@ -139,6 +131,7 @@ struct DiscoveryOutcome {
     fallback_reason: Option<&'static str>,
     /// Successful discoveries awaiting semantic-publication commit.
     completions: Vec<DiscoveryScope>,
+    inventories: Vec<RootInventoryManifest>,
 }
 
 #[cfg(all(test, feature = "rust"))]
@@ -147,77 +140,6 @@ pub(super) fn is_hydration_eligible(query_type: &str, args: &Value) -> bool {
         query_type,
         "find_entities" | "forward_edges" | "reverse_edges" | "transitive_dependencies"
     ) && args["name"].as_str().is_some_and(|name| !name.is_empty())
-}
-
-#[cfg(all(test, feature = "rust"))]
-pub(super) fn hydrate_workspace_index(
-    state: &McpState,
-    query_type: &str,
-    query_name: &str,
-    workspace_root: Option<&str>,
-) -> Result<HydrationReport, String> {
-    hydrate_workspace_index_for(
-        state,
-        query_type,
-        query_name,
-        workspace_root,
-        HydrationRequirement::LegacyEdit,
-    )
-}
-
-pub(super) fn hydrate_workspace_index_for(
-    state: &McpState,
-    query_type: &str,
-    query_name: &str,
-    workspace_root: Option<&str>,
-    requirement: HydrationRequirement,
-) -> Result<HydrationReport, String> {
-    let discovery = discovery_kind(query_type);
-    let outcome =
-        discover_candidate_paths(state, discovery, query_name, workspace_root, requirement);
-    let candidate_paths = outcome.candidates;
-    let mut project_coverage = outcome.project_coverage;
-    let discovered = candidate_paths.len();
-    let selected = select_candidates(state, candidate_paths, requirement);
-    let mut compiled = 0;
-    let mut publication_failed = false;
-    let mut csharp_reconciliation_required = false;
-    for path in &selected {
-        match compile_candidate_for(state, path, workspace_root, requirement)? {
-            CandidatePublication::Published => compiled += 1,
-            CandidatePublication::PublishedCSharp => {
-                compiled += 1;
-                csharp_reconciliation_required = true;
-            }
-            CandidatePublication::Current => {}
-            CandidatePublication::Failed => publication_failed = true,
-        }
-    }
-    if csharp_reconciliation_required {
-        state.reconcile_csharp_exact_calls()?;
-    }
-    if !publication_failed {
-        for scope in &outcome.completions {
-            mark_discovery_complete(state, scope, discovery, query_name, requirement);
-        }
-    }
-    project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
-    // The complete coverage set is retained here; the diagnostic bound is applied
-    // by the LLM-facing projection (`query::diagnostics`), which also drops the
-    // healthy entries so they cannot consume the bound.
-    Ok(HydrationReport {
-        hydration_attempted: outcome.attempted,
-        discovery_provider: outcome.provider,
-        discovery_status: if publication_failed {
-            "partial"
-        } else {
-            outcome.status
-        },
-        fallback_reason: outcome.fallback_reason,
-        candidates_discovered: discovered,
-        candidates_compiled: compiled,
-        project_coverage,
-    })
 }
 
 /// Map a `workspace_query` type to the discovery operation hydration must run.
@@ -256,6 +178,7 @@ fn discover_candidate_paths(
                         attempted: true,
                         fallback_reason: None,
                         completions: Vec::new(),
+                        inventories: Vec::new(),
                     };
                 }
             }
@@ -465,6 +388,7 @@ fn discover_candidate_paths(
                 attempted: cbm_attempted,
                 fallback_reason: None,
                 completions,
+                inventories: Vec::new(),
             };
         }
         // Every fallback root is already discovered for this generation, so no
@@ -483,6 +407,7 @@ fn discover_candidate_paths(
             attempted: true,
             fallback_reason: Some(fallback_reason),
             completions,
+            inventories: Vec::new(),
         };
     }
 
@@ -501,6 +426,7 @@ fn discover_candidate_paths(
         (false, false) => "none",
     };
     let completed = scan.completed;
+    let inventories = scan.inventories;
     DiscoveryOutcome {
         candidates,
         project_coverage: coverage,
@@ -509,6 +435,7 @@ fn discover_candidate_paths(
         attempted,
         fallback_reason: Some(fallback_reason),
         completions,
+        inventories,
     }
 }
 
@@ -534,6 +461,7 @@ fn filesystem_only_discovery(
                 attempted: false,
                 fallback_reason: Some("filesystem_unavailable"),
                 completions: Vec::new(),
+                inventories: Vec::new(),
             };
         }
         // Nothing left to scan: every configured root's fallback discovery
@@ -547,6 +475,7 @@ fn filesystem_only_discovery(
             attempted: true,
             fallback_reason: Some(fallback_reason),
             completions: Vec::new(),
+            inventories: Vec::new(),
         };
     }
     let scan = scan(state, &pending_roots, query_name);
@@ -569,6 +498,7 @@ fn filesystem_only_discovery(
             "filesystem_unavailable"
         }),
         completions,
+        inventories: scan.inventories,
     }
 }
 

@@ -2,6 +2,12 @@ use super::proof::ValidatedAcquisitionProof;
 use super::requirement::{AcquisitionRequirement, CoverageUnit};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SemanticPublicationStatus {
+    Complete,
+    Failed,
+}
+
 /// Proof coverage accumulated for one exact acquisition requirement.
 #[derive(Clone, Debug)]
 pub(crate) struct AcquisitionSatisfaction {
@@ -17,7 +23,14 @@ impl AcquisitionSatisfaction {
         }
     }
 
-    pub(crate) fn record(&mut self, proof: ValidatedAcquisitionProof) -> bool {
+    pub(crate) fn record_after_publication(
+        &mut self,
+        proof: ValidatedAcquisitionProof,
+        publication: SemanticPublicationStatus,
+    ) -> bool {
+        if publication != SemanticPublicationStatus::Complete {
+            return false;
+        }
         if !self.required.contains(&proof.unit) {
             return false;
         }

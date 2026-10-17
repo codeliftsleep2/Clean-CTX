@@ -11,8 +11,8 @@
 //   - workspace  : workspace-level operations (compress_workspace_dir, collect_source_files)
 //   - state      : per-session state shared by all tool handlers (F-05)
 
-pub(crate) mod buffered_store;
 pub(crate) mod acquisition;
+pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
 pub(crate) mod compatibility;
 pub(crate) mod content_economics;

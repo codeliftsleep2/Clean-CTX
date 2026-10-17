@@ -2,8 +2,10 @@
 
 use super::outcome::{QueryAnswer, QueryFailure, QueryResult};
 use crate::mcp::McpState;
+use crate::mcp::acquisition::AcquisitionTarget;
 use crate::mcp::tool_handlers::hydration::{
     HydrationReport, HydrationRequirement, hydrate_workspace_index_for,
+    hydrate_workspace_index_for_acquisition,
 };
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
@@ -59,6 +61,7 @@ struct HydrationKey {
     inbound: bool,
     name: String,
     requirement: HydrationRequirement,
+    acquisition_target: Option<AcquisitionTarget>,
 }
 
 /// Shared, request-local preparation state. It is deliberately neither stored
@@ -101,16 +104,57 @@ impl PreparationContext {
         workspace_root: Option<&str>,
         requirement: HydrationRequirement,
     ) -> Result<HydrationReport, QueryFailure> {
+        self.hydrate_keyed(state, query_type, name, workspace_root, requirement, None)
+    }
+
+    pub(super) fn hydrate_incoming_type_ref(
+        &mut self,
+        state: &McpState,
+        name: &str,
+        workspace_root: Option<&str>,
+        requirement: HydrationRequirement,
+        target: AcquisitionTarget,
+    ) -> Result<HydrationReport, QueryFailure> {
+        self.hydrate_keyed(
+            state,
+            "reverse_edges",
+            name,
+            workspace_root,
+            requirement,
+            Some(target),
+        )
+    }
+
+    fn hydrate_keyed(
+        &mut self,
+        state: &McpState,
+        query_type: &str,
+        name: &str,
+        workspace_root: Option<&str>,
+        requirement: HydrationRequirement,
+        acquisition_target: Option<AcquisitionTarget>,
+    ) -> Result<HydrationReport, QueryFailure> {
         let key = HydrationKey {
             inbound: query_type == "reverse_edges",
             name: name.to_string(),
             requirement,
+            acquisition_target: acquisition_target.clone(),
         };
         if let Some(result) = self.hydration.get(&key) {
             return result.clone().map_err(QueryFailure::internal);
         }
-        let result =
-            hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement);
+        let result = match acquisition_target {
+            Some(target) => hydrate_workspace_index_for_acquisition(
+                state,
+                name,
+                workspace_root,
+                requirement,
+                target,
+            ),
+            None => {
+                hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement)
+            }
+        };
         // Publication (and its required reconciliation) changes the evidence
         // from which request-local catalogs are derived. An error may follow a
         // partial publication, so it also conservatively invalidates. A

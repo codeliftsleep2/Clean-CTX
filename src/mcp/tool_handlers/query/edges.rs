@@ -20,6 +20,7 @@ use super::{
     required_name,
 };
 use crate::mcp::McpState;
+use crate::mcp::acquisition::AcquisitionTarget;
 use crate::mcp::tool_handlers::hydration::HydrationRequirement;
 use crate::workspace::index::SemanticFidelity;
 use serde_json::Value;
@@ -321,8 +322,20 @@ fn try_prepare_reverse_edges(
         );
     }
     let requirement = edge_hydration_requirement(args);
-    let mut hydration =
-        context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?;
+    let mut hydration = if identity
+        .exact()
+        .is_some_and(|exact| exact.domain == "builtin" && exact.entity_type == "TypeRef")
+    {
+        context.hydrate_incoming_type_ref(
+            state,
+            name,
+            workspace_root,
+            requirement,
+            AcquisitionTarget::exact_type_ref(name),
+        )?
+    } else {
+        context.hydrate(state, "reverse_edges", name, workspace_root, requirement)?
+    };
     hydrate_angular_template_owner(
         state,
         context,

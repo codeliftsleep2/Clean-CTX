@@ -7,19 +7,25 @@
 
 #![allow(dead_code, unused_imports)]
 
+mod clean;
 mod proof;
 mod requirement;
 mod satisfaction;
 
+pub(crate) use clean::{
+    CleanProofRejection, clean_type_ref_proof_claim, has_certified_type_ref_name_bearing_predicate,
+    type_ref_candidate_owners,
+};
 pub(crate) use proof::{
-    AcquisitionProofClaim, ProofContext, ProofProvenance, ProofRejection,
-    ValidatedAcquisitionProof, validate_proof_claim,
+    AcquisitionProofClaim, InventoryEntry, InventoryManifest, ProofContext, ProofProvenance,
+    ProofRejection, ValidatedAcquisitionProof, scope_policy_fingerprint, validate_proof_claim,
 };
 pub(crate) use requirement::{
     AcquisitionRequirement, AcquisitionTarget, CoverageUnit, EvidenceRequirement,
-    ProducerCapability, RelationshipFamily, SourceKind,
+    ProducerCapability, RelationshipFamily, SourceKind, producer_generation_fingerprint,
+    requirement_fingerprint,
 };
-pub(crate) use satisfaction::AcquisitionSatisfaction;
+pub(crate) use satisfaction::{AcquisitionSatisfaction, SemanticPublicationStatus};
 
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/acquisition_requirement.rs"]
@@ -28,3 +34,11 @@ mod requirement_tests;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/acquisition_proof.rs"]
 mod proof_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/acquisition_inventory.rs"]
+mod inventory_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/acquisition_clean.rs"]
+mod clean_tests;
