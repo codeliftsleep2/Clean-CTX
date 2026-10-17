@@ -291,6 +291,10 @@ mod tests_filesystem_discovery_cache;
 mod tests_provider_readiness;
 
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_reverse_edge_completeness.rs"]
+mod tests_reverse_edge_completeness;
+
+#[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_warm_state_authority.rs"]
 mod tests_warm_state_authority;
 

@@ -348,7 +348,9 @@ fn discover_candidate_paths(
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
                     saw_search_success = true;
-                    if readiness == "ready" {
+                    // Ready inbound search is advisory until a provider can
+                    // prove the complete incoming-relationship source universe.
+                    if readiness == "ready" && discovery != DiscoveryMode::InboundReference {
                         successful_roots.insert(root_key(&root));
                         completions.push(scope);
                     }
@@ -402,7 +404,9 @@ fn discover_candidate_paths(
             Ok(paths) => {
                 append_rooted_paths(&mut candidates, &root, paths);
                 saw_search_success = true;
-                if readiness == "ready" {
+                // Ready inbound search is advisory until a provider can prove
+                // the complete incoming-relationship source universe.
+                if readiness == "ready" && discovery != DiscoveryMode::InboundReference {
                     successful_roots.insert(root_key(&root));
                     completions.push(scope);
                 }
