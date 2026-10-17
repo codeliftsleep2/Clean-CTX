@@ -222,12 +222,14 @@ try {
     }
     Invoke-BCase '144-A' 'cold-authoritative-completeness-and-source-oracle' {
         $cold = Reverse $native 'ContextA' 'native-cold-context-a'
+        $script:nativeContextKeys = @(Edge-Keys $cold)
         Assert-Exact $cold 'native cold ContextA'
         Assert-Set (Constructor-Subjects $cold 'ContextA') $expectedContextConsumers 'Cold constructor consumer set differs.'
-        Assert-B (@($cold.edges | Where-Object relation -eq 'HasBaseType' | Where-Object subject.name -eq 'DerivedConsumer').Count -eq 1) 'DerivedConsumer base-TypeRef edge is missing.'
-        Assert-B (@($cold.edges | Where-Object subject.name -eq 'MethodOnly').Count -eq 0) 'Ordinary method parameter became an incoming TypeRef edge.'
-        Assert-B (@($cold.edges | Where-Object subject.name -eq 'ExcludedConsumer').Count -eq 0) 'Excluded source entered the admitted universe.'
-        $script:nativeContextKeys = @(Edge-Keys $cold)
+        Assert-B (@($cold.edges | Where-Object {
+            $_.relation -eq 'HasBaseType' -and $_.subject.name -eq 'DerivedConsumer'
+        }).Count -eq 1) 'DerivedConsumer base-TypeRef edge is missing.'
+        Assert-B (@($cold.edges | Where-Object { $_.subject.name -eq 'MethodOnly' }).Count -eq 0) 'Ordinary method parameter became an incoming TypeRef edge.'
+        Assert-B (@($cold.edges | Where-Object { $_.subject.name -eq 'ExcludedConsumer' }).Count -eq 0) 'Excluded source entered the admitted universe.'
     }
     Invoke-BCase '144-A' 'warm-equivalence-and-no-recompilation' {
         $warm = Reverse $native 'ContextA' 'native-warm-context-a'
@@ -248,7 +250,14 @@ try {
             type = 'reverse_edges'; domain = 'builtin'; entity_type = 'TypeRef'; name = 'ContextA'
         }
         Save-B 'native-within-unauthorized' $outside
-        Assert-B ($outside.result.isError -eq $true) 'An outside withinPath was not refused.'
+        $outsideWasRefused = $null -ne $outside.PSObject.Properties['error']
+        if (-not $outsideWasRefused -and $null -ne $outside.PSObject.Properties['result']) {
+            $outsideWasRefused = (
+                $null -ne $outside.result.PSObject.Properties['isError'] -and
+                $outside.result.isError -eq $true
+            )
+        }
+        Assert-B $outsideWasRefused 'An outside withinPath was not refused.'
     }
     Invoke-BCase '144-A' 'exact-zero-case-and-spelling-controls' {
         $zero = Reverse $native 'NeverReferenced' 'native-exact-zero'
