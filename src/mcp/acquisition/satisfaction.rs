@@ -1,5 +1,6 @@
 use super::proof::ValidatedAcquisitionProof;
-use super::requirement::{AcquisitionRequirement, CoverageUnit};
+use super::requirement::{AcquisitionRequirement, CoverageUnit, requirement_fingerprint};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -13,6 +14,8 @@ pub(crate) enum SemanticPublicationStatus {
 pub(crate) struct AcquisitionSatisfaction {
     required: BTreeSet<CoverageUnit>,
     proven: BTreeMap<CoverageUnit, ValidatedAcquisitionProof>,
+    requirement_fingerprint: String,
+    scope_fingerprint: String,
 }
 
 impl AcquisitionSatisfaction {
@@ -20,6 +23,8 @@ impl AcquisitionSatisfaction {
         Self {
             required: requirement.units.clone(),
             proven: BTreeMap::new(),
+            requirement_fingerprint: requirement_fingerprint(requirement),
+            scope_fingerprint: requirement.scope_fingerprint.clone(),
         }
     }
 
@@ -49,4 +54,25 @@ impl AcquisitionSatisfaction {
     pub(crate) fn is_source_complete(&self) -> bool {
         !self.required.is_empty() && self.residual_units().is_empty()
     }
+
+    pub(crate) fn completeness_generation(&self) -> Option<String> {
+        if !self.is_source_complete() {
+            return None;
+        }
+        let mut hasher = Sha256::new();
+        hash_part(&mut hasher, self.requirement_fingerprint.as_bytes());
+        for proof in self.proven.values() {
+            hash_part(&mut hasher, proof.inventory_generation.as_bytes());
+        }
+        Some(format!("{:x}", hasher.finalize()))
+    }
+
+    pub(crate) fn scope_fingerprint(&self) -> &str {
+        &self.scope_fingerprint
+    }
+}
+
+fn hash_part(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_le_bytes());
+    hasher.update(value);
 }

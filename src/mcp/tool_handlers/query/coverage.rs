@@ -1,6 +1,7 @@
 //! Truthfulness metadata for exact-identity graph answers.
 
 use super::identity::ResolvedIdentity;
+use crate::mcp::acquisition::AcquisitionSatisfaction;
 use crate::mcp::tool_handlers::hydration::HydrationReport;
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
@@ -36,6 +37,20 @@ impl CompletenessCertificate {
                 "dependencies_current",
             ],
         }
+    }
+
+    fn incoming_relationships(satisfaction: &AcquisitionSatisfaction) -> Option<Self> {
+        Some(Self {
+            scope_kind: "workspace",
+            scope_value: satisfaction.scope_fingerprint().to_string(),
+            source_generation: satisfaction.completeness_generation()?,
+            evidence_requirements: &[
+                "incoming_relationship_units_proven",
+                "semantic_projection_current",
+                "dependencies_current",
+                "publication_complete",
+            ],
+        })
     }
 
     pub(super) fn project(&self) -> Value {
@@ -78,6 +93,20 @@ pub(super) fn exact_identity_coverage(
         }
     };
     let capability_established = stored_capability_established || response_has_typed_evidence;
+    let exact_incoming_type_ref = matches!(direction, CapabilityDirection::Reverse)
+        && identity.domain == "builtin"
+        && identity.entity_type == "TypeRef";
+    if exact_incoming_type_ref
+        && let Some(certificate) = hydration
+            .acquisition_satisfaction
+            .as_ref()
+            .and_then(CompletenessCertificate::incoming_relationships)
+    {
+        let mut coverage = certificate.project();
+        coverage["identity_indexed"] = identity_indexed.into();
+        coverage["capability_established"] = capability_established.into();
+        return coverage;
+    }
     let status = if !identity_indexed {
         "identity_not_indexed"
     } else if !capability_established {

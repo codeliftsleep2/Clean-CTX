@@ -7,7 +7,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    TestProjectReadiness, clear_test_project_search_results, reset_test_scan_calls,
+    TestProjectReadiness, clear_test_project_search_results, fail_test_publication_once,
+    reset_test_scan_calls,
     set_test_inbound_project_search_results, set_test_project_readiness,
     set_test_project_search_results, test_scan_calls,
 };
@@ -132,6 +133,14 @@ fn expected_subjects() -> BTreeSet<String> {
         .collect()
 }
 
+fn assert_exact_coverage(response: &Value) {
+    let coverage = &structured(response)["coverage"];
+    assert_eq!(coverage["status"], "authoritative_complete", "{coverage}");
+    assert_eq!(coverage["source_complete"], true, "{coverage}");
+    assert_eq!(coverage["result_semantics"], "exact", "{coverage}");
+    assert_eq!(coverage["omitted_possible"], false, "{coverage}");
+}
+
 #[test]
 fn issue_144_ready_provider_without_proof_cannot_omit_a_consumer() {
     let _hydration_serial = TEST_SERIALIZE
@@ -205,4 +214,110 @@ fn issue_144_warm_request_cannot_cache_an_unproved_provider_subset() {
         test_scan_calls() >= 1,
         "an unproved provider subset must not suppress all Clean acquisition"
     );
+}
+
+#[test]
+fn issue_144_proof_backed_reverse_type_ref_earns_exact_coverage() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+
+    let response = dispatch_reverse(&state, root.path());
+
+    assert_eq!(constructor_subjects(&response), expected_subjects());
+    assert_exact_coverage(&response);
+}
+
+#[test]
+fn issue_144_exact_coverage_is_stable_across_cold_and_warm_requests() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+
+    let cold = dispatch_reverse(&state, root.path());
+    let warm = dispatch_reverse(&state, root.path());
+
+    assert_exact_coverage(&cold);
+    assert_exact_coverage(&warm);
+    assert_eq!(structured(&cold)["edges"], structured(&warm)["edges"]);
+    assert_eq!(structured(&cold)["coverage"], structured(&warm)["coverage"]);
+}
+
+#[test]
+fn issue_144_complete_zero_result_is_exact() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    std::fs::create_dir(root.path().join(".git")).expect("Git root marker");
+    std::fs::write(
+        root.path().join("ContextA.cs"),
+        "public sealed class ContextA {}\n",
+    )
+    .expect("target source");
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &[]);
+
+    let response = dispatch_reverse(&state, root.path());
+
+    assert_eq!(structured(&response)["count"], 0);
+    assert_exact_coverage(&response);
+}
+
+#[test]
+fn issue_144_unproved_language_unit_remains_lower_bound() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    std::fs::write(root.path().join("Unproved.ts"), "export class Unproved {}\n")
+        .expect("unproved TypeScript source");
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+
+    let response = dispatch_reverse(&state, root.path());
+    let coverage = &structured(&response)["coverage"];
+
+    assert_eq!(constructor_subjects(&response), expected_subjects());
+    assert_eq!(coverage["source_complete"], false, "{coverage}");
+    assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
+    assert_eq!(coverage["omitted_possible"], true, "{coverage}");
+}
+
+#[test]
+fn issue_144_publication_failure_remains_lower_bound() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+    fail_test_publication_once(&root.path().join("KnownConsumer.cs").to_string_lossy());
+
+    let response = dispatch_reverse(&state, root.path());
+    let coverage = &structured(&response)["coverage"];
+
+    assert_eq!(coverage["source_complete"], false, "{coverage}");
+    assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
+    assert_eq!(coverage["omitted_possible"], true, "{coverage}");
 }
