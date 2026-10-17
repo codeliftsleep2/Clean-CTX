@@ -7,6 +7,7 @@
 
 #![allow(dead_code, unused_imports)]
 
+mod cache;
 mod clean;
 mod proof;
 mod requirement;
@@ -40,5 +41,10 @@ mod proof_tests;
 mod inventory_tests;
 
 #[cfg(all(test, feature = "rust"))]
+#[path = "../tests/mcp/acquisition_cache.rs"]
+mod cache_tests;
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/acquisition_clean.rs"]
 mod clean_tests;
+pub(crate) use cache::{AcquisitionCacheKey, AcquisitionCompletionCache};

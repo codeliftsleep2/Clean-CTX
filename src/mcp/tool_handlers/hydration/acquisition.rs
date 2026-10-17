@@ -1,15 +1,48 @@
 use super::filesystem::RootInventoryManifest;
 use crate::mcp::acquisition::{
-    AcquisitionRequirement, AcquisitionSatisfaction, AcquisitionTarget, CoverageUnit,
-    InventoryManifest, ProofContext, SemanticPublicationStatus, SourceKind,
-    ValidatedAcquisitionProof, clean_type_ref_proof_claim, producer_generation_fingerprint,
-    scope_policy_fingerprint, validate_proof_claim,
+    AcquisitionCacheKey, AcquisitionRequirement, AcquisitionSatisfaction, AcquisitionTarget,
+    CoverageUnit, EvidenceRequirement, InventoryManifest, ProofContext,
+    SemanticPublicationStatus, SourceKind, ValidatedAcquisitionProof,
+    clean_type_ref_proof_claim, producer_generation_fingerprint, scope_policy_fingerprint,
+    validate_proof_claim,
 };
 use crate::mcp::compatibility::producer::GenerationCatalog;
 use std::collections::BTreeMap;
 
 const TYPE_REF_PREDICATE_VERSION: u32 = 1;
 const ACQUISITION_PROOF_CONTRACT_VERSION: u32 = 1;
+
+pub(super) fn acquisition_cache_key(
+    target: AcquisitionTarget,
+    roots: Vec<String>,
+    exclusions: &[String],
+) -> AcquisitionCacheKey {
+    let catalog = GenerationCatalog::current();
+    let admission_fingerprint =
+        scope_policy_fingerprint(roots.iter().cloned(), exclusions.iter().cloned());
+    let producer_generations = [
+        SourceKind::CSharp,
+        SourceKind::TypeScript,
+        SourceKind::Rust,
+        SourceKind::Java,
+    ]
+    .into_iter()
+    .map(|source_kind| {
+        let generation = producer_generation_fingerprint(source_kind, &catalog)
+            .unwrap_or_else(|| "missing-generation".into());
+        (source_kind, generation)
+    })
+    .collect();
+    AcquisitionCacheKey {
+        target,
+        roots,
+        admission_fingerprint,
+        producer_generations,
+        predicate_version: TYPE_REF_PREDICATE_VERSION,
+        proof_contract_version: ACQUISITION_PROOF_CONTRACT_VERSION,
+        evidence: EvidenceRequirement::CurrentHighSemanticProjection,
+    }
+}
 
 pub(super) struct ProvisionalAcquisition {
     requirement: AcquisitionRequirement,

@@ -1,4 +1,5 @@
 use super::cache::mark_discovery_complete;
+use super::filesystem::{configured_roots, root_key};
 use super::publication::{CandidatePublication, compile_candidate_for, select_candidates};
 use super::{HydrationReport, HydrationRequirement, discover_candidate_paths, discovery_kind};
 use crate::mcp::McpState;
@@ -62,6 +63,20 @@ fn hydrate_workspace_index_for_target(
     requirement: HydrationRequirement,
     target: Option<AcquisitionTarget>,
 ) -> Result<HydrationReport, String> {
+    let cache_key = target.as_ref().map(|target| {
+        let roots = configured_roots(state, workspace_root)
+            .iter()
+            .map(|root| root_key(root))
+            .collect();
+        super::acquisition::acquisition_cache_key(
+            target.clone(),
+            roots,
+            &state.config.exclude_patterns,
+        )
+    });
+    let cached_satisfaction = cache_key
+        .as_ref()
+        .and_then(|key| state.acquisition_completion_lock().get(key));
     let discovery = discovery_kind(query_type);
     let outcome =
         discover_candidate_paths(state, discovery, query_name, workspace_root, requirement);
@@ -99,6 +114,22 @@ fn hydrate_workspace_index_for_target(
         }
     }
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
+    let acquisition_satisfaction = cached_satisfaction.or_else(|| {
+        provisional.map(|provisional| {
+            provisional.finish(if publication_failed {
+                SemanticPublicationStatus::Failed
+            } else {
+                SemanticPublicationStatus::Complete
+            })
+        })
+    });
+    if let (Some(key), Some(satisfaction)) =
+        (cache_key, acquisition_satisfaction.as_ref())
+    {
+        state
+            .acquisition_completion_lock()
+            .commit(key, satisfaction.clone());
+    }
     Ok(HydrationReport {
         hydration_attempted: outcome.attempted,
         discovery_provider: outcome.provider,
@@ -111,12 +142,6 @@ fn hydrate_workspace_index_for_target(
         candidates_discovered: discovered,
         candidates_compiled: compiled,
         project_coverage,
-        acquisition_satisfaction: provisional.map(|provisional| {
-            provisional.finish(if publication_failed {
-                SemanticPublicationStatus::Failed
-            } else {
-                SemanticPublicationStatus::Complete
-            })
-        }),
+        acquisition_satisfaction,
     })
 }

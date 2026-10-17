@@ -26,6 +26,7 @@ use crate::mcp::buffered_store::BufferedStore;
 use crate::mcp::cache_hints::CacheMetrics;
 use crate::mcp::context_store::InMemoryContextStore;
 use crate::mcp::discovery_cache::HydrationDiscoveryCache;
+use crate::mcp::acquisition::AcquisitionCompletionCache;
 use crate::mcp::session_stats::SessionStats;
 use crate::mcp::sqlite_store::SqliteStore;
 use crate::mcp::state::source_cache::CacheEntry;
@@ -210,6 +211,9 @@ pub struct McpState {
     /// Session-scoped record of completed hydration discovery.
     pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
 
+    /// Session-scoped proof-backed incoming-relationship acquisition cache.
+    pub(crate) acquisition_completion: Mutex<AcquisitionCompletionCache>,
+
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
@@ -301,6 +305,7 @@ impl McpState {
             cache_metrics: Mutex::new(CacheMetrics::default()),
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
             hydration_discovery: Mutex::new(HydrationDiscoveryCache::new()),
+            acquisition_completion: Mutex::new(AcquisitionCompletionCache::new()),
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,
@@ -558,6 +563,12 @@ impl McpState {
         lock_or_recover!(self.hydration_discovery.lock(), "hydration_discovery")
     }
 
+    pub(crate) fn acquisition_completion_lock(
+        &self,
+    ) -> std::sync::MutexGuard<'_, AcquisitionCompletionCache> {
+        lock_or_recover!(self.acquisition_completion.lock(), "acquisition_completion")
+    }
+
     /// Drop every completed hydration discovery record.
     ///
     /// Used when a workspace change cannot be attributed to one configured
@@ -566,6 +577,7 @@ impl McpState {
     /// `invalidate_root` on the guard instead.
     pub(crate) fn invalidate_hydration_discovery_all(&self) {
         self.hydration_discovery_lock().invalidate_all();
+        self.acquisition_completion_lock().invalidate_all();
     }
 
     /// Access CBM filter skip set for a file (thread-safe convenience method).

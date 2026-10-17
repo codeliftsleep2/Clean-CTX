@@ -35,8 +35,14 @@ pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: 
         .filter(|root| crate::workspace::path_identity::is_within_root(&edited, root))
         .max_by_key(String::len);
     match matched {
-        Some(root) => state.hydration_discovery_lock().invalidate_root(&root),
-        None => state.hydration_discovery_lock().invalidate_all(),
+        Some(root) => {
+            state.hydration_discovery_lock().invalidate_root(&root);
+            state.acquisition_completion_lock().invalidate_root(&root);
+        }
+        None => {
+            state.hydration_discovery_lock().invalidate_all();
+            state.acquisition_completion_lock().invalidate_all();
+        }
     }
 }
 
@@ -102,4 +108,5 @@ pub(crate) fn reconcile_external_refresh_for_root(
 pub(crate) fn invalidate_discovery_for_root(state: &McpState, root: &str) {
     let identity = crate::dictionary::path::canonical_identity_key(root);
     state.hydration_discovery_lock().invalidate_root(&identity);
+    state.acquisition_completion_lock().invalidate_root(&identity);
 }
