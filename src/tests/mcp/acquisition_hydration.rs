@@ -1,7 +1,7 @@
 use super::{
     HydrationRequirement, TEST_PROJECT_HYDRATION_SERIALIZE, fail_test_publication_once,
-    hydrate_workspace_index_for_acquisition, invalidate_discovery_for_root,
-    reset_test_scan_calls, test_scan_calls,
+    hydrate_workspace_index_for_acquisition, invalidate_discovery_for_root, reset_test_scan_calls,
+    test_scan_calls,
 };
 use crate::mcp::acquisition::AcquisitionTarget;
 

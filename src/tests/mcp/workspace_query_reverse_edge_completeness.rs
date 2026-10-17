@@ -8,8 +8,7 @@ use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
     TestProjectReadiness, clear_test_project_search_results, fail_test_publication_once,
-    reset_test_scan_calls,
-    set_test_inbound_project_search_results, set_test_project_readiness,
+    reset_test_scan_calls, set_test_inbound_project_search_results, set_test_project_readiness,
     set_test_project_search_results, test_scan_calls,
 };
 use crate::mcp::tools::dispatch_tools_call;
@@ -287,8 +286,11 @@ fn issue_144_unproved_language_unit_remains_lower_bound() {
     let _reset = ResetProvider;
     let root = tempfile::tempdir().expect("workspace");
     write_fixture(root.path());
-    std::fs::write(root.path().join("Unproved.ts"), "export class Unproved {}\n")
-        .expect("unproved TypeScript source");
+    std::fs::write(
+        root.path().join("Unproved.ts"),
+        "export class Unproved {}\n",
+    )
+    .expect("unproved TypeScript source");
     let state = state_with_provider(root.path());
     configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
 

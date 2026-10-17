@@ -1,10 +1,9 @@
 use super::filesystem::RootInventoryManifest;
 use crate::mcp::acquisition::{
     AcquisitionCacheKey, AcquisitionRequirement, AcquisitionSatisfaction, AcquisitionTarget,
-    CoverageUnit, EvidenceRequirement, InventoryManifest, ProofContext,
-    SemanticPublicationStatus, SourceKind, ValidatedAcquisitionProof,
-    clean_type_ref_proof_claim, producer_generation_fingerprint, scope_policy_fingerprint,
-    validate_proof_claim,
+    CoverageUnit, EvidenceRequirement, InventoryManifest, ProofContext, SemanticPublicationStatus,
+    SourceKind, ValidatedAcquisitionProof, clean_type_ref_proof_claim,
+    producer_generation_fingerprint, scope_policy_fingerprint, validate_proof_claim,
 };
 use crate::mcp::compatibility::producer::GenerationCatalog;
 use std::collections::BTreeMap;

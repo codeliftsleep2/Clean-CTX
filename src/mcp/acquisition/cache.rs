@@ -30,10 +30,7 @@ impl AcquisitionCompletionCache {
         Self::default()
     }
 
-    pub(crate) fn get(
-        &self,
-        key: &AcquisitionCacheKey,
-    ) -> Option<AcquisitionSatisfaction> {
+    pub(crate) fn get(&self, key: &AcquisitionCacheKey) -> Option<AcquisitionSatisfaction> {
         let entry = self.completed.get(key)?;
         entry
             .root_generations

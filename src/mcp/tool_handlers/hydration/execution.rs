@@ -123,9 +123,7 @@ fn hydrate_workspace_index_for_target(
             })
         })
     });
-    if let (Some(key), Some(satisfaction)) =
-        (cache_key, acquisition_satisfaction.as_ref())
-    {
+    if let (Some(key), Some(satisfaction)) = (cache_key, acquisition_satisfaction.as_ref()) {
         state
             .acquisition_completion_lock()
             .commit(key, satisfaction.clone());

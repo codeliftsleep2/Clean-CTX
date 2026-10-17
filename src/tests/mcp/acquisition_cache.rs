@@ -1,7 +1,7 @@
 use super::{
     AcquisitionCacheKey, AcquisitionCompletionCache, AcquisitionRequirement,
-    AcquisitionSatisfaction, AcquisitionTarget, CoverageUnit, EvidenceRequirement,
-    ProofProvenance, SemanticPublicationStatus, SourceKind, ValidatedAcquisitionProof,
+    AcquisitionSatisfaction, AcquisitionTarget, CoverageUnit, EvidenceRequirement, ProofProvenance,
+    SemanticPublicationStatus, SourceKind, ValidatedAcquisitionProof,
 };
 
 fn key(root: &str) -> AcquisitionCacheKey {
@@ -18,11 +18,8 @@ fn key(root: &str) -> AcquisitionCacheKey {
 
 fn satisfaction(root: &str, complete: bool) -> AcquisitionSatisfaction {
     let unit = CoverageUnit::builtin_type_ref(root, SourceKind::CSharp, "producer-1");
-    let requirement = AcquisitionRequirement::incoming_type_ref(
-        "ContextA",
-        "admission-1",
-        [unit.clone()],
-    );
+    let requirement =
+        AcquisitionRequirement::incoming_type_ref("ContextA", "admission-1", [unit.clone()]);
     let mut satisfaction = AcquisitionSatisfaction::new(&requirement);
     if complete {
         assert!(satisfaction.record_after_publication(

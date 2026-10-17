@@ -108,5 +108,7 @@ pub(crate) fn reconcile_external_refresh_for_root(
 pub(crate) fn invalidate_discovery_for_root(state: &McpState, root: &str) {
     let identity = crate::dictionary::path::canonical_identity_key(root);
     state.hydration_discovery_lock().invalidate_root(&identity);
-    state.acquisition_completion_lock().invalidate_root(&identity);
+    state
+        .acquisition_completion_lock()
+        .invalidate_root(&identity);
 }
