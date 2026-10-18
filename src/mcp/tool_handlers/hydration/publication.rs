@@ -114,7 +114,7 @@ struct PreparedPublication {
 }
 
 enum PreparedCandidate {
-    Compile(PreparedPublication, CompilationJob),
+    Compile(PreparedPublication, Box<CompilationJob>),
     Terminal(CandidatePublication),
 }
 
@@ -131,7 +131,7 @@ pub(super) fn compile_candidates_for(
         match prepare_candidate(state, resolved_path, workspace_root, requirement)? {
             PreparedCandidate::Compile(publication, job) => {
                 publications.push(publication);
-                jobs.push(job);
+                jobs.push(*job);
             }
             PreparedCandidate::Terminal(outcome) => terminal.push(outcome),
         }
@@ -256,7 +256,7 @@ fn prepare_candidate(
             published_outcome,
             ticket: publication,
         },
-        job,
+        Box::new(job),
     ))
 }
 
