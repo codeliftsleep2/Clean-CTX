@@ -260,7 +260,7 @@ impl super::McpState {
             self.llm_text_cache_lock().remove(&alias);
         });
         #[cfg(feature = "csharp")]
-        self.reconcile_csharp_after_authority_change(file_path)?;
+        self.mark_csharp_call_authority_dirty_for_file(file_path)?;
         Ok(())
     }
 

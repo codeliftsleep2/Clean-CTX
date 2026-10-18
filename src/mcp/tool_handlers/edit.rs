@@ -185,7 +185,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .unwrap_or("");
     let pre_compiled =
         match compile_source_ir_candidate(&resolved_path, source, Fidelity::Edit, state) {
-            Ok((ir, _, _, _)) => ir,
+            Ok(artifact) => artifact.into_parts().0,
             Err(e) => return err_response(id, -32603, e.to_string(), None),
         };
     let units = {
@@ -224,7 +224,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     let (mut target_ir, semantic_edges, semantic_dependencies, new_hash) =
         match compile_source_ir_candidate(&resolved_path, &report.new_source, Fidelity::Edit, state)
         {
-            Ok(candidate) => candidate,
+            Ok(candidate) => candidate.into_parts(),
             Err(error) => return err_response(id, -32603, error.to_string(), None),
         };
     if let Err(error) = crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
@@ -391,7 +391,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         Err(()) => return,
     }
     #[cfg(feature = "csharp")]
-    if let Err(error) = state.reconcile_csharp_after_authority_change(&resolved_path) {
+    if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&resolved_path) {
         err_response(id, -32603, error, None);
         return;
     }

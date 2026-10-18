@@ -143,7 +143,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         Err(error) => return send_persistence_error(id, &error),
     }
     #[cfg(feature = "csharp")]
-    if let Err(error) = state.reconcile_csharp_after_authority_change(file_path) {
+    if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(file_path) {
         return send_persistence_error(id, &error);
     }
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);

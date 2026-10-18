@@ -229,6 +229,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     .unwrap_or_else(|| {
         compile_file_ir_focused(&resolved_path, effective_fidelity, state, None)
             .map_err(|error| error.to_string())
+            .map(|artifact| artifact.into_parts())
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
@@ -353,7 +354,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     }
     #[cfg(feature = "csharp")]
     state
-        .reconcile_csharp_after_authority_change(&canonical_path)
+        .mark_csharp_call_authority_dirty_for_file(&canonical_path)
         .map_err(ProvideFailure::internal)?;
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(

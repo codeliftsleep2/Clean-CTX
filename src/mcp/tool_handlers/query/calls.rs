@@ -65,7 +65,7 @@ fn evaluate_calls_in_file(
         Fidelity::High,
         state,
     ) {
-        Ok(candidate) => candidate,
+        Ok(candidate) => candidate.into_parts(),
         Err(error) => return Err(QueryFailure::from_clean_ctx(&error)),
     };
     let hierarchy = match crate::ir::hierarchical::try_ir_to_hierarchical(&compiled) {

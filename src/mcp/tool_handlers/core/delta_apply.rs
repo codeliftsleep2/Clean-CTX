@@ -282,7 +282,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 state.consume_pending_transition(&file, from, new_version);
             }
             #[cfg(feature = "csharp")]
-            if let Err(error) = state.reconcile_csharp_after_authority_change(&durable_file) {
+            if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&durable_file) {
                 send_response(&invalid_session_ir_response(id, &error));
                 return;
             }

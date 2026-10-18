@@ -64,7 +64,8 @@ fn establish_intent(
             crate::compression::Fidelity::Edit,
             state,
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
     let identities = crate::mcp::compatibility::derive_identities(
         target_source,
         std::path::Path::new(file),

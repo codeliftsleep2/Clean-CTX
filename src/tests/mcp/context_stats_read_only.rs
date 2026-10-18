@@ -210,7 +210,8 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
             crate::compression::Fidelity::Edit,
             &state,
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: "stats-pending".to_string(),

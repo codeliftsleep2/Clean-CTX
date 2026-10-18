@@ -121,9 +121,8 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((mut ir, semantic_edges, semantic_dependencies, source_hash)) =
-        ir_result
-    {
+    let mut response = if let Ok(artifact) = ir_result {
+        let (mut ir, semantic_edges, semantic_dependencies, source_hash) = artifact.into_parts();
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
             None => return,
@@ -210,7 +209,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             return;
         }
         #[cfg(feature = "csharp")]
-        if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_path) {
+        if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&canonical_path) {
             send_response(&crate::mcp::tool_helpers::jsonrpc_error(
                 id.clone(),
                 -32603,

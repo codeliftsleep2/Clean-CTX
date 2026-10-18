@@ -192,7 +192,7 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
         Err(error) => return send_restore_error(id, &error),
     }
     #[cfg(feature = "csharp")]
-    if let Err(error) = state.reconcile_csharp_after_authority_change(&durable_path) {
+    if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&durable_path) {
         return send_restore_error(id, &error);
     }
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);

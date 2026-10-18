@@ -1,4 +1,4 @@
-//! C# exact-call reconciliation after declaration-authority changes.
+//! Artifact-backed C# exact-call projection and deterministic commit.
 //!
 //! Current source-bound artifacts supply declaration and invocation evidence.
 //! Missing artifacts are compiled once, then every caller is projected against
@@ -51,7 +51,7 @@ impl McpState {
         self.csharp_call_authority.reconciliation_count()
     }
 
-    pub(crate) fn reconcile_csharp_after_authority_change(
+    pub(crate) fn mark_csharp_call_authority_dirty_for_file(
         &self,
         changed_file: &str,
     ) -> Result<(), String> {
@@ -65,7 +65,7 @@ impl McpState {
         Ok(())
     }
 
-    pub(crate) fn reconcile_csharp_exact_calls_for_generation(
+    pub(crate) fn project_csharp_exact_calls_for_generation(
         &self,
         generation: u64,
     ) -> Result<String, String> {
@@ -195,5 +195,5 @@ fn is_admitted_csharp_source(state: &McpState, file: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "../tests/mcp/csharp_call_reconciliation.rs"]
+#[path = "../../tests/mcp/csharp_call_reconciliation.rs"]
 mod tests;

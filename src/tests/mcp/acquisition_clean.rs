@@ -88,7 +88,8 @@ public sealed class Consumer : IContextA
         Fidelity::High,
         &state,
     )
-    .expect("C# production compilation");
+    .expect("C# production compilation")
+    .into_parts();
     let type_refs: Vec<_> = edges
         .iter()
         .filter(|edge| {

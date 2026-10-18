@@ -56,7 +56,8 @@ fn establish_deletion_intent(
             crate::compression::Fidelity::Edit,
             state,
         )
-        .expect("target compilation");
+        .expect("target compilation")
+        .into_parts();
     target_ir.file_id = file.to_string();
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: transition.to_string(),

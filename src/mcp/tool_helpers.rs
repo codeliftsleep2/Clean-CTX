@@ -6,7 +6,7 @@
 use crate::compression::Fidelity;
 
 use crate::mcp::McpState;
-use crate::mcp::semantic_compilation::artifact::{CompiledSemantic, SemanticCompilationArtifact};
+use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
 #[cfg(test)]
 pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_IR_FAILURE;
 #[cfg(test)]
@@ -255,7 +255,7 @@ pub(super) fn compile_file_ir_candidate(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let existing_alias = state.alias_for_path(file_path);
     let candidate_id = existing_alias
         .clone()
@@ -280,7 +280,7 @@ pub(super) fn compile_source_ir_candidate(
     source: &str,
     fidelity: Fidelity,
     state: &McpState,
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let alias = state
         .alias_for_path(file_path)
         .unwrap_or_else(|| file_path.to_string());
@@ -295,7 +295,6 @@ pub(super) fn compile_source_ir_candidate(
         previous_version,
         None,
     )
-    .map(SemanticCompilationArtifact::into_compiled_semantic)
 }
 
 /// Compile a file to IR with symbol targeting (`focus`).
@@ -313,7 +312,7 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let path_alias = state.get_or_create_alias(file_path.to_string());
     let previous_version = state.file_version(&path_alias).unwrap_or(0);
     compile_file_ir_focused_with_identity(
@@ -333,7 +332,7 @@ fn compile_file_ir_focused_with_identity(
     focus: Option<&std::collections::HashSet<String>>,
     path_alias: &str,
     previous_version: u64,
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let source_arc = state.read_source(file_path)?;
     compile_source_ir_focused_with_identity(
         file_path,
@@ -345,7 +344,6 @@ fn compile_file_ir_focused_with_identity(
         previous_version,
         None,
     )
-    .map(SemanticCompilationArtifact::into_compiled_semantic)
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -157,7 +157,8 @@ fn restore_rejects_removed_additional_root_before_recovery_or_publication() {
             crate::compression::Fidelity::Edit,
             &producer,
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let identities =
         crate::mcp::compatibility::derive_identities(target_source, &file_path, &producer.config)

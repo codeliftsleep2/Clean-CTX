@@ -5,13 +5,6 @@ use crate::mcp::compatibility::identity::ProducerKey;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-pub(crate) type CompiledSemantic = (
-    CompiledIR,
-    Vec<SemanticEdge>,
-    Vec<SemanticDependency>,
-    String,
-);
-
 #[cfg(feature = "csharp")]
 #[derive(Debug)]
 pub(crate) struct CSharpSemanticArtifact {
@@ -88,7 +81,14 @@ impl SemanticCompilationArtifact {
         })
     }
 
-    pub(crate) fn into_compiled_semantic(self) -> CompiledSemantic {
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        CompiledIR,
+        Vec<SemanticEdge>,
+        Vec<SemanticDependency>,
+        String,
+    ) {
         let Self {
             identity,
             source_snapshot,

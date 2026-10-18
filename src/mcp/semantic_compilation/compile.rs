@@ -56,7 +56,10 @@ pub(crate) fn compile_source_artifact(
     use crate::ir::layers::typescript::TypeScriptLayer;
 
     let path = Path::new(request.file_path);
-    let extension = path.extension().and_then(|value| value.to_str()).unwrap_or("");
+    let extension = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("");
     let (language, query_string) = language_for_extension(extension).ok_or_else(|| {
         crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{extension}"))
     })?;

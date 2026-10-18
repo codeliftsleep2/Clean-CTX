@@ -17,4 +17,3 @@ pub(crate) fn record_full_semantic_parse() {
 pub(crate) fn full_semantic_parses() -> usize {
     FULL_SEMANTIC_PARSES.load(std::sync::atomic::Ordering::SeqCst)
 }
-

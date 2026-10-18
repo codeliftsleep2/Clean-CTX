@@ -19,7 +19,7 @@ fn compile_artifact(
 }
 
 #[test]
-fn semantic_compilation_artifact_matches_legacy_boundary_for_enabled_languages() {
+fn semantic_compilation_helpers_preserve_artifacts_for_enabled_languages() {
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let cases = [
         #[cfg(feature = "csharp")]
@@ -47,28 +47,44 @@ fn semantic_compilation_artifact_matches_legacy_boundary_for_enabled_languages()
     assert!(!cases.is_empty(), "the test requires one enabled language");
     for (file_path, source) in cases {
         let artifact = compile_artifact(&state, file_path, source).expect("artifact compilation");
-        let legacy = crate::mcp::tool_helpers::compile_source_ir_candidate(
+        let candidate = crate::mcp::tool_helpers::compile_source_ir_candidate(
             file_path,
             source,
             Fidelity::High,
             &state,
         )
-        .expect("legacy compatibility compilation");
+        .expect("candidate artifact compilation");
 
-        assert_eq!(artifact.compiled(), &legacy.0, "compiled IR for {file_path}");
+        assert_eq!(
+            artifact.compiled(),
+            candidate.compiled(),
+            "compiled IR for {file_path}"
+        );
         assert_eq!(
             serde_json::to_value(artifact.semantic_edges()).expect("artifact edge serialization"),
-            serde_json::to_value(&legacy.1).expect("legacy edge serialization"),
+            serde_json::to_value(candidate.semantic_edges()).expect("candidate edge serialization"),
             "edges for {file_path}"
         );
         assert_eq!(
             artifact.semantic_dependencies(),
-            legacy.2,
+            candidate.semantic_dependencies(),
             "dependencies for {file_path}"
         );
-        assert_eq!(artifact.source_hash(), legacy.3, "hash for {file_path}");
-        assert_eq!(artifact.source_snapshot(), source, "snapshot for {file_path}");
-        assert_eq!(artifact.fidelity(), Fidelity::High, "fidelity for {file_path}");
+        assert_eq!(
+            artifact.source_hash(),
+            candidate.source_hash(),
+            "hash for {file_path}"
+        );
+        assert_eq!(
+            artifact.source_snapshot(),
+            source,
+            "snapshot for {file_path}"
+        );
+        assert_eq!(
+            artifact.fidelity(),
+            Fidelity::High,
+            "fidelity for {file_path}"
+        );
         assert!(
             !artifact.canonical_owner().is_empty(),
             "canonical owner for {file_path}"
@@ -125,5 +141,8 @@ fn semantic_compilation_artifact_failure_produces_no_artifact() {
     *crate::mcp::tool_helpers::TEST_INJECTED_SOURCE_FAILURE
         .lock()
         .expect("failure injection lock") = None;
-    assert!(result.is_err(), "failed compilation must return no artifact");
+    assert!(
+        result.is_err(),
+        "failed compilation must return no artifact"
+    );
 }

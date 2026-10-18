@@ -486,7 +486,8 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
             crate::compression::Fidelity::Edit,
             &initial_state,
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let target_version = target_ir.version;
     let target_binary = crate::ir::binary_wire::encode(&target_ir);

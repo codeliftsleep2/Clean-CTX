@@ -237,7 +237,8 @@ fn production_compile_path_carries_typed_execution_semantics_to_llm_projection()
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let path = file.to_string_lossy();
     let (compiled, _, _, _) = compile_file_ir_focused(&path, Fidelity::High, &state, None)
-        .expect("default production compilation path");
+        .expect("default production compilation path")
+        .into_parts();
     assert!(compiled.instructions.iter().any(|operation| {
         matches!(
             operation,

@@ -222,7 +222,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     // Source changed or no baseline - compile
     let (mut compiled, semantic_edges, semantic_dependencies, source_hash) =
         match compile_file_ir_candidate(&resolved_path, fidelity, state) {
-            Ok(c) => c,
+            Ok(artifact) => artifact.into_parts(),
             Err(e) => {
                 send_response(&to_jsonrpc_error(id, &e));
                 return;
@@ -357,7 +357,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         }
     };
     #[cfg(feature = "csharp")]
-    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_path) {
+    if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&canonical_path) {
         send_response(&invalid_session_ir_response(id, &error));
         return;
     }

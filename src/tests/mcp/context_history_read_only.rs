@@ -150,7 +150,8 @@ fn history_does_not_resolve_a_pending_edit_intent() {
             crate::compression::Fidelity::Edit,
             &initial,
         )
-        .unwrap();
+        .unwrap()
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let intent = crate::mcp::sqlite_store::EditIntent {
         transition_id: "history-pending".to_string(),

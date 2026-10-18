@@ -63,7 +63,8 @@ fn establish_irreconcilable_intent(
         crate::compression::Fidelity::Edit,
         state,
     )
-    .expect("target compilation");
+    .expect("target compilation")
+    .into_parts();
     let identities = crate::mcp::compatibility::derive_identities(
         target_source,
         std::path::Path::new(file),
@@ -330,7 +331,8 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
             crate::compression::Fidelity::Edit,
             &initial,
         )
-        .expect("target compilation");
+        .expect("target compilation")
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let identities =
         crate::mcp::compatibility::derive_identities(target_text, &path, &initial.config)
@@ -420,7 +422,8 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
             crate::compression::Fidelity::Edit,
             &initial,
         )
-        .expect("target compilation");
+        .expect("target compilation")
+        .into_parts();
     target_ir.file_id.clone_from(&file);
     let identities =
         crate::mcp::compatibility::derive_identities(target_text, &path, &initial.config)

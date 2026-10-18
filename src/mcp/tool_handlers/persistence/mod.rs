@@ -305,7 +305,7 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
         "validated alias ownership must remain stable"
     );
     #[cfg(feature = "csharp")]
-    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_requested) {
+    if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&canonical_requested) {
         return send_persistence_error(id, &error);
     }
 

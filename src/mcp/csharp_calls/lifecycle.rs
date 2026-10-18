@@ -150,7 +150,7 @@ impl CSharpCallAuthorityState {
                 }
             };
 
-            let result = state.reconcile_csharp_exact_calls_for_generation(generation);
+            let result = state.project_csharp_exact_calls_for_generation(generation);
             let mut inner = self.lock();
             let generation_is_current = inner.generation == generation
                 && inner.status == CSharpCallAuthorityStatus::Reconciling;

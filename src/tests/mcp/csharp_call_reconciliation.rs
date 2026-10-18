@@ -14,7 +14,8 @@ fn publish(state: &McpState, file: &std::path::Path) {
     state.invalidate_source_cache(&file);
     let (_, edges, _, hash) =
         crate::mcp::tool_helpers::compile_file_ir_candidate(&file, Fidelity::High, state)
-            .expect("candidate compilation");
+            .expect("candidate compilation")
+            .into_parts();
     let canonical = state.semantic_owner_path(&file);
     state.workspace_index_lock().replace_semantic_projection(
         &canonical,
@@ -23,7 +24,7 @@ fn publish(state: &McpState, file: &std::path::Path) {
         hash,
     );
     state
-        .reconcile_csharp_after_authority_change(&canonical)
+        .mark_csharp_call_authority_dirty_for_file(&canonical)
         .expect("C# reconciliation");
     state
         .prepare_exact_csharp_calls()
@@ -84,7 +85,7 @@ fn removal_and_signature_change_revoke_exact_calls() {
     let canonical_target = state.semantic_owner_path(&target.to_string_lossy());
     state.workspace_index_lock().remove_file(&canonical_target);
     state
-        .reconcile_csharp_after_authority_change(&canonical_target)
+        .mark_csharp_call_authority_dirty_for_file(&canonical_target)
         .unwrap();
     assert!(callers(&state).is_empty());
 
@@ -118,7 +119,7 @@ fn newly_introduced_ambiguity_revokes_and_removal_reestablishes() {
         .workspace_index_lock()
         .remove_file(&canonical_duplicate);
     state
-        .reconcile_csharp_after_authority_change(&canonical_duplicate)
+        .mark_csharp_call_authority_dirty_for_file(&canonical_duplicate)
         .unwrap();
     assert_eq!(callers(&state), [CALLER_IDENTITY]);
 }

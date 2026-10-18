@@ -274,7 +274,10 @@ fn try_prepare_entities_in_file(
         .map_err(QueryFailure::internal)?;
     let (semantic_edges, semantic_dependencies, compiled_hash) =
         match crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state) {
-            Ok((_, edges, dependencies, hash)) => (edges, dependencies, hash),
+            Ok(artifact) => {
+                let (_, edges, dependencies, hash) = artifact.into_parts();
+                (edges, dependencies, hash)
+            }
             Err(error) => return Err(QueryFailure::internal(error.to_string())),
         };
     context.invalidate_derived_catalogs();
@@ -290,7 +293,7 @@ fn try_prepare_entities_in_file(
     }
     #[cfg(feature = "csharp")]
     state
-        .reconcile_csharp_after_authority_change(&canonical_path)
+        .mark_csharp_call_authority_dirty_for_file(&canonical_path)
         .map_err(QueryFailure::internal)?;
     let certificate = CompletenessCertificate::current_file(canonical_path.clone(), compiled_hash);
     Ok(prepared_entities_in_file(canonical_path, certificate))
@@ -388,7 +391,8 @@ fn try_prepare_declarations_in_file(
             .map_err(QueryFailure::internal)?;
         let (_, semantic_edges, semantic_dependencies, compiled_hash) =
             crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state)
-                .map_err(|error| QueryFailure::internal(error.to_string()))?;
+                .map_err(|error| QueryFailure::internal(error.to_string()))?
+                .into_parts();
         state
             .workspace_index_lock()
             .replace_semantic_projection_with_dependencies(
@@ -400,7 +404,7 @@ fn try_prepare_declarations_in_file(
             );
         #[cfg(feature = "csharp")]
         state
-            .reconcile_csharp_after_authority_change(&canonical_path)
+            .mark_csharp_call_authority_dirty_for_file(&canonical_path)
             .map_err(QueryFailure::internal)?;
     }
     Ok(prepared_declarations_in_file(canonical_path))

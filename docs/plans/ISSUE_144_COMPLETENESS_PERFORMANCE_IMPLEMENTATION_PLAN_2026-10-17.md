@@ -6,6 +6,11 @@
 
 **Production implementation:** separately gated; not performed by this document
 
+**Implementation status (2026-10-17):** Phases 1–7 have separate focused GREEN
+baselines. The typed artifact migration, obsolete-path removal, and production
+integration audit are complete. Phase 8 remains an operator-run release Live
+MCP acceptance gate.
+
 **Approved investigation:**
 `docs/plans/ISSUE_144_REVERSE_EDGE_COMPLETENESS_PERFORMANCE_INVESTIGATION_2026-10-17.md`
 
