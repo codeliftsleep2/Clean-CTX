@@ -7,9 +7,9 @@
 **Production implementation:** separately gated; not performed by this document
 
 **Implementation status (2026-10-17):** Phases 1–7 have separate focused GREEN
-baselines. The typed artifact migration, obsolete-path removal, and production
-integration audit are complete. Phase 8 remains an operator-run release Live
-MCP acceptance gate.
+baselines, and the operator-run Phase 8 release Live MCP acceptance gate is
+GREEN. The typed artifact migration, obsolete-path removal, production
+integration audit, and field acceptance are complete.
 
 **Approved investigation:**
 `docs/plans/ISSUE_144_REVERSE_EDGE_COMPLETENESS_PERFORMANCE_INVESTIGATION_2026-10-17.md`
@@ -517,6 +517,11 @@ below 10 seconds and every semantic case must pass. Store `timings.json`,
 verdicts, requests, responses, stderr, and binary hashes under `target/**`.
 
 This is operator/live evidence, not a replacement for tracked Rust tests.
+
+**Result (2026-10-17): GREEN.** All 15 live scenarios passed. The maximum
+reverse-edge duration was 2.928 seconds against the fixed 10-second ceiling.
+The retained evidence is under
+`target/issue-144-live-verification/20261017-235311-de15d096`.
 
 ## 9. Required correctness matrix
 

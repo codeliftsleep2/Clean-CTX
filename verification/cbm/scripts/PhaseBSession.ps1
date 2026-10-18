@@ -99,7 +99,12 @@ function Get-BTextBody($Result) {
     }
     return $text
 }
-function Start-BSession([string]$Name, [string]$Executable, [string]$Root) {
+function Start-BSession(
+    [string]$Name,
+    [string]$Executable,
+    [string]$Root,
+    [hashtable]$Environment = @{}
+) {
     $info = [Diagnostics.ProcessStartInfo]::new()
     $info.FileName=$Executable; $info.WorkingDirectory=$Root
     $info.UseShellExecute=$false; $info.RedirectStandardInput=$true
@@ -114,6 +119,9 @@ function Start-BSession([string]$Name, [string]$Executable, [string]$Root) {
     }
     if ($info.PSObject.Properties['StandardOutputEncoding']) {
         $info.StandardOutputEncoding=$utf8
+    }
+    foreach ($entry in $Environment.GetEnumerator()) {
+        $info.EnvironmentVariables[[string]$entry.Key] = [string]$entry.Value
     }
     $process=[Diagnostics.Process]::new(); $process.StartInfo=$info
     Assert-B ($process.Start()) "Could not launch $Executable"

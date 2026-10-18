@@ -122,9 +122,13 @@ function Tool($Session, [string]$Name, [hashtable]$Arguments, [string]$Evidence)
 }
 
 function Query($Session, [hashtable]$Arguments, [string]$Evidence) {
-    $containsReverse = $Arguments.type -eq 'reverse_edges' -or @(
-        $Arguments.queries | Where-Object { $_.type -eq 'reverse_edges' }
-    ).Count -gt 0
+    $containsReverse = $Arguments.ContainsKey('type') -and
+        $Arguments['type'] -eq 'reverse_edges'
+    if (-not $containsReverse -and $Arguments.ContainsKey('queries')) {
+        $containsReverse = @(
+            $Arguments['queries'] | Where-Object { $_.type -eq 'reverse_edges' }
+        ).Count -gt 0
+    }
     $stopwatch = [Diagnostics.Stopwatch]::StartNew()
     $result = Tool $Session 'workspace_query' $Arguments $Evidence
     $stopwatch.Stop()
@@ -386,8 +390,40 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
     Write-Fixture
 
     Write-Config $true (Join-Path $runRoot 'missing-provider.exe')
-    $unavailable = Start-BSession 'provider-unavailable' $BinaryPath $primary
+    $unavailableHome = Join-Path $runRoot 'provider-unavailable-home'
+    New-Item -ItemType Directory -Force $unavailableHome | Out-Null
+    $providerNames = @(
+        'codebase-memory-mcp.exe',
+        'codebase-memory-mcp.cmd',
+        'codebase-memory-mcp.bat',
+        'codebase-memory-mcp'
+    )
+    $isolatedPath = @(
+        [Environment]::GetEnvironmentVariable('PATH') -split [IO.Path]::PathSeparator |
+            Where-Object {
+                $directory = $_
+                $directory -and -not @(
+                    $providerNames | Where-Object {
+                        Test-Path -LiteralPath (Join-Path $directory $_) -PathType Leaf
+                    }
+                ).Count
+            }
+    ) -join [IO.Path]::PathSeparator
+    $unavailable = Start-BSession 'provider-unavailable' $BinaryPath $primary @{
+        PATH = $isolatedPath
+        HOME = $unavailableHome
+        USERPROFILE = $unavailableHome
+        HOMEDRIVE = [IO.Path]::GetPathRoot($unavailableHome).TrimEnd('\')
+        HOMEPATH = $unavailableHome.Substring([IO.Path]::GetPathRoot($unavailableHome).Length - 1)
+        LOCALAPPDATA = Join-Path $unavailableHome 'AppData/Local'
+        APPDATA = Join-Path $unavailableHome 'AppData/Roaming'
+    }
     Invoke-BCase '144-C' 'provider-unavailable-retains-Clean-authority' {
+        $status = Get-BResult (Invoke-BReadyTool $unavailable 'get_cbm_status' @{})
+        Save-B 'provider-unavailable-status' $status
+        Assert-B ($status._meta.cbm_status -eq 'unavailable') (
+            "Provider-unavailable fixture unexpectedly resolved CBM: $($status._meta.cbm_status)"
+        )
         $answer = Reverse $unavailable 'ContextA' 'provider-unavailable-context-a'
         Assert-Exact $answer 'provider-unavailable ContextA'
         Assert-Set (Edge-Keys $answer) $nativeContextKeys 'Provider-unavailable truth differs from the native oracle.'
