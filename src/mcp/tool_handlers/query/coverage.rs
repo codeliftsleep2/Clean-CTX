@@ -174,6 +174,9 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             Some(CoverageProofDisposition::Unproven(ProofBarrier::PublicationFailed)) => {
                 "publication_failed"
             }
+            Some(CoverageProofDisposition::Unproven(ProofBarrier::CandidateProcessingFailed)) => {
+                "candidate_processing_failed"
+            }
             Some(CoverageProofDisposition::Unproven(ProofBarrier::ClaimIncompatible)) => {
                 "proof_incompatible"
             }
@@ -187,6 +190,7 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
         "inventory_incomplete",
         "candidate_predicate_uncertified",
         "proof_incompatible",
+        "candidate_processing_failed",
         "publication_failed",
         "indeterminate",
     ]
@@ -200,9 +204,12 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             "candidate_predicate_uncertified" | "proof_incompatible"
         )
     });
-    let has_operational = reasons
-        .iter()
-        .any(|reason| matches!(*reason, "inventory_incomplete" | "publication_failed"));
+    let has_operational = reasons.iter().any(|reason| {
+        matches!(
+            *reason,
+            "inventory_incomplete" | "candidate_processing_failed" | "publication_failed"
+        )
+    });
     let has_indeterminate = reasons.contains(&"indeterminate");
     let structurally_unproven = outcome.processing() == AcquisitionProcessingState::Terminal
         && has_structural

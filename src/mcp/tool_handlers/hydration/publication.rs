@@ -13,7 +13,7 @@ static TEST_BATCH_SUPERSESSION: std::sync::Mutex<Option<(String, String)>> =
     std::sync::Mutex::new(None);
 
 #[cfg(all(test, feature = "rust"))]
-pub(super) fn supersede_test_batch_once(path: String, source: String) {
+pub(crate) fn supersede_test_batch_once(path: String, source: String) {
     *TEST_BATCH_SUPERSESSION
         .lock()
         .expect("batch supersession lock") = Some((path, source));
@@ -24,6 +24,7 @@ pub(super) enum CandidatePublication {
     Published,
     PublishedCSharp,
     Current,
+    PublicationFailed,
     Failed,
 }
 
@@ -85,7 +86,12 @@ pub(crate) fn compile_candidate(
     ) {
         Ok(CandidatePublication::Published) => true,
         Ok(CandidatePublication::PublishedCSharp) => state.prepare_exact_csharp_calls().is_ok(),
-        Ok(CandidatePublication::Current | CandidatePublication::Failed) | Err(_) => false,
+        Ok(
+            CandidatePublication::Current
+            | CandidatePublication::PublicationFailed
+            | CandidatePublication::Failed,
+        )
+        | Err(_) => false,
     }
 }
 
@@ -229,7 +235,9 @@ fn prepare_candidate(
 
     #[cfg(all(test, feature = "rust"))]
     if super::take_test_publication_failure(&canonical) {
-        return Ok(PreparedCandidate::Terminal(CandidatePublication::Failed));
+        return Ok(PreparedCandidate::Terminal(
+            CandidatePublication::PublicationFailed,
+        ));
     }
 
     state.preflight_semantic_publication(&validated)?;
@@ -304,5 +312,5 @@ fn commit_candidate(
                 Ok::<_, String>(publication.published_outcome)
             },
         )
-        .map(|published| published.unwrap_or(CandidatePublication::Failed))
+        .map(|published| published.unwrap_or(CandidatePublication::PublicationFailed))
 }

@@ -9,7 +9,7 @@ use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
     TestProjectReadiness, clear_test_project_search_results, fail_test_publication_once,
     reset_test_scan_calls, set_test_inbound_project_search_results, set_test_project_readiness,
-    set_test_project_search_results, test_scan_calls,
+    set_test_project_search_results, supersede_test_batch_once, test_scan_calls,
 };
 use crate::mcp::tools::dispatch_tools_call;
 use crate::tests::assert_valid_mcp_envelope;
@@ -364,6 +364,43 @@ fn issue_144_publication_failure_remains_lower_bound() {
             "reasons": ["publication_failed"]
         }),
         "publication failure must remain an operationally incomplete, retryable lower bound: {coverage}"
+    );
+}
+
+#[test]
+fn issue_144_source_race_reports_candidate_processing_failure() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+    let consumer = root.path().join("KnownConsumer.cs");
+    supersede_test_batch_once(
+        consumer.to_string_lossy().into_owned(),
+        "public sealed class KnownConsumer { public KnownConsumer(ContextA changed) {} }\n".into(),
+    );
+
+    let response = dispatch_reverse(&state, root.path());
+    let coverage = &structured(&response)["coverage"];
+
+    assert_eq!(coverage["source_complete"], false, "{coverage}");
+    assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
+    assert_eq!(coverage["omitted_possible"], true, "{coverage}");
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "incomplete",
+            "proof_state": "operationally_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "same_request_may_help",
+            "residual_unit_count": 1,
+            "reasons": ["candidate_processing_failed"]
+        }),
+        "a source race is candidate-processing failure, not a structural or publication barrier: {coverage}"
     );
 }
 

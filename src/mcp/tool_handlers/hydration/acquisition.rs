@@ -112,7 +112,11 @@ pub(super) fn prepare_clean_type_ref_acquisition(
 }
 
 impl ProvisionalAcquisition {
-    pub(super) fn finish(self, publication: SemanticPublicationStatus) -> AcquisitionOutcome {
+    pub(super) fn finish(
+        self,
+        publication: SemanticPublicationStatus,
+        failure_barrier: ProofBarrier,
+    ) -> AcquisitionOutcome {
         let mut satisfaction = AcquisitionSatisfaction::new(&self.requirement);
         let mut dispositions = self
             .barriers
@@ -124,10 +128,7 @@ impl ProvisionalAcquisition {
             if satisfaction.record_after_publication(proof, publication) {
                 dispositions.insert(unit, CoverageProofDisposition::Proven);
             } else {
-                dispositions.insert(
-                    unit,
-                    CoverageProofDisposition::Unproven(ProofBarrier::PublicationFailed),
-                );
+                dispositions.insert(unit, CoverageProofDisposition::Unproven(failure_barrier));
             }
         }
         AcquisitionOutcome::new(satisfaction, dispositions, publication)

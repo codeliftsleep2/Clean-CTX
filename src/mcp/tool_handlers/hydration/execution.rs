@@ -3,7 +3,9 @@ use super::filesystem::{configured_roots, root_key};
 use super::publication::{CandidatePublication, compile_candidates_for, select_candidates};
 use super::{HydrationReport, HydrationRequirement, discover_candidate_paths, discovery_kind};
 use crate::mcp::McpState;
-use crate::mcp::acquisition::{AcquisitionOutcome, AcquisitionTarget, SemanticPublicationStatus};
+use crate::mcp::acquisition::{
+    AcquisitionOutcome, AcquisitionTarget, ProofBarrier, SemanticPublicationStatus,
+};
 
 #[cfg(all(test, feature = "rust"))]
 pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index(
@@ -93,15 +95,17 @@ fn hydrate_workspace_index_for_target(
     let selected = select_candidates(state, candidate_paths, requirement);
     let mut compiled = 0;
     let mut publication_failed = false;
+    let mut candidate_processing_failed = false;
     for outcome in compile_candidates_for(state, &selected, workspace_root, requirement)? {
         match outcome {
             CandidatePublication::Published => compiled += 1,
             CandidatePublication::PublishedCSharp => compiled += 1,
             CandidatePublication::Current => {}
-            CandidatePublication::Failed => publication_failed = true,
+            CandidatePublication::PublicationFailed => publication_failed = true,
+            CandidatePublication::Failed => candidate_processing_failed = true,
         }
     }
-    if !publication_failed {
+    if !publication_failed && !candidate_processing_failed {
         for scope in &outcome.completions {
             mark_discovery_complete(state, scope, discovery, query_name, requirement);
         }
@@ -112,11 +116,19 @@ fn hydrate_workspace_index_for_target(
         .and_then(AcquisitionOutcome::from_cached_complete);
     let acquisition_outcome = cached_outcome.or_else(|| {
         provisional.map(|provisional| {
-            provisional.finish(if publication_failed {
-                SemanticPublicationStatus::Failed
-            } else {
-                SemanticPublicationStatus::Complete
-            })
+            let failed = publication_failed || candidate_processing_failed;
+            provisional.finish(
+                if failed {
+                    SemanticPublicationStatus::Failed
+                } else {
+                    SemanticPublicationStatus::Complete
+                },
+                if candidate_processing_failed {
+                    ProofBarrier::CandidateProcessingFailed
+                } else {
+                    ProofBarrier::PublicationFailed
+                },
+            )
         })
     });
     let acquisition_satisfaction = cached_satisfaction.or_else(|| {
@@ -132,7 +144,7 @@ fn hydrate_workspace_index_for_target(
     Ok(HydrationReport {
         hydration_attempted: outcome.attempted,
         discovery_provider: outcome.provider,
-        discovery_status: if publication_failed {
+        discovery_status: if publication_failed || candidate_processing_failed {
             "partial"
         } else {
             outcome.status

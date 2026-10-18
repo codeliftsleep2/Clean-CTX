@@ -20,6 +20,7 @@ pub(crate) enum ProofBarrier {
     InventoryIncomplete,
     CandidatePredicateUncertified,
     ClaimIncompatible,
+    CandidateProcessingFailed,
     PublicationFailed,
 }
 
@@ -48,7 +49,9 @@ impl AcquisitionOutcome {
             matches!(
                 disposition,
                 CoverageProofDisposition::Unproven(
-                    ProofBarrier::InventoryIncomplete | ProofBarrier::PublicationFailed
+                    ProofBarrier::InventoryIncomplete
+                        | ProofBarrier::PublicationFailed
+                        | ProofBarrier::CandidateProcessingFailed
                 )
             )
         });
