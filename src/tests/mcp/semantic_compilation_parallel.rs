@@ -25,7 +25,10 @@ fn compile_with(worker_count: usize) -> Vec<(String, String)> {
                 job(0, "struct Zero; impl Zero { fn value(&self) -> i32 { 0 } }"),
                 job(1, "struct One; impl One { fn value(&self) -> i32 { 1 } }"),
                 job(2, "struct Two; impl Two { fn value(&self) -> i32 { 2 } }"),
-                job(3, "struct Three; impl Three { fn value(&self) -> i32 { 3 } }"),
+                job(
+                    3,
+                    "struct Three; impl Three { fn value(&self) -> i32 { 3 } }",
+                ),
             ],
         )
         .into_iter()
@@ -46,7 +49,10 @@ fn semantic_compilation_parallel_is_deterministic_for_pool_sizes_one_two_and_fou
     assert_eq!(compile_with(2), serial);
     assert_eq!(compile_with(4), serial);
     assert_eq!(
-        serial.iter().map(|entry| entry.0.as_str()).collect::<Vec<_>>(),
+        serial
+            .iter()
+            .map(|entry| entry.0.as_str())
+            .collect::<Vec<_>>(),
         vec![
             "parallel-0.rs",
             "parallel-1.rs",
@@ -108,11 +114,15 @@ fn assert_first_was_not_published(state: &crate::mcp::McpState, path: &str) {
     let source = state.read_source(path).expect("first source snapshot");
     let hash = crate::cache::content_hash(source.as_bytes());
     let canonical = state.semantic_owner_path(path);
-    assert!(!state.workspace_index_read().has_current_semantic_projection(
-        &canonical,
-        crate::workspace::index::SemanticFidelity::High,
-        &hash,
-    ));
+    assert!(
+        !state
+            .workspace_index_read()
+            .has_current_semantic_projection(
+                &canonical,
+                crate::workspace::index::SemanticFidelity::High,
+                &hash,
+            )
+    );
 }
 
 #[test]
@@ -133,10 +143,11 @@ fn semantic_compilation_parallel_worker_failure_commits_no_partial_authority() {
         .lock()
         .expect("failure injection lock") = None;
 
-    assert!(outcomes.iter().all(|outcome| matches!(
-        outcome,
-        super::publication::CandidatePublication::Failed
-    )));
+    assert!(
+        outcomes
+            .iter()
+            .all(|outcome| matches!(outcome, super::publication::CandidatePublication::Failed))
+    );
     assert_first_was_not_published(&state, &paths[0]);
 }
 
@@ -156,9 +167,10 @@ fn semantic_compilation_parallel_superseded_job_commits_no_partial_authority() {
     )
     .expect("batch result");
 
-    assert!(outcomes.iter().all(|outcome| matches!(
-        outcome,
-        super::publication::CandidatePublication::Failed
-    )));
+    assert!(
+        outcomes
+            .iter()
+            .all(|outcome| matches!(outcome, super::publication::CandidatePublication::Failed))
+    );
     assert_first_was_not_published(&state, &paths[0]);
 }
