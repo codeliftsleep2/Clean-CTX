@@ -151,6 +151,17 @@ impl SemanticCompilationArtifact {
         self.identity.fidelity
     }
 
+    #[cfg(feature = "csharp")]
+    pub(crate) fn authority_identity_material(&self) -> String {
+        format!(
+            "{}\0{}\0{:?}\0{:?}",
+            self.identity.canonical_owner,
+            self.identity.source_hash,
+            self.identity.producer_generations.canonical,
+            self.identity.producer_generations.semantic
+        )
+    }
+
     pub(crate) fn published_semantics(
         &self,
     ) -> (Vec<SemanticEdge>, Vec<SemanticDependency>, String) {
@@ -159,6 +170,11 @@ impl SemanticCompilationArtifact {
             self.semantic_dependencies.clone(),
             self.identity.source_hash.clone(),
         )
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn semantic_dependencies_owned(&self) -> Vec<SemanticDependency> {
+        self.semantic_dependencies.clone()
     }
 
     #[cfg(feature = "csharp")]

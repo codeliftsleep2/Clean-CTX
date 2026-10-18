@@ -15,6 +15,7 @@ pub(crate) enum CSharpCallAuthorityStatus {
 struct AuthorityInner {
     generation: u64,
     status: CSharpCallAuthorityStatus,
+    fingerprint: Option<String>,
 }
 
 #[derive(Debug)]
@@ -32,6 +33,7 @@ impl Default for CSharpCallAuthorityState {
             inner: Mutex::new(AuthorityInner {
                 generation: 0,
                 status: CSharpCallAuthorityStatus::Dirty,
+                fingerprint: None,
             }),
             changed: Condvar::new(),
             artifacts: Mutex::new(BTreeMap::new()),
@@ -107,12 +109,32 @@ impl CSharpCallAuthorityState {
         self.lock().status
     }
 
+    #[cfg(test)]
+    pub(crate) fn fingerprint(&self) -> Option<String> {
+        self.lock().fingerprint.clone()
+    }
+
     pub(crate) fn prepare(&self, state: &McpState) -> Result<u64, String> {
         loop {
             let generation = {
                 let mut inner = self.lock();
                 match inner.status {
-                    CSharpCallAuthorityStatus::Current => return Ok(inner.generation),
+                    CSharpCallAuthorityStatus::Current
+                        if inner.fingerprint.as_deref().is_some_and(|fingerprint| {
+                            state
+                                .workspace_index_read()
+                                .has_current_csharp_exact_call_coverage(
+                                    fingerprint,
+                                    inner.generation,
+                                )
+                        }) =>
+                    {
+                        return Ok(inner.generation);
+                    }
+                    CSharpCallAuthorityStatus::Current => {
+                        inner.status = CSharpCallAuthorityStatus::Reconciling;
+                        inner.generation
+                    }
                     CSharpCallAuthorityStatus::Dirty => {
                         inner.status = CSharpCallAuthorityStatus::Reconciling;
                         inner.generation
@@ -128,12 +150,13 @@ impl CSharpCallAuthorityState {
                 }
             };
 
-            let result = state.reconcile_csharp_exact_calls();
+            let result = state.reconcile_csharp_exact_calls_for_generation(generation);
             let mut inner = self.lock();
             let generation_is_current = inner.generation == generation
                 && inner.status == CSharpCallAuthorityStatus::Reconciling;
             if generation_is_current {
-                inner.status = if result.is_ok() {
+                inner.status = if let Ok(fingerprint) = &result {
+                    inner.fingerprint = Some(fingerprint.clone());
                     CSharpCallAuthorityStatus::Current
                 } else {
                     CSharpCallAuthorityStatus::Dirty
@@ -154,6 +177,8 @@ impl CSharpCallAuthorityState {
 impl McpState {
     pub(crate) fn mark_csharp_authority_dirty(&self) {
         self.csharp_call_authority.mark_dirty();
+        self.workspace_index_lock()
+            .dirty_csharp_exact_call_coverage();
     }
 
     pub(crate) fn prepare_exact_csharp_calls(&self) -> Result<u64, String> {

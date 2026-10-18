@@ -60,7 +60,7 @@ fn cross_file_exact_call_is_file_order_independent() {
     assert!(callers(&caller_first).is_empty());
     publish(&caller_first, &target);
     assert_eq!(callers(&caller_first), [CALLER_IDENTITY]);
-    caller_first.reconcile_csharp_exact_calls().unwrap();
+    caller_first.prepare_exact_csharp_calls().unwrap();
     assert_eq!(
         callers(&caller_first),
         [CALLER_IDENTITY],

@@ -44,6 +44,7 @@
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
 
+mod capability_coverage;
 mod coverage;
 mod declarations;
 mod edges;
@@ -227,6 +228,7 @@ pub struct WorkspaceIndex {
     /// beside the occurrences it qualifies so removal and replacement cannot
     /// leave an independent fidelity/freshness map behind.
     semantic_coverage: HashMap<String, SemanticCoverage>,
+    capability_coverage: capability_coverage::CapabilityCoverage,
     /// Total edge count before dedup (for diagnostic purposes).
     total_edges_inserted: usize,
     /// Active edge count after dedup.
@@ -251,6 +253,7 @@ impl WorkspaceIndex {
             ngrx_refined_edges: Vec::new(),
             name_index: HashMap::new(),
             semantic_coverage: HashMap::new(),
+            capability_coverage: Default::default(),
             total_edges_inserted: 0,
             edge_count: 0,
             #[cfg(test)]

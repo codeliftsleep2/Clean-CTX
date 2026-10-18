@@ -7,6 +7,9 @@
 
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+use crate::mcp::csharp_calls::authority::{
+    authority_fingerprint, authority_manifest, merge_declarations,
+};
 use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
 use crate::mcp::semantic_compilation::executor::CompilationJob;
 use crate::workspace::index::SemanticFidelity;
@@ -62,7 +65,10 @@ impl McpState {
         Ok(())
     }
 
-    pub(crate) fn reconcile_csharp_exact_calls(&self) -> Result<(), String> {
+    pub(crate) fn reconcile_csharp_exact_calls_for_generation(
+        &self,
+        generation: u64,
+    ) -> Result<String, String> {
         #[cfg(test)]
         self.csharp_call_authority.record_reconciliation();
 
@@ -75,23 +81,15 @@ impl McpState {
             .collect();
         files.sort();
         files.dedup();
-        if files.is_empty() {
-            return Ok(());
-        }
-
         let artifacts = self.current_csharp_artifacts(&files)?;
-        let authority: Vec<_> = artifacts
-            .iter()
-            .flat_map(|artifact| {
-                artifact
-                    .csharp_declarations()
-                    .unwrap_or_default()
-                    .iter()
-                    .cloned()
-            })
-            .collect();
+        let manifest = authority_manifest(
+            &artifacts,
+            self.config.additional_roots.iter().cloned(),
+            self.config.exclude_patterns.iter().cloned(),
+        );
+        let fingerprint = authority_fingerprint(&manifest);
+        let authority = merge_declarations(&artifacts);
 
-        let authority_files = files.clone();
         let mut projections = Vec::with_capacity(files.len());
         for artifact in artifacts {
             let file = artifact.canonical_owner().to_string();
@@ -103,7 +101,7 @@ impl McpState {
                 .unwrap_or_else(|| semantic_fidelity(artifact.fidelity()));
             let edges = artifact.project_exact_csharp_calls(&authority)?;
             projections.push(Projection {
-                dependencies: authority_dependencies(&file, &authority_files, &edges),
+                dependencies: artifact.semantic_dependencies_owned(),
                 file,
                 edges,
                 source_hash: artifact.source_hash().to_string(),
@@ -122,6 +120,7 @@ impl McpState {
                     projection.dependencies.clone(),
                 );
             }
+            index.commit_csharp_exact_call_coverage(fingerprint.0.clone(), generation);
         }
         for projection in projections {
             if let Some(alias) = self.alias_for_path(&projection.file) {
@@ -132,7 +131,7 @@ impl McpState {
                 );
             }
         }
-        Ok(())
+        Ok(fingerprint.0)
     }
 
     fn current_csharp_artifacts(
@@ -183,31 +182,6 @@ impl McpState {
         artifacts.sort_by(|left, right| left.canonical_owner().cmp(right.canonical_owner()));
         Ok(artifacts)
     }
-}
-
-fn authority_dependencies(
-    owner: &str,
-    authority_files: &[String],
-    edges: &[crate::layers::meta::semantic::SemanticEdge],
-) -> Vec<crate::layers::meta::semantic::SemanticDependency> {
-    if !edges
-        .iter()
-        .any(|edge| edge.relation == crate::layers::meta::semantic::SemanticRelation::Calls)
-    {
-        return Vec::new();
-    }
-    let mut files: Vec<_> = authority_files
-        .iter()
-        .map(String::as_str)
-        .filter(|file| *file != owner)
-        .map(str::to_owned)
-        .collect();
-    files.sort();
-    files.dedup();
-    files
-        .into_iter()
-        .map(crate::layers::meta::semantic::SemanticDependency::current)
-        .collect()
 }
 
 fn is_admitted_csharp_source(state: &McpState, file: &str) -> bool {

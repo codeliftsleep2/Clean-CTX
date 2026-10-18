@@ -107,6 +107,13 @@ impl WorkspaceIndex {
             .map(|coverage| coverage.fidelity)
     }
 
+    #[cfg(test)]
+    pub(crate) fn semantic_dependency_count(&self, file_path: &str) -> usize {
+        self.semantic_coverage
+            .get(file_path)
+            .map_or(0, |coverage| coverage.dependencies.len())
+    }
+
     pub fn replace_semantic_projection(
         &mut self,
         file_path: &str,

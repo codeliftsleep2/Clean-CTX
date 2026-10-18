@@ -96,11 +96,7 @@ fn hydrate_workspace_index_for_target(
     for outcome in compile_candidates_for(state, &selected, workspace_root, requirement)? {
         match outcome {
             CandidatePublication::Published => compiled += 1,
-            CandidatePublication::PublishedCSharp => {
-                compiled += 1;
-                #[cfg(feature = "csharp")]
-                state.mark_csharp_authority_dirty();
-            }
+            CandidatePublication::PublishedCSharp => compiled += 1,
             CandidatePublication::Current => {}
             CandidatePublication::Failed => publication_failed = true,
         }

@@ -84,7 +84,7 @@ pub(crate) fn compile_candidate(
         HydrationRequirement::LegacyEdit,
     ) {
         Ok(CandidatePublication::Published) => true,
-        Ok(CandidatePublication::PublishedCSharp) => state.reconcile_csharp_exact_calls().is_ok(),
+        Ok(CandidatePublication::PublishedCSharp) => state.prepare_exact_csharp_calls().is_ok(),
         Ok(CandidatePublication::Current | CandidatePublication::Failed) | Err(_) => false,
     }
 }
@@ -297,6 +297,10 @@ fn commit_candidate(
                         compiled_hash,
                         semantic_dependencies,
                     );
+                #[cfg(feature = "csharp")]
+                if publication.published_outcome == CandidatePublication::PublishedCSharp {
+                    state.mark_csharp_authority_dirty();
+                }
                 Ok::<_, String>(publication.published_outcome)
             },
         )
