@@ -101,6 +101,23 @@ fn interface_reverse_coverage_points_to_csharp_constructor_type_query() {
     assert_eq!(coverage["alternative_query"]["entity_type"], "TypeRef");
     assert_eq!(coverage["alternative_query"]["name"], "IFooService");
     assert_eq!(coverage["alternative_query"]["relation"], "HasBaseType");
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "not_attempted",
+            "proof_state": "unsupported",
+            "fact_authority": "authoritative_observed",
+            "retryability": "indeterminate",
+            "reasons": ["capability_not_supported"]
+        }),
+        "an unsupported exact query family must explain why no completeness acquisition ran"
+    );
+    assert!(
+        coverage["coverage_detail"]
+            .get("residual_unit_count")
+            .is_none(),
+        "unsupported families have no acquisition requirement from which to derive a count"
+    );
 }
 
 #[test]

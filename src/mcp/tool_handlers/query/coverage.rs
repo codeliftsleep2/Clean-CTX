@@ -148,6 +148,13 @@ pub(super) fn exact_identity_coverage(
         && matches!(identity.entity_type.as_str(), "Class" | "Interface")
         && !response_has_typed_evidence
     {
+        coverage["coverage_detail"] = json!({
+            "processing_state": "not_attempted",
+            "proof_state": "unsupported",
+            "fact_authority": "authoritative_observed",
+            "retryability": "indeterminate",
+            "reasons": ["capability_not_supported"],
+        });
         coverage["alternative_query"] = json!({
             "type": "reverse_edges",
             "domain": "builtin",
