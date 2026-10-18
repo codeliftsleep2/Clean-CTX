@@ -76,7 +76,7 @@ fn live_proxy_exercises_all_cbm_tools() {
 
 /// CBM-ID fix regression: the graph_search wrapper must find symbols of
 /// ALL node labels. Before the fix, `bridge.search` hardcoded
-/// `label: "Function"`, so Class nodes (e.g. GraphBridge itself) were
+/// `label: "Function"`, so Struct nodes (e.g. GraphBridge itself) were
 /// invisible to every wrapper search.
 ///
 /// The test invalidates caches first: pre-fix runs wrote their own empty
@@ -88,7 +88,7 @@ fn live_proxy_exercises_all_cbm_tools() {
 /// poison the shared mutex for later live tests.
 #[serial(cbm_live)]
 #[test]
-fn e2e_bridge_search_finds_class_symbols_across_labels() {
+fn e2e_bridge_search_finds_struct_symbols_across_labels() {
     enum Outcome {
         Skipped(&'static str),
         Hit { name: String, label: String },
@@ -142,7 +142,7 @@ fn e2e_bridge_search_finds_class_symbols_across_labels() {
         ),
         Outcome::Hit { name, label } => {
             assert_eq!(name, "GraphBridge");
-            assert_eq!(label, "Class", "GraphBridge must be found as a Class");
+            assert_eq!(label, "Struct", "GraphBridge must be found as a Struct");
         }
     }
 }

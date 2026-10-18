@@ -104,6 +104,7 @@ fn shared_live_state() -> Arc<crate::mcp::McpState> {
             .push(fixture_root.to_string_lossy().into_owned());
         let state = crate::mcp::McpState::new(config);
         state.start_cbm_after_initialize();
+        wait_for_admission_complete(&state);
         wait_for_indexing_complete(&state);
         let fixture_project = {
             let mut bridge = state.graph_bridge_lock();
@@ -121,6 +122,31 @@ fn shared_live_state() -> Arc<crate::mcp::McpState> {
             .as_ref()
             .expect("shared live state was just initialized"),
     )
+}
+
+/// Wait for asynchronous provider admission to publish the shared bridge
+/// before either indexing waiter attempts to access it. MCP startup no longer
+/// blocks on CBM admission, so the live fixture must synchronize explicitly.
+fn wait_for_admission_complete(state: &crate::mcp::McpState) {
+    let deadline = std::time::Instant::now() + LIVE_INDEXING_TIMEOUT;
+    loop {
+        match state.cbm_status() {
+            crate::cbm::CbmStatus::Available => return,
+            crate::cbm::CbmStatus::Initializing => {
+                if std::time::Instant::now() >= deadline {
+                    panic!(
+                        "[cbm-e2e] Timed out after {}s waiting for provider admission",
+                        LIVE_INDEXING_TIMEOUT.as_secs()
+                    );
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            status => panic!(
+                "[cbm-e2e] Provider admission failed before indexing: {}",
+                status.summary()
+            ),
+        }
+    }
 }
 
 fn wait_for_project_indexing_complete(state: &crate::mcp::McpState, project: &str) {
