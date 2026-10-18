@@ -224,6 +224,61 @@ fn workspace_query_exact_identity_coverage_schema() {
         coverage["properties"]["alternative_query"]["type"],
         "object"
     );
+    let detail = &coverage["properties"]["coverage_detail"];
+    assert_eq!(detail["type"], "object");
+    assert_eq!(detail["additionalProperties"], false);
+    assert_eq!(
+        detail["required"],
+        json!([
+            "processing_state",
+            "proof_state",
+            "fact_authority",
+            "retryability",
+            "reasons"
+        ])
+    );
+    assert_eq!(
+        detail["properties"]["processing_state"]["enum"],
+        json!(["terminal", "incomplete", "not_attempted", "indeterminate"])
+    );
+    assert_eq!(
+        detail["properties"]["proof_state"]["enum"],
+        json!([
+            "complete",
+            "structurally_unproven",
+            "operationally_unproven",
+            "mixed_unproven",
+            "unsupported",
+            "indeterminate"
+        ])
+    );
+    assert_eq!(
+        detail["properties"]["fact_authority"]["enum"],
+        json!(["authoritative_observed"])
+    );
+    assert_eq!(
+        detail["properties"]["retryability"]["enum"],
+        json!([
+            "not_needed",
+            "same_request_may_help",
+            "change_required",
+            "indeterminate"
+        ])
+    );
+    assert_eq!(detail["properties"]["residual_unit_count"]["minimum"], 0);
+    assert_eq!(
+        detail["properties"]["reasons"]["items"]["enum"],
+        json!([
+            "inventory_incomplete",
+            "candidate_predicate_uncertified",
+            "proof_incompatible",
+            "candidate_processing_failed",
+            "publication_failed",
+            "capability_not_supported",
+            "processing_not_attempted",
+            "indeterminate"
+        ])
+    );
 }
 
 #[test]

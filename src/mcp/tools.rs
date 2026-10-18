@@ -119,6 +119,46 @@ fn workspace_query_cycle_schema() -> Value {
     })
 }
 
+fn workspace_query_coverage_detail_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "description": "Bounded explanation of the authority, processing, and retry state behind exact-identity coverage. This detail never strengthens the legacy completeness tuple.",
+        "additionalProperties": false,
+        "properties": {
+            "processing_state": {
+                "type": "string",
+                "enum": ["terminal", "incomplete", "not_attempted", "indeterminate"]
+            },
+            "proof_state": {
+                "type": "string",
+                "enum": ["complete", "structurally_unproven", "operationally_unproven", "mixed_unproven", "unsupported", "indeterminate"]
+            },
+            "fact_authority": {
+                "type": "string",
+                "enum": ["authoritative_observed"]
+            },
+            "retryability": {
+                "type": "string",
+                "enum": ["not_needed", "same_request_may_help", "change_required", "indeterminate"]
+            },
+            "residual_unit_count": {
+                "type": "integer",
+                "minimum": 0
+            },
+            "reasons": {
+                "type": "array",
+                "uniqueItems": true,
+                "maxItems": 8,
+                "items": {
+                    "type": "string",
+                    "enum": ["inventory_incomplete", "candidate_predicate_uncertified", "proof_incompatible", "candidate_processing_failed", "publication_failed", "capability_not_supported", "processing_not_attempted", "indeterminate"]
+                }
+            }
+        },
+        "required": ["processing_state", "proof_state", "fact_authority", "retryability", "reasons"]
+    })
+}
+
 pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     let tools = vec![
         serde_json::json!({
@@ -441,6 +481,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                             "source_generation": { "type": "string" },
                             "evidence_requirements": { "type": "array", "items": { "type": "string" } },
                             "reasons": { "type": "array", "items": { "type": "object" } },
+                            "coverage_detail": workspace_query_coverage_detail_schema(),
                             "discovered_not_compiled_this_cycle": {
                                 "type": "integer",
                                 "minimum": 0
