@@ -174,7 +174,10 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             Some(CoverageProofDisposition::Unproven(ProofBarrier::PublicationFailed)) => {
                 "publication_failed"
             }
-            _ => "claim_incompatible",
+            Some(CoverageProofDisposition::Unproven(ProofBarrier::ClaimIncompatible)) => {
+                "proof_incompatible"
+            }
+            Some(CoverageProofDisposition::Proven) | None => "indeterminate",
         };
         if !reasons.contains(&reason) {
             reasons.push(reason);
@@ -182,7 +185,13 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
     }
     let complete = outcome.satisfaction().is_source_complete();
     let structurally_unproven = outcome.processing() == AcquisitionProcessingState::Terminal
-        && reasons == ["candidate_predicate_uncertified"];
+        && !reasons.is_empty()
+        && reasons.iter().all(|reason| {
+            matches!(
+                *reason,
+                "candidate_predicate_uncertified" | "proof_incompatible"
+            )
+        });
     let operationally_unproven = outcome.processing() == AcquisitionProcessingState::Incomplete
         && !reasons.is_empty()
         && reasons

@@ -1,8 +1,14 @@
-use super::{CapabilityDirection, exact_identity_coverage};
+use super::{CapabilityDirection, acquisition_coverage_detail, exact_identity_coverage};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use crate::mcp::acquisition::{
+    AcquisitionOutcome, AcquisitionRequirement, AcquisitionSatisfaction, CoverageProofDisposition,
+    CoverageUnit, ProofBarrier, SemanticPublicationStatus, SourceKind,
+};
 use crate::mcp::tool_handlers::hydration::HydrationReport;
 use crate::mcp::tool_handlers::query::identity::ResolvedIdentity;
 use crate::workspace::index::WorkspaceIndex;
+use serde_json::json;
+use std::collections::BTreeMap;
 
 fn indexed_identity() -> (WorkspaceIndex, ResolvedIdentity) {
     let identity = ResolvedIdentity {
@@ -95,4 +101,32 @@ fn interface_reverse_coverage_points_to_csharp_constructor_type_query() {
     assert_eq!(coverage["alternative_query"]["entity_type"], "TypeRef");
     assert_eq!(coverage["alternative_query"]["name"], "IFooService");
     assert_eq!(coverage["alternative_query"]["relation"], "HasBaseType");
+}
+
+#[test]
+fn incompatible_proof_claim_projects_stable_structural_reason() {
+    let unit = CoverageUnit::builtin_type_ref("C:/repo", SourceKind::CSharp, "generation");
+    let requirement =
+        AcquisitionRequirement::incoming_type_ref("IFooService", "scope", [unit.clone()]);
+    let outcome = AcquisitionOutcome::new(
+        AcquisitionSatisfaction::new(&requirement),
+        BTreeMap::from([(
+            unit,
+            CoverageProofDisposition::Unproven(ProofBarrier::ClaimIncompatible),
+        )]),
+        SemanticPublicationStatus::Complete,
+    );
+
+    assert_eq!(
+        acquisition_coverage_detail(&outcome),
+        json!({
+            "processing_state": "terminal",
+            "proof_state": "structurally_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "change_required",
+            "residual_unit_count": 1,
+            "reasons": ["proof_incompatible"]
+        }),
+        "internal proof-rejection names must not leak through the bounded public vocabulary"
+    );
 }
