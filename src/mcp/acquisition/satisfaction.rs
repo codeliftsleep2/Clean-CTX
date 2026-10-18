@@ -44,12 +44,23 @@ impl AcquisitionOutcome {
         dispositions: BTreeMap<CoverageUnit, CoverageProofDisposition>,
         publication: SemanticPublicationStatus,
     ) -> Self {
+        let has_operational_barrier = dispositions.values().any(|disposition| {
+            matches!(
+                disposition,
+                CoverageProofDisposition::Unproven(
+                    ProofBarrier::InventoryIncomplete | ProofBarrier::PublicationFailed
+                )
+            )
+        });
         Self {
             satisfaction,
             dispositions,
-            processing: match publication {
-                SemanticPublicationStatus::Complete => AcquisitionProcessingState::Terminal,
-                SemanticPublicationStatus::Failed => AcquisitionProcessingState::Incomplete,
+            processing: if publication == SemanticPublicationStatus::Failed
+                || has_operational_barrier
+            {
+                AcquisitionProcessingState::Incomplete
+            } else {
+                AcquisitionProcessingState::Terminal
             },
         }
     }

@@ -130,3 +130,31 @@ fn incompatible_proof_claim_projects_stable_structural_reason() {
         "internal proof-rejection names must not leak through the bounded public vocabulary"
     );
 }
+
+#[test]
+fn incomplete_inventory_projects_operational_processing_state() {
+    let unit = CoverageUnit::builtin_type_ref("C:/repo", SourceKind::CSharp, "generation");
+    let requirement =
+        AcquisitionRequirement::incoming_type_ref("IFooService", "scope", [unit.clone()]);
+    let outcome = AcquisitionOutcome::new(
+        AcquisitionSatisfaction::new(&requirement),
+        BTreeMap::from([(
+            unit,
+            CoverageProofDisposition::Unproven(ProofBarrier::InventoryIncomplete),
+        )]),
+        SemanticPublicationStatus::Complete,
+    );
+
+    assert_eq!(
+        acquisition_coverage_detail(&outcome),
+        json!({
+            "processing_state": "incomplete",
+            "proof_state": "operationally_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "same_request_may_help",
+            "residual_unit_count": 1,
+            "reasons": ["inventory_incomplete"]
+        }),
+        "an incomplete inventory is unfinished acquisition work even when candidate publication did not fail"
+    );
+}
