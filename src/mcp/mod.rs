@@ -17,6 +17,8 @@ pub(crate) mod cache_hints;
 pub(crate) mod compatibility;
 pub(crate) mod content_economics;
 pub(crate) mod context_store;
+#[cfg(feature = "csharp")]
+pub(crate) mod csharp_calls;
 pub(crate) mod discovery_cache;
 pub mod dispatcher;
 mod handlers;
@@ -25,6 +27,8 @@ pub(crate) mod persistence_ir;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
 pub(crate) mod semantic_compilation;
+#[cfg(test)]
+pub(crate) mod semantic_work_metrics;
 mod router;
 mod server;
 pub(crate) mod session_stats;

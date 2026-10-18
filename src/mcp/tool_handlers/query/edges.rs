@@ -155,6 +155,8 @@ fn try_prepare_forward_edges(
         requirement,
         &mut hydration,
     )?;
+    #[cfg(feature = "csharp")]
+    context.prepare_exact_csharp_calls_for_edges(state, args)?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity
         .exact()
@@ -353,6 +355,8 @@ fn try_prepare_reverse_edges(
         requirement,
         &mut hydration,
     )?;
+    #[cfg(feature = "csharp")]
+    context.prepare_exact_csharp_calls_for_edges(state, args)?;
     let classification_complete = hydration.is_complete();
     let needs_csharp_resolution = identity.exact().is_some_and(|exact| {
         exact.domain == "builtin" && matches!(exact.entity_type.as_str(), "Class" | "Interface")

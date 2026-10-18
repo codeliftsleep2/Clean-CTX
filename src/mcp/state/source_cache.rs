@@ -156,6 +156,14 @@ impl McpState {
                 // documented external-edit boundary (see
                 // docs/CLAUDE_INTEGRATION_RULES.md: use `index_repository`).
                 self.invalidate_hydration_discovery_all();
+                #[cfg(feature = "csharp")]
+                if std::path::Path::new(path)
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("cs"))
+                {
+                    self.mark_csharp_authority_dirty();
+                }
                 #[cfg(debug_assertions)]
                 eprintln!(
                     "[read_source] CACHE STALE for {} (mtime/size changed)",

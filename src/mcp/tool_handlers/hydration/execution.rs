@@ -93,20 +93,17 @@ fn hydrate_workspace_index_for_target(
     let selected = select_candidates(state, candidate_paths, requirement);
     let mut compiled = 0;
     let mut publication_failed = false;
-    let mut csharp_reconciliation_required = false;
     for outcome in compile_candidates_for(state, &selected, workspace_root, requirement)? {
         match outcome {
             CandidatePublication::Published => compiled += 1,
             CandidatePublication::PublishedCSharp => {
                 compiled += 1;
-                csharp_reconciliation_required = true;
+                #[cfg(feature = "csharp")]
+                state.mark_csharp_authority_dirty();
             }
             CandidatePublication::Current => {}
             CandidatePublication::Failed => publication_failed = true,
         }
-    }
-    if csharp_reconciliation_required {
-        state.reconcile_csharp_exact_calls()?;
     }
     if !publication_failed {
         for scope in &outcome.completions {

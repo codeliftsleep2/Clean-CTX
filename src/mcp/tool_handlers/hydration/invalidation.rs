@@ -74,6 +74,8 @@ pub(crate) fn reconcile_external_refresh_for_root(
     state: &McpState,
     root: &str,
 ) -> RefreshReconciliation {
+    #[cfg(feature = "csharp")]
+    state.mark_csharp_authority_dirty();
     let identity = crate::dictionary::path::canonical_identity_key(root);
     let dependent_owners = state
         .workspace_index_read()

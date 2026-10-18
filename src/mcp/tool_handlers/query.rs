@@ -166,6 +166,13 @@ where
     // Step 3: One exhaustive discovery hydration pass.
     let hydration =
         super::hydration::hydrate_workspace_index(state, query_type, query_name, workspace_root)?;
+    // Legacy test helper callers provide only a query name, not the exact
+    // identity needed by the production capability gate. Preserve their
+    // historical edge-query behavior without affecting production routing.
+    #[cfg(feature = "csharp")]
+    if matches!(query_type, "forward_edges" | "reverse_edges") {
+        state.prepare_exact_csharp_calls()?;
+    }
 
     // Step 4: Rerun original query exactly once.
     let (final_results, final_count) = {
@@ -353,6 +360,14 @@ mod tests_file_diagnostics;
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_calls.rs"]
 mod tests_native_calls;
+
+#[cfg(all(test, feature = "rust", feature = "csharp"))]
+#[path = "../../tests/mcp/csharp_call_authority_lifecycle.rs"]
+mod csharp_call_authority_lifecycle_tests;
+
+#[cfg(all(test, feature = "rust", feature = "csharp"))]
+#[path = "../../tests/mcp/issue_144_performance_work_counts.rs"]
+mod tests_issue_144_performance_work_counts;
 
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_exact_identity_coverage.rs"]

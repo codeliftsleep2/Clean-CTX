@@ -203,17 +203,16 @@ pub struct McpState {
 
     /// Rendered LLM hierarchy cache keyed by path alias.
     pub llm_text_cache: Mutex<HashMap<String, String>>,
-
     /// Cross-file semantic index populated by production compilation.
     pub workspace_index: RwLock<crate::workspace::index::WorkspaceIndex>,
-
     /// Session-scoped record of completed hydration discovery.
     pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
-
     /// Session-scoped proof-backed incoming-relationship acquisition cache.
     pub(crate) acquisition_completion: Mutex<AcquisitionCompletionCache>,
     pub(crate) semantic_compiler:
         crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor,
+    #[cfg(feature = "csharp")]
+    pub(crate) csharp_call_authority: crate::mcp::csharp_calls::lifecycle::CSharpCallAuthorityState,
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
@@ -306,10 +305,11 @@ impl McpState {
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
             hydration_discovery: Mutex::new(HydrationDiscoveryCache::new()),
             acquisition_completion: Mutex::new(AcquisitionCompletionCache::new()),
-            semantic_compiler:
-                crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::new(
-                    crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::default_worker_count(),
-                ),
+            semantic_compiler: crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::new(
+                crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::default_worker_count(),
+            ),
+            #[cfg(feature = "csharp")]
+            csharp_call_authority: Default::default(),
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,

@@ -83,7 +83,7 @@ pub(crate) fn compile_candidate(
     ) {
         Ok(CandidatePublication::Published) => true,
         Ok(CandidatePublication::PublishedCSharp) => state
-            .reconcile_csharp_after_authority_change(resolved_path)
+            .reconcile_csharp_exact_calls()
             .is_ok(),
         Ok(CandidatePublication::Current | CandidatePublication::Failed) | Err(_) => false,
     }

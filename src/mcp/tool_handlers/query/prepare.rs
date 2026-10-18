@@ -72,6 +72,8 @@ pub(super) struct PreparationContext {
     csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
     efcore_catalog: Option<Arc<super::csharp_resolution::EfCoreCatalog>>,
     angular_catalogs: [Option<Arc<super::angular_templates::Catalog>>; 2],
+    #[cfg(feature = "csharp")]
+    exact_csharp_calls: Option<(u64, Result<(), String>)>,
 }
 
 impl PreparationContext {
@@ -82,7 +84,38 @@ impl PreparationContext {
             csharp_catalog: None,
             efcore_catalog: None,
             angular_catalogs: [None, None],
+            #[cfg(feature = "csharp")]
+            exact_csharp_calls: None,
         }
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(super) fn prepare_exact_csharp_calls(
+        &mut self,
+        state: &McpState,
+    ) -> Result<(), QueryFailure> {
+        let generation = state.csharp_authority_generation();
+        if let Some((prepared_generation, result)) = &self.exact_csharp_calls
+            && *prepared_generation == generation
+        {
+            return result.clone().map_err(QueryFailure::internal);
+        }
+        let result = state.prepare_exact_csharp_calls().map(|_| ());
+        let prepared_generation = state.csharp_authority_generation();
+        self.exact_csharp_calls = Some((prepared_generation, result.clone()));
+        result.map_err(QueryFailure::internal)
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(super) fn prepare_exact_csharp_calls_for_edges(
+        &mut self,
+        state: &McpState,
+        args: &serde_json::Value,
+    ) -> Result<(), QueryFailure> {
+        if args["domain"] == "builtin" && args["entity_type"] == "Method" {
+            self.prepare_exact_csharp_calls(state)?;
+        }
+        Ok(())
     }
 
     pub(super) fn scope(

@@ -295,8 +295,8 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
     );
     assert_eq!(
         state.test_csharp_reconciliation_count(),
-        1,
-        "one acquisition cycle must reconcile once after publishing all relevant C# candidates"
+        0,
+        "unrelated C# acquisition must defer exact-call reconciliation"
     );
 
     state.reset_test_csharp_reconciliation_count();
@@ -308,7 +308,7 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
     assert_eq!(
         state.test_csharp_reconciliation_count(),
         0,
-        "a cycle with zero relevant publications must not reconcile"
+        "a warm unrelated acquisition must not reconcile exact calls"
     );
 
     crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES

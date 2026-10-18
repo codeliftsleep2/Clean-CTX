@@ -193,7 +193,7 @@ fn run_case(provider: ProviderState, reverse_roots: bool) {
     .expect("cold hydration");
     assert!(cold.is_complete(), "cold Clean authority: {provider:?}");
     assert_eq!(cold.candidates_compiled, 2);
-    assert_eq!(state.test_csharp_reconciliation_count(), 1);
+    assert_eq!(state.test_csharp_reconciliation_count(), 0);
 
     let expected_files = BTreeSet::from([
         state.semantic_owner_path(&first.path().join("ProjectContext.cs").to_string_lossy()),
@@ -210,7 +210,7 @@ fn run_case(provider: ProviderState, reverse_roots: bool) {
     .expect("warm hydration");
     assert!(warm.is_complete(), "warm Clean authority: {provider:?}");
     assert_eq!(warm.candidates_compiled, 0);
-    assert_eq!(state.test_csharp_reconciliation_count(), 1);
+    assert_eq!(state.test_csharp_reconciliation_count(), 0);
     assert_authority(&state, primary, &expected_files);
 }
 
