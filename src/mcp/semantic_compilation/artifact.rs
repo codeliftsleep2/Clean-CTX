@@ -138,7 +138,6 @@ impl SemanticCompilationArtifact {
         &self.semantic_dependencies
     }
 
-    #[cfg(test)]
     pub(crate) fn source_hash(&self) -> &str {
         &self.identity.source_hash
     }

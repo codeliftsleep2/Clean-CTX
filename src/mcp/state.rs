@@ -32,7 +32,6 @@ use crate::mcp::sqlite_store::SqliteStore;
 use crate::mcp::state::source_cache::CacheEntry;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, RwLock};
-
 // The session's shared file-content cache and its read boundary
 // (`CacheEntry`, `source_cache` reads, metadata-based invalidation), split
 // out of this file into one semantic module when `hydration_discovery` was
@@ -73,7 +72,7 @@ macro_rules! lock_or_recover {
 }
 
 pub(crate) mod physical_identity;
-mod publication;
+pub(crate) mod publication;
 mod source_cache;
 
 #[cfg(feature = "csharp")]
@@ -213,7 +212,8 @@ pub struct McpState {
 
     /// Session-scoped proof-backed incoming-relationship acquisition cache.
     pub(crate) acquisition_completion: Mutex<AcquisitionCompletionCache>,
-
+    pub(crate) semantic_compiler:
+        crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor,
     /// Phase 2: Proxy port for fetching tool-filtering and cache stats.
     /// Defaults to 8787 (the proxy's default port).
     pub proxy_port: u16,
@@ -306,6 +306,10 @@ impl McpState {
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
             hydration_discovery: Mutex::new(HydrationDiscoveryCache::new()),
             acquisition_completion: Mutex::new(AcquisitionCompletionCache::new()),
+            semantic_compiler:
+                crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::new(
+                    crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::default_worker_count(),
+                ),
             cbm_filter: Mutex::new(CbmFilterState::default()),
             graph_bridge: Mutex::new(graph_bridge),
             cbm_status,

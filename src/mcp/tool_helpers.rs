@@ -5,17 +5,10 @@
 
 use crate::compression::Fidelity;
 
-/// Phase A retirement tests: cfg(test)-only injection slot. When
-/// `Some(reason)`, the next IR compilation fails with an injected error so
-/// the retired-legacy-fallback contract can be exercised end-to-end
-/// (natural `CompileError` paths are unreachable with valid grammars).
 #[cfg(test)]
-pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
-    std::sync::Mutex::new(None);
-
+pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_IR_FAILURE;
 #[cfg(test)]
-pub(crate) static TEST_INJECTED_SOURCE_FAILURE: std::sync::Mutex<Option<String>> =
-    std::sync::Mutex::new(None);
+pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_SOURCE_FAILURE;
 use crate::mcp::semantic_compilation::artifact::{CompiledSemantic, SemanticCompilationArtifact};
 use crate::mcp::McpState;
 use std::path::PathBuf;
@@ -394,138 +387,24 @@ pub(crate) fn compile_source_ir_focused_with_identity(
     >,
     #[cfg(not(feature = "csharp"))] _csharp_authority: Option<&[()]>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
-    // Test-only production-compiler failure injection applies equally to
-    // on-disk and exact in-memory candidate compilation.
-    #[cfg(test)]
-    if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock()
-        && let Some(reason) = injected.as_ref()
-    {
-        return Err(crate::error::CleanCtxError::Ir(format!(
-            "injected IR failure: {reason}"
-        )));
-    }
-    #[cfg(test)]
-    if let Ok(injected) = TEST_INJECTED_SOURCE_FAILURE.lock()
-        && let Some(marker) = injected.as_ref()
-        && source.contains(marker)
-    {
-        return Err(crate::error::CleanCtxError::Ir(format!(
-            "injected candidate IR failure: {marker}"
-        )));
-    }
-
-    use crate::ir::compiler::IRCompiler;
-    use crate::ir::layers::csharp::CSharpLayer;
-    use crate::ir::layers::java::JavaLayer;
-    use crate::ir::layers::rust::RustLayer;
-    use crate::ir::layers::typescript::TypeScriptLayer;
-    // P0-4: Meta-layers are now handled by LayerRegistry::global() inside IRCompiler.
-    // The old ir::layers::angular/spring/dotnet modules have been removed.
-    use crate::compression::language::language_for_extension;
-
-    let path_buf = PathBuf::from(file_path);
-    let extension = path_buf.extension().and_then(|e| e.to_str()).unwrap_or("");
-
-    let (language, query_string) = language_for_extension(extension).ok_or_else(|| {
-        crate::error::CleanCtxError::Ir(format!("Unsupported file extension: .{}", extension))
-    })?;
-
-    // EntityRef.file provenance uses the canonical semantic owner. This keeps
-    // paths (rather than platform file IDs) in public/index records while
-    // ensuring hard-link spellings cannot create distinct occurrences for one
-    // physical file. It remains distinct from the session-local αN alias.
+    #[cfg(not(feature = "csharp"))]
+    let _ = _csharp_authority;
     let canonical_path = state.semantic_owner_path(file_path);
-
-    // NF-02: Determine the next version based on the previous context state
-    // A-08: Compute source hash for change detection
-    let source_hash = {
-        let cache = state.cache_read();
-        cache.compute_hash(source.as_bytes())
-    };
-
-    let mut compiler = IRCompiler::new();
-    compiler.set_config(state.config.clone());
-    #[cfg(feature = "csharp")]
-    if let Some(authority) = csharp_authority {
-        compiler.set_csharp_declaration_authority(authority.to_vec());
-    }
-
-    // Add language-specific layers (Layer 2)
-    match extension {
-        "ts" | "js" => {
-            compiler.add_language_layer(Box::new(TypeScriptLayer::new()));
-        }
-        "cs" => {
-            compiler.add_language_layer(Box::new(CSharpLayer::new()));
-        }
-        "rs" => {
-            compiler.add_language_layer(Box::new(RustLayer::new()));
-        }
-        "java" => {
-            compiler.add_language_layer(Box::new(JavaLayer::new()));
-        }
-        _ => {}
-    }
-
-    // P0-4: Framework meta-layers (Layer 3) are handled by LayerRegistry::global()
-    // inside IRCompiler::compile(). The active McpState configuration is passed
-    // through the compiler so framework and sub-layer opt-outs are honored.
-
-    // F-07 (FAANG audit): Wire the additive CodePatternRecognizer into
-    // the compile path. This is the Layer 4 additive recognizer that
-    // emits CTOR/OBSERVABLE/GETTER/SETTER flags alongside the original
-    // instructions. The recognizer is always-on because it adds context
-    // without removing any instructions (zero regression).
-    compiler.add_pattern_recognizer(Box::new(
-        crate::ir::layers::patterns::CodePatternRecognizer::new(),
-    ));
-
-    // NF-01: Wire the consumptive CompressingPatternRecognizer *after*
-    // the additive recognizer. This enables the Phase H 30% compression
-    // on edits by consuming recognised patterns into single PAT ops.
-    // The additive recognizer's flags (CTOR/OBSERVABLE/GETTER/SETTER)
-    // are emitted first, then the consumptive recognizer collapses them
-    // where possible. This ordering ensures maximum compression.
-    compiler.add_pattern_recognizer(Box::new(
-        crate::ir::patterns::CompressingPatternRecognizer::new(),
-    ));
-
-    // CBM filter-first: pass the skip set so low-importance symbols
-    // are excluded from IR output entirely.
     let skip_set = state.get_skip_set(file_path);
-    let mut compiled = compiler.compile_focused(
-        source,
-        path_alias,
-        Some(&canonical_path),
-        language,
-        query_string,
-        fidelity,
-        skip_set.as_ref(),
-        focus,
-    )?;
-
-    // R-02 Phase 3: Apply type aliases to the IR instruction stream.
-    // Replaces type names in FieldType, Return, and Param ops with
-    // alias tokens, and appends CoreOp::TypeAlias ops for used aliases.
-    crate::ir::type_aliases::apply_type_aliases_to_ir(
-        &mut compiled.instructions,
-        &state.config.type_aliases,
-    );
-
-    // NF-02: Override the version with the next monotonic value.
-    // The compiler always sets version=1; we fix it here.
-    compiled.version = previous_version.saturating_add(1);
-
-    SemanticCompilationArtifact::from_compiler(
-        compiled,
-        &mut compiler,
-        source_hash,
-        canonical_path,
-        source,
-        fidelity,
-        &path_buf,
-        &state.config,
-        extension,
+    crate::mcp::semantic_compilation::compile::compile_source_artifact(
+        crate::mcp::semantic_compilation::compile::CompilationRequest {
+            file_path,
+            source,
+            fidelity,
+            config: &state.config,
+            focus,
+            skip_set: skip_set.as_ref(),
+            path_alias,
+            previous_version,
+            canonical_owner: &canonical_path,
+            #[cfg(feature = "csharp")]
+            csharp_authority,
+        },
     )
 }
 

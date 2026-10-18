@@ -1,8 +1,21 @@
 use super::HydrationRequirement;
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+use crate::mcp::semantic_compilation::executor::{CompilationBatchResult, CompilationJob};
+use crate::mcp::state::publication::SemanticPublicationTicket;
 use crate::workspace::index::SemanticFidelity;
 use std::collections::HashSet;
+
+#[cfg(all(test, feature = "rust"))]
+static TEST_BATCH_SUPERSESSION: std::sync::Mutex<Option<(String, String)>> =
+    std::sync::Mutex::new(None);
+
+#[cfg(all(test, feature = "rust"))]
+pub(super) fn supersede_test_batch_once(path: String, source: String) {
+    *TEST_BATCH_SUPERSESSION
+        .lock()
+        .expect("batch supersession lock") = Some((path, source));
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CandidatePublication {
@@ -76,19 +89,103 @@ pub(crate) fn compile_candidate(
     }
 }
 
+#[cfg(all(test, feature = "rust"))]
 pub(super) fn compile_candidate_for(
     state: &McpState,
     resolved_path: &str,
     workspace_root: Option<&str>,
     requirement: HydrationRequirement,
 ) -> Result<CandidatePublication, String> {
+    let paths = [resolved_path.to_string()];
+    Ok(compile_candidates_for(
+        state,
+        &paths,
+        workspace_root,
+        requirement,
+    )?
+    .into_iter()
+    .next()
+    .unwrap_or(CandidatePublication::Failed))
+}
+
+struct PreparedPublication {
+    validated: String,
+    canonical: String,
+    coverage: SemanticFidelity,
+    published_outcome: CandidatePublication,
+    ticket: SemanticPublicationTicket,
+}
+
+enum PreparedCandidate {
+    Compile(PreparedPublication, CompilationJob),
+    Terminal(CandidatePublication),
+}
+
+pub(super) fn compile_candidates_for(
+    state: &McpState,
+    resolved_paths: &[String],
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+) -> Result<Vec<CandidatePublication>, String> {
+    let mut publications = Vec::new();
+    let mut jobs = Vec::new();
+    let mut terminal = Vec::new();
+    for resolved_path in resolved_paths {
+        match prepare_candidate(state, resolved_path, workspace_root, requirement)? {
+            PreparedCandidate::Compile(publication, job) => {
+                publications.push(publication);
+                jobs.push(job);
+            }
+            PreparedCandidate::Terminal(outcome) => terminal.push(outcome),
+        }
+    }
+    let compiled = state.semantic_compiler().compile(&state.config, jobs);
+    #[cfg(all(test, feature = "rust"))]
+    if let Some((path, source)) = TEST_BATCH_SUPERSESSION
+        .lock()
+        .expect("batch supersession lock")
+        .take()
+    {
+        std::fs::write(&path, source).expect("superseding source write");
+        state.invalidate_source_cache(&path);
+    }
+    if compiled.iter().any(|result| result.result.is_err())
+        || publications.iter().zip(&compiled).any(|(publication, result)| {
+            let Ok(artifact) = result.result.as_ref() else {
+                return true;
+            };
+            state
+                .read_source(&publication.validated)
+                .map(|source| {
+                    crate::cache::content_hash(source.as_bytes()) != artifact.source_hash()
+                })
+                .unwrap_or(true)
+        })
+    {
+        terminal.extend(
+            std::iter::repeat_n(CandidatePublication::Failed, publications.len()),
+        );
+        return Ok(terminal);
+    }
+    for (publication, compiled) in publications.into_iter().zip(compiled) {
+        terminal.push(commit_candidate(state, publication, compiled)?);
+    }
+    Ok(terminal)
+}
+
+fn prepare_candidate(
+    state: &McpState,
+    resolved_path: &str,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+) -> Result<PreparedCandidate, String> {
     let validated = match super::super::super::tool_helpers::resolve_file_path_checked(
         resolved_path,
         workspace_root,
         &state.config.additional_roots,
     ) {
         Ok(path) => path,
-        Err(_) => return Ok(CandidatePublication::Failed),
+        Err(_) => return Ok(PreparedCandidate::Terminal(CandidatePublication::Failed)),
     };
     let canonical = state.semantic_owner_path(&validated);
     let published_outcome = if cfg!(feature = "csharp")
@@ -105,7 +202,7 @@ pub(super) fn compile_candidate_for(
     let (fidelity, coverage) = match requirement {
         HydrationRequirement::LegacyEdit => {
             if has_current_legacy_edit_projection(state, &canonical) {
-                return Ok(CandidatePublication::Current);
+                return Ok(PreparedCandidate::Terminal(CandidatePublication::Current));
             }
             (Fidelity::Edit, SemanticFidelity::High)
         }
@@ -118,7 +215,7 @@ pub(super) fn compile_candidate_for(
                 .workspace_index_read()
                 .has_current_semantic_projection(&canonical, coverage, &source_hash)
             {
-                return Ok(CandidatePublication::Current);
+                return Ok(PreparedCandidate::Terminal(CandidatePublication::Current));
             }
             let fidelity = match coverage {
                 SemanticFidelity::Low => Fidelity::Low,
@@ -131,40 +228,68 @@ pub(super) fn compile_candidate_for(
 
     #[cfg(all(test, feature = "rust"))]
     if super::take_test_publication_failure(&canonical) {
-        return Ok(CandidatePublication::Failed);
+        return Ok(PreparedCandidate::Terminal(CandidatePublication::Failed));
     }
 
     state.preflight_semantic_publication(&validated)?;
-    match super::super::super::tool_helpers::compile_file_ir_focused(
-        &validated, fidelity, state, None,
-    ) {
-        Ok((_, semantic_edges, semantic_dependencies, compiled_hash)) => {
-            let expected_hash = compiled_hash.clone();
-            let outcome = publication
-                .commit(
-                    || {
-                        state
-                            .read_source(&validated)
-                            .map(|current| {
-                                state.cache_read().compute_hash(current.as_bytes()) == expected_hash
-                            })
-                            .map_err(|error| error.to_string())
-                    },
-                    || {
-                        let mut index = state.workspace_index_lock();
-                        index.replace_semantic_projection_with_dependencies(
-                            &canonical,
-                            semantic_edges,
-                            coverage,
-                            compiled_hash,
-                            semantic_dependencies,
-                        );
-                        Ok::<_, String>(published_outcome)
-                    },
-                )
-                .map(|published| published.unwrap_or(CandidatePublication::Failed))?;
-            Ok(outcome)
-        }
-        Err(_) => Ok(CandidatePublication::Failed),
-    }
+    let source = match state.read_source(&validated) {
+        Ok(source) => source,
+        Err(_) => return Ok(PreparedCandidate::Terminal(CandidatePublication::Failed)),
+    };
+    let path_alias = state.get_or_create_alias(validated.clone());
+    let previous_version = state.file_version(&path_alias).unwrap_or(0);
+    let job = CompilationJob {
+        file_path: validated.clone(),
+        source,
+        fidelity,
+        path_alias,
+        previous_version,
+        canonical_owner: canonical.clone(),
+        skip_set: state.get_skip_set(&validated),
+    };
+    Ok(PreparedCandidate::Compile(
+        PreparedPublication {
+            validated,
+            canonical,
+            coverage,
+            published_outcome,
+            ticket: publication,
+        },
+        job,
+    ))
+}
+
+fn commit_candidate(
+    state: &McpState,
+    publication: PreparedPublication,
+    compiled: CompilationBatchResult,
+) -> Result<CandidatePublication, String> {
+    debug_assert_eq!(compiled.file_path, publication.validated);
+    let Ok(artifact) = compiled.result else {
+        return Ok(CandidatePublication::Failed);
+    };
+    let (_, semantic_edges, semantic_dependencies, compiled_hash) =
+        artifact.into_compiled_semantic();
+    let expected_hash = compiled_hash.clone();
+    publication
+        .ticket
+        .commit(
+            || {
+                state
+                    .read_source(&publication.validated)
+                    .map(|current| crate::cache::content_hash(current.as_bytes()) == expected_hash)
+                    .map_err(|error| error.to_string())
+            },
+            || {
+                state.workspace_index_lock().replace_semantic_projection_with_dependencies(
+                    &publication.canonical,
+                    semantic_edges,
+                    publication.coverage,
+                    compiled_hash,
+                    semantic_dependencies,
+                );
+                Ok::<_, String>(publication.published_outcome)
+            },
+        )
+        .map(|published| published.unwrap_or(CandidatePublication::Failed))
 }

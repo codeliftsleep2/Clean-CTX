@@ -42,6 +42,9 @@ mod publication;
 mod report;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use publication::compile_candidate;
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/semantic_compilation_parallel.rs"]
+mod semantic_compilation_parallel_tests;
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use filesystem::{

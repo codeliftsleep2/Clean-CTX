@@ -1,6 +1,6 @@
 use super::cache::mark_discovery_complete;
 use super::filesystem::{configured_roots, root_key};
-use super::publication::{CandidatePublication, compile_candidate_for, select_candidates};
+use super::publication::{CandidatePublication, compile_candidates_for, select_candidates};
 use super::{HydrationReport, HydrationRequirement, discover_candidate_paths, discovery_kind};
 use crate::mcp::McpState;
 use crate::mcp::acquisition::{AcquisitionTarget, SemanticPublicationStatus};
@@ -94,8 +94,8 @@ fn hydrate_workspace_index_for_target(
     let mut compiled = 0;
     let mut publication_failed = false;
     let mut csharp_reconciliation_required = false;
-    for path in &selected {
-        match compile_candidate_for(state, path, workspace_root, requirement)? {
+    for outcome in compile_candidates_for(state, &selected, workspace_root, requirement)? {
+        match outcome {
             CandidatePublication::Published => compiled += 1,
             CandidatePublication::PublishedCSharp => {
                 compiled += 1;
