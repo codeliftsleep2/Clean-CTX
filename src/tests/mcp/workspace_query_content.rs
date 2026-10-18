@@ -84,6 +84,14 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
             "source_complete": false,
             "result_semantics": "lower_bound",
             "omitted_possible": true,
+            "coverage_detail": {
+                "processing_state": "terminal",
+                "proof_state": "structurally_unproven",
+                "fact_authority": "authoritative_observed",
+                "retryability": "change_required",
+                "residual_unit_count": 1,
+                "reasons": ["candidate_predicate_uncertified"]
+            },
             "alternative_query": {
                 "type": "reverse_edges",
                 "domain": "builtin",
@@ -106,6 +114,10 @@ fn workspace_query_exact_identity_coverage_content_envelope() {
     assert_eq!(value["completeness"]["source_complete"], false);
     assert_eq!(value["completeness"]["result_semantics"], "lower_bound");
     assert_eq!(value["completeness"]["omitted_possible"], true);
+    assert_eq!(
+        value["completeness"]["coverage_detail"], structured["coverage"]["coverage_detail"],
+        "the model-facing completeness summary must mirror typed coverage detail unchanged"
+    );
     assert_eq!(
         value["result"]["coverage"]["result_semantics"],
         "lower_bound"

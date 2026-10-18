@@ -134,6 +134,9 @@ fn answer_envelope(
     {
         completeness["omitted_possible"] = omitted_possible.into();
     }
+    if let Some(coverage_detail) = coverage.and_then(|value| value.get("coverage_detail")) {
+        completeness["coverage_detail"] = coverage_detail.clone();
+    }
     json!({
         "schema": "clean-ctx/workspace-query-answer",
         "schema_version": WORKSPACE_QUERY_CONTENT_VERSION,
