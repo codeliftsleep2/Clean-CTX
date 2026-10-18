@@ -162,7 +162,7 @@ pub(super) fn exact_identity_coverage(
 
 fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
     let residual = outcome.satisfaction().residual_units();
-    let mut reasons = Vec::new();
+    let mut observed_reasons = Vec::new();
     for unit in &residual {
         let reason = match outcome.dispositions().get(unit) {
             Some(CoverageProofDisposition::Unproven(
@@ -179,24 +179,43 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             }
             Some(CoverageProofDisposition::Proven) | None => "indeterminate",
         };
-        if !reasons.contains(&reason) {
-            reasons.push(reason);
+        if !observed_reasons.contains(&reason) {
+            observed_reasons.push(reason);
         }
     }
+    let reasons: Vec<_> = [
+        "inventory_incomplete",
+        "candidate_predicate_uncertified",
+        "proof_incompatible",
+        "publication_failed",
+        "indeterminate",
+    ]
+    .into_iter()
+    .filter(|reason| observed_reasons.contains(reason))
+    .collect();
     let complete = outcome.satisfaction().is_source_complete();
+    let has_structural = reasons.iter().any(|reason| {
+        matches!(
+            *reason,
+            "candidate_predicate_uncertified" | "proof_incompatible"
+        )
+    });
+    let has_operational = reasons
+        .iter()
+        .any(|reason| matches!(*reason, "inventory_incomplete" | "publication_failed"));
+    let has_indeterminate = reasons.contains(&"indeterminate");
     let structurally_unproven = outcome.processing() == AcquisitionProcessingState::Terminal
-        && !reasons.is_empty()
-        && reasons.iter().all(|reason| {
-            matches!(
-                *reason,
-                "candidate_predicate_uncertified" | "proof_incompatible"
-            )
-        });
+        && has_structural
+        && !has_operational
+        && !has_indeterminate;
     let operationally_unproven = outcome.processing() == AcquisitionProcessingState::Incomplete
-        && !reasons.is_empty()
-        && reasons
-            .iter()
-            .all(|reason| matches!(*reason, "inventory_incomplete" | "publication_failed"));
+        && has_operational
+        && !has_structural
+        && !has_indeterminate;
+    let mixed_unproven = outcome.processing() == AcquisitionProcessingState::Incomplete
+        && has_operational
+        && has_structural
+        && !has_indeterminate;
     json!({
         "processing_state": if outcome.processing() == AcquisitionProcessingState::Terminal {
             "terminal"
@@ -209,6 +228,8 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             "structurally_unproven"
         } else if operationally_unproven {
             "operationally_unproven"
+        } else if mixed_unproven {
+            "mixed_unproven"
         } else {
             "indeterminate"
         },
@@ -217,7 +238,7 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             "not_needed"
         } else if structurally_unproven {
             "change_required"
-        } else if operationally_unproven {
+        } else if operationally_unproven || mixed_unproven {
             "same_request_may_help"
         } else {
             "indeterminate"

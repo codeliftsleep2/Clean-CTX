@@ -158,3 +158,43 @@ fn incomplete_inventory_projects_operational_processing_state() {
         "an incomplete inventory is unfinished acquisition work even when candidate publication did not fail"
     );
 }
+
+#[test]
+fn mixed_structural_and_operational_barriers_project_deterministically() {
+    let inventory_unit =
+        CoverageUnit::builtin_type_ref("C:/repo", SourceKind::CSharp, "generation");
+    let predicate_unit =
+        CoverageUnit::builtin_type_ref("C:/repo", SourceKind::TypeScript, "generation");
+    let requirement = AcquisitionRequirement::incoming_type_ref(
+        "IFooService",
+        "scope",
+        [inventory_unit.clone(), predicate_unit.clone()],
+    );
+    let outcome = AcquisitionOutcome::new(
+        AcquisitionSatisfaction::new(&requirement),
+        BTreeMap::from([
+            (
+                inventory_unit,
+                CoverageProofDisposition::Unproven(ProofBarrier::InventoryIncomplete),
+            ),
+            (
+                predicate_unit,
+                CoverageProofDisposition::Unproven(ProofBarrier::CandidatePredicateUncertified),
+            ),
+        ]),
+        SemanticPublicationStatus::Complete,
+    );
+
+    assert_eq!(
+        acquisition_coverage_detail(&outcome),
+        json!({
+            "processing_state": "incomplete",
+            "proof_state": "mixed_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "same_request_may_help",
+            "residual_unit_count": 2,
+            "reasons": ["inventory_incomplete", "candidate_predicate_uncertified"]
+        }),
+        "mixed barriers must retain both categories in stable public-vocabulary order"
+    );
+}
