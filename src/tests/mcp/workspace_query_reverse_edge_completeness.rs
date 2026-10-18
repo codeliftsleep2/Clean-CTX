@@ -264,6 +264,11 @@ fn issue_144_exact_coverage_is_stable_across_cold_and_warm_requests() {
     assert_exact_coverage(&cold);
     assert_exact_coverage(&warm);
     assert_eq!(structured(&cold)["edges"], structured(&warm)["edges"]);
+    assert_eq!(
+        structured(&cold)["coverage"]["coverage_detail"],
+        structured(&warm)["coverage"]["coverage_detail"],
+        "proof-backed warm reuse must preserve the cold request's complete epistemic detail"
+    );
     assert_eq!(structured(&cold)["coverage"], structured(&warm)["coverage"]);
 }
 

@@ -3,7 +3,7 @@ use super::filesystem::{configured_roots, root_key};
 use super::publication::{CandidatePublication, compile_candidates_for, select_candidates};
 use super::{HydrationReport, HydrationRequirement, discover_candidate_paths, discovery_kind};
 use crate::mcp::McpState;
-use crate::mcp::acquisition::{AcquisitionTarget, SemanticPublicationStatus};
+use crate::mcp::acquisition::{AcquisitionOutcome, AcquisitionTarget, SemanticPublicationStatus};
 
 #[cfg(all(test, feature = "rust"))]
 pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index(
@@ -107,11 +107,16 @@ fn hydrate_workspace_index_for_target(
         }
     }
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
-    let acquisition_outcome = provisional.map(|provisional| {
-        provisional.finish(if publication_failed {
-            SemanticPublicationStatus::Failed
-        } else {
-            SemanticPublicationStatus::Complete
+    let cached_outcome = cached_satisfaction
+        .clone()
+        .and_then(AcquisitionOutcome::from_cached_complete);
+    let acquisition_outcome = cached_outcome.or_else(|| {
+        provisional.map(|provisional| {
+            provisional.finish(if publication_failed {
+                SemanticPublicationStatus::Failed
+            } else {
+                SemanticPublicationStatus::Complete
+            })
         })
     });
     let acquisition_satisfaction = cached_satisfaction.or_else(|| {

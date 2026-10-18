@@ -58,6 +58,14 @@ impl AcquisitionOutcome {
         &self.satisfaction
     }
 
+    pub(crate) fn from_cached_complete(satisfaction: AcquisitionSatisfaction) -> Option<Self> {
+        satisfaction.is_source_complete().then(|| Self {
+            satisfaction,
+            dispositions: BTreeMap::new(),
+            processing: AcquisitionProcessingState::Terminal,
+        })
+    }
+
     pub(crate) fn dispositions(&self) -> &BTreeMap<CoverageUnit, CoverageProofDisposition> {
         &self.dispositions
     }
