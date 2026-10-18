@@ -57,6 +57,23 @@ fn workspace_query_exact_identity_coverage_partial_hydration() {
     assert_eq!(coverage["result_semantics"], "lower_bound");
     assert_eq!(coverage["omitted_possible"], true);
     assert_eq!(coverage["discovered_not_compiled_this_cycle"], 8);
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "not_attempted",
+            "proof_state": "indeterminate",
+            "fact_authority": "authoritative_observed",
+            "retryability": "indeterminate",
+            "reasons": ["processing_not_attempted"]
+        }),
+        "an unscoped TypeRef query has no workspace acquisition requirement and must say so"
+    );
+    assert!(
+        coverage["coverage_detail"]
+            .get("residual_unit_count")
+            .is_none(),
+        "no acquisition requirement means there is no residual-unit count"
+    );
 }
 
 #[test]

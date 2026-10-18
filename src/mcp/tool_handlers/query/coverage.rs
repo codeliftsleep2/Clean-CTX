@@ -96,10 +96,10 @@ pub(super) fn exact_identity_coverage(
         }
     };
     let capability_established = stored_capability_established || response_has_typed_evidence;
-    let exact_incoming_type_ref = matches!(direction, CapabilityDirection::Reverse)
+    let incoming_type_ref = matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"
-        && identity.entity_type == "TypeRef"
-        && scope.is_some();
+        && identity.entity_type == "TypeRef";
+    let exact_incoming_type_ref = incoming_type_ref && scope.is_some();
     if exact_incoming_type_ref
         && let Some(certificate) = hydration
             .acquisition_satisfaction
@@ -142,6 +142,15 @@ pub(super) fn exact_identity_coverage(
         && !outcome.satisfaction().is_source_complete()
     {
         coverage["coverage_detail"] = acquisition_coverage_detail(outcome);
+    }
+    if incoming_type_ref && hydration.acquisition_outcome.is_none() {
+        coverage["coverage_detail"] = json!({
+            "processing_state": "not_attempted",
+            "proof_state": "indeterminate",
+            "fact_authority": "authoritative_observed",
+            "retryability": "indeterminate",
+            "reasons": ["processing_not_attempted"],
+        });
     }
     if matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"
