@@ -16,14 +16,7 @@ pub(crate) static TEST_INJECTED_IR_FAILURE: std::sync::Mutex<Option<String>> =
 #[cfg(test)]
 pub(crate) static TEST_INJECTED_SOURCE_FAILURE: std::sync::Mutex<Option<String>> =
     std::sync::Mutex::new(None);
-use crate::layers::meta::semantic::{SemanticDependency, SemanticEdge};
-
-type CompiledSemantic = (
-    crate::ir::compiler::CompiledIR,
-    Vec<SemanticEdge>,
-    Vec<SemanticDependency>,
-    String,
-);
+use crate::mcp::semantic_compilation::artifact::{CompiledSemantic, SemanticCompilationArtifact};
 use crate::mcp::McpState;
 use std::path::PathBuf;
 
@@ -309,6 +302,7 @@ pub(super) fn compile_source_ir_candidate(
         previous_version,
         None,
     )
+    .map(SemanticCompilationArtifact::into_compiled_semantic)
 }
 
 #[cfg(feature = "csharp")]
@@ -333,6 +327,7 @@ pub(crate) fn compile_file_ir_candidate_with_csharp_authority(
         previous_version,
         Some(authority),
     )
+    .map(SemanticCompilationArtifact::into_compiled_semantic)
 }
 
 /// Compile a file to IR with symbol targeting (`focus`).
@@ -382,10 +377,11 @@ fn compile_file_ir_focused_with_identity(
         previous_version,
         None,
     )
+    .map(SemanticCompilationArtifact::into_compiled_semantic)
 }
 
 #[allow(clippy::too_many_arguments)]
-fn compile_source_ir_focused_with_identity(
+pub(crate) fn compile_source_ir_focused_with_identity(
     file_path: &str,
     source: &str,
     fidelity: Fidelity,
@@ -397,7 +393,7 @@ fn compile_source_ir_focused_with_identity(
         &[crate::ir::csharp_exact_calls::Declaration],
     >,
     #[cfg(not(feature = "csharp"))] _csharp_authority: Option<&[()]>,
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     // Test-only production-compiler failure injection applies equally to
     // on-disk and exact in-memory candidate compilation.
     #[cfg(test)]
@@ -516,18 +512,21 @@ fn compile_source_ir_focused_with_identity(
         &state.config.type_aliases,
     );
 
-    // Capture semantic edges from the compiler before they are lost on the
-    // next compilation. These edges were produced by MetaLayerPass (Pass 3)
-    // during the production pipeline and survived through compile_inner().
-    let semantic_edges = std::mem::take(&mut compiler.semantic_edges);
-    let semantic_dependencies = std::mem::take(&mut compiler.semantic_dependencies);
-
     // NF-02: Override the version with the next monotonic value.
     // The compiler always sets version=1; we fix it here.
     compiled.version = previous_version.saturating_add(1);
 
-    // A-08: Return source hash along with compiled IR and semantic edges
-    Ok((compiled, semantic_edges, semantic_dependencies, source_hash))
+    SemanticCompilationArtifact::from_compiler(
+        compiled,
+        &mut compiler,
+        source_hash,
+        canonical_path,
+        source,
+        fidelity,
+        &path_buf,
+        &state.config,
+        extension,
+    )
 }
 
 /// Compute an AST-level diff between the file's in-session baseline and

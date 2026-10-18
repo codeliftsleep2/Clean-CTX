@@ -24,6 +24,7 @@ pub(crate) mod heuristics;
 pub(crate) mod persistence_ir;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
+pub(crate) mod semantic_compilation;
 mod router;
 mod server;
 pub(crate) mod session_stats;
