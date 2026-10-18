@@ -131,6 +131,8 @@ fn failed_preparation_remains_dirty_and_returns_no_current_authority() {
     let state = state();
     let hydration = dispatch(&state, exact_reverse(root.path(), "TypeRef", "Target"));
     assert!(hydration.get("error").is_none(), "{hydration}");
+    state.csharp_call_authority.clear_artifacts();
+    state.mark_csharp_authority_dirty();
     *crate::mcp::tool_helpers::TEST_INJECTED_SOURCE_FAILURE
         .lock()
         .expect("failure injection") = Some("class Target".to_string());

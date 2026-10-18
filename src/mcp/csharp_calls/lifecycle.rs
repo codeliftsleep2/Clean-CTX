@@ -1,4 +1,7 @@
 use crate::mcp::McpState;
+use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 use std::sync::{Condvar, Mutex, MutexGuard};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -18,6 +21,7 @@ struct AuthorityInner {
 pub(crate) struct CSharpCallAuthorityState {
     inner: Mutex<AuthorityInner>,
     changed: Condvar,
+    artifacts: Mutex<BTreeMap<String, Arc<SemanticCompilationArtifact>>>,
     #[cfg(test)]
     reconciliation_count: std::sync::atomic::AtomicUsize,
 }
@@ -30,6 +34,7 @@ impl Default for CSharpCallAuthorityState {
                 status: CSharpCallAuthorityStatus::Dirty,
             }),
             changed: Condvar::new(),
+            artifacts: Mutex::new(BTreeMap::new()),
             #[cfg(test)]
             reconciliation_count: std::sync::atomic::AtomicUsize::new(0),
         }
@@ -54,6 +59,29 @@ impl CSharpCallAuthorityState {
 
     pub(crate) fn generation(&self) -> u64 {
         self.lock().generation
+    }
+
+    pub(crate) fn retain_artifact(&self, artifact: Arc<SemanticCompilationArtifact>) {
+        self.artifacts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(artifact.canonical_owner().to_string(), artifact);
+    }
+
+    pub(crate) fn artifact(&self, owner: &str) -> Option<Arc<SemanticCompilationArtifact>> {
+        self.artifacts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(owner)
+            .cloned()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn clear_artifacts(&self) {
+        self.artifacts
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clear();
     }
 
     #[cfg(test)]
@@ -136,4 +164,3 @@ impl McpState {
         self.csharp_call_authority.generation()
     }
 }
-

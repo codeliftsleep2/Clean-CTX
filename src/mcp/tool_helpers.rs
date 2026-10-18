@@ -5,12 +5,12 @@
 
 use crate::compression::Fidelity;
 
+use crate::mcp::McpState;
+use crate::mcp::semantic_compilation::artifact::{CompiledSemantic, SemanticCompilationArtifact};
 #[cfg(test)]
 pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_IR_FAILURE;
 #[cfg(test)]
 pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_SOURCE_FAILURE;
-use crate::mcp::semantic_compilation::artifact::{CompiledSemantic, SemanticCompilationArtifact};
-use crate::mcp::McpState;
 use std::path::PathBuf;
 
 /// Resolve a file path, handling relative paths with optional workspace root.
@@ -294,31 +294,6 @@ pub(super) fn compile_source_ir_candidate(
         &alias,
         previous_version,
         None,
-    )
-    .map(SemanticCompilationArtifact::into_compiled_semantic)
-}
-
-#[cfg(feature = "csharp")]
-pub(crate) fn compile_file_ir_candidate_with_csharp_authority(
-    file_path: &str,
-    fidelity: Fidelity,
-    state: &McpState,
-    authority: &[crate::ir::csharp_exact_calls::Declaration],
-) -> Result<CompiledSemantic, crate::error::CleanCtxError> {
-    let alias = state
-        .alias_for_path(file_path)
-        .unwrap_or_else(|| file_path.to_string());
-    let previous_version = state.file_version(&alias).unwrap_or(0);
-    let source = state.read_source(file_path)?;
-    compile_source_ir_focused_with_identity(
-        file_path,
-        &source,
-        fidelity,
-        state,
-        None,
-        &alias,
-        previous_version,
-        Some(authority),
     )
     .map(SemanticCompilationArtifact::into_compiled_semantic)
 }

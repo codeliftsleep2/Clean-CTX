@@ -5,6 +5,8 @@ use crate::mcp::semantic_compilation::executor::{CompilationBatchResult, Compila
 use crate::mcp::state::publication::SemanticPublicationTicket;
 use crate::workspace::index::SemanticFidelity;
 use std::collections::HashSet;
+#[cfg(feature = "csharp")]
+use std::sync::Arc;
 
 #[cfg(all(test, feature = "rust"))]
 static TEST_BATCH_SUPERSESSION: std::sync::Mutex<Option<(String, String)>> =
@@ -82,9 +84,7 @@ pub(crate) fn compile_candidate(
         HydrationRequirement::LegacyEdit,
     ) {
         Ok(CandidatePublication::Published) => true,
-        Ok(CandidatePublication::PublishedCSharp) => state
-            .reconcile_csharp_exact_calls()
-            .is_ok(),
+        Ok(CandidatePublication::PublishedCSharp) => state.reconcile_csharp_exact_calls().is_ok(),
         Ok(CandidatePublication::Current | CandidatePublication::Failed) | Err(_) => false,
     }
 }
@@ -97,15 +97,12 @@ pub(super) fn compile_candidate_for(
     requirement: HydrationRequirement,
 ) -> Result<CandidatePublication, String> {
     let paths = [resolved_path.to_string()];
-    Ok(compile_candidates_for(
-        state,
-        &paths,
-        workspace_root,
-        requirement,
-    )?
-    .into_iter()
-    .next()
-    .unwrap_or(CandidatePublication::Failed))
+    Ok(
+        compile_candidates_for(state, &paths, workspace_root, requirement)?
+            .into_iter()
+            .next()
+            .unwrap_or(CandidatePublication::Failed),
+    )
 }
 
 struct PreparedPublication {
@@ -150,21 +147,25 @@ pub(super) fn compile_candidates_for(
         state.invalidate_source_cache(&path);
     }
     if compiled.iter().any(|result| result.result.is_err())
-        || publications.iter().zip(&compiled).any(|(publication, result)| {
-            let Ok(artifact) = result.result.as_ref() else {
-                return true;
-            };
-            state
-                .read_source(&publication.validated)
-                .map(|source| {
-                    crate::cache::content_hash(source.as_bytes()) != artifact.source_hash()
-                })
-                .unwrap_or(true)
-        })
+        || publications
+            .iter()
+            .zip(&compiled)
+            .any(|(publication, result)| {
+                let Ok(artifact) = result.result.as_ref() else {
+                    return true;
+                };
+                state
+                    .read_source(&publication.validated)
+                    .map(|source| {
+                        crate::cache::content_hash(source.as_bytes()) != artifact.source_hash()
+                    })
+                    .unwrap_or(true)
+            })
     {
-        terminal.extend(
-            std::iter::repeat_n(CandidatePublication::Failed, publications.len()),
-        );
+        terminal.extend(std::iter::repeat_n(
+            CandidatePublication::Failed,
+            publications.len(),
+        ));
         return Ok(terminal);
     }
     for (publication, compiled) in publications.into_iter().zip(compiled) {
@@ -268,8 +269,10 @@ fn commit_candidate(
     let Ok(artifact) = compiled.result else {
         return Ok(CandidatePublication::Failed);
     };
-    let (_, semantic_edges, semantic_dependencies, compiled_hash) =
-        artifact.into_compiled_semantic();
+    let (semantic_edges, semantic_dependencies, compiled_hash) = artifact.published_semantics();
+    #[cfg(feature = "csharp")]
+    let retained = (publication.published_outcome == CandidatePublication::PublishedCSharp)
+        .then(|| Arc::new(artifact));
     let expected_hash = compiled_hash.clone();
     publication
         .ticket
@@ -281,13 +284,19 @@ fn commit_candidate(
                     .map_err(|error| error.to_string())
             },
             || {
-                state.workspace_index_lock().replace_semantic_projection_with_dependencies(
-                    &publication.canonical,
-                    semantic_edges,
-                    publication.coverage,
-                    compiled_hash,
-                    semantic_dependencies,
-                );
+                #[cfg(feature = "csharp")]
+                if let Some(artifact) = retained {
+                    state.csharp_call_authority.retain_artifact(artifact);
+                }
+                state
+                    .workspace_index_lock()
+                    .replace_semantic_projection_with_dependencies(
+                        &publication.canonical,
+                        semantic_edges,
+                        publication.coverage,
+                        compiled_hash,
+                        semantic_dependencies,
+                    );
                 Ok::<_, String>(publication.published_outcome)
             },
         )

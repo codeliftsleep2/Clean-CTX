@@ -25,6 +25,9 @@ fn publish(state: &McpState, file: &std::path::Path) {
     state
         .reconcile_csharp_after_authority_change(&canonical)
         .expect("C# reconciliation");
+    state
+        .prepare_exact_csharp_calls()
+        .expect("exact-call preparation");
 }
 
 fn callers(state: &McpState) -> Vec<String> {

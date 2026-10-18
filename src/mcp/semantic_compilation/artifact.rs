@@ -97,7 +97,7 @@ impl SemanticCompilationArtifact {
             semantic_dependencies,
             invocation_evidence,
             #[cfg(feature = "csharp")]
-                csharp,
+            csharp,
         } = self;
         let ArtifactIdentity {
             canonical_owner,
@@ -109,18 +109,19 @@ impl SemanticCompilationArtifact {
             canonical,
             semantic,
         } = producer_generations;
-        drop((canonical_owner, fidelity, canonical, semantic, source_snapshot));
+        drop((
+            canonical_owner,
+            fidelity,
+            canonical,
+            semantic,
+            source_snapshot,
+        ));
         drop(invocation_evidence);
         #[cfg(feature = "csharp")]
         if let Some(CSharpSemanticArtifact { declarations }) = csharp {
             drop(declarations);
         }
-        (
-            compiled,
-            semantic_edges,
-            semantic_dependencies,
-            source_hash,
-        )
+        (compiled, semantic_edges, semantic_dependencies, source_hash)
     }
 
     #[cfg(test)]
@@ -142,19 +143,69 @@ impl SemanticCompilationArtifact {
         &self.identity.source_hash
     }
 
-    #[cfg(test)]
     pub(crate) fn canonical_owner(&self) -> &str {
         &self.identity.canonical_owner
+    }
+
+    pub(crate) fn fidelity(&self) -> crate::compression::Fidelity {
+        self.identity.fidelity
+    }
+
+    pub(crate) fn published_semantics(
+        &self,
+    ) -> (Vec<SemanticEdge>, Vec<SemanticDependency>, String) {
+        (
+            self.semantic_edges.clone(),
+            self.semantic_dependencies.clone(),
+            self.identity.source_hash.clone(),
+        )
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn csharp_declarations(
+        &self,
+    ) -> Option<&[crate::ir::csharp_exact_calls::Declaration]> {
+        self.csharp
+            .as_ref()
+            .map(|artifact| artifact.declarations.as_slice())
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn project_exact_csharp_calls(
+        &self,
+        authority: &[crate::ir::csharp_exact_calls::Declaration],
+    ) -> Result<Vec<SemanticEdge>, String> {
+        let Some(evidence) = self.invocation_evidence.as_ref() else {
+            return Err(format!(
+                "C# artifact lacks structured invocation evidence: {}",
+                self.identity.canonical_owner
+            ));
+        };
+        let evidence = evidence
+            .view(
+                &self.identity.canonical_owner,
+                self.source_snapshot.as_str(),
+            )
+            .map_err(|error| format!("C# artifact evidence mismatch: {error:?}"))?;
+        let mut edges: Vec<_> = self
+            .semantic_edges
+            .iter()
+            .filter(|edge| edge.layer != "csharp-exact-call")
+            .cloned()
+            .collect();
+        edges.extend(crate::ir::csharp_exact_calls::project_with_authority(
+            self.source_snapshot.as_str(),
+            &self.compiled.instructions,
+            evidence.occurrences(),
+            &self.identity.canonical_owner,
+            authority,
+        ));
+        Ok(edges)
     }
 
     #[cfg(test)]
     pub(crate) fn source_snapshot(&self) -> &str {
         self.source_snapshot.as_str()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn fidelity(&self) -> crate::compression::Fidelity {
-        self.identity.fidelity
     }
 
     #[cfg(test)]
@@ -166,15 +217,6 @@ impl SemanticCompilationArtifact {
     #[cfg(test)]
     pub(crate) fn invocation_evidence(&self) -> Option<&InvocationEvidenceSet> {
         self.invocation_evidence.as_ref()
-    }
-
-    #[cfg(all(test, feature = "csharp"))]
-    pub(crate) fn csharp_declarations(
-        &self,
-    ) -> Option<&[crate::ir::csharp_exact_calls::Declaration]> {
-        self.csharp
-            .as_ref()
-            .map(|artifact| artifact.declarations.as_slice())
     }
 }
 

@@ -1,14 +1,17 @@
 //! C# exact-call reconciliation after declaration-authority changes.
 //!
-//! Invocation evidence remains compilation-local. The current admitted C#
-//! source set is recompiled twice: once to reconstitute declaration authority,
-//! then again to resolve every caller against that complete authority. All
-//! source hashes are revalidated before one index replacement transaction.
+//! Current source-bound artifacts supply declaration and invocation evidence.
+//! Missing artifacts are compiled once, then every caller is projected against
+//! the complete declaration catalog without reparsing or rereading retained
+//! source snapshots.
 
 use crate::compression::Fidelity;
 use crate::mcp::McpState;
+use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
+use crate::mcp::semantic_compilation::executor::CompilationJob;
 use crate::workspace::index::SemanticFidelity;
 use std::path::Path;
+use std::sync::Arc;
 
 struct Projection {
     file: String,
@@ -23,6 +26,14 @@ fn compilation_fidelity(fidelity: SemanticFidelity) -> Fidelity {
         SemanticFidelity::Low => Fidelity::Low,
         SemanticFidelity::Medium => Fidelity::Medium,
         SemanticFidelity::High => Fidelity::High,
+    }
+}
+
+fn semantic_fidelity(fidelity: Fidelity) -> SemanticFidelity {
+    match fidelity {
+        Fidelity::Low => SemanticFidelity::Low,
+        Fidelity::Medium => SemanticFidelity::Medium,
+        Fidelity::High | Fidelity::Edit | Fidelity::Verbatim => SemanticFidelity::High,
     }
 }
 
@@ -68,53 +79,36 @@ impl McpState {
             return Ok(());
         }
 
-        let mut authority = Vec::new();
-        for file in &files {
-            let (compiled, _, _, _) =
-                crate::mcp::tool_helpers::compile_file_ir_candidate(file, Fidelity::High, self)
-                    .map_err(|error| error.to_string())?;
-            authority.extend(crate::ir::csharp_exact_calls::declaration_authority(
-                &compiled.instructions,
-            ));
-        }
+        let artifacts = self.current_csharp_artifacts(&files)?;
+        let authority: Vec<_> = artifacts
+            .iter()
+            .flat_map(|artifact| {
+                artifact
+                    .csharp_declarations()
+                    .unwrap_or_default()
+                    .iter()
+                    .cloned()
+            })
+            .collect();
 
         let authority_files = files.clone();
         let mut projections = Vec::with_capacity(files.len());
-        for file in files {
+        for artifact in artifacts {
+            let file = artifact.canonical_owner().to_string();
             // Reconciliation may strengthen exact-call evidence, but it must
             // preserve the semantic fidelity of the publication it reconciles.
             let fidelity = self
                 .workspace_index_read()
                 .semantic_projection_fidelity(&file)
-                .unwrap_or(SemanticFidelity::High);
-            let (_, edges, _, source_hash) =
-                crate::mcp::tool_helpers::compile_file_ir_candidate_with_csharp_authority(
-                    &file,
-                    compilation_fidelity(fidelity),
-                    self,
-                    &authority,
-                )
-                .map_err(|error| error.to_string())?;
+                .unwrap_or_else(|| semantic_fidelity(artifact.fidelity()));
+            let edges = artifact.project_exact_csharp_calls(&authority)?;
             projections.push(Projection {
                 dependencies: authority_dependencies(&file, &authority_files, &edges),
                 file,
                 edges,
-                source_hash,
+                source_hash: artifact.source_hash().to_string(),
                 fidelity,
             });
-        }
-
-        for projection in &projections {
-            let source = self
-                .read_source(&projection.file)
-                .map_err(|error| error.to_string())?;
-            let current_hash = self.cache_read().compute_hash(source.as_bytes());
-            if current_hash != projection.source_hash {
-                return Err(format!(
-                    "C# exact-call reconciliation source changed during compilation: {}",
-                    projection.file
-                ));
-            }
         }
 
         {
@@ -139,6 +133,55 @@ impl McpState {
             }
         }
         Ok(())
+    }
+
+    fn current_csharp_artifacts(
+        &self,
+        files: &[String],
+    ) -> Result<Vec<Arc<SemanticCompilationArtifact>>, String> {
+        let mut artifacts = Vec::with_capacity(files.len());
+        let mut missing = Vec::new();
+        for file in files {
+            let source = self.read_source(file).map_err(|error| error.to_string())?;
+            let source_hash = crate::cache::content_hash(source.as_bytes());
+            if let Some(artifact) = self.csharp_call_authority.artifact(file)
+                && artifact.source_hash() == source_hash
+            {
+                artifacts.push(artifact);
+                continue;
+            }
+            let fidelity = self
+                .workspace_index_read()
+                .semantic_projection_fidelity(file)
+                .unwrap_or(SemanticFidelity::High);
+            let path_alias = self.get_or_create_alias(file.clone());
+            missing.push(CompilationJob {
+                file_path: file.clone(),
+                source,
+                fidelity: compilation_fidelity(fidelity),
+                previous_version: self.file_version(&path_alias).unwrap_or(0),
+                path_alias,
+                canonical_owner: file.clone(),
+                skip_set: self.get_skip_set(file),
+            });
+        }
+        for result in self.semantic_compiler().compile(&self.config, missing) {
+            let artifact = Arc::new(result.result.map_err(|error| error.to_string())?);
+            let current = self
+                .read_source(&result.file_path)
+                .map_err(|error| error.to_string())?;
+            if crate::cache::content_hash(current.as_bytes()) != artifact.source_hash() {
+                return Err(format!(
+                    "C# artifact source changed during compilation: {}",
+                    result.file_path
+                ));
+            }
+            self.csharp_call_authority
+                .retain_artifact(Arc::clone(&artifact));
+            artifacts.push(artifact);
+        }
+        artifacts.sort_by(|left, right| left.canonical_owner().cmp(right.canonical_owner()));
+        Ok(artifacts)
     }
 }
 
