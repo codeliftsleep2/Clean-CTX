@@ -207,6 +207,17 @@ candidates than it compiled in that cycle,
 already-indexed or deduplicated candidates and is not itself an omitted-file
 count.
 
+When present, `coverage_detail` explains why those legacy fields were earned.
+It never upgrades `lower_bound` to `exact`. Returned facts remain authoritative
+observations even when the set is incomplete; only the exact legacy tuple
+authorizes conclusions from absence. Use `retryability` directly: repeat the
+same request only for `same_request_may_help`; `change_required` means unchanged
+repetition cannot remove every barrier; `not_needed` means acquisition is
+complete; `indeterminate` gives no retry guarantee. `not_attempted` can mean the
+query family has no supported completeness acquisition or the request lacked a
+workspace acquisition scope. Never treat provider readiness, provider failure,
+or discovered/compiled counts as substitutes for this proof state.
+
 ### `entities_in_file`
 
 Pass `file_path`, `workspaceRoot`, and optional `fidelity`. It compiles an

@@ -743,6 +743,35 @@ proofs, `AcquisitionSatisfaction`, the proof-backed completion cache,
 the workspace-query coverage path. Acquisition/cache/hydration tests and
 `workspace_query_reverse_edge_completeness.rs` are the test authorities.
 
+### WSC-018 Coverage Detail Cannot Strengthen Completeness
+
+**Status:** ENFORCED
+
+`coverage_detail` is an additive, bounded explanation of exact-identity
+coverage. It may classify processing as terminal, incomplete, not attempted, or
+indeterminate and proof as complete, structural, operational, mixed,
+unsupported, or indeterminate. It must never authorize `source_complete=true`,
+`result_semantics=exact`, or `omitted_possible=false`; only a
+`CompletenessCertificate` may do that. Returned positive facts remain
+`authoritative_observed` while absence authority follows only the legacy tuple.
+Reasons use a closed public vocabulary, deterministic ordering, and no source,
+root, provider, or owner identities. Residual counts exist only when an actual
+acquisition requirement exists.
+
+`AcquisitionOutcome` is request-local and retains typed proof dispositions plus
+processing state. It is not persisted or negative-cached. The completion cache
+continues to store only complete `AcquisitionSatisfaction`; warm reuse may
+reconstruct terminal complete detail but cannot persist structural or transient
+barriers. Provider readiness and discovery counters cannot determine proof
+state or retryability.
+
+**Enforcement:** `src/mcp/acquisition/satisfaction.rs`;
+`src/mcp/tool_handlers/hydration/{acquisition,execution,publication}.rs`;
+`src/mcp/tool_handlers/query/{coverage,content}.rs`; the `workspace_query`
+output schema; `workspace_query_coverage.rs`,
+`workspace_query_exact_identity_coverage.rs`, `workspace_query_content.rs`, and
+`workspace_query_reverse_edge_completeness.rs`.
+
 ### SEMDEP-001 Semantic Validity Follows Dependencies
 
 **Status:** ENFORCED

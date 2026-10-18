@@ -156,6 +156,19 @@ when `source_complete` is false, `result_semantics: "lower_bound"` and
 `discovered_not_compiled_this_cycle`, when present, is the per-cycle
 discovered-minus-compiled gap and can include already-indexed or deduplicated
 candidates; it is not an exact omitted-file count.
+
+Exact-identity coverage may include additive `coverage_detail`. Treat it as the
+bounded explanation of the legacy completeness tuple, never as authority to
+strengthen that tuple. `fact_authority: "authoritative_observed"` means returned
+facts are authoritative observations; absence is authoritative only when the
+legacy fields say `source_complete: true`, `result_semantics: "exact"`, and
+`omitted_possible: false`. Processing may be `terminal`, `incomplete`,
+`not_attempted`, or `indeterminate`; proof may be complete, structurally or
+operationally unproven, mixed, unsupported, or indeterminate. Follow
+`retryability`: `not_needed`, `same_request_may_help`, `change_required`, or
+`indeterminate`. Reasons are bounded categories, not file lists. Do not infer
+unfinished work from `discovered_not_compiled_this_cycle`; use
+`coverage_detail.processing_state`.
 This relation does not cover service-locator calls such as
 `GetRequiredService<T>()` because no constructor parameter declares that fact.
 

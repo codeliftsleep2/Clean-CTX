@@ -91,6 +91,16 @@ result_semantics:lower_bound when exhaustiveness cannot be established.
 Failure to earn a certificate does not make returned facts wrong; it means
 Clean-CTX cannot claim they are exhaustive.
 
+Request-local `AcquisitionOutcome` composes mathematical satisfaction, one
+typed disposition per required coverage unit, and processing state. It is not
+durable authority and is not negative-cached. The completion cache remains
+restricted to complete `AcquisitionSatisfaction`; a compatible cache hit may
+reconstruct only the terminal complete request-local outcome. Coverage derives
+a bounded additive `coverage_detail` from this state. That projection explains
+complete, structural, operational, mixed, unsupported, and indeterminate
+conditions while preserving the legacy exact/lower-bound tuple unchanged.
+Provider diagnostics remain discovery facts and cannot determine proof state.
+
 ## Validity and lifecycle
 
 Source-cache validity, canonical-IR validity, and derived-semantic validity are

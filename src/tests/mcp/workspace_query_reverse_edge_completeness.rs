@@ -102,6 +102,30 @@ fn dispatch_reverse(state: &crate::mcp::McpState, root: &Path) -> Value {
         .expect("workspace_query response")
 }
 
+fn dispatch_reverse_batch(state: &crate::mcp::McpState, root: &Path) -> Value {
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(
+        &json!(145),
+        "workspace_query",
+        &json!({
+            "arguments": {
+                "workspaceRoot": root.to_string_lossy(),
+                "queries": [{
+                    "id": "reverse-context-a",
+                    "type": "reverse_edges",
+                    "domain": "builtin",
+                    "entity_type": "TypeRef",
+                    "name": TARGET
+                }]
+            }
+        }),
+        state,
+    );
+    crate::protocol::captured_responses()
+        .pop()
+        .expect("workspace_query batch response")
+}
+
 fn structured(response: &Value) -> &Value {
     let result = response["result"]
         .as_object()
@@ -293,6 +317,79 @@ fn issue_144_complete_zero_result_is_exact() {
 
     assert_eq!(structured(&response)["count"], 0);
     assert_exact_coverage(&response);
+    assert_eq!(
+        structured(&response)["coverage"]["coverage_detail"],
+        json!({
+            "processing_state": "terminal",
+            "proof_state": "complete",
+            "fact_authority": "authoritative_observed",
+            "retryability": "not_needed",
+            "residual_unit_count": 0,
+            "reasons": []
+        }),
+        "authoritative zero and positive exact results have identical proof detail"
+    );
+}
+
+#[test]
+fn issue_144_provider_unavailable_clean_proof_keeps_complete_detail() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = true;
+    let state = crate::mcp::McpState::new(config);
+    reset_test_scan_calls();
+
+    let response = dispatch_reverse(&state, root.path());
+
+    assert_exact_coverage(&response);
+    assert_eq!(constructor_subjects(&response), expected_subjects());
+    assert_eq!(
+        structured(&response)["coverage"]["coverage_detail"],
+        json!({
+            "processing_state": "terminal",
+            "proof_state": "complete",
+            "fact_authority": "authoritative_observed",
+            "retryability": "not_needed",
+            "residual_unit_count": 0,
+            "reasons": []
+        }),
+        "provider availability cannot change Clean-owned proof truth"
+    );
+    assert_eq!(
+        test_scan_calls(),
+        1,
+        "unavailable CBM must fall back to one Clean filesystem scan"
+    );
+}
+
+#[test]
+fn issue_144_singular_and_batch_preserve_identical_complete_detail() {
+    let _hydration_serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _response_serial = crate::protocol::handler_response_serial();
+    let _reset = ResetProvider;
+    let root = tempfile::tempdir().expect("workspace");
+    write_fixture(root.path());
+    let state = state_with_provider(root.path());
+    configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
+
+    let singular = dispatch_reverse(&state, root.path());
+    let batch = dispatch_reverse_batch(&state, root.path());
+    let batch_result = &structured(&batch)["results"][0]["result"];
+
+    assert_eq!(batch_result["count"], structured(&singular)["count"]);
+    assert_eq!(batch_result["edges"], structured(&singular)["edges"]);
+    assert_eq!(
+        batch_result["coverage"],
+        structured(&singular)["coverage"],
+        "batch preparation and warm reuse must preserve the singular epistemic contract"
+    );
 }
 
 #[test]
