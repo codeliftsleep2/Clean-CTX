@@ -229,3 +229,139 @@ fn two_root_projectcontext_preserves_independent_source_authority() {
         run_case(provider, true);
     }
 }
+
+#[cfg(feature = "dotnet")]
+fn write_classified_context(root: &Path, namespace: &str) {
+    std::fs::write(
+        root.join(format!("{namespace}.csproj")),
+        "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+    )
+    .expect("project fixture");
+    std::fs::write(
+        root.join("ContextA.cs"),
+        format!(
+            "using Microsoft.EntityFrameworkCore; namespace {namespace} {{ public interface IContextA {{}} public class EntityA {{}} public class ContextA : DbContext, IContextA {{ public DbSet<EntityA> Entities {{ get; set; }} }} }}\n"
+        ),
+    )
+    .expect("classified ContextA fixture");
+}
+
+#[cfg(feature = "dotnet")]
+fn configure_context_provider(primary: &Path, additional: &Path, available: bool) {
+    let readiness = if available {
+        TestProjectReadiness::Ready
+    } else {
+        TestProjectReadiness::Unavailable
+    };
+    let nodes = available.then(|| {
+        vec![GraphNode {
+            id: "ContextA.cs".into(),
+            label: "Class".into(),
+            name: "ContextA".into(),
+            file: "ContextA.cs".into(),
+            properties: HashMap::new(),
+        }]
+    });
+    let primary_slug = project_slug(primary);
+    let additional_slug = project_slug(additional);
+    set_test_project_search_results(HashMap::from([
+        (primary_slug.clone(), Ok(nodes.clone().unwrap_or_default())),
+        (additional_slug.clone(), Ok(nodes.unwrap_or_default())),
+    ]));
+    set_test_inbound_project_search_results(HashMap::from([
+        (primary_slug.clone(), Ok(Vec::new())),
+        (additional_slug.clone(), Ok(Vec::new())),
+    ]));
+    set_test_project_readiness(HashMap::from([
+        (primary_slug, readiness),
+        (additional_slug, readiness),
+    ]));
+}
+
+#[cfg(feature = "dotnet")]
+fn public_context_occurrence_files(
+    state: &crate::mcp::McpState,
+    primary: &Path,
+) -> BTreeSet<String> {
+    crate::protocol::captured_responses().clear();
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(146),
+        "workspace_query",
+        &serde_json::json!({ "arguments": {
+            "workspaceRoot": primary.to_string_lossy(),
+            "type": "find_entities",
+            "name": "ContextA"
+        }}),
+        state,
+    );
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("workspace_query response");
+    assert!(response.get("error").is_none(), "{response}");
+    response["result"]["structuredContent"]["entities"]
+        .as_array()
+        .expect("entities")
+        .iter()
+        .filter(|entity| {
+            entity["domain"] == "dotnet"
+                && entity["entity_type"] == "DbContext"
+                && entity["name"] == "ContextA"
+        })
+        .filter_map(|entity| entity["file"].as_str().map(str::to_owned))
+        .collect()
+}
+
+#[cfg(feature = "dotnet")]
+fn run_cross_root_dbcontext_case(provider_available: bool, reverse_roots: bool) {
+    let first = tempfile::TempDir::new().expect("first root");
+    let second = tempfile::TempDir::new().expect("second root");
+    write_classified_context(first.path(), "FirstRoot");
+    write_classified_context(second.path(), "SecondRoot");
+    let (primary, additional) = if reverse_roots {
+        (second.path(), first.path())
+    } else {
+        (first.path(), second.path())
+    };
+    let state = state_with_roots(primary, additional);
+    configure_context_provider(primary, additional, provider_available);
+
+    let cold = hydrate_workspace_index(
+        &state,
+        "find_entities",
+        "ContextA",
+        Some(&primary.to_string_lossy()),
+    )
+    .expect("cold hydration");
+    assert!(cold.is_complete(), "cold hydration must cover both roots");
+    assert_eq!(cold.candidates_compiled, 2, "both owners must compile");
+
+    let expected = BTreeSet::from([
+        state.semantic_owner_path(&first.path().join("ContextA.cs").to_string_lossy()),
+        state.semantic_owner_path(&second.path().join("ContextA.cs").to_string_lossy()),
+    ]);
+    assert_eq!(public_context_occurrence_files(&state, primary), expected);
+
+    let warm = hydrate_workspace_index(
+        &state,
+        "find_entities",
+        "ContextA",
+        Some(&primary.to_string_lossy()),
+    )
+    .expect("warm hydration");
+    assert!(warm.is_complete(), "warm hydration must remain complete");
+    assert_eq!(warm.candidates_compiled, 0, "warm owners must stay current");
+    assert_eq!(public_context_occurrence_files(&state, primary), expected);
+}
+
+#[cfg(feature = "dotnet")]
+#[test]
+fn issue_146_equivalent_cross_root_dbcontexts_keep_independent_occurrences() {
+    let _serial = TEST_SERIALIZE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let _reset = ResetProjectSearch;
+    for provider_available in [true, false] {
+        run_cross_root_dbcontext_case(provider_available, false);
+        run_cross_root_dbcontext_case(provider_available, true);
+    }
+}

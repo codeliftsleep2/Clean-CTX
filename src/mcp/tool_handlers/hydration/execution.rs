@@ -107,14 +107,17 @@ fn hydrate_workspace_index_for_target(
         }
     }
     project_coverage.sort_by(|left, right| left.project.cmp(&right.project));
-    let acquisition_satisfaction = cached_satisfaction.or_else(|| {
-        provisional.map(|provisional| {
-            provisional.finish(if publication_failed {
-                SemanticPublicationStatus::Failed
-            } else {
-                SemanticPublicationStatus::Complete
-            })
+    let acquisition_outcome = provisional.map(|provisional| {
+        provisional.finish(if publication_failed {
+            SemanticPublicationStatus::Failed
+        } else {
+            SemanticPublicationStatus::Complete
         })
+    });
+    let acquisition_satisfaction = cached_satisfaction.or_else(|| {
+        acquisition_outcome
+            .as_ref()
+            .map(|outcome| outcome.satisfaction().clone())
     });
     if let (Some(key), Some(satisfaction)) = (cache_key, acquisition_satisfaction.as_ref()) {
         state
@@ -134,5 +137,6 @@ fn hydrate_workspace_index_for_target(
         candidates_compiled: compiled,
         project_coverage,
         acquisition_satisfaction,
+        acquisition_outcome,
     })
 }

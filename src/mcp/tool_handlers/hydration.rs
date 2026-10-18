@@ -7,7 +7,7 @@
 //   test_support.rs  — test-only discovery instrumentation (cfg(test,rust))
 
 use crate::mcp::McpState;
-use crate::mcp::acquisition::AcquisitionSatisfaction;
+use crate::mcp::acquisition::{AcquisitionOutcome, AcquisitionSatisfaction};
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
 #[cfg(all(test, feature = "rust"))]
@@ -112,6 +112,7 @@ pub(super) struct HydrationReport {
     pub(super) candidates_compiled: usize,
     pub(super) project_coverage: Vec<ProjectCoverage>,
     pub(super) acquisition_satisfaction: Option<AcquisitionSatisfaction>,
+    pub(super) acquisition_outcome: Option<AcquisitionOutcome>,
 }
 
 #[derive(Clone, Serialize)]

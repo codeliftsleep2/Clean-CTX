@@ -1,7 +1,8 @@
 use super::filesystem::RootInventoryManifest;
 use crate::mcp::acquisition::{
-    AcquisitionCacheKey, AcquisitionRequirement, AcquisitionSatisfaction, AcquisitionTarget,
-    CoverageUnit, EvidenceRequirement, InventoryManifest, ProofContext, SemanticPublicationStatus,
+    AcquisitionCacheKey, AcquisitionOutcome, AcquisitionRequirement, AcquisitionSatisfaction,
+    AcquisitionTarget, CleanProofRejection, CoverageProofDisposition, CoverageUnit,
+    EvidenceRequirement, InventoryManifest, ProofBarrier, ProofContext, SemanticPublicationStatus,
     SourceKind, ValidatedAcquisitionProof, clean_type_ref_proof_claim,
     producer_generation_fingerprint, scope_policy_fingerprint, validate_proof_claim,
 };
@@ -46,6 +47,7 @@ pub(super) fn acquisition_cache_key(
 pub(super) struct ProvisionalAcquisition {
     requirement: AcquisitionRequirement,
     proofs: Vec<ValidatedAcquisitionProof>,
+    barriers: BTreeMap<CoverageUnit, ProofBarrier>,
 }
 
 pub(super) fn prepare_clean_type_ref_acquisition(
@@ -69,44 +71,76 @@ pub(super) fn prepare_clean_type_ref_acquisition(
         admission.clone(),
         grouped.iter().map(|(unit, _)| unit.clone()),
     );
-    let proofs = grouped
-        .into_iter()
-        .filter_map(|(unit, manifest)| {
-            let claim = clean_type_ref_proof_claim(
-                &requirement,
-                &unit,
-                &manifest,
-                admission.clone(),
-                TYPE_REF_PREDICATE_VERSION,
-                ACQUISITION_PROOF_CONTRACT_VERSION,
-            )
-            .ok()?;
-            validate_proof_claim(
-                &requirement,
-                &ProofContext {
-                    inventory_generation: manifest.digest,
-                    admission_fingerprint: admission.clone(),
-                    predicate_version: TYPE_REF_PREDICATE_VERSION,
-                    proof_contract_version: ACQUISITION_PROOF_CONTRACT_VERSION,
-                },
-                claim,
-            )
-            .ok()
-        })
-        .collect();
+    let mut proofs = Vec::new();
+    let mut barriers = BTreeMap::new();
+    for (unit, manifest) in grouped {
+        let claim = match clean_type_ref_proof_claim(
+            &requirement,
+            &unit,
+            &manifest,
+            admission.clone(),
+            TYPE_REF_PREDICATE_VERSION,
+            ACQUISITION_PROOF_CONTRACT_VERSION,
+        ) {
+            Ok(claim) => claim,
+            Err(rejection) => {
+                barriers.insert(unit, barrier_for_clean_rejection(rejection));
+                continue;
+            }
+        };
+        match validate_proof_claim(
+            &requirement,
+            &ProofContext {
+                inventory_generation: manifest.digest,
+                admission_fingerprint: admission.clone(),
+                predicate_version: TYPE_REF_PREDICATE_VERSION,
+                proof_contract_version: ACQUISITION_PROOF_CONTRACT_VERSION,
+            },
+            claim,
+        ) {
+            Ok(proof) => proofs.push(proof),
+            Err(_) => {
+                barriers.insert(unit, ProofBarrier::ClaimIncompatible);
+            }
+        }
+    }
     Some(ProvisionalAcquisition {
         requirement,
         proofs,
+        barriers,
     })
 }
 
 impl ProvisionalAcquisition {
-    pub(super) fn finish(self, publication: SemanticPublicationStatus) -> AcquisitionSatisfaction {
+    pub(super) fn finish(self, publication: SemanticPublicationStatus) -> AcquisitionOutcome {
         let mut satisfaction = AcquisitionSatisfaction::new(&self.requirement);
+        let mut dispositions = self
+            .barriers
+            .into_iter()
+            .map(|(unit, barrier)| (unit, CoverageProofDisposition::Unproven(barrier)))
+            .collect::<BTreeMap<_, _>>();
         for proof in self.proofs {
-            satisfaction.record_after_publication(proof, publication);
+            let unit = proof.unit.clone();
+            if satisfaction.record_after_publication(proof, publication) {
+                dispositions.insert(unit, CoverageProofDisposition::Proven);
+            } else {
+                dispositions.insert(
+                    unit,
+                    CoverageProofDisposition::Unproven(ProofBarrier::PublicationFailed),
+                );
+            }
         }
-        satisfaction
+        AcquisitionOutcome::new(satisfaction, dispositions, publication)
+    }
+}
+
+fn barrier_for_clean_rejection(rejection: CleanProofRejection) -> ProofBarrier {
+    match rejection {
+        CleanProofRejection::IncompleteInventory => ProofBarrier::InventoryIncomplete,
+        CleanProofRejection::UncertifiedPredicate => ProofBarrier::CandidatePredicateUncertified,
+        CleanProofRejection::SourceKindMismatch | CleanProofRejection::OwnerOutsideRoot => {
+            ProofBarrier::ClaimIncompatible
+        }
     }
 }
 

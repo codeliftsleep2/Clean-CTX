@@ -30,6 +30,9 @@ impl HydrationReport {
         if self.acquisition_satisfaction.is_none() {
             self.acquisition_satisfaction = other.acquisition_satisfaction;
         }
+        if self.acquisition_outcome.is_none() {
+            self.acquisition_outcome = other.acquisition_outcome;
+        }
     }
 }
 

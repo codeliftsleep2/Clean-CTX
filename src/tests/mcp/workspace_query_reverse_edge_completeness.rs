@@ -301,6 +301,19 @@ fn issue_144_unproved_language_unit_remains_lower_bound() {
     assert_eq!(coverage["source_complete"], false, "{coverage}");
     assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
     assert_eq!(coverage["omitted_possible"], true, "{coverage}");
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "terminal",
+            "proof_state": "structurally_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "change_required",
+            "residual_unit_count": 1,
+            "reasons": ["candidate_predicate_uncertified"]
+        }),
+        "a terminal mixed-language acquisition must explain that its lower bound is a \
+         structural proof limitation, not known unfinished candidate work: {coverage}"
+    );
 }
 
 #[test]

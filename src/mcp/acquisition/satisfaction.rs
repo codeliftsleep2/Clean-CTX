@@ -9,6 +9,55 @@ pub(crate) enum SemanticPublicationStatus {
     Failed,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum ProofBarrier {
+    InventoryIncomplete,
+    CandidatePredicateUncertified,
+    ClaimIncompatible,
+    PublicationFailed,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum CoverageProofDisposition {
+    Proven,
+    Unproven(ProofBarrier),
+}
+
+/// Request-local proof outcome. Unlike cached satisfaction, this retains why
+/// each required coverage unit did or did not become authoritative.
+#[derive(Clone, Debug)]
+pub(crate) struct AcquisitionOutcome {
+    satisfaction: AcquisitionSatisfaction,
+    dispositions: BTreeMap<CoverageUnit, CoverageProofDisposition>,
+    publication: SemanticPublicationStatus,
+}
+
+impl AcquisitionOutcome {
+    pub(crate) fn new(
+        satisfaction: AcquisitionSatisfaction,
+        dispositions: BTreeMap<CoverageUnit, CoverageProofDisposition>,
+        publication: SemanticPublicationStatus,
+    ) -> Self {
+        Self {
+            satisfaction,
+            dispositions,
+            publication,
+        }
+    }
+
+    pub(crate) fn satisfaction(&self) -> &AcquisitionSatisfaction {
+        &self.satisfaction
+    }
+
+    pub(crate) fn dispositions(&self) -> &BTreeMap<CoverageUnit, CoverageProofDisposition> {
+        &self.dispositions
+    }
+
+    pub(crate) fn publication(&self) -> SemanticPublicationStatus {
+        self.publication
+    }
+}
+
 /// Proof coverage accumulated for one exact acquisition requirement.
 #[derive(Clone, Debug)]
 pub(crate) struct AcquisitionSatisfaction {

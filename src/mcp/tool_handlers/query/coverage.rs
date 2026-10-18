@@ -1,7 +1,10 @@
 //! Truthfulness metadata for exact-identity graph answers.
 
 use super::identity::ResolvedIdentity;
-use crate::mcp::acquisition::AcquisitionSatisfaction;
+use crate::mcp::acquisition::{
+    AcquisitionOutcome, AcquisitionSatisfaction, CoverageProofDisposition, ProofBarrier,
+    SemanticPublicationStatus,
+};
 use crate::mcp::tool_handlers::hydration::HydrationReport;
 use crate::workspace::index::WorkspaceIndex;
 use crate::workspace::scope::WorkspaceScope;
@@ -131,6 +134,12 @@ pub(super) fn exact_identity_coverage(
     if discovered_not_compiled_this_cycle > 0 {
         coverage["discovered_not_compiled_this_cycle"] = discovered_not_compiled_this_cycle.into();
     }
+    if exact_incoming_type_ref
+        && let Some(outcome) = hydration.acquisition_outcome.as_ref()
+        && !outcome.satisfaction().is_source_complete()
+    {
+        coverage["coverage_detail"] = acquisition_coverage_detail(outcome);
+    }
     if matches!(direction, CapabilityDirection::Reverse)
         && identity.domain == "builtin"
         && matches!(identity.entity_type.as_str(), "Class" | "Interface")
@@ -146,6 +155,50 @@ pub(super) fn exact_identity_coverage(
         });
     }
     coverage
+}
+
+fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
+    let residual = outcome.satisfaction().residual_units();
+    let mut reasons = Vec::new();
+    for unit in &residual {
+        let reason = match outcome.dispositions().get(unit) {
+            Some(CoverageProofDisposition::Unproven(
+                ProofBarrier::CandidatePredicateUncertified,
+            )) => "candidate_predicate_uncertified",
+            Some(CoverageProofDisposition::Unproven(ProofBarrier::InventoryIncomplete)) => {
+                "inventory_incomplete"
+            }
+            Some(CoverageProofDisposition::Unproven(ProofBarrier::PublicationFailed)) => {
+                "publication_failed"
+            }
+            _ => "claim_incompatible",
+        };
+        if !reasons.contains(&reason) {
+            reasons.push(reason);
+        }
+    }
+    let structurally_unproven = outcome.publication() == SemanticPublicationStatus::Complete
+        && reasons == ["candidate_predicate_uncertified"];
+    json!({
+        "processing_state": if outcome.publication() == SemanticPublicationStatus::Complete {
+            "terminal"
+        } else {
+            "incomplete"
+        },
+        "proof_state": if structurally_unproven {
+            "structurally_unproven"
+        } else {
+            "indeterminate"
+        },
+        "fact_authority": "authoritative_observed",
+        "retryability": if structurally_unproven {
+            "change_required"
+        } else {
+            "retryable"
+        },
+        "residual_unit_count": residual.len(),
+        "reasons": reasons,
+    })
 }
 
 #[cfg(test)]

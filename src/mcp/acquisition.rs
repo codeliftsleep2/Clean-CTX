@@ -26,7 +26,10 @@ pub(crate) use requirement::{
     ProducerCapability, RelationshipFamily, SourceKind, producer_generation_fingerprint,
     requirement_fingerprint,
 };
-pub(crate) use satisfaction::{AcquisitionSatisfaction, SemanticPublicationStatus};
+pub(crate) use satisfaction::{
+    AcquisitionOutcome, AcquisitionSatisfaction, CoverageProofDisposition, ProofBarrier,
+    SemanticPublicationStatus,
+};
 
 #[cfg(all(test, feature = "rust"))]
 #[path = "../tests/mcp/acquisition_requirement.rs"]
