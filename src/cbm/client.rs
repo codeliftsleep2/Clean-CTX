@@ -35,6 +35,9 @@ mod a4_support;
 #[cfg(test)]
 #[path = "../tests/cbm/frontend_recovery.rs"]
 mod a4_tests;
+#[cfg(test)]
+#[path = "../tests/cbm/startup_readiness.rs"]
+mod startup_readiness_tests;
 
 #[cfg(test)]
 #[path = "../tests/cbm/current_wire_support.rs"]

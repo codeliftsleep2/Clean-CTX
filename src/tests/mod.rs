@@ -11,7 +11,7 @@
 /// Create a test config with CBM and persistence disabled.
 ///
 /// Most unit tests do not need CBM or persistence. Using a default config
-/// would launch a CBM subprocess on every `McpState::new()` call, costing
+/// could make provider-backed handler tests launch a CBM subprocess, costing
 /// ~500ms+ per test and wasting CI resources. Furthermore, with persistence
 /// enabled each handler test would open the repo's real
 /// `.clean-ctx/persistence.db` — cross-test pollution via `rebuild_stats()`

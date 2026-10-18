@@ -2,9 +2,8 @@
 //
 // CBM setup & auto-detection utilities.
 //
-// Provides `cbm_setup_check()` for the `clean-ctx setup --with-cbm` CLI
-// command and `detect_cbm()` for runtime auto-detection used by
-// `provide_code_context` enrichment and `McpState::init_cbm_bridge`.
+// Provides `cbm_setup_check()` for the `clean-ctx setup --with-cbm` CLI.
+// Runtime launch and admission are owned by the session CBM lifecycle.
 
 use std::path::{Path, PathBuf};
 

@@ -126,6 +126,7 @@ impl GraphBridge {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            indexing_workers: Vec::new(),
             freshness: Arc::new(Mutex::new(HashMap::new())),
             last_error: None,
         };
@@ -264,5 +265,15 @@ impl GraphBridge {
         self.project
             .clone()
             .unwrap_or_else(|| "default".to_string())
+    }
+}
+
+impl Drop for GraphBridge {
+    fn drop(&mut self) {
+        for worker in self.indexing_workers.drain(..) {
+            if worker.join().is_err() {
+                eprintln!("[clean-ctx-cbm] Background indexing worker panicked during shutdown");
+            }
+        }
     }
 }

@@ -240,6 +240,9 @@ fn fixture_entry() {
         if mode == "stall" {
             std::thread::sleep(Duration::from_secs(30));
         }
+        if mode == "a2-slow-index" && request["params"]["name"] == "index_repository" {
+            std::thread::sleep(Duration::from_millis(500));
+        }
         let id = if mode == "poison" {
             serde_json::json!(999)
         } else {

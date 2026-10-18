@@ -24,7 +24,7 @@ pub(crate) fn dispatch(req: crate::protocol::JsonRpcRequest, state: &McpState) {
     match req.method.as_str() {
         "initialize" => {
             if let Some(ref id) = req.id {
-                handlers::handle_initialize(id);
+                handlers::handle_initialize(id, state);
             }
         }
         "tools/list" => {

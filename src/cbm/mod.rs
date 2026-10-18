@@ -7,7 +7,7 @@
 // Clean-CTX knows about CBM through exactly three hooks:
 //
 //   1. `crate::config::CleanCtxConfig::cbm` — the CBM config field
-//   2. `crate::mcp::state::McpState::graph_bridge` — Option<GraphBridge>
+//   2. `crate::mcp::cbm_lifecycle::CbmLifecycle` — session-owned GraphBridge
 //   3. Tool dispatch in `crate::mcp::tools` calls into `crate::cbm::handlers`
 //
 // To install CBM: `codebase-memory-mcp` binary on PATH.

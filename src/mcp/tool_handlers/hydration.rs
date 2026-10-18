@@ -189,6 +189,7 @@ fn discover_candidate_paths(
     }
 
     let filesystem_roots = configured_roots(state, workspace_root);
+    state.prepare_cbm_for_consumer();
     let mut bridge_guard = state.graph_bridge_lock();
     let Some(bridge) = bridge_guard.as_mut() else {
         drop(bridge_guard);

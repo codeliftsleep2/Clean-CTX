@@ -223,3 +223,31 @@ fn cbm_a2_baseline_retirement_preserves_other_frontend_session() {
     drop(first);
     assert!(other.call_tool_raw("query_graph", json!({})).is_ok());
 }
+
+#[test]
+fn cbm_indexing_worker_is_joined_before_bridge_retires_frontend() {
+    let root = TempDir::new().unwrap();
+    let log = root.path().join("launch.json");
+    let bridge = fixture::bridge_with_mode(root.path(), &[], &log, "a2-slow-index");
+    let pid = {
+        let client = bridge.client.lock().unwrap();
+        fixture::child_id(client.as_ref().expect("admitted frontend"))
+    };
+    let requests = log.with_extension("requests");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+    loop {
+        let indexing_started =
+            std::fs::read_to_string(&requests).is_ok_and(|text| text.contains("index_repository"));
+        if indexing_started {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "fixture indexing request did not start"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+
+    drop(bridge);
+    fixture::assert_process_gone(pid);
+}

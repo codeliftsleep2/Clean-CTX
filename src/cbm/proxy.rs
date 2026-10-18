@@ -164,15 +164,17 @@ fn index_reply_published(raw: &str) -> bool {
 /// fails, applies minimum compression (whitespace stripping + key
 /// shortening) before returning.
 pub fn handle_cbm_proxy(id: &Value, params: &Value, state: &McpState) {
+    state.prepare_cbm_for_consumer();
     let mut bridge_guard = state.graph_bridge_lock();
     let bridge = match &mut *bridge_guard {
         Some(b) => b,
         None => {
+            let status = state.unadmitted_cbm_status();
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0", "id": id,
                 "error": {
                     "code": -32603,
-                    "message": "CBM proxy unavailable. Install codebase-memory-mcp on PATH."
+                    "message": format!("CBM proxy unavailable: {}.", status.summary())
                 }
             }));
             return;

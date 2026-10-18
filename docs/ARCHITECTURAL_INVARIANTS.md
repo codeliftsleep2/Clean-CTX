@@ -208,6 +208,17 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
 
+### CBM-LIFE-001 Optional Provider Never Gates Core MCP Readiness
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Clean-CTX must establish its stdio MCP session independently of optional CBM startup, while retaining deterministic ownership of every provider process and startup task it creates. |
+| **Invariant** | `McpState` construction performs no CBM launch or admission. A successfully flushed Clean `initialize` response permits `auto_launch`; it does not prove that the client will remain connected. One session-owned lifecycle authority coalesces concurrent launch requests and owns admission state, the admitted bridge, background indexing workers, and shutdown. With `auto_launch = false`, only the first provider-dependent consumer starts that same lifecycle. `get_cbm_status` is report-only. Provider consumers fail closed while status is `initializing`, `degraded`, or `unavailable`; Clean-owned semantic authority never depends on provider readiness. On transport shutdown, Clean joins any in-flight admission and all indexing workers before retiring the directly owned frontend. No provider startup work is fire-and-forget. |
+| **Enforcement** | `src/tests/cbm/startup_readiness.rs` pins core readiness independence; `src/tests/mcp/cbm_lifecycle.rs` pins the initialize trigger, lazy mode, coalescing, observable initialization, and admission joining; `src/tests/cbm/frontend_lifecycle.rs` pins indexing-worker ownership and frontend retirement ordering. |
+| **Authority** | `src/mcp/cbm_lifecycle.rs`, `src/mcp/state.rs`, `src/mcp/handlers.rs`, `src/mcp/server.rs`, `src/cbm/bridge/indexing.rs`, `src/cbm/bridge/lifecycle.rs` |
+| **Type** | STRUCTURAL + ENFORCED (test) |
+| **Gate** | Focused lifecycle regressions and the complete all-feature verification gate |
+
 ### CBM-CACHE-001 Canonical Project-Owned Graph Cache
 
 | Property | Value |

@@ -67,6 +67,10 @@ impl FrontendSession {
         if let Some(outcome) = self.retired {
             return outcome;
         }
+        crate::observability::startup::event_detail(
+            "cbm_frontend_retire_begin",
+            self.child.id().to_string(),
+        );
         // Do not flush buffered requests while retiring an uncertain session.
         if let Some(stdin) = self.stdin.take() {
             drop(stdin.into_parts());
@@ -108,6 +112,15 @@ impl FrontendSession {
             workers_joined,
         };
         self.retired = Some(outcome);
+        crate::observability::startup::event_detail(
+            "cbm_frontend_retire_end",
+            format!(
+                "pid={} reaped={} workers_joined={}",
+                self.child.id(),
+                outcome.child_reaped,
+                outcome.workers_joined
+            ),
+        );
         if !child_reaped || !workers_joined {
             eprintln!(
                 "[clean-ctx-cbm] Frontend cleanup uncertain: reaped={child_reaped}, workers_joined={workers_joined}"

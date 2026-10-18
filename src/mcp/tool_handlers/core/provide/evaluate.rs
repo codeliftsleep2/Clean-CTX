@@ -189,7 +189,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         file_path = %resolved_path,
         fidelity = %format!("{:?}", effective_fidelity),
         strategy = "full",
-        cbm_status = %state.cbm_status.summary(),
+        cbm_status = %state.cbm_status().summary(),
         is_angular = %is_angular,
         prediction = %te_prediction,
         threshold = %te_threshold,

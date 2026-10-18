@@ -112,7 +112,7 @@ caller to the authoritative structured item errors.
 | Tool | Required | Optional | Status |
 |------|----------|----------|--------|
 | `cbm_proxy` | — | `cbm_tool`, `parameters`, `query`, `project` | **Preferred compact path** for raw CBM operations. Project resolution is call-scoped and does not mutate the wrapper bridge's active project. |
-| `get_cbm_status` | — | — | Availability probe. Returns `available`, `degraded`, or `unavailable`. |
+| `get_cbm_status` | — | — | Read-only lifecycle probe. Returns `initializing`, `available`, `degraded`, or `unavailable`; it does not trigger launch. |
 | `list_projects` | — | — | **AVAILABLE** — list CBM-indexed projects. Project-independent, no project parameter required. |
 | `index_repository` | `repo_path` | `mode` | **AVAILABLE** — trigger CBM to index/reindex a repository. `mode` is optional: `"fast"` (normal refresh, default) or `"full"` (rebuild/recovery). |
 | `graph_search` | `query` | `name_pattern`, `project` | **STRUCTURED** — returns typed results (cached). Prefer when the typed identity/file result is useful. |
@@ -565,7 +565,7 @@ indexing-progress inspection rather than routine task preflight.
 
 ### CBM Unavailable Fallback
 
-When a graph operation reports CBM as unavailable or degraded, do NOT add a
+When a graph operation reports CBM as initializing, unavailable, or degraded, do NOT add a
 status probe or attempt to bypass the proxy by calling raw CBM tools directly.
 Instead:
 

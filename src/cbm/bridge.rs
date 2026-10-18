@@ -225,6 +225,9 @@ pub struct GraphBridge {
     /// Multi-repo: keyed by project name so switching projects doesn't
     /// corrupt another project's indexing state.
     pub(crate) indexing_state: Arc<Mutex<HashMap<String, IndexingState>>>,
+    /// Background indexers are session-owned work. They must finish before
+    /// the bridge drops its final client handle and retires the frontend.
+    pub(crate) indexing_workers: Vec<std::thread::JoinHandle<()>>,
     /// Authoritative mapping: canonical repository root â†’ CBM project ID.
     ///
     /// CBM derives a project's identity from the canonical repo path (see
@@ -331,6 +334,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            indexing_workers: Vec::new(),
             freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
@@ -373,6 +377,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(HashMap::new())),
+            indexing_workers: Vec::new(),
             freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),
@@ -412,6 +417,7 @@ pub mod test_helpers {
             disk_cache: None,
             graph_version: String::new(),
             indexing_state: Arc::new(Mutex::new(states)),
+            indexing_workers: Vec::new(),
             freshness: Arc::new(Mutex::new(HashMap::new())),
             project_ids: HashMap::new(),
             project_paths: HashMap::new(),

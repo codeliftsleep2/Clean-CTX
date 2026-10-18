@@ -48,9 +48,14 @@ impl CbmClient {
                 self.usable = true;
                 self.admitted_once = true;
                 self.status = CbmStatus::Available;
+                crate::observability::startup::event("cbm_admission_complete");
                 Ok(())
             }
             Err(error) => {
+                crate::observability::startup::event_detail(
+                    "cbm_admission_error",
+                    error.to_string(),
+                );
                 self.retire_frontend(&format!("admission failed: {error}"));
                 self.status = CbmStatus::Degraded(format!(
                     "admission failed: {error}; transport: {:?}",
@@ -62,6 +67,7 @@ impl CbmClient {
     }
 
     fn admit_inner(&mut self, deadline: Instant) -> Result<(), CbmError> {
+        crate::observability::startup::event("cbm_admit_initialize_begin");
         let response = self.admission_request(
             "initialize",
             json!({
@@ -70,11 +76,14 @@ impl CbmClient {
             }),
             deadline,
         )?;
+        crate::observability::startup::event("cbm_admit_initialize_response");
         validate_initialize(&response)?;
         self.send_initialized(deadline)?;
         // Pinned no-cursor tools/list returns the complete registry. No query
         // paging, cursor collection or optional-tool requirements are added.
+        crate::observability::startup::event("cbm_admit_tools_list_begin");
         let tools = self.admission_request("tools/list", json!({}), deadline)?;
+        crate::observability::startup::event("cbm_admit_tools_list_response");
         validate_tools(&tools)?;
         if Instant::now() >= deadline {
             return Err(CbmError::Timeout(self.timeout));

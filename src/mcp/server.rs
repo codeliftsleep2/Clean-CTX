@@ -109,6 +109,7 @@ pub(crate) const MAX_LINE_BYTES: usize = 16 * 1024 * 1024;
 /// on slow requests. Each parsed request is enqueued to a worker thread;
 /// the reader immediately returns to reading the next line.
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
+    crate::observability::startup::event("process_entry");
     // A-04: Initialize structured tracing. Configures the tracing
     // subscriber from environment variables:
     //   CLEAN_CTX_LOG       — log level (default: info)
@@ -145,7 +146,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let config = CleanCtxConfig::load(project_root);
+    crate::observability::startup::event("project_config_complete");
+    crate::observability::startup::event("state_construction_begin");
     let mut state = McpState::new(config.clone());
+    crate::observability::startup::event("state_construction_end");
 
     // Auto-start the proxy if enabled in config. Non-fatal: if the
     // proxy binary is missing or fails to spawn, the MCP server
@@ -218,6 +222,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     // A-PRODUCTION: Wrap state in the production-grade dispatcher.
     let dispatcher = Dispatcher::new(state);
+    crate::observability::startup::event("dispatcher_ready");
 
     // A-04: Spawn periodic metrics exporter if enabled in config.
     if dispatcher.state().config.observability.export_metrics {
@@ -242,6 +247,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     let stdin = io::stdin();
     let mut handle = stdin.lock();
+    crate::observability::startup::event("stdio_read_begin");
 
     while let Some(line_result) = read_request_line(&mut handle) {
         let line = match line_result {
@@ -270,6 +276,9 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         // The closure captures the parsed request data and dispatches
         // it on a worker thread. The reader thread returns immediately.
         if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
+            if req.method == "initialize" {
+                crate::observability::startup::event("clean_initialize_received");
+            }
             let req_for_handler = req.clone();
             if let Err(e) = dispatcher.spawn(&req, move |state| {
                 crate::mcp::router::dispatch(req_for_handler, state);
@@ -297,6 +306,12 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // finish, so terminate the auto-started proxy child FIRST (while
     // we still have access to the state via `dispatcher.state()`).
     eprintln!("[clean-ctx] Stdin exhausted, waiting for pending work...");
+    crate::observability::startup::event("dispatcher_shutdown_begin");
+
+    // Admission is session-owned. Join it and retire its direct frontend before
+    // releasing the dispatcher state, even if transport vanished immediately
+    // after a successful initialize response.
+    dispatcher.state().shutdown_cbm();
 
     // Terminate the auto-started proxy child (if any).
     if let Some(ref mut child) = *dispatcher.state().proxy_child_lock() {
@@ -305,6 +320,8 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     drop(dispatcher);
+    crate::observability::startup::event("dispatcher_shutdown_end");
+    crate::observability::startup::event("process_exit");
 
     Ok(())
 }
@@ -342,6 +359,7 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
         // 20 MB worth of bytes, even if it ends in `\n`.
         match handle.read_line(&mut buffer) {
             Ok(0) => {
+                crate::observability::startup::event("stdin_eof");
                 // EOF.
                 if buffer.is_empty() && total == 0 {
                     return None;
@@ -384,7 +402,8 @@ fn read_request_line<R: BufRead>(handle: &mut R) -> Option<Result<String, Oversi
                     return Some(Ok(buffer));
                 }
             }
-            Err(_) => {
+            Err(error) => {
+                crate::observability::startup::event_detail("stdin_error", error.to_string());
                 // Treat any read error as EOF for the purposes of the
                 // outer loop; the server should not crash on a
                 // transient stdin error.

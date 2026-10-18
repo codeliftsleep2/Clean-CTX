@@ -114,6 +114,7 @@ fn default_circuit_cooldown_secs() -> u64 {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub enum CbmStatus {
     Available,
+    Initializing,
     Degraded(String),
     #[default]
     Unavailable,
@@ -127,6 +128,7 @@ impl CbmStatus {
     pub fn summary(&self) -> &str {
         match self {
             CbmStatus::Available => "available",
+            CbmStatus::Initializing => "initializing",
             CbmStatus::Degraded(_) => "degraded",
             CbmStatus::Unavailable => "unavailable",
         }

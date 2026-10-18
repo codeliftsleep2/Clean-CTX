@@ -121,6 +121,16 @@ dispatcher sizing and queues use internal production defaults.
 }
 ```
 
+CBM is optional and never gates the core Clean-CTX MCP `initialize` response.
+With `auto_launch: true`, Clean-CTX starts one session-owned CBM
+launch/admission attempt only after its initialize response has been flushed.
+With `auto_launch: false`, no background provider launch occurs; the first
+provider-dependent tool starts that same coalesced lifecycle. During admission,
+`get_cbm_status` reports `initializing`, provider-backed tools fail closed, and
+Clean-owned semantic completeness remains available independently. Successful
+admission starts background indexing; session shutdown joins admission and
+indexing work before retiring the directly owned CBM frontend.
+
 `auto_delta` is retained as an inactive compatibility field so existing
 configuration files continue to parse. `provide_code_context` always returns
 complete model-facing content. Code-side delta transport is explicitly invoked

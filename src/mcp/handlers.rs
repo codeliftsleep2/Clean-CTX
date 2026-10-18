@@ -12,8 +12,8 @@ use crate::tokenizer::{create_tokenizer, resolve_tokenizer_kind};
 use serde_json::Value;
 
 /// Handle `initialize` — returns server capabilities and protocol version.
-pub(crate) fn handle_initialize(id: &Value) {
-    send_response(&serde_json::json!({
+pub(crate) fn handle_initialize(id: &Value, state: &McpState) {
+    if crate::protocol::send_response_checked(&serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
@@ -22,7 +22,9 @@ pub(crate) fn handle_initialize(id: &Value) {
             "serverInfo": { "name": "clean-ctx", "version": "1.0.0" },
             "instructions": prompts::WORKFLOW_INSTRUCTIONS
         }
-    }));
+    })) {
+        state.start_cbm_after_initialize();
+    }
 }
 
 /// Handle `tools/list` — returns the list of available tools with cache hints.

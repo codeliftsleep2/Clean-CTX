@@ -17,6 +17,7 @@
 // via the `context_stats` MCP tool).
 
 pub mod metrics;
+pub(crate) mod startup;
 pub mod tracing;
 
 pub use metrics::MetricsRegistry;

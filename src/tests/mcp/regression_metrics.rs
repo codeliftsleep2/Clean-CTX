@@ -407,8 +407,7 @@ fn regression_cbm_proxy_meta_in_result() {
     // CBM proxy sends responses via send_response, which goes to stdout.
     // We verify the handler runs without panicking — the _meta placement
     // is validated by the inject_cache_breakpoints unit tests above.
-    let mut state = crate::mcp::McpState::new(crate::tests::test_config());
-    state.cbm_status = crate::cbm::CbmStatus::Unavailable;
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
     let id = serde_json::json!(1);
     let params = serde_json::json!({
         "arguments": {

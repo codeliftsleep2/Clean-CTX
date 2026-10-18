@@ -32,6 +32,7 @@ impl CbmClient {
         let mut command = Command::new(&spec.binary);
         #[cfg(test)]
         super::a2_support::configure_command(&mut command);
+        crate::observability::startup::event("cbm_spawn_begin");
         let child = command
             .current_dir(&spec.root)
             .stdin(Stdio::piped())
@@ -39,6 +40,7 @@ impl CbmClient {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| CbmError::LaunchError(format!("spawn: {e}")))?;
+        crate::observability::startup::event_detail("cbm_spawn_end", child.id().to_string());
         #[cfg(test)]
         super::a2_support::record_child(child.id());
         let mut frontend = FrontendSession::new(child);

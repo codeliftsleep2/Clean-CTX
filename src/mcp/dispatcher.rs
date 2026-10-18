@@ -8,7 +8,7 @@
 //         This allows true parallel execution instead of serializing all requests.
 // - P0-3: Removed dead stdout writer thread and ResponseEnvelope — send_response()
 //         in protocol.rs handles stdout writes with its own global mutex.
-// - RwLock for read-heavy operations (90% reads on cache/cbm_status)
+// - RwLock for read-heavy operations (90% reads on shared caches)
 // - Mutex for write-heavy operations (dict, persistence)
 // - Timeout wrapper: 10s default, configurable per request
 // - Panic recovery: catch_unwind + poisoned lock recovery

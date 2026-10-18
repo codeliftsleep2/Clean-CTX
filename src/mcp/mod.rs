@@ -14,6 +14,7 @@
 pub(crate) mod acquisition;
 pub(crate) mod buffered_store;
 pub(crate) mod cache_hints;
+pub(crate) mod cbm_lifecycle;
 pub(crate) mod compatibility;
 pub(crate) mod content_economics;
 pub(crate) mod context_store;

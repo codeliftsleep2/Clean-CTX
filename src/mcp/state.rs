@@ -186,12 +186,8 @@ pub struct McpState {
     /// Records hits, misses, tokens_saved, and per-region status.
     pub cache_metrics: Mutex<CacheMetrics>,
 
-    /// CBM (codebase-memory-mcp) graph bridge for graph intelligence.
-    /// `None` if CBM is not installed, disabled, or failed to launch.
-    pub graph_bridge: Mutex<Option<crate::cbm::GraphBridge>>,
-
-    /// CBM integration status, mirrored for quick access.
-    pub cbm_status: crate::cbm::CbmStatus,
+    /// Single session owner for CBM launch, admission, status, and shutdown.
+    cbm_lifecycle: crate::mcp::cbm_lifecycle::CbmLifecycle,
 
     /// CBM filter state: per-file skip sets populated by the Intelligence
     /// Layer before compression. When a symbol has low importance (< 0.4),
@@ -274,10 +270,12 @@ impl McpState {
 
         // Capture config-derived values *before* moving config into Self
         // (avoiding after-move borrows).
-        let cbm_config = config.cbm.clone();
         let project_root = crate::mcp::server::find_project_root().clone();
-        let (graph_bridge, cbm_status) =
-            Self::init_cbm_bridge(&cbm_config, &project_root, &config.additional_roots);
+        let cbm_lifecycle = crate::mcp::cbm_lifecycle::CbmLifecycle::new(
+            config.cbm.clone(),
+            project_root,
+            &config.additional_roots,
+        );
         let proxy_port = config.proxy.port;
 
         Self {
@@ -308,76 +306,11 @@ impl McpState {
             #[cfg(feature = "csharp")]
             csharp_call_authority: Default::default(),
             cbm_filter: Mutex::new(CbmFilterState::default()),
-            graph_bridge: Mutex::new(graph_bridge),
-            cbm_status,
+            cbm_lifecycle,
             proxy_port,
             metrics_registry: std::sync::Arc::new(crate::observability::MetricsRegistry::new()),
             proxy_child: Mutex::new(None),
             proxy_cache: None,
-        }
-    }
-
-    /// Try to initialize the CBM graph bridge.
-    ///
-    /// Resolves the disk-cache DB path from config scope:
-    ///   1. `cache_db_path` (explicit override) if set
-    ///   2. `PerWorkspace` → `<project_root>/.clean-ctx/cbm-graph-cache.db`
-    ///   3. `Global` (default) → `.clean-ctx/cbm-graph-cache.db`
-    ///
-    /// The `GraphCacheStore` is attached to the bridge so query results
-    /// are hydrated from disk on first touch (avoiding CBM re-indexing
-    /// on restart) and written through on insert.
-    fn init_cbm_bridge(
-        cbm_config: &crate::cbm::CbmConfig,
-        project_root: &std::path::Path,
-        additional_roots: &[String],
-    ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        // All configured roots share one frontend subprocess. Each root gets
-        // its own async index request and is tracked under its own
-        // canonical CBM slug (see `GraphBridge::try_create_with_roots`).
-        let extras: Vec<std::path::PathBuf> = additional_roots
-            .iter()
-            .map(std::path::PathBuf::from)
-            .collect();
-        let mut bridge =
-            crate::cbm::GraphBridge::try_create_with_roots(cbm_config, project_root, &extras);
-
-        // Resolve the disk-cache DB path by scope precedence.
-        let cache_db_path = cbm_config
-            .cache_db_path
-            .as_ref()
-            .map(std::path::PathBuf::from)
-            .or_else(|| match cbm_config.cache_scope {
-                crate::cbm::config::CacheScope::Global => {
-                    Some(std::path::PathBuf::from(".clean-ctx/cbm-graph-cache.db"))
-                }
-                crate::cbm::config::CacheScope::PerWorkspace => {
-                    Some(project_root.join(".clean-ctx/cbm-graph-cache.db"))
-                }
-            });
-
-        if let Some(db_path) = cache_db_path {
-            match crate::cbm::cache_store::GraphCacheStore::open(&db_path) {
-                Ok(store) => {
-                    eprintln!("[clean-ctx] CBM graph cache: {}", db_path.display());
-                    bridge.attach_disk_cache(store);
-                }
-                Err(e) => {
-                    eprintln!("[clean-ctx] WARNING: Failed to open CBM graph cache DB: {e}");
-                }
-            }
-        }
-
-        if bridge.is_available() {
-            eprintln!("[clean-ctx] CBM graph intelligence: available");
-            let status = bridge.status().clone();
-            (Some(bridge), status)
-        } else {
-            let status = bridge.status().clone();
-            if status.summary() != "unavailable" {
-                eprintln!("[clean-ctx] CBM graph intelligence: {}", status.summary());
-            }
-            (None, status)
         }
     }
 
@@ -443,7 +376,42 @@ impl McpState {
 
     /// Lock the graph bridge for mutation.
     pub fn graph_bridge_lock(&self) -> std::sync::MutexGuard<'_, Option<crate::cbm::GraphBridge>> {
-        lock_or_recover!(self.graph_bridge.lock(), "graph_bridge")
+        self.cbm_lifecycle.bridge_lock()
+    }
+
+    pub(crate) fn start_cbm_after_initialize(&self) {
+        self.cbm_lifecycle.start_after_initialize();
+    }
+
+    pub(crate) fn prepare_cbm_for_consumer(&self) {
+        self.cbm_lifecycle.start_for_consumer();
+    }
+
+    pub(crate) fn cbm_status(&self) -> crate::cbm::CbmStatus {
+        self.cbm_lifecycle.status()
+    }
+
+    pub(crate) fn unadmitted_cbm_status(&self) -> crate::cbm::CbmStatus {
+        self.cbm_lifecycle.unadmitted_status()
+    }
+
+    pub(crate) fn shutdown_cbm(&self) {
+        self.cbm_lifecycle.shutdown();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn skip_cbm_provider_build_for_test(&self) {
+        self.cbm_lifecycle.skip_provider_build_for_test();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn cbm_admission_attempts_for_test(&self) -> usize {
+        self.cbm_lifecycle.admission_attempts_for_test()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn block_cbm_admission_for_test(&self) -> std::sync::Arc<std::sync::Barrier> {
+        self.cbm_lifecycle.block_admission_for_test()
     }
 
     /// Lock the persistence store for writing.
@@ -608,5 +576,11 @@ impl McpState {
     /// that the caller embeds in the response's `_warnings` field.
     pub fn drain_warnings(&self) -> Vec<String> {
         std::mem::take(&mut *lock_or_recover!(self.warnings.lock(), "warnings"))
+    }
+}
+
+impl Drop for McpState {
+    fn drop(&mut self) {
+        self.cbm_lifecycle.shutdown();
     }
 }

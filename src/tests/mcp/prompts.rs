@@ -92,7 +92,8 @@ fn initialize_includes_compact_workflow_instructions() {
     let _serial = crate::protocol::handler_response_serial();
     crate::protocol::captured_responses().clear();
 
-    crate::mcp::handlers::handle_initialize(&serde_json::json!(1));
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    crate::mcp::handlers::handle_initialize(&serde_json::json!(1), &state);
     let response = crate::protocol::captured_responses()
         .pop()
         .expect("initialize response");

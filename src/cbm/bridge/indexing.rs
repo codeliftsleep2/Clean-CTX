@@ -211,6 +211,7 @@ impl GraphBridge {
     /// then transitions the state to `Complete` or `Failed`. The thread flips
     /// the circuit breaker via `record_failure()` on error.
     pub(super) fn start_indexing_for(&mut self, project: &str) {
+        crate::observability::startup::event_detail("cbm_index_submit", project);
         let project_owned = project.to_string();
         let repo_path = self
             .project_paths
@@ -239,7 +240,7 @@ impl GraphBridge {
         let _status = self.status.clone();
 
         // Spawn background indexing thread.
-        std::thread::Builder::new()
+        let worker = std::thread::Builder::new()
             .name("cbm-indexer".into())
             .spawn(move || {
                 eprintln!("[clean-ctx-cbm] Background indexing started for: {project_for_spawn}");
@@ -294,8 +295,22 @@ impl GraphBridge {
                         *s = IndexingState::Failed(e.to_string());
                     }
                 }
-            })
-            .ok();
+            });
+        match worker {
+            Ok(worker) => self.indexing_workers.push(worker),
+            Err(error) => {
+                let mut states = self
+                    .indexing_state
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                states.insert(
+                    project_owned,
+                    IndexingState::Failed(format!(
+                        "background indexing worker could not start: {error}"
+                    )),
+                );
+            }
+        }
     }
 
     /// Start indexing for every configured root (primary + additional).

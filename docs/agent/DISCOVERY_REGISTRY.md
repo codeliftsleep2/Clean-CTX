@@ -46,6 +46,33 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-037: Optional CBM Admission Blocked Core MCP Readiness
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-18 |
+| **Environment** | Codex + Clean-CTX v0.10.0 release binary with installed CBM |
+| **Repository/context** | Clean-CTX repository; stdio MCP startup with CBM enabled and auto-launch configured |
+| **Symptom** | Initial host connection could exceed the host's approximately 30-second window; reconnect could leave two Clean processes. Pre-fix traces showed Clean initialize delayed 14.5–20.3 seconds behind provider admission/index startup. |
+| **Root cause** | `McpState::new` synchronously launched and admitted optional CBM before constructing the dispatcher or reading host stdin. Provider admission therefore gated core MCP readiness. Admission and indexing also lacked one complete session-owned shutdown boundary. |
+| **Classification** | Protocol / lifecycle |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/cbm/startup_readiness.rs`, `src/tests/mcp/cbm_lifecycle.rs`, and `src/tests/cbm/frontend_lifecycle.rs` |
+| **Live scenario required?** | Yes — actual release-binary initialize ordering and process ownership |
+| **Architectural invariant** | CBM-LIFE-001 |
+| **Status** | Fixed; startup verified, reconnect control unavailable in the Codex settings UI |
+
+**Verification (2026-10-18):** Release PID 6324 constructed core state and
+began reading stdin by 345 ms, flushed the Clean initialize response at 383 ms,
+then began CBM launch at 388 ms on the owned `cbm-admission` thread. CBM
+admission completed at 8.955 s without delaying core readiness. A read-only
+runtime check found exactly one `clean-ctx.exe`; the two CBM processes were the
+direct frontend and shared provider process, not duplicate Clean instances.
+The Codex MCP toggle was disabled, so manual reconnect duplication remains
+unexecuted rather than inferred green.
+
+---
+
 ## DIS-2026-036: Exact-Call Reconciliation Multiplied Reverse-TypeRef Compilation Work
 
 | Field | Value |

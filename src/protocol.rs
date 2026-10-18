@@ -57,6 +57,11 @@ macro_rules! lock_or_recover_protocol {
 ///
 /// P0-5: Uses lock_or_recover_protocol! to handle poisoned locks gracefully.
 pub fn send_response(val: &serde_json::Value) {
+    let _ = send_response_checked(val);
+}
+
+/// Send a response and report whether serialization, write, and flush succeeded.
+pub(crate) fn send_response_checked(val: &serde_json::Value) -> bool {
     #[cfg(test)]
     {
         if let Ok(mut q) = CAPTURED_RESPONSES.lock() {
@@ -66,19 +71,37 @@ pub fn send_response(val: &serde_json::Value) {
             // Route diagnostics through libtest capture: successful tests stay
             // quiet, while failures retain the complete model-facing response.
             println!("{payload}");
+            return true;
         }
+        false
     }
 
     #[cfg(not(test))]
     {
         use std::io::{self, Write};
+        let is_initialize = val["result"]["serverInfo"]["name"].as_str() == Some("clean-ctx");
+        if is_initialize {
+            crate::observability::startup::event("clean_initialize_response_begin");
+        }
         // P0-5: Lock the global stdout mutex with poison recovery.
         let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
         let mut stdout = io::stdout().lock();
         if let Ok(payload) = serde_json::to_string(val) {
-            let _ = writeln!(stdout, "{payload}");
-            let _ = stdout.flush();
+            let result = writeln!(stdout, "{payload}").and_then(|_| stdout.flush());
+            if is_initialize {
+                match &result {
+                    Ok(()) => {
+                        crate::observability::startup::event("clean_initialize_response_flushed")
+                    }
+                    Err(error) => crate::observability::startup::event_detail(
+                        "stdout_error",
+                        error.to_string(),
+                    ),
+                }
+            }
+            return result.is_ok();
         }
+        false
     }
 }
 

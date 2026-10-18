@@ -37,7 +37,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                         }
                     },
                     "count": { "type": "integer", "description": "Number of matching nodes." },
-                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                    "cbm_status": { "type": "string", "description": "CBM current status (initializing, available, degraded, unavailable)." }
                 },
                 "required": ["nodes", "count", "cbm_status"]
             }
@@ -85,7 +85,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                             "required": ["from", "to", "label"]
                         }
                     },
-                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                    "cbm_status": { "type": "string", "description": "CBM current status (initializing, available, degraded, unavailable)." }
                 },
                 "required": ["nodes", "edges", "cbm_status"]
             }
@@ -120,7 +120,7 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                         }
                     },
                     "count": { "type": "integer", "description": "Number of edges in the trace path." },
-                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                    "cbm_status": { "type": "string", "description": "CBM current status (initializing, available, degraded, unavailable)." }
                 },
                 "required": ["edges", "count", "cbm_status"]
             }
@@ -163,14 +163,14 @@ pub fn cbm_tool_list() -> Vec<serde_json::Value> {
                             "required": ["from", "to", "kind"]
                         }
                     },
-                    "cbm_status": { "type": "string", "description": "CBM current status (available, degraded, unavailable)." }
+                    "cbm_status": { "type": "string", "description": "CBM current status (initializing, available, degraded, unavailable)." }
                 },
                 "required": ["modules", "dependencies", "cbm_status"]
             }
         }),
         serde_json::json!({
             "name": "get_cbm_status",
-            "description": "Check whether codebase-memory-mcp (CBM) is available. Returns 'available', 'degraded', or 'unavailable' with details.",
+            "description": "Report the current codebase-memory-mcp (CBM) lifecycle state without launching it. Returns 'initializing', 'available', 'degraded', or 'unavailable' with details.",
             "inputSchema": {
                 "type": "object",
                 "properties": {}

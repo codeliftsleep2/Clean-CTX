@@ -14,13 +14,8 @@ const CBM_FALLBACK_GUIDANCE: &str = "Use host-native text/file search for broad 
 /// Circuit breaker guard: check if CBM is healthy before proceeding.
 /// Returns `true` if CBM is available, otherwise sends error response.
 ///
-/// **Live-status fix:** This previously read `state.cbm_status` — a field
-/// snapshotted at server startup and never refreshed. `bridge.update_status()`
-/// keeps the bridge's own status current after every query, so the bridge is
-/// the authoritative source here. Reading the stale `state.cbm_status` made
-/// `graph_search` & co. disagree with `get_cbm_status` (which reads the bridge):
-/// the gate could pass a query while indexing was still in progress (or block
-/// one when the bridge had recovered).
+/// Status comes from the session lifecycle or admitted bridge rather than a
+/// construction-time snapshot, so graph tools and `get_cbm_status` agree.
 fn check_cbm_healthy(id: &Value, status: &crate::cbm::CbmStatus) -> bool {
     if !status.is_available() {
         send_response(&serde_json::json!({
@@ -35,17 +30,21 @@ fn check_cbm_healthy(id: &Value, status: &crate::cbm::CbmStatus) -> bool {
 /// M-3 fix: Factor out bridge extraction boilerplate.
 /// Returns `Some(&mut GraphBridge)` or sends "not available" error and returns `None`.
 ///
-/// The bridge guard already holds the authoritative live status — we check
-/// `bridge.status()`, not the stale `state.cbm_status` snapshot.
+/// After admission, the bridge guard holds the authoritative live status.
 fn with_bridge<'a>(
     id: &Value,
     state: &'a McpState,
 ) -> Option<std::sync::MutexGuard<'a, Option<crate::cbm::GraphBridge>>> {
+    state.prepare_cbm_for_consumer();
     let bridge_opt = state.graph_bridge_lock();
     if bridge_opt.is_none() {
+        let status = state.unadmitted_cbm_status();
         send_response(&serde_json::json!({
             "jsonrpc": "2.0", "id": id,
-            "error": { "code": -32603, "message": format!("CBM not available. Install codebase-memory-mcp on PATH. {CBM_FALLBACK_GUIDANCE}") }
+            "error": {
+                "code": -32603,
+                "message": format!("CBM unavailable: {}. {CBM_FALLBACK_GUIDANCE}", status.summary())
+            }
         }));
         return None;
     }
@@ -449,6 +448,9 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                     // ready for queries since ensure_indexed will kick it off).
                     _ => "CBM is running and ready.".into(),
                 },
+                crate::cbm::CbmStatus::Initializing => {
+                    "CBM provider admission is in progress.".into()
+                }
                 crate::cbm::CbmStatus::Degraded(msg) => format!("CBM degraded: {msg}"),
                 crate::cbm::CbmStatus::Unavailable => {
                     "CBM not installed or disabled. See github.com/DeusData/codebase-memory-mcp"
@@ -481,11 +483,18 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
             (s, d, v, idx_info, freshness_info)
         }
         None => {
-            let d = match &state.cbm_status {
+            let status = state.unadmitted_cbm_status();
+            let d = match &status {
                 crate::cbm::CbmStatus::Available => "CBM configured but not connected.".into(),
+                crate::cbm::CbmStatus::Initializing => {
+                    "CBM provider admission is in progress.".into()
+                }
+                crate::cbm::CbmStatus::Degraded(message) => {
+                    format!("CBM degraded: {message}")
+                }
                 _ => "CBM not available.".into(),
             };
-            (state.cbm_status.clone(), d, String::new(), None, None)
+            (status, d, String::new(), None, None)
         }
     };
 

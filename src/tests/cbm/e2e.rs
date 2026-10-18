@@ -103,6 +103,7 @@ fn shared_live_state() -> Arc<crate::mcp::McpState> {
             .additional_roots
             .push(fixture_root.to_string_lossy().into_owned());
         let state = crate::mcp::McpState::new(config);
+        state.start_cbm_after_initialize();
         wait_for_indexing_complete(&state);
         let fixture_project = {
             let mut bridge = state.graph_bridge_lock();
@@ -372,7 +373,7 @@ fn e2e_proxy_handler_returns_compressed_result() {
     // Test that the proxy can handle a get_architecture call
     // handle_cbm_proxy sends responses directly via send_response,
     // so we test the bridge's proxy_call directly instead
-    let mut binding = state.graph_bridge.lock().unwrap();
+    let mut binding = state.graph_bridge_lock();
     let bridge = binding.as_mut().unwrap();
     let result = bridge.proxy_call("get_architecture", json!({}));
 
