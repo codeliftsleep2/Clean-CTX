@@ -27,8 +27,8 @@ pub(crate) use requirement::{
     requirement_fingerprint,
 };
 pub(crate) use satisfaction::{
-    AcquisitionOutcome, AcquisitionSatisfaction, CoverageProofDisposition, ProofBarrier,
-    SemanticPublicationStatus,
+    AcquisitionOutcome, AcquisitionProcessingState, AcquisitionSatisfaction,
+    CoverageProofDisposition, ProofBarrier, SemanticPublicationStatus,
 };
 
 #[cfg(all(test, feature = "rust"))]

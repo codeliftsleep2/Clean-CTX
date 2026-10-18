@@ -2,8 +2,8 @@
 
 use super::identity::ResolvedIdentity;
 use crate::mcp::acquisition::{
-    AcquisitionOutcome, AcquisitionSatisfaction, CoverageProofDisposition, ProofBarrier,
-    SemanticPublicationStatus,
+    AcquisitionOutcome, AcquisitionProcessingState, AcquisitionSatisfaction,
+    CoverageProofDisposition, ProofBarrier,
 };
 use crate::mcp::tool_handlers::hydration::HydrationReport;
 use crate::workspace::index::WorkspaceIndex;
@@ -109,6 +109,9 @@ pub(super) fn exact_identity_coverage(
         let mut coverage = certificate.project();
         coverage["identity_indexed"] = identity_indexed.into();
         coverage["capability_established"] = capability_established.into();
+        if let Some(outcome) = hydration.acquisition_outcome.as_ref() {
+            coverage["coverage_detail"] = acquisition_coverage_detail(outcome);
+        }
         return coverage;
     }
     let status = if !identity_indexed {
@@ -177,21 +180,26 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             reasons.push(reason);
         }
     }
-    let structurally_unproven = outcome.publication() == SemanticPublicationStatus::Complete
+    let complete = outcome.satisfaction().is_source_complete();
+    let structurally_unproven = outcome.processing() == AcquisitionProcessingState::Terminal
         && reasons == ["candidate_predicate_uncertified"];
     json!({
-        "processing_state": if outcome.publication() == SemanticPublicationStatus::Complete {
+        "processing_state": if outcome.processing() == AcquisitionProcessingState::Terminal {
             "terminal"
         } else {
             "incomplete"
         },
-        "proof_state": if structurally_unproven {
+        "proof_state": if complete {
+            "complete"
+        } else if structurally_unproven {
             "structurally_unproven"
         } else {
             "indeterminate"
         },
         "fact_authority": "authoritative_observed",
-        "retryability": if structurally_unproven {
+        "retryability": if complete {
+            "not_needed"
+        } else if structurally_unproven {
             "change_required"
         } else {
             "retryable"

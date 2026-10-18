@@ -10,6 +10,12 @@ pub(crate) enum SemanticPublicationStatus {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum AcquisitionProcessingState {
+    Terminal,
+    Incomplete,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ProofBarrier {
     InventoryIncomplete,
     CandidatePredicateUncertified,
@@ -29,7 +35,7 @@ pub(crate) enum CoverageProofDisposition {
 pub(crate) struct AcquisitionOutcome {
     satisfaction: AcquisitionSatisfaction,
     dispositions: BTreeMap<CoverageUnit, CoverageProofDisposition>,
-    publication: SemanticPublicationStatus,
+    processing: AcquisitionProcessingState,
 }
 
 impl AcquisitionOutcome {
@@ -41,7 +47,10 @@ impl AcquisitionOutcome {
         Self {
             satisfaction,
             dispositions,
-            publication,
+            processing: match publication {
+                SemanticPublicationStatus::Complete => AcquisitionProcessingState::Terminal,
+                SemanticPublicationStatus::Failed => AcquisitionProcessingState::Incomplete,
+            },
         }
     }
 
@@ -53,8 +62,8 @@ impl AcquisitionOutcome {
         &self.dispositions
     }
 
-    pub(crate) fn publication(&self) -> SemanticPublicationStatus {
-        self.publication
+    pub(crate) fn processing(&self) -> AcquisitionProcessingState {
+        self.processing
     }
 }
 

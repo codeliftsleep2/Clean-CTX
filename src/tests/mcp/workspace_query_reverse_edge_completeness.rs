@@ -231,6 +231,19 @@ fn issue_144_proof_backed_reverse_type_ref_earns_exact_coverage() {
 
     assert_eq!(constructor_subjects(&response), expected_subjects());
     assert_exact_coverage(&response);
+    let coverage = &structured(&response)["coverage"];
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "terminal",
+            "proof_state": "complete",
+            "fact_authority": "authoritative_observed",
+            "retryability": "not_needed",
+            "residual_unit_count": 0,
+            "reasons": []
+        }),
+        "proof-backed exact coverage must explain that processing is terminal and no retry is needed: {coverage}"
+    );
 }
 
 #[test]
