@@ -183,6 +183,11 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
     let complete = outcome.satisfaction().is_source_complete();
     let structurally_unproven = outcome.processing() == AcquisitionProcessingState::Terminal
         && reasons == ["candidate_predicate_uncertified"];
+    let operationally_unproven = outcome.processing() == AcquisitionProcessingState::Incomplete
+        && !reasons.is_empty()
+        && reasons
+            .iter()
+            .all(|reason| matches!(*reason, "inventory_incomplete" | "publication_failed"));
     json!({
         "processing_state": if outcome.processing() == AcquisitionProcessingState::Terminal {
             "terminal"
@@ -193,6 +198,8 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             "complete"
         } else if structurally_unproven {
             "structurally_unproven"
+        } else if operationally_unproven {
+            "operationally_unproven"
         } else {
             "indeterminate"
         },
@@ -201,8 +208,10 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             "not_needed"
         } else if structurally_unproven {
             "change_required"
+        } else if operationally_unproven {
+            "same_request_may_help"
         } else {
-            "retryable"
+            "indeterminate"
         },
         "residual_unit_count": residual.len(),
         "reasons": reasons,

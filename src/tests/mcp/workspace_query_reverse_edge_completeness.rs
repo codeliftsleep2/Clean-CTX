@@ -348,6 +348,18 @@ fn issue_144_publication_failure_remains_lower_bound() {
     assert_eq!(coverage["source_complete"], false, "{coverage}");
     assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
     assert_eq!(coverage["omitted_possible"], true, "{coverage}");
+    assert_eq!(
+        coverage["coverage_detail"],
+        json!({
+            "processing_state": "incomplete",
+            "proof_state": "operationally_unproven",
+            "fact_authority": "authoritative_observed",
+            "retryability": "same_request_may_help",
+            "residual_unit_count": 1,
+            "reasons": ["publication_failed"]
+        }),
+        "publication failure must remain an operationally incomplete, retryable lower bound: {coverage}"
+    );
 }
 
 #[test]
