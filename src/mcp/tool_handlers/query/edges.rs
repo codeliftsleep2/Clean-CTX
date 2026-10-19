@@ -181,21 +181,6 @@ fn try_prepare_forward_edges(
             let index = state.workspace_index_read();
             context.efcore_catalog(state, &index, scope.as_ref())
         });
-    let (aspnet_projection, aspnet_authorized) = if classification_complete
-        && identity
-            .exact()
-            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
-    {
-        let index = state.workspace_index_read();
-        let catalog = context.csharp_catalog(state, &index, scope.as_ref());
-        let exact = identity.exact().expect("checked exact Controller identity");
-        (
-            catalog.aspnet_projection(&exact.name, crate::compression::Fidelity::High),
-            catalog.has_aspnet_controller_authority(&exact.name),
-        )
-    } else {
-        (None, false)
-    };
     let angular_catalog = needs_angular_template_resolution(&identity).then(|| {
         let index = state.workspace_index_read();
         context.angular_catalog(state, &index, scope.as_ref(), classification_complete)
@@ -214,13 +199,6 @@ fn try_prepare_forward_edges(
             .ok()
             .and_then(|value| value.as_array().cloned())
             .unwrap_or_default();
-        if identity
-            .exact()
-            .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Controller")
-            && !aspnet_authorized
-        {
-            edges.clear();
-        }
         let stored_count = edges.len();
         if let (Some(exact), Some(catalog)) = (identity.exact(), angular_catalog.as_ref()) {
             edges.extend(catalog.forward(&exact.domain, &exact.entity_type, &exact.name));
@@ -242,17 +220,6 @@ fn try_prepare_forward_edges(
                 &mut edges,
                 catalog.forward(&exact.domain, &exact.entity_type, &exact.name),
             );
-        }
-        if let Some(projection) = &aspnet_projection {
-            for edge in serde_json::to_value(&projection.edges)
-                .ok()
-                .and_then(|value| value.as_array().cloned())
-                .unwrap_or_default()
-            {
-                if !edges.contains(&edge) {
-                    edges.push(edge);
-                }
-            }
         }
         let count = edges.len();
         let mut structured = serde_json::json!({

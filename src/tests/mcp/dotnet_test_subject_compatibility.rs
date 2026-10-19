@@ -8,8 +8,8 @@ const SOURCE: &str = "public class OrderService {} [TestClass] public class Orde
 fn declaration_proven_test_subjects_advance_only_dotnet_semantics() {
     assert_eq!(
         crate::dotnet_meta::SEMANTIC_PRODUCER_GENERATION,
-        3,
-        "durable structured DbContext role registration changes .NET semantics"
+        4,
+        "resolved ASP.NET controller authority changes .NET semantics"
     );
     assert_eq!(crate::dotnet_meta::MARKER_PRODUCER_GENERATION, 1);
 
@@ -29,11 +29,9 @@ fn declaration_proven_test_subjects_advance_only_dotnet_semantics() {
     )
     .expect("prior .NET identity");
 
-    assert!(
-        current
-            .semantic_producers
-            .differs_bidirectionally(&prior.semantic_producers)
-    );
+    assert!(current
+        .semantic_producers
+        .differs_bidirectionally(&prior.semantic_producers));
     assert_eq!(current.canonical_producers, prior.canonical_producers);
     assert_eq!(current.canonical_config, prior.canonical_config);
     assert_eq!(current.semantic_config, prior.semantic_config);

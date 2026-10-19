@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    TestProjectReadiness, TestProjectSearchResult, clear_test_project_search_results,
-    searched_projects, set_test_project_readiness, set_test_project_search_results,
+    clear_test_project_search_results, searched_projects, set_test_project_readiness,
+    set_test_project_search_results, TestProjectReadiness, TestProjectSearchResult,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -147,13 +147,11 @@ fn red15_additional_root_only_discovery() {
     let sc = call_find(&state, "AdditionalOnly", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 2);
     assert_eq!(sc["discovery"]["compiled"], 1);
-    assert!(
-        entities.iter().any(|entity| {
-            entity["entity_type"] == "Class" && entity["name"] == "AdditionalOnly"
-        })
-    );
+    assert!(entities
+        .iter()
+        .any(|entity| { entity["entity_type"] == "Class" && entity["name"] == "AdditionalOnly" }));
     clear_test_project_search_results();
 }
 
@@ -296,7 +294,7 @@ fn red17_merged_candidates_are_exhaustive_after_dedup_and_index_exclusion() {
     expected.dedup();
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 9);
+    assert_eq!(sc["discovery"]["discovered"], 16);
     assert_eq!(sc["discovery"]["compiled"], 7);
     assert_eq!(added.len(), 7, "all unique unindexed candidates compile");
     assert_eq!(added, expected.into_iter().collect());
@@ -326,7 +324,7 @@ fn red18_per_project_failure_degrades_locally() {
     let sc = call_find(&state, "Survivor", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["discovered"], 2);
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert!(entities.iter().any(|entity| entity["name"] == "Survivor"));
     clear_test_project_search_results();
@@ -350,10 +348,13 @@ fn additional_root_registration_is_reached_by_hydration_discovery() {
     let sc = call_find(&state, "Absent", primary.path());
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert!(
-        discovery(&sc).is_none(),
-        "both projects were searched while ready and nothing was discovered, so there is no \
-         diagnostic to report: {sc:?}"
+    assert_eq!(
+        discovery(&sc),
+        Some(&serde_json::json!({
+            "provider": "cbm_and_filesystem",
+            "fallback_reason": "cbm_scope_unavailable"
+        })),
+        "provider success cannot hide the required Clean acquisition route: {sc:?}"
     );
     assert!(!reports_project(&sc, &primary_slug));
     assert!(!reports_project(&sc, &additional_slug));

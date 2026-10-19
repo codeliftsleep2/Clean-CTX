@@ -327,6 +327,10 @@ mod tests_automapper_r7;
 #[path = "../../tests/mcp/workspace_query_signalr_r8.rs"]
 mod tests_signalr_r8;
 
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_aspnet_r9.rs"]
+mod tests_aspnet_r9;
+
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
 mod tests_legacy_edit_adequacy;

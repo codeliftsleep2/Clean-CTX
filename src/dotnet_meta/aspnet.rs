@@ -35,8 +35,9 @@ pub(crate) fn analyze_aspnet(class_source: &str, fidelity: Fidelity) -> Option<A
     super::class_analysis_metrics::record_analysis();
 
     // Detect controller class
-    let is_controller = class_source.contains("[ApiController]")
-        || class_source.contains("[Controller]")
+    let has_controller_attribute =
+        class_source.contains("[ApiController]") || class_source.contains("[Controller]");
+    let is_controller = has_controller_attribute
         || class_source.contains(": ControllerBase")
         || class_source.contains(": Controller");
 
@@ -44,7 +45,21 @@ pub(crate) fn analyze_aspnet(class_source: &str, fidelity: Fidelity) -> Option<A
         return None;
     }
 
-    analyze_authorized_controller(class_source, fidelity)
+    let mut analysis = analyze_authorized_controller(class_source, fidelity)?;
+    if !has_controller_attribute {
+        analysis.semantic_edges.clear();
+    }
+    Some(analysis)
+}
+
+/// Analyze direct controller-attribute authority pending the shared attribute
+/// resolver migration. Written base names are deliberately excluded.
+pub(crate) fn analyze_attribute_authorized_controller(
+    class_source: &str,
+    fidelity: Fidelity,
+) -> Option<AspNetAnalysis> {
+    (class_source.contains("[ApiController]") || class_source.contains("[Controller]"))
+        .then(|| analyze_authorized_controller(class_source, fidelity))?
 }
 
 /// Analyze a class whose ASP.NET controller ancestry was proven externally.

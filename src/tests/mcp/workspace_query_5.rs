@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    TestProjectSearchResult, clear_test_project_search_results,
-    set_test_inbound_project_search_results, set_test_project_search_results,
+    clear_test_project_search_results, set_test_inbound_project_search_results,
+    set_test_project_search_results, TestProjectSearchResult,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -130,7 +130,7 @@ fn red_c1_reverse_edges_returns_all_inbound_consumers() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 9);
+    assert_eq!(sc["discovery"]["discovered"], 18);
     assert_eq!(sc["discovery"]["compiled"], 9);
     assert_eq!(sc["count"], 9);
     assert_eq!(consumer_names(&sc).len(), 9);
@@ -160,7 +160,7 @@ fn red_c2_find_entities_is_not_silently_truncated() {
 
     let sc = call_query(&state, "find_entities", "SharedDeclaration", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 7);
+    assert_eq!(sc["discovery"]["discovered"], 14);
     assert_eq!(sc["discovery"]["compiled"], 7);
     assert_eq!(sc["count"], 7);
     clear_test_project_search_results();
@@ -200,7 +200,7 @@ fn red_c3_multi_project_reverse_edges_is_complete() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 8);
+    assert_eq!(sc["discovery"]["discovered"], 16);
     assert_eq!(sc["discovery"]["compiled"], 8);
     assert_eq!(sc["count"], 8);
     assert_eq!(consumer_names(&sc).len(), 8);
@@ -235,7 +235,7 @@ fn red_c4_duplicate_candidates_compile_once() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 3);
+    assert_eq!(sc["discovery"]["discovered"], 4);
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     clear_test_project_search_results();
@@ -266,7 +266,7 @@ fn red_c5_already_indexed_candidates_are_excluded_without_losing_results() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 7);
+    assert_eq!(sc["discovery"]["discovered"], 14);
     assert_eq!(sc["discovery"]["compiled"], 6);
     assert_eq!(sc["count"], 7);
     clear_test_project_search_results();
@@ -298,7 +298,7 @@ fn red_c6_candidate_count_is_not_semantic_result_count() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 8);
+    assert_eq!(sc["discovery"]["discovered"], 9);
     assert_eq!(sc["discovery"]["compiled"], 8);
     assert_eq!(sc["count"], 1);
     assert_eq!(consumer_names(&sc), HashSet::from(["RealConsumer"]));

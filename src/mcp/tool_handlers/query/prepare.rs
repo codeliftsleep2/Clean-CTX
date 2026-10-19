@@ -114,7 +114,10 @@ impl PreparationContext {
     ) -> Result<(), QueryFailure> {
         if (args["domain"] == "builtin" && args["entity_type"] == "Method")
             || (args["domain"] == "dotnet"
-                && matches!(args["entity_type"].as_str(), Some("DbContext" | "Entity")))
+                && matches!(
+                    args["entity_type"].as_str(),
+                    Some("DbContext" | "Entity" | "Controller")
+                ))
         {
             self.prepare_exact_csharp_calls(state)?;
         }

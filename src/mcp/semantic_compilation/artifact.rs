@@ -255,7 +255,14 @@ impl SemanticCompilationArtifact {
                         ))
                     || (edge.subject.entity_type == "Hub"
                         && edge.relation
-                            == crate::layers::meta::semantic::SemanticRelation::HubMethodTargets)))
+                            == crate::layers::meta::semantic::SemanticRelation::HubMethodTargets)
+                    || (edge.subject.entity_type == "Controller"
+                        && matches!(
+                            edge.relation,
+                            crate::layers::meta::semantic::SemanticRelation::Defines
+                                | crate::layers::meta::semantic::SemanticRelation::HasRoute
+                                | crate::layers::meta::semantic::SemanticRelation::ControllerAction
+                        ))))
         });
         edges.extend(
             crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
@@ -272,6 +279,18 @@ impl SemanticCompilationArtifact {
         );
         edges.extend(
             crate::dotnet_meta::semantic::project_resolved_signalr_edges(
+                resolved_classes,
+                self.canonical_owner(),
+                self.fidelity(),
+            ),
+        );
+        edges.extend(crate::dotnet_meta::semantic::project_resolved_aspnet_edges(
+            resolved_classes,
+            self.canonical_owner(),
+            self.fidelity(),
+        ));
+        edges.extend(
+            crate::dotnet_meta::semantic::project_attribute_authorized_aspnet_edges(
                 resolved_classes,
                 self.canonical_owner(),
                 self.fidelity(),

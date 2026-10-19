@@ -12,7 +12,6 @@ use std::collections::HashSet;
 use tree_sitter::Node;
 mod declaration_candidates;
 mod dependencies;
-pub(super) mod direct_aspnet;
 mod reference_candidates;
 mod using_aliases;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
@@ -69,11 +68,6 @@ pub(super) struct Catalog {
 pub(super) struct ResolvedTarget {
     pub(super) kind: TypeKind,
     pub(super) name: String,
-}
-
-pub(super) struct AspNetProjection {
-    pub(super) file: String,
-    pub(super) edges: Vec<SemanticEdge>,
 }
 
 impl Catalog {
@@ -168,60 +162,6 @@ impl Catalog {
             .map(|reference| reference.shape.name.clone())
     }
 
-    pub(super) fn aspnet_projection(
-        &self,
-        name: &str,
-        fidelity: crate::compression::Fidelity,
-    ) -> Option<AspNetProjection> {
-        let original = self.unique_named_class(name)?;
-        if original.source.contains("[ApiController]") || original.source.contains("[Controller]") {
-            return direct_aspnet::projection(original, fidelity);
-        }
-        let mut current = original;
-        let mut visited = HashSet::new();
-        loop {
-            if !visited.insert((current.file.clone(), current.path.clone(), current.arity)) {
-                return None;
-            }
-            let reference = self.base_reference(current)?;
-            if is_qualified_aspnet_framework_base(reference) {
-                break;
-            }
-            if let Some(declaration) = self.resolve_declaration(reference) {
-                if declaration.kind != TypeKind::Class {
-                    return None;
-                }
-                current = declaration;
-                continue;
-            }
-            if is_imported_aspnet_framework_base(reference) {
-                break;
-            }
-            return None;
-        }
-        let mut analysis =
-            crate::dotnet_meta::aspnet::analyze_authorized_controller(&original.source, fidelity)?;
-        for edge in &mut analysis.semantic_edges {
-            edge.subject.file = Some(original.file.clone());
-            edge.object.file = Some(original.file.clone());
-        }
-        Some(AspNetProjection {
-            file: original.file.clone(),
-            edges: analysis.semantic_edges,
-        })
-    }
-
-    pub(super) fn has_aspnet_controller_authority(&self, name: &str) -> bool {
-        let Some(declaration) = self.unique_named_class(name) else {
-            return false;
-        };
-        declaration.source.contains("[ApiController]")
-            || declaration.source.contains("[Controller]")
-            || self
-                .aspnet_projection(name, crate::compression::Fidelity::High)
-                .is_some()
-    }
-
     fn unique_named_class(&self, name: &str) -> Option<&Declaration> {
         let mut matches = self
             .declarations
@@ -309,28 +249,6 @@ fn candidate_paths(reference: &BaseReference) -> Vec<Vec<String>> {
         paths.push(absolute);
     }
     paths
-}
-
-fn is_qualified_aspnet_framework_base(reference: &BaseReference) -> bool {
-    if !matches!(
-        reference.shape.name.as_str(),
-        "ControllerBase" | "Controller"
-    ) {
-        return false;
-    }
-    let written = reference.written.trim_start_matches("global::");
-    written == format!("Microsoft.AspNetCore.Mvc.{}", reference.shape.name)
-}
-
-fn is_imported_aspnet_framework_base(reference: &BaseReference) -> bool {
-    matches!(
-        reference.shape.name.as_str(),
-        "ControllerBase" | "Controller"
-    ) && reference.shape.qualifier.is_empty()
-        && reference
-            .imports
-            .iter()
-            .any(|path| path.join(".") == "Microsoft.AspNetCore.Mvc")
 }
 
 fn direct_using_namespaces(node: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {

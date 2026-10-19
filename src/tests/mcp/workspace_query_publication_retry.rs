@@ -3,9 +3,9 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    HydrationRequirement, TEST_PROJECT_HYDRATION_SERIALIZE, TestDiscoveryKind,
     clear_test_project_search_results, discovery_calls, fail_test_publication_once,
-    hydrate_workspace_index_for, set_test_project_search_results,
+    hydrate_workspace_index_for, set_test_project_search_results, HydrationRequirement,
+    TestDiscoveryKind, TEST_PROJECT_HYDRATION_SERIALIZE,
 };
 use crate::workspace::index::SemanticFidelity;
 use std::collections::HashMap;
@@ -78,7 +78,7 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
         requirement,
     )
     .unwrap();
-    assert_eq!(first.candidates_discovered, 2);
+    assert_eq!(first.candidates_discovered, 4);
     assert_eq!(first.candidates_compiled, 0);
     assert_eq!(first.discovery_status, "partial");
     assert!(
@@ -97,7 +97,10 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
         requirement,
     )
     .unwrap();
-    assert_eq!(second.candidates_discovered, 2);
+    assert_eq!(
+        second.candidates_discovered, 4,
+        "retry must repeat both uncommitted provider hints and Clean root acquisition"
+    );
     assert_eq!(second.candidates_compiled, 1);
     assert_eq!(second.discovery_status, "completed");
     assert!(

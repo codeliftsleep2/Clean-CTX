@@ -15,6 +15,8 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
 const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
 const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
+const ASPNET_CONTROLLER: &str = "Microsoft.AspNetCore.Mvc.Controller";
+const ASPNET_CONTROLLER_BASE: &str = "Microsoft.AspNetCore.Mvc.ControllerBase";
 
 pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
 {
@@ -23,6 +25,8 @@ pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(AUTOMAPPER_PROFILE),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(SIGNALR_HUB),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external_with_arity(SIGNALR_HUB, 1),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER_BASE),
     ]
 }
 
@@ -94,6 +98,104 @@ fn is_resolved_signalr_hub(class: &crate::ir::csharp_resolution::CSharpResolvedC
                 && identity.origin
                     == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
     )
+}
+
+fn is_resolved_aspnet_controller(
+    class: &crate::ir::csharp_resolution::CSharpResolvedClass,
+) -> bool {
+    matches!(
+        &class.ancestry,
+        crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+            if matches!(
+                identity.qualified_name.as_str(),
+                ASPNET_CONTROLLER | ASPNET_CONTROLLER_BASE
+            )
+                && identity.generic_arity == 0
+                && identity.origin
+                    == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+    )
+}
+
+pub(crate) fn project_resolved_aspnet_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+    fidelity: Fidelity,
+) -> Vec<SemanticEdge> {
+    let mut edges = Vec::new();
+    for class in classes.iter().filter(|class| {
+        is_resolved_aspnet_controller(class) && class.files.iter().any(|owner| owner == file)
+    }) {
+        let Some(symbol_owner) = class.files.first() else {
+            continue;
+        };
+        // A partial class is one resolved source symbol even though payload
+        // facts remain attributed to their physical parts. Register its role
+        // once under the deterministic first composed owner.
+        if symbol_owner == file {
+            let mut role = EntityRef::new("dotnet", "Controller", &class.owner);
+            role.file = Some(file.to_string());
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: role.clone(),
+                object: role,
+                layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
+                call_evidence: None,
+            });
+        }
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+            if let Some(analysis) =
+                crate::dotnet_meta::aspnet::analyze_authorized_controller(raw_class, fidelity)
+            {
+                edges.extend(analysis.semantic_edges.into_iter().map(|mut edge| {
+                    // Relationships remain asserted by the physical payload
+                    // part through WorkspaceIndex's owner key, but their
+                    // controller subject is the one composed symbol
+                    // occurrence. Otherwise every partial payload part would
+                    // manufacture another framework-role occurrence.
+                    edge.subject.file = Some(symbol_owner.clone());
+                    edge.object.file = Some(file.to_string());
+                    edge
+                }));
+            }
+        }
+    }
+    edges
+}
+
+pub(crate) fn project_attribute_authorized_aspnet_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+    fidelity: Fidelity,
+) -> Vec<SemanticEdge> {
+    let mut edges = Vec::new();
+    for class in classes.iter().filter(|class| {
+        !is_resolved_aspnet_controller(class) && class.files.iter().any(|owner| owner == file)
+    }) {
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+            let Some(analysis) =
+                crate::dotnet_meta::aspnet::analyze_attribute_authorized_controller(
+                    raw_class, fidelity,
+                )
+            else {
+                continue;
+            };
+            let mut role = EntityRef::new("dotnet", "Controller", &class.owner);
+            role.file = Some(file.to_string());
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: role.clone(),
+                object: role,
+                layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
+                call_evidence: None,
+            });
+            edges.extend(analysis.semantic_edges.into_iter().map(|mut edge| {
+                edge.subject.file = Some(file.to_string());
+                edge.object.file = Some(file.to_string());
+                edge
+            }));
+        }
+    }
+    edges
 }
 
 pub(crate) fn project_resolved_automapper_edges(
@@ -194,6 +296,7 @@ pub(crate) fn has_resolved_dotnet_role(
         is_resolved_dbcontext(class)
             || is_resolved_automapper_profile(class)
             || is_resolved_signalr_hub(class)
+            || is_resolved_aspnet_controller(class)
     })
 }
 
@@ -242,7 +345,7 @@ pub fn extract_dotnet_semantic_edges(
     #[cfg(test)]
     super::class_analysis_metrics::record_analysis();
 
-    crate::dotnet_meta::aspnet::analyze_aspnet(raw_class, fidelity)
+    crate::dotnet_meta::aspnet::analyze_attribute_authorized_controller(raw_class, fidelity)
         .map(|analysis| analysis.semantic_edges)
         .unwrap_or_default()
 }
@@ -336,3 +439,7 @@ mod tests_r7;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/signalr_resolution_r8.rs"]
 mod tests_r8;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/aspnet_resolution_r9.rs"]
+mod tests_r9;

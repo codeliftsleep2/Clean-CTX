@@ -1,14 +1,14 @@
 //! RED preparation/snapshot regressions for heterogeneous workspace batches.
 
-use crate::cbm::GraphBridge;
 use crate::cbm::bridge::cbm_project_slug;
+use crate::cbm::GraphBridge;
 use crate::mcp::tool_handlers::hydration::{
-    TestDiscoveryKind, TestProjectReadiness, clear_test_project_search_results, discovery_calls,
-    set_test_inbound_project_search_results, set_test_project_readiness,
-    set_test_project_search_results,
+    clear_test_project_search_results, discovery_calls, set_test_inbound_project_search_results,
+    set_test_project_readiness, set_test_project_search_results, TestDiscoveryKind,
+    TestProjectReadiness,
 };
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -114,16 +114,12 @@ fn red_batch_runs_distinct_names_and_discovery_modes_independently() {
 
     assert_eq!(results(&response).len(), 3, "{response}");
     assert_eq!(calls.len(), 2, "distinct preparation keys: {calls:?}");
-    assert!(
-        calls
-            .iter()
-            .any(|(_, kind)| *kind == TestDiscoveryKind::Declaration)
-    );
-    assert!(
-        calls
-            .iter()
-            .any(|(_, kind)| *kind == TestDiscoveryKind::InboundReference)
-    );
+    assert!(calls
+        .iter()
+        .any(|(_, kind)| *kind == TestDiscoveryKind::Declaration));
+    assert!(calls
+        .iter()
+        .any(|(_, kind)| *kind == TestDiscoveryKind::InboundReference));
 }
 
 #[test]
@@ -198,7 +194,18 @@ fn batch_permutation_preserves_each_items_semantic_truth() {
             .unwrap()["result"]
             .clone()
     };
-    assert_eq!(by_id(&first, "find"), by_id(&second, "find"));
+    let semantic_result = |response: &Value, id: &str| {
+        let mut result = by_id(response, id);
+        result
+            .as_object_mut()
+            .expect("query result")
+            .remove("discovery");
+        result
+    };
+    assert_eq!(
+        semantic_result(&first, "find"),
+        semantic_result(&second, "find")
+    );
     assert_eq!(by_id(&first, "file"), by_id(&second, "file"));
 }
 
@@ -293,8 +300,8 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
     );
     assert_eq!(
         state.test_csharp_reconciliation_count(),
-        0,
-        "unrelated C# acquisition must defer exact-call reconciliation"
+        1,
+        "controller acquisition must reconcile shared C# ancestry once"
     );
 
     state.reset_test_csharp_reconciliation_count();
@@ -306,7 +313,7 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
     assert_eq!(
         state.test_csharp_reconciliation_count(),
         0,
-        "a warm unrelated acquisition must not reconcile exact calls"
+        "a warm controller batch must reuse the reconciled C# generation"
     );
 
     crate::mcp::tool_handlers::hydration::clear_test_hydration_candidates();

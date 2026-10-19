@@ -1,5 +1,30 @@
 # Native issue reconciliation over live MCP
 
+## C# semantic resolution R9 ASP.NET base convergence
+
+`Invoke-CSharpR9Acceptance.ps1` drives a current production binary over MCP
+stdio. Its owned fixture covers `Controller` and `ControllerBase` through full,
+`global::`, imported, namespace-alias, type-alias, partial, and cross-file
+indirect ancestry. Local shadows, competing imports, wrong arity, and cycles
+must fail closed. The same session verifies unrelated/warm history independence,
+base removal/restoration, owner deletion, route/action attribution, and a neutral
+file control. Direct controller attributes are recorded separately as the
+temporary R11 boundary.
+
+When `-ProviderPath` is supplied, an additional session indexes a plausible
+but incomplete snapshot before the complete fixture is written. Optional CBM
+state may change acquisition diagnostics and work, but cannot change controller
+identity or facts. This harness builds nothing and retains all fixtures, RPC
+frames, stderr, provenance, and verdicts under
+`target/csharp-r9-live-verification/`. It is operator/live evidence, not a Rust
+test or CI gate.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-CSharpR9Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA/Programs/codebase-memory-mcp/codebase-memory-mcp.exe"
+```
+
 ## Issue #148 provider-state and history-independence matrix
 
 `Invoke-Issue148Acceptance.ps1` drives the production binary over MCP stdio

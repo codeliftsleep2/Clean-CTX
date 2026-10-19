@@ -100,10 +100,6 @@ fn try_prepare_find_entities(
         workspace_root,
         crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
     )?;
-    #[cfg(feature = "csharp")]
-    if !declarations_only {
-        context.prepare_exact_csharp_calls(state)?;
-    }
     if hydration.is_complete() {
         let mut current = name.clone();
         let mut visited = HashSet::new();
@@ -128,31 +124,13 @@ fn try_prepare_find_entities(
             current = candidate;
         }
     }
-    let (aspnet_controller, aspnet_authorized) = if !declarations_only {
-        let index = state.workspace_index_read();
-        let catalog = context.csharp_catalog(state, &index, scope.as_ref());
-        let direct = super::csharp_resolution::direct_aspnet::projection_for_catalog(
-            &catalog,
-            &name,
-            crate::compression::Fidelity::High,
-        );
-        let authorized = direct.is_some()
-            || (hydration.is_complete() && catalog.has_aspnet_controller_authority(&name));
-        let controller = direct
-            .or_else(|| {
-                hydration
-                    .is_complete()
-                    .then(|| catalog.aspnet_projection(&name, crate::compression::Fidelity::High))
-                    .flatten()
-            })
-            .map(|projection| {
-                crate::layers::meta::semantic::EntityRef::new("dotnet", "Controller", &name)
-                    .with_file(projection.file)
-            });
-        (controller, authorized)
-    } else {
-        (None, false)
-    };
+    #[cfg(feature = "csharp")]
+    if !declarations_only {
+        // Controller ancestry hydration can publish additional source symbols.
+        // Reconcile only after that acquisition so negative shadow proof and
+        // indirect ancestry observe one complete admitted generation.
+        context.prepare_exact_csharp_calls(state)?;
+    }
     Ok(PreparedQuery::indexed(move |index| {
         let entities = if declarations_only {
             match scope.as_ref() {
@@ -176,23 +154,11 @@ fn try_prepare_find_entities(
                         .as_deref()
                         .is_none_or(|value| entity.entity_type == value)
             })
-            .filter(|entity| {
-                declarations_only
-                    || aspnet_authorized
-                    || !(entity.domain == "dotnet"
-                        && entity.entity_type == "Controller"
-                        && entity.name == name)
-            })
             .collect();
-        let mut serialized = serde_json::to_value(&entities)
+        let serialized = serde_json::to_value(&entities)
             .ok()
             .and_then(|value| value.as_array().cloned())
             .unwrap_or_default();
-        if let Some(controller) = &aspnet_controller
-            && !entities.iter().any(|entity| **entity == *controller)
-        {
-            serialized.push(serde_json::to_value(controller).unwrap_or_default());
-        }
         let count = serialized.len();
         let mut structured = serde_json::json!({
             "entities": serialized,

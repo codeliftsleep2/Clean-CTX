@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    TestDiscoveryKind, TestProjectSearchResult, clear_test_project_search_results, discovery_calls,
-    set_test_inbound_project_search_results, set_test_project_search_results,
+    clear_test_project_search_results, discovery_calls, set_test_inbound_project_search_results,
+    set_test_project_search_results, TestDiscoveryKind, TestProjectSearchResult,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -155,8 +155,11 @@ fn red23_reverse_edges_discovers_consumer_files_in_additional_root() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 2);
-    assert_eq!(sc["discovery"]["compiled"], 2);
+    assert_eq!(sc["discovery"]["discovered"], 5);
+    assert_eq!(
+        sc["discovery"]["compiled"], 3,
+        "Clean acquisition compiles the service declaration plus both inbound consumers"
+    );
     assert_injecting_consumers(&sc, &["ComponentA", "ComponentB"]);
     clear_test_project_search_results();
 }
@@ -180,12 +183,10 @@ fn red24_compiled_declaration_is_not_sufficient_for_reverse_edges() {
         &service_path,
         Some(&root.path().to_string_lossy()),
     ));
-    assert!(
-        state
-            .workspace_index_read()
-            .reverse_edges_by_identity("angular", "Service", "ServiceA")
-            .is_empty()
-    );
+    assert!(state
+        .workspace_index_read()
+        .reverse_edges_by_identity("angular", "Service", "ServiceA")
+        .is_empty());
     let slug = project_slug(root.path());
     configure_results(
         vec![(slug.clone(), Ok(vec![node("ServiceA.ts")]))],
@@ -241,10 +242,9 @@ fn red26_zero_inbound_references_is_a_successful_empty_search() {
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
     assert_eq!(sc["count"], 0);
-    assert!(
-        sc.get("discovery").is_none(),
-        "a completed CBM pass whose only project was searched while ready reports nothing: {sc:?}"
-    );
+    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(sc["discovery"]["compiled"], 1);
+    assert_eq!(sc["discovery"]["provider"], "cbm_and_filesystem");
     assert_eq!(
         discovery_calls(),
         vec![(slug, TestDiscoveryKind::InboundReference)]
@@ -358,7 +358,7 @@ fn red28_cbm_relationship_cardinality_never_becomes_semantic_count() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 3);
+    assert_eq!(sc["discovery"]["discovered"], 4);
     assert_eq!(sc["count"], 1, "only Clean-CTX semantic edges count");
     assert_injecting_consumers(&sc, &["RealConsumer"]);
     clear_test_project_search_results();

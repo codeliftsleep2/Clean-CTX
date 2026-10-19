@@ -278,7 +278,8 @@ fn namespace_path(captures: &[CapEntry], owner: CSharpSourceSpan) -> Vec<String>
         .iter()
         .filter(|capture| capture.name == "csharp.namespace_root")
         .filter(|capture| {
-            capture.start_byte <= owner.start_byte && owner.end_byte <= capture.end_byte
+            contains_span(capture, owner)
+                || (is_file_scoped_namespace(capture) && capture.start_byte <= owner.start_byte)
         })
         .collect::<Vec<_>>();
     roots.sort_by_key(|capture| capture.start_byte);
@@ -287,6 +288,19 @@ fn namespace_path(captures: &[CapEntry], owner: CSharpSourceSpan) -> Vec<String>
         .filter_map(|root| namespace_name(captures, root))
         .flat_map(|name| name.split('.').map(str::to_string).collect::<Vec<_>>())
         .collect()
+}
+
+fn contains_span(capture: &CapEntry, owner: CSharpSourceSpan) -> bool {
+    capture.start_byte <= owner.start_byte && owner.end_byte <= capture.end_byte
+}
+
+fn is_file_scoped_namespace(capture: &CapEntry) -> bool {
+    capture
+        .raw_text
+        .split_once(';')
+        .is_some_and(|(declaration, _)| {
+            declaration.trim_start().starts_with("namespace ") && !declaration.contains('{')
+        })
 }
 
 fn namespace_name<'a>(captures: &'a [CapEntry], root: &CapEntry) -> Option<&'a str> {

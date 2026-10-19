@@ -25,7 +25,7 @@
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 3;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 4;
 
 pub mod aspnet;
 pub mod automapper;
@@ -349,6 +349,15 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .and_then(|value| value.meta_layers.get("dotnet"));
         let (block, mut semantic_edges) =
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
+        semantic_edges.retain(|edge| {
+            !(edge.subject.domain == "dotnet"
+                && edge.subject.entity_type == "Controller"
+                && matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::HasRoute
+                        | crate::layers::meta::semantic::SemanticRelation::ControllerAction
+                ))
+        });
         if let Some(classes) = context.csharp_resolved_classes {
             semantic_edges.extend(semantic::resolved_dbcontext_role_registrations(classes));
             let file = classes
@@ -359,6 +368,16 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             if let Some(file) = file {
                 semantic_edges.extend(semantic::project_resolved_automapper_edges(classes, file));
                 semantic_edges.extend(semantic::project_resolved_signalr_edges(
+                    classes,
+                    file,
+                    context.fidelity,
+                ));
+                semantic_edges.extend(semantic::project_resolved_aspnet_edges(
+                    classes,
+                    file,
+                    context.fidelity,
+                ));
+                semantic_edges.extend(semantic::project_attribute_authorized_aspnet_edges(
                     classes,
                     file,
                     context.fidelity,

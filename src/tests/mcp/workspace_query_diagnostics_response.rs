@@ -117,9 +117,13 @@ fn red_diag9_semantic_payload_is_unchanged() {
         sc["edges"][0]["subject"]["file"].as_str().is_some(),
         "occurrence provenance must survive the projection"
     );
-    assert!(
-        discovery_of(&sc).is_none(),
-        "a healthy answer carries no discovery diagnostics: {sc:?}"
+    assert_eq!(
+        discovery_of(&sc),
+        Some(&json!({
+            "provider": "cbm_and_filesystem",
+            "fallback_reason": "cbm_scope_unavailable"
+        })),
+        "required Clean acquisition remains visible without changing semantic truth"
     );
     assert_no_legacy_flat_diagnostics(&sc);
 
@@ -141,7 +145,14 @@ fn red_diag9_semantic_payload_is_unchanged() {
         json!(2),
         "argc evidence must survive the projection"
     );
-    assert!(discovery_of(&calls).is_none());
+    assert_eq!(
+        discovery_of(&calls),
+        Some(&json!({
+            "provider": "cbm_and_filesystem",
+            "fallback_reason": "cbm_scope_unavailable"
+        })),
+        "call discovery must expose the required Clean acquisition route"
+    );
     assert_no_legacy_flat_diagnostics(&calls);
 
     clear_test_project_search_results();
@@ -149,8 +160,8 @@ fn red_diag9_semantic_payload_is_unchanged() {
 
 // ── RED-DIAG10..13: steady-state surfaces ─────────────────────────────
 
-/// A steady-state response carries its semantic answer and no boring
-/// diagnostics at all: no `discovery` object, and none of the ten flat fields.
+/// A steady-state response carries its semantic answer and only the compact
+/// diagnostics needed to expose required Clean acquisition after advisory CBM.
 fn assert_steady_state_response(sc: &Map<String, Value>, semantic_key: &str) {
     assert!(
         sc[semantic_key]
@@ -162,9 +173,13 @@ fn assert_steady_state_response(sc: &Map<String, Value>, semantic_key: &str) {
         sc["count"].as_u64().unwrap_or(0) >= 1,
         "count must describe the answer: {sc:?}"
     );
-    assert!(
-        discovery_of(sc).is_none(),
-        "expected discovery must not be serialized: {sc:?}"
+    assert_eq!(
+        discovery_of(sc),
+        Some(&json!({
+            "provider": "cbm_and_filesystem",
+            "fallback_reason": "cbm_scope_unavailable"
+        })),
+        "authoritative Clean fallback must remain observable: {sc:?}"
     );
     assert_no_legacy_flat_diagnostics(sc);
 }

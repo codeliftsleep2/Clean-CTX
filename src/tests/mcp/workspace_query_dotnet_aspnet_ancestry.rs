@@ -107,7 +107,11 @@ fn exact_multi_hop_ancestry_projects_controller_route_and_actions() {
         "Controller",
         "OrdersEndpoint",
     );
-    assert_eq!(controller_count(&entities, "OrdersEndpoint"), 1);
+    assert_eq!(
+        controller_count(&entities, "OrdersEndpoint"),
+        1,
+        "controller occurrence mismatch: {entities:#}"
+    );
     let edges = query(
         &root,
         &state,
@@ -148,7 +152,17 @@ fn project_owned_controllerbase_name_is_not_framework_authority() {
     let state = state();
     publish_all(&root, &state, &["Fake.cs", "Endpoint.cs"]);
     let result = query(&root, &state, "find_entities", "Controller", "Endpoint");
-    assert_eq!(controller_count(&result, "Endpoint"), 0);
+    let indexed_edges = state
+        .workspace_index_read()
+        .forward_edges_by_identity("dotnet", "Controller", "Endpoint")
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(
+        controller_count(&result, "Endpoint"),
+        0,
+        "shadow classification leaked: result={result:#}, edges={indexed_edges:#?}"
+    );
 }
 
 #[test]
@@ -222,7 +236,11 @@ fn exact_namespace_import_selects_one_project_base() {
         "Controller",
         "QualifiedEndpoint",
     );
-    assert_eq!(controller_count(&result, "QualifiedEndpoint"), 1);
+    assert_eq!(
+        controller_count(&result, "QualifiedEndpoint"),
+        1,
+        "qualified source ancestry was not exposed: {result:#}"
+    );
 }
 
 #[test]
@@ -240,12 +258,11 @@ fn replacing_framework_base_retracts_projection() {
     );
     let state = state();
     publish_all(&root, &state, &["Base.cs", "Endpoint.cs"]);
+    let initial = query(&root, &state, "find_entities", "Controller", "Endpoint");
     assert_eq!(
-        controller_count(
-            &query(&root, &state, "find_entities", "Controller", "Endpoint"),
-            "Endpoint",
-        ),
-        1
+        controller_count(&initial, "Endpoint"),
+        1,
+        "initial resolved role missing: {initial:#}"
     );
     std::fs::write(root.path().join("Base.cs"), "public class Replacement {}").unwrap();
     crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(
