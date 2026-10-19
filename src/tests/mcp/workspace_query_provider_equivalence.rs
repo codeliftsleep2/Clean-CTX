@@ -181,7 +181,10 @@ fn assert_forward_reverse_generation(state: &crate::mcp::McpState) {
             ("ConsumerB".into(), "ServiceX".into()),
         ])
     );
-    assert_eq!(reverse, forward, "forward and reverse must share one generation");
+    assert_eq!(
+        reverse, forward,
+        "forward and reverse must share one generation"
+    );
 }
 
 #[test]
@@ -220,11 +223,13 @@ fn issue_148_angular_provider_states_converge_and_completion_requires_clean_acqu
             ]),
             "provider state changed injector ownership: {cold}"
         );
-        assert_eq!(cold["result"]["structuredContent"]["discovery"]["compiled"], 3);
+        assert_eq!(
+            cold["result"]["structuredContent"]["discovery"]["compiled"],
+            3
+        );
         assert!(warm["result"]["structuredContent"]["discovery"]["compiled"].is_null());
         assert_eq!(
-            cold["result"]["structuredContent"]["coverage"]["result_semantics"],
-            "lower_bound",
+            cold["result"]["structuredContent"]["coverage"]["result_semantics"], "lower_bound",
             "unsupported proof families must remain honest: {cold}"
         );
         assert_eq!(
@@ -233,7 +238,11 @@ fn issue_148_angular_provider_states_converge_and_completion_requires_clean_acqu
             "provider success, including useful-looking candidates, cannot satisfy the root"
         );
         if case.ready() {
-            assert_eq!(discovery_calls().len(), 1, "warm provider search must be reused");
+            assert_eq!(
+                discovery_calls().len(),
+                1,
+                "warm provider search must be reused"
+            );
             assert_eq!(
                 state.hydration_discovery_lock().completed_entries(),
                 2,
@@ -258,9 +267,7 @@ fn write_csharp_fixture(root: &Path) {
     for consumer in ["ConsumerOne", "ConsumerTwo"] {
         std::fs::write(
             root.join(format!("{consumer}.cs")),
-            format!(
-                "public class {consumer} {{ public {consumer}(ContextA value) {{}} }}\n"
-            ),
+            format!("public class {consumer} {{ public {consumer}(ContextA value) {{}} }}\n"),
         )
         .expect("consumer fixture");
     }
@@ -314,7 +321,10 @@ fn issue_148_declaration_provider_states_cannot_shrink_occurrence_universe() {
         let warm = find_context(&state, root.path());
         let cold_occurrences = context_occurrences(&cold);
         assert_eq!(cold_occurrences, context_occurrences(&warm));
-        assert_eq!(cold["result"]["structuredContent"]["discovery"]["compiled"], 3);
+        assert_eq!(
+            cold["result"]["structuredContent"]["discovery"]["compiled"],
+            3
+        );
         assert!(warm["result"]["structuredContent"]["discovery"]["compiled"].is_null());
         assert_eq!(
             test_scan_calls(),
@@ -322,13 +332,20 @@ fn issue_148_declaration_provider_states_cannot_shrink_occurrence_universe() {
             "declaration hints cannot become authoritative root completion"
         );
         if case.ready() {
-            assert_eq!(discovery_calls().len(), 1, "warm provider search must be reused");
+            assert_eq!(
+                discovery_calls().len(),
+                1,
+                "warm provider search must be reused"
+            );
             assert_eq!(state.hydration_discovery_lock().completed_entries(), 2);
         } else {
             assert_eq!(state.hydration_discovery_lock().completed_entries(), 1);
         }
         if let Some(expected) = &baseline {
-            assert_eq!(expected, &cold_occurrences, "provider-state occurrence divergence");
+            assert_eq!(
+                expected, &cold_occurrences,
+                "provider-state occurrence divergence"
+            );
         } else {
             baseline = Some(cold_occurrences);
         }

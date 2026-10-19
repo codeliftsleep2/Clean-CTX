@@ -13,10 +13,14 @@ use crate::compression::Fidelity;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
+const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
 
 pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
 {
-    vec![crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(EF_CORE_DB_CONTEXT)]
+    vec![
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(EF_CORE_DB_CONTEXT),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(AUTOMAPPER_PROFILE),
+    ]
 }
 
 pub(crate) fn is_resolved_dbcontext(
@@ -65,10 +69,61 @@ pub(crate) fn project_resolved_dbcontext_edges(
     edges
 }
 
-pub(crate) fn has_resolved_dbcontext_role(
+fn is_resolved_automapper_profile(
+    class: &crate::ir::csharp_resolution::CSharpResolvedClass,
+) -> bool {
+    matches!(
+        &class.ancestry,
+        crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+            if identity.qualified_name == AUTOMAPPER_PROFILE
+                && identity.generic_arity == 0
+                && identity.origin
+                    == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+    )
+}
+
+pub(crate) fn project_resolved_automapper_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+) -> Vec<SemanticEdge> {
+    let mut edges = Vec::new();
+    for class in classes.iter().filter(|class| {
+        is_resolved_automapper_profile(class) && class.files.iter().any(|owner| owner == file)
+    }) {
+        let mut profile = EntityRef::new("dotnet", "MapperProfile", &class.owner);
+        profile.file = Some(file.to_string());
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+            for (source, destination) in extract_create_map_mappings(raw_class) {
+                let mut source_entity = EntityRef::new("dotnet", "Entity", source);
+                source_entity.file = Some(file.to_string());
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::MapsFrom,
+                    subject: profile.clone(),
+                    object: source_entity,
+                    layer: "dotnet",
+                    call_evidence: None,
+                });
+                let mut destination_entity = EntityRef::new("dotnet", "Entity", destination);
+                destination_entity.file = Some(file.to_string());
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::MapsTo,
+                    subject: profile.clone(),
+                    object: destination_entity,
+                    layer: "dotnet",
+                    call_evidence: None,
+                });
+            }
+        }
+    }
+    edges
+}
+
+pub(crate) fn has_resolved_dotnet_role(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> bool {
-    classes.iter().any(is_resolved_dbcontext)
+    classes
+        .iter()
+        .any(|class| is_resolved_dbcontext(class) || is_resolved_automapper_profile(class))
 }
 
 /// Register EF Core DbContext roles from parser-owned first-base evidence.
@@ -131,29 +186,6 @@ pub(crate) fn extract_non_aspnet_efcore_semantic_edges(
     fidelity: Fidelity,
 ) -> Vec<SemanticEdge> {
     let mut edges: Vec<SemanticEdge> = Vec::new();
-
-    // ── AutoMapper: Profile -> MapsFrom/MapsTo (via CreateMap<TSource, TDest>) ──
-    let is_profile = raw_class.contains(": Profile");
-    if is_profile {
-        let profile = EntityRef::new("dotnet", "MapperProfile", class_name);
-        let mappings = extract_create_map_mappings(raw_class);
-        for (source, dest) in &mappings {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::MapsFrom,
-                subject: profile.clone(),
-                object: EntityRef::new("dotnet", "Entity", source),
-                layer: "dotnet",
-                call_evidence: None,
-            });
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::MapsTo,
-                subject: profile.clone(),
-                object: EntityRef::new("dotnet", "Entity", dest),
-                layer: "dotnet",
-                call_evidence: None,
-            });
-        }
-    }
 
     // ── SignalR: Hub -> HubMethodTargets ──
     let is_hub = raw_class.contains(": Hub<") || raw_class.contains(": Hub");
@@ -255,3 +287,7 @@ mod tests;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/ef_resolution_r6.rs"]
 mod tests_r6;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/automapper_resolution_r7.rs"]
+mod tests_r7;

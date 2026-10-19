@@ -358,6 +358,14 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
         if let Some(classes) = context.csharp_resolved_classes {
             semantic_edges.extend(semantic::resolved_dbcontext_role_registrations(classes));
+            let file = classes
+                .iter()
+                .flat_map(|class| class.files.iter())
+                .next()
+                .map(String::as_str);
+            if let Some(file) = file {
+                semantic_edges.extend(semantic::project_resolved_automapper_edges(classes, file));
+            }
             let roles = semantic::resolved_dbcontext_role_names(classes);
             for raw_class in context.class_captures {
                 let Some(name) = semantic::extract_class_name_from_class(raw_class) else {
@@ -395,7 +403,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .unwrap_or(true);
         let structured_role = context
             .csharp_resolved_classes
-            .is_some_and(semantic::has_resolved_dbcontext_role);
+            .is_some_and(semantic::has_resolved_dotnet_role);
         (enabled
             && (structured_role
                 || detect::is_dotnet_file_with_regions(context.source, context.lexical_regions)))

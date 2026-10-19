@@ -241,18 +241,30 @@ impl SemanticCompilationArtifact {
         let mut edges = self.project_exact_csharp_calls(authority)?;
         edges.retain(|edge| {
             !(edge.subject.domain == "dotnet"
-                && edge.subject.entity_type == "DbContext"
-                && matches!(
-                    edge.relation,
-                    crate::layers::meta::semantic::SemanticRelation::Defines
-                        | crate::layers::meta::semantic::SemanticRelation::HasEntity
-                ))
+                && ((edge.subject.entity_type == "DbContext"
+                    && matches!(
+                        edge.relation,
+                        crate::layers::meta::semantic::SemanticRelation::Defines
+                            | crate::layers::meta::semantic::SemanticRelation::HasEntity
+                    ))
+                    || (edge.subject.entity_type == "MapperProfile"
+                        && matches!(
+                            edge.relation,
+                            crate::layers::meta::semantic::SemanticRelation::MapsFrom
+                                | crate::layers::meta::semantic::SemanticRelation::MapsTo
+                        ))))
         });
         edges.extend(
             crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
                 resolved_classes,
                 self.canonical_owner(),
                 self.fidelity(),
+            ),
+        );
+        edges.extend(
+            crate::dotnet_meta::semantic::project_resolved_automapper_edges(
+                resolved_classes,
+                self.canonical_owner(),
             ),
         );
         Ok(edges)

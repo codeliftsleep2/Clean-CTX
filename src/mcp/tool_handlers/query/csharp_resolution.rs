@@ -380,12 +380,7 @@ impl TraversalScope {
     }
 }
 
-fn visit_container(
-    node: Node<'_>,
-    source: &[u8],
-    scope: &TraversalScope,
-    catalog: &mut Catalog,
-) {
+fn visit_container(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &mut Catalog) {
     let mut scoped = scope.clone();
     scoped.imports.extend(direct_using_namespaces(node, source));
     scoped.imports.sort();
@@ -421,12 +416,7 @@ fn visit_container(
     }
 }
 
-fn visit_type(
-    node: Node<'_>,
-    source: &[u8],
-    scope: &TraversalScope,
-    catalog: &mut Catalog,
-) {
+fn visit_type(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &mut Catalog) {
     let Some(name_node) = node.child_by_field_name("name") else {
         return;
     };
