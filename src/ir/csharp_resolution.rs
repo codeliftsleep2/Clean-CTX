@@ -7,6 +7,8 @@ use crate::compression::capture_pipeline::CapEntry;
 
 mod aliases;
 pub use aliases::{CSharpAliasContext, CSharpAliasDirective, resolve_alias_type_reference};
+mod ancestry;
+pub use ancestry::{CSharpInheritanceArc, CSharpInheritanceGraph, resolve_type_ancestry};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CSharpSourceSpan {
@@ -202,6 +204,7 @@ pub enum CSharpResolutionBasis {
     OrdinaryImport,
     NamespaceAlias,
     TypeAlias,
+    Inheritance,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -215,6 +218,7 @@ pub enum CSharpResolutionReason {
     UnknownImportContents,
     DuplicateAlias,
     AliasCycle,
+    InheritanceCycle,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
