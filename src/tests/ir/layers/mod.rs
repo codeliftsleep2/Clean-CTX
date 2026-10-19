@@ -300,7 +300,7 @@ fn cs_legitimate_static_method_stays_static() {
 // ── C# SignalR Hub / IDisposable Regression Tests ─────
 
 #[test]
-fn cs_signalr_hub_class_semantics_apply_to_its_method() {
+fn cs_signalr_written_base_does_not_authorize_realtime_in_language_layer() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new("public class ChatHub : Hub<IChatClient>", Fidelity::Low);
     ctx.current_class = Some("C1".into());
@@ -322,13 +322,13 @@ fn cs_signalr_hub_class_semantics_apply_to_its_method() {
     );
     ctx.current_method = Some("M1".into());
     let method_ops = layer.process_capture("method.root", "public void Send()", &mut ctx);
-    assert!(method_ops.iter().any(|op| matches!(
+    assert!(!method_ops.iter().any(|op| matches!(
         op,
-        CoreOp::ExecutionContext(mid, ExecutionContextKind::Realtime) if mid == "M1"
+        CoreOp::ExecutionContext(_, ExecutionContextKind::Realtime)
     )));
 }
 #[test]
-fn cs_signalr_hub_method_emits_realtime_ctx() {
+fn cs_signalr_written_base_cannot_add_realtime_to_async_method() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new(
         "public async Task SendMessage(string message)",
@@ -350,9 +350,8 @@ fn cs_signalr_hub_method_emits_realtime_ctx() {
             if mid == "M5" && *ctx_type == ExecutionContextKind::Realtime)
     });
     assert!(
-        has_realtime,
-        "method must emit ExecutionContext(M5, realtime): {:?}",
-        ops
+        !has_realtime,
+        "language layer cannot resolve Hub identity: {ops:?}"
     );
 
     let has_bad = ops.iter().any(
@@ -397,9 +396,8 @@ fn cs_signalr_hub_method_still_emits_async_semantics() {
         ops
     );
     assert!(
-        realtime,
-        "hub method must also emit ExecutionContext(M5, realtime): {:?}",
-        ops
+        !realtime,
+        "realtime requires resolved Hub ancestry: {ops:?}"
     );
 }
 
@@ -468,9 +466,7 @@ fn cs_disposable_class_method_emits_io_side_effect() {
 
 // ── Cross-contamination regression ────────────────────
 #[test]
-fn cs_signalr_hub_flags_reset_between_classes() {
-    // R-43a: A plain sibling after a SignalR hub must not inherit the hub's
-    // ExecutionContext(method, "realtime") semantics.
+fn cs_signalr_written_base_never_sets_language_layer_state() {
     let mut layer = CSharpLayer::new();
     let mut ctx = LayerContext::new("", Fidelity::Low);
 
@@ -484,9 +480,9 @@ fn cs_signalr_hub_flags_reset_between_classes() {
     let _ = layer.process_capture("csharp.class_base_type", "Hub<IChatClient>", &mut ctx);
     ctx.current_method = Some("M1".into());
     let hub_ops = layer.process_capture("method.root", "public void Send()", &mut ctx);
-    assert!(hub_ops.iter().any(|op| matches!(
+    assert!(!hub_ops.iter().any(|op| matches!(
         op,
-        CoreOp::ExecutionContext(mid, ExecutionContextKind::Realtime) if mid == "M1"
+        CoreOp::ExecutionContext(_, ExecutionContextKind::Realtime)
     )));
 
     // Process second class (plain class, no Hub)

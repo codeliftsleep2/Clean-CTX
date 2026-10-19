@@ -252,7 +252,10 @@ impl SemanticCompilationArtifact {
                             edge.relation,
                             crate::layers::meta::semantic::SemanticRelation::MapsFrom
                                 | crate::layers::meta::semantic::SemanticRelation::MapsTo
-                        ))))
+                        ))
+                    || (edge.subject.entity_type == "Hub"
+                        && edge.relation
+                            == crate::layers::meta::semantic::SemanticRelation::HubMethodTargets)))
         });
         edges.extend(
             crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
@@ -267,7 +270,38 @@ impl SemanticCompilationArtifact {
                 self.canonical_owner(),
             ),
         );
+        edges.extend(
+            crate::dotnet_meta::semantic::project_resolved_signalr_edges(
+                resolved_classes,
+                self.canonical_owner(),
+                self.fidelity(),
+            ),
+        );
         Ok(edges)
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn project_csharp_generation_ir(
+        &self,
+        resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    ) -> CompiledIR {
+        let mut compiled = self.compiled.clone();
+        compiled.instructions.retain(|instruction| {
+            !matches!(
+                instruction,
+                crate::ir::opcodes::CoreOp::ExecutionContext(
+                    _,
+                    crate::ir::opcodes::ExecutionContextKind::Realtime
+                )
+            )
+        });
+        compiled.instructions.extend(
+            crate::dotnet_meta::semantic::project_resolved_signalr_execution_contexts(
+                resolved_classes,
+                self.canonical_owner(),
+            ),
+        );
+        compiled
     }
 
     #[cfg(test)]

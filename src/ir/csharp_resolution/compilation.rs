@@ -14,6 +14,7 @@ pub(crate) struct CSharpResolvedClass {
     pub owner: String,
     pub files: Vec<String>,
     pub raw_parts: Vec<(String, String)>,
+    pub method_ids: Vec<(String, Vec<String>)>,
     pub ancestry: CSharpResolution<CSharpTypeIdentity>,
 }
 
@@ -27,6 +28,7 @@ struct ClassInput {
     part: CSharpDeclarationPart,
     scope: Scope,
     raw_class: String,
+    method_ids: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -41,14 +43,19 @@ pub(crate) fn resolve_compilation_class_ancestry(
     captures: &[CapEntry],
     file: &str,
     known_external: &[CSharpTypeIdentity],
+    instructions: &[crate::ir::opcodes::CoreOp],
 ) -> Vec<CSharpResolvedClass> {
-    let unit = collect_compilation_unit(captures, file);
+    let unit = collect_compilation_unit(captures, file, instructions);
     resolve_compilation_units(&[unit], known_external)
 }
 
-pub(crate) fn collect_compilation_unit(captures: &[CapEntry], file: &str) -> CSharpCompilationUnit {
+pub(crate) fn collect_compilation_unit(
+    captures: &[CapEntry],
+    file: &str,
+    instructions: &[crate::ir::opcodes::CoreOp],
+) -> CSharpCompilationUnit {
     CSharpCompilationUnit {
-        classes: class_inputs(captures, file),
+        classes: class_inputs(captures, file, instructions),
     }
 }
 
@@ -112,6 +119,17 @@ pub(crate) fn resolve_compilation_units(
                         .map(|input| (part.file.clone(), input.raw_class.clone()))
                 })
                 .collect(),
+            method_ids: symbol
+                .parts
+                .iter()
+                .filter_map(|part| {
+                    units
+                        .iter()
+                        .flat_map(|unit| &unit.classes)
+                        .find(|input| input.part.file == part.file && input.part.span == part.span)
+                        .map(|input| (part.file.clone(), input.method_ids.clone()))
+                })
+                .collect(),
             ancestry: resolve_type_ancestry(&source_identity(symbol), &graph),
         })
         .collect()
@@ -147,7 +165,18 @@ fn resolve_direct_base(
     )
 }
 
-fn class_inputs(captures: &[CapEntry], file: &str) -> Vec<ClassInput> {
+fn class_inputs(
+    captures: &[CapEntry],
+    file: &str,
+    instructions: &[crate::ir::opcodes::CoreOp],
+) -> Vec<ClassInput> {
+    let mut available_classes = instructions
+        .iter()
+        .filter_map(|instruction| match instruction {
+            crate::ir::opcodes::CoreOp::DefClass(id, name) => Some((id.clone(), name.clone())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
     captures
         .iter()
         .filter(|capture| capture.name == "class.root")
@@ -186,10 +215,28 @@ fn class_inputs(captures: &[CapEntry], file: &str) -> Vec<ClassInput> {
                 span,
                 base_references,
             };
+            let class_position = available_classes
+                .iter()
+                .position(|(_, candidate)| candidate == &part.key.name);
+            let method_ids = class_position.map_or_else(Vec::new, |position| {
+                let (class_id, _) = available_classes.remove(position);
+                instructions
+                    .iter()
+                    .filter_map(|instruction| match instruction {
+                        crate::ir::opcodes::CoreOp::DefMethod(owner, method, _)
+                            if owner == &class_id =>
+                        {
+                            Some(method.clone())
+                        }
+                        _ => None,
+                    })
+                    .collect()
+            });
             Some(ClassInput {
                 scope: scope_for(captures, span, file),
                 part,
                 raw_class: owner.raw_text.clone(),
+                method_ids,
             })
         })
         .collect()

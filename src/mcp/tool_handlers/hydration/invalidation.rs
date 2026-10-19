@@ -80,9 +80,21 @@ pub(crate) fn reconcile_external_refresh_for_root(
     let dependent_owners = state
         .workspace_index_read()
         .semantic_dependents_of_root(&identity);
+    let current_owners = state
+        .workspace_index_read()
+        .file_map()
+        .keys()
+        .filter(|owner| crate::workspace::path_identity::is_within_root(owner, &identity))
+        .cloned()
+        .collect::<Vec<_>>();
     let source_snapshots_invalidated = state.invalidate_source_cache_in_root(&identity);
     let pending_transitions_retired = state.forget_pending_transitions_in_root(&identity);
     let indexed_owners_retracted = state.workspace_index_lock().remove_files_in_root(&identity);
+    for owner in current_owners {
+        if let Some(alias) = state.alias_for_path(&owner) {
+            state.ir_context_lock().remove_file(&alias);
+        }
+    }
     let reconciliation = RefreshReconciliation {
         indexed_owners_retracted,
         source_snapshots_invalidated,

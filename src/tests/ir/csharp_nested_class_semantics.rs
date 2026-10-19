@@ -55,6 +55,8 @@ fn method_semantics(context: &PassContext) -> HashMap<String, (bool, bool)> {
 #[test]
 fn csharp_class_semantics_follow_nested_lexical_ownership() {
     let source = r#"
+using Microsoft.AspNetCore.SignalR;
+
 class OuterHub : Hub
 {
     void HubBefore() { }

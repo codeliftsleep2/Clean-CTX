@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 struct Projection {
     file: String,
+    ir: crate::ir::compiler::CompiledIR,
     edges: Vec<crate::layers::meta::semantic::SemanticEdge>,
     source_hash: String,
     dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
@@ -128,6 +129,7 @@ impl McpState {
             projections.push(Projection {
                 dependencies: artifact.semantic_dependencies_owned(),
                 file,
+                ir: artifact.project_csharp_generation_ir(&resolved_classes),
                 edges,
                 source_hash: artifact.source_hash().to_string(),
                 fidelity,
@@ -148,6 +150,12 @@ impl McpState {
             index.commit_csharp_exact_call_coverage(fingerprint.0.clone(), generation);
         }
         for projection in projections {
+            self.ir_context_lock()
+                .load_ir(projection.ir, Some(projection.source_hash.clone()));
+            self.remember_context_fidelity(
+                &self.get_or_create_alias(projection.file.clone()),
+                compilation_fidelity(projection.fidelity),
+            );
             if let Some(alias) = self.alias_for_path(&projection.file) {
                 self.remember_semantic_projection(
                     &alias,

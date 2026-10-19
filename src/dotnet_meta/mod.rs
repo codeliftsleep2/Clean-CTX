@@ -230,13 +230,6 @@ fn evaluate_applicable_source(
             block.lines.extend(result.lines);
         }
 
-        if let Some(class_name) = semantic::extract_class_name_from_class(raw_class) {
-            semantic_edges.extend(semantic::extract_non_aspnet_efcore_semantic_edges(
-                raw_class,
-                &class_name,
-                fidelity,
-            ));
-        }
         if testing_enabled && let Some(edge) = testing::extract_testing_declaration(raw_class) {
             semantic_edges.push(edge);
         }
@@ -365,6 +358,11 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                 .map(String::as_str);
             if let Some(file) = file {
                 semantic_edges.extend(semantic::project_resolved_automapper_edges(classes, file));
+                semantic_edges.extend(semantic::project_resolved_signalr_edges(
+                    classes,
+                    file,
+                    context.fidelity,
+                ));
             }
             let roles = semantic::resolved_dbcontext_role_names(classes);
             for raw_class in context.class_captures {

@@ -61,6 +61,7 @@ impl IRPass for MetaLayerPass {
                 &state.captures,
                 &file_provenance,
                 &crate::dotnet_meta::semantic::known_csharp_type_identities(),
+                &state.instructions,
             )
         } else {
             Vec::new()
@@ -102,6 +103,16 @@ impl IRPass for MetaLayerPass {
             {
                 context.csharp_resolved_classes = Some(&csharp_resolved_classes);
             }
+        }
+
+        #[cfg(all(feature = "csharp", feature = "dotnet"))]
+        if state.query_string == crate::queries::CS_QUERY {
+            state.instructions.extend(
+                crate::dotnet_meta::semantic::project_resolved_signalr_execution_contexts(
+                    &csharp_resolved_classes,
+                    &file_provenance,
+                ),
+            );
         }
 
         let (meta_results, mut semantic_edges, semantic_dependencies) =

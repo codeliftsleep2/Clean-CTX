@@ -13,7 +13,7 @@
 //
 // R-43a: Execution semantics extraction:
 //   - async Task/IAsyncEnumerable → SideEffect + ExecutionContext
-//   - SignalR Hub base class → ExecutionContext("realtime")
+//   - SignalR realtime context is projected later from resolved C# ancestry
 //   - DbSet<T> fields → DataFlow
 //   - SaveChangesAsync() → SideEffect("io") + ExecutionContext("async")
 //   - TransactionScope → ExecutionContext("transaction_scope")
@@ -29,9 +29,9 @@ use crate::ir::opcodes::{
 use std::collections::HashMap;
 
 /// Increment when identical C# input can emit different canonical IR.
-pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 3;
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 4;
 /// Increment when C# canonical facts change meaning for projection.
-pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 3;
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 4;
 
 /// True when `head` (a declaration head, never a full body) carries `word`
 /// as a standalone modifier token. Splits on non-identifier characters so
@@ -91,7 +91,6 @@ fn split_depth_zero_arrow(head: &str) -> &str {
 /// Processes C#-specific captures and emits additional CoreOp instructions.
 #[derive(Clone, Copy, Default)]
 struct ClassSemantics {
-    is_signalr_hub: bool,
     is_disposable: bool,
 }
 
@@ -158,12 +157,6 @@ impl CSharpLayer {
             flags.push(DeclarationModifier::Abstract);
         }
         flags
-    }
-
-    /// R-43a: Detect SignalR Hub base class from declaration text.
-    /// Returns true if the class extends Hub or Hub<T>.
-    fn is_signalr_hub(base: &str) -> bool {
-        base.trim() == "Hub" || base.trim().starts_with("Hub<")
     }
 
     /// R-43a: Extract execution semantics from method body text.
@@ -299,16 +292,7 @@ impl LanguageLayer for CSharpLayer {
                     }
                 }
             }
-            "csharp.class_base_type" => {
-                if let Some(class_id) = &context.current_class
-                    && Self::is_signalr_hub(raw_text)
-                {
-                    self.class_semantics
-                        .entry(class_id.clone())
-                        .or_default()
-                        .is_signalr_hub = true;
-                }
-            }
+            "csharp.class_base_type" => {}
             "csharp.class_interface_type" => {
                 if let Some(class_id) = &context.current_class
                     && matches!(raw_text.trim(), "IDisposable" | "IAsyncDisposable")
@@ -355,14 +339,6 @@ impl LanguageLayer for CSharpLayer {
                         .and_then(|class_id| self.class_semantics.get(class_id))
                         .copied()
                         .unwrap_or_default();
-
-                    // R-43a: Per-method SignalR hub realtime context
-                    if class_semantics.is_signalr_hub {
-                        ops.push(CoreOp::ExecutionContext(
-                            method_id.clone(),
-                            ExecutionContextKind::Realtime,
-                        ));
-                    }
 
                     // R-43a: Per-method IDisposable side-effect
                     if class_semantics.is_disposable {

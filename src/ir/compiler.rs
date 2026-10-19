@@ -311,9 +311,12 @@ impl IRCompiler {
         if ctx.query_string == crate::queries::CS_QUERY {
             self.csharp_syntax_facts =
                 crate::ir::csharp_resolution::collect_syntax_facts(&ctx.captures);
-            self.csharp_compilation_unit = Some(
-                crate::ir::csharp_resolution::collect_compilation_unit(&ctx.captures, &provenance),
-            );
+            self.csharp_compilation_unit =
+                Some(crate::ir::csharp_resolution::collect_compilation_unit(
+                    &ctx.captures,
+                    &provenance,
+                    &ctx.instructions,
+                ));
             self.semantic_edges.extend(
                 crate::ir::semantic_projection::project_csharp_struct_record_base_types(
                     &ctx.captures,

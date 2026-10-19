@@ -14,12 +14,15 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
 const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
+const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
 
 pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
 {
     vec![
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(EF_CORE_DB_CONTEXT),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(AUTOMAPPER_PROFILE),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(SIGNALR_HUB),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external_with_arity(SIGNALR_HUB, 1),
     ]
 }
 
@@ -82,6 +85,17 @@ fn is_resolved_automapper_profile(
     )
 }
 
+fn is_resolved_signalr_hub(class: &crate::ir::csharp_resolution::CSharpResolvedClass) -> bool {
+    matches!(
+        &class.ancestry,
+        crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+            if identity.qualified_name == SIGNALR_HUB
+                && matches!(identity.generic_arity, 0 | 1)
+                && identity.origin
+                    == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+    )
+}
+
 pub(crate) fn project_resolved_automapper_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -118,12 +132,69 @@ pub(crate) fn project_resolved_automapper_edges(
     edges
 }
 
+pub(crate) fn project_resolved_signalr_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+    fidelity: Fidelity,
+) -> Vec<SemanticEdge> {
+    if fidelity == Fidelity::Low {
+        return Vec::new();
+    }
+    let mut edges = Vec::new();
+    for class in classes
+        .iter()
+        .filter(|class| is_resolved_signalr_hub(class) && class.files.iter().any(|f| f == file))
+    {
+        let mut hub = EntityRef::new("dotnet", "Hub", &class.owner);
+        hub.file = Some(file.to_string());
+        let mut projected_methods = std::collections::BTreeSet::new();
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+            for method_name in extract_hub_methods(raw_class) {
+                if !projected_methods.insert(method_name.clone()) {
+                    continue;
+                }
+                let mut method = EntityRef::new("dotnet", "HubMethod", method_name);
+                method.file = Some(file.to_string());
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::HubMethodTargets,
+                    subject: hub.clone(),
+                    object: method,
+                    layer: "dotnet",
+                    call_evidence: None,
+                });
+            }
+        }
+    }
+    edges
+}
+
+pub(crate) fn project_resolved_signalr_execution_contexts(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+) -> Vec<crate::ir::opcodes::CoreOp> {
+    classes
+        .iter()
+        .filter(|class| is_resolved_signalr_hub(class))
+        .flat_map(|class| &class.method_ids)
+        .filter(|(owner, _)| owner == file)
+        .flat_map(|(_, methods)| methods)
+        .map(|method| {
+            crate::ir::opcodes::CoreOp::ExecutionContext(
+                method.clone(),
+                crate::ir::opcodes::ExecutionContextKind::Realtime,
+            )
+        })
+        .collect()
+}
+
 pub(crate) fn has_resolved_dotnet_role(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> bool {
-    classes
-        .iter()
-        .any(|class| is_resolved_dbcontext(class) || is_resolved_automapper_profile(class))
+    classes.iter().any(|class| {
+        is_resolved_dbcontext(class)
+            || is_resolved_automapper_profile(class)
+            || is_resolved_signalr_hub(class)
+    })
 }
 
 /// Register EF Core DbContext roles from parser-owned first-base evidence.
@@ -165,45 +236,15 @@ pub(crate) fn resolved_dbcontext_role_names(
 /// Reuses the same string-scanning patterns as the existing .NET extractors.
 pub fn extract_dotnet_semantic_edges(
     raw_class: &str,
-    class_name: &str,
+    _class_name: &str,
     fidelity: Fidelity,
 ) -> Vec<SemanticEdge> {
     #[cfg(test)]
     super::class_analysis_metrics::record_analysis();
 
-    let mut edges = crate::dotnet_meta::aspnet::analyze_aspnet(raw_class, fidelity)
+    crate::dotnet_meta::aspnet::analyze_aspnet(raw_class, fidelity)
         .map(|analysis| analysis.semantic_edges)
-        .unwrap_or_default();
-    edges.extend(extract_non_aspnet_efcore_semantic_edges(
-        raw_class, class_name, fidelity,
-    ));
-    edges
-}
-
-pub(crate) fn extract_non_aspnet_efcore_semantic_edges(
-    raw_class: &str,
-    class_name: &str,
-    fidelity: Fidelity,
-) -> Vec<SemanticEdge> {
-    let mut edges: Vec<SemanticEdge> = Vec::new();
-
-    // ── SignalR: Hub -> HubMethodTargets ──
-    let is_hub = raw_class.contains(": Hub<") || raw_class.contains(": Hub");
-    if is_hub && fidelity != Fidelity::Low {
-        let hub = EntityRef::new("dotnet", "Hub", class_name);
-        let methods = extract_hub_methods(raw_class);
-        for method_name in &methods {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::HubMethodTargets,
-                subject: hub.clone(),
-                object: EntityRef::new("dotnet", "HubMethod", method_name),
-                layer: "dotnet",
-                call_evidence: None,
-            });
-        }
-    }
-
-    edges
+        .unwrap_or_default()
 }
 // ── Private Helpers (mirroring existing .NET extractor patterns) ──────────
 
@@ -291,3 +332,7 @@ mod tests_r6;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/automapper_resolution_r7.rs"]
 mod tests_r7;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/signalr_resolution_r8.rs"]
+mod tests_r8;
