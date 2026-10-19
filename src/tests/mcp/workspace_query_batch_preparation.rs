@@ -269,9 +269,7 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
         })
         .collect();
     let state = crate::mcp::McpState::new(crate::tests::test_config());
-    *crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
-        .lock()
-        .expect("hydration candidates") = Some(
+    crate::mcp::tool_handlers::hydration::set_test_hydration_candidates(
         files
             .iter()
             .map(|path| path.to_string_lossy().into_owned())
@@ -311,8 +309,5 @@ fn red_controller_batch_reconciles_csharp_once_after_candidate_publication() {
         "a warm unrelated acquisition must not reconcile exact calls"
     );
 
-    crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
-        .lock()
-        .expect("hydration candidates")
-        .take();
+    crate::mcp::tool_handlers::hydration::clear_test_hydration_candidates();
 }

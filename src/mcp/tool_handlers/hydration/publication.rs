@@ -9,14 +9,16 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(all(test, feature = "rust"))]
-static TEST_BATCH_SUPERSESSION: std::sync::Mutex<Option<(String, String)>> =
+static TEST_BATCH_SUPERSESSION: std::sync::Mutex<
+    Option<(std::thread::ThreadId, String, String)>,
+> =
     std::sync::Mutex::new(None);
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) fn supersede_test_batch_once(path: String, source: String) {
     *TEST_BATCH_SUPERSESSION
         .lock()
-        .expect("batch supersession lock") = Some((path, source));
+        .expect("batch supersession lock") = Some((std::thread::current().id(), path, source));
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -144,11 +146,21 @@ pub(super) fn compile_candidates_for(
     }
     let compiled = state.semantic_compiler().compile(&state.config, jobs);
     #[cfg(all(test, feature = "rust"))]
-    if let Some((path, source)) = TEST_BATCH_SUPERSESSION
-        .lock()
-        .expect("batch supersession lock")
-        .take()
-    {
+    let supersession = {
+        let mut guard = TEST_BATCH_SUPERSESSION
+            .lock()
+            .expect("batch supersession lock");
+        if guard
+            .as_ref()
+            .is_some_and(|(owner, _, _)| *owner == std::thread::current().id())
+        {
+            guard.take().map(|(_, path, source)| (path, source))
+        } else {
+            None
+        }
+    };
+    #[cfg(all(test, feature = "rust"))]
+    if let Some((path, source)) = supersession {
         std::fs::write(&path, source).expect("superseding source write");
         state.invalidate_source_cache(&path);
     }

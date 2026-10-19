@@ -270,7 +270,11 @@ fn build_inventory(
         .par_iter()
         .map(|owner| {
             let source_kind = SourceKind::from_path(Path::new(owner));
-            let source = state.read_source(owner);
+            // Inventory observation is request-local proof input, not semantic
+            // admission. Do not populate the shared source cache merely by
+            // enumerating a file: request-local catalogs consume that cache as
+            // admitted semantic evidence.
+            let source = std::fs::read_to_string(owner).map(std::sync::Arc::new);
             match (source_kind, source) {
                 (Some(source_kind), Ok(source)) => Some(InventoryEntry {
                     owner: state.semantic_owner_path(owner),

@@ -110,7 +110,7 @@ impl GraphBridge {
         let is_available = client
             .as_ref()
             .is_some_and(|client| client.status().is_available());
-        let mut bridge = Self {
+        let bridge = Self {
             status: if is_available {
                 CbmStatus::Available
             } else {
@@ -131,19 +131,18 @@ impl GraphBridge {
             last_error: None,
         };
 
-        // K-1: Start indexing immediately when CBM launched successfully.
-        //
-        // Previously indexing was deferred until the first CBM-dependent
-        // request called `ensure_indexed()`, which blocked/spawned lazily.
-        // Worse, the MANUAL construction in this method (via the `Self { }`
-        // literal) used to pre-seed `indexing_state` to `Complete`, hiding the
-        // cold-start problem: on a fresh session with a warm disk cache the
-        // first graph query would still return empty results until indexing
-        // finished. Now the background indexer begins as soon as the bridge is
-        // constructed, so by the time a request arrives the graph is ready (or
-        // `ensure_indexed()` reports `StillIndexing` and the agent retries).
+        // Launch implicitly owns initial indexing of the primary root. Record
+        // that provider-owned transition before explicitly starting only the
+        // configured additional roots.
         if is_available {
-            bridge.start_indexing_roots();
+            if let Some(primary) = bridge.project.clone() {
+                bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
+                    primary.clone(),
+                    IndexingState::ProviderOwned {
+                        started_at: Instant::now(),
+                    },
+                );
+            }
         }
 
         bridge

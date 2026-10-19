@@ -33,6 +33,28 @@ pub(super) fn with_bridge(mode: &str, body: impl FnOnce(&mut GraphBridge)) {
         .insert(bridge.project_root.clone(), "test-project".into());
     body(&mut bridge);
 }
+
+#[test]
+fn provider_owned_primary_startup_is_observed_without_explicit_reindex() {
+    with_bridge("b2-good", |bridge| {
+        bridge.indexing_state.lock().unwrap().insert(
+            "test-project".into(),
+            crate::cbm::bridge::IndexingState::ProviderOwned {
+                started_at: std::time::Instant::now(),
+            },
+        );
+
+        assert_eq!(
+            bridge.ensure_indexed().unwrap(),
+            crate::cbm::bridge::IndexingStatus::Ready
+        );
+        assert!(matches!(
+            bridge.indexing_state().get("test-project"),
+            Some(crate::cbm::bridge::IndexingState::Complete)
+        ));
+    });
+}
+
 #[test]
 fn cbm_provider_state_query_more_is_not_full_success() {
     with_client("b2-more", |c| {

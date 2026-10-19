@@ -22,9 +22,8 @@ use serde_json::json;
 
 // ── Test serialization ──────────────────────────────────────────────
 //
-// The TEST_HYDRATION_CANDIDATES static and the global LayerRegistry are
-// not safe for concurrent access across threads. This mutex serializes
-// the hydration regressions so they don't interfere with each other.
+// The global LayerRegistry and same-thread hydration injection lifecycle are
+// serialized so these regressions don't interfere with each other.
 static TEST_SERIALIZE: &std::sync::Mutex<()> =
     &crate::mcp::tool_handlers::hydration::TEST_PROJECT_HYDRATION_SERIALIZE;
 
@@ -53,18 +52,35 @@ fn pop_response() -> serde_json::Value {
 
 /// Set the test-injected CBM candidate file paths (test-only injection).
 fn set_test_hydration_candidates(paths: &[String]) {
-    let mut guard = crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
-        .lock()
-        .expect("TEST_HYDRATION_CANDIDATES lock poisoned");
-    *guard = Some(paths.to_vec());
+    crate::mcp::tool_handlers::hydration::set_test_hydration_candidates(paths.to_vec());
 }
 
 /// Clear the test-injected CBM candidate file paths.
 fn clear_test_hydration_candidates() {
-    let mut guard = crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
-        .lock()
-        .expect("TEST_HYDRATION_CANDIDATES lock poisoned");
-    *guard = None;
+    crate::mcp::tool_handlers::hydration::clear_test_hydration_candidates();
+}
+
+#[test]
+fn hydration_candidate_injection_is_visible_only_to_its_owner_thread() {
+    let _guard = acquire_test_lock();
+    let expected = vec!["owner-only.rs".to_string()];
+    set_test_hydration_candidates(&expected);
+
+    assert_eq!(
+        crate::mcp::tool_handlers::hydration::test_hydration_candidates(),
+        Some(expected)
+    );
+    let foreign = std::thread::spawn(|| {
+        crate::mcp::tool_handlers::hydration::test_hydration_candidates()
+    })
+    .join()
+    .expect("foreign test thread");
+    assert_eq!(
+        foreign, None,
+        "one test's injected candidates must not alter another test thread's discovery"
+    );
+
+    clear_test_hydration_candidates();
 }
 
 /// Compile a real temp source file through the production MCP dispatch.

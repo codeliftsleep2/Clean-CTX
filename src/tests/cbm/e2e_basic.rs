@@ -127,8 +127,7 @@ fn ensure_indexed_does_not_trigger_indexing() {
     }
 }
 
-/// Prove indexing begins at bridge construction and reaches a non-`NotStarted`
-/// state.
+/// Prove provider-owned primary indexing is recorded at bridge construction.
 ///
 /// Uses a small dedicated root because this assertion is about construction-
 /// time state publication, not successful indexing of the repository-wide
@@ -181,8 +180,13 @@ fn try_create_begins_indexing_at_construction() {
     );
     for (project, state) in &states {
         match state {
-            IndexingState::InProgress { .. } | IndexingState::Complete => {
-                // Good: indexing was kicked off at construction.
+            IndexingState::ProviderOwned { .. } | IndexingState::Complete => {
+                // Good: launch-owned primary indexing was adopted.
+            }
+            IndexingState::InProgress { .. } => {
+                panic!(
+                    "primary project '{project}' was explicitly indexed by Clean-CTX at startup"
+                );
             }
             IndexingState::Failed(msg) => {
                 // Acceptable: CBM binary may not be compatible.

@@ -72,13 +72,17 @@ impl McpState {
         #[cfg(test)]
         self.csharp_call_authority.record_reconciliation();
 
-        let mut files: Vec<_> = self
-            .workspace_index_read()
+        let index = self.workspace_index_read();
+        let mut files: Vec<_> = index
             .file_map()
             .keys()
-            .filter(|file| is_admitted_csharp_source(self, file))
+            .filter(|file| {
+                is_admitted_csharp_source(self, file)
+                    && index.semantic_projection_fidelity(file).is_some()
+            })
             .cloned()
             .collect();
+        drop(index);
         files.sort();
         files.dedup();
         let artifacts = self.current_csharp_artifacts(&files)?;

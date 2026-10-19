@@ -138,12 +138,16 @@ impl CbmClient {
         &mut self,
         project: &str,
         min_degree: Option<usize>,
+        limit: Option<usize>,
     ) -> Result<Vec<Value>, CbmError> {
         let min = min_degree.unwrap_or(1);
-        let cypher = format!(
+        let mut cypher = format!(
             "MATCH (f:Function) WHERE f.in_degree >= {} RETURN f.name, f.file_path, f.in_degree, f.out_degree ORDER BY f.in_degree DESC",
             min
         );
+        if let Some(limit) = limit {
+            cypher.push_str(&format!(" LIMIT {limit}"));
+        }
         let table = self.query_graph(&cypher, project)?;
         Ok(table
             .rows

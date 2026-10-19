@@ -29,8 +29,6 @@ pub(crate) fn compile_source_artifact(
     request: CompilationRequest<'_>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     #[cfg(test)]
-    crate::mcp::semantic_work_metrics::record_full_semantic_parse();
-    #[cfg(test)]
     if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock()
         && let Some(reason) = injected.as_ref()
     {

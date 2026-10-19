@@ -402,6 +402,15 @@ pub fn handle_get_cbm_status(id: &Value, _params: &Value, state: &McpState) {
                             }));
                             break;
                         }
+                        crate::cbm::bridge::IndexingState::ProviderOwned { started_at } => {
+                            found = Some(serde_json::json!({
+                                "status": "indexing",
+                                "owner": "provider",
+                                "elapsed_secs": started_at.elapsed().as_secs(),
+                                "project": project,
+                            }));
+                            break;
+                        }
                         crate::cbm::bridge::IndexingState::Complete => {
                             found = Some(serde_json::json!({
                                 "status": "complete",

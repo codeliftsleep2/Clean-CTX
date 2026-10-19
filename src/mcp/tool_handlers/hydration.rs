@@ -170,23 +170,22 @@ fn discover_candidate_paths(
     query_name: &str,
     workspace_root: Option<&str>,
     requirement: HydrationRequirement,
+    requires_provider_neutral_proof: bool,
 ) -> DiscoveryOutcome {
     #[cfg(all(test, feature = "rust"))]
     {
         if !has_test_project_search() {
-            if let Ok(injected) = TEST_HYDRATION_CANDIDATES.lock() {
-                if let Some(paths) = injected.as_ref() {
-                    return DiscoveryOutcome {
-                        candidates: paths.clone(),
-                        project_coverage: Vec::new(),
-                        provider: "cbm",
-                        status: "completed",
-                        attempted: true,
-                        fallback_reason: None,
-                        completions: Vec::new(),
-                        inventories: Vec::new(),
-                    };
-                }
+            if let Some(paths) = test_hydration_candidates() {
+                return DiscoveryOutcome {
+                    candidates: paths,
+                    project_coverage: Vec::new(),
+                    provider: "cbm",
+                    status: "completed",
+                    attempted: true,
+                    fallback_reason: None,
+                    completions: Vec::new(),
+                    inventories: Vec::new(),
+                };
             }
         }
     }
@@ -278,9 +277,13 @@ fn discover_candidate_paths(
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
                     saw_search_success = true;
-                    // Ready inbound search is advisory until a provider can
-                    // prove the complete incoming-relationship source universe.
-                    if readiness == "ready" && discovery != DiscoveryMode::InboundReference {
+                    // Exact incoming-TypeRef acquisition requires a
+                    // provider-neutral proof. Legacy reverse discovery keeps
+                    // its established ready-provider completion contract.
+                    if readiness == "ready"
+                        && (discovery != DiscoveryMode::InboundReference
+                            || !requires_provider_neutral_proof)
+                    {
                         successful_roots.insert(root_key(&root));
                         completions.push(scope);
                     }
@@ -334,9 +337,13 @@ fn discover_candidate_paths(
             Ok(paths) => {
                 append_rooted_paths(&mut candidates, &root, paths);
                 saw_search_success = true;
-                // Ready inbound search is advisory until a provider can prove
-                // the complete incoming-relationship source universe.
-                if readiness == "ready" && discovery != DiscoveryMode::InboundReference {
+                // Exact incoming-TypeRef acquisition requires a
+                // provider-neutral proof. Legacy reverse discovery keeps its
+                // established ready-provider completion contract.
+                if readiness == "ready"
+                    && (discovery != DiscoveryMode::InboundReference
+                        || !requires_provider_neutral_proof)
+                {
                     successful_roots.insert(root_key(&root));
                     completions.push(scope);
                 }

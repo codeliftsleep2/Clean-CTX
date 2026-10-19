@@ -284,7 +284,14 @@ fn cbm_a4_baseline_explicit_retirement_cannot_be_revived_by_cooldown() {
 #[test]
 fn cbm_a4_background_indexing_internal_error_does_not_duplicate_uncertain_job() {
     let root = TempDir::new().unwrap();
-    let bridge = fixture::bridge_with_mode(root.path(), &[], &log(&root), "a4-rpc");
+    let additional = TempDir::new().unwrap();
+    let mut bridge = fixture::bridge_with_mode(
+        root.path(),
+        &[additional.path().to_path_buf()],
+        &log(&root),
+        "a4-rpc",
+    );
+    bridge.complete_provider_startup_and_start_additional_roots_for_test();
     let deadline = Instant::now() + Duration::from_secs(3);
     loop {
         if bridge

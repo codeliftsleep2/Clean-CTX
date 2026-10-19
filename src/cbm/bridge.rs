@@ -168,6 +168,10 @@ pub enum IndexingState {
     NotStarted,
     /// Indexing is in progress, started at the given instant.
     InProgress { started_at: Instant },
+    /// Initial primary-root indexing was initiated implicitly by the CBM
+    /// frontend launch. Clean-CTX observes it and must not submit a competing
+    /// index request for the same lifecycle transition.
+    ProviderOwned { started_at: Instant },
     /// Indexing completed successfully.
     Complete,
     /// Indexing failed with an error message.

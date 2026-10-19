@@ -21,6 +21,8 @@ pub(crate) struct CompilationBatchResult {
 
 pub(crate) struct SemanticCompilerExecutor {
     pool: rayon::ThreadPool,
+    #[cfg(test)]
+    full_semantic_parses: std::sync::atomic::AtomicUsize,
 }
 
 impl SemanticCompilerExecutor {
@@ -30,7 +32,11 @@ impl SemanticCompilerExecutor {
             .thread_name(|index| format!("clean-ctx-compiler-{index}"))
             .build()
             .expect("bounded semantic compiler pool must initialize");
-        Self { pool }
+        Self {
+            pool,
+            #[cfg(test)]
+            full_semantic_parses: std::sync::atomic::AtomicUsize::new(0),
+        }
     }
 
     pub(crate) fn default_worker_count() -> usize {
@@ -46,6 +52,9 @@ impl SemanticCompilerExecutor {
         config: &crate::config::CleanCtxConfig,
         jobs: Vec<CompilationJob>,
     ) -> Vec<CompilationBatchResult> {
+        #[cfg(test)]
+        self.full_semantic_parses
+            .fetch_add(jobs.len(), std::sync::atomic::Ordering::SeqCst);
         self.pool.install(|| {
             jobs.into_par_iter()
                 .map(|job| {
@@ -82,5 +91,19 @@ impl SemanticCompilerExecutor {
 impl crate::mcp::McpState {
     pub(crate) fn semantic_compiler(&self) -> &SemanticCompilerExecutor {
         &self.semantic_compiler
+    }
+
+    #[cfg(test)]
+    pub(crate) fn reset_test_full_semantic_parses(&self) {
+        self.semantic_compiler
+            .full_semantic_parses
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn test_full_semantic_parses(&self) -> usize {
+        self.semantic_compiler
+            .full_semantic_parses
+            .load(std::sync::atomic::Ordering::SeqCst)
     }
 }

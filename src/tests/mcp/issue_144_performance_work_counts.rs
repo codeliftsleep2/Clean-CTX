@@ -4,7 +4,6 @@
 //! parse exactly the K owners reported as compiled, must not reconcile the
 //! unrelated exact-Calls capability, and must do no work when repeated warm.
 
-use crate::mcp::semantic_work_metrics;
 use crate::mcp::tools::dispatch_tools_call;
 use crate::tests::assert_valid_mcp_envelope;
 use serde_json::{Value, json};
@@ -66,21 +65,21 @@ fn issue_144_performance_work_counts_compile_only_k_and_skip_unrelated_calls() {
     config.cbm.enabled = false;
     let state = crate::mcp::McpState::new(config);
 
-    semantic_work_metrics::reset();
+    state.reset_test_full_semantic_parses();
     state.reset_test_csharp_reconciliation_count();
     let cold = reverse_type_ref(&state, root.path());
     let cold = structured(&cold);
     let compiled = cold["discovery"]["compiled"]
         .as_u64()
         .expect("cold query must report compiled K") as usize;
-    let cold_parses = semantic_work_metrics::full_semantic_parses();
+    let cold_parses = state.test_full_semantic_parses();
     let cold_reconciliations = state.test_csharp_reconciliation_count();
 
-    semantic_work_metrics::reset();
+    state.reset_test_full_semantic_parses();
     state.reset_test_csharp_reconciliation_count();
     let warm = reverse_type_ref(&state, root.path());
     let warm = structured(&warm);
-    let warm_parses = semantic_work_metrics::full_semantic_parses();
+    let warm_parses = state.test_full_semantic_parses();
     let warm_reconciliations = state.test_csharp_reconciliation_count();
 
     assert_eq!(cold["coverage"]["source_complete"], true, "{cold}");

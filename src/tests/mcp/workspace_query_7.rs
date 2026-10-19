@@ -1,8 +1,8 @@
 // Filesystem hydration safe-default regressions (RED-S1..S9).
 
 use crate::mcp::tool_handlers::hydration::{
-    TEST_PROJECT_HYDRATION_SERIALIZE, TraversalStats, clear_test_project_search_results,
-    last_test_traversal_stats,
+    TEST_PROJECT_HYDRATION_SERIALIZE, TraversalStats, clear_test_hydration_candidates,
+    clear_test_project_search_results, last_test_traversal_stats,
 };
 use std::path::{Path, PathBuf};
 
@@ -10,9 +10,7 @@ fn serial_guard() -> std::sync::MutexGuard<'static, ()> {
     let guard = TEST_PROJECT_HYDRATION_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
-    *crate::mcp::tool_handlers::hydration::TEST_HYDRATION_CANDIDATES
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    clear_test_hydration_candidates();
     clear_test_project_search_results();
     guard
 }

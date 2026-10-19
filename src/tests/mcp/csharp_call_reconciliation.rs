@@ -87,6 +87,7 @@ fn removal_and_signature_change_revoke_exact_calls() {
     state
         .mark_csharp_call_authority_dirty_for_file(&canonical_target)
         .unwrap();
+    state.prepare_exact_csharp_calls().unwrap();
     assert!(callers(&state).is_empty());
 
     std::fs::write(
@@ -121,5 +122,6 @@ fn newly_introduced_ambiguity_revokes_and_removal_reestablishes() {
     state
         .mark_csharp_call_authority_dirty_for_file(&canonical_duplicate)
         .unwrap();
+    state.prepare_exact_csharp_calls().unwrap();
     assert_eq!(callers(&state), [CALLER_IDENTITY]);
 }

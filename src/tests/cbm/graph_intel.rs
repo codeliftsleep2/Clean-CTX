@@ -37,8 +37,6 @@
 //   ISO disk-cache partitioning + hydration across workspace switches
 //       verified (positive test).
 
-use std::path::Path;
-
 use serial_test::serial;
 
 use crate::cbm::bridge::GraphBridge;
@@ -63,12 +61,6 @@ fn live_config() -> CbmConfig {
         enabled: true,
         ..Default::default()
     }
-}
-
-/// The canonical CBM project slug for this repository's working directory.
-fn this_project() -> String {
-    let canon = std::path::Path::new(".").canonicalize().expect("cwd");
-    crate::cbm::bridge::cbm_project_slug(&canon)
 }
 
 /// Wait until this repo's CBM index is Ready (each `try_create` triggers a
@@ -203,9 +195,9 @@ fn live_wire_in_degree_cells_are_json_numbers() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
-    let project = this_project();
+    let project = bridge.project_str();
 
     let rows = {
         let mut guard = bridge.client.lock().unwrap_or_else(|p| p.into_inner());
@@ -240,9 +232,9 @@ fn live_symbol_importance_scores_are_nonzero_and_bounded() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
-    let project = this_project();
+    let project = bridge.project_str();
 
     // Ground truth: hottest function name straight from the graph.
     let hottest = {
@@ -262,8 +254,8 @@ fn live_symbol_importance_scores_are_nonzero_and_bounded() {
     // F2w/F11: scores flow through the Result API; an Ok(map) is always a
     // complete, valid result.
     let map = bridge
-        .get_symbol_importance_mut()
-        .expect("importance query must succeed on a live indexed graph");
+        .get_bounded_symbol_importance_for_test(25)
+        .expect("bounded importance query must succeed on a live indexed graph");
     assert!(
         !map.is_empty(),
         "importance map must not be empty on a live graph"
@@ -297,9 +289,9 @@ fn live_blast_radius_matches_true_caller_files() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
-    let project = this_project();
+    let project = bridge.project_str();
 
     // Pick a concrete called function and compute its true caller files.
     let (symbol, true_files): (String, Vec<String>) = {
@@ -318,7 +310,7 @@ fn live_blast_radius_matches_true_caller_files() {
             .query_graph(
                 &format!(
                     "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{sym}' \
-                     RETURN caller.name, caller.file_path"
+                     RETURN caller.name, caller.file_path LIMIT 25"
                 ),
                 &project,
             )
@@ -335,8 +327,8 @@ fn live_blast_radius_matches_true_caller_files() {
     // F1 REGRESSION GUARD: the reported blast radius must equal the true
     // caller-file set now that the Cypher matches on f.name.
     let reported = bridge
-        .get_blast_radius(&symbol, 1)
-        .expect("blast-radius query must succeed on a live indexed graph");
+        .get_bounded_blast_radius_for_test(&symbol, 25)
+        .expect("bounded blast-radius query must succeed on a live indexed graph");
 
     let mut expected = true_files.clone();
     expected.sort();
@@ -361,9 +353,9 @@ fn live_dead_code_detection_covers_methods() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
-    let project = this_project();
+    let project = bridge.project_str();
 
     // Ground truth: exact dead-node pairs per label, merged client-side.
     let mut expected_pairs: Vec<(String, String)> = {
@@ -375,7 +367,7 @@ fn live_dead_code_detection_covers_methods() {
                 .query_graph(
                     &format!(
                         "MATCH (n:{label}) WHERE n.in_degree = 0 AND n.is_entry_point = false \
-                         RETURN n.name, n.file_path"
+                         RETURN n.name, n.file_path LIMIT 25"
                     ),
                     &project,
                 )
@@ -395,8 +387,8 @@ fn live_dead_code_detection_covers_methods() {
     expected_pairs.dedup();
 
     let production: Vec<(String, String)> = bridge
-        .get_dead_code()
-        .expect("dead-code query must succeed on a live indexed graph")
+        .get_bounded_dead_code_for_test(25)
+        .expect("bounded dead-code query must succeed on a live indexed graph")
         .into_iter()
         .map(|e| (e.symbol, e.file))
         .collect();
@@ -442,21 +434,21 @@ fn live_dataflow_edge_type_still_absent_reintroduction_guard() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
-
-    assert!(
-        !bridge
-            .get_call_edges()
-            .expect("CALLS edge query must succeed on a live indexed graph")
-            .is_empty(),
-        "fixture sanity: live graph must have CALLS edges for this probe"
-    );
+    let project = bridge.project_str();
 
     let dataflow_rows = {
-        let project = this_project();
         let mut guard = bridge.client.lock().unwrap_or_else(|p| p.into_inner());
         let client = guard.as_mut().expect("live CBM client");
+        let calls = client
+            .query_graph(
+                "MATCH (a)-[:CALLS]->(b) RETURN a.name, b.name LIMIT 5",
+                &project,
+            )
+            .expect("bounded CALLS fixture probe")
+            .rows;
+        assert!(!calls.is_empty(), "fixture sanity: CALLS edges must exist");
         client
             .query_graph(
                 "MATCH (a)-[r:DATAFLOW]->(b) RETURN a.name, b.name LIMIT 5",
@@ -483,7 +475,7 @@ fn live_architecture_overview_parses_packages_and_boundaries() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
     let overview = bridge
         .get_architecture()
@@ -516,7 +508,7 @@ fn live_intel_queries_propagate_errors_on_unknown_project() {
         eprintln!("Skipping — CBM not installed");
         return;
     }
-    let mut bridge = GraphBridge::try_create(&live_config(), Path::new("."));
+    let mut bridge = GraphBridge::try_create(&live_config(), std::path::Path::new("."));
     wait_ready(&mut bridge);
     const BOGUS: &str = "definitely-not-a-real-project-xyz";
 

@@ -65,6 +65,7 @@ fn hydrate_workspace_index_for_target(
     requirement: HydrationRequirement,
     target: Option<AcquisitionTarget>,
 ) -> Result<HydrationReport, String> {
+    let requires_provider_neutral_proof = target.is_some();
     let cache_key = target.as_ref().map(|target| {
         let roots = configured_roots(state, workspace_root)
             .iter()
@@ -80,8 +81,14 @@ fn hydrate_workspace_index_for_target(
         .as_ref()
         .and_then(|key| state.acquisition_completion_lock().get(key));
     let discovery = discovery_kind(query_type);
-    let outcome =
-        discover_candidate_paths(state, discovery, query_name, workspace_root, requirement);
+    let outcome = discover_candidate_paths(
+        state,
+        discovery,
+        query_name,
+        workspace_root,
+        requirement,
+        requires_provider_neutral_proof,
+    );
     let provisional = target.and_then(|target| {
         super::acquisition::prepare_clean_type_ref_acquisition(
             target,

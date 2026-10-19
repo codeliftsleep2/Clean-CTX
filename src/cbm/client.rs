@@ -17,6 +17,7 @@ use lifecycle::{FrontendSession, RetirementOutcome};
 mod collection;
 mod decoder;
 mod observations;
+pub(crate) use observations::ProviderIndexReadiness;
 mod transport;
 mod wire;
 

@@ -227,8 +227,15 @@ fn cbm_a2_baseline_retirement_preserves_other_frontend_session() {
 #[test]
 fn cbm_indexing_worker_is_joined_before_bridge_retires_frontend() {
     let root = TempDir::new().unwrap();
+    let additional = TempDir::new().unwrap();
     let log = root.path().join("launch.json");
-    let bridge = fixture::bridge_with_mode(root.path(), &[], &log, "a2-slow-index");
+    let mut bridge = fixture::bridge_with_mode(
+        root.path(),
+        &[additional.path().to_path_buf()],
+        &log,
+        "a2-slow-index",
+    );
+    bridge.complete_provider_startup_and_start_additional_roots_for_test();
     let pid = {
         let client = bridge.client.lock().unwrap();
         fixture::child_id(client.as_ref().expect("admitted frontend"))

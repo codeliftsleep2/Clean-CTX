@@ -319,29 +319,31 @@ impl GraphBridge {
     /// roots begin indexing immediately at construction. Each root is tracked
     /// under its own canonical CBM slug; one root remaining `StillIndexing`
     /// never blocks another root that is already `Complete`.
-    pub(crate) fn start_indexing_roots(&mut self) {
+    pub(crate) fn start_indexing_roots_except(&mut self, excluded: &str) {
         let slugs: Vec<String> = self.project_ids.values().cloned().collect();
         let mut started: Vec<String> = Vec::new();
         for slug in &slugs {
-            if !started.contains(slug) {
+            if slug != excluded && !started.contains(slug) {
                 self.start_indexing_for(slug);
                 started.push(slug.clone());
             }
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn complete_provider_startup_and_start_additional_roots_for_test(&mut self) {
+        let primary = self.project_str();
+        let mut states = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
+        states.insert(primary.clone(), IndexingState::Complete);
+        drop(states);
+        self.start_indexing_roots_except(&primary);
+    }
+
     /// Ensure the project is indexed before issuing queries.
     ///
-    /// K-1: **Report-only rewrite. Indexing is started at bridge construction
-    /// (`try_create` â†’ `start_indexing`), so this method no longer spawns a
-    /// background indexing thread.** It only reports the current state:
-    ///
-    /// - `InProgress` â†’ `StillIndexing` (retry later); times out after 60s.
-    /// - `Complete`   â†’ `Ready`.
-    /// - `Failed`     â†’ `Err`.
-    ///
-    /// `NotStarted` is treated as freshly-launched so the caller retries; this
-    /// avoids duplicating the construction-time spawn while never blocking.
+    /// Primary startup is provider-owned and observed through `index_status`.
+    /// Explicit additional-root work reports from the local state machine.
+    /// This method never initiates a competing primary-root index operation.
     pub fn ensure_indexed(&mut self) -> Result<IndexingStatus, CbmError> {
         // Guard before touching any state: when CBM is unavailable (disabled,
         // binary missing, launch failed), return the same error on every call.
@@ -351,6 +353,71 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
+
+        let provider_owned_started = self
+            .indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .get(&project)
+            .and_then(|state| match state {
+                IndexingState::ProviderOwned { started_at } => Some(*started_at),
+                _ => None,
+            });
+        if let Some(started_at) = provider_owned_started {
+            let readiness = {
+                let mut client = self.client.lock().unwrap_or_else(|p| p.into_inner());
+                client
+                    .as_mut()
+                    .ok_or_else(|| CbmError::LaunchError("CBM not available".into()))?
+                    .observe_initial_index_readiness(&project, &self.project_root)
+            };
+            let readiness = match readiness {
+                Ok(readiness) => readiness,
+                Err(CbmError::ToolError { message, .. })
+                    if message.contains("project not found")
+                        || message.contains("not indexed") =>
+                {
+                    let elapsed = started_at.elapsed().as_secs();
+                    if elapsed > 60 {
+                        let message = "provider-owned initial indexing timed out".to_string();
+                        self.indexing_state
+                            .lock()
+                            .unwrap_or_else(|p| p.into_inner())
+                            .insert(project, IndexingState::Failed(message.clone()));
+                        return Err(CbmError::LaunchError(message));
+                    }
+                    return Ok(IndexingStatus::StillIndexing {
+                        elapsed_secs: elapsed,
+                    });
+                }
+                Err(error) => return Err(error),
+            };
+            let mut states = self
+                .indexing_state
+                .lock()
+                .unwrap_or_else(|p| p.into_inner());
+            return match readiness {
+                crate::cbm::client::ProviderIndexReadiness::Ready => {
+                    states.insert(project.clone(), IndexingState::Complete);
+                    drop(states);
+                    // CBM accepts one indexing transition at a time. Additional
+                    // roots remain Clean-CTX-owned, but begin only after the
+                    // provider-owned primary transition is terminal.
+                    self.start_indexing_roots_except(&project);
+                    Ok(IndexingStatus::Ready)
+                }
+                crate::cbm::client::ProviderIndexReadiness::InProgress => {
+                    let elapsed = started_at.elapsed().as_secs();
+                    Ok(IndexingStatus::StillIndexing {
+                        elapsed_secs: elapsed,
+                    })
+                }
+                crate::cbm::client::ProviderIndexReadiness::Failed(message) => {
+                    states.insert(project, IndexingState::Failed(message.clone()));
+                    Err(CbmError::LaunchError(message))
+                }
+            };
+        }
 
         // ── Lazy freshness gate ──────────────────────────────────────
         // If the project is dirty (filesystem edits occurred since the last
@@ -383,6 +450,9 @@ impl GraphBridge {
                     })
                 }
             }
+            IndexingState::ProviderOwned { started_at } => Ok(IndexingStatus::StillIndexing {
+                elapsed_secs: started_at.elapsed().as_secs(),
+            }),
             IndexingState::Failed(msg) => Err(CbmError::LaunchError(msg.clone())),
             // Construction-time `start_indexing()` marks the state InProgress
             // before the thread runs; if we observe NotStarted (e.g. the thread
@@ -410,6 +480,22 @@ impl GraphBridge {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         if self.project.as_deref() != Some(project) {
+            let additional_not_started = self.project_paths.contains_key(project)
+                && !self
+                    .indexing_state
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .contains_key(project);
+            if additional_not_started {
+                match self.ensure_indexed()? {
+                    IndexingStatus::Ready => {
+                        self.start_indexing_for(project);
+                    }
+                    still_indexing @ IndexingStatus::StillIndexing { .. } => {
+                        return Ok(still_indexing);
+                    }
+                }
+            }
             // Not the active project. Check freshness before proceeding.
             // ── Lazy freshness gate (non-active project) ───────────────
             if self.is_project_dirty(project) {
@@ -477,6 +563,11 @@ impl GraphBridge {
                             elapsed_secs: elapsed,
                         })
                     }
+                }
+                IndexingState::ProviderOwned { started_at } => {
+                    Ok(IndexingStatus::StillIndexing {
+                        elapsed_secs: started_at.elapsed().as_secs(),
+                    })
                 }
                 IndexingState::Failed(msg) => Err(CbmError::LaunchError(msg.clone())),
                 IndexingState::NotStarted => Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 }),

@@ -384,7 +384,11 @@ fn red19_still_indexing_project_with_queryable_graph_is_searched() {
     let sc = call_find(&state, "Persisted", primary.path());
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(
+        sc["discovery"]["discovered"],
+        2,
+        "CBM advisory evidence and the filesystem fallback both report the shared candidate"
+    );
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
@@ -419,7 +423,11 @@ fn red20_failed_readiness_with_queryable_graph_is_searched() {
     let sc = call_find(&state, "PersistedAfterFailure", primary.path());
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 1);
+    assert_eq!(
+        sc["discovery"]["discovered"],
+        2,
+        "CBM advisory evidence and the filesystem fallback both report the shared candidate"
+    );
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
     assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");

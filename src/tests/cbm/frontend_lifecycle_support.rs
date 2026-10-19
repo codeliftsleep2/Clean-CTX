@@ -351,7 +351,7 @@ pub(super) fn launch_for_admission(root: &Path, log: &Path, mode: &str) -> CbmCl
     let result = CbmClient::try_launch(
         &std::env::current_exe().unwrap(),
         root,
-        Duration::from_millis(300),
+        Duration::from_secs(1),
         3,
         0,
     );

@@ -12,6 +12,12 @@ pub(crate) struct ProviderObservation {
 }
 pub(super) type Observations = HashMap<(String, String), ProviderObservation>;
 
+pub(crate) enum ProviderIndexReadiness {
+    Ready,
+    InProgress,
+    Failed(String),
+}
+
 impl ProviderObservation {
     pub(super) fn page(body: &Value) -> Self {
         let mut metadata = body.as_object().cloned().unwrap_or_default();
@@ -111,6 +117,58 @@ impl ProviderObservation {
     }
 }
 impl CbmClient {
+    pub(crate) fn observe_initial_index_readiness(
+        &mut self,
+        project: &str,
+        root: &Path,
+    ) -> Result<ProviderIndexReadiness, CbmError> {
+        let response = self.call_tool(
+            "index_status",
+            json!({"project":project,"format":"json"}),
+        )?;
+        let status = self.parse_cbm_response(&response)?;
+        if status["project"] != project {
+            return Err(CbmError::ParseError("serving project mismatch".into()));
+        }
+        let supplied = status["root_path"]
+            .as_str()
+            .ok_or_else(|| CbmError::ParseError("unknown serving root".into()))?;
+        let actual = Path::new(supplied)
+            .canonicalize()
+            .map_err(|error| CbmError::ParseError(format!("serving root: {error}")))?;
+        let expected = root
+            .canonicalize()
+            .map_err(|error| CbmError::ParseError(format!("admitted root: {error}")))?;
+        if actual != expected {
+            return Err(CbmError::ParseError(
+                "serving root differs from admitted root".into(),
+            ));
+        }
+        let state = status["status"]
+            .as_str()
+            .or_else(|| status["state"].as_str());
+        match state {
+            Some("ready" | "indexed" | "complete" | "completed" | "succeeded") => {
+                Ok(ProviderIndexReadiness::Ready)
+            }
+            Some("queued" | "running" | "indexing" | "initializing") => {
+                Ok(ProviderIndexReadiness::InProgress)
+            }
+            Some("failed" | "cancelled" | "canceled") => Ok(ProviderIndexReadiness::Failed(
+                status["error"]
+                    .as_str()
+                    .unwrap_or("provider-owned initial indexing failed")
+                    .to_string(),
+            )),
+            Some(other) => Err(CbmError::ParseError(format!(
+                "unknown provider index status: {other}"
+            ))),
+            None => Err(CbmError::ParseError(
+                "missing provider index status".into(),
+            )),
+        }
+    }
+
     pub(crate) fn provider_observation(
         &self,
         project: &str,

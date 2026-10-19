@@ -29,8 +29,6 @@ pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
 mod router;
 pub(crate) mod semantic_compilation;
-#[cfg(test)]
-pub(crate) mod semantic_work_metrics;
 mod server;
 pub(crate) mod session_stats;
 pub(crate) mod sqlite_store;

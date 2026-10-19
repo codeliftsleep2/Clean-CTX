@@ -95,11 +95,11 @@ fn dirty_calls_authority_does_not_invalidate_current_type_ref_evidence() {
     state.prepare_exact_csharp_calls().expect("exact calls");
     state.mark_csharp_authority_dirty();
     reset_manifest_constructions();
-    crate::mcp::semantic_work_metrics::reset();
+    state.reset_test_full_semantic_parses();
 
     let type_ref = dispatch(&state, reverse(root.path(), "TypeRef", "Target"));
 
     assert!(type_ref.get("error").is_none(), "{type_ref}");
     assert_eq!(manifest_constructions(), 0);
-    assert_eq!(crate::mcp::semantic_work_metrics::full_semantic_parses(), 0);
+    assert_eq!(state.test_full_semantic_parses(), 0);
 }

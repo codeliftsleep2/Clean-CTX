@@ -14,10 +14,34 @@
 use crate::cbm::GraphNode;
 use crate::mcp::discovery_cache::DiscoveryMode;
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
-/// Candidate paths injected by tests in place of real CBM discovery.
-pub(crate) static TEST_HYDRATION_CANDIDATES: Mutex<Option<Vec<String>>> = Mutex::new(None);
+/// Candidate paths injected per test thread in place of real CBM discovery.
+static TEST_HYDRATION_CANDIDATES: LazyLock<
+    Mutex<HashMap<std::thread::ThreadId, Vec<String>>>,
+> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+pub(crate) fn set_test_hydration_candidates(paths: Vec<String>) {
+    TEST_HYDRATION_CANDIDATES
+        .lock()
+        .expect("TEST_HYDRATION_CANDIDATES lock poisoned")
+        .insert(std::thread::current().id(), paths);
+}
+
+pub(crate) fn clear_test_hydration_candidates() {
+    TEST_HYDRATION_CANDIDATES
+        .lock()
+        .expect("TEST_HYDRATION_CANDIDATES lock poisoned")
+        .remove(&std::thread::current().id());
+}
+
+pub(crate) fn test_hydration_candidates() -> Option<Vec<String>> {
+    TEST_HYDRATION_CANDIDATES
+        .lock()
+        .expect("TEST_HYDRATION_CANDIDATES lock poisoned")
+        .get(&std::thread::current().id())
+        .cloned()
+}
 
 /// Serializes the hydration regressions (these statics are process-wide).
 pub(crate) static TEST_PROJECT_HYDRATION_SERIALIZE: Mutex<()> = Mutex::new(());

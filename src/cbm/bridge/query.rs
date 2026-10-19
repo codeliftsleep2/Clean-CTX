@@ -22,24 +22,42 @@ impl GraphBridge {
                 .map_err(|e| CbmError::ParseError(format!("cached symbol_importance: {e}")));
         }
         let project = self.project_str();
-        let symbols = self.query(move |c| c.get_symbol_importance(&project, Some(1)))?;
-        let map: HashMap<_, _> = symbols
-            .iter()
-            .filter_map(|e| {
-                Some((
-                    e["name"].as_str()?.to_string(),
-                    SymbolImportance {
-                        symbol: e["name"].as_str()?.to_string(),
-                        score: e["importance"].as_f64().unwrap_or(0.0),
-                        file: e["file"].as_str().unwrap_or("").to_string(),
-                    },
-                ))
-            })
-            .collect();
+        let symbols = self.query(move |c| c.get_symbol_importance(&project, Some(1), None))?;
+        let map = symbol_importance_map(&symbols);
         self.cache_insert(&key, &map);
         Ok(map)
     }
 
+    #[cfg(test)]
+    pub(crate) fn get_bounded_symbol_importance_for_test(
+        &mut self,
+        limit: usize,
+    ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
+        let project = self.project_str();
+        let symbols = self.query(move |client| {
+            client.get_symbol_importance(&project, Some(1), Some(limit))
+        })?;
+        Ok(symbol_importance_map(&symbols))
+    }
+}
+
+fn symbol_importance_map(symbols: &[serde_json::Value]) -> HashMap<String, SymbolImportance> {
+    symbols
+        .iter()
+        .filter_map(|e| {
+            Some((
+                e["name"].as_str()?.to_string(),
+                SymbolImportance {
+                    symbol: e["name"].as_str()?.to_string(),
+                    score: e["importance"].as_f64().unwrap_or(0.0),
+                    file: e["file"].as_str().unwrap_or("").to_string(),
+                },
+            ))
+        })
+        .collect()
+}
+
+impl GraphBridge {
     /// Blast radius at depth 1: files containing direct callers of a symbol.
     ///
     /// H-01/M-04 fix: Replaced invalid `search_graph` name_pattern with valid Cypher
@@ -62,19 +80,38 @@ impl GraphBridge {
             return serde_json::from_value(data)
                 .map_err(|e| CbmError::ParseError(format!("cached blast radius: {e}")));
         }
-        let escaped = symbol.replace('\'', "\\'");
-        let cypher = format!(
-            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' RETURN caller.name, caller.file_path"
-        );
-        let project = self.project_str();
-        let table = self.query(move |c| c.query_graph(&cypher, &project))?;
-        let files: Vec<_> = table
-            .rows
-            .iter()
-            .filter_map(|r| r.get(1).and_then(|v| v.as_str().map(String::from)))
-            .collect();
+        let files = self.query_blast_radius(symbol, None)?;
         self.cache_insert(&key, &files);
         Ok(files)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_bounded_blast_radius_for_test(
+        &mut self,
+        symbol: &str,
+        limit: usize,
+    ) -> Result<Vec<String>, CbmError> {
+        self.query_blast_radius(symbol, Some(limit))
+    }
+
+    fn query_blast_radius(
+        &mut self,
+        symbol: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<String>, CbmError> {
+        let escaped = symbol.replace('\'', "\\'");
+        let limit = limit.map(|value| format!(" LIMIT {value}")).unwrap_or_default();
+        let cypher = format!(
+            "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' \
+             RETURN caller.name, caller.file_path{limit}"
+        );
+        let project = self.project_str();
+        let table = self.query(move |client| client.query_graph(&cypher, &project))?;
+        Ok(table
+            .rows
+            .iter()
+            .filter_map(|row| row.get(1).and_then(|value| value.as_str().map(String::from)))
+            .collect())
     }
 
     /// Dead-code candidates: `Function` and `Method` nodes with no callers
@@ -88,23 +125,41 @@ impl GraphBridge {
     /// An `Ok(vec![])` means the graph genuinely has no dead candidates;
     /// failures propagate as [`CbmError::Err`].
     pub fn get_dead_code(&mut self) -> Result<Vec<DeadCodeEntry>, CbmError> {
-        const DEAD_CODE_CYPHER: fn(&str) -> String = |label| {
-            format!(
-                "MATCH (n:{label}) WHERE n.in_degree = 0 AND n.is_entry_point = false \
-                     RETURN n.name, n.file_path"
-            )
-        };
         let key = "dead_code".to_string();
         if let Some(data) = self.cached_value(&key) {
             return serde_json::from_value(data)
                 .map_err(|e| CbmError::ParseError(format!("cached dead_code: {e}")));
         }
+        let entries = self.query_dead_code(None)?;
+        self.cache_insert(&key, &entries);
+        Ok(entries)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn get_bounded_dead_code_for_test(
+        &mut self,
+        limit_per_label: usize,
+    ) -> Result<Vec<DeadCodeEntry>, CbmError> {
+        self.query_dead_code(Some(limit_per_label))
+    }
+
+    fn query_dead_code(
+        &mut self,
+        limit_per_label: Option<usize>,
+    ) -> Result<Vec<DeadCodeEntry>, CbmError> {
         let project = self.project_str();
         let mut entries = Vec::new();
         for label in ["Function", "Method"] {
+            let limit = limit_per_label
+                .map(|value| format!(" LIMIT {value}"))
+                .unwrap_or_default();
+            let cypher = format!(
+                "MATCH (n:{label}) WHERE n.in_degree = 0 AND n.is_entry_point = false \
+                 RETURN n.name, n.file_path{limit}"
+            );
             let table = self.query({
                 let project = project.clone();
-                move |c| c.query_graph(&DEAD_CODE_CYPHER(label), &project)
+                move |c| c.query_graph(&cypher, &project)
             })?;
             for row in &table.rows {
                 if let Some(name) = row.first().and_then(|v| v.as_str()) {
@@ -120,7 +175,6 @@ impl GraphBridge {
                 }
             }
         }
-        self.cache_insert(&key, &entries);
         Ok(entries)
     }
 

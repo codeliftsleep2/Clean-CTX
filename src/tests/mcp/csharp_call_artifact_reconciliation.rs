@@ -54,7 +54,7 @@ fn retained_artifacts_project_cross_file_calls_without_reparsing() {
     let state = state();
     let hydration = dispatch(&state, reverse(root.path(), "TypeRef", "Target"));
     assert!(hydration.get("error").is_none(), "{hydration}");
-    crate::mcp::semantic_work_metrics::reset();
+    state.reset_test_full_semantic_parses();
 
     let calls = dispatch(&state, reverse(root.path(), "Method", "Save"));
 
@@ -65,7 +65,7 @@ fn retained_artifacts_project_cross_file_calls_without_reparsing() {
     assert_eq!(edges.len(), 1, "{calls}");
     assert_eq!(edges[0]["subject"]["name"], "Run", "{calls}");
     assert_eq!(edges[0]["object"]["name"], "Save", "{calls}");
-    assert_eq!(crate::mcp::semantic_work_metrics::full_semantic_parses(), 0);
+    assert_eq!(state.test_full_semantic_parses(), 0);
 }
 
 #[test]
@@ -77,10 +77,10 @@ fn missing_artifacts_are_compiled_once_then_reused() {
     assert!(hydration.get("error").is_none(), "{hydration}");
     state.csharp_call_authority.clear_artifacts();
     state.mark_csharp_authority_dirty();
-    crate::mcp::semantic_work_metrics::reset();
+    state.reset_test_full_semantic_parses();
 
     let first = dispatch(&state, reverse(root.path(), "Method", "Save"));
-    let first_parses = crate::mcp::semantic_work_metrics::full_semantic_parses();
+    let first_parses = state.test_full_semantic_parses();
     let second = dispatch(&state, reverse(root.path(), "Method", "Save"));
 
     assert!(first.get("error").is_none(), "{first}");
@@ -90,7 +90,7 @@ fn missing_artifacts_are_compiled_once_then_reused() {
         "missing artifacts must fail closed through compilation"
     );
     assert_eq!(
-        crate::mcp::semantic_work_metrics::full_semantic_parses(),
+        state.test_full_semantic_parses(),
         first_parses,
         "a current exact-call generation must reuse retained artifacts"
     );

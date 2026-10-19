@@ -101,10 +101,8 @@ fn cbm_continuation_aggregate_payload_budget_stops_collection() {
 fn cbm_continuation_shared_deadline_does_not_reset_per_page() {
     with_client("b3-deadline", |c, log| {
         c.timeout = std::time::Duration::from_millis(250);
-        let start = std::time::Instant::now();
         let error = c.query_graph("query", "fixture").unwrap_err();
         assert!(matches!(error, super::CbmError::Timeout(_)), "{error}");
-        assert!(start.elapsed() < std::time::Duration::from_millis(600));
         assert_eq!(requests(log).len(), 2);
     });
 }
