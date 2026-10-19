@@ -305,6 +305,10 @@ mod tests_reverse_edge_completeness;
 #[path = "../../tests/mcp/workspace_query_warm_state_authority.rs"]
 mod tests_warm_state_authority;
 
+#[cfg(all(test, feature = "rust", feature = "csharp", feature = "dotnet"))]
+#[path = "../../tests/mcp/workspace_query_dbcontext_role.rs"]
+mod tests_dbcontext_role;
+
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
 mod tests_legacy_edit_adequacy;

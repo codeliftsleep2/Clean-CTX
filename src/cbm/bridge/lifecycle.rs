@@ -136,12 +136,16 @@ impl GraphBridge {
         // configured additional roots.
         if is_available {
             if let Some(primary) = bridge.project.clone() {
-                bridge.indexing_state.lock().unwrap_or_else(|p| p.into_inner()).insert(
-                    primary.clone(),
-                    IndexingState::ProviderOwned {
-                        started_at: Instant::now(),
-                    },
-                );
+                bridge
+                    .indexing_state
+                    .lock()
+                    .unwrap_or_else(|p| p.into_inner())
+                    .insert(
+                        primary.clone(),
+                        IndexingState::ProviderOwned {
+                            started_at: Instant::now(),
+                        },
+                    );
             }
         }
 

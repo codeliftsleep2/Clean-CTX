@@ -70,9 +70,9 @@ fn hydration_candidate_injection_is_visible_only_to_its_owner_thread() {
         crate::mcp::tool_handlers::hydration::test_hydration_candidates(),
         Some(expected)
     );
-    let foreign = std::thread::spawn(|| {
-        crate::mcp::tool_handlers::hydration::test_hydration_candidates()
-    })
+    let foreign = std::thread::spawn(
+        crate::mcp::tool_handlers::hydration::test_hydration_candidates,
+    )
     .join()
     .expect("foreign test thread");
     assert_eq!(

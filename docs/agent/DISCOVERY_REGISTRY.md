@@ -46,6 +46,57 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-039: Durable DbContext Role Depended on Relationship Payload
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-18 |
+| **Environment** | Claude + Clean-CTX live multi-root .NET workspace |
+| **Repository/context** | Two same-named `ContextA` classes deriving from EF Core DbContext; one contained no supported DbSet relationship payload and the other contained nineteen DbSets |
+| **Symptom** | Only the relationship-producing owner exposed a durable `dotnet/DbContext/ContextA` occurrence, although both source declarations expressed the framework role. |
+| **Root cause** | The historical durable producer registered the framework identity only as the subject endpoint of emitted `HasEntity` edges. Framework role identity and relationship evidence were accidentally coupled. |
+| **Classification** | Semantic / representation |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_warm_state_authority.rs::issue_147_structured_dbcontext_role_does_not_require_relationship_payload`; `src/tests/mcp/workspace_query_dbcontext_role.rs` |
+| **Live scenario required?** | No for the implemented fully qualified authority slice; local lifecycle and cross-root regressions cover the production boundary |
+| **Architectural invariant** | DOTNET-001 |
+| **Status** | Implemented — awaiting focused user-run GREEN verification |
+
+**Resolution:** parser-owned first-base evidence now authorizes a durable role
+registration for the exact fully qualified EF Core DbContext base. The index
+normalizes that record into a file-provenanced occurrence without declaration
+authority or graph adjacency. Relationship extraction remains independent;
+role-only contexts publish zero `HasEntity` edges. Unqualified imports and
+other unresolved forms remain fail-closed. Campaign B remains
+architecture-approved and implementation-pending.
+
+---
+
+## DIS-2026-038: CBM Scope Diagnostic Conflated Authority with Provider Failure
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-19 |
+| **Environment** | Claude + Clean-CTX mixed-language workspace field testing |
+| **Repository/context** | Exact reverse `builtin/TypeRef` acquisition where CBM was ready and search succeeded, but Clean-owned filesystem inventory was required for authoritative scope proof |
+| **Symptom** | Public diagnostics reported `fallback_reason: "cbm_scope_unavailable"` with `provider: "cbm_and_filesystem"`; the word “unavailable” could be read as a CBM outage or failed search even though CBM responded successfully and contributed advisory candidates. |
+| **Root cause** | The serialized value correctly selected the absence of authoritative CBM scope coverage, but its public schema did not distinguish provider health from authority for the request's proof contract. |
+| **Classification** | Protocol / diagnostic semantics |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/mcp/workspace_query_diagnostics.rs::red_diag3_fallback_reason_surfaced`; `src/tests/mcp/workspace_query_3.rs::workspace_query_schema_declares_sparse_discovery_diagnostics` |
+| **Live scenario required?** | No — Campaign C changes description only and preserves the observed serialized behavior |
+| **Architectural invariant** | WSC-019 |
+| **Status** | Fixed — schema and operator guidance now define the compatibility-preserving meaning; provider lifecycle and selection logic are unchanged |
+
+**Resolution:** `cbm_scope_unavailable` continues to serialize unchanged. It
+means CBM did not provide authoritative coverage for the required request scope
+or proof contract; CBM may still have responded successfully and contributed
+advisory candidates, and the reason alone does not assert CBM failure. Campaign
+A is implemented pending focused verification; Campaign B remains
+architecture-approved and implementation-pending.
+
+---
+
 ## DIS-2026-037: Optional CBM Admission Blocked Core MCP Readiness
 
 | Field | Value |

@@ -50,6 +50,11 @@ impl IRPass for MetaLayerPass {
             })
             .map(|capture| (capture.name.clone(), capture.text.clone()))
             .collect();
+        let structured_class_bases = if state.query_string == crate::queries::CS_QUERY {
+            structured_csharp_class_bases(&state.captures)
+        } else {
+            Vec::new()
+        };
         let mut context = crate::layers::meta::MetaLayerContext::new(
             &state.source,
             path,
@@ -80,6 +85,7 @@ impl IRPass for MetaLayerPass {
         }
         if state.query_string == crate::queries::CS_QUERY {
             context.structured_declarations = Some(&structured_declarations);
+            context.structured_class_bases = Some(&structured_class_bases);
         }
 
         let (meta_results, mut semantic_edges, semantic_dependencies) =
@@ -97,6 +103,51 @@ impl IRPass for MetaLayerPass {
         state.semantic_dependencies.extend(semantic_dependencies);
         Ok(())
     }
+}
+
+fn structured_csharp_class_bases(
+    captures: &[crate::compression::capture_pipeline::CapEntry],
+) -> Vec<crate::layers::meta::StructuredClassBase> {
+    const TYPE_ROOTS: [&str; 5] = [
+        "class.root",
+        "interface.root",
+        "struct.root",
+        "enum.root",
+        "record.root",
+    ];
+    captures
+        .iter()
+        .filter(|capture| capture.name == "class.root")
+        .filter_map(|owner| {
+            let first_base = captures
+                .iter()
+                .filter(|candidate| {
+                    candidate.name == "csharp.base_type"
+                        && captures
+                            .iter()
+                            .filter(|possible_owner| {
+                                TYPE_ROOTS.contains(&possible_owner.name.as_str())
+                                    && possible_owner.start_byte <= candidate.start_byte
+                                    && candidate.end_byte <= possible_owner.end_byte
+                            })
+                            .min_by_key(|possible_owner| {
+                                possible_owner.end_byte - possible_owner.start_byte
+                            })
+                            .is_some_and(|nearest| {
+                                nearest.start_byte == owner.start_byte
+                                    && nearest.end_byte == owner.end_byte
+                            })
+                })
+                .min_by_key(|candidate| candidate.start_byte)?;
+            let written = first_base.raw_text.trim();
+            (!owner.text.is_empty() && !written.is_empty()).then(|| {
+                crate::layers::meta::StructuredClassBase {
+                    owner: owner.text.clone(),
+                    written: written.to_string(),
+                }
+            })
+        })
+        .collect()
 }
 
 fn class_entries(state: &PassContext) -> Vec<(String, String)> {

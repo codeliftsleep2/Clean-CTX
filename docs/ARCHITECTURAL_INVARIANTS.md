@@ -555,6 +555,19 @@ generation, producer, or exhaustiveness proof.
 
 ---
 
+### WSC-019 Provider Health and Provider Authority Are Independent
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Sparse discovery diagnostics must distinguish provider failure from a healthy provider response that cannot authorize the request's required proof scope. |
+| **Invariant** | Provider health/readiness and provider authority are independent. `cbm_scope_unavailable` means CBM did not provide authoritative coverage for the request's required scope or proof contract. CBM may still have responded successfully and contributed advisory candidates; this reason does not by itself indicate a CBM failure. `cbm_unavailable`, `cbm_discovery_failed`, and `cbm_partial_failure` retain their existing provider-state meanings. Optional provider output never becomes implicit authority for Clean-CTX semantic truth or completeness. |
+| **Enforcement** | The `workspace_query` output schema documents the public interpretation. `src/tests/mcp/workspace_query_diagnostics.rs::red_diag3_fallback_reason_surfaced` pins the compatible combined-provider response after a ready successful CBM search; `src/tests/mcp/workspace_query_3.rs::workspace_query_schema_declares_sparse_discovery_diagnostics` pins the schema wording. |
+| **Authority** | `src/mcp/tools.rs`, `src/mcp/tool_handlers/hydration.rs`, `src/tests/mcp/workspace_query_diagnostics.rs`, `src/tests/mcp/workspace_query_3.rs` |
+| **Type** | DOCUMENTED and ENFORCED (test) |
+| **Gate** | Focused workspace-query diagnostic and schema tests; complete repository gate in CI |
+
+---
+
 ### WSC-004 Workspace Queries Respect Declared Workspace Scope
 
 | Property | Value |
@@ -942,6 +955,20 @@ reconciliation paths plus occurrence-preserving publication.
 | **Authority** | Current admitted source snapshots and structured C# declaration catalog; `src/mcp/tool_handlers/query/csharp_resolution.rs`; `src/mcp/tool_handlers/query/csharp_resolution/direct_aspnet.rs` |
 | **Type** | ENFORCED (current-source declaration authority + tests) |
 | **Gate** | Focused workspace-query regressions plus `cargo test --workspace --all-targets --all-features` |
+
+---
+
+### DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Clean-CTX must durably express an EF Core DbContext role when structured source proves it, without requiring an unrelated entity relationship to act as the role's storage carrier. |
+| **Invariant** | Parser-owned, ambiguity-safe framework evidence may register a file-provenanced `dotnet/DbContext/<class>` role independently of `HasEntity` payload. The role registration never enters the relationship graph and never becomes source declaration authority; `builtin/Class/<class>` remains the declaration. Role identity alone cannot create a `HasEntity` edge. The first implemented authority envelope is a class whose parser-captured first base is exactly `Microsoft.EntityFrameworkCore.DbContext`, optionally prefixed by `global::`. Unqualified imports, aliases, indirect inheritance, generic bases, ambiguous/shadowed names, and malformed declarations fail closed. |
+| **Lifecycle** | The normalized semantic-role registration is owned by the same file projection as other durable semantic output. Publication, replacement, refresh, deletion, rename, warm reuse, producer-generation compatibility, and same-name cross-root occurrence identity use the existing `WorkspaceIndex` owner lifecycle. .NET semantic producer generation 3 owns this projection. |
+| **Enforcement** | `src/ir/pipeline/meta_layer.rs` derives structured first-base evidence from the existing C# capture walk; `src/dotnet_meta/semantic.rs` owns EF role interpretation; `src/workspace/index/edges.rs` normalizes semantic-role registrations into non-declaration occurrences without adjacency. `src/tests/mcp/workspace_query_warm_state_authority.rs::issue_147_structured_dbcontext_role_does_not_require_relationship_payload` pins the zero-relationship and false-positive boundary. `src/tests/mcp/workspace_query_dbcontext_role.rs` pins lifecycle, same-name roots, and independent relationship production. |
+| **Authority** | `src/layers/meta/context.rs`, `src/ir/pipeline/meta_layer.rs`, `src/dotnet_meta/semantic.rs`, `src/dotnet_meta/efcore.rs`, `src/workspace/index/edges.rs` |
+| **Type** | STRUCTURAL and ENFORCED (test) |
+| **Gate** | Focused Issue #147-A regressions, then the authoritative final verification gate when authorized |
 
 ---
 

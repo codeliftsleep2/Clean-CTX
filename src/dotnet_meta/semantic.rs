@@ -12,6 +12,53 @@
 use crate::compression::Fidelity;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
+const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
+
+fn is_structured_dbcontext_base(base: &crate::layers::meta::StructuredClassBase) -> bool {
+    base.written.trim_start_matches("global::") == EF_CORE_DB_CONTEXT
+}
+
+pub(crate) fn has_structured_dbcontext_role(
+    bases: &[crate::layers::meta::StructuredClassBase],
+) -> bool {
+    bases.iter().any(is_structured_dbcontext_base)
+}
+
+/// Register EF Core DbContext roles from parser-owned first-base evidence.
+///
+/// Campaign 147-A intentionally supports only the fully qualified framework
+/// base (with optional `global::`). Unqualified imports, aliases, indirect
+/// inheritance, and ambiguous bindings fail closed until a stronger resolver
+/// can prove them.
+pub(crate) fn structured_dbcontext_role_registrations(
+    bases: &[crate::layers::meta::StructuredClassBase],
+) -> Vec<SemanticEdge> {
+    bases
+        .iter()
+        .filter(|base| is_structured_dbcontext_base(base))
+        .map(|base| {
+            let role = EntityRef::new("dotnet", "DbContext", &base.owner);
+            SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: role.clone(),
+                object: role,
+                layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
+                call_evidence: None,
+            }
+        })
+        .collect()
+}
+
+pub(crate) fn structured_dbcontext_role_names(
+    bases: &[crate::layers::meta::StructuredClassBase],
+) -> std::collections::HashSet<&str> {
+    bases
+        .iter()
+        .filter(|base| is_structured_dbcontext_base(base))
+        .map(|base| base.owner.as_str())
+        .collect()
+}
+
 /// Extract .NET semantic edges from a single class capture.
 /// Reuses the same string-scanning patterns as the existing .NET extractors.
 pub fn extract_dotnet_semantic_edges(

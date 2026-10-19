@@ -323,6 +323,21 @@ fn red_diag3_fallback_reason_surfaced() {
 
     // No fallback → no reason, and no boolean restating its absence.
     assert!(super::discovery_field(&steady_state_report()).is_none());
+
+    let healthy_advisory_cbm = HydrationReport {
+        discovery_provider: "cbm_and_filesystem",
+        fallback_reason: Some("cbm_scope_unavailable"),
+        project_coverage: vec![coverage("Healthy", "searched", Some("ready"), None)],
+        ..steady_state_report()
+    };
+    assert_eq!(
+        super::discovery_field(&healthy_advisory_cbm).expect("scope fallback is reported"),
+        json!({
+            "provider": "cbm_and_filesystem",
+            "fallback_reason": "cbm_scope_unavailable"
+        }),
+        "scope authority can require filesystem coverage after a successful ready CBM search"
+    );
 }
 
 // ── RED-DIAG4: candidate counts appear only when non-zero ──────────────

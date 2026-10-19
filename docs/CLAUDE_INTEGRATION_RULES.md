@@ -61,6 +61,13 @@ eligible name-bearing semantic queries. Its sparse `discovery` metadata reports
 only exceptional coverage; absence of that field means the expected discovery
 path completed, not that CBM facts became semantic authority.
 
+Provider health and provider authority are independent. In particular,
+`fallback_reason: "cbm_scope_unavailable"` means CBM did not provide
+authoritative coverage for the request's required scope or proof contract. CBM
+may still have responded successfully and contributed advisory candidates;
+this reason does not by itself indicate a CBM failure. Clean-owned evidence
+remains the authority for semantic completeness.
+
 ---
 
 ## 2. Read source through `provide_code_context`

@@ -23,7 +23,7 @@ pub mod builtin;
 mod context;
 pub mod semantic;
 
-pub use context::{MetaLayerContext, MetaLayerEvaluation};
+pub use context::{MetaLayerContext, MetaLayerEvaluation, StructuredClassBase};
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;

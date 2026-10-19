@@ -231,6 +231,143 @@ fn two_root_projectcontext_preserves_independent_source_authority() {
 }
 
 #[cfg(feature = "dotnet")]
+fn public_find_entities(
+    state: &crate::mcp::McpState,
+    root: &Path,
+    name: &str,
+    declarations_only: bool,
+) -> Vec<serde_json::Value> {
+    crate::protocol::captured_responses().clear();
+    crate::mcp::tools::dispatch_tools_call(
+        &serde_json::json!(147),
+        "workspace_query",
+        &serde_json::json!({ "arguments": {
+            "workspaceRoot": root.to_string_lossy(),
+            "type": "find_entities",
+            "name": name,
+            "domain": "dotnet",
+            "entity_type": "DbContext",
+            "declarations_only": declarations_only
+        }}),
+        state,
+    );
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("workspace_query response");
+    assert!(response.get("error").is_none(), "{response}");
+    response["result"]["structuredContent"]["entities"]
+        .as_array()
+        .expect("entities")
+        .clone()
+}
+
+#[cfg(feature = "dotnet")]
+#[test]
+fn issue_147_structured_dbcontext_role_does_not_require_relationship_payload() {
+    let root = tempfile::TempDir::new().expect("workspace root");
+    std::fs::write(
+        root.path().join("InfrastructureContext.csproj"),
+        "<Project Sdk=\"Microsoft.NET.Sdk\" />\n",
+    )
+    .expect("project fixture");
+    std::fs::write(
+        root.path().join("InfrastructureContext.cs"),
+        r#"
+public class InfrastructureContext : global::Microsoft.EntityFrameworkCore.DbContext
+{
+    public T Select<T>() where T : class
+    {
+        throw new System.NotImplementedException();
+    }
+}
+
+public class FakeContext : DbContext
+{
+    private const string Marker = ": DbContext";
+}
+"#,
+    )
+    .expect("DbContext authority fixture");
+
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    let state = crate::mcp::McpState::new(config);
+
+    let entities = public_find_entities(&state, root.path(), "InfrastructureContext", false);
+    assert!(
+        entities.iter().any(|entity| {
+            entity["domain"] == "builtin"
+                && entity["entity_type"] == "Class"
+                && entity["name"] == "InfrastructureContext"
+        }),
+        "the source declaration remains visible as builtin/Class"
+    );
+    assert!(
+        entities.iter().any(|entity| {
+            entity["domain"] == "dotnet"
+                && entity["entity_type"] == "DbContext"
+                && entity["name"] == "InfrastructureContext"
+                && entity["file"].as_str().is_some()
+        }),
+        "structured fully-qualified EF base authority must publish a durable DbContext role"
+    );
+
+    let index = state.workspace_index_read();
+    assert!(
+        index
+            .declarations_by_identity("builtin", "Class", "InfrastructureContext")
+            .iter()
+            .any(|entity| entity.file.is_some()),
+        "source declaration authority stays builtin/Class"
+    );
+    assert!(
+        index
+            .declarations_by_identity("dotnet", "DbContext", "InfrastructureContext")
+            .is_empty(),
+        "the durable framework role must not become source declaration authority"
+    );
+    assert_eq!(
+        index
+            .forward_edges_by_identity("dotnet", "DbContext", "InfrastructureContext")
+            .into_iter()
+            .filter(|edge| edge.relation == SemanticRelation::HasEntity)
+            .count(),
+        0,
+        "role identity alone must not fabricate outgoing HasEntity edges"
+    );
+    assert_eq!(
+        index
+            .reverse_edges_by_identity("dotnet", "DbContext", "InfrastructureContext")
+            .into_iter()
+            .filter(|edge| edge.relation == SemanticRelation::HasEntity)
+            .count(),
+        0,
+        "role identity alone must not fabricate incoming HasEntity edges"
+    );
+    drop(index);
+
+    assert!(
+        public_find_entities(&state, root.path(), "InfrastructureContext", true).is_empty(),
+        "declarations_only dotnet/DbContext remains empty under Issue #145"
+    );
+
+    let fake = public_find_entities(&state, root.path(), "FakeContext", false);
+    assert!(
+        fake.iter().any(|entity| {
+            entity["domain"] == "builtin"
+                && entity["entity_type"] == "Class"
+                && entity["name"] == "FakeContext"
+        }),
+        "the negative control remains a source class"
+    );
+    assert!(
+        fake.iter()
+            .all(|entity| { entity["domain"] != "dotnet" || entity["entity_type"] != "DbContext" }),
+        "an unqualified spelling without supported framework authority must not gain the role"
+    );
+}
+
+#[cfg(feature = "dotnet")]
 fn write_classified_context(root: &Path, namespace: &str) {
     std::fs::write(
         root.join(format!("{namespace}.csproj")),

@@ -86,7 +86,7 @@ fn workspace_query_discovery_schema() -> Value {
             "fallback_reason": {
                 "type": "string",
                 "enum": ["cbm_unavailable", "cbm_discovery_failed", "cbm_partial_failure", "cbm_scope_unavailable", "filesystem_unavailable"],
-                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact."
+                "description": "Present only when filesystem fallback was engaged for at least one root; its presence IS that fact. 'cbm_scope_unavailable' means CBM did not provide authoritative coverage for the request's required scope or proof contract. CBM may still have responded successfully and contributed advisory candidates; this reason does not by itself indicate a CBM failure."
             },
             "discovered": { "type": "integer", "description": "Present only when > 0 - candidate file paths discovered by this query." },
             "compiled": { "type": "integer", "description": "Present only when > 0 - unique, previously-unindexed candidate files compiled into the WorkspaceIndex by this query." },

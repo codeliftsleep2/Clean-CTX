@@ -63,6 +63,12 @@ pub struct EntityRef {
     pub file: Option<String>,
 }
 
+/// Provenance marker for a self-`Defines` registration record that represents
+/// an independently proven semantic role, not source declaration authority.
+/// The workspace write boundary consumes these records as occurrences only;
+/// they never enter the relationship graph.
+pub const SEMANTIC_ROLE_REGISTRATION_LAYER: &str = "semantic-role";
+
 impl EntityRef {
     /// Build an entity reference with no file provenance.
     pub fn new(domain: &'static str, entity_type: &'static str, name: impl Into<String>) -> Self {

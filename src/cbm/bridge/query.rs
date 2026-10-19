@@ -34,9 +34,8 @@ impl GraphBridge {
         limit: usize,
     ) -> Result<HashMap<String, SymbolImportance>, CbmError> {
         let project = self.project_str();
-        let symbols = self.query(move |client| {
-            client.get_symbol_importance(&project, Some(1), Some(limit))
-        })?;
+        let symbols =
+            self.query(move |client| client.get_symbol_importance(&project, Some(1), Some(limit)))?;
         Ok(symbol_importance_map(&symbols))
     }
 }
@@ -100,7 +99,9 @@ impl GraphBridge {
         limit: Option<usize>,
     ) -> Result<Vec<String>, CbmError> {
         let escaped = symbol.replace('\'', "\\'");
-        let limit = limit.map(|value| format!(" LIMIT {value}")).unwrap_or_default();
+        let limit = limit
+            .map(|value| format!(" LIMIT {value}"))
+            .unwrap_or_default();
         let cypher = format!(
             "MATCH (caller:Function)-[:CALLS]->(f:Function) WHERE f.name = '{escaped}' \
              RETURN caller.name, caller.file_path{limit}"
@@ -110,7 +111,10 @@ impl GraphBridge {
         Ok(table
             .rows
             .iter()
-            .filter_map(|row| row.get(1).and_then(|value| value.as_str().map(String::from)))
+            .filter_map(|row| {
+                row.get(1)
+                    .and_then(|value| value.as_str().map(String::from))
+            })
             .collect())
     }
 

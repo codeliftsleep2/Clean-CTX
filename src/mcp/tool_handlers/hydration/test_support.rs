@@ -17,9 +17,8 @@ use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
 /// Candidate paths injected per test thread in place of real CBM discovery.
-static TEST_HYDRATION_CANDIDATES: LazyLock<
-    Mutex<HashMap<std::thread::ThreadId, Vec<String>>>,
-> = LazyLock::new(|| Mutex::new(HashMap::new()));
+static TEST_HYDRATION_CANDIDATES: LazyLock<Mutex<HashMap<std::thread::ThreadId, Vec<String>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 pub(crate) fn set_test_hydration_candidates(paths: Vec<String>) {
     TEST_HYDRATION_CANDIDATES

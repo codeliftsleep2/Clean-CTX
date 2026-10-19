@@ -385,8 +385,7 @@ fn red19_still_indexing_project_with_queryable_graph_is_searched() {
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
     assert_eq!(
-        sc["discovery"]["discovered"],
-        2,
+        sc["discovery"]["discovered"], 2,
         "CBM advisory evidence and the filesystem fallback both report the shared candidate"
     );
     assert_eq!(sc["discovery"]["compiled"], 1);
@@ -424,8 +423,7 @@ fn red20_failed_readiness_with_queryable_graph_is_searched() {
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
     assert_eq!(
-        sc["discovery"]["discovered"],
-        2,
+        sc["discovery"]["discovered"], 2,
         "CBM advisory evidence and the filesystem fallback both report the shared candidate"
     );
     assert_eq!(sc["discovery"]["compiled"], 1);
@@ -580,4 +578,17 @@ fn workspace_query_schema_declares_sparse_discovery_diagnostics() {
         fields["projects"]["items"]["properties"]["status"]["enum"],
         serde_json::json!(["searched", "search_failed", "skipped"])
     );
+    let fallback_description = fields["fallback_reason"]["description"]
+        .as_str()
+        .expect("fallback_reason description");
+    for required_meaning in [
+        "authoritative coverage",
+        "responded successfully",
+        "does not by itself indicate a CBM failure",
+    ] {
+        assert!(
+            fallback_description.contains(required_meaning),
+            "fallback_reason description must explain '{required_meaning}'"
+        );
+    }
 }

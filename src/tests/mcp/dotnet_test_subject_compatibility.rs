@@ -8,8 +8,8 @@ const SOURCE: &str = "public class OrderService {} [TestClass] public class Orde
 fn declaration_proven_test_subjects_advance_only_dotnet_semantics() {
     assert_eq!(
         crate::dotnet_meta::SEMANTIC_PRODUCER_GENERATION,
-        2,
-        "removing durable candidate Tests edges and adding TestClass declarations changes semantics"
+        3,
+        "durable structured DbContext role registration changes .NET semantics"
     );
     assert_eq!(crate::dotnet_meta::MARKER_PRODUCER_GENERATION, 1);
 
@@ -25,7 +25,7 @@ fn declaration_proven_test_subjects_advance_only_dotnet_semantics() {
         SOURCE,
         Path::new("OrderServiceTests.cs"),
         &config,
-        &GenerationCatalog::current().with_generation(ProducerKey::DotNetSemantic, 1),
+        &GenerationCatalog::current().with_generation(ProducerKey::DotNetSemantic, 2),
     )
     .expect("prior .NET identity");
 

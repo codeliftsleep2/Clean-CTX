@@ -9,9 +9,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 #[cfg(all(test, feature = "rust"))]
-static TEST_BATCH_SUPERSESSION: std::sync::Mutex<
-    Option<(std::thread::ThreadId, String, String)>,
-> =
+static TEST_BATCH_SUPERSESSION: std::sync::Mutex<Option<(std::thread::ThreadId, String, String)>> =
     std::sync::Mutex::new(None);
 
 #[cfg(all(test, feature = "rust"))]

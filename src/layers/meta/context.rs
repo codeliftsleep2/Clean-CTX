@@ -9,6 +9,13 @@ use crate::meta_util::LexicalRegions;
 
 use super::MetaLayerOutput;
 
+/// Parser-owned first-base evidence for one structured class declaration.
+/// Framework layers may classify only the exact written forms they support.
+pub struct StructuredClassBase {
+    pub owner: String,
+    pub written: String,
+}
+
 /// Marker and semantic results produced by one applicable meta-layer.
 #[derive(Debug, Default)]
 pub struct MetaLayerEvaluation {
@@ -25,6 +32,8 @@ pub struct MetaLayerContext<'a> {
     pub paired_class_captures: &'a [(String, String)],
     /// Parser-owned declaration identifiers when a language provides them.
     pub structured_declarations: Option<&'a [(String, String)]>,
+    /// Parser-owned first class-base references when a language provides them.
+    pub structured_class_bases: Option<&'a [StructuredClassBase]>,
     pub fidelity: Fidelity,
     pub config: Option<&'a CleanCtxConfig>,
     pub lexical_regions: &'a LexicalRegions,
@@ -63,6 +72,7 @@ impl<'a> MetaLayerContext<'a> {
             class_captures,
             paired_class_captures,
             structured_declarations: None,
+            structured_class_bases: None,
             fidelity,
             config,
             lexical_regions,

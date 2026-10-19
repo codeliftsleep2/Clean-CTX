@@ -25,7 +25,7 @@
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 2;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 3;
 
 pub mod aspnet;
 pub mod automapper;
@@ -355,8 +355,23 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         let meta_config = context
             .config
             .and_then(|value| value.meta_layers.get("dotnet"));
-        let (block, semantic_edges) =
+        let (block, mut semantic_edges) =
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
+        if let Some(bases) = context.structured_class_bases {
+            semantic_edges.extend(semantic::structured_dbcontext_role_registrations(bases));
+            let roles = semantic::structured_dbcontext_role_names(bases);
+            for raw_class in context.class_captures {
+                let Some(name) = semantic::extract_class_name_from_class(raw_class) else {
+                    continue;
+                };
+                if roles.contains(name.as_str())
+                    && let Some(analysis) =
+                        efcore::analyze_authorized_efcore(raw_class, context.fidelity)
+                {
+                    semantic_edges.extend(analysis.semantic_edges);
+                }
+            }
+        }
         let output = block.map(|block| crate::layers::meta::MetaLayerOutput {
             layer_name: self.name(),
             rendered: block.render(),
@@ -379,8 +394,13 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .and_then(|value| value.meta_layers.get("dotnet"))
             .map(|value| value.enabled)
             .unwrap_or(true);
-        (enabled && detect::is_dotnet_file_with_regions(context.source, context.lexical_regions))
-            .then(|| self.evaluate_context(context))
+        let structured_role = context
+            .structured_class_bases
+            .is_some_and(semantic::has_structured_dbcontext_role);
+        (enabled
+            && (structured_role
+                || detect::is_dotnet_file_with_regions(context.source, context.lexical_regions)))
+        .then(|| self.evaluate_context(context))
     }
 }
 

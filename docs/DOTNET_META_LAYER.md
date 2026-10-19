@@ -68,6 +68,22 @@
 | `Φrel:` | Navigation | Navigation relationships |
 | `Φcfg:` | Fluent API | Configuration / `OnModelCreating` |
 
+### Durable EF Core DbContext role authority
+
+The durable semantic index separates framework role identity from relationship
+evidence. A C# class whose parser-captured first base is exactly
+`Microsoft.EntityFrameworkCore.DbContext` (including the supported `global::`
+form) registers a file-provenanced `dotnet / DbContext / <class>` occurrence.
+That occurrence exists even when no supported `DbSet<T>` or model-building
+relationship is present. It does not replace the source declaration identity,
+which remains `builtin / Class / <class>`, and it does not create a
+`HasEntity` relationship by itself.
+
+This first durable authority slice deliberately fails closed for unqualified
+imports, aliases, indirect inheritance, generic bases, ambiguous or shadowed
+names, and malformed declarations. Existing textual EF markers and relationship
+extractors do not broaden this role-classification authority.
+
 ### AutoMapper
 
 | Marker | Expansion | Description |

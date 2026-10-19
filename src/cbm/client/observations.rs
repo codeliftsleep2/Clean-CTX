@@ -122,10 +122,8 @@ impl CbmClient {
         project: &str,
         root: &Path,
     ) -> Result<ProviderIndexReadiness, CbmError> {
-        let response = self.call_tool(
-            "index_status",
-            json!({"project":project,"format":"json"}),
-        )?;
+        let response =
+            self.call_tool("index_status", json!({"project":project,"format":"json"}))?;
         let status = self.parse_cbm_response(&response)?;
         if status["project"] != project {
             return Err(CbmError::ParseError("serving project mismatch".into()));
@@ -163,9 +161,7 @@ impl CbmClient {
             Some(other) => Err(CbmError::ParseError(format!(
                 "unknown provider index status: {other}"
             ))),
-            None => Err(CbmError::ParseError(
-                "missing provider index status".into(),
-            )),
+            None => Err(CbmError::ParseError("missing provider index status".into())),
         }
     }
 

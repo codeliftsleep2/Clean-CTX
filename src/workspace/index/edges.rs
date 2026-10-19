@@ -221,9 +221,8 @@ impl WorkspaceIndex {
             let obj_key = entity_key(&edge.object);
 
             // Registration-record normalization (index write boundary):
-            // a self-referential `Defines` edge (subject identity == object
-            // identity) is an entity-registration carrier (e.g.
-            // BuiltinMetaLayer declaring an ordinary type), NOT a semantic
+            // a self-referential `Defines` record (subject identity == object
+            // identity) is an entity-registration carrier, NOT a semantic
             // relationship. It registers the entity once with file provenance
             // and never enters the relationship graph (edge_set / file_edges /
             // forward / reverse), so graph queries (`has_cycle`, forward and
@@ -233,7 +232,9 @@ impl WorkspaceIndex {
             // a detected cycle (tests::has_cycle_self_loop).
             if edge.relation == SemanticRelation::Defines && subj_key == obj_key {
                 self.register_entity(&subj_key, edge.subject.clone(), &mut file_entity_keys);
-                self.register_declaration(file_path, &subj_key, edge.subject);
+                if edge.layer != crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER {
+                    self.register_declaration(file_path, &subj_key, edge.subject);
+                }
                 continue;
             }
 

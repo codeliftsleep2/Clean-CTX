@@ -333,7 +333,10 @@ impl GraphBridge {
     #[cfg(test)]
     pub(crate) fn complete_provider_startup_and_start_additional_roots_for_test(&mut self) {
         let primary = self.project_str();
-        let mut states = self.indexing_state.lock().unwrap_or_else(|p| p.into_inner());
+        let mut states = self
+            .indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
         states.insert(primary.clone(), IndexingState::Complete);
         drop(states);
         self.start_indexing_roots_except(&primary);
@@ -374,8 +377,7 @@ impl GraphBridge {
             let readiness = match readiness {
                 Ok(readiness) => readiness,
                 Err(CbmError::ToolError { message, .. })
-                    if message.contains("project not found")
-                        || message.contains("not indexed") =>
+                    if message.contains("project not found") || message.contains("not indexed") =>
                 {
                     let elapsed = started_at.elapsed().as_secs();
                     if elapsed > 60 {
@@ -564,11 +566,9 @@ impl GraphBridge {
                         })
                     }
                 }
-                IndexingState::ProviderOwned { started_at } => {
-                    Ok(IndexingStatus::StillIndexing {
-                        elapsed_secs: started_at.elapsed().as_secs(),
-                    })
-                }
+                IndexingState::ProviderOwned { started_at } => Ok(IndexingStatus::StillIndexing {
+                    elapsed_secs: started_at.elapsed().as_secs(),
+                }),
                 IndexingState::Failed(msg) => Err(CbmError::LaunchError(msg.clone())),
                 IndexingState::NotStarted => Ok(IndexingStatus::StillIndexing { elapsed_secs: 0 }),
             };

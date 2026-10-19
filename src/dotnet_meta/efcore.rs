@@ -30,8 +30,6 @@ pub(crate) fn analyze_efcore(class_source: &str, fidelity: Fidelity) -> Option<E
     #[cfg(test)]
     super::efcore_analysis_metrics::record_analysis();
 
-    let mut lines = Vec::new();
-
     // Detect DbContext class
     let is_dbcontext = class_source.contains(": DbContext");
 
@@ -39,7 +37,18 @@ pub(crate) fn analyze_efcore(class_source: &str, fidelity: Fidelity) -> Option<E
         return None;
     }
 
-    // Extract class name
+    analyze_authorized_efcore(class_source, fidelity)
+}
+
+/// Extract relationships after a structured caller has independently proven
+/// that this exact class is an EF Core DbContext.
+pub(crate) fn analyze_authorized_efcore(
+    class_source: &str,
+    fidelity: Fidelity,
+) -> Option<EfCoreAnalysis> {
+    let mut lines = Vec::new();
+
+    // Extract class name after the caller's structured authorization.
     let class_name = extract_class_name(class_source)?;
 
     // Emit DbContext marker
