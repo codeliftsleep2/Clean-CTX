@@ -5,6 +5,9 @@
 
 use crate::compression::capture_pipeline::CapEntry;
 
+mod aliases;
+pub use aliases::{CSharpAliasContext, CSharpAliasDirective, resolve_alias_type_reference};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CSharpSourceSpan {
     pub start_byte: usize,
@@ -161,6 +164,13 @@ pub struct CSharpTypeIdentity {
 impl CSharpTypeIdentity {
     /// Declare a non-generic external identity known by the caller.
     pub fn known_external(qualified_name: impl Into<String>) -> Self {
+        Self::known_external_with_arity(qualified_name, 0)
+    }
+
+    pub fn known_external_with_arity(
+        qualified_name: impl Into<String>,
+        generic_arity: usize,
+    ) -> Self {
         let qualified_name = qualified_name.into();
         let mut segments = qualified_name
             .split('.')
@@ -172,7 +182,7 @@ impl CSharpTypeIdentity {
             namespace_path: segments,
             containing_type_path: Vec::new(),
             terminal_name,
-            generic_arity: 0,
+            generic_arity,
             origin: CSharpTypeIdentityOrigin::KnownExternal,
         }
     }
@@ -190,6 +200,8 @@ pub enum CSharpResolutionBasis {
     GlobalQualified,
     LexicalDeclaration,
     OrdinaryImport,
+    NamespaceAlias,
+    TypeAlias,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -201,6 +213,14 @@ pub enum CSharpResolutionReason {
     MalformedTypeReference,
     CompetingCandidates,
     UnknownImportContents,
+    DuplicateAlias,
+    AliasCycle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CSharpResolutionEvidence {
+    pub file: String,
+    pub span: CSharpSourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +228,7 @@ pub enum CSharpResolution<T> {
     Resolved {
         identity: T,
         basis: CSharpResolutionBasis,
+        evidence: Vec<CSharpResolutionEvidence>,
     },
     Ambiguous(CSharpResolutionReason),
     Unsupported(CSharpResolutionReason),
@@ -280,6 +301,7 @@ pub fn resolve_explicit_type_reference(
         return CSharpResolution::Resolved {
             identity: (*identity).clone(),
             basis,
+            evidence: Vec::new(),
         };
     }
     let Some(crate::ir::csharp_symbols::CSharpSymbolComposition::Resolved(symbol)) = source.first()
@@ -289,6 +311,7 @@ pub fn resolve_explicit_type_reference(
     CSharpResolution::Resolved {
         identity: source_identity(symbol),
         basis,
+        evidence: Vec::new(),
     }
 }
 
@@ -319,6 +342,7 @@ pub fn resolve_ordinary_import_type_reference(
             return CSharpResolution::Resolved {
                 identity,
                 basis: CSharpResolutionBasis::LexicalDeclaration,
+                evidence: Vec::new(),
             };
         }
     }
@@ -333,6 +357,7 @@ pub fn resolve_ordinary_import_type_reference(
             return CSharpResolution::Resolved {
                 identity,
                 basis: CSharpResolutionBasis::LexicalDeclaration,
+                evidence: Vec::new(),
             };
         }
     }
@@ -369,6 +394,7 @@ pub fn resolve_ordinary_import_type_reference(
     CSharpResolution::Resolved {
         identity,
         basis: CSharpResolutionBasis::OrdinaryImport,
+        evidence: Vec::new(),
     }
 }
 
