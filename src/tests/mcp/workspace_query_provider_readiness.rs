@@ -182,7 +182,7 @@ fn still_indexing_cbm_candidates_are_unioned_with_filesystem_fallback() {
 }
 
 #[test]
-fn ready_cbm_coverage_suppresses_unnecessary_filesystem_fallback() {
+fn ready_cbm_candidates_do_not_suppress_authoritative_filesystem_acquisition() {
     let _serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -218,15 +218,19 @@ fn ready_cbm_coverage_suppresses_unnecessary_filesystem_fallback() {
 
     assert_eq!(
         test_scan_calls(),
-        0,
-        "ready successful CBM coverage suppresses unnecessary filesystem fallback"
+        1,
+        "ready provider success is advisory and cannot satisfy the root"
     );
     assert!(
         report.is_complete(),
-        "ready CBM discovery and Clean publication complete"
+        "completed Clean acquisition authorizes completion"
     );
-    assert_eq!(report.discovery_provider, "cbm");
-    assert_eq!(report.candidates_discovered, 1);
+    assert_eq!(report.discovery_provider, "cbm_and_filesystem");
+    assert_eq!(report.candidates_discovered, 2);
     assert_eq!(report.candidates_compiled, 1);
-    assert_eq!(state.hydration_discovery_lock().completed_entries(), 1);
+    assert_eq!(
+        state.hydration_discovery_lock().completed_entries(),
+        2,
+        "provider search reuse and authoritative filesystem completion are separate scopes"
+    );
 }

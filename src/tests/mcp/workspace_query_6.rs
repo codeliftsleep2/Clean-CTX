@@ -156,7 +156,7 @@ fn red_f5_successful_empty_filesystem_discovery_is_truthful() {
 }
 
 #[test]
-fn red_f6_healthy_cbm_zero_is_distinct_from_filesystem_zero() {
+fn red_f6_healthy_cbm_zero_retains_authoritative_filesystem_acquisition() {
     let _serial = serial_guard();
     let root = tempfile::TempDir::new().unwrap();
     let state = state(&[]);
@@ -171,16 +171,13 @@ fn red_f6_healthy_cbm_zero_is_distinct_from_filesystem_zero() {
 
     let (_, report) = call(&state, "find_entities", "Absent", root.path());
 
-    assert_eq!(report.discovery_provider, "cbm");
-    assert!(
-        report.fallback_reason.is_none(),
-        "healthy CBM discovery engages no fallback, and its absence of a reason IS that fact"
-    );
+    assert_eq!(report.discovery_provider, "cbm_and_filesystem");
+    assert_eq!(report.fallback_reason, Some("cbm_scope_unavailable"));
     clear_test_project_search_results();
 }
 
 #[test]
-fn red_f7_healthy_cbm_does_not_run_filesystem_fallback() {
+fn red_f7_healthy_cbm_cannot_suppress_authoritative_filesystem_acquisition() {
     let _serial = serial_guard();
     let root = tempfile::TempDir::new().unwrap();
     std::fs::write(root.path().join("Hidden.ts"), "export class Hidden {}\n").unwrap();
@@ -199,9 +196,9 @@ fn red_f7_healthy_cbm_does_not_run_filesystem_fallback() {
 
     let (result, report) = call(&state, "find_entities", "Hidden", root.path());
 
-    assert_eq!(report.discovery_provider, "cbm");
-    assert_eq!(report.candidates_compiled, 0);
-    assert!(result.as_array().unwrap().is_empty());
+    assert_eq!(report.discovery_provider, "cbm_and_filesystem");
+    assert_eq!(report.candidates_compiled, 1);
+    assert_eq!(result.as_array().unwrap().len(), 1);
     clear_test_project_search_results();
 }
 

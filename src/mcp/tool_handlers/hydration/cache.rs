@@ -7,18 +7,17 @@
 // rediscovered the same candidates only to discard them as already current.
 //
 // These helpers are the only place hydration touches the session-scoped
-// discovery cache (`crate::mcp::discovery_cache`). They record *completion* of
-// discovery — never candidates and never query answers — and they hold the
-// cache lock only for the individual lookup/insert, never across CBM calls,
-// filesystem scans, source reads, or compilation.
+// discovery cache (`crate::mcp::discovery_cache`). Provider scopes record
+// reusable advisory search work; filesystem scopes record Clean-owned root
+// acquisition. Neither stores candidates or query answers, and provider scope
+// completion never satisfies a filesystem scope.
 
 use super::{HydrationRequirement, filesystem::root_key};
 use crate::mcp::McpState;
 use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use std::path::PathBuf;
 
-/// True when discovery for this scope/mode/name already completed in the
-/// scope's current generation.
+/// True when work for this exact provider scope/mode/name is current.
 pub(super) fn discovery_is_complete(
     state: &McpState,
     scope: &DiscoveryScope,
@@ -35,7 +34,7 @@ pub(super) fn discovery_is_complete(
     }
 }
 
-/// Record a successful discovery for one scope/mode/name.
+/// Record completed work for one exact provider scope/mode/name.
 pub(super) fn mark_discovery_complete(
     state: &McpState,
     scope: &DiscoveryScope,

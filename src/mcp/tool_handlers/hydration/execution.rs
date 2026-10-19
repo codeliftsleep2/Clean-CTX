@@ -1,7 +1,10 @@
 use super::cache::mark_discovery_complete;
 use super::filesystem::{configured_roots, root_key};
 use super::publication::{CandidatePublication, compile_candidates_for, select_candidates};
-use super::{HydrationReport, HydrationRequirement, discover_candidate_paths, discovery_kind};
+use super::{
+    HydrationAuthority, HydrationReport, HydrationRequirement, discover_candidate_paths,
+    discovery_kind,
+};
 use crate::mcp::McpState;
 use crate::mcp::acquisition::{
     AcquisitionOutcome, AcquisitionTarget, ProofBarrier, SemanticPublicationStatus,
@@ -36,7 +39,7 @@ pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index_for(
         query_name,
         workspace_root,
         requirement,
-        None,
+        HydrationAuthority::CleanAuthoritative,
     )
 }
 
@@ -53,7 +56,7 @@ pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index_for_acquisition(
         query_name,
         workspace_root,
         requirement,
-        Some(target),
+        HydrationAuthority::ProofBacked(target),
     )
 }
 
@@ -63,10 +66,9 @@ fn hydrate_workspace_index_for_target(
     query_name: &str,
     workspace_root: Option<&str>,
     requirement: HydrationRequirement,
-    target: Option<AcquisitionTarget>,
+    authority: HydrationAuthority,
 ) -> Result<HydrationReport, String> {
-    let requires_provider_neutral_proof = target.is_some();
-    let cache_key = target.as_ref().map(|target| {
+    let cache_key = authority.proof_target().map(|target| {
         let roots = configured_roots(state, workspace_root)
             .iter()
             .map(|root| root_key(root))
@@ -87,9 +89,9 @@ fn hydrate_workspace_index_for_target(
         query_name,
         workspace_root,
         requirement,
-        requires_provider_neutral_proof,
+        &authority,
     );
-    let provisional = target.and_then(|target| {
+    let provisional = authority.proof_target().cloned().and_then(|target| {
         super::acquisition::prepare_clean_type_ref_acquisition(
             target,
             &outcome.inventories,
@@ -113,7 +115,11 @@ fn hydrate_workspace_index_for_target(
         }
     }
     if !publication_failed && !candidate_processing_failed {
-        for scope in &outcome.completions {
+        for scope in outcome
+            .provider_completions
+            .iter()
+            .chain(&outcome.root_completions)
+        {
             mark_discovery_complete(state, scope, discovery, query_name, requirement);
         }
     }

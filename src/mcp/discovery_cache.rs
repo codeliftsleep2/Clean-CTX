@@ -37,12 +37,11 @@ use std::collections::HashMap;
 
 /// Which provider completed a discovery unit.
 ///
-/// A CBM project search and a filesystem scan are different discovery
-/// operations with different (provider-specific) candidate sets, so a result
-/// completed by one provider never satisfies the other. Keeping the provider
-/// in the scope identity prevents, for example, a CBM-discovered project from
-/// suppressing the filesystem fallback scan that the same root would otherwise
-/// receive when CBM is unavailable.
+/// A CBM project search and a filesystem scan are different operations. A CBM
+/// entry records reusable advisory search work only; a filesystem entry records
+/// completed Clean-owned root acquisition. Keeping the provider in the scope
+/// identity prevents advisory completion from satisfying or suppressing the
+/// authoritative filesystem scope.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum DiscoveryProvider {
     /// One CBM project (`search_in_project` / `inbound_reference_paths_in_project`).
@@ -154,9 +153,9 @@ impl HydrationDiscoveryCache {
             .is_some_and(|completed_at| *completed_at == self.generation(scope))
     }
 
-    /// Record a *successful* discovery (including a successful discovery that
-    /// found zero candidates). Failed or partial discovery must never be
-    /// recorded: it stays eligible for retry on the next request.
+    /// Record completed work for this exact provider scope. For CBM this means
+    /// only that advisory search need not repeat; it is never root satisfaction.
+    /// Failed or partial work remains eligible for retry.
     pub(crate) fn mark_complete(
         &mut self,
         scope: &DiscoveryScope,

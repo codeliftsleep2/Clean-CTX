@@ -162,16 +162,16 @@ fn red_h1_repeated_identical_query_does_not_repeat_discovery() {
 
     let first = call_query(&state, "reverse_edges", "ServiceA", root.path());
     assert_eq!(calls_for(&slug), 1, "first call must discover");
-    assert_eq!(first["discovery"]["discovered"], 1);
-    assert_eq!(first["discovery"]["compiled"], 1);
+    assert_eq!(first["discovery"]["discovered"], 3);
+    assert_eq!(first["discovery"]["compiled"], 2);
     assert_eq!(
         first["count"], 1,
         "the live WorkspaceIndex answers the query"
     );
     assert_eq!(
         state.hydration_discovery_lock().completed_entries(),
-        1,
-        "exactly one discovery target is recorded"
+        2,
+        "provider search reuse and Clean root acquisition are recorded separately"
     );
 
     let second = call_query(&state, "reverse_edges", "ServiceA", root.path());
@@ -180,10 +180,9 @@ fn red_h1_repeated_identical_query_does_not_repeat_discovery() {
         1,
         "an unchanged session must not re-run discovery for the same target"
     );
-    assert!(
-        second.get("discovery").is_none(),
-        "a cached repeat discovers nothing and completes as expected, so it reports nothing: {second:?}"
-    );
+    assert!(second["discovery"]["discovered"].is_null());
+    assert!(second["discovery"]["compiled"].is_null());
+    assert_eq!(second["discovery"]["provider"], "cbm_and_filesystem");
     assert_eq!(
         second["count"], 1,
         "the WorkspaceIndex query itself still executes"
@@ -246,10 +245,9 @@ fn red_h3_successful_zero_result_discovery_is_cached() {
 
     let first = call_query(&state, "reverse_edges", "AbsentService", root.path());
     assert_eq!(calls_for(&slug), 1);
-    assert!(
-        first.get("discovery").is_none(),
-        "a completed CBM pass with zero candidates and a healthy project reports nothing: {first:?}"
-    );
+    assert!(first["discovery"]["discovered"].is_null());
+    assert!(first["discovery"]["compiled"].is_null());
+    assert_eq!(first["discovery"]["provider"], "cbm_and_filesystem");
 
     let _ = call_query(&state, "reverse_edges", "AbsentService", root.path());
     assert_eq!(
@@ -497,13 +495,11 @@ fn red_h8_declaration_oriented_queries_share_one_discovery_entry() {
     let third = call_query(&state, "transitive_dependencies", "ServiceA", root.path());
 
     assert_eq!(
-        first["discovery"]["discovered"], 1,
-        "the shared declaration discovery is performed and reported once: {first:?}"
+        first["discovery"]["discovered"], 2,
+        "provider and Clean discovery are both reported on the first call: {first:?}"
     );
-    assert!(
-        second.get("discovery").is_none() && third.get("discovery").is_none(),
-        "the second and third call reuse the same discovery and report nothing: {second:?} / {third:?}"
-    );
+    assert!(second["discovery"]["discovered"].is_null());
+    assert!(third["discovery"]["discovered"].is_null());
     assert_eq!(
         discovery_calls(),
         vec![(slug.clone(), TestDiscoveryKind::Declaration)],
@@ -512,8 +508,8 @@ fn red_h8_declaration_oriented_queries_share_one_discovery_entry() {
     );
     assert_eq!(
         state.hydration_discovery_lock().completed_entries(),
-        1,
-        "one target + one discovery mode = one cache entry"
+        2,
+        "one provider scope and one Clean root scope are cached"
     );
 
     clear_test_project_search_results();

@@ -12,7 +12,6 @@ use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
 #[cfg(all(test, feature = "rust"))]
 use serde_json::Value;
-use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 mod cache;
@@ -86,6 +85,27 @@ pub(super) enum HydrationRequirement {
     Semantic(crate::workspace::index::SemanticFidelity),
 }
 
+/// The authority obligation attached to one hydration request.
+///
+/// Provider discovery is advisory under both variants. `ProofBacked` enables
+/// the existing exact-TypeRef coverage contract after Clean inventory and
+/// publication; `CleanAuthoritative` requires the filesystem-owned acquisition
+/// path because no selective proof contract exists for that query family.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(super) enum HydrationAuthority {
+    CleanAuthoritative,
+    ProofBacked(crate::mcp::acquisition::AcquisitionTarget),
+}
+
+impl HydrationAuthority {
+    pub(super) fn proof_target(&self) -> Option<&crate::mcp::acquisition::AcquisitionTarget> {
+        match self {
+            Self::CleanAuthoritative => None,
+            Self::ProofBacked(target) => Some(target),
+        }
+    }
+}
+
 /// The complete result of one hydration discovery/compile cycle.
 ///
 /// This is the INTERNAL record: it deliberately keeps the full provider,
@@ -135,8 +155,12 @@ struct DiscoveryOutcome {
     status: &'static str,
     attempted: bool,
     fallback_reason: Option<&'static str>,
-    /// Successful discoveries awaiting semantic-publication commit.
-    completions: Vec<DiscoveryScope>,
+    /// Advisory provider searches awaiting candidate-publication commit. These
+    /// scopes may skip the same provider search later, but never satisfy a root.
+    provider_completions: Vec<DiscoveryScope>,
+    /// Clean filesystem acquisitions awaiting semantic-publication commit.
+    /// Only these scopes may satisfy the root-selection boundary.
+    root_completions: Vec<DiscoveryScope>,
     inventories: Vec<RootInventoryManifest>,
 }
 
@@ -170,7 +194,7 @@ fn discover_candidate_paths(
     query_name: &str,
     workspace_root: Option<&str>,
     requirement: HydrationRequirement,
-    requires_provider_neutral_proof: bool,
+    authority: &HydrationAuthority,
 ) -> DiscoveryOutcome {
     #[cfg(all(test, feature = "rust"))]
     {
@@ -183,7 +207,8 @@ fn discover_candidate_paths(
                     status: "completed",
                     attempted: true,
                     fallback_reason: None,
-                    completions: Vec::new(),
+                    provider_completions: Vec::new(),
+                    root_completions: Vec::new(),
                     inventories: Vec::new(),
                 };
             }
@@ -207,13 +232,12 @@ fn discover_candidate_paths(
     let projects = bridge.configured_projects();
     let mut candidates = Vec::new();
     let mut coverage = Vec::new();
-    let mut successful_roots = HashSet::new();
     let mut fallback_roots = Vec::new();
     let mut cbm_attempted = false;
     let mut saw_unavailable = false;
     let mut saw_search_failure = false;
     let mut saw_search_success = false;
-    let mut completions = Vec::new();
+    let mut provider_completions = Vec::new();
 
     for configured_root in &state.config.additional_roots {
         let resolved = bridge.resolve_project_id(configured_root);
@@ -232,17 +256,15 @@ fn discover_candidate_paths(
         let scope = DiscoveryScope::cbm(root_key(&root));
         // Discovery completion gate (see `crate::mcp::discovery_cache`).
         //
-        // A successful discovery for this project/mode/name is not repeated
-        // while the project's discovery generation is unchanged: every
-        // candidate it found was compiled into the WorkspaceIndex by the
-        // hydration that completed it, so this generation is already hydrated
-        // for this target. Skipping here also skips `ensure_indexed_for` — the
-        // only in-session producer of CBM dirty state is `apply_edit`, which
-        // invalidates this scope, and every other CBM consumer resolves its
-        // own indexing gate.
+        // A successful provider search for this project/mode/name is not
+        // repeated while the project's discovery generation is unchanged.
+        // This cache entry reuses only advisory candidates; it never satisfies
+        // the Clean-owned filesystem scope below. Skipping here also skips
+        // `ensure_indexed_for` -- the only in-session producer of CBM dirty
+        // state is `apply_edit`, which invalidates this scope.
         if discovery_is_complete(state, &scope, discovery, query_name, requirement) {
             cbm_attempted = true;
-            successful_roots.insert(root_key(&root));
+            saw_search_success = true;
             coverage.push(ProjectCoverage {
                 project,
                 status: "searched",
@@ -277,15 +299,8 @@ fn discover_candidate_paths(
                 Ok(nodes) => {
                     append_project_paths(&mut candidates, &root, nodes);
                     saw_search_success = true;
-                    // Exact incoming-TypeRef acquisition requires a
-                    // provider-neutral proof. Legacy reverse discovery keeps
-                    // its established ready-provider completion contract.
-                    if readiness == "ready"
-                        && (discovery != DiscoveryMode::InboundReference
-                            || !requires_provider_neutral_proof)
-                    {
-                        successful_roots.insert(root_key(&root));
-                        completions.push(scope);
+                    if readiness == "ready" {
+                        provider_completions.push(scope);
                     }
                     coverage.push(ProjectCoverage {
                         project,
@@ -337,15 +352,8 @@ fn discover_candidate_paths(
             Ok(paths) => {
                 append_rooted_paths(&mut candidates, &root, paths);
                 saw_search_success = true;
-                // Exact incoming-TypeRef acquisition requires a
-                // provider-neutral proof. Legacy reverse discovery keeps its
-                // established ready-provider completion contract.
-                if readiness == "ready"
-                    && (discovery != DiscoveryMode::InboundReference
-                        || !requires_provider_neutral_proof)
-                {
-                    successful_roots.insert(root_key(&root));
-                    completions.push(scope);
+                if readiness == "ready" {
+                    provider_completions.push(scope);
                 }
                 coverage.push(ProjectCoverage {
                     project,
@@ -368,9 +376,12 @@ fn discover_candidate_paths(
     }
     drop(bridge_guard);
 
-    for root in filesystem_roots {
-        if !successful_roots.contains(&root_key(&root)) {
-            fallback_roots.push(root);
+    // Provider candidates are additive hints. Root satisfaction comes only
+    // from a compatible proof or Clean-owned acquisition, so every configured
+    // root remains in the fallback set until its filesystem scope is current.
+    match authority {
+        HydrationAuthority::CleanAuthoritative | HydrationAuthority::ProofBacked(_) => {
+            fallback_roots.extend(filesystem_roots);
         }
     }
     deduplicate_roots(&mut fallback_roots);
@@ -401,7 +412,8 @@ fn discover_candidate_paths(
                 status: "completed",
                 attempted: cbm_attempted,
                 fallback_reason: None,
-                completions,
+                provider_completions,
+                root_completions: Vec::new(),
                 inventories: Vec::new(),
             };
         }
@@ -420,15 +432,18 @@ fn discover_candidate_paths(
             status: "completed",
             attempted: true,
             fallback_reason: Some(fallback_reason),
-            completions,
+            provider_completions,
+            root_completions: Vec::new(),
             inventories: Vec::new(),
         };
     }
 
     let scan = scan(state, &pending_roots, query_name);
-    if scan.completed {
-        completions.extend(discovery_scopes_for_roots(&pending_roots));
-    }
+    let root_completions = if scan.completed {
+        discovery_scopes_for_roots(&pending_roots)
+    } else {
+        Vec::new()
+    };
     candidates.extend(scan.candidates);
     let any_cbm_success = saw_search_success;
     let attempted = cbm_attempted || scan.attempted || cached_roots > 0;
@@ -448,7 +463,8 @@ fn discover_candidate_paths(
         status: discovery_status(attempted, completed, any_cbm_success),
         attempted,
         fallback_reason: Some(fallback_reason),
-        completions,
+        provider_completions,
+        root_completions,
         inventories,
     }
 }
@@ -474,7 +490,8 @@ fn filesystem_only_discovery(
                 status: "failed",
                 attempted: false,
                 fallback_reason: Some("filesystem_unavailable"),
-                completions: Vec::new(),
+                provider_completions: Vec::new(),
+                root_completions: Vec::new(),
                 inventories: Vec::new(),
             };
         }
@@ -488,12 +505,13 @@ fn filesystem_only_discovery(
             status: "completed",
             attempted: true,
             fallback_reason: Some(fallback_reason),
-            completions: Vec::new(),
+            provider_completions: Vec::new(),
+            root_completions: Vec::new(),
             inventories: Vec::new(),
         };
     }
     let scan = scan(state, &pending_roots, query_name);
-    let completions = if scan.completed {
+    let root_completions = if scan.completed {
         discovery_scopes_for_roots(&pending_roots)
     } else {
         Vec::new()
@@ -511,7 +529,8 @@ fn filesystem_only_discovery(
         } else {
             "filesystem_unavailable"
         }),
-        completions,
+        provider_completions: Vec::new(),
+        root_completions,
         inventories: scan.inventories,
     }
 }

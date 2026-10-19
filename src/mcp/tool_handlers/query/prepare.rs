@@ -4,7 +4,7 @@ use super::outcome::{QueryAnswer, QueryFailure, QueryResult};
 use crate::mcp::McpState;
 use crate::mcp::acquisition::AcquisitionTarget;
 use crate::mcp::tool_handlers::hydration::{
-    HydrationReport, HydrationRequirement, hydrate_workspace_index_for,
+    HydrationAuthority, HydrationReport, HydrationRequirement, hydrate_workspace_index_for,
     hydrate_workspace_index_for_acquisition,
 };
 use crate::workspace::index::WorkspaceIndex;
@@ -61,7 +61,7 @@ struct HydrationKey {
     inbound: bool,
     name: String,
     requirement: HydrationRequirement,
-    acquisition_target: Option<AcquisitionTarget>,
+    authority: HydrationAuthority,
 }
 
 /// Shared, request-local preparation state. It is deliberately neither stored
@@ -140,7 +140,14 @@ impl PreparationContext {
         workspace_root: Option<&str>,
         requirement: HydrationRequirement,
     ) -> Result<HydrationReport, QueryFailure> {
-        self.hydrate_keyed(state, query_type, name, workspace_root, requirement, None)
+        self.hydrate_keyed(
+            state,
+            query_type,
+            name,
+            workspace_root,
+            requirement,
+            HydrationAuthority::CleanAuthoritative,
+        )
     }
 
     pub(super) fn hydrate_incoming_type_ref(
@@ -157,7 +164,7 @@ impl PreparationContext {
             name,
             workspace_root,
             requirement,
-            Some(target),
+            HydrationAuthority::ProofBacked(target),
         )
     }
 
@@ -168,26 +175,26 @@ impl PreparationContext {
         name: &str,
         workspace_root: Option<&str>,
         requirement: HydrationRequirement,
-        acquisition_target: Option<AcquisitionTarget>,
+        authority: HydrationAuthority,
     ) -> Result<HydrationReport, QueryFailure> {
         let key = HydrationKey {
             inbound: query_type == "reverse_edges",
             name: name.to_string(),
             requirement,
-            acquisition_target: acquisition_target.clone(),
+            authority: authority.clone(),
         };
         if let Some(result) = self.hydration.get(&key) {
             return result.clone().map_err(QueryFailure::internal);
         }
-        let result = match acquisition_target {
-            Some(target) => hydrate_workspace_index_for_acquisition(
+        let result = match authority {
+            HydrationAuthority::ProofBacked(target) => hydrate_workspace_index_for_acquisition(
                 state,
                 name,
                 workspace_root,
                 requirement,
                 target,
             ),
-            None => {
+            HydrationAuthority::CleanAuthoritative => {
                 hydrate_workspace_index_for(state, query_type, name, workspace_root, requirement)
             }
         };

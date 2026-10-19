@@ -301,6 +301,16 @@ mod tests_provider_readiness;
 #[path = "../../tests/mcp/workspace_query_reverse_edge_completeness.rs"]
 mod tests_reverse_edge_completeness;
 
+#[cfg(all(
+    test,
+    feature = "rust",
+    feature = "csharp",
+    feature = "typescript",
+    feature = "angular"
+))]
+#[path = "../../tests/mcp/workspace_query_provider_equivalence.rs"]
+mod tests_provider_equivalence;
+
 #[cfg(all(test, feature = "rust", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_warm_state_authority.rs"]
 mod tests_warm_state_authority;
