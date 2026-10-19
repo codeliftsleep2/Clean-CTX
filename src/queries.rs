@@ -146,6 +146,9 @@ pub const CS_SEMANTIC_QUERY: &str = r#"
         (base_list
             (primary_constructor_base_type
                 type: (_) @csharp.base_type)))
+    ; Attribute identity remains neutral. The R0 collector separates the
+    ; written name from any argument payload without assigning framework meaning.
+    (attribute) @csharp.attribute
 "#;
 
 pub const CS_CALL_QUERY: &str = r#"

@@ -28,6 +28,8 @@ pub(crate) mod compiler_methods;
 pub mod control_full;
 #[cfg(feature = "csharp")]
 pub(crate) mod csharp_exact_calls;
+#[cfg(feature = "csharp")]
+pub mod csharp_resolution;
 pub mod delta;
 pub mod focus;
 pub mod hierarchical;

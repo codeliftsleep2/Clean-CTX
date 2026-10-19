@@ -95,6 +95,9 @@ pub struct IRCompiler {
     pub(crate) invocation_evidence: Option<InvocationEvidenceSet>,
     #[cfg(feature = "csharp")]
     csharp_declaration_authority: Option<Vec<crate::ir::csharp_exact_calls::Declaration>>,
+    /// Framework-neutral syntax facts captured by the most recent C# compile.
+    #[cfg(feature = "csharp")]
+    pub csharp_syntax_facts: crate::ir::csharp_resolution::CSharpSyntaxFacts,
 }
 
 impl IRCompiler {
@@ -109,6 +112,8 @@ impl IRCompiler {
             invocation_evidence: None,
             #[cfg(feature = "csharp")]
             csharp_declaration_authority: None,
+            #[cfg(feature = "csharp")]
+            csharp_syntax_facts: crate::ir::csharp_resolution::CSharpSyntaxFacts::default(),
         }
     }
 
@@ -240,6 +245,10 @@ impl IRCompiler {
         self.invocation_evidence = None;
         self.semantic_edges.clear();
         self.semantic_dependencies.clear();
+        #[cfg(feature = "csharp")]
+        {
+            self.csharp_syntax_facts = crate::ir::csharp_resolution::CSharpSyntaxFacts::default();
+        }
 
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
@@ -295,6 +304,8 @@ impl IRCompiler {
         // captures without changing or duplicating the v0.9.1 Class path.
         #[cfg(feature = "csharp")]
         if ctx.query_string == crate::queries::CS_QUERY {
+            self.csharp_syntax_facts =
+                crate::ir::csharp_resolution::collect_syntax_facts(&ctx.captures);
             self.semantic_edges.extend(
                 crate::ir::semantic_projection::project_csharp_struct_record_base_types(
                     &ctx.captures,
@@ -347,3 +358,7 @@ impl Default for IRCompiler {
 #[cfg(test)]
 #[path = "../tests/ir/compiler.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "csharp"))]
+#[path = "../tests/ir/csharp_semantic_resolution_r0.rs"]
+mod tests_csharp_semantic_resolution_r0;
