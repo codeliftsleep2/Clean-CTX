@@ -216,49 +216,151 @@ pub fn resolve_known_external_type(
     written: &str,
     known_external: &[CSharpTypeIdentity],
 ) -> CSharpResolution<CSharpTypeIdentity> {
-    let written = written.trim();
-    if written.is_empty() {
-        return CSharpResolution::Unsupported(CSharpResolutionReason::MalformedTypeReference);
-    }
+    resolve_explicit_type_reference(
+        written,
+        known_external,
+        &crate::ir::csharp_symbols::CSharpSourceSymbolIndex::default(),
+    )
+}
 
-    let (qualified_name, basis) = if let Some(qualified) = written.strip_prefix("global::") {
+/// Resolve an explicitly qualified C# type reference against neutral external
+/// identities and the admitted-source symbol index.
+pub fn resolve_explicit_type_reference(
+    written: &str,
+    known_external: &[CSharpTypeIdentity],
+    source_symbols: &crate::ir::csharp_symbols::CSharpSourceSymbolIndex,
+) -> CSharpResolution<CSharpTypeIdentity> {
+    let written = written.trim();
+    let (written, basis) = if let Some(qualified) = written.strip_prefix("global::") {
         (qualified, CSharpResolutionBasis::GlobalQualified)
     } else if written.contains("::") {
         return CSharpResolution::Unsupported(
             CSharpResolutionReason::UnsupportedAliasQualifiedName,
         );
-    } else if !written.contains('.') {
-        return CSharpResolution::Unsupported(CSharpResolutionReason::UnsupportedSimpleName);
     } else {
         (written, CSharpResolutionBasis::ExplicitQualified)
     };
-
-    if !is_qualified_identifier(qualified_name) {
+    let Some((path, generic_arity)) = parse_explicit_type_path(written) else {
         return CSharpResolution::Unsupported(CSharpResolutionReason::MalformedTypeReference);
+    };
+    if path.len() < 2 {
+        return CSharpResolution::Unsupported(CSharpResolutionReason::UnsupportedSimpleName);
     }
 
-    let mut candidates = known_external
+    let qualified_name = path.join(".");
+    let external = known_external
         .iter()
-        .filter(|identity| identity.qualified_name == qualified_name);
-    let Some(identity) = candidates.next() else {
-        return CSharpResolution::Unresolved(CSharpResolutionReason::MissingAuthority);
-    };
-    if candidates.next().is_some() {
+        .filter(|identity| {
+            identity.qualified_name == qualified_name && identity.generic_arity == generic_arity
+        })
+        .collect::<Vec<_>>();
+    let source = source_symbols.matching_qualified_path(&path, generic_arity);
+    if external.len() + source.len() > 1
+        || source.iter().any(|composition| {
+            matches!(
+                composition,
+                crate::ir::csharp_symbols::CSharpSymbolComposition::Ambiguous(_)
+            )
+        })
+    {
         return CSharpResolution::Ambiguous(CSharpResolutionReason::CompetingCandidates);
     }
-
+    if let Some(identity) = external.first() {
+        return CSharpResolution::Resolved {
+            identity: (*identity).clone(),
+            basis,
+        };
+    }
+    let Some(crate::ir::csharp_symbols::CSharpSymbolComposition::Resolved(symbol)) = source.first()
+    else {
+        return CSharpResolution::Unresolved(CSharpResolutionReason::MissingAuthority);
+    };
     CSharpResolution::Resolved {
-        identity: identity.clone(),
+        identity: CSharpTypeIdentity {
+            qualified_name,
+            namespace_path: symbol.key.namespace_path.clone(),
+            containing_type_path: symbol.key.containing_type_path.clone(),
+            terminal_name: symbol.key.name.clone(),
+            generic_arity: symbol.key.generic_arity,
+            origin: CSharpTypeIdentityOrigin::AdmittedSource,
+        },
         basis,
     }
 }
 
-fn is_qualified_identifier(name: &str) -> bool {
-    let mut segments = name.split('.');
-    let Some(first) = segments.next() else {
-        return false;
+fn parse_explicit_type_path(written: &str) -> Option<(Vec<String>, usize)> {
+    let mut segments = Vec::new();
+    let mut start = 0;
+    let mut depth = 0usize;
+    for (index, character) in written.char_indices() {
+        match character {
+            '<' => depth = depth.checked_add(1)?,
+            '>' => depth = depth.checked_sub(1)?,
+            '.' if depth == 0 => {
+                segments.push(&written[start..index]);
+                start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if depth != 0 {
+        return None;
+    }
+    segments.push(&written[start..]);
+
+    let terminal = segments.pop()?;
+    let (terminal_name, generic_arity) = parse_named_segment(terminal)?;
+    let mut path = segments
+        .into_iter()
+        .map(parse_non_generic_segment)
+        .collect::<Option<Vec<_>>>()?;
+    path.push(terminal_name);
+    Some((path, generic_arity))
+}
+
+fn parse_non_generic_segment(segment: &str) -> Option<String> {
+    (!segment.contains('<') && !segment.contains('>') && is_identifier(segment))
+        .then(|| segment.to_string())
+}
+
+fn parse_named_segment(segment: &str) -> Option<(String, usize)> {
+    let Some(open) = segment.find('<') else {
+        return is_identifier(segment).then(|| (segment.to_string(), 0));
     };
-    is_identifier(first) && segments.all(is_identifier) && name.contains('.')
+    if !segment.ends_with('>') {
+        return None;
+    }
+    let name = &segment[..open];
+    if !is_identifier(name) {
+        return None;
+    }
+    let arguments = &segment[open + 1..segment.len() - 1];
+    let arity = generic_argument_count(arguments)?;
+    Some((name.to_string(), arity))
+}
+
+fn generic_argument_count(arguments: &str) -> Option<usize> {
+    if arguments.trim().is_empty() {
+        return None;
+    }
+    let mut depth = 0usize;
+    let mut arity = 1usize;
+    let mut argument_start = 0usize;
+    for (index, character) in arguments.char_indices() {
+        match character {
+            '<' => depth = depth.checked_add(1)?,
+            '>' => depth = depth.checked_sub(1)?,
+            ',' if depth == 0 => {
+                if arguments[argument_start..index].trim().is_empty() {
+                    return None;
+                }
+                arity += 1;
+                argument_start = index + character.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    (depth == 0 && !arguments[argument_start..].trim().is_empty()).then_some(arity)
 }
 
 fn is_identifier(segment: &str) -> bool {
@@ -269,3 +371,7 @@ fn is_identifier(segment: &str) -> bool {
         .is_some_and(|first| first == '_' || first.is_alphabetic())
         && chars.all(|character| character == '_' || character.is_alphanumeric())
 }
+
+#[cfg(test)]
+#[path = "../tests/ir/csharp_direct_resolution_r2.rs"]
+mod tests_r2;

@@ -3,7 +3,7 @@
 use super::csharp_resolution::{CSharpDeclarationKind, CSharpSourceSpan};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CSharpSymbolKey {
     pub namespace_path: Vec<String>,
     pub containing_type_path: Vec<String>,
@@ -45,6 +45,7 @@ pub enum CSharpSymbolComposition {
 #[derive(Debug, Default)]
 pub struct CSharpSourceSymbolIndex {
     symbols: HashMap<CSharpSymbolKey, CSharpSymbolComposition>,
+    qualified_candidates: HashMap<(Vec<String>, usize), Vec<CSharpSymbolKey>>,
 }
 
 impl CSharpSourceSymbolIndex {
@@ -55,7 +56,7 @@ impl CSharpSourceSymbolIndex {
             grouped.entry(part.key.clone()).or_default().push(part);
         }
 
-        let symbols = grouped
+        let symbols: HashMap<CSharpSymbolKey, CSharpSymbolComposition> = grouped
             .into_iter()
             .map(|(key, mut parts)| {
                 parts.sort_by(|left, right| {
@@ -69,7 +70,24 @@ impl CSharpSourceSymbolIndex {
                 (key, composition)
             })
             .collect();
-        Self { symbols }
+        let mut qualified_candidates: HashMap<(Vec<String>, usize), Vec<CSharpSymbolKey>> =
+            HashMap::new();
+        for key in symbols.keys() {
+            let mut path = key.namespace_path.clone();
+            path.extend(key.containing_type_path.iter().cloned());
+            path.push(key.name.clone());
+            qualified_candidates
+                .entry((path, key.generic_arity))
+                .or_default()
+                .push(key.clone());
+        }
+        for candidates in qualified_candidates.values_mut() {
+            candidates.sort();
+        }
+        Self {
+            symbols,
+            qualified_candidates,
+        }
     }
 
     pub fn get(&self, key: &CSharpSymbolKey) -> Option<&CSharpSymbolComposition> {
@@ -82,6 +100,19 @@ impl CSharpSourceSymbolIndex {
 
     pub fn is_empty(&self) -> bool {
         self.symbols.is_empty()
+    }
+
+    pub(crate) fn matching_qualified_path(
+        &self,
+        path: &[String],
+        generic_arity: usize,
+    ) -> Vec<&CSharpSymbolComposition> {
+        self.qualified_candidates
+            .get(&(path.to_vec(), generic_arity))
+            .into_iter()
+            .flatten()
+            .filter_map(|key| self.symbols.get(key))
+            .collect()
     }
 }
 
