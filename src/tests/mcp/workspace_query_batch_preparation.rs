@@ -1,14 +1,14 @@
 //! RED preparation/snapshot regressions for heterogeneous workspace batches.
 
-use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::GraphBridge;
+use crate::cbm::bridge::cbm_project_slug;
 use crate::mcp::tool_handlers::hydration::{
-    clear_test_project_search_results, discovery_calls, set_test_inbound_project_search_results,
-    set_test_project_readiness, set_test_project_search_results, TestDiscoveryKind,
-    TestProjectReadiness,
+    TestDiscoveryKind, TestProjectReadiness, clear_test_project_search_results, discovery_calls,
+    set_test_inbound_project_search_results, set_test_project_readiness,
+    set_test_project_search_results,
 };
 use crate::mcp::tools::dispatch_tools_call;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -114,12 +114,16 @@ fn red_batch_runs_distinct_names_and_discovery_modes_independently() {
 
     assert_eq!(results(&response).len(), 3, "{response}");
     assert_eq!(calls.len(), 2, "distinct preparation keys: {calls:?}");
-    assert!(calls
-        .iter()
-        .any(|(_, kind)| *kind == TestDiscoveryKind::Declaration));
-    assert!(calls
-        .iter()
-        .any(|(_, kind)| *kind == TestDiscoveryKind::InboundReference));
+    assert!(
+        calls
+            .iter()
+            .any(|(_, kind)| *kind == TestDiscoveryKind::Declaration)
+    );
+    assert!(
+        calls
+            .iter()
+            .any(|(_, kind)| *kind == TestDiscoveryKind::InboundReference)
+    );
 }
 
 #[test]

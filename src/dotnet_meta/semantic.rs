@@ -17,6 +17,8 @@ const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
 const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
 const ASPNET_CONTROLLER: &str = "Microsoft.AspNetCore.Mvc.Controller";
 const ASPNET_CONTROLLER_BASE: &str = "Microsoft.AspNetCore.Mvc.ControllerBase";
+const MSTEST_TEST_CLASS_ATTRIBUTE: &str =
+    "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute";
 
 pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
 {
@@ -27,7 +29,47 @@ pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external_with_arity(SIGNALR_HUB, 1),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER_BASE),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
+            MSTEST_TEST_CLASS_ATTRIBUTE,
+        ),
     ]
+}
+
+pub(crate) fn project_resolved_mstest_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+) -> Vec<SemanticEdge> {
+    classes
+        .iter()
+        .filter(|class| class.files.first().is_some_and(|owner| owner == file))
+        .filter(|class| is_resolved_mstest_test_class(class))
+        .map(|class| {
+            let mut entity = EntityRef::new("dotnet", "TestClass", &class.owner);
+            entity.file = Some(file.to_string());
+            SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "dotnet",
+                call_evidence: None,
+            }
+        })
+        .collect()
+}
+
+fn is_resolved_mstest_test_class(
+    class: &crate::ir::csharp_resolution::CSharpResolvedClass,
+) -> bool {
+    class.attributes.iter().any(|attribute| {
+        matches!(
+            &attribute.resolution,
+            crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+                if identity.qualified_name == MSTEST_TEST_CLASS_ATTRIBUTE
+                    && identity.generic_arity == 0
+                    && identity.origin
+                        == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+        )
+    })
 }
 
 pub(crate) fn is_resolved_dbcontext(
@@ -297,6 +339,7 @@ pub(crate) fn has_resolved_dotnet_role(
             || is_resolved_automapper_profile(class)
             || is_resolved_signalr_hub(class)
             || is_resolved_aspnet_controller(class)
+            || is_resolved_mstest_test_class(class)
     })
 }
 
@@ -443,3 +486,7 @@ mod tests_r8;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/aspnet_resolution_r9.rs"]
 mod tests_r9;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/mstest_attribute_resolution_r10.rs"]
+mod tests_r10;

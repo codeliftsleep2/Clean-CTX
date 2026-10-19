@@ -7,6 +7,8 @@ use crate::compression::capture_pipeline::CapEntry;
 
 mod aliases;
 pub use aliases::{CSharpAliasContext, CSharpAliasDirective, resolve_alias_type_reference};
+mod attributes;
+pub use attributes::resolve_attribute_type_reference;
 mod ancestry;
 pub use ancestry::{CSharpInheritanceArc, CSharpInheritanceGraph, resolve_type_ancestry};
 mod compilation;

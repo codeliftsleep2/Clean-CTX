@@ -1,5 +1,5 @@
 use crate::layers::meta::semantic::SemanticRelation;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::Path;
 
 fn state() -> crate::mcp::McpState {

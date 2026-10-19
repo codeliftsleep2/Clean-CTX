@@ -3,6 +3,13 @@
 use super::*;
 
 fn write(root: &tempfile::TempDir, file: &str, source: &str) {
+    let source = if source.contains("[TestClass]")
+        && !source.contains("Microsoft.VisualStudio.TestTools.UnitTesting")
+    {
+        format!("using Microsoft.VisualStudio.TestTools.UnitTesting;\n{source}")
+    } else {
+        source.to_string()
+    };
     std::fs::write(root.path().join(file), source).unwrap();
 }
 

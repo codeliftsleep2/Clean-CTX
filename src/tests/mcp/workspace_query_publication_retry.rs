@@ -3,9 +3,9 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
+    HydrationRequirement, TEST_PROJECT_HYDRATION_SERIALIZE, TestDiscoveryKind,
     clear_test_project_search_results, discovery_calls, fail_test_publication_once,
-    hydrate_workspace_index_for, set_test_project_search_results, HydrationRequirement,
-    TestDiscoveryKind, TEST_PROJECT_HYDRATION_SERIALIZE,
+    hydrate_workspace_index_for, set_test_project_search_results,
 };
 use crate::workspace::index::SemanticFidelity;
 use std::collections::HashMap;

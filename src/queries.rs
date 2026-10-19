@@ -156,6 +156,11 @@ pub const CS_SEMANTIC_QUERY: &str = r#"
     ; Attribute identity remains neutral. The R0 collector separates the
     ; written name from any argument payload without assigning framework meaning.
     (attribute) @csharp.attribute
+    ; Declaration attributes are captured separately so resolution can attach
+    ; them to their owning class without confusing method/property attributes.
+    (class_declaration
+        (attribute_list
+            (attribute) @csharp.class_attribute))
 "#;
 
 pub const CS_CALL_QUERY: &str = r#"

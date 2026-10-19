@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    clear_test_project_search_results, discovery_calls, set_test_inbound_project_search_results,
-    set_test_project_search_results, TestDiscoveryKind, TestProjectSearchResult,
+    TestDiscoveryKind, TestProjectSearchResult, clear_test_project_search_results, discovery_calls,
+    set_test_inbound_project_search_results, set_test_project_search_results,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -183,10 +183,12 @@ fn red24_compiled_declaration_is_not_sufficient_for_reverse_edges() {
         &service_path,
         Some(&root.path().to_string_lossy()),
     ));
-    assert!(state
-        .workspace_index_read()
-        .reverse_edges_by_identity("angular", "Service", "ServiceA")
-        .is_empty());
+    assert!(
+        state
+            .workspace_index_read()
+            .reverse_edges_by_identity("angular", "Service", "ServiceA")
+            .is_empty()
+    );
     let slug = project_slug(root.path());
     configure_results(
         vec![(slug.clone(), Ok(vec![node("ServiceA.ts")]))],

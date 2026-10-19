@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    clear_test_project_search_results, searched_projects, set_test_project_readiness,
-    set_test_project_search_results, TestProjectReadiness, TestProjectSearchResult,
+    TestProjectReadiness, TestProjectSearchResult, clear_test_project_search_results,
+    searched_projects, set_test_project_readiness, set_test_project_search_results,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -149,9 +149,11 @@ fn red15_additional_root_only_discovery() {
     assert_both_projects_searched(&primary_slug, &additional_slug);
     assert_eq!(sc["discovery"]["discovered"], 2);
     assert_eq!(sc["discovery"]["compiled"], 1);
-    assert!(entities
-        .iter()
-        .any(|entity| { entity["entity_type"] == "Class" && entity["name"] == "AdditionalOnly" }));
+    assert!(
+        entities.iter().any(|entity| {
+            entity["entity_type"] == "Class" && entity["name"] == "AdditionalOnly"
+        })
+    );
     clear_test_project_search_results();
 }
 

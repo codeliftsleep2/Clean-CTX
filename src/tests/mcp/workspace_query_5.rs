@@ -3,8 +3,8 @@
 use crate::cbm::bridge::cbm_project_slug;
 use crate::cbm::{GraphBridge, GraphNode};
 use crate::mcp::tool_handlers::hydration::{
-    clear_test_project_search_results, set_test_inbound_project_search_results,
-    set_test_project_search_results, TestProjectSearchResult,
+    TestProjectSearchResult, clear_test_project_search_results,
+    set_test_inbound_project_search_results, set_test_project_search_results,
 };
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

@@ -25,7 +25,7 @@
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 4;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 5;
 
 pub mod aspnet;
 pub mod automapper;
@@ -229,10 +229,6 @@ fn evaluate_applicable_source(
         if testing_enabled && let Some(result) = testing::extract_testing(raw_class, fidelity) {
             block.lines.extend(result.lines);
         }
-
-        if testing_enabled && let Some(edge) = testing::extract_testing_declaration(raw_class) {
-            semantic_edges.push(edge);
-        }
     }
 
     ((!block.is_empty()).then_some(block), semantic_edges)
@@ -308,7 +304,7 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         _source: &str,
         class_captures: &[String],
         fidelity: crate::compression::Fidelity,
-        config: Option<&crate::config::CleanCtxConfig>,
+        _config: Option<&crate::config::CleanCtxConfig>,
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::SemanticEdge;
         let mut edges: Vec<SemanticEdge> = Vec::new();
@@ -320,17 +316,6 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                 edges.extend(crate::dotnet_meta::semantic::extract_dotnet_semantic_edges(
                     raw_class, &name, fidelity,
                 ));
-            }
-
-            let testing_enabled = config
-                .and_then(|value| value.meta_layers.get("dotnet"))
-                .map(|value| value.testing.enabled)
-                .unwrap_or(true);
-            if testing_enabled
-                && let Some(edge) =
-                    crate::dotnet_meta::testing::extract_testing_declaration(raw_class)
-            {
-                edges.push(edge);
             }
         }
 
@@ -350,13 +335,18 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         let (block, mut semantic_edges) =
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
         semantic_edges.retain(|edge| {
-            !(edge.subject.domain == "dotnet"
-                && edge.subject.entity_type == "Controller"
-                && matches!(
+            if edge.subject.domain != "dotnet" {
+                return true;
+            }
+            match edge.subject.entity_type {
+                "Controller" => !matches!(
                     edge.relation,
                     crate::layers::meta::semantic::SemanticRelation::HasRoute
                         | crate::layers::meta::semantic::SemanticRelation::ControllerAction
-                ))
+                ),
+                "TestClass" => false,
+                _ => true,
+            }
         });
         if let Some(classes) = context.csharp_resolved_classes {
             semantic_edges.extend(semantic::resolved_dbcontext_role_registrations(classes));
@@ -382,6 +372,12 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                     file,
                     context.fidelity,
                 ));
+                if meta_config
+                    .map(|value| value.testing.enabled)
+                    .unwrap_or(true)
+                {
+                    semantic_edges.extend(semantic::project_resolved_mstest_edges(classes, file));
+                }
             }
             let roles = semantic::resolved_dbcontext_role_names(classes);
             for raw_class in context.class_captures {

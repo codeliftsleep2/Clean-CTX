@@ -331,6 +331,10 @@ mod tests_signalr_r8;
 #[path = "../../tests/mcp/workspace_query_aspnet_r9.rs"]
 mod tests_aspnet_r9;
 
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_mstest_r10.rs"]
+mod tests_mstest_r10;
+
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
 mod tests_legacy_edit_adequacy;

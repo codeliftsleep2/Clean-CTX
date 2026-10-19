@@ -34,6 +34,7 @@ pub(crate) struct SemanticCompilationArtifact {
     semantic_edges: Vec<SemanticEdge>,
     semantic_dependencies: Vec<SemanticDependency>,
     invocation_evidence: Option<InvocationEvidenceSet>,
+    dotnet_testing_enabled: bool,
     #[cfg(feature = "csharp")]
     csharp: Option<CSharpSemanticArtifact>,
 }
@@ -56,6 +57,11 @@ impl SemanticCompilationArtifact {
         let semantic_edges = std::mem::take(&mut compiler.semantic_edges);
         let semantic_dependencies = std::mem::take(&mut compiler.semantic_dependencies);
         let invocation_evidence = compiler.invocation_evidence.take();
+        let dotnet_testing_enabled = config
+            .meta_layers
+            .get("dotnet")
+            .map(|layer| layer.testing.enabled)
+            .unwrap_or(true);
         #[cfg(feature = "csharp")]
         let csharp = (extension == "cs").then(|| CSharpSemanticArtifact {
             declarations: crate::ir::csharp_exact_calls::declaration_authority(
@@ -78,6 +84,7 @@ impl SemanticCompilationArtifact {
             semantic_edges,
             semantic_dependencies,
             invocation_evidence,
+            dotnet_testing_enabled,
             #[cfg(feature = "csharp")]
             csharp,
         })
@@ -98,6 +105,7 @@ impl SemanticCompilationArtifact {
             semantic_edges,
             semantic_dependencies,
             invocation_evidence,
+            dotnet_testing_enabled,
             #[cfg(feature = "csharp")]
             csharp,
         } = self;
@@ -119,6 +127,7 @@ impl SemanticCompilationArtifact {
             source_snapshot,
         ));
         drop(invocation_evidence);
+        let _ = dotnet_testing_enabled;
         #[cfg(feature = "csharp")]
         if let Some(CSharpSemanticArtifact {
             declarations,
@@ -240,29 +249,34 @@ impl SemanticCompilationArtifact {
     ) -> Result<Vec<SemanticEdge>, String> {
         let mut edges = self.project_exact_csharp_calls(authority)?;
         edges.retain(|edge| {
-            !(edge.subject.domain == "dotnet"
-                && ((edge.subject.entity_type == "DbContext"
-                    && matches!(
-                        edge.relation,
-                        crate::layers::meta::semantic::SemanticRelation::Defines
-                            | crate::layers::meta::semantic::SemanticRelation::HasEntity
-                    ))
-                    || (edge.subject.entity_type == "MapperProfile"
-                        && matches!(
-                            edge.relation,
-                            crate::layers::meta::semantic::SemanticRelation::MapsFrom
-                                | crate::layers::meta::semantic::SemanticRelation::MapsTo
-                        ))
-                    || (edge.subject.entity_type == "Hub"
-                        && edge.relation
-                            == crate::layers::meta::semantic::SemanticRelation::HubMethodTargets)
-                    || (edge.subject.entity_type == "Controller"
-                        && matches!(
-                            edge.relation,
-                            crate::layers::meta::semantic::SemanticRelation::Defines
-                                | crate::layers::meta::semantic::SemanticRelation::HasRoute
-                                | crate::layers::meta::semantic::SemanticRelation::ControllerAction
-                        ))))
+            if edge.subject.domain != "dotnet" {
+                return true;
+            }
+            let generation_owned = match edge.subject.entity_type {
+                "DbContext" => matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::Defines
+                        | crate::layers::meta::semantic::SemanticRelation::HasEntity
+                ),
+                "MapperProfile" => matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::MapsFrom
+                        | crate::layers::meta::semantic::SemanticRelation::MapsTo
+                ),
+                "Hub" => {
+                    edge.relation
+                        == crate::layers::meta::semantic::SemanticRelation::HubMethodTargets
+                }
+                "Controller" => matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::Defines
+                        | crate::layers::meta::semantic::SemanticRelation::HasRoute
+                        | crate::layers::meta::semantic::SemanticRelation::ControllerAction
+                ),
+                "TestClass" => true,
+                _ => false,
+            };
+            !generation_owned
         });
         edges.extend(
             crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
@@ -296,6 +310,12 @@ impl SemanticCompilationArtifact {
                 self.fidelity(),
             ),
         );
+        if self.dotnet_testing_enabled {
+            edges.extend(crate::dotnet_meta::semantic::project_resolved_mstest_edges(
+                resolved_classes,
+                self.canonical_owner(),
+            ));
+        }
         Ok(edges)
     }
 

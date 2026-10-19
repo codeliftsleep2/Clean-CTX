@@ -3,11 +3,14 @@
 use super::{
     CSharpAliasContext, CSharpAliasDirective, CSharpInheritanceArc, CSharpInheritanceGraph,
     CSharpOrdinaryImportContext, CSharpResolution, CSharpResolutionEvidence, CSharpSourceSpan,
-    CSharpTypeIdentity, resolve_alias_type_reference, resolve_explicit_type_reference,
-    resolve_ordinary_import_type_reference, resolve_type_ancestry, source_identity,
+    CSharpTypeIdentity, resolve_alias_type_reference, resolve_attribute_type_reference,
+    resolve_explicit_type_reference, resolve_ordinary_import_type_reference, resolve_type_ancestry,
+    source_identity,
 };
 use crate::compression::capture_pipeline::CapEntry;
-use crate::ir::csharp_symbols::{CSharpDeclarationPart, CSharpSourceSymbolIndex, CSharpSymbolKey};
+use crate::ir::csharp_symbols::{
+    CSharpDeclarationPart, CSharpSourceSymbol, CSharpSourceSymbolIndex, CSharpSymbolKey,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CSharpResolvedClass {
@@ -15,7 +18,16 @@ pub(crate) struct CSharpResolvedClass {
     pub files: Vec<String>,
     pub raw_parts: Vec<(String, String)>,
     pub method_ids: Vec<(String, Vec<String>)>,
+    pub attributes: Vec<CSharpResolvedAttribute>,
     pub ancestry: CSharpResolution<CSharpTypeIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CSharpResolvedAttribute {
+    pub written: String,
+    pub file: String,
+    pub span: CSharpSourceSpan,
+    pub resolution: CSharpResolution<CSharpTypeIdentity>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -29,6 +41,13 @@ struct ClassInput {
     scope: Scope,
     raw_class: String,
     method_ids: Vec<String>,
+    attributes: Vec<AttributeInput>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AttributeInput {
+    written: String,
+    span: CSharpSourceSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -130,9 +149,68 @@ pub(crate) fn resolve_compilation_units(
                         .map(|input| (part.file.clone(), input.method_ids.clone()))
                 })
                 .collect(),
+            attributes: resolved_attributes(symbol, units, known_external, &index),
             ancestry: resolve_type_ancestry(&source_identity(symbol), &graph),
         })
         .collect()
+}
+
+fn resolved_attributes(
+    symbol: &CSharpSourceSymbol,
+    units: &[CSharpCompilationUnit],
+    known_external: &[CSharpTypeIdentity],
+    index: &CSharpSourceSymbolIndex,
+) -> Vec<CSharpResolvedAttribute> {
+    let mut resolved = Vec::new();
+    for part in &symbol.parts {
+        let Some(input) = units
+            .iter()
+            .flat_map(|unit| &unit.classes)
+            .find(|input| input.part.file == part.file && input.part.span == part.span)
+        else {
+            continue;
+        };
+        for attribute in &input.attributes {
+            resolved.push(CSharpResolvedAttribute {
+                written: attribute.written.clone(),
+                file: part.file.clone(),
+                span: attribute.span,
+                resolution: with_attribute_evidence(
+                    resolve_attribute_type_reference(
+                        &attribute.written,
+                        &CSharpOrdinaryImportContext {
+                            namespace_path: input.scope.namespace_path.clone(),
+                            containing_type_path: input.scope.containing_type_path.clone(),
+                            ordinary_imports: input.scope.ordinary_imports.clone(),
+                        },
+                        &input.scope.aliases,
+                        known_external,
+                        index,
+                    ),
+                    &part.file,
+                    attribute.span,
+                ),
+            });
+        }
+    }
+    resolved
+}
+
+fn with_attribute_evidence(
+    mut resolution: CSharpResolution<CSharpTypeIdentity>,
+    file: &str,
+    span: CSharpSourceSpan,
+) -> CSharpResolution<CSharpTypeIdentity> {
+    if let CSharpResolution::Resolved { evidence, .. } = &mut resolution {
+        evidence.insert(
+            0,
+            CSharpResolutionEvidence {
+                file: file.to_string(),
+                span,
+            },
+        );
+    }
+    resolution
 }
 
 fn resolve_direct_base(
@@ -237,6 +315,34 @@ fn class_inputs(
                 part,
                 raw_class: owner.raw_text.clone(),
                 method_ids,
+                attributes: direct_class_attributes(captures, owner),
+            })
+        })
+        .collect()
+}
+
+fn direct_class_attributes(captures: &[CapEntry], owner: &CapEntry) -> Vec<AttributeInput> {
+    captures
+        .iter()
+        .filter(|capture| capture.name == "csharp.class_attribute" && contains(owner, capture))
+        .filter(|capture| {
+            !captures.iter().any(|nested| {
+                nested.name == "class.root"
+                    && nested.start_byte > owner.start_byte
+                    && nested.end_byte < owner.end_byte
+                    && contains(nested, capture)
+            })
+        })
+        .filter_map(|capture| {
+            let written = capture
+                .raw_text
+                .trim()
+                .split_once('(')
+                .map_or(capture.raw_text.trim(), |(name, _)| name)
+                .trim();
+            (!written.is_empty()).then(|| AttributeInput {
+                written: written.to_string(),
+                span: span(capture),
             })
         })
         .collect()

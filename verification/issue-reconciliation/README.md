@@ -1,5 +1,33 @@
 # Native issue reconciliation over live MCP
 
+## C# semantic resolution R10 attribute foundation and MSTest migration
+
+`Invoke-CSharpR10Acceptance.ps1` drives a current production binary over MCP
+stdio. It verifies MSTest `TestClassAttribute` identity through suffix-elided,
+explicit-suffix, fully qualified, `global::`, namespace-alias, type-alias, and
+cross-file partial forms. Local shadows, competing imports, and unsupported
+unimported simple names must fail closed. Every positive case proves both the
+durable `dotnet/TestClass` identity and its exact `Tests` relationship.
+
+Separate fresh processes exercise direct, unrelated-query-first,
+subject-declaration-first, exact-TypeRef-first, and warm histories. The harness
+also verifies alias retarget/restoration/deletion, the testing opt-out while
+preserving neutral C# truth, partial-part removal/restoration, cross-root
+subject/test resolution, and optional-provider independence against a plausible
+but incomplete ready-provider snapshot. Discovery and coverage
+diagnostics are retained but excluded from semantic equality because some
+families legitimately remain lower bounds.
+
+The harness builds nothing and retains fixtures, RPC frames, stderr, binary and
+provider hashes, and verdicts under `target/csharp-r10-live-verification/`. It
+is operator/live evidence, not a Rust test or CI gate.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-CSharpR10Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA/Programs/codebase-memory-mcp/codebase-memory-mcp.exe"
+```
+
 ## C# semantic resolution R9 ASP.NET base convergence
 
 `Invoke-CSharpR9Acceptance.ps1` drives a current production binary over MCP

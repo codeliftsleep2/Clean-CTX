@@ -7,7 +7,6 @@
 use std::collections::BTreeSet;
 
 use crate::compression::Fidelity;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 use super::MetaBlock;
 use super::markers::{
@@ -51,29 +50,10 @@ enum ConstructedSubject {
     Ambiguous,
 }
 
-/// Publish the source-proven TestClass declaration without manufacturing a SUT.
-pub(crate) fn extract_testing_declaration(class_source: &str) -> Option<SemanticEdge> {
-    if !is_test_class_declaration(class_source) {
-        return None;
-    }
-    let class_name = extract_class_name_from_class(class_source)?;
-    let entity = EntityRef::new("dotnet", "TestClass", class_name);
-    Some(SemanticEdge {
-        relation: SemanticRelation::Defines,
-        subject: entity.clone(),
-        object: entity,
-        layer: "dotnet",
-        call_evidence: None,
-    })
-}
-
 /// Collect candidate evidence. Exact declaration authority is joined later.
 pub(crate) fn extract_testing_subject_candidate(
     class_source: &str,
 ) -> Option<TestSubjectCandidate> {
-    if !is_test_class_declaration(class_source) {
-        return None;
-    }
     let class_name = extract_class_name_from_class(class_source)?;
     let constructed = infer_constructed_sut(class_source, &class_name);
     let naming_candidate = (!class_name.ends_with("IntegrationTests")
@@ -124,35 +104,6 @@ fn collect_test_candidates(
     for child in node.named_children(&mut cursor) {
         collect_test_candidates(child, source, candidates);
     }
-}
-
-fn is_test_class_declaration(source: &str) -> bool {
-    let Some(language) = crate::compression::language::safe_csharp_language() else {
-        return false;
-    };
-    let mut parser = tree_sitter::Parser::new();
-    if parser.set_language(&language).is_err() {
-        return false;
-    }
-    let Some(tree) = parser.parse(source, None) else {
-        return false;
-    };
-    first_class_has_attribute(tree.root_node(), source.as_bytes(), "TestClass")
-}
-
-fn first_class_has_attribute(node: tree_sitter::Node<'_>, source: &[u8], name: &str) -> bool {
-    if node.kind() == "class_declaration" {
-        let mut cursor = node.walk();
-        return node.named_children(&mut cursor).any(|child| {
-            child.kind() == "attribute_list"
-                && child
-                    .utf8_text(source)
-                    .is_ok_and(|attributes| has_attribute(attributes, name))
-        });
-    }
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
-        .any(|child| first_class_has_attribute(child, source, name))
 }
 
 fn has_attribute(source: &str, name: &str) -> bool {

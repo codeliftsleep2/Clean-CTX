@@ -131,11 +131,12 @@ fn candidate_precedence_and_ambiguity_are_source_local() {
     let layer = DotNetMetaLayer::new();
     let named =
         layer.extract_semantic_edges(TEST_CLASS, &[TEST_CLASS.to_string()], Fidelity::Low, None);
-    let declaration = named
-        .iter()
-        .find(|edge| edge.relation == SemanticRelation::Defines)
-        .expect("TestClass declaration");
-    assert_eq!(declaration.subject.name, "AccountsControllerTests");
+    assert!(
+        named.iter().all(|edge| {
+            edge.relation != SemanticRelation::Defines || edge.subject.entity_type != "TestClass"
+        }),
+        "the text-only MetaLayer API cannot publish resolved attribute identity"
+    );
     let candidate = crate::dotnet_meta::testing::extract_testing_subject_candidate(TEST_CLASS)
         .expect("candidate");
     assert_eq!(candidate.subject, "AccountsController");
@@ -184,7 +185,7 @@ fn production_pipeline_publishes_testclass_declaration_without_tests_edge() {
     let source = r#"
 public class AccountsController { }
 
-[TestClass]
+[Microsoft.VisualStudio.TestTools.UnitTesting.TestClass]
 public class AccountsControllerTests
 {
     [TestMethod]
