@@ -30,6 +30,8 @@ pub mod control_full;
 pub(crate) mod csharp_exact_calls;
 #[cfg(feature = "csharp")]
 pub mod csharp_resolution;
+#[cfg(feature = "csharp")]
+pub mod csharp_symbols;
 pub mod delta;
 pub mod focus;
 pub mod hierarchical;
