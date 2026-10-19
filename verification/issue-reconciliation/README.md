@@ -1,5 +1,34 @@
 # Native issue reconciliation over live MCP
 
+## Issue #148 provider-state and history-independence matrix
+
+`Invoke-Issue148Acceptance.ps1` drives the production binary over MCP stdio
+against an independently specified, two-root Angular/C# fixture. With the real
+provider it deliberately indexes staged snapshots, then completes the
+filesystem fixture without reindexing CBM. This produces ready-empty,
+ready-partial, plausible-but-incomplete, and useful provider views over
+equivalent final source. Every provider view is verified through registered
+`graph_search` before the semantic queries run.
+
+For each provider view, fresh Clean-CTX sessions exercise Angular-first,
+C#-first, unrelated-query-first, related-declaration-first, exact-TypeRef-first,
+and warm-repeat histories. The independent oracle requires identical semantic
+identities, edge/occurrence sets, cardinality, attribution, framework roles,
+and forward/reverse relationships while allowing discovery diagnostics, work,
+latency, and lower-bound coverage details to differ. Provider-disabled and
+provider-unavailable controls are included.
+
+The harness builds nothing. Requests, responses, stderr, binary/provider
+hashes, timings, staged-provider observations, fixture oracles, and verdicts
+are retained under `target/issue-148-live-verification/`. This is operator/live
+evidence, not a Rust test or CI gate.
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue148Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"
+```
+
 This read-only investigation harness exercises current #133/#134/#136–#140
 acceptance probes against a current all-feature Clean-CTX binary. It creates
 owned C#/TypeScript sources and a small controlled Git history under target/.

@@ -161,6 +161,24 @@ R7 remains blocked until the #148 focused gate and separate R6 reverification ar
 - Runtime compilation, formatting, Clippy, and behavior remain unverified until the operator runs the focused commands.
 - Unsupported semantic families still report lower-bound coverage; this repair prevents optional provider state from unnecessarily shrinking that lower bound but does not invent exact proof.
 - Clean scanning is newly required on provider-ready legacy paths. Existing currentness checks bound recompilation, but operator work-count evidence must confirm the intended cold/warm behavior.
+- The tracked live matrix is authored but not yet run. It deliberately stages
+  real-provider empty, partial, plausible-but-incomplete, and useful snapshots
+  over equivalent final two-root source, then checks six fresh/warm query
+  histories across Angular inbound, C# declarations/occurrences, and exact
+  TypeRef acquisition. Until it passes, production stdio/provider integration
+  remains operator-unverified.
+
+### Live MCP matrix awaiting operator authorization
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue148Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"
+```
+
+The harness builds nothing and stores all generated evidence under
+`target/issue-148-live-verification/`. Its PASS is live operator evidence, not
+a Rust test or CI result.
 
 ## 23. Final verdict
 
@@ -208,3 +226,4 @@ COMMANDS-AWAITING-OPERATOR-AUTHORIZATION:
 5. `cargo test --all-features red_f7_healthy_cbm_cannot_suppress_authoritative_filesystem_acquisition`
 6. `cargo test --all-features red_h`
 7. `cargo clippy --all-targets --all-features -- -D warnings`
+8. `pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue148Acceptance.ps1 -BinaryPath ./target/debug/clean-ctx.exe -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"`
