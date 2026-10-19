@@ -1,7 +1,7 @@
 //! Admitted-source C# symbol identity and partial declaration composition.
 
 use super::csharp_resolution::{CSharpDeclarationKind, CSharpSourceSpan};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct CSharpSymbolKey {
@@ -46,6 +46,7 @@ pub enum CSharpSymbolComposition {
 pub struct CSharpSourceSymbolIndex {
     symbols: HashMap<CSharpSymbolKey, CSharpSymbolComposition>,
     qualified_candidates: HashMap<(Vec<String>, usize), Vec<CSharpSymbolKey>>,
+    known_namespaces: HashSet<Vec<String>>,
 }
 
 impl CSharpSourceSymbolIndex {
@@ -72,7 +73,9 @@ impl CSharpSourceSymbolIndex {
             .collect();
         let mut qualified_candidates: HashMap<(Vec<String>, usize), Vec<CSharpSymbolKey>> =
             HashMap::new();
+        let mut known_namespaces = HashSet::new();
         for key in symbols.keys() {
+            known_namespaces.insert(key.namespace_path.clone());
             let mut path = key.namespace_path.clone();
             path.extend(key.containing_type_path.iter().cloned());
             path.push(key.name.clone());
@@ -87,6 +90,7 @@ impl CSharpSourceSymbolIndex {
         Self {
             symbols,
             qualified_candidates,
+            known_namespaces,
         }
     }
 
@@ -113,6 +117,10 @@ impl CSharpSourceSymbolIndex {
             .flatten()
             .filter_map(|key| self.symbols.get(key))
             .collect()
+    }
+
+    pub(crate) fn knows_namespace(&self, namespace_path: &[String]) -> bool {
+        self.known_namespaces.contains(namespace_path)
     }
 }
 

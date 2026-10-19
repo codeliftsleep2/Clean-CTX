@@ -188,6 +188,8 @@ pub enum CSharpTypeIdentityOrigin {
 pub enum CSharpResolutionBasis {
     ExplicitQualified,
     GlobalQualified,
+    LexicalDeclaration,
+    OrdinaryImport,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -195,8 +197,10 @@ pub enum CSharpResolutionReason {
     MissingAuthority,
     UnsupportedSimpleName,
     UnsupportedAliasQualifiedName,
+    UnsupportedQualifiedName,
     MalformedTypeReference,
     CompetingCandidates,
+    UnknownImportContents,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -208,6 +212,13 @@ pub enum CSharpResolution<T> {
     Ambiguous(CSharpResolutionReason),
     Unsupported(CSharpResolutionReason),
     Unresolved(CSharpResolutionReason),
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CSharpOrdinaryImportContext {
+    pub namespace_path: Vec<String>,
+    pub containing_type_path: Vec<String>,
+    pub ordinary_imports: Vec<Vec<String>>,
 }
 
 /// Resolve one written C# type reference against caller-supplied neutral
@@ -276,15 +287,154 @@ pub fn resolve_explicit_type_reference(
         return CSharpResolution::Unresolved(CSharpResolutionReason::MissingAuthority);
     };
     CSharpResolution::Resolved {
-        identity: CSharpTypeIdentity {
-            qualified_name,
-            namespace_path: symbol.key.namespace_path.clone(),
-            containing_type_path: symbol.key.containing_type_path.clone(),
-            terminal_name: symbol.key.name.clone(),
-            generic_arity: symbol.key.generic_arity,
-            origin: CSharpTypeIdentityOrigin::AdmittedSource,
-        },
+        identity: source_identity(symbol),
         basis,
+    }
+}
+
+/// Resolve one simple C# type reference under ordinary-import rules.
+pub fn resolve_ordinary_import_type_reference(
+    written: &str,
+    context: &CSharpOrdinaryImportContext,
+    known_external: &[CSharpTypeIdentity],
+    source_symbols: &crate::ir::csharp_symbols::CSharpSourceSymbolIndex,
+) -> CSharpResolution<CSharpTypeIdentity> {
+    let written = written.trim();
+    if written.contains('.') || written.contains("::") {
+        return CSharpResolution::Unsupported(CSharpResolutionReason::UnsupportedQualifiedName);
+    }
+    let Some((name, generic_arity)) = parse_named_segment(written) else {
+        return CSharpResolution::Unsupported(CSharpResolutionReason::MalformedTypeReference);
+    };
+
+    for depth in (0..=context.containing_type_path.len()).rev() {
+        let mut path = context.namespace_path.clone();
+        path.extend(context.containing_type_path[..depth].iter().cloned());
+        path.push(name.clone());
+        let candidates = candidates_for_path(&path, generic_arity, known_external, source_symbols);
+        if candidates.ambiguous {
+            return CSharpResolution::Ambiguous(CSharpResolutionReason::CompetingCandidates);
+        }
+        if let Some(identity) = candidates.unique() {
+            return CSharpResolution::Resolved {
+                identity,
+                basis: CSharpResolutionBasis::LexicalDeclaration,
+            };
+        }
+    }
+    for depth in (0..context.namespace_path.len()).rev() {
+        let mut path = context.namespace_path[..depth].to_vec();
+        path.push(name.clone());
+        let candidates = candidates_for_path(&path, generic_arity, known_external, source_symbols);
+        if candidates.ambiguous {
+            return CSharpResolution::Ambiguous(CSharpResolutionReason::CompetingCandidates);
+        }
+        if let Some(identity) = candidates.unique() {
+            return CSharpResolution::Resolved {
+                identity,
+                basis: CSharpResolutionBasis::LexicalDeclaration,
+            };
+        }
+    }
+
+    let mut imported = Vec::new();
+    let mut ambiguous = false;
+    let mut unknown_import = false;
+    for import in &context.ordinary_imports {
+        let external_namespace_known = known_external
+            .iter()
+            .any(|identity| identity.namespace_path == *import);
+        if !external_namespace_known && !source_symbols.knows_namespace(import) {
+            unknown_import = true;
+        }
+        let mut path = import.clone();
+        path.push(name.clone());
+        let candidates = candidates_for_path(&path, generic_arity, known_external, source_symbols);
+        ambiguous |= candidates.ambiguous;
+        imported.extend(candidates.identities);
+    }
+    if ambiguous || imported.len() > 1 {
+        return CSharpResolution::Ambiguous(CSharpResolutionReason::CompetingCandidates);
+    }
+    if unknown_import {
+        return if imported.is_empty() {
+            CSharpResolution::Unresolved(CSharpResolutionReason::UnknownImportContents)
+        } else {
+            CSharpResolution::Ambiguous(CSharpResolutionReason::UnknownImportContents)
+        };
+    }
+    let Some(identity) = imported.pop() else {
+        return CSharpResolution::Unresolved(CSharpResolutionReason::MissingAuthority);
+    };
+    CSharpResolution::Resolved {
+        identity,
+        basis: CSharpResolutionBasis::OrdinaryImport,
+    }
+}
+
+struct ResolutionCandidates {
+    identities: Vec<CSharpTypeIdentity>,
+    ambiguous: bool,
+}
+
+impl ResolutionCandidates {
+    fn unique(mut self) -> Option<CSharpTypeIdentity> {
+        if self.identities.len() == 1 {
+            self.identities.pop()
+        } else {
+            None
+        }
+    }
+}
+
+fn candidates_for_path(
+    path: &[String],
+    generic_arity: usize,
+    known_external: &[CSharpTypeIdentity],
+    source_symbols: &crate::ir::csharp_symbols::CSharpSourceSymbolIndex,
+) -> ResolutionCandidates {
+    let qualified_name = path.join(".");
+    let mut identities = known_external
+        .iter()
+        .filter(|identity| {
+            identity.qualified_name == qualified_name && identity.generic_arity == generic_arity
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let source = source_symbols.matching_qualified_path(path, generic_arity);
+    let ambiguous = source.iter().any(|composition| {
+        matches!(
+            composition,
+            crate::ir::csharp_symbols::CSharpSymbolComposition::Ambiguous(_)
+        )
+    });
+    identities.extend(
+        source
+            .into_iter()
+            .filter_map(|composition| match composition {
+                crate::ir::csharp_symbols::CSharpSymbolComposition::Resolved(symbol) => {
+                    Some(source_identity(symbol))
+                }
+                crate::ir::csharp_symbols::CSharpSymbolComposition::Ambiguous(_) => None,
+            }),
+    );
+    ResolutionCandidates {
+        ambiguous: ambiguous || identities.len() > 1,
+        identities,
+    }
+}
+
+fn source_identity(symbol: &crate::ir::csharp_symbols::CSharpSourceSymbol) -> CSharpTypeIdentity {
+    let mut path = symbol.key.namespace_path.clone();
+    path.extend(symbol.key.containing_type_path.iter().cloned());
+    path.push(symbol.key.name.clone());
+    CSharpTypeIdentity {
+        qualified_name: path.join("."),
+        namespace_path: symbol.key.namespace_path.clone(),
+        containing_type_path: symbol.key.containing_type_path.clone(),
+        terminal_name: symbol.key.name.clone(),
+        generic_arity: symbol.key.generic_arity,
+        origin: CSharpTypeIdentityOrigin::AdmittedSource,
     }
 }
 
@@ -375,3 +525,7 @@ fn is_identifier(segment: &str) -> bool {
 #[cfg(test)]
 #[path = "../tests/ir/csharp_direct_resolution_r2.rs"]
 mod tests_r2;
+
+#[cfg(test)]
+#[path = "../tests/ir/csharp_import_resolution_r3.rs"]
+mod tests_r3;
