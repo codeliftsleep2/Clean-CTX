@@ -211,9 +211,8 @@ fn evaluate_applicable_source(
             block.lines.extend(analysis.block.lines);
             semantic_edges.extend(analysis.semantic_edges);
         }
-        if let Some(analysis) = efcore::analyze_efcore(raw_class, fidelity) {
-            block.lines.extend(analysis.block.lines);
-            semantic_edges.extend(analysis.semantic_edges);
+        if let Some(result) = efcore::extract_efcore(raw_class, fidelity) {
+            block.lines.extend(result.lines);
         }
         if let Some(result) = signalr::extract_signalr(raw_class, fidelity) {
             block.lines.extend(result.lines);
@@ -357,9 +356,9 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .and_then(|value| value.meta_layers.get("dotnet"));
         let (block, mut semantic_edges) =
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
-        if let Some(bases) = context.structured_class_bases {
-            semantic_edges.extend(semantic::structured_dbcontext_role_registrations(bases));
-            let roles = semantic::structured_dbcontext_role_names(bases);
+        if let Some(classes) = context.csharp_resolved_classes {
+            semantic_edges.extend(semantic::resolved_dbcontext_role_registrations(classes));
+            let roles = semantic::resolved_dbcontext_role_names(classes);
             for raw_class in context.class_captures {
                 let Some(name) = semantic::extract_class_name_from_class(raw_class) else {
                     continue;
@@ -395,8 +394,8 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
             .map(|value| value.enabled)
             .unwrap_or(true);
         let structured_role = context
-            .structured_class_bases
-            .is_some_and(semantic::has_structured_dbcontext_role);
+            .csharp_resolved_classes
+            .is_some_and(semantic::has_resolved_dbcontext_role);
         (enabled
             && (structured_role
                 || detect::is_dotnet_file_with_regions(context.source, context.lexical_regions)))

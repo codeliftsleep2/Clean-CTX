@@ -14,6 +14,7 @@ mod declaration_candidates;
 mod dependencies;
 pub(super) mod direct_aspnet;
 mod reference_candidates;
+mod using_aliases;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
 pub(super) use reference_candidates::terminal_lookup_name;
 
@@ -48,6 +49,7 @@ struct BaseReference {
     written: String,
     shape: TypeShape,
     imports: Vec<Vec<String>>,
+    aliases: Vec<crate::ir::csharp_resolution::CSharpAliasDirective>,
 }
 #[derive(Clone, Debug)]
 struct TypeShape {
@@ -253,14 +255,10 @@ impl Catalog {
         };
         #[cfg(test)]
         super::work_metrics::record_csharp_file_parsed();
-        let imports = using_namespaces(tree.root_node(), source.as_bytes());
         visit_container(
             tree.root_node(),
             source.as_bytes(),
-            file,
-            &[],
-            &[],
-            &imports,
+            &TraversalScope::new(file),
             self,
         );
     }
@@ -335,15 +333,18 @@ fn is_imported_aspnet_framework_base(reference: &BaseReference) -> bool {
             .any(|path| path.join(".") == "Microsoft.AspNetCore.Mvc")
 }
 
-fn using_namespaces(node: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {
+fn direct_using_namespaces(node: Node<'_>, source: &[u8]) -> Vec<Vec<String>> {
     let mut imports = Vec::new();
-    collect_using_namespaces(node, source, &mut imports);
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_using_namespace(child, source, &mut imports);
+    }
     imports.sort();
     imports.dedup();
     imports
 }
 
-fn collect_using_namespaces(node: Node<'_>, source: &[u8], imports: &mut Vec<Vec<String>>) {
+fn collect_using_namespace(node: Node<'_>, source: &[u8], imports: &mut Vec<Vec<String>>) {
     if node.kind() == "using_directive" {
         let text = node.utf8_text(source).unwrap_or_default();
         if node.child_by_field_name("name").is_none()
@@ -356,65 +357,66 @@ fn collect_using_namespaces(node: Node<'_>, source: &[u8], imports: &mut Vec<Vec
             }
         }
     }
-    let mut cursor = node.walk();
-    for child in node.named_children(&mut cursor) {
-        collect_using_namespaces(child, source, imports);
+}
+
+#[derive(Clone)]
+struct TraversalScope {
+    file: String,
+    namespace: Vec<String>,
+    nesting: Vec<String>,
+    imports: Vec<Vec<String>>,
+    aliases: Vec<crate::ir::csharp_resolution::CSharpAliasDirective>,
+}
+
+impl TraversalScope {
+    fn new(file: &str) -> Self {
+        Self {
+            file: file.to_string(),
+            namespace: Vec::new(),
+            nesting: Vec::new(),
+            imports: Vec::new(),
+            aliases: Vec::new(),
+        }
     }
 }
 
 fn visit_container(
     node: Node<'_>,
     source: &[u8],
-    file: &str,
-    namespace: &[String],
-    nesting: &[String],
-    imports: &[Vec<String>],
+    scope: &TraversalScope,
     catalog: &mut Catalog,
 ) {
-    let mut file_namespace = namespace.to_vec();
+    let mut scoped = scope.clone();
+    scoped.imports.extend(direct_using_namespaces(node, source));
+    scoped.imports.sort();
+    scoped.imports.dedup();
+    scoped.aliases.extend(using_aliases::collect_direct(
+        node,
+        source,
+        &scope.file,
+        scope.namespace.len(),
+    ));
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
         match child.kind() {
             "file_scoped_namespace_declaration" => {
                 if let Some(name) = child.child_by_field_name("name") {
-                    file_namespace.extend(name_segments(name, source));
+                    scoped.namespace.extend(name_segments(name, source));
                 }
             }
             "namespace_declaration" => {
-                let mut nested_namespace = namespace.to_vec();
+                let mut nested_scope = scoped.clone();
                 if let Some(name) = child.child_by_field_name("name") {
-                    nested_namespace.extend(name_segments(name, source));
+                    nested_scope.namespace.extend(name_segments(name, source));
                 }
                 if let Some(body) = child.child_by_field_name("body") {
-                    visit_container(
-                        body,
-                        source,
-                        file,
-                        &nested_namespace,
-                        nesting,
-                        imports,
-                        catalog,
-                    );
+                    visit_container(body, source, &nested_scope, catalog);
                 }
             }
-            "class_declaration" | "interface_declaration" => visit_type(
-                child,
-                source,
-                file,
-                &file_namespace,
-                nesting,
-                imports,
-                catalog,
-            ),
-            _ => visit_container(
-                child,
-                source,
-                file,
-                &file_namespace,
-                nesting,
-                imports,
-                catalog,
-            ),
+            "class_declaration" | "interface_declaration" => {
+                visit_type(child, source, &scoped, catalog);
+            }
+            _ => visit_container(child, source, &scoped, catalog),
         }
     }
 }
@@ -422,10 +424,7 @@ fn visit_container(
 fn visit_type(
     node: Node<'_>,
     source: &[u8],
-    file: &str,
-    namespace: &[String],
-    nesting: &[String],
-    imports: &[Vec<String>],
+    scope: &TraversalScope,
     catalog: &mut Catalog,
 ) {
     let Some(name_node) = node.child_by_field_name("name") else {
@@ -443,12 +442,12 @@ fn visit_type(
     let arity = named_child(node, "type_parameter_list")
         .map(|parameters| named_child_count(parameters, "type_parameter"))
         .unwrap_or(0);
-    let mut path = namespace.to_vec();
-    path.extend(nesting.iter().cloned());
+    let mut path = scope.namespace.clone();
+    path.extend(scope.nesting.iter().cloned());
     path.push(name.clone());
     catalog.declarations.push(Declaration {
         kind,
-        file: file.to_string(),
+        file: scope.file.clone(),
         path,
         name: name.clone(),
         arity,
@@ -475,30 +474,32 @@ fn visit_type(
                 continue;
             };
             catalog.references.push(BaseReference {
-                file: file.to_string(),
+                file: scope.file.clone(),
                 owner: name.clone(),
-                namespace: namespace.to_vec(),
-                nesting: nesting.to_vec(),
+                namespace: scope.namespace.clone(),
+                nesting: scope.nesting.clone(),
                 written: written.trim().to_string(),
                 shape,
-                imports: imports.to_vec(),
+                imports: scope.imports.clone(),
+                aliases: scope.aliases.clone(),
             });
         }
     }
 
     let context = dependencies::ConstructorContext {
-        file,
-        namespace,
-        nesting,
-        imports,
+        file: &scope.file,
+        namespace: &scope.namespace,
+        nesting: &scope.nesting,
+        imports: &scope.imports,
+        aliases: &scope.aliases,
         owner: &name,
     };
     dependencies::collect_constructor_references(node, source, &context, catalog);
 
     if let Some(body) = node.child_by_field_name("body") {
-        let mut nested = nesting.to_vec();
-        nested.push(name);
-        visit_container(body, source, file, namespace, &nested, imports, catalog);
+        let mut nested_scope = scope.clone();
+        nested_scope.nesting.push(name);
+        visit_container(body, source, &nested_scope, catalog);
     }
 }
 

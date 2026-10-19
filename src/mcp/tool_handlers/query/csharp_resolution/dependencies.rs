@@ -51,6 +51,7 @@ pub(super) struct ConstructorContext<'a> {
     pub(super) namespace: &'a [String],
     pub(super) nesting: &'a [String],
     pub(super) imports: &'a [Vec<String>],
+    pub(super) aliases: &'a [crate::ir::csharp_resolution::CSharpAliasDirective],
     pub(super) owner: &'a str,
 }
 
@@ -296,6 +297,7 @@ pub(super) fn collect_constructor_references(
                 written: written.trim().to_string(),
                 shape,
                 imports: context.imports.to_vec(),
+                aliases: context.aliases.to_vec(),
             });
         }
     }

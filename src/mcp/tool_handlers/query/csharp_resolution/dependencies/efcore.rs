@@ -4,6 +4,7 @@ use super::super::{
     BaseReference, Catalog, Declaration, TypeKind, TypeShape, find_first_base_shape,
 };
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use crate::workspace::index::WorkspaceIndex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use tree_sitter::Node;
@@ -20,16 +21,20 @@ pub(in crate::mcp::tool_handlers::query) struct EfCoreCatalog {
 }
 
 impl EfCoreCatalog {
-    pub(in crate::mcp::tool_handlers::query) fn build(catalog: &Catalog) -> Self {
+    pub(in crate::mcp::tool_handlers::query) fn build(
+        catalog: &Catalog,
+        index: &WorkspaceIndex,
+    ) -> Self {
         #[cfg(test)]
         work_metrics::record_ef_catalog_build();
-        let configurations = configuration_entities(catalog);
+        let source = neutral_source_index(catalog);
+        let configurations = configuration_entities(catalog, &source);
         let mut edges = Vec::new();
         let mut project_lookup = ProjectLookup::default();
         for context in catalog.declarations.iter().filter(|declaration| {
             #[cfg(test)]
             work_metrics::record_ef_context_declaration();
-            declaration.kind == TypeKind::Class && is_ef_db_context(catalog, declaration)
+            declaration.kind == TypeKind::Class && is_ef_db_context(catalog, index, declaration)
         }) {
             let Some(model) = OnModelCreating::parse(&context.source) else {
                 continue;
@@ -127,30 +132,24 @@ impl EfCoreCatalog {
     }
 }
 
-fn is_ef_db_context(catalog: &Catalog, declaration: &Declaration) -> bool {
-    catalog
+fn is_ef_db_context(catalog: &Catalog, index: &WorkspaceIndex, declaration: &Declaration) -> bool {
+    if catalog
         .references_for_owner(&declaration.file, &declaration.name)
-        .any(|reference| {
-            #[cfg(test)]
-            work_metrics::record_ef_context_reference_comparison();
-            reference.shape.name == DB_CONTEXT
-                && reference.shape.arity == 0
-                && is_ef_framework_type(reference, DB_CONTEXT)
+        .next()
+        .is_none()
+    {
+        return false;
+    }
+    #[cfg(test)]
+    work_metrics::record_ef_context_reference_comparison();
+    index
+        .find_entities_by_name(&declaration.name)
+        .into_iter()
+        .any(|entity| {
+            entity.domain == DOTNET
+                && entity.entity_type == DB_CONTEXT
+                && entity.file.as_deref() == Some(declaration.file.as_str())
         })
-}
-
-fn is_ef_framework_type(reference: &BaseReference, name: &str) -> bool {
-    let written = reference.written.trim_start_matches("global::");
-    let qualified = format!("Microsoft.EntityFrameworkCore.{name}");
-    written == qualified
-        || written
-            .strip_prefix(&qualified)
-            .is_some_and(|suffix| suffix.starts_with('<'))
-        || (reference.shape.qualifier.is_empty()
-            && reference
-                .imports
-                .iter()
-                .any(|import| import.join(".") == "Microsoft.EntityFrameworkCore"))
 }
 
 #[derive(Default)]
@@ -268,7 +267,10 @@ fn local_assembly_marker(rest: &str) -> Option<String> {
         .then(|| written.to_string())
 }
 
-fn configuration_entities(catalog: &Catalog) -> BTreeMap<DeclarationKey, &Declaration> {
+fn configuration_entities<'a>(
+    catalog: &'a Catalog,
+    source: &crate::ir::csharp_symbols::CSharpSourceSymbolIndex,
+) -> BTreeMap<DeclarationKey, &'a Declaration> {
     let mut mappings = BTreeMap::new();
     for configuration in catalog
         .declarations
@@ -277,20 +279,18 @@ fn configuration_entities(catalog: &Catalog) -> BTreeMap<DeclarationKey, &Declar
     {
         #[cfg(test)]
         work_metrics::record_ef_configuration_declaration();
-        let Some(reference) = catalog
+        let Some((reference, entity_written)) = catalog
             .references_for_owner(&configuration.file, &configuration.name)
-            .find(|reference| {
+            .find_map(|reference| {
                 #[cfg(test)]
                 work_metrics::record_ef_configuration_reference_comparison();
-                is_ef_configuration_interface(reference)
+                resolved_ef_configuration_entity(reference, source)
+                    .map(|entity| (reference, entity))
             })
         else {
             continue;
         };
-        let Some(written) = first_generic_argument(&reference.written) else {
-            continue;
-        };
-        let Some(entity) = resolve_with_reference(catalog, reference, &written) else {
+        let Some(entity) = resolve_with_reference(catalog, reference, &entity_written) else {
             continue;
         };
         if entity.kind == TypeKind::Class {
@@ -300,11 +300,84 @@ fn configuration_entities(catalog: &Catalog) -> BTreeMap<DeclarationKey, &Declar
     mappings
 }
 
-fn is_ef_configuration_interface(reference: &BaseReference) -> bool {
-    if reference.shape.name != "IEntityTypeConfiguration" || reference.shape.arity != 1 {
-        return false;
+fn resolved_ef_configuration_entity(
+    reference: &BaseReference,
+    source: &crate::ir::csharp_symbols::CSharpSourceSymbolIndex,
+) -> Option<String> {
+    let external = [
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external_with_arity(
+            "Microsoft.EntityFrameworkCore.IEntityTypeConfiguration",
+            1,
+        ),
+    ];
+    let aliases = crate::ir::csharp_resolution::CSharpAliasContext {
+        directives: reference.aliases.clone(),
+    };
+    let alias = reference
+        .aliases
+        .iter()
+        .filter(|alias| alias.alias == reference.shape.name)
+        .max_by_key(|alias| alias.scope_depth);
+    let resolution = if alias.is_some() {
+        crate::ir::csharp_resolution::resolve_alias_type_reference(
+            &reference.written,
+            &aliases,
+            &external,
+            source,
+        )
+    } else if reference.shape.qualifier.is_empty() {
+        crate::ir::csharp_resolution::resolve_ordinary_import_type_reference(
+            &reference.written,
+            &crate::ir::csharp_resolution::CSharpOrdinaryImportContext {
+                namespace_path: reference.namespace.clone(),
+                containing_type_path: reference.nesting.clone(),
+                ordinary_imports: reference.imports.clone(),
+            },
+            &external,
+            source,
+        )
+    } else {
+        crate::ir::csharp_resolution::resolve_explicit_type_reference(
+            &reference.written,
+            &external,
+            source,
+        )
+    };
+    let crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. } = resolution
+    else {
+        return None;
+    };
+    if identity != external[0] {
+        return None;
     }
-    is_ef_framework_type(reference, "IEntityTypeConfiguration")
+    first_generic_argument(alias.map_or(reference.written.as_str(), |alias| &alias.target))
+}
+
+fn neutral_source_index(catalog: &Catalog) -> crate::ir::csharp_symbols::CSharpSourceSymbolIndex {
+    crate::ir::csharp_symbols::CSharpSourceSymbolIndex::build(catalog.declarations.iter().map(
+        |declaration| crate::ir::csharp_symbols::CSharpDeclarationPart {
+            key: crate::ir::csharp_symbols::CSharpSymbolKey {
+                namespace_path:
+                    declaration.path[..declaration.path.len().saturating_sub(1)].to_vec(),
+                containing_type_path: Vec::new(),
+                name: declaration.name.clone(),
+                generic_arity: declaration.arity,
+            },
+            kind: match declaration.kind {
+                TypeKind::Class => crate::ir::csharp_resolution::CSharpDeclarationKind::Class,
+                TypeKind::Interface => {
+                    crate::ir::csharp_resolution::CSharpDeclarationKind::Interface
+                }
+            },
+            is_partial: false,
+            file: declaration.file.clone(),
+            span: crate::ir::csharp_resolution::CSharpSourceSpan {
+                start_byte: 0,
+                end_byte: declaration.source.len(),
+            },
+            base_references: Vec::new(),
+        },
+    ))
 }
 
 fn first_generic_argument(written: &str) -> Option<String> {
@@ -343,6 +416,7 @@ fn resolve_with_reference<'a>(
         written: written.to_string(),
         shape,
         imports: context.imports.clone(),
+        aliases: context.aliases.clone(),
     };
     catalog.resolve_declaration(&reference)
 }

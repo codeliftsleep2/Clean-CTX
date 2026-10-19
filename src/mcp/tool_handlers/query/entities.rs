@@ -100,6 +100,10 @@ fn try_prepare_find_entities(
         workspace_root,
         crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
     )?;
+    #[cfg(feature = "csharp")]
+    if !declarations_only {
+        context.prepare_exact_csharp_calls(state)?;
+    }
     if hydration.is_complete() {
         let mut current = name.clone();
         let mut visited = HashSet::new();

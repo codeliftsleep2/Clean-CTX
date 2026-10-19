@@ -9,6 +9,11 @@ mod aliases;
 pub use aliases::{CSharpAliasContext, CSharpAliasDirective, resolve_alias_type_reference};
 mod ancestry;
 pub use ancestry::{CSharpInheritanceArc, CSharpInheritanceGraph, resolve_type_ancestry};
+mod compilation;
+pub(crate) use compilation::{
+    CSharpCompilationUnit, CSharpResolvedClass, collect_compilation_unit,
+    resolve_compilation_class_ancestry, resolve_compilation_units,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CSharpSourceSpan {

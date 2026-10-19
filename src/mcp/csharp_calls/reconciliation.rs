@@ -13,6 +13,7 @@ use crate::mcp::csharp_calls::authority::{
 use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
 use crate::mcp::semantic_compilation::executor::CompilationJob;
 use crate::workspace::index::SemanticFidelity;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -93,6 +94,25 @@ impl McpState {
         );
         let fingerprint = authority_fingerprint(&manifest);
         let authority = merge_declarations(&artifacts);
+        let mut resolution_partitions = BTreeMap::<String, Vec<_>>::new();
+        for artifact in &artifacts {
+            if let Some(unit) = artifact.csharp_resolution_unit().cloned() {
+                resolution_partitions
+                    .entry(csharp_resolution_partition(
+                        self,
+                        artifact.canonical_owner(),
+                    ))
+                    .or_default()
+                    .push(unit);
+            }
+        }
+        let known_external = crate::dotnet_meta::semantic::known_csharp_type_identities();
+        let resolved_classes = resolution_partitions
+            .into_values()
+            .flat_map(|units| {
+                crate::ir::csharp_resolution::resolve_compilation_units(&units, &known_external)
+            })
+            .collect::<Vec<_>>();
 
         let mut projections = Vec::with_capacity(files.len());
         for artifact in artifacts {
@@ -103,7 +123,8 @@ impl McpState {
                 .workspace_index_read()
                 .semantic_projection_fidelity(&file)
                 .unwrap_or_else(|| semantic_fidelity(artifact.fidelity()));
-            let edges = artifact.project_exact_csharp_calls(&authority)?;
+            let edges =
+                artifact.project_csharp_generation_semantics(&authority, &resolved_classes)?;
             projections.push(Projection {
                 dependencies: artifact.semantic_dependencies_owned(),
                 file,
@@ -196,6 +217,43 @@ fn is_admitted_csharp_source(state: &McpState, file: &str) -> bool {
             .and_then(|extension| extension.to_str())
             .is_some_and(|extension| extension.eq_ignore_ascii_case("cs"))
         && !state.config.is_excluded(file)
+}
+
+fn csharp_resolution_partition(state: &McpState, file: &str) -> String {
+    let path = Path::new(file);
+    if let Some(root) = state
+        .config
+        .additional_roots
+        .iter()
+        .map(Path::new)
+        .find(|root| path.starts_with(root))
+    {
+        return root.to_string_lossy().into_owned();
+    }
+    let mut directory = path.parent();
+    while let Some(candidate) = directory {
+        let project_count = std::fs::read_dir(candidate)
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("csproj"))
+            })
+            .take(2)
+            .count();
+        if project_count == 1 {
+            return candidate.to_string_lossy().into_owned();
+        }
+        if project_count > 1 {
+            break;
+        }
+        directory = candidate.parent();
+    }
+    path.parent().unwrap_or(path).to_string_lossy().into_owned()
 }
 
 #[cfg(test)]

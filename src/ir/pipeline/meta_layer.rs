@@ -55,6 +55,18 @@ impl IRPass for MetaLayerPass {
         } else {
             Vec::new()
         };
+        #[cfg(all(feature = "csharp", feature = "dotnet"))]
+        let csharp_resolved_classes = if state.query_string == crate::queries::CS_QUERY {
+            crate::ir::csharp_resolution::resolve_compilation_class_ancestry(
+                &state.captures,
+                &file_provenance,
+                &crate::dotnet_meta::semantic::known_csharp_type_identities(),
+            )
+        } else {
+            Vec::new()
+        };
+        #[cfg(all(feature = "csharp", not(feature = "dotnet")))]
+        let csharp_resolved_classes = Vec::new();
         let mut context = crate::layers::meta::MetaLayerContext::new(
             &state.source,
             path,
@@ -86,6 +98,10 @@ impl IRPass for MetaLayerPass {
         if state.query_string == crate::queries::CS_QUERY {
             context.structured_declarations = Some(&structured_declarations);
             context.structured_class_bases = Some(&structured_class_bases);
+            #[cfg(feature = "csharp")]
+            {
+                context.csharp_resolved_classes = Some(&csharp_resolved_classes);
+            }
         }
 
         let (meta_results, mut semantic_edges, semantic_dependencies) =

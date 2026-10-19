@@ -79,9 +79,22 @@ public class AppDbContext : DbContext
     public DbSet<Order> Orders { get; set; }
 }
 "#;
-    let class_captures = vec![source.to_string()];
-    let layer = DotNetMetaLayer::new();
-    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Low, None);
+    let (language, query) =
+        crate::compression::language::language_for_extension("cs").expect("C# language");
+    let mut compiler = crate::ir::compiler::IRCompiler::new();
+    compiler
+        .compile_focused(
+            source,
+            "ef-semantic-test",
+            Some("C:/repo/AppDbContext.cs"),
+            language,
+            query,
+            Fidelity::Low,
+            None,
+            None,
+        )
+        .expect("C# compilation");
+    let edges = compiler.semantic_edges;
 
     let entities: Vec<&SemanticEdge> = edges
         .iter()

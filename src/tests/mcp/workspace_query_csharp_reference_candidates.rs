@@ -19,6 +19,7 @@ fn reference(
             arity: 0,
         },
         imports: Vec::new(),
+        aliases: Vec::new(),
     }
 }
 

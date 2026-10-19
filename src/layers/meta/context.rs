@@ -34,6 +34,10 @@ pub struct MetaLayerContext<'a> {
     pub structured_declarations: Option<&'a [(String, String)]>,
     /// Parser-owned first class-base references when a language provides them.
     pub structured_class_bases: Option<&'a [StructuredClassBase]>,
+    /// Framework-neutral resolved class ancestry from the current C# parse.
+    #[cfg(feature = "csharp")]
+    pub(crate) csharp_resolved_classes:
+        Option<&'a [crate::ir::csharp_resolution::CSharpResolvedClass]>,
     pub fidelity: Fidelity,
     pub config: Option<&'a CleanCtxConfig>,
     pub lexical_regions: &'a LexicalRegions,
@@ -73,6 +77,8 @@ impl<'a> MetaLayerContext<'a> {
             paired_class_captures,
             structured_declarations: None,
             structured_class_bases: None,
+            #[cfg(feature = "csharp")]
+            csharp_resolved_classes: None,
             fidelity,
             config,
             lexical_regions,

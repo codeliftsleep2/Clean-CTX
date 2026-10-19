@@ -34,6 +34,7 @@ fn reference(
             .iter()
             .map(|path| path.iter().map(|part| (*part).to_owned()).collect())
             .collect(),
+        aliases: Vec::new(),
     }
 }
 

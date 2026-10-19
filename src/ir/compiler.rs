@@ -98,6 +98,8 @@ pub struct IRCompiler {
     /// Framework-neutral syntax facts captured by the most recent C# compile.
     #[cfg(feature = "csharp")]
     pub csharp_syntax_facts: crate::ir::csharp_resolution::CSharpSyntaxFacts,
+    #[cfg(feature = "csharp")]
+    pub(crate) csharp_compilation_unit: Option<crate::ir::csharp_resolution::CSharpCompilationUnit>,
 }
 
 impl IRCompiler {
@@ -114,6 +116,8 @@ impl IRCompiler {
             csharp_declaration_authority: None,
             #[cfg(feature = "csharp")]
             csharp_syntax_facts: crate::ir::csharp_resolution::CSharpSyntaxFacts::default(),
+            #[cfg(feature = "csharp")]
+            csharp_compilation_unit: None,
         }
     }
 
@@ -248,6 +252,7 @@ impl IRCompiler {
         #[cfg(feature = "csharp")]
         {
             self.csharp_syntax_facts = crate::ir::csharp_resolution::CSharpSyntaxFacts::default();
+            self.csharp_compilation_unit = None;
         }
 
         // Construct PassContext with per-compilation state
@@ -306,6 +311,9 @@ impl IRCompiler {
         if ctx.query_string == crate::queries::CS_QUERY {
             self.csharp_syntax_facts =
                 crate::ir::csharp_resolution::collect_syntax_facts(&ctx.captures);
+            self.csharp_compilation_unit = Some(
+                crate::ir::csharp_resolution::collect_compilation_unit(&ctx.captures, &provenance),
+            );
             self.semantic_edges.extend(
                 crate::ir::semantic_projection::project_csharp_struct_record_base_types(
                     &ctx.captures,

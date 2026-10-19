@@ -14,14 +14,61 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
 
-fn is_structured_dbcontext_base(base: &crate::layers::meta::StructuredClassBase) -> bool {
-    base.written.trim_start_matches("global::") == EF_CORE_DB_CONTEXT
+pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
+{
+    vec![crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(EF_CORE_DB_CONTEXT)]
 }
 
-pub(crate) fn has_structured_dbcontext_role(
-    bases: &[crate::layers::meta::StructuredClassBase],
+pub(crate) fn is_resolved_dbcontext(
+    class: &crate::ir::csharp_resolution::CSharpResolvedClass,
 ) -> bool {
-    bases.iter().any(is_structured_dbcontext_base)
+    matches!(
+        &class.ancestry,
+        crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+            if identity.qualified_name == EF_CORE_DB_CONTEXT
+                && identity.generic_arity == 0
+                && identity.origin
+                    == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+    )
+}
+
+pub(crate) fn project_resolved_dbcontext_edges(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    file: &str,
+    fidelity: Fidelity,
+) -> Vec<SemanticEdge> {
+    let mut edges = Vec::new();
+    for class in classes.iter().filter(|class| {
+        is_resolved_dbcontext(class) && class.files.iter().any(|owner| owner == file)
+    }) {
+        let mut role = EntityRef::new("dotnet", "DbContext", &class.owner);
+        role.file = Some(file.to_string());
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Defines,
+            subject: role.clone(),
+            object: role,
+            layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
+            call_evidence: None,
+        });
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+            if let Some(analysis) =
+                crate::dotnet_meta::efcore::analyze_authorized_efcore(raw_class, fidelity)
+            {
+                edges.extend(analysis.semantic_edges.into_iter().map(|mut edge| {
+                    edge.subject.file = Some(file.to_string());
+                    edge.object.file = Some(file.to_string());
+                    edge
+                }));
+            }
+        }
+    }
+    edges
+}
+
+pub(crate) fn has_resolved_dbcontext_role(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+) -> bool {
+    classes.iter().any(is_resolved_dbcontext)
 }
 
 /// Register EF Core DbContext roles from parser-owned first-base evidence.
@@ -30,14 +77,14 @@ pub(crate) fn has_structured_dbcontext_role(
 /// base (with optional `global::`). Unqualified imports, aliases, indirect
 /// inheritance, and ambiguous bindings fail closed until a stronger resolver
 /// can prove them.
-pub(crate) fn structured_dbcontext_role_registrations(
-    bases: &[crate::layers::meta::StructuredClassBase],
+pub(crate) fn resolved_dbcontext_role_registrations(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> Vec<SemanticEdge> {
-    bases
+    classes
         .iter()
-        .filter(|base| is_structured_dbcontext_base(base))
-        .map(|base| {
-            let role = EntityRef::new("dotnet", "DbContext", &base.owner);
+        .filter(|class| is_resolved_dbcontext(class))
+        .map(|class| {
+            let role = EntityRef::new("dotnet", "DbContext", &class.owner);
             SemanticEdge {
                 relation: SemanticRelation::Defines,
                 subject: role.clone(),
@@ -49,13 +96,13 @@ pub(crate) fn structured_dbcontext_role_registrations(
         .collect()
 }
 
-pub(crate) fn structured_dbcontext_role_names(
-    bases: &[crate::layers::meta::StructuredClassBase],
+pub(crate) fn resolved_dbcontext_role_names(
+    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> std::collections::HashSet<&str> {
-    bases
+    classes
         .iter()
-        .filter(|base| is_structured_dbcontext_base(base))
-        .map(|base| base.owner.as_str())
+        .filter(|class| is_resolved_dbcontext(class))
+        .map(|class| class.owner.as_str())
         .collect()
 }
 
@@ -72,11 +119,6 @@ pub fn extract_dotnet_semantic_edges(
     let mut edges = crate::dotnet_meta::aspnet::analyze_aspnet(raw_class, fidelity)
         .map(|analysis| analysis.semantic_edges)
         .unwrap_or_default();
-    edges.extend(
-        crate::dotnet_meta::efcore::analyze_efcore(raw_class, fidelity)
-            .map(|analysis| analysis.semantic_edges)
-            .unwrap_or_default(),
-    );
     edges.extend(extract_non_aspnet_efcore_semantic_edges(
         raw_class, class_name, fidelity,
     ));
@@ -209,3 +251,7 @@ fn extract_hub_methods(class_source: &str) -> Vec<String> {
 #[cfg(all(test, feature = "dotnet"))]
 #[path = "../tests/dotnet_meta/semantic.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/ef_resolution_r6.rs"]
+mod tests_r6;

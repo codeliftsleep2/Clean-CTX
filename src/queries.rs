@@ -126,12 +126,19 @@ pub const CS_QUERY: &str = r#"
 // The IR capture walk appends this query and `CS_CALL_QUERY` to the same
 // tree-sitter query, preserving the single-parse production invariant.
 pub const CS_SEMANTIC_QUERY: &str = r#"
+    ; Namespace scopes are captured structurally so semantic resolution never
+    ; reconstructs lexical ownership from strings.
+    (namespace_declaration) @csharp.namespace_root
+    (file_scoped_namespace_declaration) @csharp.namespace_root
+    (namespace_declaration name: (_) @csharp.namespace_name)
+    (file_scoped_namespace_declaration name: (_) @csharp.namespace_name)
     ; Declaration identifiers are the single C# canonical/builtin name authority.
     (class_declaration name: (identifier) @csharp.class_name)
     (interface_declaration name: (identifier) @csharp.interface_name)
     (struct_declaration name: (identifier) @csharp.struct_name)
     (enum_declaration name: (identifier) @csharp.enum_name)
     (record_declaration name: (identifier) @csharp.record_name)
+    (type_parameter_list) @csharp.type_parameters
     ; Class/struct/interface base lists expose entries through the type supertype.
     (base_list (type) @csharp.base_type)
     ; record_base is aliased to base_list. Capture each direct named child

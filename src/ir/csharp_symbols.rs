@@ -106,6 +106,15 @@ impl CSharpSourceSymbolIndex {
         self.symbols.is_empty()
     }
 
+    pub(crate) fn resolved_symbols(&self) -> impl Iterator<Item = &CSharpSourceSymbol> {
+        self.symbols
+            .values()
+            .filter_map(|composition| match composition {
+                CSharpSymbolComposition::Resolved(symbol) => Some(symbol),
+                CSharpSymbolComposition::Ambiguous(_) => None,
+            })
+    }
+
     pub(crate) fn matching_qualified_path(
         &self,
         path: &[String],

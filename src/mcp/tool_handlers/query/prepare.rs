@@ -112,7 +112,10 @@ impl PreparationContext {
         state: &McpState,
         args: &serde_json::Value,
     ) -> Result<(), QueryFailure> {
-        if args["domain"] == "builtin" && args["entity_type"] == "Method" {
+        if (args["domain"] == "builtin" && args["entity_type"] == "Method")
+            || (args["domain"] == "dotnet"
+                && matches!(args["entity_type"].as_str(), Some("DbContext" | "Entity")))
+        {
             self.prepare_exact_csharp_calls(state)?;
         }
         Ok(())
@@ -257,7 +260,9 @@ impl PreparationContext {
         let csharp = self.csharp_catalog(state, index, scope);
         self.efcore_catalog
             .get_or_insert_with(|| {
-                Arc::new(super::csharp_resolution::EfCoreCatalog::build(&csharp))
+                Arc::new(super::csharp_resolution::EfCoreCatalog::build(
+                    &csharp, index,
+                ))
             })
             .clone()
     }

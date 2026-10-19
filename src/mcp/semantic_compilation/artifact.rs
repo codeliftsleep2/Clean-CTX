@@ -9,6 +9,7 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub(crate) struct CSharpSemanticArtifact {
     declarations: Vec<crate::ir::csharp_exact_calls::Declaration>,
+    resolution: crate::ir::csharp_resolution::CSharpCompilationUnit,
 }
 
 #[derive(Debug)]
@@ -60,6 +61,7 @@ impl SemanticCompilationArtifact {
             declarations: crate::ir::csharp_exact_calls::declaration_authority(
                 &compiled.instructions,
             ),
+            resolution: compiler.csharp_compilation_unit.take().unwrap_or_default(),
         });
         #[cfg(not(feature = "csharp"))]
         let _ = extension;
@@ -118,8 +120,12 @@ impl SemanticCompilationArtifact {
         ));
         drop(invocation_evidence);
         #[cfg(feature = "csharp")]
-        if let Some(CSharpSemanticArtifact { declarations }) = csharp {
-            drop(declarations);
+        if let Some(CSharpSemanticArtifact {
+            declarations,
+            resolution,
+        }) = csharp
+        {
+            drop((declarations, resolution));
         }
         (compiled, semantic_edges, semantic_dependencies, source_hash)
     }
@@ -187,6 +193,13 @@ impl SemanticCompilationArtifact {
     }
 
     #[cfg(feature = "csharp")]
+    pub(crate) fn csharp_resolution_unit(
+        &self,
+    ) -> Option<&crate::ir::csharp_resolution::CSharpCompilationUnit> {
+        self.csharp.as_ref().map(|artifact| &artifact.resolution)
+    }
+
+    #[cfg(feature = "csharp")]
     pub(crate) fn project_exact_csharp_calls(
         &self,
         authority: &[crate::ir::csharp_exact_calls::Declaration],
@@ -216,6 +229,32 @@ impl SemanticCompilationArtifact {
             &self.identity.canonical_owner,
             authority,
         ));
+        Ok(edges)
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn project_csharp_generation_semantics(
+        &self,
+        authority: &[crate::ir::csharp_exact_calls::Declaration],
+        resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+    ) -> Result<Vec<SemanticEdge>, String> {
+        let mut edges = self.project_exact_csharp_calls(authority)?;
+        edges.retain(|edge| {
+            !(edge.subject.domain == "dotnet"
+                && edge.subject.entity_type == "DbContext"
+                && matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::Defines
+                        | crate::layers::meta::semantic::SemanticRelation::HasEntity
+                ))
+        });
+        edges.extend(
+            crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
+                resolved_classes,
+                self.canonical_owner(),
+                self.fidelity(),
+            ),
+        );
         Ok(edges)
     }
 

@@ -190,3 +190,66 @@ fn issue_147_dbcontext_role_follows_refresh_rename_base_removal_and_deletion() {
         .is_empty()
     );
 }
+
+#[test]
+fn r6_cross_file_ancestry_reconciles_role_and_relationship_lifecycle() {
+    let root = tempfile::TempDir::new().expect("workspace root");
+    std::fs::write(
+        root.path().join("Base.cs"),
+        "using Microsoft.EntityFrameworkCore; public class BaseContext : DbContext {}\n",
+    )
+    .expect("base fixture");
+    std::fs::write(
+        root.path().join("Derived.cs"),
+        "public class Entity {} public class DerivedContext : BaseContext { public DbSet<Entity> Entities { get; set; } }\n",
+    )
+    .expect("derived fixture");
+    let state = state(&[]);
+
+    assert_eq!(
+        role_files(&entities(&state, root.path(), "BaseContext"), "BaseContext").len(),
+        1
+    );
+    assert_eq!(
+        role_files(
+            &entities(&state, root.path(), "DerivedContext"),
+            "DerivedContext"
+        )
+        .len(),
+        1,
+        "a resolved cross-file ancestry chain must publish the derived durable role"
+    );
+    assert_eq!(
+        state
+            .workspace_index_read()
+            .forward_edges_by_identity("dotnet", "DbContext", "DerivedContext")
+            .into_iter()
+            .filter(|edge| edge.relation == SemanticRelation::HasEntity)
+            .count(),
+        1,
+        "the reconciled role must authorize its existing relationship payload"
+    );
+
+    std::fs::write(
+        root.path().join("Base.cs"),
+        "public class PlainBase {} public class BaseContext : PlainBase {}\n",
+    )
+    .expect("remove EF ancestry");
+    refresh(&state, root.path());
+    assert!(
+        role_files(
+            &entities(&state, root.path(), "DerivedContext"),
+            "DerivedContext"
+        )
+        .is_empty(),
+        "changing an upstream base must retract the derived role"
+    );
+    assert!(
+        state
+            .workspace_index_read()
+            .forward_edges_by_identity("dotnet", "DbContext", "DerivedContext")
+            .into_iter()
+            .all(|edge| edge.relation != SemanticRelation::HasEntity),
+        "relationship authority must retract with the ancestry proof"
+    );
+}

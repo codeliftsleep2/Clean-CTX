@@ -23,21 +23,13 @@ pub(crate) struct EfCoreAnalysis {
 ///
 /// Returns `None` when the class is not an EF Core construct.
 pub fn extract_efcore(class_source: &str, fidelity: Fidelity) -> Option<MetaBlock> {
-    analyze_efcore(class_source, fidelity).map(|analysis| analysis.block)
-}
-
-pub(crate) fn analyze_efcore(class_source: &str, fidelity: Fidelity) -> Option<EfCoreAnalysis> {
     #[cfg(test)]
     super::efcore_analysis_metrics::record_analysis();
 
-    // Detect DbContext class
-    let is_dbcontext = class_source.contains(": DbContext");
-
-    if !is_dbcontext {
+    if !class_source.contains(": DbContext") {
         return None;
     }
-
-    analyze_authorized_efcore(class_source, fidelity)
+    analyze_authorized_efcore(class_source, fidelity).map(|analysis| analysis.block)
 }
 
 /// Extract relationships after a structured caller has independently proven

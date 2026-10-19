@@ -186,3 +186,64 @@ fn unproven_assembly_expression_and_removed_registration_fail_closed() {
     let retracted = edges(&root, &state, "forward_edges", "DbContext", "AppDbContext");
     assert!(entity_names(&retracted).is_empty(), "{retracted:?}");
 }
+
+#[test]
+#[serial]
+fn r6_request_local_ef_projection_consumes_the_resolved_durable_role() {
+    let root = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    write(&root, "App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+    write(
+        &root,
+        "Contexts.cs",
+        r#"using ContextBase = Microsoft.EntityFrameworkCore.DbContext;
+public class Entity {}
+public class AliasContext : ContextBase {
+ protected override void OnModelCreating(ModelBuilder builder) { builder.Entity<Entity>(); }
+}
+namespace Shadow {
+ public class DbContext {}
+ public class FakeEntity {}
+ public class FakeContext : DbContext {
+  protected void OnModelCreating(ModelBuilder builder) { builder.Entity<FakeEntity>(); }
+ }
+}"#,
+    );
+    publish(&root, &state, "Contexts.cs");
+
+    let resolved = edges(&root, &state, "forward_edges", "DbContext", "AliasContext");
+    assert_eq!(entity_names(&resolved), vec!["Entity"]);
+    let shadow = edges(&root, &state, "forward_edges", "DbContext", "FakeContext");
+    assert!(
+        entity_names(&shadow).is_empty(),
+        "an identical model payload cannot create EF authority for a local shadow"
+    );
+}
+
+#[test]
+#[serial]
+fn r6_configuration_interface_alias_uses_neutral_type_resolution() {
+    let root = tempfile::TempDir::new().unwrap();
+    let state = crate::mcp::McpState::new(crate::tests::test_config());
+    write(&root, "App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+    write(
+        &root,
+        "Configuration.cs",
+        r#"using ConfigContract = Microsoft.EntityFrameworkCore.IEntityTypeConfiguration<Configured>;
+public class Configured {}
+public class Configuration : ConfigContract {}
+public class AppDbContext : Microsoft.EntityFrameworkCore.DbContext {
+ protected override void OnModelCreating(ModelBuilder builder) {
+  builder.ApplyConfiguration(new Configuration());
+ }
+}"#,
+    );
+    publish(&root, &state, "Configuration.cs");
+
+    let projected = edges(&root, &state, "forward_edges", "DbContext", "AppDbContext");
+    assert_eq!(
+        entity_names(&projected),
+        vec!["Configured"],
+        "an aliased EF configuration contract must retain its generic entity identity"
+    );
+}
