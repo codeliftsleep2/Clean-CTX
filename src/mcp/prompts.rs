@@ -80,8 +80,8 @@ unit edit. On rejection, re-read and retry; never blind-retry. Use
 ## Paths and legacy formats
 
 The trailing `§PATHMAP` maps session aliases to paths. Do not reproduce it in
-source edits. The reversible COMPACT-A codec and `compress_workspace` manifests
-are code-side / legacy measurement formats; the SCHEMA-vNext presentation is the
+source edits. The A2 compatibility snapshot and `compress_workspace` manifests
+are code-side / legacy formats; the SCHEMA-vNext presentation is the
 model-visible content. When the presentation is not safely cheaper under the
 local tokenizer estimate, `content` is the byte-exact raw source with no
 wrapper or footer.

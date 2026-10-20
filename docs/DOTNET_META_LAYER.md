@@ -12,7 +12,9 @@
 >
 > **Implementation:** Phase 1 (C# Core) complete with full ASP.NET Core  EF Core  SignalR  AutoMapper  and DI support. The .NET meta-layer is now integrated and available via the dotnet Cargo feature flag (enabled by default).
 > **Ship status:** see `docs/ROADMAP.md`. **Release record:** see `docs/changelogs/CHANGELOG.md`. This document does not duplicate volatile test counts.
-> **Note (v0.6.0):** The .NET graph infrastructure (`DotnetGraph`, `graph_state.rs`) was **replaced** by `extract_semantic_edges()` and `WorkspaceIndex`. Semantic edges now flow through `InferenceLayer.semantic_edges` alongside existing Phi markers.
+> **Semantic authority:** Φ extraction remains a compact rendering facility.
+> Durable semantic roles and relationships are authorized separately by the
+> shared structured C# resolver and published through `WorkspaceIndex`.
 
 ---
 
@@ -20,7 +22,7 @@
 
 | Question | Decision |
 |----------|----------|
-| Compiler approach | String-based extraction on tree-sitter C# captures (same strategy as Angular/Spring Boot). No re-parse of AST. |
+| Compiler approach | One parser/capture path supplies neutral C# declarations, references, imports, aliases, attributes, and method ownership. Marker payload extraction may remain textual inside bounded captures; semantic identity uses structured resolution. |
 | Marker approach | `Φ`-prefixed markers  no new opcodes. Opcodes stay language-agnostic primitives. |
 | Phasing | Three independently shippable phases. Stop after any phase for a useful Meta-Layer. |
 | Default state | On  opt-out via `.clean-ctx.json`. Non-.NET files pay zero overhead. |
@@ -68,21 +70,24 @@
 | `Φrel:` | Navigation | Navigation relationships |
 | `Φcfg:` | Fluent API | Configuration / `OnModelCreating` |
 
-### Durable EF Core DbContext role authority
+### Structured semantic authority
 
 The durable semantic index separates framework role identity from relationship
-evidence. A C# class whose parser-captured first base is exactly
-`Microsoft.EntityFrameworkCore.DbContext` (including the supported `global::`
-form) registers a file-provenanced `dotnet / DbContext / <class>` occurrence.
-That occurrence exists even when no supported `DbSet<T>` or model-building
-relationship is present. It does not replace the source declaration identity,
-which remains `builtin / Class / <class>`, and it does not create a
-`HasEntity` relationship by itself.
+evidence. EF Core `DbContext`, AutoMapper `Profile`, SignalR `Hub`/`Hub<T>`,
+ASP.NET controller bases and attributes, route/HTTP attributes, and MSTest
+`TestClassAttribute` consume neutral C# resolution results. Supported explicit,
+`global::`, ordinary-import, namespace-alias, type-alias, partial, and indirect
+source-ancestry forms converge on canonical identities. Local shadows,
+competing candidates, cycles, malformed forms, and unsupported external
+universes fail closed while neutral source facts remain available.
 
-This first durable authority slice deliberately fails closed for unqualified
-imports, aliases, indirect inheritance, generic bases, ambiguous or shadowed
-names, and malformed declarations. Existing textual EF markers and relationship
-extractors do not broaden this role-classification authority.
+Resolved identity positively admits semantic evaluation even when textual
+candidate detection misses. Textual framework checks in the extractor modules
+produce Φ rendering only; they cannot authorize durable roles or relationships.
+Generation reconciliation retracts and restores framework facts after owner,
+alias, partial, ancestry, attribute, refresh, and deletion lifecycle changes.
+Optional provider state changes acquisition work and diagnostics, never
+semantic identity or cardinality.
 
 ### AutoMapper
 

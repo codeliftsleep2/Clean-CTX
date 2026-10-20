@@ -170,7 +170,10 @@ fn registered_provide_honors_dotnet_testing_sub_layer_opt_out() {
     let path = write_fixture(
         &root,
         "accounts_controller_tests.cs",
-        r#"[TestClass]
+        r#"using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Microsoft.AspNetCore.Mvc;
+
+[TestClass]
 public class AccountsControllerTests {
   [TestMethod]
   public async Task Returns_account() {}

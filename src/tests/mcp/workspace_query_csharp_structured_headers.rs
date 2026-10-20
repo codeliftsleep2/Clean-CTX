@@ -415,8 +415,8 @@ fn csharp_structured_headers_version_existing_producer_keys() {
     );
     assert_eq!(
         crate::ir::layers::csharp::SEMANTIC_INPUT_GENERATION,
-        6,
-        "class-attribute ownership changes projected semantic input"
+        7,
+        "resolved method-attribute ownership changes projected semantic input"
     );
     assert_eq!(
         crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION,

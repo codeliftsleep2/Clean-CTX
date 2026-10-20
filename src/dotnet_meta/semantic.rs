@@ -376,12 +376,8 @@ pub(crate) fn has_resolved_dotnet_role(
     })
 }
 
-/// Register EF Core DbContext roles from parser-owned first-base evidence.
-///
-/// Campaign 147-A intentionally supports only the fully qualified framework
-/// base (with optional `global::`). Unqualified imports, aliases, indirect
-/// inheritance, and ambiguous bindings fail closed until a stronger resolver
-/// can prove them.
+/// Register EF Core DbContext roles from the shared resolved class authority.
+/// Relationship payload remains independently gated and may be empty.
 pub(crate) fn resolved_dbcontext_role_registrations(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> Vec<SemanticEdge> {

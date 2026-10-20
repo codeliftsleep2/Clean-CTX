@@ -198,12 +198,8 @@ fn evaluate_applicable_source(
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&crate::config::MetaLayerConfig>,
-) -> (
-    Option<MetaBlock>,
-    Vec<crate::layers::meta::semantic::SemanticEdge>,
-) {
+) -> Option<MetaBlock> {
     let mut block = MetaBlock::default();
-    let semantic_edges = Vec::new();
     let testing_enabled = config.map(|value| value.testing.enabled).unwrap_or(true);
 
     for raw_class in class_captures {
@@ -230,7 +226,7 @@ fn evaluate_applicable_source(
         }
     }
 
-    ((!block.is_empty()).then_some(block), semantic_edges)
+    (!block.is_empty()).then_some(block)
 }
 
 #[cfg(all(test, feature = "dotnet"))]
@@ -298,16 +294,6 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         })
     }
 
-    fn extract_semantic_edges(
-        &self,
-        _source: &str,
-        _class_captures: &[String],
-        _fidelity: crate::compression::Fidelity,
-        _config: Option<&crate::config::CleanCtxConfig>,
-    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
-        Vec::new()
-    }
-
     fn evaluate_context(
         &self,
         context: &crate::layers::meta::MetaLayerContext<'_>,
@@ -318,22 +304,9 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
         let meta_config = context
             .config
             .and_then(|value| value.meta_layers.get("dotnet"));
-        let (block, mut semantic_edges) =
+        let block =
             evaluate_applicable_source(context.class_captures, context.fidelity, meta_config);
-        semantic_edges.retain(|edge| {
-            if edge.subject.domain != "dotnet" {
-                return true;
-            }
-            match edge.subject.entity_type {
-                "Controller" => !matches!(
-                    edge.relation,
-                    crate::layers::meta::semantic::SemanticRelation::HasRoute
-                        | crate::layers::meta::semantic::SemanticRelation::ControllerAction
-                ),
-                "TestClass" => false,
-                _ => true,
-            }
-        });
+        let mut semantic_edges = Vec::new();
         if let Some(classes) = context.csharp_resolved_classes {
             semantic_edges.extend(semantic::resolved_dbcontext_role_registrations(classes));
             let file = classes

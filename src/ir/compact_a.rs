@@ -1,16 +1,14 @@
-//! Experimental CONTROL-FULL text codecs and the non-authoritative A2 snapshot.
+//! Non-authoritative A2 compatibility snapshot.
 //!
-//! This codec is derived only from normalized CONTROL-FULL. Positional rows
-//! retain canonical typed identities and exact UTF-8 body frames. A1 remains a
-//! research codec. A2 is written as compatibility/diagnostic `pretty_text` by
-//! the delta persistence path, but restore and replay never decode or trust it:
-//! physical binary `0x04`, `dv:2` history, and aligned semantic-edge snapshots
-//! are the durable authority. Neither format is model-visible content.
+//! A2 is derived only from normalized CONTROL-FULL and is written as
+//! compatibility/diagnostic `pretty_text` by the delta persistence path.
+//! Restore and replay never decode or trust it: physical binary `0x04`, `dv:2`
+//! history, and aligned semantic-edge snapshots are the durable authority. A2
+//! is not model-visible content. The superseded A1 and A3 research codecs were
+//! retired after Binary `0x04` became the canonical transport.
 
 use serde_json::{Value, json};
 use std::fmt::Write;
-
-pub const LEGEND: &str = "S A1 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,base_type_refs,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution] E[occurrence,relation,S(domain,type,name,file),O(domain,type,name,file),layer,call_evidence]. N.D[owner_id,ordered_core_injection_groups]; NO_CORE_INJECTION_OCCURRENCES is authoritative; constructor parameters are signatures and NEVER injection evidence; duplicates significant. N.V tagged rows: mod,cs,pf,lf,pt,cf,df,se,ec. N.E framework relation direction is subject -> object; subject_file and object_file are independent. B[method_id,start,end,utf8_bytes]";
 
 pub const FILE_CONTEXT_LEGEND: &str = "S A2 h[schema,version,file,mode] c[id,name,synthetic,methods,fields,mods,class_flags,extends,base_type_refs,implements,injects,patterns] i[id,name,methods,fields,mods,extends] M[id,name,params,return,mods,control_summary,pattern_facts,legacy_flags,patterns,control_flow,data_flow,side_effects,execution_contexts] K[occurrence,caller,callee_written,explicit_arg_count,spread,resolution]. Workspace graph edges are retrieved with workspace_query. N.D and N.V index existing local facts. B[method_id,start,end,utf8_bytes]";
 pub const FILE_CONTEXT_SCHEMA: &str = "clean-ctx/file-context";
@@ -234,15 +232,6 @@ fn body_wire(normalized: &Value) -> String {
         wire.push('\n');
     }
     wire
-}
-
-pub fn render(normalized: &Value) -> String {
-    format!(
-        "// COMPACT-A A1; decodes to normalized CONTROL-FULL v2\n{}\n{}\n§BODIES\n{}",
-        LEGEND,
-        serde_json::to_string(&envelope(normalized)).expect("A1 envelope is serializable"),
-        body_wire(normalized)
-    )
 }
 
 /// Render the file-local A2 boundary. Workspace graph edges remain in the

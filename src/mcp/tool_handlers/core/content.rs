@@ -8,9 +8,9 @@ use crate::mcp::McpState;
 ///
 /// ARCH-003: `content` is a compact projection — class/interface/method names,
 /// typed ownership, signatures, collapsed modifiers, extends/implements,
-/// imports, type aliases, and (at Edit) exact bodies. The reversible codec
-/// (CTX-001, `compact_a`/`compact_a3`) is code-side and must never appear in
-/// the model-visible content.
+/// imports, type aliases, and (at Edit) exact bodies. The non-authoritative A2
+/// compatibility snapshot is code-side and must never appear in model-visible
+/// content.
 pub(crate) fn presentation_document(
     ir: &CompiledIR,
     hierarchy: &HierarchicalIR,

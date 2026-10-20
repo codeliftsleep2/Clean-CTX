@@ -60,15 +60,16 @@ behavior is superseded.
 | **Local regression** | `src/tests/mcp/workspace_query_warm_state_authority.rs::issue_147_structured_dbcontext_role_does_not_require_relationship_payload`; `src/tests/mcp/workspace_query_dbcontext_role.rs` |
 | **Live scenario required?** | No for the implemented fully qualified authority slice; local lifecycle and cross-root regressions cover the production boundary |
 | **Architectural invariant** | DOTNET-001 |
-| **Status** | Implemented — awaiting focused user-run GREEN verification |
+| **Status** | Verified — absorbed into the GREEN R6-R12 C# semantic-resolution campaign |
 
-**Resolution:** parser-owned first-base evidence now authorizes a durable role
-registration for the exact fully qualified EF Core DbContext base. The index
-normalizes that record into a file-provenanced occurrence without declaration
-authority or graph adjacency. Relationship extraction remains independent;
-role-only contexts publish zero `HasEntity` edges. Unqualified imports and
-other unresolved forms remain fail-closed. Campaign B remains
-architecture-approved and implementation-pending.
+**Resolution:** shared C# resolution now authorizes the durable DbContext role
+across the bounded supported qualification, import, alias, partial, and
+ancestry envelope. The index normalizes that record into a file-provenanced
+occurrence without declaration authority or graph adjacency. Relationship
+extraction remains independently payload-gated; role-only contexts publish
+zero `HasEntity` edges. Shadows, ambiguity, unsupported external authority,
+and malformed evidence fail closed. R6-R12 deterministic, lifecycle,
+cross-root, history, provider-equivalence, and live MCP gates are GREEN.
 
 ---
 

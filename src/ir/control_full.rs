@@ -318,23 +318,3 @@ pub fn render_control_full(
 #[cfg(test)]
 #[path = "../tests/ir/control_full.rs"]
 mod tests;
-
-#[cfg(test)]
-#[path = "../tests/ir/compact_a.rs"]
-mod compact_a_tests;
-
-#[cfg(test)]
-#[path = "../tests/ir/compact_a_graph.rs"]
-mod compact_a_graph_tests;
-
-#[cfg(test)]
-#[path = "../tests/ir/compact_a_envelope.rs"]
-pub(crate) mod compact_a_envelope_tests;
-
-#[cfg(test)]
-#[path = "../tests/ir/compact_a_production_edges.rs"]
-mod compact_a_production_edge_tests;
-
-#[cfg(test)]
-#[path = "../tests/ir/compact_a3_matrix.rs"]
-mod compact_a3_matrix_tests;
