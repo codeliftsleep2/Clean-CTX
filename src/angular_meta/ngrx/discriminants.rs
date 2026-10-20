@@ -51,20 +51,19 @@ pub(crate) fn has_object_string_actions(source: &str) -> bool {
                 continue;
             };
             let mut object_cursor = object.walk();
-            for pair in object
-                .named_children(&mut object_cursor)
-                .filter(|node| node.kind() == "pair")
-            {
-                let (Some(key), Some(value)) = (
-                    pair.child_by_field_name("key"),
-                    pair.child_by_field_name("value"),
-                ) else {
-                    continue;
+            for property in object.named_children(&mut object_cursor) {
+                let key = if property.kind() == "shorthand_property_identifier" {
+                    Some(property)
+                } else if property.kind() == "pair"
+                    && property
+                        .child_by_field_name("value")
+                        .is_some_and(|value| matches!(value.kind(), "string" | "identifier"))
+                {
+                    property.child_by_field_name("key")
+                } else {
+                    None
                 };
-                if value.kind() != "string" {
-                    continue;
-                }
-                if let Ok(key) = key.utf8_text(bytes) {
+                if let Some(Ok(key)) = key.map(|key| key.utf8_text(bytes)) {
                     members.insert(format!("{owner}.{key}"));
                 }
             }
@@ -104,9 +103,10 @@ fn contains_object_action_case(node: tree_sitter::Node<'_>, source: &[u8]) -> bo
                 child.named_children(&mut body_cursor).any(|case| {
                     case.kind() == "switch_case"
                         && case.child_by_field_name("value").is_some_and(|value| {
-                            value.kind() == "member_expression"
-                                && value.child_by_field_name("object").is_some()
-                                && value.child_by_field_name("property").is_some()
+                            value.kind() == "identifier"
+                                || (value.kind() == "member_expression"
+                                    && value.child_by_field_name("object").is_some()
+                                    && value.child_by_field_name("property").is_some())
                         })
                 })
             }

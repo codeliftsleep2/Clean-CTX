@@ -64,8 +64,10 @@ pub(crate) fn bind_direct_value_identifier(
     let reference = tree
         .root_node()
         .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())?;
-    if reference.kind() != "identifier"
-        || reference.start_byte() != reference_span.start_byte()
+    if !matches!(
+        reference.kind(),
+        "identifier" | "shorthand_property_identifier"
+    ) || reference.start_byte() != reference_span.start_byte()
         || reference.end_byte() != reference_span.end_byte()
         || is_declaration_name(reference)
     {

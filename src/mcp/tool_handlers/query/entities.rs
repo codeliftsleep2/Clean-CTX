@@ -226,7 +226,9 @@ fn try_prepare_entities_in_file(
         crate::angular_meta::ngrx::discriminants::has_object_string_actions(&source);
     let has_object_switch =
         crate::angular_meta::ngrx::discriminants::has_switch_action_type_handlers(&source);
-    if has_object_actions || has_object_switch {
+    let has_ngrx_registration =
+        crate::angular_meta::ngrx::object_registration::has_registration(&canonical_path, &source);
+    if has_object_actions || has_object_switch || has_ngrx_registration {
         for term in
             crate::angular_meta::ngrx::object_actions::hydration_terms(&canonical_path, &source)
         {
@@ -261,6 +263,7 @@ fn try_prepare_entities_in_file(
             certificate,
             has_object_actions,
             has_object_switch,
+            has_ngrx_registration,
         ));
     }
     state
@@ -295,6 +298,7 @@ fn try_prepare_entities_in_file(
         certificate,
         has_object_actions,
         has_object_switch,
+        has_ngrx_registration,
     ))
 }
 
@@ -323,6 +327,7 @@ fn prepared_entities_in_file(
     certificate: CompletenessCertificate,
     has_object_actions: bool,
     has_object_switch: bool,
+    has_ngrx_registration: bool,
 ) -> PreparedQuery {
     PreparedQuery::indexed(move |index| {
         let entities = index.entities_in_file(&canonical_path);
@@ -333,6 +338,9 @@ fn prepared_entities_in_file(
         }
         if has_object_switch && !index.has_authoritative_object_switch_in_file(&canonical_path) {
             semantic_omissions.push("ngrx_switch_action_type_handlers");
+        }
+        if has_ngrx_registration && !index.has_authoritative_registration_in_file(&canonical_path) {
+            semantic_omissions.push("ngrx_reducer_registration");
         }
         let structured = serde_json::json!({
             "entities": serde_json::to_value(&entities).unwrap_or_default(),

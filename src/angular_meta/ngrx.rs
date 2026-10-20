@@ -38,6 +38,7 @@ pub(crate) mod legacy;
 #[path = "../tests/angular_meta/ngrx_legacy_discriminant.rs"]
 mod legacy_discriminant_tests;
 pub(crate) mod object_actions;
+pub(crate) mod object_registration;
 pub(crate) mod selector_declarations;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_selector_reference_binding.rs"]

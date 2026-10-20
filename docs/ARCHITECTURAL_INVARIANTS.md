@@ -753,7 +753,13 @@ omitted semantic class.
 For NgRx object actions, the omission is removed per fact only when current
 workspace reconciliation proves the qualified action member through exact
 Store dispatch authority and proves the switch handler through exact reducer
-registration plus case identity. Syntax recognition alone never removes it.
+registration plus case identity. Shorthand and reference-valued members retain
+their qualified member identity while referencing an exact value declaration.
+A bare switch case joins only through that declaration identity; equal text or
+equal string values never join facts, and multiple authorized members backed by
+one declaration remain ambiguous. Reducer-map members gain reducer authority
+only through an exact NgRx registration consumer. Syntax recognition alone
+never removes an omission.
 Populated caches/indexes, provider success, or stable empty results never grant
 exhaustiveness. Lack of a certificate means “not authorized to claim complete,”
 not “the returned facts are false.”
@@ -1006,7 +1012,7 @@ reconciliation paths plus occurrence-preserving publication.
 | **Safety boundary** | Unsupported/degradation metadata is a truthful safety boundary, not a substitute for required semantic capability. Truthful degradation is a safety mechanism, not a completion criterion. |
 | **Engineering rule** | Do not explain away an implementable semantic gap. Either implement the required structured authority or explicitly narrow the meta-layer's supported envelope. A materially used idiom inside the intended envelope must not remain a permanent omission merely because support requires additional identity, reconciliation, or lifecycle machinery. |
 | **Constraint** | Completeness never authorizes guessing: framework roles require structured identity and framework-specific authority; lookalike syntax fails closed. Meta-layers must provide no fabricated semantics, no silent gaps, and no knowingly half-implemented contract inside their declared envelope. |
-| **NgRx application** | Object-member actions require exact Store dispatch authority; untyped switch reducers require exact reducer-registration authority; aliases normalize to declaration identity; handler relationships publish only after both roles and the exact case member reconcile. Derived roles retract with their last supporting proof. |
+| **NgRx application** | Object-member actions require exact Store dispatch authority. Shorthand/reference-valued members preserve qualified member identity and carry a separate exact declaration reference. Bare switch cases join through that declaration identity, never spelling or literal equality, and ambiguity fails closed. Direct reducers and reducer-map members require exact NgRx registration authority; map shape alone grants none. Aliases normalize to declaration identity; handlers publish only after Action, Reducer, and case identity reconcile. Supported registration queries acquire their bounded dependency closure before claiming exact completeness. Derived roles and handlers retract with their last supporting proof. |
 | **Type** | STRUCTURAL and ENFORCED |
 
 ---

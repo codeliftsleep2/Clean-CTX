@@ -179,12 +179,18 @@ NgRx object-string actions and `switch(action.type)` handlers are authoritative
 only after workspace reconciliation proves their complete evidence chain:
 an exported object-member declaration; structured local or named-alias member
 binding; an object-literal dispatch on a receiver typed as `Store` from
-`@ngrx/store`; and an exported reducer registered through the supported exact
-`StoreModule.forFeature` form. The switch discriminant must bind to that
-reducer's last parameter and each case must resolve to the same qualified
-member identity authorized by dispatch. Direct-relative imports become
-semantic dependencies, and reconciliation retracts roles and relationships
-when their last dispatch or registration proof disappears.
+`@ngrx/store`; and an exported reducer consumed by an exact supported
+`StoreModule` registration. Shorthand and reference-valued object members keep
+their qualified member identity and separately reference their exact value
+declaration. A bare case label may join that action only through the same
+declaration identity; equal spelling or string values do not join, and a shared
+declaration backing multiple authorized actions is ambiguous. Reducer-map shape
+has no framework authority until an exact registration consumes the resolved
+map and its members resolve to exported reducer declarations. Direct-relative
+imports become semantic dependencies, and registration-file queries acquire
+the bounded dependency closure before exact completion. Reconciliation retracts
+roles and relationships when their last dispatch, map, or registration proof
+disappears.
 
 Recognized object/switch syntax outside that authority envelope remains
 fail-closed. File coverage reports `semantic_scope:

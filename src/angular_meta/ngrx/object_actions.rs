@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 pub(crate) const DISPATCH_LAYER: &str = "ngrx-object-dispatch-evidence";
 pub(crate) const REGISTRATION_LAYER: &str = "ngrx-reducer-registration-evidence";
 pub(crate) const SWITCH_LAYER: &str = "ngrx-object-switch-evidence";
+pub(crate) const SWITCH_VALUE_LAYER: &str = "ngrx-object-switch-value-evidence";
 
 pub(crate) fn evidence(source_id: &str, source: &str) -> Vec<SemanticEdge> {
     let Some(language) = crate::compression::language::safe_typescript_language() else {
@@ -26,6 +27,7 @@ pub(crate) fn evidence(source_id: &str, source: &str) -> Vec<SemanticEdge> {
     };
     let mut output = Vec::new();
     walk(tree.root_node(), source_id, source, &mut output);
+    output.extend(super::object_registration::evidence(source_id, source));
     output
 }
 
@@ -97,7 +99,14 @@ fn resolve_module_path(source_id: &str, module: &str) -> Option<String> {
 }
 
 pub(crate) fn is_evidence_layer(layer: &str) -> bool {
-    matches!(layer, DISPATCH_LAYER | REGISTRATION_LAYER | SWITCH_LAYER)
+    matches!(
+        layer,
+        DISPATCH_LAYER
+            | REGISTRATION_LAYER
+            | SWITCH_LAYER
+            | SWITCH_VALUE_LAYER
+            | super::object_registration::MAP_LAYER
+    )
 }
 
 /// Search terms sufficient to acquire the bounded evidence neighborhood from
@@ -119,7 +128,9 @@ pub(crate) fn hydration_terms(source_id: &str, source: &str) -> Vec<String> {
     };
     let mut terms = Vec::new();
     collect_hydration_terms(tree.root_node(), source_id, source, &mut terms);
-    terms.push("StoreModule".to_owned());
+    terms.extend(super::object_registration::hydration_terms(
+        source_id, source,
+    ));
     terms.sort();
     terms.dedup();
     terms
@@ -153,6 +164,17 @@ fn collect_hydration_terms(
             )
     {
         output.push(binding.imported_object);
+    } else if node.kind() == "switch_case"
+        && let Some(value) = node
+            .child_by_field_name("value")
+            .filter(|value| value.kind() == "identifier")
+        && let Ok(span) = SourceSpan::new(value.start_byte(), value.end_byte())
+        && let Some(binding) =
+            crate::ir::typescript_value_import_binding::bind_direct_named_value_import_allow_alias(
+                source_id, source, span,
+            )
+    {
+        output.push(binding.imported_name);
     }
     let mut cursor = node.walk();
     for child in node.named_children(&mut cursor) {
@@ -163,9 +185,6 @@ fn collect_hydration_terms(
 fn walk(node: tree_sitter::Node<'_>, source_id: &str, source: &str, out: &mut Vec<SemanticEdge>) {
     if node.kind() == "call_expression" {
         dispatch(node, source_id, source)
-            .into_iter()
-            .for_each(|edge| out.push(edge));
-        registration(node, source_id, source)
             .into_iter()
             .for_each(|edge| out.push(edge));
     } else if node.kind() == "function_declaration" {
@@ -216,46 +235,6 @@ fn dispatch(node: tree_sitter::Node<'_>, source_id: &str, source: &str) -> Optio
         EntityRef::new("typescript", "DispatchSite", owner_name(node, source)?),
         member_entity(&resolved),
         DISPATCH_LAYER,
-    ))
-}
-
-fn registration(
-    node: tree_sitter::Node<'_>,
-    source_id: &str,
-    source: &str,
-) -> Option<SemanticEdge> {
-    let function = node.child_by_field_name("function")?;
-    if function.kind() != "member_expression"
-        || function
-            .child_by_field_name("property")?
-            .utf8_text(source.as_bytes())
-            .ok()?
-            != "forFeature"
-    {
-        return None;
-    }
-    let receiver = function
-        .child_by_field_name("object")?
-        .filter_kind("identifier")?;
-    let receiver_binding =
-        crate::ir::typescript_value_import_binding::bind_named_value_import_allow_alias(
-            source_id,
-            source,
-            SourceSpan::new(receiver.start_byte(), receiver.end_byte()).ok()?,
-        )?;
-    if receiver_binding.imported_name != "StoreModule"
-        || receiver_binding.module_specifier != "@ngrx/store"
-    {
-        return None;
-    }
-    let arguments = node.child_by_field_name("arguments")?;
-    let reducer = arguments.named_child(1)?.filter_kind("identifier")?;
-    let resolved = resolve_value(source_id, source, reducer)?;
-    Some(carrier(
-        SemanticRelation::RegistersReducer,
-        EntityRef::new("ngrx", "StoreRegistration", "StoreModule.forFeature"),
-        resolved_entity("ngrx", "Reducer", &resolved),
-        REGISTRATION_LAYER,
     ))
 }
 
@@ -312,20 +291,34 @@ fn collect_switches(
             .named_children(&mut cursor)
             .filter(|child| child.kind() == "switch_case")
         {
-            let Some(value) = case
-                .child_by_field_name("value")
-                .and_then(|v| v.filter_kind("member_expression"))
-            else {
+            let Some(value) = case.child_by_field_name("value") else {
                 continue;
             };
-            let Some(member) = resolve_member(source_id, source, value) else {
+            let (subject, layer) = if value.kind() == "member_expression" {
+                let Some(member) = resolve_member(source_id, source, value) else {
+                    continue;
+                };
+                (member_entity(&member), SWITCH_LAYER)
+            } else if value.kind() == "identifier" {
+                let Some(resolved) = resolve_value(source_id, source, value) else {
+                    continue;
+                };
+                (
+                    resolved_entity(
+                        crate::ir::typescript_object_members::DOMAIN,
+                        crate::ir::typescript_object_members::VALUE_ENTITY_TYPE,
+                        &resolved,
+                    ),
+                    SWITCH_VALUE_LAYER,
+                )
+            } else {
                 continue;
             };
             out.push(carrier(
                 SemanticRelation::TriggersReducer,
-                member_entity(&member),
+                subject,
                 EntityRef::new("ngrx", "Reducer", reducer).with_file(source_id.to_owned()),
-                SWITCH_LAYER,
+                layer,
             ));
         }
         return;
@@ -501,38 +494,37 @@ fn owner_name<'a>(mut node: tree_sitter::Node<'a>, source: &'a str) -> Option<&'
     }
 }
 fn is_exported_object_declaration(source: &str, declaration: SourceSpan) -> bool {
-    let Some(language) = crate::compression::language::safe_typescript_language() else {
-        return false;
-    };
+    object_declaration_exported(source, declaration) == Some(true)
+}
+
+pub(crate) fn is_object_declaration(source: &str, declaration: SourceSpan) -> bool {
+    object_declaration_exported(source, declaration).is_some()
+}
+
+fn object_declaration_exported(source: &str, declaration: SourceSpan) -> Option<bool> {
+    let language = crate::compression::language::safe_typescript_language()?;
     let mut parser = tree_sitter::Parser::new();
     if parser.set_language(&language).is_err() {
-        return false;
+        return None;
     }
-    let Some(tree) = parser
+    let tree = parser
         .parse(source, None)
-        .filter(|tree| !tree.root_node().has_error())
-    else {
-        return false;
-    };
-    let Some(name) = tree
+        .filter(|tree| !tree.root_node().has_error())?;
+    let name = tree
         .root_node()
-        .named_descendant_for_byte_range(declaration.start_byte(), declaration.end_byte())
-    else {
-        return false;
-    };
-    let Some(declarator) = name
+        .named_descendant_for_byte_range(declaration.start_byte(), declaration.end_byte())?;
+    let declarator = name
         .parent()
-        .filter(|node| node.kind() == "variable_declarator")
-    else {
-        return false;
-    };
+        .filter(|node| node.kind() == "variable_declarator")?;
     declarator
         .child_by_field_name("value")
-        .is_some_and(|value| value.kind() == "object")
-        && declarator
+        .filter(|value| value.kind() == "object")?;
+    Some(
+        declarator
             .parent()
             .and_then(|node| node.parent())
-            .is_some_and(|node| node.kind() == "export_statement")
+            .is_some_and(|node| node.kind() == "export_statement"),
+    )
 }
 trait NodeKindExt<'a> {
     fn filter_kind(self, kind: &str) -> Option<tree_sitter::Node<'a>>;

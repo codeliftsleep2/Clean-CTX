@@ -130,8 +130,10 @@ fn bind_named_value_import_with_scope(
     let reference = tree
         .root_node()
         .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())?;
-    if reference.kind() != "identifier"
-        || reference.start_byte() != reference_span.start_byte()
+    if !matches!(
+        reference.kind(),
+        "identifier" | "shorthand_property_identifier"
+    ) || reference.start_byte() != reference_span.start_byte()
         || reference.end_byte() != reference_span.end_byte()
         || crate::ir::typescript_identifier_binding::bind_direct_value_identifier(
             source_id,

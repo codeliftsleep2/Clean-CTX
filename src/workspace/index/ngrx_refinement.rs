@@ -1,13 +1,20 @@
-//! Workspace-owned refinement of bounded direct-relative NgRx imports.
-
 use super::edges::{EdgeKey, StoredEdge};
 use super::{WorkspaceIndex, entity_key};
-use crate::layers::meta::semantic::SemanticEdge;
-use crate::layers::meta::semantic::{EntityRef, SemanticRelation};
-use std::collections::BTreeSet;
+use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 impl WorkspaceIndex {
+    pub(crate) fn has_authoritative_registration_in_file(&self, file: &str) -> bool {
+        self.entities.iter().any(|(key, occurrences)| {
+            key.0 == "ngrx"
+                && key.1 == "StoreRegistration"
+                && occurrences
+                    .iter()
+                    .any(|entity| entity.file.as_deref() == Some(file))
+        })
+    }
+
     pub(crate) fn has_authoritative_object_actions_in_file(&self, file: &str) -> bool {
         self.entities.iter().any(|(key, occurrences)| {
             key.0 == "ngrx"
@@ -47,6 +54,8 @@ impl WorkspaceIndex {
             .collect();
         let mut action_authorities = BTreeSet::new();
         let mut reducer_authorities = BTreeSet::new();
+        let value_bindings = self.object_member_value_bindings();
+        let mut map_reducers = BTreeMap::new();
 
         for (asserting_file, edge) in &candidates {
             if edge.layer == crate::angular_meta::ngrx::object_actions::DISPATCH_LAYER
@@ -62,6 +71,38 @@ impl WorkspaceIndex {
                 && exports_function(&target, &edge.object.name)
             {
                 reducer_authorities.insert((edge.object.name.clone(), target));
+            }
+        }
+
+        for (asserting_file, edge) in &candidates {
+            if edge.layer != crate::angular_meta::ngrx::object_registration::MAP_LAYER {
+                continue;
+            }
+            let Some(map_target) =
+                resolve_candidate_target(asserting_file, edge.object.file.as_deref())
+            else {
+                continue;
+            };
+            let prefix = format!("{}.", edge.object.name);
+            let mut reducers = Vec::new();
+            for (member, member_file, value, value_file) in &value_bindings {
+                if member_file != &map_target || !member.starts_with(&prefix) {
+                    continue;
+                }
+                let Some(target) = resolve_candidate_target(member_file, Some(value_file)) else {
+                    continue;
+                };
+                if self.has_reducer_declaration(value, &target) && exports_function(&target, value)
+                {
+                    reducer_authorities.insert((value.clone(), target.clone()));
+                    reducers.push((value.clone(), target));
+                }
+            }
+            if !reducers.is_empty() {
+                map_reducers.insert(
+                    (asserting_file.clone(), edge.object.name.clone(), map_target),
+                    reducers,
+                );
             }
         }
 
@@ -92,6 +133,67 @@ impl WorkspaceIndex {
                 }
                 edge.subject.file = Some(asserting_file.clone());
                 edge.object.file = Some(target);
+                edge.layer = "ngrx";
+                self.insert_refined_edge(&asserting_file, edge);
+                continue;
+            }
+            if edge.layer == crate::angular_meta::ngrx::object_registration::MAP_LAYER {
+                let Some(map_target) =
+                    resolve_candidate_target(&asserting_file, edge.object.file.as_deref())
+                else {
+                    continue;
+                };
+                let Some(reducers) = map_reducers.get(&(
+                    asserting_file.clone(),
+                    edge.object.name.clone(),
+                    map_target,
+                )) else {
+                    continue;
+                };
+                for (name, target) in reducers {
+                    let mut registration = edge.clone();
+                    registration.object =
+                        EntityRef::new("ngrx", "Reducer", name).with_file(target.clone());
+                    registration.layer = "ngrx";
+                    registration.subject.file = Some(asserting_file.clone());
+                    self.insert_refined_edge(&asserting_file, registration);
+                }
+                continue;
+            }
+            if edge.layer == crate::angular_meta::ngrx::object_actions::SWITCH_VALUE_LAYER {
+                let Some(value_target) =
+                    resolve_candidate_target(&asserting_file, edge.subject.file.as_deref())
+                else {
+                    continue;
+                };
+                let actions: Vec<_> = value_bindings
+                    .iter()
+                    .filter(|(_, member_file, value, value_file)| {
+                        value == &edge.subject.name
+                            && resolve_candidate_target(member_file, Some(value_file)).as_deref()
+                                == Some(value_target.as_str())
+                            && self.has_value_declaration(value, &value_target)
+                    })
+                    .filter(|(member, member_file, _, _)| {
+                        action_authorities.contains(&(member.clone(), member_file.clone()))
+                    })
+                    .collect();
+                let [action] = actions.as_slice() else {
+                    continue;
+                };
+                let reducer_target = edge
+                    .object
+                    .file
+                    .clone()
+                    .unwrap_or_else(|| asserting_file.clone());
+                if !reducer_authorities
+                    .contains(&(edge.object.name.clone(), reducer_target.clone()))
+                {
+                    continue;
+                }
+                edge.subject =
+                    EntityRef::new("ngrx", "Action", &action.0).with_file(action.1.clone());
+                edge.object.file = Some(reducer_target);
                 edge.layer = "ngrx";
                 self.insert_refined_edge(&asserting_file, edge);
                 continue;
@@ -169,6 +271,37 @@ impl WorkspaceIndex {
         self.declarations_by_identity(
             crate::ir::typescript_object_members::DOMAIN,
             crate::ir::typescript_object_members::ENTITY_TYPE,
+            name,
+        )
+        .iter()
+        .filter(|declaration| declaration.file.as_deref() == Some(target))
+        .count()
+            == 1
+    }
+
+    fn object_member_value_bindings(&self) -> Vec<(String, String, String, String)> {
+        self.forward
+            .values()
+            .flatten()
+            .filter(|stored| {
+                stored.edge.layer == crate::ir::typescript_object_members::LAYER
+                    && stored.edge.relation == SemanticRelation::ReferencesValue
+            })
+            .filter_map(|stored| {
+                Some((
+                    stored.edge.subject.name.clone(),
+                    stored.edge.subject.file.clone()?,
+                    stored.edge.object.name.clone(),
+                    stored.edge.object.file.clone()?,
+                ))
+            })
+            .collect()
+    }
+
+    fn has_value_declaration(&self, name: &str, target: &str) -> bool {
+        self.declarations_by_identity(
+            crate::ir::typescript_object_members::DOMAIN,
+            crate::ir::typescript_object_members::VALUE_ENTITY_TYPE,
             name,
         )
         .iter()

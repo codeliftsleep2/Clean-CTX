@@ -150,6 +150,8 @@ pub enum SemanticRelation {
     Dispatches,
     /// An exact NgRx store configuration registers a reducer declaration.
     RegistersReducer,
+    /// A neutral TypeScript object member takes its value from a declaration.
+    ReferencesValue,
     /// A component/effect selects from the store.
     Selects,
     /// An effect handles an action.
