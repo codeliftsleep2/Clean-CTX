@@ -78,7 +78,7 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
         requirement,
     )
     .unwrap();
-    assert_eq!(first.candidates_discovered, 4);
+    assert_eq!(first.candidates_discovered, 2);
     assert_eq!(first.candidates_compiled, 0);
     assert_eq!(first.discovery_status, "partial");
     assert!(
@@ -98,8 +98,8 @@ fn failed_candidate_publication_remains_retryable_after_successful_discovery() {
     )
     .unwrap();
     assert_eq!(
-        second.candidates_discovered, 4,
-        "retry must repeat both uncommitted provider hints and Clean root acquisition"
+        second.candidates_discovered, 2,
+        "retry must repeat both acquisition routes while counting canonical owners once"
     );
     assert_eq!(second.candidates_compiled, 1);
     assert_eq!(second.discovery_status, "completed");

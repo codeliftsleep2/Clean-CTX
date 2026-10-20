@@ -147,7 +147,7 @@ fn red15_additional_root_only_discovery() {
     let sc = call_find(&state, "AdditionalOnly", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 2);
+    assert_eq!(sc["discovery"]["discovered"], 1);
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert!(
         entities.iter().any(|entity| {
@@ -296,7 +296,7 @@ fn red17_merged_candidates_are_exhaustive_after_dedup_and_index_exclusion() {
     expected.dedup();
 
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 16);
+    assert_eq!(sc["discovery"]["discovered"], 8);
     assert_eq!(sc["discovery"]["compiled"], 7);
     assert_eq!(added.len(), 7, "all unique unindexed candidates compile");
     assert_eq!(added, expected.into_iter().collect());
@@ -326,7 +326,7 @@ fn red18_per_project_failure_degrades_locally() {
     let sc = call_find(&state, "Survivor", primary.path());
     let entities = sc["entities"].as_array().expect("entities array");
     assert_both_projects_searched(&primary_slug, &additional_slug);
-    assert_eq!(sc["discovery"]["discovered"], 2);
+    assert_eq!(sc["discovery"]["discovered"], 1);
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert!(entities.iter().any(|entity| entity["name"] == "Survivor"));
     clear_test_project_search_results();

@@ -162,7 +162,7 @@ fn red_h1_repeated_identical_query_does_not_repeat_discovery() {
 
     let first = call_query(&state, "reverse_edges", "ServiceA", root.path());
     assert_eq!(calls_for(&slug), 1, "first call must discover");
-    assert_eq!(first["discovery"]["discovered"], 3);
+    assert_eq!(first["discovery"]["discovered"], 2);
     assert_eq!(first["discovery"]["compiled"], 2);
     assert_eq!(
         first["count"], 1,
@@ -499,8 +499,8 @@ fn red_h8_declaration_oriented_queries_share_one_discovery_entry() {
     let third = call_query(&state, "transitive_dependencies", "ServiceA", root.path());
 
     assert_eq!(
-        first["discovery"]["discovered"], 2,
-        "provider and Clean discovery are both reported on the first call: {first:?}"
+        first["discovery"]["discovered"], 1,
+        "the canonical owner is reported once across provider and Clean routes: {first:?}"
     );
     assert!(second["discovery"]["discovered"].is_null());
     assert!(third["discovery"]["discovered"].is_null());

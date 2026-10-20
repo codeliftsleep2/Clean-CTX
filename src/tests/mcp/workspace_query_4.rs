@@ -155,7 +155,7 @@ fn red23_reverse_edges_discovers_consumer_files_in_additional_root() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", primary.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 5);
+    assert_eq!(sc["discovery"]["discovered"], 3);
     assert_eq!(
         sc["discovery"]["compiled"], 3,
         "Clean acquisition compiles the service declaration plus both inbound consumers"
@@ -360,7 +360,7 @@ fn red28_cbm_relationship_cardinality_never_becomes_semantic_count() {
 
     let sc = call_query(&state, "reverse_edges", "ServiceA", root.path());
 
-    assert_eq!(sc["discovery"]["discovered"], 4);
+    assert_eq!(sc["discovery"]["discovered"], 3);
     assert_eq!(sc["count"], 1, "only Clean-CTX semantic edges count");
     assert_injecting_consumers(&sc, &["RealConsumer"]);
     clear_test_project_search_results();
