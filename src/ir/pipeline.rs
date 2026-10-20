@@ -573,6 +573,10 @@ impl Default for PassPipeline {
 #[path = "../tests/ir/pipeline.rs"]
 mod tests;
 
+#[cfg(all(test, feature = "csharp", feature = "dotnet"))]
+#[path = "../tests/ir/pipeline_entity_ingestion.rs"]
+mod entity_ingestion_tests;
+
 // Structural method-identity regressions: a declaration's name, its generic
 // type parameters, its parameters, and its return type are read from
 // structure (`compaction::signature`), never from whitespace-token position.

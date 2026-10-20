@@ -12,12 +12,17 @@ use crate::ir::csharp_symbols::{
     CSharpDeclarationPart, CSharpSourceSymbol, CSharpSourceSymbolIndex, CSharpSymbolKey,
 };
 
+#[path = "compilation/method_inputs.rs"]
+mod method_inputs;
+use method_inputs::direct_methods;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CSharpResolvedClass {
     pub owner: String,
     pub files: Vec<String>,
     pub raw_parts: Vec<(String, String)>,
     pub method_ids: Vec<(String, Vec<String>)>,
+    pub methods: Vec<CSharpResolvedMethod>,
     pub attributes: Vec<CSharpResolvedAttribute>,
     pub ancestry: CSharpResolution<CSharpTypeIdentity>,
 }
@@ -25,9 +30,17 @@ pub(crate) struct CSharpResolvedClass {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CSharpResolvedAttribute {
     pub written: String,
+    pub raw: String,
     pub file: String,
     pub span: CSharpSourceSpan,
     pub resolution: CSharpResolution<CSharpTypeIdentity>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct CSharpResolvedMethod {
+    pub name: String,
+    pub file: String,
+    pub attributes: Vec<CSharpResolvedAttribute>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -41,13 +54,21 @@ struct ClassInput {
     scope: Scope,
     raw_class: String,
     method_ids: Vec<String>,
+    methods: Vec<MethodInput>,
     attributes: Vec<AttributeInput>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct AttributeInput {
+pub(super) struct AttributeInput {
     written: String,
+    raw: String,
     span: CSharpSourceSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MethodInput {
+    name: String,
+    attributes: Vec<AttributeInput>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -149,6 +170,7 @@ pub(crate) fn resolve_compilation_units(
                         .map(|input| (part.file.clone(), input.method_ids.clone()))
                 })
                 .collect(),
+            methods: resolved_methods(symbol, units, known_external, &index),
             attributes: resolved_attributes(symbol, units, known_external, &index),
             ancestry: resolve_type_ancestry(&source_identity(symbol), &graph),
         })
@@ -170,30 +192,73 @@ fn resolved_attributes(
         else {
             continue;
         };
-        for attribute in &input.attributes {
-            resolved.push(CSharpResolvedAttribute {
-                written: attribute.written.clone(),
+        resolved.extend(
+            input
+                .attributes
+                .iter()
+                .map(|attribute| resolve_attribute(attribute, input, known_external, index)),
+        );
+    }
+    resolved
+}
+
+fn resolved_methods(
+    symbol: &CSharpSourceSymbol,
+    units: &[CSharpCompilationUnit],
+    known_external: &[CSharpTypeIdentity],
+    index: &CSharpSourceSymbolIndex,
+) -> Vec<CSharpResolvedMethod> {
+    let mut methods = Vec::new();
+    for part in &symbol.parts {
+        let Some(input) = units
+            .iter()
+            .flat_map(|unit| &unit.classes)
+            .find(|input| input.part.file == part.file && input.part.span == part.span)
+        else {
+            continue;
+        };
+        for method in &input.methods {
+            methods.push(CSharpResolvedMethod {
+                name: method.name.clone(),
                 file: part.file.clone(),
-                span: attribute.span,
-                resolution: with_attribute_evidence(
-                    resolve_attribute_type_reference(
-                        &attribute.written,
-                        &CSharpOrdinaryImportContext {
-                            namespace_path: input.scope.namespace_path.clone(),
-                            containing_type_path: input.scope.containing_type_path.clone(),
-                            ordinary_imports: input.scope.ordinary_imports.clone(),
-                        },
-                        &input.scope.aliases,
-                        known_external,
-                        index,
-                    ),
-                    &part.file,
-                    attribute.span,
-                ),
+                attributes: method
+                    .attributes
+                    .iter()
+                    .map(|attribute| resolve_attribute(attribute, input, known_external, index))
+                    .collect(),
             });
         }
     }
-    resolved
+    methods
+}
+
+fn resolve_attribute(
+    attribute: &AttributeInput,
+    input: &ClassInput,
+    known_external: &[CSharpTypeIdentity],
+    index: &CSharpSourceSymbolIndex,
+) -> CSharpResolvedAttribute {
+    CSharpResolvedAttribute {
+        written: attribute.written.clone(),
+        raw: attribute.raw.clone(),
+        file: input.part.file.clone(),
+        span: attribute.span,
+        resolution: with_attribute_evidence(
+            resolve_attribute_type_reference(
+                &attribute.written,
+                &CSharpOrdinaryImportContext {
+                    namespace_path: input.scope.namespace_path.clone(),
+                    containing_type_path: input.scope.containing_type_path.clone(),
+                    ordinary_imports: input.scope.ordinary_imports.clone(),
+                },
+                &input.scope.aliases,
+                known_external,
+                index,
+            ),
+            &input.part.file,
+            attribute.span,
+        ),
+    }
 }
 
 fn with_attribute_evidence(
@@ -296,25 +361,28 @@ fn class_inputs(
             let class_position = available_classes
                 .iter()
                 .position(|(_, candidate)| candidate == &part.key.name);
-            let method_ids = class_position.map_or_else(Vec::new, |position| {
+            let method_records = class_position.map_or_else(Vec::new, |position| {
                 let (class_id, _) = available_classes.remove(position);
                 instructions
                     .iter()
                     .filter_map(|instruction| match instruction {
-                        crate::ir::opcodes::CoreOp::DefMethod(owner, method, _)
+                        crate::ir::opcodes::CoreOp::DefMethod(owner, method, name)
                             if owner == &class_id =>
                         {
-                            Some(method.clone())
+                            Some((method.clone(), name.clone()))
                         }
                         _ => None,
                     })
                     .collect()
             });
+            let methods = direct_methods(captures, owner, &method_records);
+            let method_ids = method_records.into_iter().map(|(id, _)| id).collect();
             Some(ClassInput {
                 scope: scope_for(captures, span, file),
                 part,
                 raw_class: owner.raw_text.clone(),
                 method_ids,
+                methods,
                 attributes: direct_class_attributes(captures, owner),
             })
         })
@@ -342,6 +410,7 @@ fn direct_class_attributes(captures: &[CapEntry], owner: &CapEntry) -> Vec<Attri
                 .trim();
             (!written.is_empty()).then(|| AttributeInput {
                 written: written.to_string(),
+                raw: capture.raw_text.trim().to_string(),
                 span: span(capture),
             })
         })

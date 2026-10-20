@@ -303,13 +303,6 @@ impl SemanticCompilationArtifact {
             self.canonical_owner(),
             self.fidelity(),
         ));
-        edges.extend(
-            crate::dotnet_meta::semantic::project_attribute_authorized_aspnet_edges(
-                resolved_classes,
-                self.canonical_owner(),
-                self.fidelity(),
-            ),
-        );
         if self.dotnet_testing_enabled {
             edges.extend(crate::dotnet_meta::semantic::project_resolved_mstest_edges(
                 resolved_classes,

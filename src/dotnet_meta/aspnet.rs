@@ -16,11 +16,9 @@ use super::markers::{
 };
 use crate::compression::Fidelity;
 use crate::dotnet_meta::MetaBlock;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 pub(crate) struct AspNetAnalysis {
     pub block: MetaBlock,
-    pub semantic_edges: Vec<SemanticEdge>,
 }
 
 /// Extract ASP.NET Core markers from a single class capture.
@@ -45,28 +43,12 @@ pub(crate) fn analyze_aspnet(class_source: &str, fidelity: Fidelity) -> Option<A
         return None;
     }
 
-    let mut analysis = analyze_authorized_controller(class_source, fidelity)?;
-    if !has_controller_attribute {
-        analysis.semantic_edges.clear();
-    }
-    Some(analysis)
+    analyze_controller_markers(class_source, fidelity)
 }
 
-/// Analyze direct controller-attribute authority pending the shared attribute
-/// resolver migration. Written base names are deliberately excluded.
-pub(crate) fn analyze_attribute_authorized_controller(
-    class_source: &str,
-    fidelity: Fidelity,
-) -> Option<AspNetAnalysis> {
-    (class_source.contains("[ApiController]") || class_source.contains("[Controller]"))
-        .then(|| analyze_authorized_controller(class_source, fidelity))?
-}
-
-/// Analyze a class whose ASP.NET controller ancestry was proven externally.
-pub(crate) fn analyze_authorized_controller(
-    class_source: &str,
-    fidelity: Fidelity,
-) -> Option<AspNetAnalysis> {
+/// Render markers for a textual ASP.NET candidate. This function has no
+/// semantic authority; resolved C# identities own durable controller facts.
+fn analyze_controller_markers(class_source: &str, fidelity: Fidelity) -> Option<AspNetAnalysis> {
     let mut lines = Vec::new();
 
     // Extract class name
@@ -108,29 +90,8 @@ pub(crate) fn analyze_authorized_controller(
     if lines.is_empty() {
         None
     } else {
-        let controller = EntityRef::new("dotnet", "Controller", &class_name);
-        let mut semantic_edges = Vec::new();
-        if let Some(route) = extract_semantic_route(class_source) {
-            semantic_edges.push(SemanticEdge {
-                relation: SemanticRelation::HasRoute,
-                subject: controller.clone(),
-                object: EntityRef::new("dotnet", "Route", &route),
-                layer: "dotnet",
-                call_evidence: None,
-            });
-        }
-        if let Some(actions) = actions {
-            semantic_edges.extend(actions.into_iter().map(|action| SemanticEdge {
-                relation: SemanticRelation::ControllerAction,
-                subject: controller.clone(),
-                object: EntityRef::new("dotnet", "Action", &action.name),
-                layer: "dotnet",
-                call_evidence: None,
-            }));
-        }
         Some(AspNetAnalysis {
             block: MetaBlock { lines },
-            semantic_edges,
         })
     }
 }
@@ -173,14 +134,6 @@ fn extract_route(source: &str) -> Option<String> {
         }
     }
     None
-}
-
-fn extract_semantic_route(source: &str) -> Option<String> {
-    let pos = source.find("[Route(")?;
-    let rest = &source[pos + "[Route(".len()..];
-    let quote_start = rest.find('"')? + 1;
-    let quote_end = rest[quote_start..].find('"')?;
-    Some(rest[quote_start..quote_start + quote_end].to_string())
 }
 
 /// Extract authorization policy from [Authorize(Policy = "...")] or [Authorize(Roles = "...")].

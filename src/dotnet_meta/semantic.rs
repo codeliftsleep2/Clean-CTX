@@ -17,6 +17,18 @@ const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
 const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
 const ASPNET_CONTROLLER: &str = "Microsoft.AspNetCore.Mvc.Controller";
 const ASPNET_CONTROLLER_BASE: &str = "Microsoft.AspNetCore.Mvc.ControllerBase";
+const ASPNET_API_CONTROLLER_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.ApiControllerAttribute";
+const ASPNET_CONTROLLER_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.ControllerAttribute";
+const ASPNET_ROUTE_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.RouteAttribute";
+const ASPNET_HTTP_ATTRIBUTES: &[&str] = &[
+    "Microsoft.AspNetCore.Mvc.HttpGetAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPostAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPutAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpDeleteAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPatchAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpHeadAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpOptionsAttribute",
+];
 const MSTEST_TEST_CLASS_ATTRIBUTE: &str =
     "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute";
 
@@ -30,9 +42,21 @@ pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER_BASE),
         crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
+            ASPNET_API_CONTROLLER_ATTRIBUTE,
+        ),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
+            ASPNET_CONTROLLER_ATTRIBUTE,
+        ),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_ROUTE_ATTRIBUTE),
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
             MSTEST_TEST_CLASS_ATTRIBUTE,
         ),
     ]
+    .into_iter()
+    .chain(ASPNET_HTTP_ATTRIBUTES.iter().map(|identity| {
+        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(*identity)
+    }))
+    .collect()
 }
 
 pub(crate) fn project_resolved_mstest_edges(
@@ -155,6 +179,23 @@ fn is_resolved_aspnet_controller(
                 && identity.generic_arity == 0
                 && identity.origin
                     == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
+    ) || class.attributes.iter().any(|attribute| {
+        resolved_attribute_is(attribute, ASPNET_API_CONTROLLER_ATTRIBUTE)
+            || resolved_attribute_is(attribute, ASPNET_CONTROLLER_ATTRIBUTE)
+    })
+}
+
+fn resolved_attribute_is(
+    attribute: &crate::ir::csharp_resolution::CSharpResolvedAttribute,
+    expected: &str,
+) -> bool {
+    matches!(
+        &attribute.resolution,
+        crate::ir::csharp_resolution::CSharpResolution::Resolved { identity, .. }
+            if identity.qualified_name == expected
+                && identity.generic_arity == 0
+                && identity.origin
+                    == crate::ir::csharp_resolution::CSharpTypeIdentityOrigin::KnownExternal
     )
 }
 
@@ -184,60 +225,52 @@ pub(crate) fn project_resolved_aspnet_edges(
                 call_evidence: None,
             });
         }
-        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
-            if let Some(analysis) =
-                crate::dotnet_meta::aspnet::analyze_authorized_controller(raw_class, fidelity)
-            {
-                edges.extend(analysis.semantic_edges.into_iter().map(|mut edge| {
-                    // Relationships remain asserted by the physical payload
-                    // part through WorkspaceIndex's owner key, but their
-                    // controller subject is the one composed symbol
-                    // occurrence. Otherwise every partial payload part would
-                    // manufacture another framework-role occurrence.
-                    edge.subject.file = Some(symbol_owner.clone());
-                    edge.object.file = Some(file.to_string());
-                    edge
-                }));
+        let mut controller = EntityRef::new("dotnet", "Controller", &class.owner);
+        controller.file = Some(symbol_owner.clone());
+        for attribute in class.attributes.iter().filter(|attribute| {
+            attribute.file == file && resolved_attribute_is(attribute, ASPNET_ROUTE_ATTRIBUTE)
+        }) {
+            let Some(route) = first_quoted_argument(&attribute.raw) else {
+                continue;
+            };
+            let mut target = EntityRef::new("dotnet", "Route", route);
+            target.file = Some(file.to_string());
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::HasRoute,
+                subject: controller.clone(),
+                object: target,
+                layer: "dotnet",
+                call_evidence: None,
+            });
+        }
+        if fidelity != Fidelity::Low {
+            for method in class.methods.iter().filter(|method| method.file == file) {
+                if !method.attributes.iter().any(|attribute| {
+                    ASPNET_HTTP_ATTRIBUTES
+                        .iter()
+                        .any(|identity| resolved_attribute_is(attribute, identity))
+                }) {
+                    continue;
+                }
+                let mut target = EntityRef::new("dotnet", "Action", &method.name);
+                target.file = Some(file.to_string());
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::ControllerAction,
+                    subject: controller.clone(),
+                    object: target,
+                    layer: "dotnet",
+                    call_evidence: None,
+                });
             }
         }
     }
     edges
 }
 
-pub(crate) fn project_attribute_authorized_aspnet_edges(
-    classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
-    file: &str,
-    fidelity: Fidelity,
-) -> Vec<SemanticEdge> {
-    let mut edges = Vec::new();
-    for class in classes.iter().filter(|class| {
-        !is_resolved_aspnet_controller(class) && class.files.iter().any(|owner| owner == file)
-    }) {
-        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
-            let Some(analysis) =
-                crate::dotnet_meta::aspnet::analyze_attribute_authorized_controller(
-                    raw_class, fidelity,
-                )
-            else {
-                continue;
-            };
-            let mut role = EntityRef::new("dotnet", "Controller", &class.owner);
-            role.file = Some(file.to_string());
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::Defines,
-                subject: role.clone(),
-                object: role,
-                layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
-                call_evidence: None,
-            });
-            edges.extend(analysis.semantic_edges.into_iter().map(|mut edge| {
-                edge.subject.file = Some(file.to_string());
-                edge.object.file = Some(file.to_string());
-                edge
-            }));
-        }
-    }
-    edges
+fn first_quoted_argument(raw: &str) -> Option<&str> {
+    let start = raw.find('"')? + 1;
+    let end = raw[start..].find('"')?;
+    Some(&raw[start..start + end])
 }
 
 pub(crate) fn project_resolved_automapper_edges(
@@ -378,20 +411,6 @@ pub(crate) fn resolved_dbcontext_role_names(
         .collect()
 }
 
-/// Extract .NET semantic edges from a single class capture.
-/// Reuses the same string-scanning patterns as the existing .NET extractors.
-pub fn extract_dotnet_semantic_edges(
-    raw_class: &str,
-    _class_name: &str,
-    fidelity: Fidelity,
-) -> Vec<SemanticEdge> {
-    #[cfg(test)]
-    super::class_analysis_metrics::record_analysis();
-
-    crate::dotnet_meta::aspnet::analyze_attribute_authorized_controller(raw_class, fidelity)
-        .map(|analysis| analysis.semantic_edges)
-        .unwrap_or_default()
-}
 // ── Private Helpers (mirroring existing .NET extractor patterns) ──────────
 
 /// Extract source/destination type pairs from CreateMap<TSource, TDest>() calls.
@@ -490,3 +509,7 @@ mod tests_r9;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/mstest_attribute_resolution_r10.rs"]
 mod tests_r10;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/aspnet_attribute_resolution_r11.rs"]
+mod tests_r11;

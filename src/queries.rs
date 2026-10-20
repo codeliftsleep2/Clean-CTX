@@ -161,6 +161,11 @@ pub const CS_SEMANTIC_QUERY: &str = r#"
     (class_declaration
         (attribute_list
             (attribute) @csharp.class_attribute))
+    ; Method attributes retain their declaration owner so framework consumers
+    ; can authorize action semantics without scanning written class text.
+    (method_declaration
+        (attribute_list
+            (attribute) @csharp.method_attribute))
 "#;
 
 pub const CS_CALL_QUERY: &str = r#"

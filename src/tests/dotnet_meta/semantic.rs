@@ -5,7 +5,26 @@
 use crate::compression::Fidelity;
 use crate::dotnet_meta::DotNetMetaLayer;
 use crate::layers::meta::MetaLayer;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
+
+fn compile_edges(source: &str, fidelity: Fidelity) -> Vec<SemanticEdge> {
+    let (language, query) =
+        crate::compression::language::language_for_extension("cs").expect("C# language");
+    let mut compiler = crate::ir::compiler::IRCompiler::new();
+    compiler
+        .compile_focused(
+            source,
+            "dotnet-semantic-test",
+            Some("C:/repo/Semantics.cs"),
+            language,
+            query,
+            fidelity,
+            None,
+            None,
+        )
+        .expect("C# compilation");
+    compiler.semantic_edges
+}
 
 // ── Controller → ControllerAction ────────────────────────────────────
 
@@ -25,9 +44,7 @@ public class UsersController : ControllerBase
     public IActionResult Create([FromBody] CreateUserDto dto) { return Ok(); }
 }
 "#;
-    let class_captures = vec![source.to_string()];
-    let layer = DotNetMetaLayer::new();
-    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Medium, None);
+    let edges = compile_edges(source, Fidelity::Medium);
 
     let actions: Vec<&SemanticEdge> = edges
         .iter()
@@ -35,9 +52,9 @@ public class UsersController : ControllerBase
         .collect();
     assert!(!actions.is_empty(), "should have ControllerAction edges");
 
-    let has_get_all = actions
-        .iter()
-        .any(|e| e.object == EntityRef::new("dotnet", "Action", "GetAll"));
+    let has_get_all = actions.iter().any(|e| {
+        e.object.domain == "dotnet" && e.object.entity_type == "Action" && e.object.name == "GetAll"
+    });
     assert!(has_get_all, "should have GetAll action");
 }
 
@@ -46,13 +63,13 @@ public class UsersController : ControllerBase
 #[test]
 fn controller_has_route() {
     let source = r#"
+using Microsoft.AspNetCore.Mvc;
+
 [ApiController]
 [Route("api/users")]
 public class UsersController : ControllerBase { }
 "#;
-    let class_captures = vec![source.to_string()];
-    let layer = DotNetMetaLayer::new();
-    let edges = layer.extract_semantic_edges(source, &class_captures, Fidelity::Low, None);
+    let edges = compile_edges(source, Fidelity::Low);
 
     let routes: Vec<&SemanticEdge> = edges
         .iter()
@@ -60,9 +77,11 @@ public class UsersController : ControllerBase { }
         .collect();
     assert!(!routes.is_empty(), "should have HasRoute edge");
 
-    let has_route = routes
-        .iter()
-        .any(|e| e.object == EntityRef::new("dotnet", "Route", "api/users"));
+    let has_route = routes.iter().any(|e| {
+        e.object.domain == "dotnet"
+            && e.object.entity_type == "Route"
+            && e.object.name == "api/users"
+    });
     assert!(has_route, "should route to api/users");
 }
 

@@ -25,7 +25,7 @@
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 5;
+pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 6;
 
 pub mod aspnet;
 pub mod automapper;
@@ -203,13 +203,12 @@ fn evaluate_applicable_source(
     Vec<crate::layers::meta::semantic::SemanticEdge>,
 ) {
     let mut block = MetaBlock::default();
-    let mut semantic_edges = Vec::new();
+    let semantic_edges = Vec::new();
     let testing_enabled = config.map(|value| value.testing.enabled).unwrap_or(true);
 
     for raw_class in class_captures {
         if let Some(analysis) = aspnet::analyze_aspnet(raw_class, fidelity) {
             block.lines.extend(analysis.block.lines);
-            semantic_edges.extend(analysis.semantic_edges);
         }
         if let Some(result) = efcore::extract_efcore(raw_class, fidelity) {
             block.lines.extend(result.lines);
@@ -302,24 +301,11 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
     fn extract_semantic_edges(
         &self,
         _source: &str,
-        class_captures: &[String],
-        fidelity: crate::compression::Fidelity,
+        _class_captures: &[String],
+        _fidelity: crate::compression::Fidelity,
         _config: Option<&crate::config::CleanCtxConfig>,
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
-        use crate::layers::meta::semantic::SemanticEdge;
-        let mut edges: Vec<SemanticEdge> = Vec::new();
-
-        // Run per-class extraction following the same pattern as run_meta_layer
-        for raw_class in class_captures {
-            let class_name = crate::dotnet_meta::semantic::extract_class_name_from_class(raw_class);
-            if let Some(name) = class_name {
-                edges.extend(crate::dotnet_meta::semantic::extract_dotnet_semantic_edges(
-                    raw_class, &name, fidelity,
-                ));
-            }
-        }
-
-        edges
+        Vec::new()
     }
 
     fn evaluate_context(
@@ -363,11 +349,6 @@ impl crate::layers::meta::MetaLayer for DotNetMetaLayer {
                     context.fidelity,
                 ));
                 semantic_edges.extend(semantic::project_resolved_aspnet_edges(
-                    classes,
-                    file,
-                    context.fidelity,
-                ));
-                semantic_edges.extend(semantic::project_attribute_authorized_aspnet_edges(
                     classes,
                     file,
                     context.fidelity,
