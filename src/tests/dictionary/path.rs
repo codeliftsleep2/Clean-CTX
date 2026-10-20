@@ -3,6 +3,7 @@
 // Tests for PathDictionary alias management and footer formatting.
 
 use crate::dictionary::PathDictionary;
+use crate::dictionary::path::canonical_identity_key;
 
 /// format_footer_for_aliases with known aliases includes only those aliases.
 #[test]
@@ -106,5 +107,74 @@ fn prior_session_aliases_do_not_leak_into_scoped_footer() {
     assert!(
         !footer.contains("α1"),
         "footer must NOT contain a.ts's alias α1"
+    );
+}
+
+#[test]
+fn canonical_identity_collapses_resolvable_dot_and_dotdot_aliases_only() {
+    let root = tempfile::tempdir().expect("identity root");
+    let nested = root.path().join("nested");
+    std::fs::create_dir(&nested).expect("nested directory");
+    let owner = root.path().join("Owner.ts");
+    std::fs::write(&owner, "export class Owner {}\n").expect("owner source");
+
+    let canonical = canonical_identity_key(&owner.to_string_lossy());
+    let dotted = canonical_identity_key(&root.path().join(".").join("Owner.ts").to_string_lossy());
+    let dotdot = canonical_identity_key(&nested.join("..").join("Owner.ts").to_string_lossy());
+    let distinct = root.path().join("Distinct.ts");
+    std::fs::write(&distinct, "export class Distinct {}\n").expect("distinct source");
+
+    assert_eq!(dotted, canonical);
+    assert_eq!(dotdot, canonical);
+    assert_ne!(
+        canonical_identity_key(&distinct.to_string_lossy()),
+        canonical,
+        "textually similar routes must not collapse distinct physical owners"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn canonical_identity_uses_supported_physical_symlink_identity() {
+    use std::os::unix::fs::symlink;
+
+    let root = tempfile::tempdir().expect("identity root");
+    let owner = root.path().join("Owner.ts");
+    let alias = root.path().join("OwnerAlias.ts");
+    std::fs::write(&owner, "export class Owner {}\n").expect("owner source");
+    symlink(&owner, &alias).expect("source symlink");
+
+    assert_eq!(
+        canonical_identity_key(&alias.to_string_lossy()),
+        canonical_identity_key(&owner.to_string_lossy())
+    );
+}
+
+#[cfg(not(windows))]
+#[test]
+fn canonical_identity_preserves_case_distinct_physical_owners() {
+    let root = tempfile::tempdir().expect("identity root");
+    let upper = root.path().join("Owner.ts");
+    let lower = root.path().join("owner.ts");
+    std::fs::write(&upper, "export class Upper {}\n").expect("upper owner");
+    std::fs::write(&lower, "export class Lower {}\n").expect("lower owner");
+
+    assert_ne!(
+        canonical_identity_key(&upper.to_string_lossy()),
+        canonical_identity_key(&lower.to_string_lossy())
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn canonical_identity_collapses_windows_case_aliases() {
+    let root = tempfile::tempdir().expect("identity root");
+    let owner = root.path().join("Owner.ts");
+    std::fs::write(&owner, "export class Owner {}\n").expect("owner source");
+    let case_alias = root.path().join("owner.ts");
+
+    assert_eq!(
+        canonical_identity_key(&case_alias.to_string_lossy()),
+        canonical_identity_key(&owner.to_string_lossy())
     );
 }

@@ -202,6 +202,10 @@ pub struct McpState {
     pub(crate) hydration_discovery: Mutex<HydrationDiscoveryCache>,
     /// Session-scoped proof-backed incoming-relationship acquisition cache.
     pub(crate) acquisition_completion: Mutex<AcquisitionCompletionCache>,
+    /// Session-scoped execution coordination for equivalent cold hydration.
+    pub(crate) hydration_flights: crate::mcp::hydration_flight::HydrationFlightRegistry,
+    #[cfg(test)]
+    pub(crate) hydration_scan_calls: std::sync::atomic::AtomicUsize,
     pub(crate) semantic_compiler:
         crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor,
     #[cfg(feature = "csharp")]
@@ -300,6 +304,9 @@ impl McpState {
             workspace_index: RwLock::new(crate::workspace::index::WorkspaceIndex::new()),
             hydration_discovery: Mutex::new(HydrationDiscoveryCache::new()),
             acquisition_completion: Mutex::new(AcquisitionCompletionCache::new()),
+            hydration_flights: Default::default(),
+            #[cfg(test)]
+            hydration_scan_calls: std::sync::atomic::AtomicUsize::new(0),
             semantic_compiler: crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::new(
                 crate::mcp::semantic_compilation::executor::SemanticCompilerExecutor::default_worker_count(),
             ),

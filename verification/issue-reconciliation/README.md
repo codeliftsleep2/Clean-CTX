@@ -148,6 +148,10 @@ pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue144Accepta
 The harness drives owned provider-disabled, provider-unavailable, and
 provider-enabled MCP stdio sessions. It verifies exact nonempty and zero reverse
 TypeRef results, cold/warm equivalence, no warm semantic recompilation,
+provider-disabled and provider-enabled single-flight behavior with two identical
+cold requests outstanding before either response is consumed, JSON-RPC response
+correlation independent of arrival order, exactly one compilation-contributing
+response, a zero-additional-compilation follower, and a zero-work warm repeat,
 additional-root and `withinPath` scope, exclusions, a 37-consumer cardinality
 control crossing historical/common candidate limits, duplicate semantic owners
 in distinct files, constructor and
@@ -163,7 +167,9 @@ timing, and verdict is retained beneath `target/issue-144-live-verification/`.
 Every single or batched workspace query containing a reverse-edge request must
 finish within 10 seconds by default; `-MaxReverseSeconds` may make the operator
 gate stricter but must not be raised for Issue #144 acceptance. This is
-operator/live evidence, not a Rust test or substitute for the final gate.
+operator/live evidence, not a Rust test or substitute for the tracked concurrency
+regressions or final gate. Deterministic tests remain authoritative for proving
+unrelated hydration keys do not serialize and failed leaders unblock followers.
 
 ## Post-CBM causal investigation
 

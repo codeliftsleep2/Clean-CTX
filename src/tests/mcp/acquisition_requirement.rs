@@ -71,6 +71,48 @@ fn acquisition_partial_proof_leaves_only_exact_residual_units() {
 }
 
 #[test]
+fn explicitly_incapable_only_universe_may_be_vacuously_complete() {
+    let requirement = AcquisitionRequirement::incoming_type_ref(
+        "ContextA",
+        "scope-incapable-only",
+        std::iter::empty(),
+    );
+    let satisfaction = AcquisitionSatisfaction::new(&requirement);
+
+    assert!(requirement.units.is_empty());
+    assert!(satisfaction.residual_units().is_empty());
+    assert!(
+        satisfaction.is_source_complete(),
+        "positive construction of an empty capable-producer universe permits vacuous completeness"
+    );
+}
+
+#[test]
+fn missing_producer_generation_retains_the_acquisition_obligation() {
+    let current = GenerationCatalog::current();
+    let missing = current.without(ProducerKey::CSharpSemanticInput);
+    let generation = producer_generation_fingerprint(SourceKind::CSharp, &missing)
+        .unwrap_or_else(|| "missing-generation".into());
+    let retained = unit("root-a", SourceKind::CSharp, &generation);
+    let requirement = AcquisitionRequirement::incoming_type_ref(
+        "ContextA",
+        "scope-missing-generation",
+        [retained.clone()],
+    );
+    let satisfaction = AcquisitionSatisfaction::new(&requirement);
+
+    assert_eq!(generation, "missing-generation");
+    assert_eq!(
+        satisfaction.residual_units(),
+        [retained].into_iter().collect()
+    );
+    assert!(
+        !satisfaction.is_source_complete(),
+        "capability/generation lookup failure must fail closed rather than erase the unit"
+    );
+}
+
+#[test]
 fn requirement_fingerprint_is_order_independent_and_authority_complete() {
     let csharp = unit("root-a", SourceKind::CSharp, "cs-1");
     let typescript = unit("root-a", SourceKind::TypeScript, "ts-1");

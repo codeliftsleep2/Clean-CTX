@@ -22,6 +22,7 @@ $timings = [Collections.Generic.List[object]]::new()
 $rpcId = 0
 $deadline = [DateTime]::UtcNow.AddSeconds($CaseTimeoutSeconds)
 . (Join-Path $PSScriptRoot '../cbm/scripts/PhaseBSession.ps1')
+. (Join-Path $PSScriptRoot 'Issue144Concurrency.ps1')
 
 New-Item -ItemType Directory -Force $primary, $additional,
     (Join-Path $primary 'group-a'), (Join-Path $primary 'group-b'),
@@ -227,6 +228,35 @@ function Assert-NoWarmCompilation($Result, [string]$Label) {
     }
 }
 
+function Get-CompiledCount($Result) {
+    if ($Result.PSObject.Properties['discovery'] -and
+        $Result.discovery.PSObject.Properties['compiled']) {
+        return [int]$Result.discovery.compiled
+    }
+    return 0
+}
+
+function Assert-SingleFlightPair($Pair, $ExpectedKeys, [string]$Label) {
+    Assert-Exact $Pair.first "$Label first response"
+    Assert-Exact $Pair.second "$Label second response"
+    $firstKeys = Edge-Keys $Pair.first
+    $secondKeys = Edge-Keys $Pair.second
+    Assert-Set $firstKeys $ExpectedKeys "$Label first response differs from the oracle."
+    Assert-Set $secondKeys $ExpectedKeys "$Label second response differs from the oracle."
+    Assert-Set $firstKeys $secondKeys "$Label concurrent responses disagree."
+
+    $compiled = @(
+        Get-CompiledCount $Pair.first
+        Get-CompiledCount $Pair.second
+    )
+    Assert-B (@($compiled | Where-Object { $_ -gt 0 }).Count -eq 1) (
+        "$Label did not have exactly one compilation-contributing leader: $($compiled -join ',')."
+    )
+    Assert-B (@($compiled | Where-Object { $_ -eq 0 }).Count -eq 1) (
+        "$Label follower performed additional semantic compilation: $($compiled -join ',')."
+    )
+}
+
 function Stop-OwnedSession($Session) {
     Stop-BSession $Session
     $null = $sessions.Remove($Session)
@@ -254,6 +284,21 @@ $expectedContextConsumers = @(
 $nativeContextKeys = $null
 
 try {
+    $nativeConcurrent = Start-BSession 'native-concurrent' $BinaryPath $primary
+    Invoke-BCase '144-A' 'provider-disabled-concurrent-cold-single-flight' {
+        $pair = Invoke-ConcurrentReversePair $nativeConcurrent 'ContextA' 'native-concurrent-context-a'
+        $expectedKeys = Edge-Keys $pair.first
+        Assert-Set (Constructor-Subjects $pair.first 'ContextA') $expectedContextConsumers (
+            'Provider-disabled concurrent response missed an expected constructor consumer.'
+        )
+        Assert-SingleFlightPair $pair $expectedKeys 'provider-disabled concurrent ContextA'
+        $repeat = Reverse $nativeConcurrent 'ContextA' 'native-concurrent-warm-repeat'
+        Assert-Exact $repeat 'provider-disabled post-flight warm ContextA'
+        Assert-Set (Edge-Keys $repeat) $expectedKeys 'Provider-disabled post-flight truth changed.'
+        Assert-NoWarmCompilation $repeat 'provider-disabled post-flight warm ContextA'
+    }
+    Stop-OwnedSession $nativeConcurrent
+
     $native = Start-BSession 'native' $BinaryPath $primary
     Invoke-BCase '144-A' 'registered-production-surface' {
         $tools = Get-BResult (Invoke-BRpc $native 'tools/list' @{})
@@ -456,10 +501,19 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
         $null = Tool $provider 'refresh_workspace' @{ workspaceRoot = $primary } 'provider-refresh'
     }
     if ($verdicts[$verdicts.Count - 1].result -eq 'PASS') {
+        Invoke-BCase '144-D' 'provider-enabled-concurrent-cold-single-flight' {
+            $pair = Invoke-ConcurrentReversePair $provider 'ContextA' 'provider-concurrent-context-a'
+            Assert-SingleFlightPair $pair $nativeContextKeys 'provider-enabled concurrent ContextA'
+            $repeat = Reverse $provider 'ContextA' 'provider-concurrent-warm-repeat'
+            Assert-Exact $repeat 'provider-enabled post-flight warm ContextA'
+            Assert-Set (Edge-Keys $repeat) $nativeContextKeys 'Provider-enabled post-flight truth changed.'
+            Assert-NoWarmCompilation $repeat 'provider-enabled post-flight warm ContextA'
+        }
         Invoke-BCase '144-D' 'provider-and-Clean-semantic-parity' {
-            $cold = Reverse $provider 'ContextA' 'provider-cold-context-a'
-            Assert-Exact $cold 'provider cold ContextA'
-            Assert-Set (Edge-Keys $cold) $nativeContextKeys 'Provider-enabled truth differs from the native oracle.'
+            $repeat = Reverse $provider 'ContextA' 'provider-repeat-context-a'
+            Assert-Exact $repeat 'provider repeat ContextA'
+            Assert-Set (Edge-Keys $repeat) $nativeContextKeys 'Provider-enabled truth differs from the native oracle.'
+            Assert-NoWarmCompilation $repeat 'provider repeat ContextA'
             $warm = Reverse $provider 'ContextA' 'provider-warm-context-a'
             Assert-Exact $warm 'provider warm ContextA'
             Assert-Set (Edge-Keys $warm) $nativeContextKeys 'Provider warm truth differs from the native oracle.'

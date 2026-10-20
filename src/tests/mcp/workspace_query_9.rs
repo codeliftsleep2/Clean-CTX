@@ -171,6 +171,43 @@ fn external_refresh_retracts_a_deleted_semantic_owner() {
 }
 
 #[test]
+fn external_refresh_expires_zero_result_inbound_discovery() {
+    let _serial = serialize();
+    reset_test_scan_calls();
+    let root = tempfile::TempDir::new().unwrap();
+    let service = root.path().join("ServiceA.ts");
+    write_source(
+        &service,
+        "import { Injectable } from '@angular/core';\n@Injectable() export class ServiceA {}\n",
+    );
+    let state = filesystem_only_state(&[]);
+
+    let initial = call_query(&state, "reverse_edges", "ServiceA", root.path());
+    assert_eq!(initial["count"], 0, "the initial absence is legitimate");
+    assert_eq!(test_scan_calls(), 1);
+
+    write_source(
+        &root.path().join("Consumer.ts"),
+        "import { Component } from '@angular/core';\nimport { ServiceA } from './ServiceA';\n@Component({ selector: 'x-consumer' }) export class Consumer { constructor(private service: ServiceA) {} }\n",
+    );
+    crate::mcp::tool_handlers::hydration::reconcile_external_refresh_for_root(
+        &state,
+        &root.path().to_string_lossy(),
+    );
+
+    let refreshed = call_query(&state, "reverse_edges", "ServiceA", root.path());
+    assert_eq!(
+        refreshed["count"], 1,
+        "the prior zero-result completion must not manufacture absence after refresh"
+    );
+    assert_eq!(
+        test_scan_calls(),
+        2,
+        "the new source generation must repeat inbound discovery"
+    );
+}
+
+#[test]
 fn external_refresh_retracts_stale_cycle_without_query_specific_filtering() {
     let _serial = serialize();
     let root = tempfile::TempDir::new().unwrap();

@@ -401,7 +401,10 @@ fn red19_still_indexing_project_skips_advisory_search_and_uses_clean_source() {
         coverage_entry(&sc, &additional_slug)["reason"],
         "provider_indexing"
     );
-    assert_eq!(coverage_entry(&sc, &primary_slug)["reason"], "provider_indexing");
+    assert_eq!(
+        coverage_entry(&sc, &primary_slug)["reason"],
+        "provider_indexing"
+    );
     clear_test_project_search_results();
 }
 

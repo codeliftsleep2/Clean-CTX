@@ -9,6 +9,7 @@ use crate::mcp::McpState;
 use crate::mcp::acquisition::{
     AcquisitionOutcome, AcquisitionTarget, ProofBarrier, SemanticPublicationStatus,
 };
+use crate::mcp::hydration_flight::HydrationFlightKey;
 
 #[cfg(all(test, feature = "rust"))]
 pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index(
@@ -68,6 +69,42 @@ fn hydrate_workspace_index_for_target(
     requirement: HydrationRequirement,
     authority: HydrationAuthority,
 ) -> Result<HydrationReport, String> {
+    let roots = configured_roots(state, workspace_root)
+        .iter()
+        .map(|root| root_key(root))
+        .collect::<Vec<_>>();
+    let discovery = discovery_kind(query_type);
+    let semantic_fidelity = match requirement {
+        HydrationRequirement::LegacyEdit => None,
+        HydrationRequirement::Semantic(fidelity) => Some(fidelity),
+    };
+    let flight_key = HydrationFlightKey::new(
+        roots,
+        discovery,
+        query_name,
+        semantic_fidelity,
+        authority.proof_target().cloned(),
+    );
+    state.hydration_flights.run(flight_key, || {
+        hydrate_workspace_index_for_target_attempt(
+            state,
+            query_name,
+            workspace_root,
+            requirement,
+            &authority,
+            discovery,
+        )
+    })
+}
+
+fn hydrate_workspace_index_for_target_attempt(
+    state: &McpState,
+    query_name: &str,
+    workspace_root: Option<&str>,
+    requirement: HydrationRequirement,
+    authority: &HydrationAuthority,
+    discovery: crate::mcp::discovery_cache::DiscoveryMode,
+) -> Result<HydrationReport, String> {
     let cache_key = authority.proof_target().map(|target| {
         let roots = configured_roots(state, workspace_root)
             .iter()
@@ -82,14 +119,13 @@ fn hydrate_workspace_index_for_target(
     let cached_satisfaction = cache_key
         .as_ref()
         .and_then(|key| state.acquisition_completion_lock().get(key));
-    let discovery = discovery_kind(query_type);
     let outcome = discover_candidate_paths(
         state,
         discovery,
         query_name,
         workspace_root,
         requirement,
-        &authority,
+        authority,
     );
     let provisional = authority.proof_target().cloned().and_then(|target| {
         super::acquisition::prepare_clean_type_ref_acquisition(

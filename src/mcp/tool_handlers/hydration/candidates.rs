@@ -27,11 +27,7 @@ pub(super) fn append_project_paths(
     );
 }
 
-pub(super) fn append_rooted_paths(
-    candidates: &mut Vec<String>,
-    root: &Path,
-    paths: Vec<String>,
-) {
+pub(super) fn append_rooted_paths(candidates: &mut Vec<String>, root: &Path, paths: Vec<String>) {
     candidates.extend(paths.into_iter().filter_map(|file| {
         if file.is_empty() {
             return None;

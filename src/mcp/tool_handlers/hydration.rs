@@ -18,9 +18,9 @@ mod cache;
 use cache::{discovery_is_complete, discovery_scopes_for_roots, pending_discovery_roots};
 
 mod candidates;
-use candidates::{append_rooted_paths, discovery_status};
 #[cfg(all(test, feature = "rust"))]
 use candidates::append_project_paths;
+use candidates::{append_rooted_paths, discovery_status};
 
 mod acquisition;
 mod execution;
@@ -55,7 +55,8 @@ mod semantic_compilation_parallel_tests;
 
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use filesystem::{
-    TraversalStats, last_test_traversal_stats, reset_test_scan_calls, test_scan_calls,
+    TraversalStats, last_test_traversal_stats, reset_test_scan_calls, reset_total_test_scan_calls,
+    test_scan_calls, total_test_scan_calls,
 };
 
 // Test-only discovery instrumentation (project-search injection, traversal
@@ -71,6 +72,10 @@ pub(crate) use test_support::*;
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/acquisition_hydration.rs"]
 mod acquisition_tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/hydration_single_flight.rs"]
+mod single_flight_tests;
 
 /// Diagnostic bound for the LLM-facing project-coverage projection.
 ///

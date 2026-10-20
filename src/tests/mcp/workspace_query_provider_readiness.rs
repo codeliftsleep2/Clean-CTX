@@ -238,10 +238,17 @@ fn still_indexing_provider_scope_remains_retryable_after_becoming_ready() {
     .expect("ready provider search remains retryable");
 
     assert!(warm.is_complete());
-    assert_eq!(discovery_calls().len(), 1, "ready transition must retry CBM");
+    assert_eq!(
+        discovery_calls().len(),
+        1,
+        "ready transition must retry CBM"
+    );
     assert_eq!(test_scan_calls(), 1, "warm Clean completion must be reused");
     assert_eq!(warm.candidates_discovered, 1);
-    assert_eq!(warm.candidates_compiled, 0, "current owner is not recompiled");
+    assert_eq!(
+        warm.candidates_compiled, 0,
+        "current owner is not recompiled"
+    );
     assert_eq!(
         state.hydration_discovery_lock().completed_entries(),
         2,

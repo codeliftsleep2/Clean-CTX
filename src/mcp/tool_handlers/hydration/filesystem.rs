@@ -86,6 +86,20 @@ pub(crate) fn reset_test_scan_calls() {
     TEST_SCAN_CALLS.set(0);
 }
 
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn total_test_scan_calls(state: &McpState) -> usize {
+    state
+        .hydration_scan_calls
+        .load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[cfg(all(test, feature = "rust"))]
+pub(crate) fn reset_total_test_scan_calls(state: &McpState) {
+    state
+        .hydration_scan_calls
+        .store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
 pub(super) fn configured_roots(state: &McpState, workspace_root: Option<&str>) -> Vec<PathBuf> {
     let primary = workspace_root
         .map(PathBuf::from)
@@ -139,7 +153,12 @@ pub(crate) fn effective_refresh_roots(state: &McpState, workspace_root: &str) ->
 
 pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> FilesystemScan {
     #[cfg(all(test, feature = "rust"))]
-    TEST_SCAN_CALLS.set(TEST_SCAN_CALLS.get() + 1);
+    {
+        TEST_SCAN_CALLS.set(TEST_SCAN_CALLS.get() + 1);
+        state
+            .hydration_scan_calls
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
     #[cfg(all(test, feature = "rust"))]
     let total_started = std::time::Instant::now();
     #[cfg(all(test, feature = "rust"))]
