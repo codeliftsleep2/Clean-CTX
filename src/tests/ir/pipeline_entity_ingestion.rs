@@ -1,5 +1,5 @@
 use crate::compression::Fidelity;
-use crate::ir::pipeline::{IRPass, PassContext, PassPipeline};
+use crate::ir::pipeline::{PassContext, PassPipeline};
 use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 // Ingestion-boundary regression: entity occurrences unique per (identity, file).
@@ -33,15 +33,10 @@ fn producer_registers_each_entity_identity_once_per_file() {
     }
     source.push_str("}\n");
 
-    let mut context = PassContext::new(
-        source,
-        "OrdersController.cs".into(),
-        Fidelity::Medium,
-    );
+    let mut context = PassContext::new(source, "OrdersController.cs".into(), Fidelity::Medium);
     context.canonical_path = Some("C:/repo/OrdersController.cs".into());
-    context.language = Some(
-        crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"),
-    );
+    context.language =
+        Some(crate::compression::language::safe_csharp_language().expect("csharp grammar enabled"));
     context.query_string = crate::queries::CS_QUERY.to_string();
     PassPipeline::default_production()
         .run(&mut context)

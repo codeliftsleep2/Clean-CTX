@@ -592,3 +592,23 @@ deduplication; neighboring classes; nested, callback, and static refusals;
 same-name file isolation; and refresh/removal/restoration/deletion lifecycle.
 Failures exit 1 and evidence is stored under
 `target/ngrx-service-select/<timestamp-guid>`.
+
+## C# semantic resolution R12 convergence
+
+Run after rebuilding the production binary from the R12 branch:
+
+```powershell
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-CSharpR12Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath <path-to-provider-executable>
+```
+
+This production MCP stdio harness verifies the shared R12 boundary across EF
+Core, AutoMapper, SignalR, ASP.NET, and MSTest. It covers qualified identities
+that textual detection misses, cold/warm and query-history equivalence,
+consumer-isolated retraction, primary/additional-root convergence, and a ready
+provider with a plausible but incomplete preexisting snapshot. Provider state
+may change diagnostics and work, but not semantic identities, relationships,
+cardinality, or attribution. Evidence is written beneath
+`target/csharp-r12-live-verification/`; the harness builds nothing and does not
+replace the tracked R12 Rust regressions.

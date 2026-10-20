@@ -513,3 +513,7 @@ mod tests_r10;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/aspnet_attribute_resolution_r11.rs"]
 mod tests_r11;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../tests/dotnet_meta/csharp_convergence_r12.rs"]
+mod tests_r12;

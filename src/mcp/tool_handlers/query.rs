@@ -339,6 +339,10 @@ mod tests_mstest_r10;
 #[path = "../../tests/mcp/workspace_query_aspnet_r11.rs"]
 mod tests_aspnet_r11;
 
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_csharp_convergence_r12.rs"]
+mod tests_csharp_convergence_r12;
+
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
 mod tests_legacy_edit_adequacy;
