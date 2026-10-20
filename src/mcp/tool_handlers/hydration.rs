@@ -23,6 +23,10 @@ use candidates::append_project_paths;
 use candidates::{append_rooted_paths, discovery_status};
 
 mod acquisition;
+#[cfg(feature = "csharp")]
+mod dependencies;
+#[cfg(feature = "csharp")]
+pub(crate) use dependencies::{DependencyEvidence, acquire_csharp_dependencies};
 mod execution;
 #[cfg(all(test, feature = "rust"))]
 pub(super) use execution::hydrate_workspace_index;

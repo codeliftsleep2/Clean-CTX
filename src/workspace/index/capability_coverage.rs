@@ -37,4 +37,12 @@ impl super::WorkspaceIndex {
     pub(crate) fn dirty_csharp_exact_call_coverage(&mut self) {
         self.capability_coverage.csharp_exact_calls = None;
     }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn has_csharp_publication_generation(&self, generation: u64) -> bool {
+        self.capability_coverage
+            .csharp_exact_calls
+            .as_ref()
+            .is_some_and(|coverage| coverage.generation == generation)
+    }
 }

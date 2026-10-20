@@ -17,6 +17,11 @@ use crate::ir::pipeline::CSharpDeclarationInputs;
 mod method_inputs;
 use method_inputs::direct_methods;
 
+#[cfg(feature = "csharp")]
+mod dependencies;
+#[cfg(feature = "csharp")]
+pub(crate) use dependencies::{ancestry_obligations, ancestry_obligations_for_files};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CSharpResolvedClass {
     pub owner: String,

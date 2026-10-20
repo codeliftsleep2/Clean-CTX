@@ -151,11 +151,56 @@ fn workspace_query_coverage_detail_schema() -> Value {
                 "maxItems": 8,
                 "items": {
                     "type": "string",
-                    "enum": ["inventory_incomplete", "candidate_predicate_uncertified", "proof_incompatible", "candidate_processing_failed", "publication_failed", "capability_not_supported", "processing_not_attempted", "indeterminate"]
+                    "enum": ["inventory_incomplete", "candidate_predicate_uncertified", "proof_incompatible", "candidate_processing_failed", "publication_failed", "dependency_unresolved", "capability_not_supported", "processing_not_attempted", "indeterminate"]
                 }
             }
         },
         "required": ["processing_state", "proof_state", "fact_authority", "retryability", "reasons"]
+    })
+}
+
+/// Keep coverage expansion separate from the enclosing tool schema macro.
+fn workspace_query_coverage_schema() -> Value {
+    serde_json::json!({
+        "type": "object",
+        "description": "Truthfulness metadata. Declaration-only find_entities and authoritative file-scoped operations may project an earned exact certificate. Ordinary find_entities occurrences remain a lower bound; inspect source_complete, result_semantics, and fact_semantics.",
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": ["authoritative_complete", "established_indexed_capability", "identity_not_indexed", "capability_not_established", "indexed_evidence_only", "semantic_dependencies_unresolved"]
+            },
+            "identity_indexed": { "type": "boolean" },
+            "capability_established": { "type": "boolean" },
+            "source_complete": { "type": "boolean" },
+            "result_semantics": {
+                "type": "string",
+                "enum": ["exact", "lower_bound"]
+            },
+            "fact_semantics": { "type": "string", "enum": ["authoritative_indexed_occurrences", "source_proven_declarations"], "description": "For find_entities, identifies the authority of returned facts. It does not certify exhaustive source coverage." },
+            "omitted_possible": { "type": "boolean" },
+            "scope": { "type": "object" },
+            "source_generation": { "type": "string" },
+            "semantic_scope": { "type": "string", "enum": ["supported_producer_patterns"], "description": "When present, exact/source-complete describes the supported producer contract, not every framework convention in the source." },
+            "semantic_omissions": { "type": "array", "items": { "type": "string", "enum": ["ngrx_object_string_actions", "ngrx_switch_action_type_handlers"] }, "description": "Detected framework syntax classes that the current semantic producer does not project. Their presence prevents callers from treating absent matching entities as evidence that the source contains no such construct." },
+            "evidence_requirements": { "type": "array", "items": { "type": "string" } },
+            "reasons": { "type": "array", "items": { "oneOf": [
+                { "type": "object" },
+                { "type": "string", "enum": ["dependency_cycle", "dependency_ambiguous", "dependency_unsupported", "dependency_unresolved", "dependency_source_generation_changed", "dependency_scope_unavailable", "dependency_inventory_incomplete", "dependency_processing_failed", "dependency_publication_changed"] }
+            ] } },
+            "dependency_proof": { "oneOf": [
+                { "type": "object", "required": ["status", "generation"], "properties": { "status": { "const": "complete" }, "generation": { "type": "string" } }, "additionalProperties": false },
+                { "type": "object", "required": ["status"], "properties": { "status": { "const": "unproven" } }, "additionalProperties": false }
+            ] },
+            "coverage_detail": workspace_query_coverage_detail_schema(),
+            "discovered_not_compiled_this_cycle": {
+                "type": "integer",
+                "minimum": 0
+            },
+            "alternative_query": {
+                "type": "object",
+                "description": "Supported direct query to use when this exact identity does not own the requested semantic capability."
+            }
+        }
     })
 }
 
@@ -461,40 +506,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                         "description": "Cycle detection result (has_cycle)."
                     },
                     "cycle": workspace_query_cycle_schema(),
-                    "coverage": {
-                        "type": "object",
-                        "description": "Truthfulness metadata. Declaration-only find_entities and authoritative file-scoped operations may project an earned exact certificate. Ordinary find_entities occurrences remain a lower bound; inspect source_complete, result_semantics, and fact_semantics.",
-                        "properties": {
-                            "status": {
-                                "type": "string",
-                                "enum": ["authoritative_complete", "established_indexed_capability", "identity_not_indexed", "capability_not_established", "indexed_evidence_only"]
-                            },
-                            "identity_indexed": { "type": "boolean" },
-                            "capability_established": { "type": "boolean" },
-                            "source_complete": { "type": "boolean" },
-                            "result_semantics": {
-                                "type": "string",
-                                "enum": ["exact", "lower_bound"]
-                            },
-                            "fact_semantics": { "type": "string", "enum": ["authoritative_indexed_occurrences", "source_proven_declarations"], "description": "For find_entities, identifies the authority of returned facts. It does not certify exhaustive source coverage." },
-                            "omitted_possible": { "type": "boolean" },
-                            "scope": { "type": "object" },
-                            "source_generation": { "type": "string" },
-                            "semantic_scope": { "type": "string", "enum": ["supported_producer_patterns"], "description": "When present, exact/source-complete describes the supported producer contract, not every framework convention in the source." },
-                            "semantic_omissions": { "type": "array", "items": { "type": "string", "enum": ["ngrx_object_string_actions", "ngrx_switch_action_type_handlers"] }, "description": "Detected framework syntax classes that the current semantic producer does not project. Their presence prevents callers from treating absent matching entities as evidence that the source contains no such construct." },
-                            "evidence_requirements": { "type": "array", "items": { "type": "string" } },
-                            "reasons": { "type": "array", "items": { "type": "object" } },
-                            "coverage_detail": workspace_query_coverage_detail_schema(),
-                            "discovered_not_compiled_this_cycle": {
-                                "type": "integer",
-                                "minimum": 0
-                            },
-                            "alternative_query": {
-                                "type": "object",
-                                "description": "Supported direct query to use when this exact identity does not own the requested semantic capability."
-                            }
-                        }
-                    },
+                    "coverage": workspace_query_coverage_schema(),
                     "identity_model": { "type": "string", "description": "Semantic identity model used by has_cycle." },
                     "identity_ambiguous": { "type": "boolean", "description": "Whether a has_cycle witness identity has multiple admitted physical occurrences." },
                     "identity_ambiguities": { "type": "array", "description": "Ambiguous witness identities and their admitted occurrence files.", "items": { "type": "object" } },

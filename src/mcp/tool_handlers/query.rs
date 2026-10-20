@@ -61,6 +61,8 @@ mod classification;
 mod content;
 mod coverage;
 mod csharp_resolution;
+#[cfg(feature = "csharp")]
+mod dependencies;
 mod diagnostics;
 mod dotnet_testing;
 mod edge_merge;
@@ -350,6 +352,20 @@ mod tests_aspnet_r11;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../../tests/mcp/workspace_query_csharp_convergence_r12.rs"]
 mod tests_csharp_convergence_r12;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_issue_155.rs"]
+mod tests_issue_155;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_issue_155_dependencies.rs"]
+mod tests_issue_155_dependencies;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+mod publication_test_support;
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_issue_155_blockers.rs"]
+mod tests_issue_155_blockers;
 
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]

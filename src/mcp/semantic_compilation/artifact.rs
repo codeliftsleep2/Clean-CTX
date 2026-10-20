@@ -336,7 +336,7 @@ impl SemanticCompilationArtifact {
         compiled
     }
 
-    #[cfg(test)]
+    #[cfg(any(test, feature = "csharp"))]
     pub(crate) fn source_snapshot(&self) -> &str {
         self.source_snapshot.as_str()
     }

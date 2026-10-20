@@ -45,6 +45,8 @@ impl ResponseMode {
 struct CompletedItem {
     id: String,
     outcome: ProvideResult,
+    #[cfg(feature = "csharp")]
+    params: Value,
 }
 
 pub(super) fn response(id: &Value, args: &Value, state: &McpState) -> Value {
@@ -107,7 +109,32 @@ fn execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Provide
         completed.push(CompletedItem {
             id: item_id,
             outcome,
+            #[cfg(feature = "csharp")]
+            params,
         });
+    }
+    #[cfg(feature = "csharp")]
+    loop {
+        let index = state.workspace_index_read();
+        let stale: Vec<_> = completed
+            .iter()
+            .enumerate()
+            .filter_map(|(position, item)| {
+                item.outcome
+                    .as_ref()
+                    .ok()
+                    .and_then(|context| context.publication)
+                    .filter(|stamp| !stamp.is_current(&index))
+                    .map(|_| position)
+            })
+            .collect();
+        drop(index);
+        if stale.is_empty() {
+            break;
+        }
+        for position in stale {
+            completed[position].outcome = evaluate::evaluate(&completed[position].params, state);
+        }
     }
     Ok(completed)
 }

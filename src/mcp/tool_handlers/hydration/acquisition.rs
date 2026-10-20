@@ -81,6 +81,11 @@ pub(super) fn prepare_clean_acquisition(
     inventories: &[RootInventoryManifest],
     exclusions: &[String],
 ) -> Option<ProvisionalAcquisition> {
+    // Dependency claims require a structured fixed-point traversal, not a
+    // declaration or incoming-name scan. They are constructed by dependencies.rs.
+    if target.capability() == ProducerCapability::SourceDependencyClosure {
+        return None;
+    }
     let roots = inventories.iter().map(|inventory| inventory.root.clone());
     let admission = scope_policy_fingerprint(roots, exclusions.iter().cloned());
     let catalog = GenerationCatalog::current();
@@ -243,6 +248,9 @@ fn manifests_by_source_kind(
                     ProducerCapability::SourceDeclarations => {
                         CoverageUnit::declarations(&root.root, source_kind, generation)
                     }
+                    ProducerCapability::SourceDependencyClosure => unreachable!(
+                        "dependency acquisition has its own structured candidate predicate"
+                    ),
                 },
                 InventoryManifest::new(entries, root.manifest.attempted, root.manifest.complete),
             )
@@ -262,6 +270,9 @@ fn capability_generation(
         ProducerCapability::BuiltinTypeRefIncoming => native,
         ProducerCapability::SourceDeclarations => {
             format!("{native}:{}", catalog.declaration_generation())
+        }
+        ProducerCapability::SourceDependencyClosure => {
+            format!("{native}:dependencies-v1")
         }
     }
 }

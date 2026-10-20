@@ -16,6 +16,8 @@ pub(crate) use compilation::{
     CSharpCompilationUnit, CSharpResolvedAttribute, CSharpResolvedClass, collect_compilation_unit,
     resolve_compilation_class_ancestry, resolve_compilation_units,
 };
+#[cfg(feature = "csharp")]
+pub(crate) use compilation::{ancestry_obligations, ancestry_obligations_for_files};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct CSharpSourceSpan {

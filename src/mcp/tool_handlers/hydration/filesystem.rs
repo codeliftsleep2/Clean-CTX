@@ -215,7 +215,7 @@ fn root_inventories(roots: &[PathBuf], combined: &InventoryManifest) -> Vec<Root
         .collect()
 }
 
-#[cfg(all(test, feature = "rust"))]
+#[cfg(any(feature = "csharp", all(test, feature = "rust")))]
 pub(crate) fn source_inventory(state: &McpState, roots: &[PathBuf]) -> InventoryManifest {
     let (paths, attempted, traversal_completed, _) = enumerate_source_paths(state, roots);
     build_inventory(state, paths, attempted, traversal_completed)

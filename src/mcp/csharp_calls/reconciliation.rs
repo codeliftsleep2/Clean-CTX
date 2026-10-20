@@ -115,8 +115,10 @@ impl McpState {
             })
             .collect::<Vec<_>>();
 
+        let mut dependency_footprints =
+            crate::mcp::semantic_compilation::dependencies::footprints(self, &artifacts);
         let mut projections = Vec::with_capacity(files.len());
-        for artifact in artifacts {
+        for artifact in &artifacts {
             let file = artifact.canonical_owner().to_string();
             // Reconciliation may strengthen exact-call evidence, but it must
             // preserve the semantic fidelity of the publication it reconciles.
@@ -126,8 +128,10 @@ impl McpState {
                 .unwrap_or_else(|| semantic_fidelity(artifact.fidelity()));
             let edges =
                 artifact.project_csharp_generation_semantics(&authority, &resolved_classes)?;
+            let mut dependencies = artifact.semantic_dependencies_owned();
+            dependencies.extend(dependency_footprints.remove(&file).unwrap_or_default());
             projections.push(Projection {
-                dependencies: artifact.semantic_dependencies_owned(),
+                dependencies,
                 file,
                 ir: artifact.project_csharp_generation_ir(&resolved_classes),
                 edges,
@@ -227,7 +231,7 @@ fn is_admitted_csharp_source(state: &McpState, file: &str) -> bool {
         && !state.config.is_excluded(file)
 }
 
-fn csharp_resolution_partition(state: &McpState, file: &str) -> String {
+pub(crate) fn csharp_resolution_partition(state: &McpState, file: &str) -> String {
     let path = Path::new(file);
     if let Some(root) = state
         .config

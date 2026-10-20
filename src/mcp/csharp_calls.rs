@@ -3,6 +3,7 @@
 pub(crate) mod authority;
 pub(crate) mod lifecycle;
 mod reconciliation;
+pub(crate) use reconciliation::csharp_resolution_partition;
 
 #[cfg(all(test, feature = "csharp"))]
 #[path = "../tests/mcp/csharp_call_artifact_reconciliation.rs"]

@@ -56,7 +56,6 @@ impl CompletenessCertificate {
                 "authorized_source_acquired",
                 "producer_supported",
                 "semantic_projection_current",
-                "dependencies_current",
             ],
         }
     }
@@ -229,6 +228,9 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
             Some(CoverageProofDisposition::Unproven(ProofBarrier::ClaimIncompatible)) => {
                 "proof_incompatible"
             }
+            Some(CoverageProofDisposition::Unproven(ProofBarrier::DependencyUnresolved)) => {
+                "dependency_unresolved"
+            }
             Some(CoverageProofDisposition::Proven) | None => "indeterminate",
         };
         if !observed_reasons.contains(&reason) {
@@ -239,6 +241,7 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
         "inventory_incomplete",
         "candidate_predicate_uncertified",
         "proof_incompatible",
+        "dependency_unresolved",
         "candidate_processing_failed",
         "publication_failed",
         "indeterminate",
@@ -250,7 +253,7 @@ fn acquisition_coverage_detail(outcome: &AcquisitionOutcome) -> Value {
     let has_structural = reasons.iter().any(|reason| {
         matches!(
             *reason,
-            "candidate_predicate_uncertified" | "proof_incompatible"
+            "candidate_predicate_uncertified" | "proof_incompatible" | "dependency_unresolved"
         )
     });
     let has_operational = reasons.iter().any(|reason| {

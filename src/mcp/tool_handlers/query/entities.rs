@@ -25,7 +25,6 @@ use super::{
 };
 use crate::mcp::McpState;
 use serde_json::Value;
-use std::collections::HashSet;
 use std::path::Path;
 
 fn semantic_fidelity(
@@ -93,7 +92,7 @@ fn try_prepare_find_entities(
             }
         };
     }
-    let mut hydration = if declarations_only && workspace_root.is_some() {
+    let hydration = if declarations_only && workspace_root.is_some() {
         context.hydrate_declarations(state, &name, workspace_root)?
     } else {
         context.hydrate(
@@ -104,37 +103,6 @@ fn try_prepare_find_entities(
             crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
         )?
     };
-    if hydration.is_complete() {
-        let mut current = name.clone();
-        let mut visited = HashSet::new();
-        while visited.insert(current.clone()) {
-            let candidate = {
-                let index = state.workspace_index_read();
-                let catalog = context.csharp_catalog(state, &index, scope.as_ref());
-                catalog.aspnet_base_candidate(&current)
-            };
-            let Some(candidate) = candidate else { break };
-            let next = context.hydrate(
-                state,
-                "find_entities",
-                &candidate,
-                workspace_root,
-                crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
-            )?;
-            hydration.merge(next);
-            if !hydration.is_complete() {
-                break;
-            }
-            current = candidate;
-        }
-    }
-    #[cfg(feature = "csharp")]
-    if !declarations_only {
-        // Controller ancestry hydration can publish additional source symbols.
-        // Reconcile only after that acquisition so negative shadow proof and
-        // indirect ancestry observe one complete admitted generation.
-        context.prepare_exact_csharp_calls(state)?;
-    }
     Ok(PreparedQuery::indexed(move |index| {
         let entities = if declarations_only {
             match scope.as_ref() {
@@ -308,8 +276,22 @@ fn try_prepare_entities_in_file(
     let (semantic_edges, semantic_dependencies, compiled_hash) =
         match crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state) {
             Ok(artifact) => {
-                let (_, edges, dependencies, hash) = artifact.into_parts();
-                (edges, dependencies, hash)
+                #[cfg(feature = "csharp")]
+                if artifact.csharp_resolution_unit().is_some() {
+                    let semantics = artifact.published_semantics();
+                    state
+                        .csharp_call_authority
+                        .retain_artifact(std::sync::Arc::new(artifact));
+                    semantics
+                } else {
+                    let (_, edges, dependencies, hash) = artifact.into_parts();
+                    (edges, dependencies, hash)
+                }
+                #[cfg(not(feature = "csharp"))]
+                {
+                    let (_, edges, dependencies, hash) = artifact.into_parts();
+                    (edges, dependencies, hash)
+                }
             }
             Err(error) => return Err(QueryFailure::internal(error.to_string())),
         };

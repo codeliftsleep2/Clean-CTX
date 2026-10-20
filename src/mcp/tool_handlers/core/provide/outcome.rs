@@ -8,11 +8,19 @@ pub(super) type ProvideResult = Result<ProvidedContext, ProvideFailure>;
 pub(in crate::mcp::tool_handlers::core) struct ProvidedContext {
     pub(super) text: String,
     pub(super) meta: Value,
+    #[cfg(feature = "csharp")]
+    pub(super) publication:
+        Option<crate::mcp::semantic_compilation::dependencies::PublicationStamp>,
 }
 
 impl ProvidedContext {
     pub(in crate::mcp::tool_handlers::core) fn new(text: String, meta: Value) -> Self {
-        Self { text, meta }
+        Self {
+            text,
+            meta,
+            #[cfg(feature = "csharp")]
+            publication: None,
+        }
     }
 
     pub(super) fn legacy_response(&self, id: &Value) -> Value {

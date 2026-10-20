@@ -78,6 +78,11 @@ impl AcquisitionCompletionCache {
         }
     }
 
+    #[cfg(feature = "csharp")]
+    pub(crate) fn root_generation_snapshot(&self, roots: &[String]) -> Vec<u64> {
+        roots.iter().map(|root| self.generation(root)).collect()
+    }
+
     fn generation(&self, root: &str) -> u64 {
         self.root_generations.get(root).copied().unwrap_or(0)
     }

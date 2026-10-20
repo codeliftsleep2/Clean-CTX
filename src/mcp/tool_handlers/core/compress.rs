@@ -116,13 +116,37 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         return;
     }
 
-    let ir_result = compile_file_ir_candidate(&resolved_path, effective_fidelity, state);
+    #[cfg(feature = "csharp")]
+    if resolved_path.to_ascii_lowercase().ends_with(".cs") {
+        if let Err(error) = state.prepare_csharp_semantic_owner(&semantic_owner, workspace_root) {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32603,
+                error,
+                None,
+            ));
+            return;
+        }
+    }
+    let ir_result = compile_file_ir_candidate(&resolved_path, effective_fidelity, state)
+        .map_err(|error| error.to_string())
+        .and_then(|artifact| {
+            #[cfg(feature = "csharp")]
+            {
+                crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+            }
+            #[cfg(not(feature = "csharp"))]
+            {
+                Ok(artifact.into_parts())
+            }
+        });
 
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok(artifact) = ir_result {
-        let (mut ir, semantic_edges, semantic_dependencies, source_hash) = artifact.into_parts();
+    let mut response = if let Ok((mut ir, semantic_edges, semantic_dependencies, source_hash)) =
+        ir_result
+    {
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
             None => return,
@@ -167,7 +191,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 .ir_context_lock()
                 .load_ir(ir.clone(), Some(source_hash.clone()));
             state.remember_context_fidelity(&path_alias, effective_fidelity);
-            {
+            if !canonical_path.to_ascii_lowercase().ends_with(".cs") {
                 let mut idx = state.workspace_index_lock();
                 idx.remove_file(&canonical_path);
                 idx.add_edges(&canonical_path, semantic_edges.clone());
@@ -208,17 +232,6 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             ));
             return;
         }
-        #[cfg(feature = "csharp")]
-        if let Err(error) = state.mark_csharp_call_authority_dirty_for_file(&canonical_path) {
-            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
-                id.clone(),
-                -32603,
-                error,
-                None,
-            ));
-            return;
-        }
-
         let ir_value = match encoding {
             "positional" => {
                 let config = crate::ir::positional::PositionalConfig::stripped();

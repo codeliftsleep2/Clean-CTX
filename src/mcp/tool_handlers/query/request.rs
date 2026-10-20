@@ -37,6 +37,23 @@ impl WorkspaceQueryOperation {
         state: &McpState,
         context: &mut PreparationContext,
     ) -> PreparedQuery {
+        let initial = self.prepare_base(args, state, context);
+        #[cfg(feature = "csharp")]
+        {
+            super::dependencies::prepare(self, args, state, context, initial)
+        }
+        #[cfg(not(feature = "csharp"))]
+        {
+            initial
+        }
+    }
+
+    pub(super) fn prepare_base(
+        self,
+        args: &Value,
+        state: &McpState,
+        context: &mut PreparationContext,
+    ) -> PreparedQuery {
         match self {
             Self::FindEntities => super::entities::prepare_find_entities(args, state, context),
             Self::ForwardEdges => super::edges::prepare_forward_edges(args, state, context),

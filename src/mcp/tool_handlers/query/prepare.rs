@@ -16,12 +16,17 @@ type IndexedEvaluator = Box<dyn FnOnce(&WorkspaceIndex) -> QueryResult>;
 
 pub(super) enum PreparedQuery {
     Indexed(IndexedEvaluator),
+    #[cfg(feature = "csharp")]
+    Validated(
+        IndexedEvaluator,
+        crate::mcp::semantic_compilation::dependencies::PublicationStamp,
+    ),
     Ready(QueryResult),
 }
 
 impl PreparedQuery {
     pub(super) fn is_indexed(&self) -> bool {
-        matches!(self, Self::Indexed(_))
+        !matches!(self, Self::Ready(_))
     }
 
     pub(super) fn indexed(
@@ -37,6 +42,22 @@ impl PreparedQuery {
     pub(super) fn failure(failure: QueryFailure) -> Self {
         Self::Ready(Err(failure))
     }
+    #[cfg(feature = "csharp")]
+    pub(super) fn validated(
+        stamp: crate::mcp::semantic_compilation::dependencies::PublicationStamp,
+        evaluator: impl FnOnce(&WorkspaceIndex) -> QueryResult + 'static,
+    ) -> Self {
+        Self::Validated(Box::new(evaluator), stamp)
+    }
+
+    pub(super) fn publication_is_current(&self, index: &WorkspaceIndex) -> bool {
+        #[cfg(feature = "csharp")]
+        if let Self::Validated(_, stamp) = self {
+            return stamp.is_current(index);
+        }
+        let _ = index;
+        true
+    }
 
     pub(super) fn evaluate_single(self, state: &McpState) -> QueryResult {
         match self {
@@ -45,12 +66,31 @@ impl PreparedQuery {
                 evaluator(&index)
             }
             Self::Ready(result) => result,
+            #[cfg(feature = "csharp")]
+            Self::Validated(evaluator, stamp) => {
+                let index = state.workspace_index_read();
+                if !stamp.is_current(&index) {
+                    return Err(QueryFailure::internal(
+                        "Semantic publication changed; retry",
+                    ));
+                }
+                evaluator(&index)
+            }
         }
     }
 
     pub(super) fn evaluate_with_index(self, index: &WorkspaceIndex) -> QueryResult {
         match self {
             Self::Indexed(evaluator) => evaluator(index),
+            #[cfg(feature = "csharp")]
+            Self::Validated(evaluator, stamp) => {
+                if !stamp.is_current(index) {
+                    return Err(QueryFailure::internal(
+                        "Semantic publication changed; retry",
+                    ));
+                }
+                evaluator(index)
+            }
             Self::Ready(result) => result,
         }
     }
@@ -112,13 +152,9 @@ impl PreparationContext {
         state: &McpState,
         args: &serde_json::Value,
     ) -> Result<(), QueryFailure> {
-        if (args["domain"] == "builtin" && args["entity_type"] == "Method")
-            || (args["domain"] == "dotnet"
-                && matches!(
-                    args["entity_type"].as_str(),
-                    Some("DbContext" | "Entity" | "Controller")
-                ))
-        {
+        // Ancestry consumers reconcile through the dependency acquisition
+        // boundary after publishing their complete frontier.
+        if args["domain"] == "builtin" && args["entity_type"] == "Method" {
             self.prepare_exact_csharp_calls(state)?;
         }
         Ok(())
@@ -305,5 +341,12 @@ impl PreparationContext {
         self.csharp_catalog = None;
         self.efcore_catalog = None;
         self.angular_catalogs = [None, None];
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(super) fn invalidate_csharp_projection_catalogs(&mut self) {
+        // Reconciliation without source publication preserves the source-only
+        // C# catalog, but the EF consumer also reads projected index edges.
+        self.efcore_catalog = None;
     }
 }

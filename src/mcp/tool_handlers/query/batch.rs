@@ -94,26 +94,37 @@ fn try_execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Que
     // on batch order. Ready file-local answers retain their first preparation:
     // they already own a current explicit-file snapshot and may be intentionally
     // unpublished (for example calls_in_file).
-    for item in &mut pending {
-        if !item.prepared.is_indexed() {
+    loop {
+        for item in &mut pending {
+            if !item.prepared.is_indexed() {
+                continue;
+            }
+            let operation = WorkspaceQueryOperation::parse(&item.query_type)
+                .expect("an indexed prepared item has a registered operation");
+            item.prepared = operation.prepare(&item.args, state, &mut context);
+        }
+
+        // Every index-backed evaluator observes this one post-preparation guard.
+        #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+        super::publication_test_support::run(state);
+        let index = state.workspace_index_read();
+        if pending
+            .iter()
+            .any(|item| !item.prepared.publication_is_current(&index))
+        {
+            drop(index);
             continue;
         }
-        let operation = WorkspaceQueryOperation::parse(&item.query_type)
-            .expect("an indexed prepared item has a registered operation");
-        item.prepared = operation.prepare(&item.args, state, &mut context);
+        return Ok(pending
+            .into_iter()
+            .map(|item| CompletedItem {
+                id: item.id,
+                query_type: item.query_type,
+                args: item.args,
+                result: item.prepared.evaluate_with_index(&index),
+            })
+            .collect());
     }
-
-    // Every index-backed evaluator observes this one post-preparation guard.
-    let index = state.workspace_index_read();
-    Ok(pending
-        .into_iter()
-        .map(|item| CompletedItem {
-            id: item.id,
-            query_type: item.query_type,
-            args: item.args,
-            result: item.prepared.evaluate_with_index(&index),
-        })
-        .collect())
 }
 
 fn validate_items(queries: &[Value]) -> Result<(), QueryFailure> {

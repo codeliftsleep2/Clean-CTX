@@ -30,7 +30,7 @@ pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 /// Generation of C#-specific generic semantic projection. This is separate
 /// from the generic generation so a C#-only edge change does not invalidate
 /// durable semantic snapshots for unrelated languages.
-pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 4;
+pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 5;
 //
 // A callee that is never declared in the compiled workspace still appears as
 // the OBJECT of a `Calls` edge (it is honestly unresolved); only the caller is

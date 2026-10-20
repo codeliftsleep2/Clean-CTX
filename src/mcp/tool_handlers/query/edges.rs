@@ -24,7 +24,6 @@ use crate::mcp::acquisition::AcquisitionTarget;
 use crate::mcp::tool_handlers::hydration::HydrationRequirement;
 use crate::workspace::index::SemanticFidelity;
 use serde_json::Value;
-use std::collections::HashSet;
 
 /// `forward_edges`: outgoing semantic edges from an entity.
 ///
@@ -86,34 +85,6 @@ fn try_prepare_forward_edges(
             let target_hydration =
                 context.hydrate(state, "reverse_edges", &target, workspace_root, requirement)?;
             hydration.merge(target_hydration);
-        }
-    }
-    if hydration.is_complete()
-        && let Some(exact) = identity.exact()
-        && exact.domain == "dotnet"
-        && exact.entity_type == "Controller"
-    {
-        let mut current = exact.name.clone();
-        let mut visited = HashSet::new();
-        while visited.insert(current.clone()) {
-            let candidate = {
-                let index = state.workspace_index_read();
-                let catalog = context.csharp_catalog(state, &index, scope.as_ref());
-                catalog.aspnet_base_candidate(&current)
-            };
-            let Some(candidate) = candidate else { break };
-            let next = context.hydrate(
-                state,
-                "find_entities",
-                &candidate,
-                workspace_root,
-                requirement,
-            )?;
-            hydration.merge(next);
-            if !hydration.is_complete() {
-                break;
-            }
-            current = candidate;
         }
     }
     if hydration.is_complete()

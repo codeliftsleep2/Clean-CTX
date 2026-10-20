@@ -54,6 +54,9 @@ pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index_for_acquisition(
     let query_type = match target.capability() {
         crate::mcp::acquisition::ProducerCapability::BuiltinTypeRefIncoming => "reverse_edges",
         crate::mcp::acquisition::ProducerCapability::SourceDeclarations => "find_entities",
+        crate::mcp::acquisition::ProducerCapability::SourceDependencyClosure => {
+            return Err("Dependency closure requires structured source obligations".into());
+        }
     };
     hydrate_workspace_index_for_target(
         state,

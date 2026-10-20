@@ -81,7 +81,6 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "File excluded by config: {file_path_str}"
         )));
     }
-    let publication = state.begin_semantic_publication(&semantic_owner);
     state
         .preflight_semantic_publication(&resolved_path)
         .map_err(ProvideFailure::internal)?;
@@ -196,6 +195,17 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     )
     .entered();
 
+    #[cfg(feature = "csharp")]
+    let dependency_evidence = if resolved_path.to_ascii_lowercase().ends_with(".cs") {
+        Some(
+            state
+                .prepare_csharp_semantic_owner(&semantic_owner, workspace_root)
+                .map_err(ProvideFailure::internal)?,
+        )
+    } else {
+        None
+    };
+    let publication = state.begin_semantic_publication(&semantic_owner);
     let compile_start = Instant::now();
     let cached_ir = if state.context_fidelity(&alias) == Some(effective_fidelity) {
         let ir_context = state.ir_context_read();
@@ -229,7 +239,16 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     .unwrap_or_else(|| {
         compile_file_ir_focused(&resolved_path, effective_fidelity, state, None)
             .map_err(|error| error.to_string())
-            .map(|artifact| artifact.into_parts())
+            .and_then(|artifact| {
+                #[cfg(feature = "csharp")]
+                {
+                    crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+                }
+                #[cfg(not(feature = "csharp"))]
+                {
+                    Ok(artifact.into_parts())
+                }
+            })
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
@@ -284,12 +303,17 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     let published_semantic_fidelity =
         crate::workspace::index::SemanticFidelity::from_compilation(effective_fidelity);
     let expected_source_hash = source_hash.clone();
+    let expected_dependencies = semantic_dependencies.clone();
     let published = publication
         .commit(
             || {
-                Ok::<_, &'static str>(state.read_source(&resolved_path).is_ok_and(|current| {
-                    state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
-                }))
+                Ok::<_, &'static str>(
+                    state.read_source(&resolved_path).is_ok_and(|current| {
+                        state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
+                    }) && expected_dependencies
+                        .iter()
+                        .all(|dependency| dependency.is_current()),
+                )
             },
             || {
                 super::super::provide_persistence::persist_read_baseline(
@@ -308,7 +332,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     .ir_context_lock()
                     .load_ir(ir.clone(), Some(source_hash.clone()));
                 state.remember_context_fidelity(&ir.file_id, effective_fidelity);
-                {
+                if !canonical_path.to_ascii_lowercase().ends_with(".cs") {
                     let mut index = state.workspace_index_lock();
                     match crate::workspace::index::SemanticFidelity::from_compilation(
                         effective_fidelity,
@@ -352,10 +376,6 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             &canonical_path,
         );
     }
-    #[cfg(feature = "csharp")]
-    state
-        .mark_csharp_call_authority_dirty_for_file(&canonical_path)
-        .map_err(ProvideFailure::internal)?;
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(
         &canonical_path,
@@ -400,6 +420,22 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "degradation": degradation
         }),
     );
+    #[cfg(feature = "csharp")]
+    let mut result = result;
+    #[cfg(feature = "csharp")]
+    if let Some(evidence) = dependency_evidence {
+        let stamp = evidence.publication_stamp();
+        let index = state.workspace_index_read();
+        if !evidence.publication_is_current(&index) {
+            return Err(ProvideFailure::internal(
+                "C# publication changed during context evaluation; retry",
+            ));
+        }
+        let mut coverage = json!({});
+        evidence.apply(&index, &mut coverage);
+        result.meta["semantic_coverage"] = coverage;
+        result.publication = Some(stamp);
+    }
     let total_ms = overall_start.elapsed().as_millis() as u64;
     tracing::info!(
         heuristics_ms,

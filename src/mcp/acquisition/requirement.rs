@@ -33,6 +33,7 @@ impl SourceKind {
 pub(crate) enum ProducerCapability {
     BuiltinTypeRefIncoming,
     SourceDeclarations,
+    SourceDependencyClosure,
 }
 
 /// Generation-bound disposition of an active producer for one capability.
@@ -228,6 +229,7 @@ fn producer_tag(value: ProducerCapability) -> u8 {
     match value {
         ProducerCapability::BuiltinTypeRefIncoming => 1,
         ProducerCapability::SourceDeclarations => 2,
+        ProducerCapability::SourceDependencyClosure => 3,
     }
 }
 

@@ -156,32 +156,6 @@ impl Catalog {
             .then_some(declaration.file.as_str())
     }
 
-    pub(super) fn aspnet_base_candidate(&self, name: &str) -> Option<String> {
-        let declaration = self.unique_named_class(name)?;
-        self.base_reference(declaration)
-            .map(|reference| reference.shape.name.clone())
-    }
-
-    fn unique_named_class(&self, name: &str) -> Option<&Declaration> {
-        let mut matches = self
-            .declarations
-            .iter()
-            .filter(|declaration| declaration.kind == TypeKind::Class && declaration.name == name);
-        let declaration = matches.next()?;
-        matches.next().is_none().then_some(declaration)
-    }
-
-    fn base_reference(&self, declaration: &Declaration) -> Option<&BaseReference> {
-        let owner_parent = &declaration.path[..declaration.path.len().saturating_sub(1)];
-        self.references.iter().find(|reference| {
-            let mut reference_parent = reference.namespace.clone();
-            reference_parent.extend(reference.nesting.iter().cloned());
-            reference.file == declaration.file
-                && reference.owner == declaration.name
-                && owner_parent == reference_parent.as_slice()
-        })
-    }
-
     fn add_file(&mut self, file: &str, source: &str) {
         let Some(language) = crate::compression::language::safe_csharp_language() else {
             return;

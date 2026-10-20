@@ -22,6 +22,7 @@ pub(crate) enum ProofBarrier {
     ClaimIncompatible,
     CandidateProcessingFailed,
     PublicationFailed,
+    DependencyUnresolved,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
