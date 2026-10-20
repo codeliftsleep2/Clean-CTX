@@ -46,6 +46,21 @@ function Write-Config([bool]$ProviderEnabled, [string]$ConfiguredProvider = $Pro
     Write-BText (Join-Path $primary '.clean-ctx.json') $config
 }
 
+function Wait-ProviderStatus($Session, [string]$EvidenceName) {
+    do {
+        $status = Get-BResult (Invoke-BTool $Session 'get_cbm_status' @{})
+        $state = [string]$status._meta.cbm_status
+        if ($state -eq 'initializing') {
+            Assert-B ([DateTime]::UtcNow -lt $script:deadline) (
+                "CBM provider remained initializing through the case deadline: $EvidenceName"
+            )
+            Start-Sleep -Milliseconds 250
+        }
+    } while ($state -eq 'initializing')
+    Save-B $EvidenceName $status
+    return $status
+}
+
 function Write-Fixture {
     New-Item -ItemType Directory -Force (Join-Path $primary 'bulk') | Out-Null
     Write-BText (Join-Path $primary 'Target.cs') @'
@@ -365,7 +380,7 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
     }
     Stop-OwnedSession $native
 
-    Invoke-BCase '144-C' 'unsupported-producer-unit-fails-closed' {
+    Invoke-BCase '147-B' 'mixed-producer-capability-and-full-unit-proof' {
         $mixed = Join-Path $runRoot 'mixed-language'
         New-Item -ItemType Directory -Force $mixed | Out-Null
         & git -C $mixed init --quiet
@@ -374,12 +389,16 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
         Write-BText (Join-Path $mixed 'ContextA.cs') 'public class ContextA { }'
         Write-BText (Join-Path $mixed 'Consumer.cs') 'public class Consumer { public Consumer(ContextA value) { } }'
         Write-BText (Join-Path $mixed 'Unproved.ts') 'export class Unproved { }'
+        Write-BText (Join-Path $mixed 'Unproved.java') 'public class UnprovedJava { }'
+        Write-BText (Join-Path $mixed 'incapable.rs') 'pub struct Incapable;'
         $mixedSession = Start-BSession 'mixed' $BinaryPath $mixed
         $answer = Query $mixedSession @{
             workspaceRoot = $mixed; type = 'reverse_edges'; domain = 'builtin';
             entity_type = 'TypeRef'; name = 'ContextA'
-        } 'mixed-language-lower-bound'
-        Assert-LowerBound $answer 'mixed C#/TypeScript unit set'
+        } 'mixed-language-full-unit-proof'
+        Assert-Exact $answer 'mixed C#/TypeScript/Java/Rust unit set'
+        Assert-Set (Constructor-Subjects $answer 'ContextA') @('Consumer') `
+            'Mixed-language full-unit acquisition changed semantic truth.'
         Stop-OwnedSession $mixedSession
     }
 
@@ -419,8 +438,7 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
         APPDATA = Join-Path $unavailableHome 'AppData/Roaming'
     }
     Invoke-BCase '144-C' 'provider-unavailable-retains-Clean-authority' {
-        $status = Get-BResult (Invoke-BReadyTool $unavailable 'get_cbm_status' @{})
-        Save-B 'provider-unavailable-status' $status
+        $status = Wait-ProviderStatus $unavailable 'provider-unavailable-status'
         Assert-B ($status._meta.cbm_status -eq 'unavailable') (
             "Provider-unavailable fixture unexpectedly resolved CBM: $($status._meta.cbm_status)"
         )
@@ -433,8 +451,7 @@ public class RestoredAdditionalConsumer { public RestoredAdditionalConsumer(Cont
     Write-Config $true
     $provider = Start-BSession 'provider' $BinaryPath $primary
     Invoke-BCase '144-D' 'provider-admission' {
-        $status = Get-BResult (Invoke-BReadyTool $provider 'get_cbm_status' @{})
-        Save-B 'provider-status' $status
+        $status = Wait-ProviderStatus $provider 'provider-status'
         Assert-B ($status._meta.cbm_status -eq 'available') 'Provider-enabled session did not establish CBM availability.'
         $null = Tool $provider 'refresh_workspace' @{ workspaceRoot = $primary } 'provider-refresh'
     }

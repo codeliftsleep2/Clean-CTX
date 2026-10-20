@@ -4,6 +4,7 @@
 //! parse exactly the K owners reported as compiled, must not reconcile the
 //! unrelated exact-Calls capability, and must do no work when repeated warm.
 
+use crate::mcp::tool_handlers::hydration::{reset_test_scan_calls, test_scan_calls};
 use crate::mcp::tools::dispatch_tools_call;
 use crate::tests::assert_valid_mcp_envelope;
 use serde_json::{Value, json};
@@ -95,4 +96,78 @@ fn issue_144_performance_work_counts_compile_only_k_and_skip_unrelated_calls() {
         (0, 0),
         "unchanged warm reverse TypeRef must perform no semantic compilation or exact-Calls reconciliation"
     );
+}
+
+#[test]
+fn issue_147_b_work_counts_use_k_n_and_warm_reuse_without_exact_calls() {
+    let _response_serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    std::fs::create_dir(root.path().join(".git")).expect("Git root marker");
+    std::fs::write(
+        root.path().join("ContextA.cs"),
+        "public class ContextA {}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.path().join("Consumer.cs"),
+        "public class Consumer { public Consumer(ContextA value) {} }\n",
+    )
+    .unwrap();
+    for index in 0..5 {
+        std::fs::write(
+            root.path().join(format!("Unrelated{index}.cs")),
+            format!("public class Unrelated{index} {{}}\n"),
+        )
+        .unwrap();
+    }
+    for index in 0..3 {
+        std::fs::write(
+            root.path().join(format!("FullUnit{index}.ts")),
+            format!("export class FullUnit{index} {{}}\n"),
+        )
+        .unwrap();
+    }
+    for index in 0..2 {
+        std::fs::write(
+            root.path().join(format!("FullUnit{index}.java")),
+            format!("public class FullUnit{index} {{}}\n"),
+        )
+        .unwrap();
+    }
+    for index in 0..4 {
+        std::fs::write(
+            root.path().join(format!("Incapable{index}.rs")),
+            format!("pub struct Incapable{index};\n"),
+        )
+        .unwrap();
+    }
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    let state = crate::mcp::McpState::new(config);
+
+    reset_test_scan_calls();
+    state.reset_test_full_semantic_parses();
+    state.reset_test_csharp_reconciliation_count();
+    let cold = reverse_type_ref(&state, root.path());
+    let cold = structured(&cold);
+
+    assert_eq!(cold["coverage"]["result_semantics"], "exact", "{cold}");
+    assert_eq!(test_scan_calls(), 1, "cold acquisition must inventory once");
+    assert_eq!(
+        state.test_full_semantic_parses(),
+        7,
+        "work must be C# K=2 plus uncertified capable N=5; unrelated C# and incapable Rust stay out"
+    );
+    assert_eq!(state.test_csharp_reconciliation_count(), 0);
+
+    reset_test_scan_calls();
+    state.reset_test_full_semantic_parses();
+    state.reset_test_csharp_reconciliation_count();
+    let warm = reverse_type_ref(&state, root.path());
+    let warm = structured(&warm);
+    assert_eq!(warm["edges"], cold["edges"]);
+    assert_eq!(warm["coverage"]["result_semantics"], "exact", "{warm}");
+    assert_eq!(test_scan_calls(), 0, "warm proof must reuse completion");
+    assert_eq!(state.test_full_semantic_parses(), 0);
+    assert_eq!(state.test_csharp_reconciliation_count(), 0);
 }

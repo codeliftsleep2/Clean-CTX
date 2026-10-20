@@ -364,7 +364,7 @@ fn additional_root_registration_is_reached_by_hydration_discovery() {
 }
 
 #[test]
-fn red19_still_indexing_project_with_queryable_graph_is_searched() {
+fn red19_still_indexing_project_skips_advisory_search_and_uses_clean_source() {
     let _serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -386,23 +386,27 @@ fn red19_still_indexing_project_with_queryable_graph_is_searched() {
 
     let sc = call_find(&state, "Persisted", primary.path());
 
-    assert_both_projects_searched(&primary_slug, &additional_slug);
+    assert!(
+        searched_projects().is_empty(),
+        "one indexing project occupies the shared provider client"
+    );
     assert_eq!(
-        sc["discovery"]["discovered"], 2,
-        "CBM advisory evidence and the filesystem fallback both report the shared candidate"
+        sc["discovery"]["discovered"], 1,
+        "only the canonical Clean owner reaches downstream selection"
     );
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
-    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
+    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "skipped");
     assert_eq!(
-        coverage_entry(&sc, &additional_slug)["readiness"],
-        "still_indexing"
+        coverage_entry(&sc, &additional_slug)["reason"],
+        "provider_indexing"
     );
+    assert_eq!(coverage_entry(&sc, &primary_slug)["reason"], "provider_indexing");
     clear_test_project_search_results();
 }
 
 #[test]
-fn red20_failed_readiness_with_queryable_graph_is_searched() {
+fn red20_failed_readiness_skips_advisory_search_and_uses_clean_source() {
     let _serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -424,15 +428,18 @@ fn red20_failed_readiness_with_queryable_graph_is_searched() {
 
     let sc = call_find(&state, "PersistedAfterFailure", primary.path());
 
-    assert_both_projects_searched(&primary_slug, &additional_slug);
+    assert_eq!(searched_projects(), vec![primary_slug]);
     assert_eq!(
-        sc["discovery"]["discovered"], 2,
-        "CBM advisory evidence and the filesystem fallback both report the shared candidate"
+        sc["discovery"]["discovered"], 1,
+        "degraded provider evidence cannot amplify the Clean owner"
     );
     assert_eq!(sc["discovery"]["compiled"], 1);
     assert_eq!(sc["count"], 1);
-    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "searched");
-    assert_eq!(coverage_entry(&sc, &additional_slug)["readiness"], "failed");
+    assert_eq!(coverage_entry(&sc, &additional_slug)["status"], "skipped");
+    assert_eq!(
+        coverage_entry(&sc, &additional_slug)["reason"],
+        "provider_degraded"
+    );
     clear_test_project_search_results();
 }
 

@@ -10,8 +10,9 @@ fn key(root: &str) -> AcquisitionCacheKey {
         roots: vec![root.into()],
         admission_fingerprint: "admission-1".into(),
         producer_generations: vec![(SourceKind::CSharp, "producer-1".into())],
+        capability_version: 1,
         predicate_version: 1,
-        proof_contract_version: 1,
+        proof_contract_version: 2,
         evidence: EvidenceRequirement::CurrentHighSemanticProjection,
     }
 }
@@ -67,11 +68,14 @@ fn acquisition_cache_key_rejects_every_changed_authority_dimension() {
     let mut producer = baseline.clone();
     producer.producer_generations[0].1 = "producer-2".into();
     changed.push(producer);
+    let mut capability = baseline.clone();
+    capability.capability_version = 2;
+    changed.push(capability);
     let mut predicate = baseline.clone();
     predicate.predicate_version = 2;
     changed.push(predicate);
     let mut contract = baseline.clone();
-    contract.proof_contract_version = 2;
+    contract.proof_contract_version = 3;
     changed.push(contract);
 
     for distinct in changed {

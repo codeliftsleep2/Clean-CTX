@@ -12,10 +12,15 @@ use crate::mcp::discovery_cache::{DiscoveryMode, DiscoveryScope};
 use serde::Serialize;
 #[cfg(all(test, feature = "rust"))]
 use serde_json::Value;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 mod cache;
 use cache::{discovery_is_complete, discovery_scopes_for_roots, pending_discovery_roots};
+
+mod candidates;
+use candidates::{append_rooted_paths, discovery_status};
+#[cfg(all(test, feature = "rust"))]
+use candidates::append_project_paths;
 
 mod acquisition;
 mod execution;
@@ -38,6 +43,7 @@ pub(crate) use invalidation::{
 };
 
 mod publication;
+mod readiness;
 mod report;
 #[cfg(all(test, feature = "rust"))]
 pub(crate) use publication::compile_candidate;
@@ -51,9 +57,6 @@ mod semantic_compilation_parallel_tests;
 pub(crate) use filesystem::{
     TraversalStats, last_test_traversal_stats, reset_test_scan_calls, test_scan_calls,
 };
-
-#[cfg(all(test, feature = "rust"))]
-use crate::cbm::GraphNode;
 
 // Test-only discovery instrumentation (project-search injection, traversal
 // counters). Kept in its own module so this file stays inside the active-file
@@ -214,7 +217,6 @@ fn discover_candidate_paths(
             }
         }
     }
-
     let filesystem_roots = configured_roots(state, workspace_root);
     state.prepare_cbm_for_consumer();
     let mut bridge_guard = state.graph_bridge_lock();
@@ -230,6 +232,7 @@ fn discover_candidate_paths(
         );
     };
     let projects = bridge.configured_projects();
+    let provider_busy = readiness::provider_busy(bridge, &projects);
     let mut candidates = Vec::new();
     let mut coverage = Vec::new();
     let mut fallback_roots = Vec::new();
@@ -273,13 +276,43 @@ fn discover_candidate_paths(
             });
             continue;
         }
-
+        if readiness::skip_busy_provider(
+            provider_busy,
+            project.clone(),
+            root.clone(),
+            &mut fallback_roots,
+            &mut coverage,
+        ) {
+            cbm_attempted = true;
+            continue;
+        }
         #[cfg(all(test, feature = "rust"))]
         if let Some(readiness) = test_project_readiness(&project) {
             let readiness = match readiness {
                 TestProjectReadiness::Ready => "ready",
-                TestProjectReadiness::StillIndexing => "still_indexing",
-                TestProjectReadiness::Failed => "failed",
+                TestProjectReadiness::StillIndexing => {
+                    cbm_attempted = true;
+                    fallback_roots.push(root);
+                    coverage.push(ProjectCoverage {
+                        project,
+                        status: "skipped",
+                        readiness: Some("still_indexing"),
+                        reason: Some("still_indexing"),
+                    });
+                    continue;
+                }
+                TestProjectReadiness::Failed => {
+                    cbm_attempted = true;
+                    saw_search_failure = true;
+                    fallback_roots.push(root);
+                    coverage.push(ProjectCoverage {
+                        project,
+                        status: "skipped",
+                        readiness: Some("failed"),
+                        reason: Some("provider_degraded"),
+                    });
+                    continue;
+                }
                 TestProjectReadiness::Unavailable => {
                     saw_unavailable = true;
                     fallback_roots.push(root.clone());
@@ -322,7 +355,6 @@ fn discover_candidate_paths(
             }
             continue;
         }
-
         if !bridge.is_available() {
             saw_unavailable = true;
             fallback_roots.push(root);
@@ -336,8 +368,29 @@ fn discover_candidate_paths(
         }
         let readiness = match bridge.ensure_indexed_for(&project) {
             Ok(crate::cbm::bridge::IndexingStatus::Ready) => "ready",
-            Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => "still_indexing",
-            Err(_) => "failed",
+            Ok(crate::cbm::bridge::IndexingStatus::StillIndexing { .. }) => {
+                cbm_attempted = true;
+                fallback_roots.push(root);
+                coverage.push(ProjectCoverage {
+                    project,
+                    status: "skipped",
+                    readiness: Some("still_indexing"),
+                    reason: Some("still_indexing"),
+                });
+                continue;
+            }
+            Err(_) => {
+                cbm_attempted = true;
+                saw_search_failure = true;
+                fallback_roots.push(root);
+                coverage.push(ProjectCoverage {
+                    project,
+                    status: "skipped",
+                    readiness: Some("failed"),
+                    reason: Some("provider_degraded"),
+                });
+                continue;
+            }
         };
         cbm_attempted = true;
         let discovered = match discovery {
@@ -533,42 +586,6 @@ fn filesystem_only_discovery(
         root_completions,
         inventories: scan.inventories,
     }
-}
-
-fn discovery_status(attempted: bool, completed: bool, has_partial_coverage: bool) -> &'static str {
-    if completed {
-        "completed"
-    } else if attempted || has_partial_coverage {
-        "partial"
-    } else {
-        "failed"
-    }
-}
-
-#[cfg(all(test, feature = "rust"))]
-fn append_project_paths(candidates: &mut Vec<String>, root: &Path, nodes: Vec<GraphNode>) {
-    append_rooted_paths(
-        candidates,
-        root,
-        nodes.into_iter().map(|node| node.file).collect(),
-    );
-}
-
-fn append_rooted_paths(candidates: &mut Vec<String>, root: &Path, paths: Vec<String>) {
-    candidates.extend(paths.into_iter().filter_map(|file| {
-        if file.is_empty() {
-            return None;
-        }
-        let path = PathBuf::from(file);
-        let rooted = if path.is_absolute() {
-            path
-        } else {
-            root.join(path)
-        };
-        Some(crate::dictionary::path::canonical_identity_key(
-            &rooted.to_string_lossy(),
-        ))
-    }));
 }
 
 // Discovery-cache invalidation entry points live in `hydration/invalidation.rs`

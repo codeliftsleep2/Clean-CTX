@@ -47,11 +47,55 @@ pub(crate) fn clean_type_ref_proof_claim(
     predicate_version: u32,
     proof_contract_version: u32,
 ) -> Result<AcquisitionProofClaim, CleanProofRejection> {
-    if !manifest.complete {
-        return Err(CleanProofRejection::IncompleteInventory);
-    }
+    validate_manifest(unit, manifest)?;
     if !has_certified_type_ref_name_bearing_predicate(unit.source_kind) {
         return Err(CleanProofRejection::UncertifiedPredicate);
+    }
+
+    Ok(proof_claim(
+        requirement,
+        unit,
+        manifest,
+        admission_fingerprint,
+        predicate_version,
+        proof_contract_version,
+        type_ref_candidate_owners(manifest, &requirement.target.written_name),
+    ))
+}
+
+/// Construct a Clean-owned exhaustive claim by processing every admitted
+/// owner in an uncertified capable unit. No name-bearing predicate participates
+/// in this proof mode.
+pub(crate) fn clean_full_unit_type_ref_proof_claim(
+    requirement: &AcquisitionRequirement,
+    unit: &CoverageUnit,
+    manifest: &InventoryManifest,
+    admission_fingerprint: impl Into<String>,
+    predicate_version: u32,
+    proof_contract_version: u32,
+) -> Result<AcquisitionProofClaim, CleanProofRejection> {
+    validate_manifest(unit, manifest)?;
+    Ok(proof_claim(
+        requirement,
+        unit,
+        manifest,
+        admission_fingerprint,
+        predicate_version,
+        proof_contract_version,
+        manifest
+            .entries
+            .iter()
+            .map(|entry| entry.owner.clone())
+            .collect(),
+    ))
+}
+
+fn validate_manifest(
+    unit: &CoverageUnit,
+    manifest: &InventoryManifest,
+) -> Result<(), CleanProofRejection> {
+    if !manifest.complete {
+        return Err(CleanProofRejection::IncompleteInventory);
     }
 
     let root = Path::new(&unit.canonical_root);
@@ -69,8 +113,19 @@ pub(crate) fn clean_type_ref_proof_claim(
     {
         return Err(CleanProofRejection::SourceKindMismatch);
     }
+    Ok(())
+}
 
-    Ok(AcquisitionProofClaim {
+fn proof_claim(
+    requirement: &AcquisitionRequirement,
+    unit: &CoverageUnit,
+    manifest: &InventoryManifest,
+    admission_fingerprint: impl Into<String>,
+    predicate_version: u32,
+    proof_contract_version: u32,
+    candidate_owners: Vec<String>,
+) -> AcquisitionProofClaim {
+    AcquisitionProofClaim {
         unit: unit.clone(),
         target: requirement.target.clone(),
         scope_fingerprint: requirement.scope_fingerprint.clone(),
@@ -81,7 +136,7 @@ pub(crate) fn clean_type_ref_proof_claim(
         exhaustive: true,
         truncated: false,
         limitations: Vec::new(),
-        candidate_owners: type_ref_candidate_owners(manifest, &requirement.target.written_name),
+        candidate_owners,
         provenance: ProofProvenance::Clean,
-    })
+    }
 }

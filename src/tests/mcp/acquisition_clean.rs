@@ -1,17 +1,82 @@
 use crate::mcp::acquisition::{
     AcquisitionRequirement, CleanProofRejection, CoverageUnit, InventoryEntry, InventoryManifest,
-    SourceKind, clean_type_ref_proof_claim, has_certified_type_ref_name_bearing_predicate,
-    type_ref_candidate_owners,
+    SourceKind, clean_full_unit_type_ref_proof_claim, clean_type_ref_proof_claim,
+    has_certified_type_ref_name_bearing_predicate, type_ref_candidate_owners,
 };
 use std::sync::Arc;
 
 fn entry(owner: &str, source: &str) -> InventoryEntry {
+    entry_for(SourceKind::CSharp, owner, source)
+}
+
+fn entry_for(source_kind: SourceKind, owner: &str, source: &str) -> InventoryEntry {
     InventoryEntry {
         owner: owner.into(),
-        source_kind: SourceKind::CSharp,
+        source_kind,
         source_hash: crate::cache::content_hash(source.as_bytes()),
         source: Arc::new(source.into()),
     }
+}
+
+#[test]
+fn issue_147_b_uncertified_zero_is_not_a_selective_absence_proof() {
+    let unit = CoverageUnit::builtin_type_ref(
+        "C:/repo",
+        SourceKind::TypeScript,
+        "typescript-generation-1",
+    );
+    let requirement =
+        AcquisitionRequirement::incoming_type_ref("ContextA", "scope-1", [unit.clone()]);
+    let manifest = InventoryManifest::new(
+        vec![entry_for(
+            SourceKind::TypeScript,
+            "C:/repo/Consumer.ts",
+            "export class Consumer {}",
+        )],
+        true,
+        true,
+    );
+
+    assert!(type_ref_candidate_owners(&manifest, "ContextA").is_empty());
+    assert_eq!(
+        clean_type_ref_proof_claim(&requirement, &unit, &manifest, "admission-1", 1, 2),
+        Err(CleanProofRejection::UncertifiedPredicate)
+    );
+}
+
+#[test]
+fn issue_147_b_complete_full_unit_can_prove_an_uncertified_capable_producer() {
+    let unit = CoverageUnit::builtin_type_ref(
+        "C:/repo",
+        SourceKind::TypeScript,
+        "typescript-generation-1",
+    );
+    let requirement =
+        AcquisitionRequirement::incoming_type_ref("ContextA", "scope-1", [unit.clone()]);
+    let manifest = InventoryManifest::new(
+        vec![
+            entry_for(
+                SourceKind::TypeScript,
+                "C:/repo/Consumer.ts",
+                "export class Consumer {}",
+            ),
+            entry_for(
+                SourceKind::TypeScript,
+                "C:/repo/Other.ts",
+                "export class Other {}",
+            ),
+        ],
+        true,
+        true,
+    );
+
+    let claim =
+        clean_full_unit_type_ref_proof_claim(&requirement, &unit, &manifest, "admission-1", 1, 2)
+            .expect("complete full-unit acquisition is exhaustive without a predicate");
+    assert_eq!(
+        claim.candidate_owners,
+        ["C:/repo/Consumer.ts", "C:/repo/Other.ts"]
+    );
 }
 
 #[test]

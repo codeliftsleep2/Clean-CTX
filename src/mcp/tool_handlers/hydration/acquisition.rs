@@ -2,15 +2,17 @@ use super::filesystem::RootInventoryManifest;
 use crate::mcp::acquisition::{
     AcquisitionCacheKey, AcquisitionOutcome, AcquisitionRequirement, AcquisitionSatisfaction,
     AcquisitionTarget, CleanProofRejection, CoverageProofDisposition, CoverageUnit,
-    EvidenceRequirement, InventoryManifest, ProofBarrier, ProofContext, SemanticPublicationStatus,
-    SourceKind, ValidatedAcquisitionProof, clean_type_ref_proof_claim,
+    EvidenceRequirement, InventoryManifest, ProducerCapabilityDisposition, ProofBarrier,
+    ProofContext, SemanticPublicationStatus, SourceKind, TYPE_REF_CAPABILITY_VERSION,
+    ValidatedAcquisitionProof, builtin_type_ref_capability, clean_full_unit_type_ref_proof_claim,
+    clean_type_ref_proof_claim, has_certified_type_ref_name_bearing_predicate,
     producer_generation_fingerprint, scope_policy_fingerprint, validate_proof_claim,
 };
 use crate::mcp::compatibility::producer::GenerationCatalog;
 use std::collections::BTreeMap;
 
 const TYPE_REF_PREDICATE_VERSION: u32 = 1;
-const ACQUISITION_PROOF_CONTRACT_VERSION: u32 = 1;
+const ACQUISITION_PROOF_CONTRACT_VERSION: u32 = 2;
 
 pub(super) fn acquisition_cache_key(
     target: AcquisitionTarget,
@@ -38,6 +40,7 @@ pub(super) fn acquisition_cache_key(
         roots,
         admission_fingerprint,
         producer_generations,
+        capability_version: TYPE_REF_CAPABILITY_VERSION,
         predicate_version: TYPE_REF_PREDICATE_VERSION,
         proof_contract_version: ACQUISITION_PROOF_CONTRACT_VERSION,
         evidence: EvidenceRequirement::CurrentHighSemanticProjection,
@@ -48,6 +51,13 @@ pub(super) struct ProvisionalAcquisition {
     requirement: AcquisitionRequirement,
     proofs: Vec<ValidatedAcquisitionProof>,
     barriers: BTreeMap<CoverageUnit, ProofBarrier>,
+    owners: Vec<String>,
+}
+
+impl ProvisionalAcquisition {
+    pub(super) fn owners(&self) -> &[String] {
+        &self.owners
+    }
 }
 
 pub(super) fn prepare_clean_type_ref_acquisition(
@@ -62,7 +72,11 @@ pub(super) fn prepare_clean_type_ref_acquisition(
         .iter()
         .flat_map(|inventory| manifests_by_source_kind(inventory, &catalog))
         .collect();
-    if grouped.is_empty() {
+    if grouped.is_empty()
+        && inventories
+            .iter()
+            .any(|inventory| !inventory.manifest.complete)
+    {
         return None;
     }
 
@@ -73,15 +87,27 @@ pub(super) fn prepare_clean_type_ref_acquisition(
     );
     let mut proofs = Vec::new();
     let mut barriers = BTreeMap::new();
+    let mut owners = Vec::new();
     for (unit, manifest) in grouped {
-        let claim = match clean_type_ref_proof_claim(
-            &requirement,
-            &unit,
-            &manifest,
-            admission.clone(),
-            TYPE_REF_PREDICATE_VERSION,
-            ACQUISITION_PROOF_CONTRACT_VERSION,
-        ) {
+        let claim = match if has_certified_type_ref_name_bearing_predicate(unit.source_kind) {
+            clean_type_ref_proof_claim(
+                &requirement,
+                &unit,
+                &manifest,
+                admission.clone(),
+                TYPE_REF_PREDICATE_VERSION,
+                ACQUISITION_PROOF_CONTRACT_VERSION,
+            )
+        } else {
+            clean_full_unit_type_ref_proof_claim(
+                &requirement,
+                &unit,
+                &manifest,
+                admission.clone(),
+                TYPE_REF_PREDICATE_VERSION,
+                ACQUISITION_PROOF_CONTRACT_VERSION,
+            )
+        } {
             Ok(claim) => claim,
             Err(rejection) => {
                 barriers.insert(unit, barrier_for_clean_rejection(rejection));
@@ -98,7 +124,10 @@ pub(super) fn prepare_clean_type_ref_acquisition(
             },
             claim,
         ) {
-            Ok(proof) => proofs.push(proof),
+            Ok(proof) => {
+                owners.extend(proof.candidate_owners.iter().cloned());
+                proofs.push(proof);
+            }
             Err(_) => {
                 barriers.insert(unit, ProofBarrier::ClaimIncompatible);
             }
@@ -108,6 +137,7 @@ pub(super) fn prepare_clean_type_ref_acquisition(
         requirement,
         proofs,
         barriers,
+        owners,
     })
 }
 
@@ -158,6 +188,9 @@ fn manifests_by_source_kind(
     }
     grouped
         .into_iter()
+        .filter(|(source_kind, _)| {
+            builtin_type_ref_capability(*source_kind) != ProducerCapabilityDisposition::Incapable
+        })
         .map(|(source_kind, entries)| {
             let generation = producer_generation_fingerprint(source_kind, catalog)
                 .unwrap_or_else(|| "missing-generation".into());

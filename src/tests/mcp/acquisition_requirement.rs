@@ -1,12 +1,27 @@
 use super::{
-    AcquisitionRequirement, AcquisitionSatisfaction, CoverageUnit, SemanticPublicationStatus,
-    SourceKind, producer_generation_fingerprint, requirement_fingerprint,
+    AcquisitionRequirement, AcquisitionSatisfaction, CoverageUnit, ProducerCapabilityDisposition,
+    SemanticPublicationStatus, SourceKind, builtin_type_ref_capability,
+    producer_generation_fingerprint, requirement_fingerprint,
 };
 use crate::mcp::compatibility::identity::ProducerKey;
 use crate::mcp::compatibility::producer::GenerationCatalog;
 
 fn unit(root: &str, source_kind: SourceKind, generation: &str) -> CoverageUnit {
     CoverageUnit::builtin_type_ref(root, source_kind, generation)
+}
+
+#[test]
+fn issue_147_b_capability_catalog_excludes_only_the_proven_incapable_producer() {
+    for capable in [SourceKind::CSharp, SourceKind::TypeScript, SourceKind::Java] {
+        assert_eq!(
+            builtin_type_ref_capability(capable),
+            ProducerCapabilityDisposition::Capable
+        );
+    }
+    assert_eq!(
+        builtin_type_ref_capability(SourceKind::Rust),
+        ProducerCapabilityDisposition::Incapable
+    );
 }
 
 #[test]

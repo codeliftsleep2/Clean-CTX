@@ -425,15 +425,19 @@ fn red_h6_cache_hit_in_one_project_does_not_suppress_another() {
     )]));
 
     let _ = call_query(&state, "find_entities", "ServiceA", primary.path());
-    assert_eq!(calls_for(&primary_slug), 1);
-    assert_eq!(calls_for(&additional_slug), 1);
+    assert_eq!(calls_for(&primary_slug), 0);
+    assert_eq!(calls_for(&additional_slug), 0);
 
     let _ = call_query(&state, "find_entities", "ServiceA", primary.path());
-    assert_eq!(calls_for(&primary_slug), 1, "ready project is cached");
+    assert_eq!(
+        calls_for(&primary_slug),
+        0,
+        "a ready project must not block behind another project's indexing"
+    );
     assert_eq!(
         calls_for(&additional_slug),
-        2,
-        "a project that is still indexing must keep discovering"
+        0,
+        "a project that is still indexing must remain retryable without searching"
     );
 
     clear_test_project_search_results();

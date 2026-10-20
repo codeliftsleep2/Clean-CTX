@@ -98,7 +98,12 @@ fn hydrate_workspace_index_for_target(
             &state.config.exclude_patterns,
         )
     });
-    let candidate_paths = outcome.candidates;
+    let mut candidate_paths = outcome.candidates;
+    if let Some(provisional) = &provisional {
+        candidate_paths.extend(provisional.owners().iter().cloned());
+    }
+    candidate_paths.sort();
+    candidate_paths.dedup();
     let mut project_coverage = outcome.project_coverage;
     let discovered = candidate_paths.len();
     let selected = select_candidates(state, candidate_paths, requirement);

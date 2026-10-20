@@ -34,6 +34,29 @@ pub(crate) enum ProducerCapability {
     BuiltinTypeRefIncoming,
 }
 
+/// Generation-bound disposition of an active producer for one capability.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub(crate) enum ProducerCapabilityDisposition {
+    Capable,
+    Incapable,
+}
+
+pub(crate) const TYPE_REF_CAPABILITY_VERSION: u32 = 1;
+
+/// Direct catalog for the current canonical producers. Unknown producers must
+/// be treated as capable by callers; only an explicit `Incapable` result may
+/// remove a coverage unit from the acquisition requirement.
+pub(crate) fn builtin_type_ref_capability(
+    source_kind: SourceKind,
+) -> ProducerCapabilityDisposition {
+    match source_kind {
+        SourceKind::CSharp | SourceKind::TypeScript | SourceKind::Java => {
+            ProducerCapabilityDisposition::Capable
+        }
+        SourceKind::Rust => ProducerCapabilityDisposition::Incapable,
+    }
+}
+
 /// Incoming relation families emitted by the initial TypeRef producer.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum RelationshipFamily {

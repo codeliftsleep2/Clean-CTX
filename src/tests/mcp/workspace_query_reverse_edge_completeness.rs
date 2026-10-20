@@ -255,6 +255,16 @@ fn issue_144_proof_backed_reverse_type_ref_earns_exact_coverage() {
 
     assert_eq!(constructor_subjects(&response), expected_subjects());
     assert_exact_coverage(&response);
+    assert_eq!(
+        structured(&response)["discovery"]["discovered"],
+        3,
+        "overlapping CBM, filesystem, and proof routes must yield one candidate per owner"
+    );
+    assert_eq!(
+        structured(&response)["discovery"]["compiled"],
+        3,
+        "deduplication must preserve every distinct semantic owner"
+    );
     let coverage = &structured(&response)["coverage"];
     assert_eq!(
         coverage["coverage_detail"],
@@ -393,7 +403,7 @@ fn issue_144_singular_and_batch_preserve_identical_complete_detail() {
 }
 
 #[test]
-fn issue_144_unproved_language_unit_remains_lower_bound() {
+fn issue_147_b_uncertified_language_unit_earns_exactness_through_full_acquisition() {
     let _hydration_serial = TEST_SERIALIZE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -410,25 +420,9 @@ fn issue_144_unproved_language_unit_remains_lower_bound() {
     configure_ready_provider(root.path(), &["KnownConsumer.cs"]);
 
     let response = dispatch_reverse(&state, root.path());
-    let coverage = &structured(&response)["coverage"];
 
     assert_eq!(constructor_subjects(&response), expected_subjects());
-    assert_eq!(coverage["source_complete"], false, "{coverage}");
-    assert_eq!(coverage["result_semantics"], "lower_bound", "{coverage}");
-    assert_eq!(coverage["omitted_possible"], true, "{coverage}");
-    assert_eq!(
-        coverage["coverage_detail"],
-        json!({
-            "processing_state": "terminal",
-            "proof_state": "structurally_unproven",
-            "fact_authority": "authoritative_observed",
-            "retryability": "change_required",
-            "residual_unit_count": 1,
-            "reasons": ["candidate_predicate_uncertified"]
-        }),
-        "a terminal mixed-language acquisition must explain that its lower bound is a \
-         structural proof limitation, not known unfinished candidate work: {coverage}"
-    );
+    assert_exact_coverage(&response);
 }
 
 #[test]

@@ -8,6 +8,7 @@ pub(crate) struct AcquisitionCacheKey {
     pub(crate) roots: Vec<String>,
     pub(crate) admission_fingerprint: String,
     pub(crate) producer_generations: Vec<(SourceKind, String)>,
+    pub(crate) capability_version: u32,
     pub(crate) predicate_version: u32,
     pub(crate) proof_contract_version: u32,
     pub(crate) evidence: EvidenceRequirement,

@@ -132,7 +132,7 @@ impl AcquisitionSatisfaction {
     }
 
     pub(crate) fn is_source_complete(&self) -> bool {
-        !self.required.is_empty() && self.residual_units().is_empty()
+        self.residual_units().is_empty()
     }
 
     pub(crate) fn completeness_generation(&self) -> Option<String> {

@@ -153,9 +153,10 @@ control crossing historical/common candidate limits, duplicate semantic owners
 in distinct files, constructor and
 base-TypeRef relations, method/comment/string negative controls, written
 nullable/array/generic/qualified/alias forms, batch/single equivalence,
-unscoped and unsupported-producer lower bounds, edit/delete/restore/rename
-invalidation, and provider/native semantic parity. Provider admission must pass;
-a fallback answer is not counted as provider-enabled evidence.
+unscoped non-TypeRef lower bounds, mixed-language capability exclusion plus
+full-unit TypeRef proof, edit/delete/restore/rename invalidation, and
+provider/native semantic parity. Provider admission must pass; a fallback
+answer is not counted as provider-enabled evidence.
 
 Every fixture, request, response, stderr stream, binary/provider hash, oracle,
 timing, and verdict is retained beneath `target/issue-144-live-verification/`.
