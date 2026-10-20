@@ -32,7 +32,7 @@ fn context(namespace: &[&str], imports: &[&[&str]]) -> CSharpOrdinaryImportConte
 }
 
 #[test]
-fn r3_ordinary_imports_require_unique_candidates_and_negative_shadow_proof() {
+fn issue_149_ordinary_imports_require_unique_proven_candidates() {
     let empty = CSharpSourceSymbolIndex::default();
     let ef = CSharpTypeIdentity::known_external("Microsoft.EntityFrameworkCore.DbContext");
     let other = CSharpTypeIdentity::known_external("Other.Framework.DbContext");
@@ -84,15 +84,15 @@ fn r3_ordinary_imports_require_unique_candidates_and_negative_shadow_proof() {
             &["Unknown", "Package"],
         ],
     );
-    assert_eq!(
-        resolve_ordinary_import_type_reference(
-            "DbContext",
-            &unknown_competitor,
-            std::slice::from_ref(&ef),
-            &empty,
-        ),
-        CSharpResolution::Ambiguous(CSharpResolutionReason::UnknownImportContents)
-    );
+    let CSharpResolution::Resolved { identity, .. } = resolve_ordinary_import_type_reference(
+        "DbContext",
+        &unknown_competitor,
+        std::slice::from_ref(&ef),
+        &empty,
+    ) else {
+        panic!("an unmodeled import is not evidence of a same-name competitor");
+    };
+    assert_eq!(identity, ef);
 
     let unknown_only = context(&["Consumer"], &[&["Unknown", "Package"]]);
     assert_eq!(

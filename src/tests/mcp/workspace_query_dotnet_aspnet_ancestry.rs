@@ -72,6 +72,55 @@ fn controller_count(result: &serde_json::Value, name: &str) -> usize {
 }
 
 #[test]
+fn issue_149_unmodeled_import_preserves_controller_route_actions_and_ancestry() {
+    let root = tempfile::tempdir().unwrap();
+    write(
+        &root,
+        "Base.cs",
+        "using Microsoft.AspNetCore.Mvc; using Some.External.Namespace; namespace Mini; public class ProjectControllerBase : ControllerBase {}",
+    );
+    write(
+        &root,
+        "Endpoint.cs",
+        "using Microsoft.AspNetCore.Mvc; using Some.External.Namespace; namespace Mini; [Route(\"api/widgets\")] public class WidgetsController : ProjectControllerBase { [HttpGet] public int Get() { return 1; } [HttpPost] public int Post() { return 2; } }",
+    );
+    let state = state();
+    publish_all(&root, &state, &["Base.cs", "Endpoint.cs"]);
+
+    let entities = query(
+        &root,
+        &state,
+        "find_entities",
+        "Controller",
+        "WidgetsController",
+    );
+    assert_eq!(controller_count(&entities, "WidgetsController"), 1);
+
+    let edges = query(
+        &root,
+        &state,
+        "forward_edges",
+        "Controller",
+        "WidgetsController",
+    );
+    let edges = edges["edges"].as_array().unwrap();
+    assert_eq!(
+        edges
+            .iter()
+            .filter(|edge| edge["relation"] == "HasRoute")
+            .count(),
+        1
+    );
+    assert_eq!(
+        edges
+            .iter()
+            .filter(|edge| edge["relation"] == "ControllerAction")
+            .count(),
+        2
+    );
+}
+
+#[test]
 fn exact_multi_hop_ancestry_projects_controller_route_and_actions() {
     let root = tempfile::tempdir().unwrap();
     write(

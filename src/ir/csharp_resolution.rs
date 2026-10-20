@@ -392,12 +392,8 @@ pub fn resolve_ordinary_import_type_reference(
     if ambiguous || imported.len() > 1 {
         return CSharpResolution::Ambiguous(CSharpResolutionReason::CompetingCandidates);
     }
-    if unknown_import {
-        return if imported.is_empty() {
-            CSharpResolution::Unresolved(CSharpResolutionReason::UnknownImportContents)
-        } else {
-            CSharpResolution::Ambiguous(CSharpResolutionReason::UnknownImportContents)
-        };
+    if unknown_import && imported.is_empty() {
+        return CSharpResolution::Unresolved(CSharpResolutionReason::UnknownImportContents);
     }
     let Some(identity) = imported.pop() else {
         return CSharpResolution::Unresolved(CSharpResolutionReason::MissingAuthority);

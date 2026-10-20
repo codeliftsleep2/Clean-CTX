@@ -70,6 +70,29 @@ fn write_context(root: &Path, body: &str) {
 }
 
 #[test]
+fn issue_149_unmodeled_import_preserves_dbcontext_role_and_relationship() {
+    let root = tempfile::TempDir::new().expect("workspace root");
+    write_context(
+        root.path(),
+        "using Microsoft.EntityFrameworkCore; using Some.External.Namespace; namespace Mini; public class Widget {} public class MiniContext : DbContext { public DbSet<Widget> Widgets { get; set; } }\n",
+    );
+    let state = state(&[]);
+
+    assert_eq!(
+        role_files(&entities(&state, root.path(), "MiniContext"), "MiniContext").len(),
+        1,
+        "an unrelated unmodeled import must not retract the resolved framework role"
+    );
+    let has_entity = state
+        .workspace_index_read()
+        .forward_edges_by_identity("dotnet", "DbContext", "MiniContext")
+        .into_iter()
+        .filter(|edge| edge.relation == SemanticRelation::HasEntity)
+        .count();
+    assert_eq!(has_entity, 1, "the resolved role must retain HasEntity");
+}
+
+#[test]
 fn issue_147_same_name_context_roles_remain_owner_distinct() {
     let first = tempfile::TempDir::new().expect("first root");
     let second = tempfile::TempDir::new().expect("second root");
