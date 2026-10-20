@@ -191,7 +191,7 @@ pub(super) fn workspace_query_properties() -> Value {
         .as_object_mut()
         .expect("workspace query properties are an object");
     properties.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Shared primary trusted workspace root. Required when any item is calls_in_file; optional for cross-file operations." }));
-    properties.insert("withinPath".into(), json!({ "type": "string", "description": "Shared optional narrowing inside workspaceRoot plus configured additional roots. Rejected when outside that authorized set or when workspaceRoot is absent." }));
+    properties.insert("withinPath".into(), json!({ "type": "string", "description": "Shared optional answer projection inside workspaceRoot plus configured additional roots. Narrows returned occurrences by their asserting file; discovery, hydration, and compilation still cover all authorized roots. Rejected when outside that authorized set or when workspaceRoot is absent." }));
     properties.insert("queries".into(), workspace_query_batch_queries());
     Value::Object(properties.clone())
 }
@@ -202,7 +202,7 @@ fn workspace_query_operation_properties() -> Value {
         "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With entity_type, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With domain, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "name": { "type": "string", "minLength": 1, "description": "Exactly one entity name. Required for find_entities, forward_edges, reverse_edges, and transitive_dependencies. For multiple names, use top-level queries with one independently identified item per name; do not pass an array or a names field." },
-        "declarations_only": { "type": "boolean", "description": "find_entities only. When true, return source-proven declaration occurrences and apply optional domain/entity_type filters. Default false preserves occurrence-oriented behavior." },
+        "declarations_only": { "type": "boolean", "description": "find_entities only. When true, return source-proven declaration occurrences and apply optional domain/entity_type filters. Fact authority alone proves declarations, not source completeness. With an explicit workspaceRoot, complete provider-neutral acquisition and publication can earn exact coverage for supported declaration producers; inspect coverage for the actual outcome. Ordinary occurrence searches are lower bounds. Default false preserves occurrence-oriented behavior." },
         "file_path": { "type": "string", "description": "File path for entities_in_file or declarations_in_file query." },
         "fidelity": { "type": "string", "enum": ["low", "medium", "high", "edit", "verbatim"], "description": "Optional semantic compilation fidelity for entities_in_file or declarations_in_file. Edit and verbatim normalize to High because these queries publish no source bodies. Defaults to the configured fidelity." },
         "kind": { "type": "string", "enum": ["dependency"], "description": "Optional cycle policy for has_cycle. Defaults to dependency." },

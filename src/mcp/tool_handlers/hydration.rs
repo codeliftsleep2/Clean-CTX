@@ -74,6 +74,10 @@ pub(crate) use test_support::*;
 mod acquisition_tests;
 
 #[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/acquisition_declarations.rs"]
+mod declaration_acquisition_tests;
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/hydration_single_flight.rs"]
 mod single_flight_tests;
 
@@ -96,7 +100,7 @@ pub(super) enum HydrationRequirement {
 /// The authority obligation attached to one hydration request.
 ///
 /// Provider discovery is advisory under both variants. `ProofBacked` enables
-/// the existing exact-TypeRef coverage contract after Clean inventory and
+/// a capability-specific coverage contract after Clean inventory and
 /// publication; `CleanAuthoritative` requires the filesystem-owned acquisition
 /// path because no selective proof contract exists for that query family.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]

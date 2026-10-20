@@ -121,6 +121,18 @@ impl GenerationCatalog {
         self.generations.get(&key).copied()
     }
 
+    /// Declaration search spans native and framework declaration producers.
+    /// Bind its capability to the complete active producer catalog.
+    pub(crate) fn declaration_generation(&self) -> String {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        for (key, generation) in &self.generations {
+            hash.update(format!("{key:?}").as_bytes());
+            hash.update(generation.to_le_bytes());
+        }
+        format!("{:x}", hash.finalize())
+    }
+
     #[cfg(test)]
     pub(crate) fn with_generation(mut self, key: ProducerKey, generation: u32) -> Self {
         self.generations.insert(key, generation);

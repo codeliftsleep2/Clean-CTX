@@ -1,5 +1,52 @@
 # Native issue reconciliation over live MCP
 
+## Issue #151 declaration completeness and answer scope
+
+Agent MaxHeadRoom's `Invoke-Issue151Acceptance.ps1` runs 15 operator acceptance
+cases against the built binary through the existing `PhaseBSession.ps1` stdio
+driver. It builds nothing. Use an all-feature binary so Rust, TypeScript, C#,
+and Java producers are present. This is live operator evidence, separate from
+tracked Rust regressions and the final CI/development gate.
+
+The matrix uses provider-disabled, forced-unavailable, and observed-ready
+sessions against the same two-root fixture. It checks fresh declaration-first
+and ordinary-discovery-first histories; warm proof reuse; facts and certificate
+generation across provider states; exact negative declaration answers;
+`withinPath` inclusion/exclusion with an unchanged acquisition generation;
+mixed-language declarations; batch order; and structured/model-facing coverage
+tuple parity. A declaration is required to earn exact coverage; ordinary entity
+occurrences are required to remain lower bounds.
+
+Additional cases edit and delete generated source followed by explicit refresh,
+recover an initially missing authorized root, and hold a generated source file
+with an exclusive Windows handle to verify unreadable-source degradation and
+recovery. The Windows-only case fails explicitly on other hosts. Production
+publication-failure injection remains covered by the Rust regressions.
+
+All fixtures, config, request/response frames, process stderr, executable hashes,
+Git revision/dirty-state receipt, and individual verdicts remain under
+`target/issue-151-live-verification/<run>/`. Only one generated fixture source
+leaf is deleted to exercise the lifecycle; other evidence is retained. Each
+case has a bounded deadline. A missing provider, wrong provider status, failed
+scenario, missing matrix case, or cleanup failure prevents acceptance. Provider
+readiness is an observed test condition, never semantic completeness authority.
+
+The script launches owned Clean-CTX sessions and allows provider-enabled
+sessions to launch their configured CBM through Clean-CTX. Run it explicitly:
+
+```powershell
+cargo build --all-features
+pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue151Acceptance.ps1 `
+  -BinaryPath ./target/debug/clean-ctx.exe `
+  -ProviderPath "$env:LOCALAPPDATA/Programs/codebase-memory-mcp/codebase-memory-mcp.exe"
+```
+
+Use the actual installed provider path if different. After Issue #151 passes,
+run `Invoke-Issue144Acceptance.ps1` and `Invoke-Issue148Acceptance.ps1` with the
+same binary/provider arguments to verify preservation of the generalized shared
+proof lifecycle. Their results are separate acceptance evidence. Batch any
+remaining Claude-only field questions after these local gates.
+
 ## C# semantic resolution R10 attribute foundation and MSTest migration
 
 `Invoke-CSharpR10Acceptance.ps1` drives a current production binary over MCP

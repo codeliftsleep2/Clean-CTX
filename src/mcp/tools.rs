@@ -463,7 +463,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                     "cycle": workspace_query_cycle_schema(),
                     "coverage": {
                         "type": "object",
-                        "description": "Truthfulness metadata. Graph lower bounds retain their existing contract; authoritative file-scoped operations may project an earned exact certificate.",
+                        "description": "Truthfulness metadata. Declaration-only find_entities and authoritative file-scoped operations may project an earned exact certificate. Ordinary find_entities occurrences remain a lower bound; inspect source_complete, result_semantics, and fact_semantics.",
                         "properties": {
                             "status": {
                                 "type": "string",
@@ -476,6 +476,7 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                                 "type": "string",
                                 "enum": ["exact", "lower_bound"]
                             },
+                            "fact_semantics": { "type": "string", "enum": ["authoritative_indexed_occurrences", "source_proven_declarations"], "description": "For find_entities, identifies the authority of returned facts. It does not certify exhaustive source coverage." },
                             "omitted_possible": { "type": "boolean" },
                             "scope": { "type": "object" },
                             "source_generation": { "type": "string" },

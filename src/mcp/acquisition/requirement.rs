@@ -32,6 +32,7 @@ impl SourceKind {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) enum ProducerCapability {
     BuiltinTypeRefIncoming,
+    SourceDeclarations,
 }
 
 /// Generation-bound disposition of an active producer for one capability.
@@ -67,6 +68,7 @@ pub(crate) enum RelationshipFamily {
 /// Stable target information available before final semantic refinement.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub(crate) struct AcquisitionTarget {
+    pub(crate) capability: ProducerCapability,
     pub(crate) domain: String,
     pub(crate) entity_type: String,
     pub(crate) written_name: String,
@@ -74,8 +76,23 @@ pub(crate) struct AcquisitionTarget {
 }
 
 impl AcquisitionTarget {
+    pub(crate) fn declarations(name: impl Into<String>) -> Self {
+        Self {
+            capability: ProducerCapability::SourceDeclarations,
+            domain: "*".into(),
+            entity_type: "source_declaration".into(),
+            written_name: name.into(),
+            matching_version: 1,
+        }
+    }
+
+    pub(crate) fn capability(&self) -> ProducerCapability {
+        self.capability
+    }
+
     pub(crate) fn exact_type_ref(written_name: impl Into<String>) -> Self {
         Self {
+            capability: ProducerCapability::BuiltinTypeRefIncoming,
             domain: "builtin".into(),
             entity_type: "TypeRef".into(),
             written_name: written_name.into(),
@@ -95,6 +112,20 @@ pub(crate) struct CoverageUnit {
 }
 
 impl CoverageUnit {
+    pub(crate) fn declarations(
+        canonical_root: impl Into<String>,
+        source_kind: SourceKind,
+        producer_generation: impl Into<String>,
+    ) -> Self {
+        Self {
+            canonical_root: canonical_root.into(),
+            source_kind,
+            producer: ProducerCapability::SourceDeclarations,
+            producer_generation: producer_generation.into(),
+            relationships: BTreeSet::new(),
+        }
+    }
+
     pub(crate) fn builtin_type_ref(
         canonical_root: impl Into<String>,
         source_kind: SourceKind,
@@ -119,7 +150,7 @@ pub(crate) enum EvidenceRequirement {
     CurrentHighSemanticProjection,
 }
 
-/// Complete acquisition obligation for one incoming-relationship query.
+/// Complete acquisition obligation for one semantic producer capability.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct AcquisitionRequirement {
     pub(crate) target: AcquisitionTarget,
@@ -129,6 +160,19 @@ pub(crate) struct AcquisitionRequirement {
 }
 
 impl AcquisitionRequirement {
+    pub(crate) fn for_target(
+        target: AcquisitionTarget,
+        scope_fingerprint: impl Into<String>,
+        units: impl IntoIterator<Item = CoverageUnit>,
+    ) -> Self {
+        Self {
+            target,
+            scope_fingerprint: scope_fingerprint.into(),
+            units: units.into_iter().collect(),
+            evidence: EvidenceRequirement::CurrentHighSemanticProjection,
+        }
+    }
+
     pub(crate) fn incoming_type_ref(
         target: impl Into<String>,
         scope_fingerprint: impl Into<String>,
@@ -146,6 +190,7 @@ impl AcquisitionRequirement {
 pub(crate) fn requirement_fingerprint(requirement: &AcquisitionRequirement) -> String {
     let mut hasher = Sha256::new();
     hash_part(&mut hasher, b"incoming-type-ref-v1");
+    hasher.update([producer_tag(requirement.target.capability)]);
     hash_part(&mut hasher, requirement.target.domain.as_bytes());
     hash_part(&mut hasher, requirement.target.entity_type.as_bytes());
     hash_part(&mut hasher, requirement.target.written_name.as_bytes());
@@ -182,6 +227,7 @@ fn source_kind_tag(value: SourceKind) -> u8 {
 fn producer_tag(value: ProducerCapability) -> u8 {
     match value {
         ProducerCapability::BuiltinTypeRefIncoming => 1,
+        ProducerCapability::SourceDeclarations => 2,
     }
 }
 

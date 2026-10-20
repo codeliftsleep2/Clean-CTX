@@ -274,6 +274,10 @@ mod tests_multi_root_hydration;
 mod tests_issue_150_schema;
 
 #[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_issue_151_contract.rs"]
+mod tests_issue_151_contract;
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_4.rs"]
 mod tests_reverse_hydration;
 

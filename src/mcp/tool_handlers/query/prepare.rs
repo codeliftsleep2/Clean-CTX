@@ -171,6 +171,22 @@ impl PreparationContext {
         )
     }
 
+    pub(super) fn hydrate_declarations(
+        &mut self,
+        state: &McpState,
+        name: &str,
+        workspace_root: Option<&str>,
+    ) -> Result<HydrationReport, QueryFailure> {
+        self.hydrate_keyed(
+            state,
+            "find_entities",
+            name,
+            workspace_root,
+            HydrationRequirement::Semantic(crate::workspace::index::SemanticFidelity::High),
+            HydrationAuthority::ProofBacked(AcquisitionTarget::declarations(name)),
+        )
+    }
+
     fn hydrate_keyed(
         &mut self,
         state: &McpState,

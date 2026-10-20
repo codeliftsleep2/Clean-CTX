@@ -2,9 +2,9 @@ use super::filesystem::RootInventoryManifest;
 use crate::mcp::acquisition::{
     AcquisitionCacheKey, AcquisitionOutcome, AcquisitionRequirement, AcquisitionSatisfaction,
     AcquisitionTarget, CleanProofRejection, CoverageProofDisposition, CoverageUnit,
-    EvidenceRequirement, InventoryManifest, ProducerCapabilityDisposition, ProofBarrier,
-    ProofContext, SemanticPublicationStatus, SourceKind, TYPE_REF_CAPABILITY_VERSION,
-    ValidatedAcquisitionProof, builtin_type_ref_capability, clean_full_unit_type_ref_proof_claim,
+    EvidenceRequirement, InventoryManifest, ProducerCapability, ProducerCapabilityDisposition,
+    ProofBarrier, ProofContext, SemanticPublicationStatus, SourceKind, TYPE_REF_CAPABILITY_VERSION,
+    ValidatedAcquisitionProof, builtin_type_ref_capability, clean_full_unit_proof_claim,
     clean_type_ref_proof_claim, has_certified_type_ref_name_bearing_predicate,
     producer_generation_fingerprint, scope_policy_fingerprint, validate_proof_claim,
 };
@@ -19,6 +19,7 @@ pub(super) fn acquisition_cache_key(
     roots: Vec<String>,
     exclusions: &[String],
 ) -> AcquisitionCacheKey {
+    let capability = target.capability();
     let catalog = GenerationCatalog::current();
     let admission_fingerprint =
         scope_policy_fingerprint(roots.iter().cloned(), exclusions.iter().cloned());
@@ -30,8 +31,7 @@ pub(super) fn acquisition_cache_key(
     ]
     .into_iter()
     .map(|source_kind| {
-        let generation = producer_generation_fingerprint(source_kind, &catalog)
-            .unwrap_or_else(|| "missing-generation".into());
+        let generation = capability_generation(source_kind, &catalog, capability);
         (source_kind, generation)
     })
     .collect();
@@ -52,15 +52,31 @@ pub(super) struct ProvisionalAcquisition {
     proofs: Vec<ValidatedAcquisitionProof>,
     barriers: BTreeMap<CoverageUnit, ProofBarrier>,
     owners: Vec<String>,
+    source_snapshots: Vec<(String, String)>,
 }
 
 impl ProvisionalAcquisition {
     pub(super) fn owners(&self) -> &[String] {
         &self.owners
     }
+
+    pub(super) fn publication_is_current(&self, state: &crate::mcp::McpState) -> bool {
+        self.source_snapshots.iter().all(|(owner, expected)| {
+            state.read_source(owner).is_ok_and(|source| {
+                crate::cache::content_hash(source.as_bytes()) == *expected
+                    && state
+                        .workspace_index_read()
+                        .has_current_semantic_projection(
+                            owner,
+                            crate::workspace::index::SemanticFidelity::High,
+                            expected,
+                        )
+            })
+        })
+    }
 }
 
-pub(super) fn prepare_clean_type_ref_acquisition(
+pub(super) fn prepare_clean_acquisition(
     target: AcquisitionTarget,
     inventories: &[RootInventoryManifest],
     exclusions: &[String],
@@ -70,8 +86,16 @@ pub(super) fn prepare_clean_type_ref_acquisition(
     let catalog = GenerationCatalog::current();
     let grouped: Vec<_> = inventories
         .iter()
-        .flat_map(|inventory| manifests_by_source_kind(inventory, &catalog))
+        .flat_map(|inventory| manifests_by_source_kind(inventory, &catalog, target.capability()))
         .collect();
+    // A missing root inventory cannot disappear from the obligation merely
+    // because it contains no admitted producer entries.
+    if inventories.is_empty()
+        || (target.capability() == ProducerCapability::SourceDeclarations
+            && inventories.iter().any(|root| !root.manifest.complete))
+    {
+        return None;
+    }
     if grouped.is_empty()
         && inventories
             .iter()
@@ -80,16 +104,23 @@ pub(super) fn prepare_clean_type_ref_acquisition(
         return None;
     }
 
-    let requirement = AcquisitionRequirement::incoming_type_ref(
-        target.written_name,
+    let requirement = AcquisitionRequirement::for_target(
+        target,
         admission.clone(),
         grouped.iter().map(|(unit, _)| unit.clone()),
     );
     let mut proofs = Vec::new();
     let mut barriers = BTreeMap::new();
     let mut owners = Vec::new();
+    let mut source_snapshots = Vec::new();
     for (unit, manifest) in grouped {
-        let claim = match if has_certified_type_ref_name_bearing_predicate(unit.source_kind) {
+        if unit.producer_generation == "missing-generation" {
+            barriers.insert(unit, ProofBarrier::ClaimIncompatible);
+            continue;
+        }
+        let claim = match if unit.producer == ProducerCapability::BuiltinTypeRefIncoming
+            && has_certified_type_ref_name_bearing_predicate(unit.source_kind)
+        {
             clean_type_ref_proof_claim(
                 &requirement,
                 &unit,
@@ -99,7 +130,7 @@ pub(super) fn prepare_clean_type_ref_acquisition(
                 ACQUISITION_PROOF_CONTRACT_VERSION,
             )
         } else {
-            clean_full_unit_type_ref_proof_claim(
+            clean_full_unit_proof_claim(
                 &requirement,
                 &unit,
                 &manifest,
@@ -125,6 +156,13 @@ pub(super) fn prepare_clean_type_ref_acquisition(
             claim,
         ) {
             Ok(proof) => {
+                source_snapshots.extend(
+                    manifest
+                        .entries
+                        .iter()
+                        .filter(|entry| proof.candidate_owners.contains(&entry.owner))
+                        .map(|entry| (entry.owner.clone(), entry.source_hash.clone())),
+                );
                 owners.extend(proof.candidate_owners.iter().cloned());
                 proofs.push(proof);
             }
@@ -138,6 +176,7 @@ pub(super) fn prepare_clean_type_ref_acquisition(
         proofs,
         barriers,
         owners,
+        source_snapshots,
     })
 }
 
@@ -178,6 +217,7 @@ fn barrier_for_clean_rejection(rejection: CleanProofRejection) -> ProofBarrier {
 fn manifests_by_source_kind(
     root: &RootInventoryManifest,
     catalog: &GenerationCatalog,
+    capability: ProducerCapability,
 ) -> Vec<(CoverageUnit, InventoryManifest)> {
     let mut grouped = BTreeMap::<SourceKind, Vec<_>>::new();
     for entry in &root.manifest.entries {
@@ -189,15 +229,39 @@ fn manifests_by_source_kind(
     grouped
         .into_iter()
         .filter(|(source_kind, _)| {
-            builtin_type_ref_capability(*source_kind) != ProducerCapabilityDisposition::Incapable
+            capability == ProducerCapability::SourceDeclarations
+                || builtin_type_ref_capability(*source_kind)
+                    != ProducerCapabilityDisposition::Incapable
         })
         .map(|(source_kind, entries)| {
-            let generation = producer_generation_fingerprint(source_kind, catalog)
-                .unwrap_or_else(|| "missing-generation".into());
+            let generation = capability_generation(source_kind, catalog, capability);
             (
-                CoverageUnit::builtin_type_ref(&root.root, source_kind, generation),
+                match capability {
+                    ProducerCapability::BuiltinTypeRefIncoming => {
+                        CoverageUnit::builtin_type_ref(&root.root, source_kind, generation)
+                    }
+                    ProducerCapability::SourceDeclarations => {
+                        CoverageUnit::declarations(&root.root, source_kind, generation)
+                    }
+                },
                 InventoryManifest::new(entries, root.manifest.attempted, root.manifest.complete),
             )
         })
         .collect()
+}
+
+fn capability_generation(
+    source_kind: SourceKind,
+    catalog: &GenerationCatalog,
+    capability: ProducerCapability,
+) -> String {
+    let Some(native) = producer_generation_fingerprint(source_kind, catalog) else {
+        return "missing-generation".into();
+    };
+    match capability {
+        ProducerCapability::BuiltinTypeRefIncoming => native,
+        ProducerCapability::SourceDeclarations => {
+            format!("{native}:{}", catalog.declaration_generation())
+        }
+    }
 }

@@ -93,13 +93,17 @@ fn try_prepare_find_entities(
             }
         };
     }
-    let mut hydration = context.hydrate(
-        state,
-        "find_entities",
-        &name,
-        workspace_root,
-        crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
-    )?;
+    let mut hydration = if declarations_only && workspace_root.is_some() {
+        context.hydrate_declarations(state, &name, workspace_root)?
+    } else {
+        context.hydrate(
+            state,
+            "find_entities",
+            &name,
+            workspace_root,
+            crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
+        )?
+    };
     if hydration.is_complete() {
         let mut current = name.clone();
         let mut visited = HashSet::new();
@@ -163,12 +167,44 @@ fn try_prepare_find_entities(
         let mut structured = serde_json::json!({
             "entities": serialized,
             "count": count,
+            "coverage": find_entities_coverage(declarations_only, &hydration),
         });
         if let Some(discovery) = discovery_field(&hydration) {
             structured["discovery"] = discovery;
         }
         Ok(QueryAnswer::new("find_entities", structured))
     }))
+}
+
+/// `find_entities` returns authoritative observed facts from the demand-populated
+/// index after registered hydration. Declaration mode can earn completeness
+/// through shared acquisition proof; occurrence mode has a broader obligation.
+fn find_entities_coverage(
+    declarations_only: bool,
+    hydration: &crate::mcp::tool_handlers::hydration::HydrationReport,
+) -> Value {
+    if declarations_only
+        && let Some(certificate) = hydration
+            .acquisition_satisfaction
+            .as_ref()
+            .and_then(CompletenessCertificate::source_declarations)
+    {
+        let mut coverage = certificate.project();
+        coverage["fact_semantics"] = "source_proven_declarations".into();
+        coverage["semantic_scope"] = "supported_producer_patterns".into();
+        return coverage;
+    }
+    serde_json::json!({
+        "status": "indexed_evidence_only",
+        "fact_semantics": if declarations_only {
+            "source_proven_declarations"
+        } else {
+            "authoritative_indexed_occurrences"
+        },
+        "source_complete": false,
+        "result_semantics": "lower_bound",
+        "omitted_possible": true,
+    })
 }
 
 /// `entities_in_file`: list all entities defined in a given file.

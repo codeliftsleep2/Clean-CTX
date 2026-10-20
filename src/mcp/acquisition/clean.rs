@@ -74,6 +74,26 @@ pub(crate) fn clean_full_unit_type_ref_proof_claim(
     predicate_version: u32,
     proof_contract_version: u32,
 ) -> Result<AcquisitionProofClaim, CleanProofRejection> {
+    clean_full_unit_proof_claim(
+        requirement,
+        unit,
+        manifest,
+        admission_fingerprint,
+        predicate_version,
+        proof_contract_version,
+    )
+}
+
+/// Full-unit acquisition is independent of the semantic capability. All
+/// admitted owners must publish before its validated claim can satisfy a unit.
+pub(crate) fn clean_full_unit_proof_claim(
+    requirement: &AcquisitionRequirement,
+    unit: &CoverageUnit,
+    manifest: &InventoryManifest,
+    admission_fingerprint: impl Into<String>,
+    predicate_version: u32,
+    proof_contract_version: u32,
+) -> Result<AcquisitionProofClaim, CleanProofRejection> {
     validate_manifest(unit, manifest)?;
     Ok(proof_claim(
         requirement,

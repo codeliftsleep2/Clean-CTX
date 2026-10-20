@@ -51,9 +51,13 @@ pub(in crate::mcp::tool_handlers) fn hydrate_workspace_index_for_acquisition(
     requirement: HydrationRequirement,
     target: AcquisitionTarget,
 ) -> Result<HydrationReport, String> {
+    let query_type = match target.capability() {
+        crate::mcp::acquisition::ProducerCapability::BuiltinTypeRefIncoming => "reverse_edges",
+        crate::mcp::acquisition::ProducerCapability::SourceDeclarations => "find_entities",
+    };
     hydrate_workspace_index_for_target(
         state,
-        "reverse_edges",
+        query_type,
         query_name,
         workspace_root,
         requirement,
@@ -119,7 +123,7 @@ fn hydrate_workspace_index_for_target_attempt(
     let cached_satisfaction = cache_key
         .as_ref()
         .and_then(|key| state.acquisition_completion_lock().get(key));
-    let outcome = discover_candidate_paths(
+    let mut outcome = discover_candidate_paths(
         state,
         discovery,
         query_name,
@@ -127,8 +131,19 @@ fn hydrate_workspace_index_for_target_attempt(
         requirement,
         authority,
     );
+    // Discovery completion and proof completion are distinct authorities. A
+    // prior ordinary query may have cached discovery without retaining the
+    // inventories required to construct this acquisition proof.
+    if authority.proof_target().is_some() && cached_satisfaction.is_none() {
+        let roots = configured_roots(state, workspace_root);
+        if outcome.inventories.len() != roots.len() {
+            let inventory = super::filesystem::scan(state, &roots, query_name);
+            outcome.inventories = inventory.inventories;
+            outcome.candidates.extend(inventory.candidates);
+        }
+    }
     let provisional = authority.proof_target().cloned().and_then(|target| {
-        super::acquisition::prepare_clean_type_ref_acquisition(
+        super::acquisition::prepare_clean_acquisition(
             target,
             &outcome.inventories,
             &state.config.exclude_patterns,
@@ -154,6 +169,9 @@ fn hydrate_workspace_index_for_target_attempt(
             CandidatePublication::PublicationFailed => publication_failed = true,
             CandidatePublication::Failed => candidate_processing_failed = true,
         }
+    }
+    if let Some(provisional) = &provisional {
+        publication_failed |= !provisional.publication_is_current(state);
     }
     if !publication_failed && !candidate_processing_failed {
         for scope in outcome

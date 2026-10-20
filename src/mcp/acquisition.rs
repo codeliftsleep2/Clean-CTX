@@ -14,8 +14,9 @@ mod requirement;
 mod satisfaction;
 
 pub(crate) use clean::{
-    CleanProofRejection, clean_full_unit_type_ref_proof_claim, clean_type_ref_proof_claim,
-    has_certified_type_ref_name_bearing_predicate, type_ref_candidate_owners,
+    CleanProofRejection, clean_full_unit_proof_claim, clean_full_unit_type_ref_proof_claim,
+    clean_type_ref_proof_claim, has_certified_type_ref_name_bearing_predicate,
+    type_ref_candidate_owners,
 };
 pub(crate) use proof::{
     AcquisitionProofClaim, InventoryEntry, InventoryManifest, ProofContext, ProofProvenance,

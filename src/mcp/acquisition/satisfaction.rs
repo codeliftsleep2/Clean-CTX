@@ -92,6 +92,7 @@ impl AcquisitionOutcome {
 /// Proof coverage accumulated for one exact acquisition requirement.
 #[derive(Clone, Debug)]
 pub(crate) struct AcquisitionSatisfaction {
+    capability: super::requirement::ProducerCapability,
     required: BTreeSet<CoverageUnit>,
     proven: BTreeMap<CoverageUnit, ValidatedAcquisitionProof>,
     requirement_fingerprint: String,
@@ -101,6 +102,7 @@ pub(crate) struct AcquisitionSatisfaction {
 impl AcquisitionSatisfaction {
     pub(crate) fn new(requirement: &AcquisitionRequirement) -> Self {
         Self {
+            capability: requirement.target.capability(),
             required: requirement.units.clone(),
             proven: BTreeMap::new(),
             requirement_fingerprint: requirement_fingerprint(requirement),
@@ -149,6 +151,10 @@ impl AcquisitionSatisfaction {
 
     pub(crate) fn scope_fingerprint(&self) -> &str {
         &self.scope_fingerprint
+    }
+
+    pub(crate) fn capability(&self) -> super::requirement::ProducerCapability {
+        self.capability
     }
 }
 

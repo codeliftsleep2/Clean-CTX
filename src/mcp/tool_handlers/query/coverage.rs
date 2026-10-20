@@ -28,6 +28,25 @@ pub(super) struct CompletenessCertificate {
 }
 
 impl CompletenessCertificate {
+    pub(super) fn source_declarations(satisfaction: &AcquisitionSatisfaction) -> Option<Self> {
+        if satisfaction.capability()
+            != crate::mcp::acquisition::ProducerCapability::SourceDeclarations
+        {
+            return None;
+        }
+        Some(Self {
+            scope_kind: "workspace",
+            scope_value: satisfaction.scope_fingerprint().to_string(),
+            source_generation: satisfaction.completeness_generation()?,
+            evidence_requirements: &[
+                "source_declaration_units_proven",
+                "semantic_projection_current",
+                "dependencies_current",
+                "publication_complete",
+            ],
+        })
+    }
+
     pub(super) fn current_file(path: String, source_generation: String) -> Self {
         Self {
             scope_kind: "file",
@@ -43,6 +62,11 @@ impl CompletenessCertificate {
     }
 
     fn incoming_relationships(satisfaction: &AcquisitionSatisfaction) -> Option<Self> {
+        if satisfaction.capability()
+            != crate::mcp::acquisition::ProducerCapability::BuiltinTypeRefIncoming
+        {
+            return None;
+        }
         Some(Self {
             scope_kind: "workspace",
             scope_value: satisfaction.scope_fingerprint().to_string(),
