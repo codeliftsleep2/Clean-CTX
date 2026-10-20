@@ -218,8 +218,7 @@ pub(crate) fn model_facing_degradation(
     }
     let omits: &[&str] = match fidelity {
         crate::compression::Fidelity::Low => &[
-            "method_return_types",
-            "parameter_types",
+            "non_overload_parameter_types",
             "parameter_defaults",
             "declaration_attributes",
             "generic_constraints",
@@ -231,7 +230,6 @@ pub(crate) fn model_facing_degradation(
             "method_bodies",
         ],
         crate::compression::Fidelity::Medium => &[
-            "method_return_types",
             "parameter_defaults",
             "declaration_attributes",
             "generic_constraints",
@@ -244,14 +242,20 @@ pub(crate) fn model_facing_degradation(
         ],
         crate::compression::Fidelity::High => &[
             "declaration_attributes",
+            "generic_constraints",
             "xml_documentation",
+            "field_types",
+            "property_types",
             "record_positional_parameters",
             "partial_type_composition",
             "method_bodies",
         ],
         crate::compression::Fidelity::Edit => &[
             "declaration_attributes",
+            "generic_constraints",
             "xml_documentation",
+            "field_types",
+            "property_types",
             "record_positional_parameters",
             "partial_type_composition",
         ],

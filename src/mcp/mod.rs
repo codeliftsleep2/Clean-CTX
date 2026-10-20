@@ -177,6 +177,10 @@ mod ngrx_legacy_discriminant_tests;
 mod ngrx_legacy_object_dispatch_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/ngrx_object_switch_authority.rs"]
+mod ngrx_object_switch_authority_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/ngrx_legacy_transition_matrix.rs"]
 mod ngrx_legacy_transition_matrix_tests;
 

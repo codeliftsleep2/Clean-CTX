@@ -148,6 +148,8 @@ pub enum SemanticRelation {
     // ---- NgRx ----
     /// A component/effect dispatches an action.
     Dispatches,
+    /// An exact NgRx store configuration registers a reducer declaration.
+    RegistersReducer,
     /// A component/effect selects from the store.
     Selects,
     /// An effect handles an action.

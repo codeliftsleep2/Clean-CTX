@@ -199,7 +199,9 @@ impl WorkspaceIndex {
         for mut edge in edges {
             self.total_edges_inserted += 1;
 
-            if edge.layer == crate::angular_meta::ngrx::direct_imports::REFINEMENT_LAYER {
+            if edge.layer == crate::angular_meta::ngrx::direct_imports::REFINEMENT_LAYER
+                || crate::angular_meta::ngrx::object_actions::is_evidence_layer(edge.layer)
+            {
                 self.ngrx_refinement_candidates
                     .entry(file_path.to_string())
                     .or_default()

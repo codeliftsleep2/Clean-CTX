@@ -220,6 +220,27 @@ fn try_prepare_entities_in_file(
         .read_source(&resolved_path)
         .map_err(|error| QueryFailure::internal(error.to_string()))?;
     let source_hash = state.cache_read().compute_hash(source.as_bytes());
+    let fidelity = semantic_fidelity(args, state)?;
+    let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
+    let has_object_actions =
+        crate::angular_meta::ngrx::discriminants::has_object_string_actions(&source);
+    let has_object_switch =
+        crate::angular_meta::ngrx::discriminants::has_switch_action_type_handlers(&source);
+    if has_object_actions || has_object_switch {
+        for term in
+            crate::angular_meta::ngrx::object_actions::hydration_terms(&canonical_path, &source)
+        {
+            context.hydrate(
+                state,
+                "entities_in_file",
+                &term,
+                workspace_root,
+                crate::mcp::tool_handlers::hydration::HydrationRequirement::Semantic(
+                    workspace_fidelity,
+                ),
+            )?;
+        }
+    }
     if crate::mcp::tool_handlers::core::is_angular_template(state, workspace_root, &resolved_path) {
         let certificate =
             CompletenessCertificate::current_file(canonical_path.clone(), source_hash);
@@ -229,15 +250,18 @@ fn try_prepare_entities_in_file(
         ));
     }
     ensure_supported_file(&resolved_path)?;
-    let fidelity = semantic_fidelity(args, state)?;
-    let workspace_fidelity = crate::workspace::index::SemanticFidelity::for_request(fidelity);
     if state
         .workspace_index_read()
         .has_current_semantic_projection(&canonical_path, workspace_fidelity, &source_hash)
     {
         let certificate =
             CompletenessCertificate::current_file(canonical_path.clone(), source_hash);
-        return Ok(prepared_entities_in_file(canonical_path, certificate));
+        return Ok(prepared_entities_in_file(
+            canonical_path,
+            certificate,
+            has_object_actions,
+            has_object_switch,
+        ));
     }
     state
         .preflight_semantic_publication(&resolved_path)
@@ -266,7 +290,12 @@ fn try_prepare_entities_in_file(
         .mark_csharp_call_authority_dirty_for_file(&canonical_path)
         .map_err(QueryFailure::internal)?;
     let certificate = CompletenessCertificate::current_file(canonical_path.clone(), compiled_hash);
-    Ok(prepared_entities_in_file(canonical_path, certificate))
+    Ok(prepared_entities_in_file(
+        canonical_path,
+        certificate,
+        has_object_actions,
+        has_object_switch,
+    ))
 }
 
 fn prepared_angular_template_in_file(
@@ -292,14 +321,23 @@ fn prepared_angular_template_in_file(
 fn prepared_entities_in_file(
     canonical_path: String,
     certificate: CompletenessCertificate,
+    has_object_actions: bool,
+    has_object_switch: bool,
 ) -> PreparedQuery {
     PreparedQuery::indexed(move |index| {
         let entities = index.entities_in_file(&canonical_path);
         let count = entities.len();
+        let mut semantic_omissions = Vec::new();
+        if has_object_actions && !index.has_authoritative_object_actions_in_file(&canonical_path) {
+            semantic_omissions.push("ngrx_object_string_actions");
+        }
+        if has_object_switch && !index.has_authoritative_object_switch_in_file(&canonical_path) {
+            semantic_omissions.push("ngrx_switch_action_type_handlers");
+        }
         let structured = serde_json::json!({
             "entities": serde_json::to_value(&entities).unwrap_or_default(),
             "count": count,
-            "coverage": certificate.project(),
+            "coverage": certificate.project_with_semantic_omissions(&semantic_omissions),
         });
         Ok(QueryAnswer::new("entities_in_file", structured))
     })

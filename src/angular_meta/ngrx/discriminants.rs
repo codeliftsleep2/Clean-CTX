@@ -9,6 +9,116 @@ use crate::ir::typescript_type_import_binding::bind_type_reference_to_named_impo
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeMap;
 
+pub(crate) fn has_object_string_actions(source: &str) -> bool {
+    let Some(language) = crate::compression::language::safe_typescript_language() else {
+        return false;
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return false;
+    }
+    let Some(tree) = parser
+        .parse(source, None)
+        .filter(|tree| !tree.root_node().has_error())
+    else {
+        return false;
+    };
+    let bytes = source.as_bytes();
+    let mut members = std::collections::BTreeSet::new();
+    let root = tree.root_node();
+    let mut cursor = root.walk();
+    for child in root.named_children(&mut cursor) {
+        let declaration = if child.kind() == "export_statement" {
+            child.child_by_field_name("declaration")
+        } else {
+            Some(child)
+        };
+        let Some(declaration) = declaration.filter(|node| node.kind() == "lexical_declaration")
+        else {
+            continue;
+        };
+        let mut declaration_cursor = declaration.walk();
+        for declarator in declaration.named_children(&mut declaration_cursor) {
+            let (Some(name), Some(object)) = (
+                declarator.child_by_field_name("name"),
+                declarator
+                    .child_by_field_name("value")
+                    .filter(|node| node.kind() == "object"),
+            ) else {
+                continue;
+            };
+            let Ok(owner) = name.utf8_text(bytes) else {
+                continue;
+            };
+            let mut object_cursor = object.walk();
+            for pair in object
+                .named_children(&mut object_cursor)
+                .filter(|node| node.kind() == "pair")
+            {
+                let (Some(key), Some(value)) = (
+                    pair.child_by_field_name("key"),
+                    pair.child_by_field_name("value"),
+                ) else {
+                    continue;
+                };
+                if value.kind() != "string" {
+                    continue;
+                }
+                if let Ok(key) = key.utf8_text(bytes) {
+                    members.insert(format!("{owner}.{key}"));
+                }
+            }
+        }
+    }
+    !members.is_empty()
+}
+
+pub(crate) fn has_switch_action_type_handlers(source: &str) -> bool {
+    let Some(language) = crate::compression::language::safe_typescript_language() else {
+        return false;
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return false;
+    }
+    let Some(tree) = parser
+        .parse(source, None)
+        .filter(|tree| !tree.root_node().has_error())
+    else {
+        return false;
+    };
+    contains_object_action_case(tree.root_node(), source.as_bytes())
+}
+
+fn contains_object_action_case(node: tree_sitter::Node<'_>, source: &[u8]) -> bool {
+    if node.kind() == "switch_statement"
+        && node
+            .child_by_field_name("value")
+            .and_then(|value| value.utf8_text(source).ok())
+            .is_some_and(|value| value.trim_matches(['(', ')', ' ']).ends_with(".type"))
+    {
+        let mut cursor = node.walk();
+        if node.named_children(&mut cursor).any(|child| {
+            child.kind() == "switch_body" && {
+                let mut body_cursor = child.walk();
+                child.named_children(&mut body_cursor).any(|case| {
+                    case.kind() == "switch_case"
+                        && case.child_by_field_name("value").is_some_and(|value| {
+                            value.kind() == "member_expression"
+                                && value.child_by_field_name("object").is_some()
+                                && value.child_by_field_name("property").is_some()
+                        })
+                })
+            }
+        }) {
+            return true;
+        }
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .any(|child| contains_object_action_case(child, source))
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct LegacyDiscriminantEvidence {
     pub name: String,

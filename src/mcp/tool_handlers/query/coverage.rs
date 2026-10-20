@@ -71,6 +71,15 @@ impl CompletenessCertificate {
             "reasons": [],
         })
     }
+
+    pub(super) fn project_with_semantic_omissions(&self, omissions: &[&str]) -> Value {
+        let mut coverage = self.project();
+        if !omissions.is_empty() {
+            coverage["semantic_scope"] = "supported_producer_patterns".into();
+            coverage["semantic_omissions"] = json!(omissions);
+        }
+        coverage
+    }
 }
 
 pub(super) fn exact_identity_coverage(

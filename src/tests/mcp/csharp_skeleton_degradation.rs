@@ -51,6 +51,10 @@ fn omissions(response: &Value) -> Vec<&str> {
         .collect()
 }
 
+fn rendered(response: &Value) -> &str {
+    response["result"]["content"][0]["text"].as_str().unwrap()
+}
+
 #[test]
 fn csharp_structural_fidelities_declare_bounded_semantic_loss() {
     for fidelity in ["low", "medium", "high", "edit"] {
@@ -72,13 +76,48 @@ fn csharp_structural_fidelities_declare_bounded_semantic_loss() {
 }
 
 #[test]
-fn csharp_fidelity_specific_loss_and_exact_verbatim_are_truthful() {
+fn issue_150_csharp_fidelity_specific_loss_and_exact_verbatim_are_truthful() {
     let low = provide(CORPUS, "low");
     let medium = provide(CORPUS, "medium");
     let high = provide(CORPUS, "high");
-    assert!(omissions(&low).contains(&"parameter_types"));
-    assert!(omissions(&medium).contains(&"method_return_types"));
-    assert!(!omissions(&high).contains(&"method_return_types"));
+    let edit = provide(CORPUS, "edit");
+    assert!(omissions(&low).contains(&"non_overload_parameter_types"));
+    assert!(!omissions(&low).contains(&"parameter_types"));
+    for (fidelity, response) in [
+        ("low", &low),
+        ("medium", &medium),
+        ("high", &high),
+        ("edit", &edit),
+    ] {
+        let text = rendered(response);
+        assert!(text.contains("→ TResult"), "{fidelity}: {response}");
+        assert!(
+            !omissions(response).contains(&"method_return_types"),
+            "{fidelity}: rendered method returns must not be declared omitted: {response}"
+        );
+        assert!(
+            !text
+                .lines()
+                .any(|line| line.starts_with("M Shape") && line.contains("→ $v")),
+            "{fidelity}: a constructor has no model-facing return type: {response}"
+        );
+    }
+    for (fidelity, response) in [
+        ("low", &low),
+        ("medium", &medium),
+        ("high", &high),
+        ("edit", &edit),
+    ] {
+        let text = rendered(response);
+        assert!(!text.contains("Field:T"), "{fidelity}: {response}");
+        assert!(!text.contains("Property:T"), "{fidelity}: {response}");
+        for omitted in ["field_types", "property_types"] {
+            assert!(
+                omissions(response).contains(&omitted),
+                "{fidelity}: omitted {omitted} must be declared: {response}"
+            );
+        }
+    }
     let verbatim = provide(CORPUS, "verbatim");
     assert!(verbatim["result"]["_meta"]["degradation"].is_null());
     assert_eq!(

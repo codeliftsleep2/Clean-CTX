@@ -171,6 +171,14 @@ Verify that:
 Do not declare the architectural task complete if the audit identifies a
 critical or high-severity issue. Fix identified issues before finalization.
 
+## Meta-layer completeness rule
+
+Do not explain away an implementable semantic gap. Either implement the required authority correctly or explicitly narrow the meta-layer's supported envelope. A materially used idiom inside the intended supported envelope must not be permanently left as a declared omission merely because supporting it requires additional architecture.
+
+Truthful degradation is a safety mechanism, not a completion criterion. It protects correctness while structured identity, authority, reconciliation, and lifecycle support are being completed; it never substitutes for that work.
+
+Framework resemblance remains insufficient. Completing a meta-layer means building the required structured proof while lookalike syntax continues to fail closed.
+
 ## Completed-migration documentation expectations
 
 When a migration is complete:

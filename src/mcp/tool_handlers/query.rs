@@ -270,6 +270,10 @@ mod tests_hydration;
 mod tests_multi_root_hydration;
 
 #[cfg(all(test, feature = "rust"))]
+#[path = "../../tests/mcp/workspace_query_issue_150_schema.rs"]
+mod tests_issue_150_schema;
+
+#[cfg(all(test, feature = "rust"))]
 #[path = "../../tests/mcp/workspace_query_4.rs"]
 mod tests_reverse_hydration;
 

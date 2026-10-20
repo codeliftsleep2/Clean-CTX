@@ -8,6 +8,7 @@ pub(crate) struct ValueImportBinding {
     pub source_hash: String,
     pub reference_span: SourceSpan,
     pub imported_name: String,
+    pub local_name: String,
     pub module_specifier: String,
 }
 
@@ -21,25 +22,95 @@ pub(crate) struct NamespaceValueImportBinding {
     pub module_specifier: String,
 }
 
-/// Bind one exact identifier occurrence to one unaliased, value-space named
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NamedObjectMemberImportBinding {
+    pub source_id: String,
+    pub source_hash: String,
+    pub reference_span: SourceSpan,
+    pub imported_object: String,
+    pub local_object: String,
+    pub member_name: String,
+    pub module_specifier: String,
+}
+
+/// Bind `LocalAlias.member` through one direct-relative named value import.
+/// This is declaration mechanics only; no framework role is implied.
+pub(crate) fn bind_direct_named_object_member_import(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+) -> Option<NamedObjectMemberImportBinding> {
+    let language = crate::compression::language::safe_typescript_language()?;
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).ok()?;
+    let tree = parser.parse(source, None)?;
+    if tree.root_node().has_error() {
+        return None;
+    }
+    let reference = tree
+        .root_node()
+        .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())?;
+    if reference.kind() != "member_expression"
+        || reference.start_byte() != reference_span.start_byte()
+        || reference.end_byte() != reference_span.end_byte()
+    {
+        return None;
+    }
+    let object = reference.child_by_field_name("object")?;
+    let member = reference.child_by_field_name("property")?;
+    if object.kind() != "identifier" || member.kind() != "property_identifier" {
+        return None;
+    }
+    let object_span = SourceSpan::new(object.start_byte(), object.end_byte()).ok()?;
+    let binding = bind_direct_named_value_import_allow_alias(source_id, source, object_span)?;
+    Some(NamedObjectMemberImportBinding {
+        source_id: source_id.to_owned(),
+        source_hash: crate::cache::content_hash(source.as_bytes()),
+        reference_span,
+        imported_object: binding.imported_name,
+        local_object: binding.local_name,
+        member_name: member.utf8_text(source.as_bytes()).ok()?.to_owned(),
+        module_specifier: binding.module_specifier,
+    })
+}
+
+/// Bind one exact identifier occurrence to one value-space named
 /// import from a direct-relative module. Framework meaning is deliberately
-/// outside this mechanical boundary.
+/// outside this mechanical boundary. An `as` alias is normalized into separate
+/// imported and local names; the local spelling never becomes declaration
+/// identity.
 pub(crate) fn bind_direct_named_value_import(
     source_id: &str,
     source: &str,
     reference_span: SourceSpan,
 ) -> Option<ValueImportBinding> {
-    bind_named_value_import_with_scope(source_id, source, reference_span, true)
+    bind_named_value_import_with_scope(source_id, source, reference_span, true, false)
 }
 
-/// Bind one exact identifier occurrence to one unaliased value-space named
+pub(crate) fn bind_direct_named_value_import_allow_alias(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+) -> Option<ValueImportBinding> {
+    bind_named_value_import_with_scope(source_id, source, reference_span, true, true)
+}
+
+/// Bind one exact identifier occurrence to one value-space named
 /// import. Framework consumers interpret the returned module specifier.
 pub(crate) fn bind_named_value_import(
     source_id: &str,
     source: &str,
     reference_span: SourceSpan,
 ) -> Option<ValueImportBinding> {
-    bind_named_value_import_with_scope(source_id, source, reference_span, false)
+    bind_named_value_import_with_scope(source_id, source, reference_span, false, false)
+}
+
+pub(crate) fn bind_named_value_import_allow_alias(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+) -> Option<ValueImportBinding> {
+    bind_named_value_import_with_scope(source_id, source, reference_span, false, true)
 }
 
 fn bind_named_value_import_with_scope(
@@ -47,6 +118,7 @@ fn bind_named_value_import_with_scope(
     source: &str,
     reference_span: SourceSpan,
     relative_only: bool,
+    allow_alias: bool,
 ) -> Option<ValueImportBinding> {
     let language = crate::compression::language::safe_typescript_language()?;
     let mut parser = tree_sitter::Parser::new();
@@ -79,15 +151,19 @@ fn bind_named_value_import_with_scope(
         relative_only,
         &mut matches,
     );
-    let [module] = matches.as_slice() else {
+    let [(module, imported_name)] = matches.as_slice() else {
         return None;
     };
+    if !allow_alias && imported_name != name {
+        return None;
+    }
     Some(ValueImportBinding {
         source_id: source_id.to_owned(),
         source_hash: crate::cache::content_hash(source.as_bytes()),
         reference_span,
-        imported_name: name.to_owned(),
-        module_specifier: (*module).to_owned(),
+        imported_name: imported_name.clone(),
+        local_name: name.to_owned(),
+        module_specifier: module.clone(),
     })
 }
 
@@ -201,7 +277,7 @@ fn collect_imports(
     name: &str,
     source: &[u8],
     relative_only: bool,
-    output: &mut Vec<String>,
+    output: &mut Vec<(String, String)>,
 ) {
     if node.kind() == "import_statement" {
         if node
@@ -234,11 +310,11 @@ fn collect_specifiers(
     name: &str,
     module: &str,
     source: &[u8],
-    output: &mut Vec<String>,
+    output: &mut Vec<(String, String)>,
 ) {
     if node.kind() == "import_specifier" {
-        if specifier_is_supported(node, name, source) {
-            output.push(module.to_owned());
+        if let Some(imported) = supported_specifier(node, name, source) {
+            output.push((module.to_owned(), imported));
         }
         return;
     }
@@ -248,15 +324,24 @@ fn collect_specifiers(
     }
 }
 
-fn specifier_is_supported(node: tree_sitter::Node<'_>, name: &str, source: &[u8]) -> bool {
-    node.child_by_field_name("alias").is_none()
-        && !node
-            .children(&mut node.walk())
-            .any(|child| child.kind() == "type")
-        && node
-            .child_by_field_name("name")
-            .and_then(|binding| binding.utf8_text(source).ok())
-            == Some(name)
+fn supported_specifier(
+    node: tree_sitter::Node<'_>,
+    local_name: &str,
+    source: &[u8],
+) -> Option<String> {
+    if node
+        .children(&mut node.walk())
+        .any(|child| child.kind() == "type")
+    {
+        return None;
+    }
+    let imported = node.child_by_field_name("name")?.utf8_text(source).ok()?;
+    let local = node
+        .child_by_field_name("alias")
+        .or_else(|| node.child_by_field_name("name"))?
+        .utf8_text(source)
+        .ok()?;
+    (local == local_name).then(|| imported.to_owned())
 }
 
 #[cfg(test)]

@@ -440,6 +440,40 @@ fn red_diag6_readiness_distinction_retained() {
 // ── RED-DIAG7: exceptional-only truncation, reported structurally ──────
 
 #[test]
+fn issue_150_equivalent_project_facts_are_published_once_but_distinct_facts_survive() {
+    let repeated = coverage(
+        "ProjectA",
+        "skipped",
+        None,
+        Some("additional_root_not_registered"),
+    );
+    let report = HydrationReport {
+        project_coverage: vec![
+            repeated.clone(),
+            repeated,
+            coverage("ProjectA", "skipped", None, Some("cbm_unavailable")),
+            coverage("ProjectB", "skipped", None, Some("cbm_unavailable")),
+        ],
+        ..steady_state_report()
+    };
+
+    let discovery = super::discovery_field(&report).expect("reported");
+    assert_eq!(
+        discovery["projects"],
+        json!([
+            {
+                "project": "ProjectA",
+                "status": "skipped",
+                "reason": "additional_root_not_registered"
+            },
+            { "project": "ProjectA", "status": "skipped", "reason": "cbm_unavailable" },
+            { "project": "ProjectB", "status": "skipped", "reason": "cbm_unavailable" }
+        ]),
+        "diagnostic identity is project/status/readiness/reason, not project alone"
+    );
+}
+
+#[test]
 fn red_diag7_project_truncation_is_structured_and_exception_only() {
     let mut entries: Vec<ProjectCoverage> = (0..3)
         .map(|index| {

@@ -50,6 +50,7 @@ pub mod semantic_projection;
 pub mod string_table;
 pub mod symbol_table;
 pub(crate) mod typescript_identifier_binding;
+pub(crate) mod typescript_object_members;
 pub(crate) mod typescript_this_property_binding;
 pub(crate) mod typescript_type_import_binding;
 pub(crate) mod typescript_value_import_binding;

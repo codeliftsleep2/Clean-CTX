@@ -86,6 +86,7 @@
 use super::super::hydration::{HYDRATION_MAX_PROJECT_COVERAGE, HydrationReport, ProjectCoverage};
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::HashSet;
 
 /// The sparse, exception-only discovery diagnostic of one `workspace_query`
 /// response.
@@ -159,6 +160,20 @@ impl DiscoveryDiagnostics {
             .filter(|entry| !is_expected_coverage(entry))
             .map(project_diagnostics)
             .collect();
+        // A response can merge several legitimate hydration reports (for
+        // example owner and target acquisition). Multiplicity there records
+        // work history; it carries no meaning in this response projection.
+        // Collapse only byte-for-byte equivalent public facts, preserving
+        // distinct reasons/statuses/readiness for the same project.
+        let mut seen = HashSet::new();
+        projects.retain(|entry| {
+            seen.insert((
+                entry.project.clone(),
+                entry.status,
+                entry.readiness,
+                entry.reason,
+            ))
+        });
         // Bound the EXCEPTIONAL entries: a healthy project must not consume the
         // diagnostic budget of an exceptional one.
         let projects_truncated = projects

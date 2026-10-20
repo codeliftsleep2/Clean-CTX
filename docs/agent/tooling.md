@@ -172,6 +172,27 @@ unfinished work from `discovered_not_compiled_this_cycle`; use
 This relation does not cover service-locator calls such as
 `GetRequiredService<T>()` because no constructor parameter declares that fact.
 
+For file-scoped entity queries, `source_complete: true` and
+`result_semantics: "exact"` certify the acquired file and the declared
+producer scope; they do not silently claim support for every framework idiom.
+NgRx object-string actions and `switch(action.type)` handlers are authoritative
+only after workspace reconciliation proves their complete evidence chain:
+an exported object-member declaration; structured local or named-alias member
+binding; an object-literal dispatch on a receiver typed as `Store` from
+`@ngrx/store`; and an exported reducer registered through the supported exact
+`StoreModule.forFeature` form. The switch discriminant must bind to that
+reducer's last parameter and each case must resolve to the same qualified
+member identity authorized by dispatch. Direct-relative imports become
+semantic dependencies, and reconciliation retracts roles and relationships
+when their last dispatch or registration proof disappears.
+
+Recognized object/switch syntax outside that authority envelope remains
+fail-closed. File coverage reports `semantic_scope:
+"supported_producer_patterns"` and names only the facts still present in
+`semantic_omissions`; an authorized action may coexist with an omitted handler,
+for example. Returned facts remain exact inside the declared scope, and
+omission metadata must never be read as semantic evidence.
+
 Use the single form for one question or when a client does not consume batch
 results. Use `queries` when two or more independent questions share the same
 workspace scope, especially mixed `find_entities`, edge, traversal, and cycle

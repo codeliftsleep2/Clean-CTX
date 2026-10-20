@@ -746,6 +746,14 @@ pins exact/partial and cold/warm equivalence.
 Completeness requires declared scope, complete proof coverage of every required
 provider-neutral coverage unit, satisfied evidence requirements, a compatible
 source generation, producer support, and valid dependencies.
+File-scoped exactness is therefore scoped to supported producer patterns. A
+detected unsupported framework form must be named in `semantic_omissions`; an
+exact result inside that explicit scope cannot be interpreted as absence of the
+omitted semantic class.
+For NgRx object actions, the omission is removed per fact only when current
+workspace reconciliation proves the qualified action member through exact
+Store dispatch authority and proves the switch handler through exact reducer
+registration plus case identity. Syntax recognition alone never removes it.
 Populated caches/indexes, provider success, or stable empty results never grant
 exhaustiveness. Lack of a certificate means “not authorized to claim complete,”
 not “the returned facts are false.”
@@ -987,6 +995,19 @@ reconciliation paths plus occurrence-preserving publication.
 | **Authority** | CSHARP-RESOLUTION-001; `src/dotnet_meta/semantic.rs`; `src/mcp/semantic_compilation/artifact.rs`; `src/workspace/index/edges.rs` |
 | **Type** | STRUCTURAL and ENFORCED (test) |
 | **Gate** | Focused R6-R12 regressions, then the authoritative Final Verification Gate |
+
+---
+
+### META-LAYER-COMPLETENESS-001 Supported Framework Semantics Are Complete
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | When Clean-CTX claims semantic support for a framework or language construct, materially used semantic forms within that supported capability must be implemented completely enough to preserve the framework relationships Clean-CTX claims to understand. A known capability gap is not resolved merely by documenting, labeling, degrading, or explaining away missing semantics when sufficient authoritative evidence can be modeled. |
+| **Safety boundary** | Unsupported/degradation metadata is a truthful safety boundary, not a substitute for required semantic capability. Truthful degradation is a safety mechanism, not a completion criterion. |
+| **Engineering rule** | Do not explain away an implementable semantic gap. Either implement the required structured authority or explicitly narrow the meta-layer's supported envelope. A materially used idiom inside the intended envelope must not remain a permanent omission merely because support requires additional identity, reconciliation, or lifecycle machinery. |
+| **Constraint** | Completeness never authorizes guessing: framework roles require structured identity and framework-specific authority; lookalike syntax fails closed. Meta-layers must provide no fabricated semantics, no silent gaps, and no knowingly half-implemented contract inside their declared envelope. |
+| **NgRx application** | Object-member actions require exact Store dispatch authority; untyped switch reducers require exact reducer-registration authority; aliases normalize to declaration identity; handler relationships publish only after both roles and the exact case member reconcile. Derived roles retract with their last supporting proof. |
+| **Type** | STRUCTURAL and ENFORCED |
 
 ---
 

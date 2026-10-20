@@ -174,26 +174,8 @@ fn find_entities_by_name_with_scope<'a>(
 
 // ── WorkspaceIndex ────────────────────────────────────────────────────
 
-/// Framework-agnostic cross-file semantic index.
-///
-/// # Ownership
-///
-/// The WorkspaceIndex owns its data. It is populated by inserting semantic
-/// edges (typically from a batch of InferenceLayer instances) and queried
-/// by the public API. It is independent of the per-file pipeline.
-///
-/// # Lifecycle
-///
-/// ```text
-/// WorkspaceIndex::new()
-///     → index.add_edges(file_id, edges)
-///     → queries
-///     → drop
-/// ```
-///
-/// # Thread safety
-///
-/// Not thread-safe by default. Callers must synchronize externally.
+/// Owned, framework-agnostic cross-file semantic index. Callers synchronize
+/// access; files publish through `add_edges` and query the resulting graph.
 #[derive(Debug, Clone)]
 pub struct WorkspaceIndex {
     /// Entity identity → all entity occurrences (with file context).
@@ -221,6 +203,8 @@ pub struct WorkspaceIndex {
     /// Materialized occurrences derived from the current candidate and
     /// declaration sets, rebuilt after every affected publication change.
     ngrx_refined_edges: Vec<EdgeKey>,
+    /// Entity occurrences introduced only by reconciled NgRx evidence.
+    ngrx_refined_entities: Vec<(EntityKey, String)>,
     /// Entity name → entity keys (for name-based lookup across domains/types).
     /// Populated alongside the entities map during registration.
     name_index: HashMap<String, Vec<EntityKey>>,
@@ -251,6 +235,7 @@ impl WorkspaceIndex {
             file_edges: HashMap::new(),
             ngrx_refinement_candidates: HashMap::new(),
             ngrx_refined_edges: Vec::new(),
+            ngrx_refined_entities: Vec::new(),
             name_index: HashMap::new(),
             semantic_coverage: HashMap::new(),
             capability_coverage: Default::default(),

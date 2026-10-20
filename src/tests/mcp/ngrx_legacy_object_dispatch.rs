@@ -23,6 +23,19 @@ export class DispatchProbe {
 }
 "#;
 
+const OBJECT_ACTIONS: &str = r#"
+export const ACTIONS = {
+  SET_X: '[Feature] Set X',
+  CLEAR_X: '[Feature] Clear X'
+};
+export function reducer(state: unknown, action: any) {
+  switch (action.type) {
+    case ACTIONS.SET_X: return state;
+    default: return state;
+  }
+}
+"#;
+
 fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(&json!(140), tool, &json!({"arguments": arguments}), state);
@@ -74,6 +87,46 @@ fn state(root: &std::path::Path) -> crate::mcp::McpState {
 
 fn refresh(state: &crate::mcp::McpState, root: &std::path::Path) {
     call(state, "refresh_workspace", json!({"workspaceRoot": root}));
+}
+
+#[test]
+fn issue_150_unsupported_object_constant_switch_form_is_explicit_in_file_coverage() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("workspace");
+    let path = root.path().join("object.actions.ts");
+    std::fs::write(&path, OBJECT_ACTIONS).expect("object-action fixture");
+    let state = state(root.path());
+
+    let result = call(
+        &state,
+        "workspace_query",
+        json!({
+            "workspaceRoot": root.path(),
+            "type": "entities_in_file",
+            "file_path": path
+        }),
+    );
+    assert_eq!(result["coverage"]["source_complete"], true);
+    assert_eq!(result["coverage"]["result_semantics"], "exact");
+    assert_eq!(
+        result["coverage"]["semantic_scope"],
+        "supported_producer_patterns"
+    );
+    assert_eq!(
+        result["coverage"]["semantic_omissions"],
+        json!([
+            "ngrx_object_string_actions",
+            "ngrx_switch_action_type_handlers"
+        ])
+    );
+    assert!(
+        result["entities"]
+            .as_array()
+            .expect("entities")
+            .iter()
+            .all(|entity| entity["domain"] != "ngrx"),
+        "unsupported syntax must be declared, not projected without authority"
+    );
 }
 
 #[test]
@@ -345,7 +398,7 @@ fn destination_authority_and_file_order_converge_through_refresh() {
 fn import_refinement_advances_only_angular_semantics() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        24
+        25
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 6);
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);

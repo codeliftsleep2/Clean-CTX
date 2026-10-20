@@ -322,6 +322,10 @@ pub(super) fn evaluate(
                 semantic_edges.push(discriminant.transition_edge());
             }
         }
+        semantic_edges.extend(crate::angular_meta::ngrx::object_actions::evidence(
+            &context.path.to_string_lossy(),
+            context.source,
+        ));
     }
     if meta_config
         .map(|config| config.testing.enabled)
@@ -335,9 +339,19 @@ pub(super) fn evaluate(
             ),
         );
     }
-    let semantic_dependencies = routing_shape
+    let mut semantic_dependencies = routing_shape
         .map(|shape| shape.semantic_dependencies.clone())
         .unwrap_or_default();
+    if ngrx_enabled
+        && semantic_edges
+            .iter()
+            .any(|edge| crate::angular_meta::ngrx::object_actions::is_evidence_layer(edge.layer))
+    {
+        semantic_dependencies.extend(crate::angular_meta::ngrx::object_actions::dependencies(
+            &context.path.to_string_lossy(),
+            context.source,
+        ));
+    }
     super::MetaLayerEvaluation {
         output,
         semantic_edges,
@@ -371,6 +385,9 @@ pub(super) fn evaluate_if_applicable(
     let applicable = is_angular
         || crate::angular_meta::rx::has_rxjs_imports(context.source)
         || crate::angular_meta::ngrx::has_ngrx_imports(context.source)
+        || crate::angular_meta::ngrx::discriminants::has_switch_action_type_handlers(
+            context.source,
+        )
         || crate::angular_meta::signals::has_signal_imports(context.source)
         || reactive_forms_enabled
             && crate::angular_meta::reactive_forms::extract_reactive_form_shape_with_regions(

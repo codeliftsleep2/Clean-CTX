@@ -303,6 +303,15 @@ impl IRCompiler {
                 &provenance,
             ));
 
+        if ctx.query_string == crate::queries::TS_QUERY {
+            self.semantic_edges.extend(
+                crate::ir::typescript_object_members::project_exported_object_members(
+                    &ctx.source,
+                    &provenance,
+                ),
+            );
+        }
+
         // C# structs and records retain distinct public builtin identities,
         // but the canonical IR intentionally lowers every class-like type to
         // DefClass. Project their neutral written base types from structured

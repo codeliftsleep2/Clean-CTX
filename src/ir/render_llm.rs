@@ -168,7 +168,7 @@ fn render_class(
     render_fields(output, &class.fields, fidelity);
 
     // Methods — with overload disambiguation
-    render_methods(output, &class.methods, fidelity, focus);
+    render_methods(output, &class.methods, fidelity, focus, Some(&class.name));
 }
 
 fn render_interface(
@@ -191,7 +191,7 @@ fn render_interface(
         output.push_str(&format!("X {}\n", interface.extends.join(" ")));
     }
     render_fields(output, &interface.fields, fidelity);
-    render_methods(output, &interface.methods, fidelity, focus);
+    render_methods(output, &interface.methods, fidelity, focus, None);
 }
 
 /// Render fields for a class.
@@ -242,6 +242,7 @@ fn render_methods(
     methods: &[MethodNode],
     fidelity: Fidelity,
     focus: Option<&HashSet<String>>,
+    owner_name: Option<&str>,
 ) {
     if methods.is_empty() {
         return;
@@ -275,7 +276,14 @@ fn render_methods(
 
         // Method body (params, return type, flags)
         let has_params = !method.params.is_empty();
-        let has_return = method.return_type.is_some();
+        // Constructors have no C# return type. Canonical IR retains its
+        // language-neutral void sentinel, but the model-facing skeleton must
+        // not render that sentinel as a semantic type.
+        let visible_return = method.return_type.as_ref().filter(|return_type| {
+            !(return_type.as_str() == crate::ir::opcodes::TYPE_VOID
+                && owner_name.is_some_and(|owner| method.name == owner))
+        });
+        let has_return = visible_return.is_some();
         let has_modifiers = !method.modifiers.is_empty();
         let has_control_summaries = !method.control_summaries.is_empty();
         let visible_pattern_facts = method
@@ -315,7 +323,7 @@ fn render_methods(
             }
 
             // Return type
-            if let Some(rt) = &method.return_type {
+            if let Some(rt) = visible_return {
                 output.push_str(&format!(" → {}", rt));
             }
 

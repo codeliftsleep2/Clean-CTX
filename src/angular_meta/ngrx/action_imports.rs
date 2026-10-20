@@ -89,7 +89,7 @@ fn action_bindings(source_id: &str, source: &str) -> ActionBindings {
             }
             let item = (
                 relation,
-                binding.imported_name.clone(),
+                binding.local_name,
                 binding.imported_name,
                 binding.module_specifier,
             );

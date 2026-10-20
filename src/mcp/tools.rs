@@ -479,6 +479,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
                             "omitted_possible": { "type": "boolean" },
                             "scope": { "type": "object" },
                             "source_generation": { "type": "string" },
+                            "semantic_scope": { "type": "string", "enum": ["supported_producer_patterns"], "description": "When present, exact/source-complete describes the supported producer contract, not every framework convention in the source." },
+                            "semantic_omissions": { "type": "array", "items": { "type": "string", "enum": ["ngrx_object_string_actions", "ngrx_switch_action_type_handlers"] }, "description": "Detected framework syntax classes that the current semantic producer does not project. Their presence prevents callers from treating absent matching entities as evidence that the source contains no such construct." },
                             "evidence_requirements": { "type": "array", "items": { "type": "string" } },
                             "reasons": { "type": "array", "items": { "type": "object" } },
                             "coverage_detail": workspace_query_coverage_detail_schema(),
