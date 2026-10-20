@@ -8,8 +8,8 @@ const SOURCE: &str = "using Microsoft.VisualStudio.TestTools.UnitTesting; public
 fn declaration_proven_test_subjects_advance_only_dotnet_semantics() {
     assert_eq!(
         crate::dotnet_meta::SEMANTIC_PRODUCER_GENERATION,
-        6,
-        "resolved ASP.NET attribute authority changes .NET semantics"
+        7,
+        "compilation declaration identity corrects shared .NET semantics"
     );
     assert_eq!(crate::dotnet_meta::MARKER_PRODUCER_GENERATION, 1);
 

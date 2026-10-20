@@ -62,6 +62,7 @@ impl IRPass for MetaLayerPass {
                 &file_provenance,
                 &crate::dotnet_meta::semantic::known_csharp_type_identities(),
                 &state.instructions,
+                &state.csharp_declarations,
             )
         } else {
             Vec::new()

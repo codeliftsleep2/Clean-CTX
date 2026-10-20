@@ -3,11 +3,12 @@
 use super::{AttributeInput, MethodInput};
 use crate::compression::capture_pipeline::CapEntry;
 use crate::ir::csharp_resolution::CSharpSourceSpan;
+use crate::ir::pipeline::CSharpDeclarationInputs;
 
 pub(super) fn direct_methods(
     captures: &[CapEntry],
     owner: &CapEntry,
-    records: &[(String, String)],
+    declarations: &CSharpDeclarationInputs,
 ) -> Vec<MethodInput> {
     let mut roots = captures
         .iter()
@@ -24,10 +25,14 @@ pub(super) fn direct_methods(
     roots.sort_by_key(|capture| capture.start_byte);
     roots
         .into_iter()
-        .zip(records)
-        .map(|(method, (_, name))| MethodInput {
-            name: name.clone(),
-            attributes: direct_method_attributes(captures, method),
+        .filter_map(|method| {
+            let (_, name) = declarations
+                .methods
+                .get(&(method.start_byte, method.end_byte))?;
+            Some(MethodInput {
+                name: name.clone(),
+                attributes: direct_method_attributes(captures, method),
+            })
         })
         .collect()
 }

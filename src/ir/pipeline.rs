@@ -46,6 +46,7 @@ mod meta_layer;
 mod post;
 mod signature;
 
+pub(crate) use core::CSharpDeclarationInputs;
 pub use core::{CoreIRPass, LanguageLayerPass};
 pub use meta_layer::MetaLayerPass;
 pub use post::{
@@ -136,6 +137,7 @@ pub struct PassContext {
     pub pattern_recognizers: Vec<Box<dyn PatternRecognizer>>,
     /// Tree-sitter captures produced by the capture pipeline.
     pub captures: Vec<CapEntry>,
+    pub(crate) csharp_declarations: CSharpDeclarationInputs,
     /// Ephemeral structural invocation evidence assembled during this compile.
     /// Phase 1 establishes ownership only; language adapters populate it later.
     pub(crate) invocation_occurrences: Vec<InvocationOccurrence>,
@@ -206,6 +208,7 @@ impl PassContext {
             language_layers: Vec::new(),
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
+            csharp_declarations: CSharpDeclarationInputs::default(),
             invocation_occurrences: Vec::new(),
             angular_initializers: Vec::new(),
             ngrx_class_actions: Vec::new(),

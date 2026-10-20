@@ -29,9 +29,9 @@ use crate::ir::opcodes::{
 use std::collections::HashMap;
 
 /// Increment when identical C# input can emit different canonical IR.
-pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 4;
+pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 5;
 /// Increment when C# canonical facts change meaning for projection.
-pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 7;
+pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 8;
 
 /// True when `head` (a declaration head, never a full body) carries `word`
 /// as a standalone modifier token. Splits on non-identifier characters so

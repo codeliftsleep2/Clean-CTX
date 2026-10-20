@@ -410,13 +410,13 @@ fn csharp_structured_headers_derived_edge_establishes_query_capability() {
 fn csharp_structured_headers_version_existing_producer_keys() {
     assert_eq!(
         crate::ir::layers::csharp::CANONICAL_PRODUCER_GENERATION,
-        4,
-        "resolved SignalR method ownership changes canonical output"
+        5,
+        "class-owned generic identity corrects descendant SignalR execution contexts"
     );
     assert_eq!(
         crate::ir::layers::csharp::SEMANTIC_INPUT_GENERATION,
-        7,
-        "resolved method-attribute ownership changes projected semantic input"
+        8,
+        "declaration provenance corrects shared C# compilation inputs"
     );
     assert_eq!(
         crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION,

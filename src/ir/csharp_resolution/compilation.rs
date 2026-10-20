@@ -11,6 +11,7 @@ use crate::compression::capture_pipeline::CapEntry;
 use crate::ir::csharp_symbols::{
     CSharpDeclarationPart, CSharpSourceSymbol, CSharpSourceSymbolIndex, CSharpSymbolKey,
 };
+use crate::ir::pipeline::CSharpDeclarationInputs;
 
 #[path = "compilation/method_inputs.rs"]
 mod method_inputs;
@@ -84,8 +85,9 @@ pub(crate) fn resolve_compilation_class_ancestry(
     file: &str,
     known_external: &[CSharpTypeIdentity],
     instructions: &[crate::ir::opcodes::CoreOp],
+    declarations: &CSharpDeclarationInputs,
 ) -> Vec<CSharpResolvedClass> {
-    let unit = collect_compilation_unit(captures, file, instructions);
+    let unit = collect_compilation_unit(captures, file, instructions, declarations);
     resolve_compilation_units(&[unit], known_external)
 }
 
@@ -93,9 +95,10 @@ pub(crate) fn collect_compilation_unit(
     captures: &[CapEntry],
     file: &str,
     instructions: &[crate::ir::opcodes::CoreOp],
+    declarations: &CSharpDeclarationInputs,
 ) -> CSharpCompilationUnit {
     CSharpCompilationUnit {
-        classes: class_inputs(captures, file, instructions),
+        classes: class_inputs(captures, file, instructions, declarations),
     }
 }
 
@@ -312,6 +315,7 @@ fn class_inputs(
     captures: &[CapEntry],
     file: &str,
     instructions: &[crate::ir::opcodes::CoreOp],
+    declarations: &CSharpDeclarationInputs,
 ) -> Vec<ClassInput> {
     let mut available_classes = instructions
         .iter()
@@ -328,20 +332,11 @@ fn class_inputs(
             let span = span(owner);
             let namespace_path = namespace_path(captures, span);
             let containing = containing_classes(captures, owner);
-            let generic_arity = captures
-                .iter()
-                .filter(|capture| capture.name == "csharp.type_parameters")
-                .filter(|capture| contains(owner, capture))
-                .filter(|capture| {
-                    !captures.iter().any(|nested| {
-                        nested.name == "class.root"
-                            && nested.start_byte > owner.start_byte
-                            && nested.end_byte < owner.end_byte
-                            && contains(nested, capture)
-                    })
-                })
-                .min_by_key(|capture| capture.start_byte)
-                .map_or(0, |capture| type_parameter_arity(&capture.raw_text));
+            let generic_arity = declarations
+                .class_arities
+                .get(&(owner.start_byte, owner.end_byte))
+                .copied()
+                .unwrap_or(0);
             let base_references = first_base(captures, owner)
                 .map(|base| vec![base.raw_text.trim().to_string()])
                 .unwrap_or_default();
@@ -375,7 +370,7 @@ fn class_inputs(
                     })
                     .collect()
             });
-            let methods = direct_methods(captures, owner, &method_records);
+            let methods = direct_methods(captures, owner, declarations);
             let method_ids = method_records.into_iter().map(|(id, _)| id).collect();
             Some(ClassInput {
                 scope: scope_for(captures, span, file),
@@ -564,13 +559,6 @@ fn parse_alias(
 fn declaration_is_partial(raw: &str) -> bool {
     raw.split_once("class")
         .is_some_and(|(prefix, _)| prefix.split_whitespace().any(|word| word == "partial"))
-}
-
-fn type_parameter_arity(raw: &str) -> usize {
-    raw.trim_matches(['<', '>'])
-        .split(',')
-        .filter(|parameter| !parameter.trim().is_empty())
-        .count()
 }
 
 fn contains(owner: &CapEntry, nested: &CapEntry) -> bool {

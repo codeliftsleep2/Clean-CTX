@@ -139,6 +139,10 @@ pub const CS_SEMANTIC_QUERY: &str = r#"
     (enum_declaration name: (identifier) @csharp.enum_name)
     (record_declaration name: (identifier) @csharp.record_name)
     (type_parameter_list) @csharp.type_parameters
+    ; Direct declaration ownership is retained through the query match identity.
+    (class_declaration
+        (type_parameter_list
+            (type_parameter) @csharp.class_type_parameter)) @csharp.generic_class
     ; Class/struct/interface base lists expose entries through the type supertype.
     (base_list (type) @csharp.base_type)
     ; record_base is aliased to base_list. Capture each direct named child

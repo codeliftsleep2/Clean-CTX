@@ -16,6 +16,7 @@ use crate::ir::symbol_table::SymbolKind;
 use std::collections::{HashMap, HashSet};
 
 mod csharp;
+pub(crate) use csharp::CSharpDeclarationInputs;
 mod typescript;
 use csharp::{apply_csharp_declaration_names, emit_csharp_class_base_type};
 
@@ -102,6 +103,7 @@ impl IRPass for CoreIRPass {
 
         if query_string == crate::queries::CS_QUERY {
             apply_csharp_declaration_names(&mut captures);
+            state.csharp_declarations.collect_class_arities(&captures);
         }
         if query_string == crate::queries::TS_QUERY {
             typescript::apply_declaration_names(&mut captures);
@@ -190,7 +192,12 @@ impl IRPass for CoreIRPass {
         for cap in &captures {
             // Private evidence captures must not affect canonical emission or
             // the timing of existing callable-scope transitions.
-            if cap.name.starts_with("invoke.") {
+            if cap.name.starts_with("invoke.")
+                || matches!(
+                    cap.name.as_str(),
+                    "csharp.generic_class" | "csharp.class_type_parameter"
+                )
+            {
                 continue;
             }
             // Callable-scope maintenance is independent of filtering: the walk
@@ -421,6 +428,12 @@ fn process_method_capture(
     state.layer_context.current_method = Some(method_id.clone());
     state.layer_context.current_method_name = Some(cap.text.clone());
     let method_name = state.emit_method_ir(&owner, &method_id, &cap.text);
+    if is_csharp {
+        state.csharp_declarations.methods.insert(
+            (cap.start_byte, cap.end_byte),
+            (method_id.clone(), method_name.clone()),
+        );
+    }
     if is_csharp {
         let raw_signature = extract_method_sig(&cap.raw_text, Fidelity::High);
         let declared_return = super::parse_method_sig(&raw_signature).return_type;

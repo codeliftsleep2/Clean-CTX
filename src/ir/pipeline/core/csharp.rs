@@ -3,6 +3,36 @@
 use super::{CapturedNode, CoreOp, PassContext};
 use std::collections::HashMap;
 
+/// Compilation-local source declarations, recorded before provenance is projected away.
+#[derive(Debug, Default)]
+pub(crate) struct CSharpDeclarationInputs {
+    pub methods: HashMap<(usize, usize), (String, String)>,
+    pub class_arities: HashMap<(usize, usize), usize>,
+}
+
+impl CSharpDeclarationInputs {
+    pub(super) fn collect_class_arities(&mut self, captures: &[CapturedNode]) {
+        self.class_arities.clear();
+        let owners: HashMap<_, _> = captures
+            .iter()
+            .filter(|cap| cap.name == "csharp.generic_class")
+            .map(|cap| (cap.match_index, (cap.start_byte, cap.end_byte)))
+            .collect();
+        let mut parameters = std::collections::HashSet::new();
+        for parameter in captures
+            .iter()
+            .filter(|cap| cap.name == "csharp.class_type_parameter")
+        {
+            let Some(&span) = owners.get(&parameter.match_index) else {
+                continue;
+            };
+            if parameters.insert((span, parameter.start_byte, parameter.end_byte)) {
+                *self.class_arities.entry(span).or_default() += 1;
+            }
+        }
+    }
+}
+
 const CSHARP_TYPE_ROOTS: [&str; 5] = [
     "class.root",
     "interface.root",

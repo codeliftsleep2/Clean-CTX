@@ -513,3 +513,11 @@ mod tests_r11;
 #[cfg(all(test, feature = "dotnet", feature = "csharp"))]
 #[path = "../tests/dotnet_meta/csharp_convergence_r12.rs"]
 mod tests_r12;
+
+#[cfg(test)]
+#[path = "../tests/dotnet_meta/csharp_compilation_identity.rs"]
+mod tests_compilation_identity;
+
+#[cfg(test)]
+#[path = "../tests/dotnet_meta/csharp_compilation_identity_preservation.rs"]
+mod tests_compilation_identity_preservation;

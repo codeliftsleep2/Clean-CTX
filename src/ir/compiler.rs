@@ -325,6 +325,7 @@ impl IRCompiler {
                     &ctx.captures,
                     &provenance,
                     &ctx.instructions,
+                    &ctx.csharp_declarations,
                 ));
             self.semantic_edges.extend(
                 crate::ir::semantic_projection::project_csharp_struct_record_base_types(
