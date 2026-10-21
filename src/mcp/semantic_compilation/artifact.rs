@@ -28,6 +28,8 @@ pub(crate) struct ArtifactIdentity {
 
 #[derive(Debug)]
 pub(crate) struct SemanticCompilationArtifact {
+    #[cfg(feature = "typescript")]
+    typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
     identity: ArtifactIdentity,
     source_snapshot: Arc<String>,
     compiled: CompiledIR,
@@ -73,6 +75,18 @@ impl SemanticCompilationArtifact {
         let _ = extension;
 
         Ok(Self {
+            #[cfg(feature = "typescript")]
+            typescript_authority: matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
+                .then(|| {
+                    let roots: Vec<_> = config
+                        .additional_roots
+                        .iter()
+                        .map(std::path::PathBuf::from)
+                        .collect();
+                    crate::ir::typescript_resolution::TypeScriptAuthority::capture(
+                        path, source, &roots,
+                    )
+                }),
             identity: ArtifactIdentity {
                 canonical_owner,
                 source_hash,
@@ -99,6 +113,8 @@ impl SemanticCompilationArtifact {
         String,
     ) {
         let Self {
+            #[cfg(feature = "typescript")]
+            typescript_authority,
             identity,
             source_snapshot,
             compiled,
@@ -127,6 +143,8 @@ impl SemanticCompilationArtifact {
             source_snapshot,
         ));
         drop(invocation_evidence);
+        #[cfg(feature = "typescript")]
+        drop(typescript_authority);
         let _ = dotnet_testing_enabled;
         #[cfg(feature = "csharp")]
         if let Some(CSharpSemanticArtifact {

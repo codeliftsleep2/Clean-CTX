@@ -6,6 +6,15 @@ always-loaded; consult it when ending a multi-step architectural task.
 
 ## Authoritative reference
 
+The [Canonical Question Matrix Standard](../Clean-CTX_Canonical_Question_Matrix_Standard.md)
+is a **hard architectural and completion requirement for every layer, feature
+and upgrade**, including existing capabilities being modified. Every material
+implementation campaign must create or update its canonical question matrix and
+review actual public-query reachability, authority, currentness, completeness
+and applicable adversarial/lifecycle evidence. Internal implementation alone
+does not satisfy this gate. Apply the standard's required question classes,
+review record, consumer audit and deliverables; link campaign plans to it.
+
 Do not duplicate the durable architectural facts. `docs/ARCHITECTURAL_INVARIANTS.md`
 is authoritative for:
 
