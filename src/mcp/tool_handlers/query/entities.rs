@@ -295,6 +295,14 @@ fn try_prepare_entities_in_file(
             }
             Err(error) => return Err(QueryFailure::internal(error.to_string())),
         };
+    if !semantic_dependencies
+        .iter()
+        .all(|dependency| dependency.is_current())
+    {
+        return Err(QueryFailure::internal(
+            "Semantic contributor changed during compilation; retry",
+        ));
+    }
     context.invalidate_derived_catalogs();
     {
         let mut idx = state.workspace_index_lock();

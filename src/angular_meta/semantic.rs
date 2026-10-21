@@ -46,7 +46,9 @@ pub fn class_to_semantic_edges(
     // The producer has recognized this declaration independently of DI or
     // other relationships. Reuse the index's existing registration carrier;
     // it is normalized into an entity occurrence, never a graph self-edge.
-    if kind == ClassKind::Service {
+    // NgModule ownership must survive an empty/retracted membership projection
+    // so its contributor footprint can invalidate and restore relationships.
+    if matches!(kind, ClassKind::Service | ClassKind::Module) {
         edges.push(SemanticEdge {
             relation: SemanticRelation::Defines,
             subject: subject.clone(),

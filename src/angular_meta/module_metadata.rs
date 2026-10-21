@@ -1,12 +1,18 @@
 //! Bounded, syntax-owned NgModule metadata composition for Issue #139.
 use crate::angular_meta::decorators::ClassKind;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
-use std::path::{Path, PathBuf};
+use crate::layers::meta::semantic::{
+    EntityRef, SemanticDependency, SemanticEdge, SemanticRelation,
+};
+use std::path::Path;
+
+mod sources;
+use sources::Contributors;
 
 #[derive(Debug, Default)]
 pub(crate) struct ModuleProjection {
     pub edges: Vec<SemanticEdge>,
     pub unresolved_spreads: Vec<String>,
+    pub dependencies: Vec<SemanticDependency>,
 }
 
 pub(crate) fn project(
@@ -24,6 +30,7 @@ pub(crate) fn project(
     let (declarations, imports, exports) =
         crate::angular_meta::decorators::extract_module_declarations(raw_class);
     let mut result = ModuleProjection::default();
+    let mut contributors = Contributors::default();
     for (relation, values) in [
         (SemanticRelation::DeclaresInModule, declarations),
         (SemanticRelation::ImportsModule, imports),
@@ -34,10 +41,15 @@ pub(crate) fn project(
             source,
             declaring_path,
             &mut result.unresolved_spreads,
+            &mut contributors,
         ) {
-            let Some((name, kind)) =
-                resolve_leaf(&value, source, declaring_path, declaration_sources)
-            else {
+            let Some((name, kind)) = resolve_leaf(
+                &value,
+                source,
+                declaring_path,
+                declaration_sources,
+                &mut contributors,
+            ) else {
                 continue;
             };
             result.edges.push(SemanticEdge {
@@ -49,6 +61,7 @@ pub(crate) fn project(
             });
         }
     }
+    result.dependencies = contributors.dependencies();
     result
 }
 
@@ -78,6 +91,7 @@ fn compose(
     source: &str,
     declaring_path: Option<&Path>,
     unresolved: &mut Vec<String>,
+    contributors: &mut Contributors,
 ) -> Vec<String> {
     let mut leaves = Vec::new();
     for value in values {
@@ -93,11 +107,12 @@ fn compose(
             unresolved.push(spread.to_string());
             continue;
         };
-        let Some(path) = declaring_path.and_then(|path| resolve_module(path, &module)) else {
+        let Some(path) = declaring_path.and_then(|path| contributors.resolve_module(path, &module))
+        else {
             unresolved.push(spread.to_string());
             continue;
         };
-        let Ok(imported_source) = std::fs::read_to_string(&path) else {
+        let Some(imported_source) = contributors.read(&path) else {
             unresolved.push(spread.to_string());
             continue;
         };
@@ -133,16 +148,17 @@ fn resolve_leaf(
     source: &str,
     declaring_path: Option<&Path>,
     declaration_sources: &[String],
+    contributors: &mut Contributors,
 ) -> Option<(String, &'static str)> {
     if let Some((path, name)) = BoundLeaf::decode(value) {
         let array_path = Path::new(path);
-        let array_source = std::fs::read_to_string(array_path).ok()?;
+        let array_source = contributors.read(array_path)?;
         if let Some(kind) = declaration_kind(&array_source, name) {
             return Some((name.to_string(), kind));
         }
         let (module, imported) = import_binding(&array_source, name)?;
-        let declaration_path = resolve_module(array_path, &module)?;
-        let declaration_source = std::fs::read_to_string(declaration_path).ok()?;
+        let declaration_path = contributors.resolve_module(array_path, &module)?;
+        let declaration_source = contributors.read(&declaration_path)?;
         return declaration_kind(&declaration_source, &imported)
             .map(|kind| (name.to_string(), kind));
     }
@@ -161,8 +177,8 @@ fn resolve_leaf(
         return Some((value.to_string(), "Module"));
     }
     if let Some(declaring_path) = declaring_path {
-        let path = resolve_module(declaring_path, &module)?;
-        let imported_source = std::fs::read_to_string(path).ok()?;
+        let path = contributors.resolve_module(declaring_path, &module)?;
+        let imported_source = contributors.read(&path)?;
         return declaration_kind(&imported_source, &imported).map(|kind| (value.to_string(), kind));
     }
     declaration_kind_from_sources(declaration_sources, &imported)
@@ -369,20 +385,6 @@ fn collect_import_specifiers(
         collect_import_specifiers(child, source, local, module, output);
     }
 }
-fn resolve_module(path: &Path, module: &str) -> Option<PathBuf> {
-    if !(module.starts_with("./") || module.starts_with("../")) {
-        return None;
-    }
-    let target = path.parent()?.join(module);
-    if target.is_file() {
-        return Some(target);
-    }
-    let mut typescript_path = target.into_os_string();
-    typescript_path.push(".ts");
-    let typescript_target = PathBuf::from(typescript_path);
-    typescript_target.is_file().then_some(typescript_target)
-}
-
 fn parse(source: &str) -> Option<tree_sitter::Tree> {
     let language = crate::compression::language::safe_typescript_language()?;
     let mut parser = tree_sitter::Parser::new();
@@ -393,3 +395,7 @@ fn parse(source: &str) -> Option<tree_sitter::Tree> {
 #[cfg(test)]
 #[path = "../tests/angular_meta/module_metadata_issue_139.rs"]
 mod module_metadata_issue_139;
+
+#[cfg(test)]
+#[path = "../tests/angular_meta/module_metadata_issue_157.rs"]
+mod module_metadata_issue_157;

@@ -468,3 +468,14 @@ mod tests_native_calls_arrows;
 #[cfg(all(test, feature = "rust", feature = "csharp", feature = "typescript"))]
 #[path = "../../tests/mcp/workspace_query_calls_in_file.rs"]
 mod tests_calls_in_file;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/workspace_query_issue_157.rs"]
+mod tests_issue_157;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/workspace_query_issue_157_dependencies.rs"]
+mod tests_issue_157_dependencies;
+
+#[cfg(feature = "angular")]
+mod angular_modules;

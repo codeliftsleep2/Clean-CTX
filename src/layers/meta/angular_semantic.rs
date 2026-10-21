@@ -6,6 +6,7 @@ use crate::layers::meta::semantic::SemanticEdge;
 
 #[derive(Default)]
 pub(super) struct ProjectionEvidence<'a> {
+    module_dependencies: Option<&'a mut Vec<crate::layers::meta::semantic::SemanticDependency>>,
     lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
     ngrx_edges: Option<&'a [SemanticEdge]>,
@@ -25,6 +26,7 @@ pub(super) fn extract_non_testing_edges(
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
     let mut edges = Vec::new();
+    let mut module_dependencies = evidence.module_dependencies;
 
     if evidence
         .is_angular
@@ -62,16 +64,17 @@ pub(super) fn extract_non_testing_edges(
                     fidelity,
                 ));
                 if kind == crate::angular_meta::decorators::ClassKind::Module {
-                    edges.extend(
-                        crate::angular_meta::module_metadata::project(
-                            class_name,
-                            raw_class,
-                            source,
-                            declaring_path,
-                            class_captures,
-                        )
-                        .edges,
+                    let projection = crate::angular_meta::module_metadata::project(
+                        class_name,
+                        raw_class,
+                        source,
+                        declaring_path,
+                        class_captures,
                     );
+                    edges.extend(projection.edges);
+                    if let Some(dependencies) = module_dependencies.as_deref_mut() {
+                        dependencies.extend(projection.dependencies);
+                    }
                 }
                 let source_id = declaring_path
                     .map(|path| path.to_string_lossy())
@@ -273,6 +276,7 @@ pub(super) fn evaluate(
         .iter()
         .map(|(_, text)| text.clone())
         .collect();
+    let mut module_dependencies = Vec::new();
     let mut semantic_edges = extract_non_testing_edges(
         context.source,
         &captures,
@@ -280,6 +284,7 @@ pub(super) fn evaluate(
         context.config,
         Some(context.path),
         ProjectionEvidence {
+            module_dependencies: Some(&mut module_dependencies),
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),
             ngrx_edges: ngrx_edges.as_deref(),
@@ -342,6 +347,7 @@ pub(super) fn evaluate(
     let mut semantic_dependencies = routing_shape
         .map(|shape| shape.semantic_dependencies.clone())
         .unwrap_or_default();
+    semantic_dependencies.extend(module_dependencies);
     if ngrx_enabled
         && semantic_edges
             .iter()

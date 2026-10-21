@@ -20,7 +20,7 @@ pub(crate) fn supersede_test_batch_once(path: String, source: String) {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) enum CandidatePublication {
+pub(in crate::mcp::tool_handlers) enum CandidatePublication {
     Published,
     PublishedCSharp,
     Current,
@@ -124,7 +124,7 @@ enum PreparedCandidate {
     Terminal(CandidatePublication),
 }
 
-pub(super) fn compile_candidates_for(
+pub(in crate::mcp::tool_handlers) fn compile_candidates_for(
     state: &McpState,
     resolved_paths: &[String],
     workspace_root: Option<&str>,
@@ -292,13 +292,19 @@ fn commit_candidate(
     let retained = (publication.published_outcome == CandidatePublication::PublishedCSharp)
         .then(|| Arc::new(artifact));
     let expected_hash = compiled_hash.clone();
+    let expected_dependencies = semantic_dependencies.clone();
     publication
         .ticket
         .commit(
             || {
                 state
                     .read_source(&publication.validated)
-                    .map(|current| crate::cache::content_hash(current.as_bytes()) == expected_hash)
+                    .map(|current| {
+                        crate::cache::content_hash(current.as_bytes()) == expected_hash
+                            && expected_dependencies
+                                .iter()
+                                .all(|dependency| dependency.is_current())
+                    })
                     .map_err(|error| error.to_string())
             },
             || {

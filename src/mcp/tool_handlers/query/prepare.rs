@@ -17,6 +17,11 @@ type IndexedEvaluator = Box<dyn FnOnce(&WorkspaceIndex) -> QueryResult>;
 type PublicationValidator = Box<dyn Fn(&WorkspaceIndex) -> bool>;
 
 pub(super) enum PreparedQuery {
+    #[cfg(feature = "angular")]
+    ModuleContributors(
+        Box<PreparedQuery>,
+        Vec<crate::layers::meta::semantic::SemanticDependency>,
+    ),
     Indexed(IndexedEvaluator),
     #[cfg(feature = "csharp")]
     Validated(
@@ -28,6 +33,17 @@ pub(super) enum PreparedQuery {
 }
 
 impl PreparedQuery {
+    #[cfg(feature = "angular")]
+    pub(super) fn with_module_contributors(
+        self,
+        dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+    ) -> Self {
+        if dependencies.is_empty() || !self.is_indexed() {
+            return self;
+        }
+        Self::ModuleContributors(Box::new(self), dependencies)
+    }
+
     pub(super) fn is_indexed(&self) -> bool {
         !matches!(self, Self::Ready(_))
     }
@@ -55,6 +71,13 @@ impl PreparedQuery {
     }
 
     pub(super) fn publication_is_current(&self, index: &WorkspaceIndex) -> bool {
+        #[cfg(feature = "angular")]
+        if let Self::ModuleContributors(prepared, dependencies) = self {
+            return dependencies
+                .iter()
+                .all(|dependency| dependency.is_current())
+                && prepared.publication_is_current(index);
+        }
         #[cfg(feature = "csharp")]
         if let Self::Validated(_, stamp, validator) = self {
             return stamp.is_current(index) && validator(index);
@@ -65,6 +88,18 @@ impl PreparedQuery {
 
     pub(super) fn evaluate_single(self, state: &McpState) -> QueryResult {
         match self {
+            #[cfg(feature = "angular")]
+            Self::ModuleContributors(prepared, dependencies) => {
+                if !dependencies
+                    .iter()
+                    .all(|dependency| dependency.is_current())
+                {
+                    return Err(QueryFailure::internal(
+                        "Angular module contributor changed; retry",
+                    ));
+                }
+                prepared.evaluate_single(state)
+            }
             Self::Indexed(evaluator) => {
                 let index = state.workspace_index_read();
                 evaluator(&index)
@@ -85,6 +120,18 @@ impl PreparedQuery {
 
     pub(super) fn evaluate_with_index(self, index: &WorkspaceIndex) -> QueryResult {
         match self {
+            #[cfg(feature = "angular")]
+            Self::ModuleContributors(prepared, dependencies) => {
+                if !dependencies
+                    .iter()
+                    .all(|dependency| dependency.is_current())
+                {
+                    return Err(QueryFailure::internal(
+                        "Angular module contributor changed; retry",
+                    ));
+                }
+                prepared.evaluate_with_index(index)
+            }
             Self::Indexed(evaluator) => evaluator(index),
             #[cfg(feature = "csharp")]
             Self::Validated(evaluator, stamp, validator) => {
@@ -128,6 +175,11 @@ pub(super) struct PreparationContext {
 }
 
 impl PreparationContext {
+    #[cfg(feature = "angular")]
+    pub(super) fn invalidate_module_preparation(&mut self) {
+        self.hydration.clear();
+        self.invalidate_derived_catalogs();
+    }
     #[cfg(feature = "csharp")]
     pub(super) fn restrict_ef_sources(&mut self, sources: &std::collections::BTreeSet<String>) {
         if self

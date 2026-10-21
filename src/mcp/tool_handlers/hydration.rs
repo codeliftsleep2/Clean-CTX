@@ -51,6 +51,8 @@ pub(crate) use invalidation::{
 };
 
 mod publication;
+#[cfg(feature = "angular")]
+pub(super) use publication::compile_candidates_for as revalidate_module_owners;
 mod readiness;
 mod report;
 #[cfg(all(test, feature = "rust"))]

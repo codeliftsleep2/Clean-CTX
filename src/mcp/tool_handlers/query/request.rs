@@ -37,15 +37,29 @@ impl WorkspaceQueryOperation {
         state: &McpState,
         context: &mut PreparationContext,
     ) -> PreparedQuery {
+        #[cfg(feature = "angular")]
+        let module_owners = super::angular_modules::owners(args, state, context);
+        #[cfg(feature = "angular")]
+        match super::angular_modules::revalidate(
+            state,
+            &module_owners,
+            args["workspaceRoot"].as_str(),
+        ) {
+            Ok(true) => context.invalidate_module_preparation(),
+            Ok(false) => {}
+            Err(error) => {
+                return PreparedQuery::failure(super::outcome::QueryFailure::internal(error));
+            }
+        }
         let initial = self.prepare_base(args, state, context);
         #[cfg(feature = "csharp")]
-        {
-            super::dependencies::prepare(self, args, state, context, initial)
-        }
-        #[cfg(not(feature = "csharp"))]
-        {
-            initial
-        }
+        let initial = super::dependencies::prepare(self, args, state, context, initial);
+        #[cfg(feature = "angular")]
+        let initial = initial.with_module_contributors(super::angular_modules::dependencies(
+            state,
+            &super::angular_modules::owners(args, state, context),
+        ));
+        initial
     }
 
     pub(super) fn prepare_base(
