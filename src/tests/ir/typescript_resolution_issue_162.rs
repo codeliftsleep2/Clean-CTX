@@ -7,6 +7,13 @@ fn write(root: &Path, name: &str, source: &str) {
     std::fs::write(file, source).unwrap();
 }
 fn resolver(root: &Path) -> Resolver {
+    if !root.join("tsconfig.json").exists() {
+        write(
+            root,
+            "tsconfig.json",
+            r#"{"compilerOptions":{"moduleResolution":"bundler"}}"#,
+        );
+    }
     Resolver::new(&[root.to_path_buf()]).unwrap()
 }
 fn declaration(resolution: Resolution) -> super::DeclarationId {

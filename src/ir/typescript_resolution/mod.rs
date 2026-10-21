@@ -3,6 +3,7 @@ mod capture;
 mod host;
 mod package;
 mod project;
+mod project_config;
 mod resolver;
 mod syntax;
 
@@ -13,3 +14,7 @@ pub(crate) use resolver::{Resolution, Resolver};
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_resolution_issue_162.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/ir/typescript_project_host_issue_162.rs"]
+mod project_host_tests;

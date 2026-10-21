@@ -183,11 +183,16 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
-    let pre_compiled =
-        match compile_source_ir_candidate(&resolved_path, source, Fidelity::Edit, state) {
-            Ok(artifact) => artifact.into_parts().0,
-            Err(e) => return err_response(id, -32603, e.to_string(), None),
-        };
+    let pre_compiled = match compile_source_ir_candidate(
+        &resolved_path,
+        source,
+        Fidelity::Edit,
+        state,
+        workspace_root,
+    ) {
+        Ok(artifact) => artifact.into_parts().0,
+        Err(e) => return err_response(id, -32603, e.to_string(), None),
+    };
     let units = {
         let Some((language, query)) =
             crate::compression::language::language_for_extension(extension)
@@ -222,8 +227,13 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     }
 
     let (mut target_ir, semantic_edges, semantic_dependencies, new_hash) =
-        match compile_source_ir_candidate(&resolved_path, &report.new_source, Fidelity::Edit, state)
-        {
+        match compile_source_ir_candidate(
+            &resolved_path,
+            &report.new_source,
+            Fidelity::Edit,
+            state,
+            workspace_root,
+        ) {
             Ok(candidate) => candidate.into_parts(),
             Err(error) => return err_response(id, -32603, error.to_string(), None),
         };

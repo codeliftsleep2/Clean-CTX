@@ -42,6 +42,14 @@ pub(crate) struct SemanticCompilationArtifact {
 }
 
 impl SemanticCompilationArtifact {
+    #[cfg(all(test, feature = "typescript"))]
+    pub(crate) fn typescript_authority(
+        &self,
+    ) -> &crate::ir::typescript_resolution::TypeScriptAuthority {
+        self.typescript_authority
+            .as_ref()
+            .expect("TypeScript artifact")
+    }
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_compiler(
         compiled: CompiledIR,
@@ -53,6 +61,7 @@ impl SemanticCompilationArtifact {
         path: &std::path::Path,
         config: &crate::config::CleanCtxConfig,
         extension: &str,
+        authorized_roots: &[std::path::PathBuf],
     ) -> Result<Self, crate::error::CleanCtxError> {
         let producer_generations = ProducerGenerationFingerprint::current(source, path, config)
             .map_err(|error| crate::error::CleanCtxError::Ir(error.to_string()))?;
@@ -73,18 +82,17 @@ impl SemanticCompilationArtifact {
         });
         #[cfg(not(feature = "csharp"))]
         let _ = extension;
+        #[cfg(not(feature = "typescript"))]
+        let _ = authorized_roots;
 
         Ok(Self {
             #[cfg(feature = "typescript")]
             typescript_authority: matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
                 .then(|| {
-                    let roots: Vec<_> = config
-                        .additional_roots
-                        .iter()
-                        .map(std::path::PathBuf::from)
-                        .collect();
                     crate::ir::typescript_resolution::TypeScriptAuthority::capture(
-                        path, source, &roots,
+                        path,
+                        source,
+                        authorized_roots,
                     )
                 }),
             identity: ArtifactIdentity {

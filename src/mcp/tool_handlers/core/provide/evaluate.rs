@@ -237,18 +237,24 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         None
     }
     .unwrap_or_else(|| {
-        compile_file_ir_focused(&resolved_path, effective_fidelity, state, None)
-            .map_err(|error| error.to_string())
-            .and_then(|artifact| {
-                #[cfg(feature = "csharp")]
-                {
-                    crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
-                }
-                #[cfg(not(feature = "csharp"))]
-                {
-                    Ok(artifact.into_parts())
-                }
-            })
+        compile_file_ir_focused(
+            &resolved_path,
+            effective_fidelity,
+            state,
+            None,
+            workspace_root,
+        )
+        .map_err(|error| error.to_string())
+        .and_then(|artifact| {
+            #[cfg(feature = "csharp")]
+            {
+                crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+            }
+            #[cfg(not(feature = "csharp"))]
+            {
+                Ok(artifact.into_parts())
+            }
+        })
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 

@@ -13,7 +13,7 @@ fn publish(state: &McpState, file: &std::path::Path) {
     let file = file.to_string_lossy();
     state.invalidate_source_cache(&file);
     let (_, edges, _, hash) =
-        crate::mcp::tool_helpers::compile_file_ir_candidate(&file, Fidelity::High, state)
+        crate::mcp::tool_helpers::compile_file_ir_candidate(&file, Fidelity::High, state, None)
             .expect("candidate compilation")
             .into_parts();
     let canonical = state.semantic_owner_path(&file);

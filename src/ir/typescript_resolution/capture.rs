@@ -12,6 +12,8 @@ pub(crate) struct TypeScriptAuthority {
     pub witnesses: Vec<Witness>,
     pub capture_current: bool,
     pub disposition: Option<String>,
+    /// Supplied bytes authorize only this source when no project roots were passed.
+    pub source_only: bool,
 }
 
 impl TypeScriptAuthority {
@@ -25,6 +27,7 @@ impl TypeScriptAuthority {
             witnesses: Vec::new(),
             capture_current: false,
             disposition: None,
+            source_only: roots.is_empty(),
         };
         // A supplied source snapshot authorizes that one file. It does not
         // authorize an inferred parent/project/workspace or dependency reads.
@@ -33,11 +36,17 @@ impl TypeScriptAuthority {
         } else {
             roots.to_vec()
         };
+        let mut resolver = match Resolver::new(&roots) {
+            Ok(resolver) => resolver,
+            Err(error) => {
+                result.disposition = Some(error);
+                return result;
+            }
+        };
         let capture = (|| {
-            let mut resolver = Resolver::new(&roots)?;
             resolver.host.seed(file, source)?;
             result.declarations = resolver.source_declarations(file)?;
-            result.project = resolver.project_identity(file);
+            result.project = Some(resolver.project_identity(file)?);
             for name in resolver.source_names(file) {
                 for namespace in [Namespace::Value, Namespace::Type] {
                     let resolution = resolver.local(file, &name, namespace);
@@ -46,10 +55,10 @@ impl TypeScriptAuthority {
                         .push((name.clone(), namespace, resolution));
                 }
             }
-            result.capture_current = resolver.host.current();
-            result.witnesses = resolver.host.witnesses;
             Ok::<_, String>(())
         })();
+        result.capture_current = resolver.host.current() && capture.is_ok();
+        result.witnesses = resolver.host.witnesses;
         if let Err(error) = capture {
             result.disposition = Some(error);
         }

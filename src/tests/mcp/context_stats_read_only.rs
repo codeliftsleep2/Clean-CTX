@@ -209,6 +209,7 @@ fn stats_preserves_semantic_and_pending_edit_ownership() {
             std::str::from_utf8(&source).unwrap(),
             crate::compression::Fidelity::Edit,
             &state,
+            None,
         )
         .unwrap()
         .into_parts();

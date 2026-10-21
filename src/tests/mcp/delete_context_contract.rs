@@ -55,6 +55,7 @@ fn establish_deletion_intent(
             std::str::from_utf8(&source).expect("UTF-8 fixture"),
             crate::compression::Fidelity::Edit,
             state,
+            None,
         )
         .expect("target compilation")
         .into_parts();

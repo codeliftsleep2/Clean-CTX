@@ -485,6 +485,7 @@ fn restore_recovers_exact_target_after_restart_between_source_and_durable_commit
             target_text,
             crate::compression::Fidelity::Edit,
             &initial_state,
+            None,
         )
         .unwrap()
         .into_parts();

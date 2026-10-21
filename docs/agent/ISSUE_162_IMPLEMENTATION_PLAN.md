@@ -54,12 +54,12 @@ behavioral assertions. The frozen #162 test remains byte-identical.
 | Frozen regression SHA-256 | `B63883E818FC70DF0990D23E2C31AC9D318FED458DA74B70B693C393DBA86379` |
 | Frozen test + registration | Preserved before production edits in stash `6a82efdb5036df0b6d24e40266737d3d16b6885c`, name `issue-162 frozen RED B63883E818FC70DF` |
 | Working tree regression state | Original #162 test and registration are currently stashed, not restored; a filtered run now must not be mistaken for the full foundation suite |
-| New native source | `src/ir/typescript_resolution/{mod,host,project,syntax,resolver,package,capture}.rs`: initial implementation, not conformance-certified |
+| New native source | `src/ir/typescript_resolution/{mod,host,project,project_config,syntax,resolver,package,capture}.rs`: implementation in progress, not conformance-certified |
 | Real compiler entry | ir/mod.rs registers the module; SemanticCompilationArtifact captures neutral TS evidence |
-| Scope integration | INCOMPLETE: artifact capture currently sees configured additional roots/source-only authorization, not the request's complete primary-root authorization |
+| Scope integration | Root transport implemented, UNVERIFIED: primary + additional roots pass from existing hydration policy through direct/file/edit and batch requests to artifact capture; no parent-derived workspace authorization |
 | Retained identity lifecycle | INCOMPLETE: source-owned neutral capture enters artifact, but into_parts currently drops it; canonical Angular facts, durable payload and consumer joins are not implemented |
 | Consumer migration | No Angular family is yet certified migrated; old authority paths remain outstanding work |
-| Supplemental source tests | Eight tests authored in `src/tests/ir/typescript_resolution_issue_162.rs`; NOT RUN |
+| Supplemental source tests | Eight initial resolver tests, eleven project/host tests (two Unix-only), three compilation-scope tests authored; all NOT RUN |
 | Supplemental test SHA-256 at checkpoint | `01A6CCC19BCA0C294C8E1F5D078C6552783D89AD9B54ED7071BEC60F5530F74A`; may change during ordinary supplemental development |
 | Static formatting | Direct rustfmt performed on the initial native files/artifact edits; this is not compilation or test evidence |
 | Runtime after implementation | NOT RUN; no compilation, warning-free or behavioral GREEN claim |
@@ -187,7 +187,7 @@ Implementation tasks:
 - [x] Initial immutable consumed-byte snapshots, source hash and typed witnesses.
 - [x] Initial scope rejection and physical-route observations.
 - [x] JSONC parsing and initial local project/extends handling.
-- [ ] Carry the request's actual authorized roots/project requirement through
+- [x] Carry the request's actual authorized roots through
   compilation jobs and direct/in-memory candidate compilation. Do not infer a
   workspace from a source parent or promote a path mapping to authorization.
 - [ ] Reconcile physical alias, symlink, missing-path, file/directory and access
@@ -195,12 +195,67 @@ Implementation tasks:
 - [ ] Handle full project ownership/config inheritance: package extends, multiple
   extends option merging, config-relative origins, include/exclude/references,
   compiler/version/mode defaults and ambiguity.
-- [ ] Distinguish source-only capture from closed project authority; no missing
+- [x] Distinguish source-only capture from closed project authority; no missing
   version/config may silently supply a version-sensitive semantic default.
 
 Gate: explicit-root, same-snapshot, out-of-scope/link, unreadable-vs-absent and
 config-appearance/mutation tests. All IO used to prove authority is observable.
 No runtime gate has run.
+
+#### Phase 1 implementation receipt — Agent MaxHeadRoom, 2026-10-21
+
+Implemented the root-transport and consumed-snapshot slice:
+
+- Existing `hydration::dependency_roots` policy supplies primary and additional
+  roots to batch `CompilationJob` and `CompilationRequest`. Direct candidates,
+  focused provide, compress, delta, explicit-file queries, calls and in-memory
+  edit candidates now pass the request root. C#-only reconciliation jobs retain
+  an empty TS scope rather than inventing one. Existing test callers explicitly
+  pass their prior absent-root context; their behavioral assertions are unchanged.
+- Artifact capture consumes the supplied root list directly. `source_only` is
+  explicit; absent TS resolution mode is `unresolved`, replacing the guessed
+  Node10 default. This does not establish full project ownership/default semantics.
+- Host snapshots cannot be replaced after consumption. Authorized root aliases
+  retain physical-route witnesses; normalized existing contributors retain
+  physical identity. Escaping links fail closed. Dangling-link canonicalization
+  errors, directory read errors and invalid UTF-8 cannot become certified absence.
+- `project_config.rs` merges inherited compiler options by contributed key,
+  preserves each option's declaring directory, and captures relative/package
+  extends plus manifest/config/negative lookup witnesses. Later bases no longer
+  erase unrelated earlier options. Effective baseUrl origins feed paths.
+- Failed capture retains consulted witnesses and a disposition instead of
+  silently dropping config errors or their source proof.
+- Added tracked regressions in `typescript_project_host_issue_162.rs` and
+  `semantic_compilation_scope_issue_162.rs`. These cover snapshot immutability,
+  invalid text/read errors, config appearance, source-only scope, inheritance,
+  package retarget, cycles/escape and direct/in-memory/batch root transport.
+  Unix-only tests cover link escape/dangling links and root aliases; equivalent
+  Windows reparse coverage remains required. No test has run.
+
+Question linkage: AQ01/AQ25 authority prerequisites and all rows' shared A/D/L
+controls. Compilation-scope tests stop at the real artifact boundary; they do
+not establish queryability, retained publication or durable proof. `into_parts`
+still discards the neutral evidence, an explicit Phase 3 integration gap.
+
+**Phase 1 remains IN PROGRESS.** Full project ownership (files/include/exclude,
+references and ambiguous ownership), compiler/version-backed default semantics,
+and Windows physical-route/access conformance remain required work. Package
+extends and multiple-base merging are implemented but unverified; the combined
+project checkbox stays open until the remaining requirements are implemented.
+These are pending in-envelope requirements, not capability exclusions.
+
+Static checks for this slice: direct rustfmt completed; UTF-8/no-BOM and active
+615-line ceilings checked for 45 affected/new Rust files; `git diff --check`
+passed. These checks do not establish compilation, zero warnings or runtime
+behavior. Frozen RED hash was rechecked unchanged. Supplemental test snapshots:
+
+- Project/host: `AD8DEC4B3136470D20B833962C029E12A809820D962EA38B1C2051E46B6CFCA9`.
+- Compilation scope: `89D906D8316E6FD3BD4B62C59E28C3FC6DF6FA3309C2D370829D22EFA5E7ADE4`.
+
+The official [TypeScript moduleResolution reference](https://www.typescriptlang.org/tsconfig/moduleResolution)
+was consulted for mode distinctions. No current-document default is applied
+without project/compiler evidence. No Cargo, tests, binaries, MCP/provider
+processes or live verification ran; runtime GREEN is **NOT ESTABLISHED**.
 
 ### Phase 2 — Canonical TypeScript lexical/module/export authority
 
@@ -564,8 +619,9 @@ incomplete. Truthful degradation never substitutes for an in-envelope capability
    evaluators; replace candidate query carriers with traced production paths,
    map exact regressions to each subquestion, and close query-contract gaps.
    Keep the question index synchronized with every Section 6 migration receipt.
-1. Complete primary-root/project authorization plumbing through all compilation
-   entry points before any consumer trusts the new resolver.
+1. Complete project ownership/references/default semantics and platform path
+   conformance on top of the implemented root plumbing before any consumer
+   treats the new evidence as closed project authority.
 2. Finish source/reference/project/mode conformance gaps and add targeted tests;
    no known incomplete branch may be hidden behind a support label.
 3. Transport retained identity and typed witnesses across actual publication and

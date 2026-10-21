@@ -36,7 +36,7 @@ pub(super) use execution::{hydrate_workspace_index_for, hydrate_workspace_index_
 
 mod filesystem;
 #[cfg(feature = "csharp")]
-pub(super) use filesystem::configured_roots as dependency_roots;
+pub(crate) use filesystem::configured_roots as dependency_roots;
 #[cfg(any(feature = "csharp", all(test, feature = "rust")))]
 pub(crate) use filesystem::source_inventory;
 use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key, scan};

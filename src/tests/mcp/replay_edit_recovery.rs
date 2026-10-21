@@ -63,6 +63,7 @@ fn establish_intent(
             target_source,
             crate::compression::Fidelity::Edit,
             state,
+            None,
         )
         .unwrap()
         .into_parts();

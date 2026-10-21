@@ -46,9 +46,9 @@ impl Resolver {
     pub(super) fn project_identity(
         &mut self,
         file: &Path,
-    ) -> Option<(PathBuf, Option<PathBuf>, String)> {
-        let project = Project::discover(&mut self.host, file).ok()?;
-        Some((project.root, project.config, project.mode))
+    ) -> Result<(PathBuf, Option<PathBuf>, String), String> {
+        let project = Project::discover(&mut self.host, file)?;
+        Ok((project.root, project.config, project.mode))
     }
     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
         Ok(Self {

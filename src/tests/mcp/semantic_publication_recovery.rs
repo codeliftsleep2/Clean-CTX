@@ -62,6 +62,7 @@ fn establish_irreconcilable_intent(
         target_source,
         crate::compression::Fidelity::Edit,
         state,
+        None,
     )
     .expect("target compilation")
     .into_parts();
@@ -330,6 +331,7 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
             target_text,
             crate::compression::Fidelity::Edit,
             &initial,
+            None,
         )
         .expect("target compilation")
         .into_parts();
@@ -421,6 +423,7 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
             target_text,
             crate::compression::Fidelity::Edit,
             &initial,
+            None,
         )
         .expect("target compilation")
         .into_parts();

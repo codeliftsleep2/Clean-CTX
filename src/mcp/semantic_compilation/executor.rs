@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 pub(crate) struct CompilationJob {
+    pub(crate) authorized_roots: Vec<std::path::PathBuf>,
     pub(crate) file_path: String,
     pub(crate) source: Arc<String>,
     pub(crate) fidelity: crate::compression::Fidelity,
@@ -64,6 +65,7 @@ impl SemanticCompilerExecutor {
                             source: &job.source,
                             fidelity: job.fidelity,
                             config,
+                            authorized_roots: &job.authorized_roots,
                             focus: None,
                             skip_set: job.skip_set.as_ref(),
                             path_alias: &job.path_alias,

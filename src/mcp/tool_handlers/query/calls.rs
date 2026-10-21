@@ -64,6 +64,7 @@ fn evaluate_calls_in_file(
         &resolved_path,
         Fidelity::High,
         state,
+        args["workspaceRoot"].as_str(),
     ) {
         Ok(candidate) => candidate.into_parts(),
         Err(error) => return Err(QueryFailure::from_clean_ctx(&error)),

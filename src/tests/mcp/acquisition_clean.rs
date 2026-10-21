@@ -152,6 +152,7 @@ public sealed class Consumer : IContextA
         source,
         Fidelity::High,
         &state,
+        None,
     )
     .expect("C# production compilation")
     .into_parts();

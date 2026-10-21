@@ -15,6 +15,7 @@ fn compile_artifact(
         file_path,
         0,
         None,
+        &[],
     )
 }
 
@@ -52,6 +53,7 @@ fn semantic_compilation_helpers_preserve_artifacts_for_enabled_languages() {
             source,
             Fidelity::High,
             &state,
+            None,
         )
         .expect("candidate artifact compilation");
 

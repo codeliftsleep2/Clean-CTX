@@ -31,6 +31,7 @@ fn artifact(compiler: &mut IRCompiler, source: &str, file: &str) -> SemanticComp
         Path::new(file),
         &crate::tests::test_config(),
         "cs",
+        &[],
     )
     .unwrap()
 }

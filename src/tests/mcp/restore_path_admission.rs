@@ -156,6 +156,7 @@ fn restore_rejects_removed_additional_root_before_recovery_or_publication() {
             target_source,
             crate::compression::Fidelity::Edit,
             &producer,
+            None,
         )
         .unwrap()
         .into_parts();

@@ -16,6 +16,7 @@ pub(crate) struct CompilationRequest<'a> {
     pub(crate) source: &'a str,
     pub(crate) fidelity: Fidelity,
     pub(crate) config: &'a crate::config::CleanCtxConfig,
+    pub(crate) authorized_roots: &'a [std::path::PathBuf],
     pub(crate) focus: Option<&'a HashSet<String>>,
     pub(crate) skip_set: Option<&'a HashSet<String>>,
     pub(crate) path_alias: &'a str,
@@ -107,5 +108,6 @@ pub(crate) fn compile_source_artifact(
         path,
         request.config,
         extension,
+        request.authorized_roots,
     )
 }

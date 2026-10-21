@@ -149,6 +149,7 @@ fn history_does_not_resolve_a_pending_edit_intent() {
             std::str::from_utf8(target).unwrap(),
             crate::compression::Fidelity::Edit,
             &initial,
+            None,
         )
         .unwrap()
         .into_parts();

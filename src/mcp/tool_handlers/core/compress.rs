@@ -128,18 +128,19 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             return;
         }
     }
-    let ir_result = compile_file_ir_candidate(&resolved_path, effective_fidelity, state)
-        .map_err(|error| error.to_string())
-        .and_then(|artifact| {
-            #[cfg(feature = "csharp")]
-            {
-                crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
-            }
-            #[cfg(not(feature = "csharp"))]
-            {
-                Ok(artifact.into_parts())
-            }
-        });
+    let ir_result =
+        compile_file_ir_candidate(&resolved_path, effective_fidelity, state, workspace_root)
+            .map_err(|error| error.to_string())
+            .and_then(|artifact| {
+                #[cfg(feature = "csharp")]
+                {
+                    crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+                }
+                #[cfg(not(feature = "csharp"))]
+                {
+                    Ok(artifact.into_parts())
+                }
+            });
 
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log

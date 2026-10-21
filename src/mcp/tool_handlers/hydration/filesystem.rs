@@ -100,10 +100,7 @@ pub(crate) fn reset_total_test_scan_calls(state: &McpState) {
         .store(0, std::sync::atomic::Ordering::SeqCst);
 }
 
-pub(in crate::mcp::tool_handlers) fn configured_roots(
-    state: &McpState,
-    workspace_root: Option<&str>,
-) -> Vec<PathBuf> {
+pub(crate) fn configured_roots(state: &McpState, workspace_root: Option<&str>) -> Vec<PathBuf> {
     let primary = workspace_root
         .map(PathBuf::from)
         .unwrap_or_else(default_root);

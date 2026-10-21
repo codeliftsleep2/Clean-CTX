@@ -255,6 +255,7 @@ pub(super) fn compile_file_ir_candidate(
     file_path: &str,
     fidelity: Fidelity,
     state: &McpState,
+    workspace_root: Option<&str>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let existing_alias = state.alias_for_path(file_path);
     let candidate_id = existing_alias
@@ -271,6 +272,7 @@ pub(super) fn compile_file_ir_candidate(
         None,
         &candidate_id,
         previous_version,
+        workspace_root,
     )
 }
 
@@ -280,6 +282,7 @@ pub(super) fn compile_source_ir_candidate(
     source: &str,
     fidelity: Fidelity,
     state: &McpState,
+    workspace_root: Option<&str>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let alias = state
         .alias_for_path(file_path)
@@ -294,6 +297,7 @@ pub(super) fn compile_source_ir_candidate(
         &alias,
         previous_version,
         None,
+        &crate::mcp::tool_handlers::hydration::dependency_roots(state, workspace_root),
     )
 }
 
@@ -312,6 +316,7 @@ pub(super) fn compile_file_ir_focused(
     fidelity: Fidelity,
     state: &McpState,
     focus: Option<&std::collections::HashSet<String>>,
+    workspace_root: Option<&str>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let path_alias = state.get_or_create_alias(file_path.to_string());
     let previous_version = state.file_version(&path_alias).unwrap_or(0);
@@ -322,6 +327,7 @@ pub(super) fn compile_file_ir_focused(
         focus,
         &path_alias,
         previous_version,
+        workspace_root,
     )
 }
 
@@ -332,6 +338,7 @@ fn compile_file_ir_focused_with_identity(
     focus: Option<&std::collections::HashSet<String>>,
     path_alias: &str,
     previous_version: u64,
+    workspace_root: Option<&str>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     let source_arc = state.read_source(file_path)?;
     compile_source_ir_focused_with_identity(
@@ -343,6 +350,7 @@ fn compile_file_ir_focused_with_identity(
         path_alias,
         previous_version,
         None,
+        &crate::mcp::tool_handlers::hydration::dependency_roots(state, workspace_root),
     )
 }
 
@@ -359,6 +367,7 @@ pub(crate) fn compile_source_ir_focused_with_identity(
         &[crate::ir::csharp_exact_calls::Declaration],
     >,
     #[cfg(not(feature = "csharp"))] _csharp_authority: Option<&[()]>,
+    authorized_roots: &[PathBuf],
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     #[cfg(not(feature = "csharp"))]
     let _ = _csharp_authority;
@@ -370,6 +379,7 @@ pub(crate) fn compile_source_ir_focused_with_identity(
             source,
             fidelity,
             config: &state.config,
+            authorized_roots,
             focus,
             skip_set: skip_set.as_ref(),
             path_alias,

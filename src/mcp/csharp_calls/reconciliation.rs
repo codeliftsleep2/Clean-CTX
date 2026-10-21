@@ -192,6 +192,7 @@ impl McpState {
                 .unwrap_or(SemanticFidelity::High);
             let path_alias = self.get_or_create_alias(file.clone());
             missing.push(CompilationJob {
+                authorized_roots: Vec::new(),
                 file_path: file.clone(),
                 source,
                 fidelity: compilation_fidelity(fidelity),

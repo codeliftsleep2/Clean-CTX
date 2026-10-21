@@ -274,7 +274,12 @@ fn try_prepare_entities_in_file(
         .preflight_semantic_publication(&resolved_path)
         .map_err(QueryFailure::internal)?;
     let (semantic_edges, semantic_dependencies, compiled_hash) =
-        match crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state) {
+        match crate::mcp::tool_helpers::compile_file_ir_candidate(
+            &resolved_path,
+            fidelity,
+            state,
+            workspace_root,
+        ) {
             Ok(artifact) => {
                 #[cfg(feature = "csharp")]
                 if artifact.csharp_resolution_unit().is_some() {
@@ -432,9 +437,14 @@ fn try_prepare_declarations_in_file(
             .preflight_semantic_publication(&resolved_path)
             .map_err(QueryFailure::internal)?;
         let (_, semantic_edges, semantic_dependencies, compiled_hash) =
-            crate::mcp::tool_helpers::compile_file_ir_candidate(&resolved_path, fidelity, state)
-                .map_err(|error| QueryFailure::internal(error.to_string()))?
-                .into_parts();
+            crate::mcp::tool_helpers::compile_file_ir_candidate(
+                &resolved_path,
+                fidelity,
+                state,
+                workspace_root,
+            )
+            .map_err(|error| QueryFailure::internal(error.to_string()))?
+            .into_parts();
         state
             .workspace_index_lock()
             .replace_semantic_projection_with_dependencies(

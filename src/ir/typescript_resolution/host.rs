@@ -61,9 +61,9 @@ impl Witness {
             } => std::fs::metadata(path).is_ok_and(|metadata| {
                 metadata.is_file() == *file && metadata.is_dir() == *directory
             }),
-            Self::Physical { path, target } => {
-                path.canonicalize().is_ok_and(|current| current == *target)
-            }
+            Self::Physical { path, target } => path
+                .canonicalize()
+                .is_ok_and(|current| shape(&current) == shape(target)),
             Self::Unreadable { .. } | Self::OutsideScope { .. } => false,
         }
     }
@@ -72,6 +72,7 @@ impl Witness {
 /// One operation owns immutable bytes and every observation used to resolve them.
 pub(crate) struct Host {
     roots: Vec<PathBuf>,
+    aliases: Vec<(PathBuf, PathBuf)>,
     sources: BTreeMap<PathBuf, Option<Arc<str>>>,
     pub witnesses: Vec<Witness>,
 }
@@ -81,25 +82,50 @@ impl Host {
         let path = self
             .normalized(path)
             .ok_or("Source snapshot outside scope")?;
+        if let Some(existing) = self.sources.get(&path) {
+            return if existing.as_deref() == Some(source) {
+                Ok(())
+            } else {
+                Err("Cannot replace an already consumed TypeScript snapshot".into())
+            };
+        }
         self.sources.insert(path, Some(Arc::from(source)));
         Ok(())
     }
     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
-        let roots: Vec<_> = roots
+        let aliases: Vec<_> = roots
             .iter()
             .map(|root| {
-                root.canonicalize()
-                    .map(|path| shape(&path))
+                let route = if root.is_absolute() {
+                    root.clone()
+                } else {
+                    std::env::current_dir()
+                        .map_err(|error| error.to_string())?
+                        .join(root)
+                };
+                route
+                    .canonicalize()
+                    .map(|path| (shape(&route), shape(&path)))
                     .map_err(|error| error.to_string())
             })
             .collect::<Result<_, _>>()?;
-        if roots.is_empty() {
+        if aliases.is_empty() {
             return Err("TypeScript resolution requires explicit authorized roots".into());
         }
         Ok(Self {
-            roots,
+            roots: aliases
+                .iter()
+                .map(|(_, physical)| physical.clone())
+                .collect(),
+            witnesses: aliases
+                .iter()
+                .map(|(route, physical)| Witness::Physical {
+                    path: route.clone(),
+                    target: physical.clone(),
+                })
+                .collect(),
+            aliases,
             sources: BTreeMap::new(),
-            witnesses: Vec::new(),
         })
     }
 
@@ -140,6 +166,14 @@ impl Host {
                 _ => normalized.push(part.as_os_str()),
             }
         }
+        if let Some((route, physical)) = self
+            .aliases
+            .iter()
+            .filter(|(route, _)| normalized.starts_with(route))
+            .max_by_key(|(route, _)| route.components().count())
+        {
+            normalized = physical.join(normalized.strip_prefix(route).ok()?);
+        }
         if !self.admits(&normalized) {
             self.witnesses
                 .push(Witness::OutsideScope { path: normalized });
@@ -148,11 +182,17 @@ impl Host {
         // Check the deepest existing ancestor before probing a nonexistent leaf.
         // This prevents a symlinked directory from allowing out-of-root reads.
         let mut ancestor = normalized.as_path();
-        loop {
+        let physical = loop {
             match std::fs::symlink_metadata(ancestor) {
                 Ok(_) => {
-                    let Ok(target) = ancestor.canonicalize() else {
-                        return None;
+                    let target = match ancestor.canonicalize() {
+                        Ok(target) => target,
+                        Err(_) => {
+                            self.witnesses.push(Witness::Unreadable {
+                                path: ancestor.to_path_buf(),
+                            });
+                            return None;
+                        }
                     };
                     if !self.admits(&target) {
                         self.witnesses.push(Witness::OutsideScope { path: target });
@@ -160,9 +200,9 @@ impl Host {
                     }
                     self.witnesses.push(Witness::Physical {
                         path: ancestor.to_path_buf(),
-                        target,
+                        target: target.clone(),
                     });
-                    break;
+                    break shape(&target).join(normalized.strip_prefix(ancestor).ok()?);
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     self.witnesses.push(Witness::Missing {
@@ -177,8 +217,8 @@ impl Host {
                     return None;
                 }
             }
-        }
-        Some(normalized)
+        };
+        Some(physical)
     }
 
     pub(crate) fn read(&mut self, path: &Path) -> Option<Arc<str>> {
@@ -192,7 +232,14 @@ impl Host {
                     path: path.clone(),
                     hash: crate::cache::content_hash(&bytes),
                 });
-                String::from_utf8(bytes).ok().map(Arc::<str>::from)
+                match String::from_utf8(bytes) {
+                    Ok(source) => Some(Arc::<str>::from(source)),
+                    Err(_) => {
+                        self.witnesses
+                            .push(Witness::Unreadable { path: path.clone() });
+                        None
+                    }
+                }
             }
             Err(error) => {
                 self.witnesses

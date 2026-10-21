@@ -5,6 +5,7 @@ use std::sync::Arc;
 fn job(index: usize, source: &str) -> CompilationJob {
     let file_path = format!("parallel-{index}.rs");
     CompilationJob {
+        authorized_roots: Vec::new(),
         canonical_owner: file_path.clone(),
         file_path: file_path.clone(),
         source: Arc::new(source.to_string()),

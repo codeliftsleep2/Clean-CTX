@@ -15,9 +15,15 @@ pub(super) struct Project {
 
 impl Project {
     pub(super) fn discover(host: &mut Host, file: &Path) -> Result<Self, String> {
-        let boundary = host
-            .boundary(file)
+        let file = host
+            .normalized(file)
             .ok_or("Source outside authorized roots")?;
+        let boundary = host
+            .boundary(&file)
+            .ok_or("Source outside authorized roots")?;
+        if boundary == file {
+            return Ok(Self::source_only(boundary));
+        }
         let mut directory = file.parent().ok_or("Source has no directory")?;
         loop {
             let config = directory.join("tsconfig.json");
@@ -29,112 +35,78 @@ impl Project {
             }
             directory = directory.parent().ok_or("Missing project boundary")?;
         }
-        // Explicit source-only projects preserve legacy resolution without
-        // inferring an Angular version or package API from absent configuration.
-        Ok(Self {
+        Ok(Self::source_only(boundary))
+    }
+
+    fn source_only(boundary: PathBuf) -> Self {
+        Self {
             root: boundary.clone(),
             config: None,
-            mode: "node10".into(),
+            mode: "unresolved".into(),
             base: boundary,
             paths: BTreeMap::new(),
             conditions: vec!["types".into(), "import".into(), "default".into()],
-        })
+        }
     }
 
     fn load(host: &mut Host, path: &Path, active: &mut BTreeSet<PathBuf>) -> Result<Self, String> {
         let path = host
             .normalized(path)
             .ok_or("Configuration outside authorized roots")?;
-        if !active.insert(path.clone()) {
-            return Err("Cyclic tsconfig extends".into());
+        let directory = path
+            .parent()
+            .ok_or("Configuration has no parent")?
+            .to_path_buf();
+        let options = super::project_config::options(host, &path, active)?;
+        let mut project = Self::source_only(directory.clone());
+        project.config = Some(path);
+        if let Some(option) = options.get("moduleResolution") {
+            project.mode = option
+                .value
+                .as_str()
+                .ok_or("Invalid moduleResolution")?
+                .to_ascii_lowercase();
         }
-        let result = (|| {
-            let source = host.read(&path).ok_or("Cannot read tsconfig")?;
-            let json = jsonc(&source)?;
-            let directory = path
-                .parent()
-                .ok_or("Configuration has no parent")?
-                .to_path_buf();
-            let mut project = Self {
-                root: directory.clone(),
-                config: Some(path.clone()),
-                mode: "node10".into(),
-                base: directory.clone(),
-                paths: BTreeMap::new(),
-                conditions: vec!["types".into(), "import".into(), "default".into()],
+        if let Some(option) = options.get("baseUrl") {
+            project.base = option
+                .directory
+                .join(option.value.as_str().ok_or("Invalid baseUrl")?);
+        }
+        if let Some(option) = options.get("paths") {
+            let base = if options.contains_key("baseUrl") {
+                project.base.clone()
+            } else {
+                option.directory.clone()
             };
-            if let Some(extends) = json.get("extends") {
-                let parents: Vec<&str> = if let Some(name) = extends.as_str() {
-                    vec![name]
-                } else {
-                    extends
-                        .as_array()
-                        .ok_or("Invalid extends")?
-                        .iter()
-                        .map(|name| name.as_str().ok_or("Invalid extends entry"))
-                        .collect::<Result<_, _>>()?
-                };
-                for parent in parents {
-                    if !parent.starts_with('.') {
-                        return Err(
-                            "Package tsconfig extends requires package-config resolution".into(),
-                        );
-                    }
-                    let mut target = directory.join(parent);
-                    if !host.file(&target) {
-                        target = directory.join(format!("{parent}.json"));
-                    }
-                    project = Self::load(host, &target, active)?;
-                }
-                project.root = directory.clone();
-                project.config = Some(path.clone());
+            for (name, targets) in option.value.as_object().ok_or("Invalid paths")? {
+                let targets = targets
+                    .as_array()
+                    .ok_or("Invalid paths targets")?
+                    .iter()
+                    .map(|target| {
+                        target
+                            .as_str()
+                            .map(|target| base.join(target))
+                            .ok_or("Invalid paths target")
+                    })
+                    .collect::<Result<_, _>>()?;
+                project.paths.insert(name.clone(), targets);
             }
-            let options = &json["compilerOptions"];
-            if let Some(mode) = options["moduleResolution"].as_str() {
-                project.mode = mode.to_ascii_lowercase();
+        }
+        if let Some(option) = options.get("customConditions") {
+            for condition in option.value.as_array().ok_or("Invalid customConditions")? {
+                project
+                    .conditions
+                    .push(condition.as_str().ok_or("Invalid condition")?.to_string());
             }
-            if let Some(base) = options["baseUrl"].as_str() {
-                project.base = directory.join(base);
-            }
-            if let Some(paths) = options["paths"].as_object() {
-                let base = if options.get("baseUrl").is_some() {
-                    project.base.clone()
-                } else {
-                    directory.clone()
-                };
-                project.paths.clear();
-                for (name, targets) in paths {
-                    let targets = targets
-                        .as_array()
-                        .ok_or("Invalid paths targets")?
-                        .iter()
-                        .map(|target| {
-                            target
-                                .as_str()
-                                .map(|target| base.join(target))
-                                .ok_or("Invalid paths target")
-                        })
-                        .collect::<Result<_, _>>()?;
-                    project.paths.insert(name.clone(), targets);
-                }
-            }
-            if let Some(conditions) = options["customConditions"].as_array() {
-                for condition in conditions {
-                    project
-                        .conditions
-                        .push(condition.as_str().ok_or("Invalid condition")?.to_string());
-                }
-            }
-            if !matches!(
-                project.mode.as_str(),
-                "bundler" | "node10" | "node" | "classic" | "node16" | "nodenext"
-            ) {
-                return Err("Unknown moduleResolution".into());
-            }
-            Ok(project)
-        })();
-        active.remove(&path);
-        result
+        }
+        if !matches!(
+            project.mode.as_str(),
+            "unresolved" | "bundler" | "node10" | "node" | "classic" | "node16" | "nodenext"
+        ) {
+            return Err("Unknown moduleResolution".into());
+        }
+        Ok(project)
     }
 }
 

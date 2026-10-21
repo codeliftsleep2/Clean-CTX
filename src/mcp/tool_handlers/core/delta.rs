@@ -221,7 +221,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
 
     // Source changed or no baseline - compile
     let (mut compiled, semantic_edges, semantic_dependencies, source_hash) =
-        match compile_file_ir_candidate(&resolved_path, fidelity, state) {
+        match compile_file_ir_candidate(&resolved_path, fidelity, state, workspace_root) {
             Ok(artifact) => artifact.into_parts(),
             Err(e) => {
                 send_response(&to_jsonrpc_error(id, &e));
