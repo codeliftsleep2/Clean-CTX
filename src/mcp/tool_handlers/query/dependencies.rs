@@ -31,31 +31,49 @@ pub(super) fn prepare(
         return initial;
     }
     let generation = state.csharp_authority_generation();
+    let ef_view_revision = context.ef_view_revision;
     let published = state
         .workspace_index_read()
         .has_csharp_publication_generation(generation);
     match acquire(args, state, context) {
-        Ok(evidence) if evidence.is_empty() => initial,
-        Ok(evidence) => {
+        Ok((evidence, None)) if evidence.is_empty() => initial,
+        Ok((evidence, ef)) => {
             let changed = generation != state.csharp_authority_generation();
             if changed {
                 context.invalidate_derived_catalogs();
             } else if !published {
                 context.invalidate_csharp_projection_catalogs();
             }
-            let prepared = if changed || !published {
+            let prepared = if changed || !published || context.ef_view_revision != ef_view_revision
+            {
                 operation.prepare_base(args, state, context)
             } else {
                 initial
             };
-            let stamp = evidence[0].publication_stamp();
-            PreparedQuery::validated(stamp, move |index| {
-                let mut answer = prepared.evaluate_with_index(index)?;
-                for proof in evidence {
-                    proof.apply(index, &mut answer.structured["coverage"]);
-                }
-                Ok(answer)
-            })
+            let stamp = evidence
+                .first()
+                .map(DependencyEvidence::publication_stamp)
+                .or_else(|| ef.as_ref().map(|proof| proof.publication_stamp()))
+                .expect("nonempty dependency evidence owns its publication stamp");
+            let ef_validation = ef.clone();
+            PreparedQuery::validated(
+                stamp,
+                move |index| {
+                    ef_validation
+                        .as_ref()
+                        .is_none_or(|proof| proof.current(index))
+                },
+                move |index| {
+                    let mut answer = prepared.evaluate_with_index(index)?;
+                    for proof in evidence {
+                        proof.apply(index, &mut answer.structured["coverage"]);
+                    }
+                    if let Some(proof) = ef {
+                        proof.apply(index, &mut answer.structured["coverage"]);
+                    }
+                    Ok(answer)
+                },
+            )
         }
         Err(error) => PreparedQuery::failure(error),
     }
@@ -65,7 +83,13 @@ fn acquire(
     args: &Value,
     state: &McpState,
     context: &mut PreparationContext,
-) -> Result<Vec<DependencyEvidence>, QueryFailure> {
+) -> Result<
+    (
+        Vec<DependencyEvidence>,
+        Option<super::csharp_resolution::EfDependencyEvidence>,
+    ),
+    QueryFailure,
+> {
     let scope = context.scope(state, args)?;
     let mut owners = BTreeSet::new();
     if let Some(file) = args["file_path"].as_str() {
@@ -104,6 +128,7 @@ fn acquire(
     let owners: Vec<_> = owners
         .into_iter()
         .filter(|file| file.to_ascii_lowercase().ends_with(".cs"))
+        .filter(|file| !ef_request(args) || std::path::Path::new(file).is_file())
         .collect();
     loop {
         let mut evidence = Vec::new();
@@ -114,12 +139,47 @@ fn acquire(
                     .map_err(QueryFailure::internal)?,
             );
         }
+        let ef = if ef_request(args) {
+            let key = serde_json::to_string(args)
+                .map_err(|error| QueryFailure::internal(error.to_string()))?;
+            let proof = super::csharp_resolution::prepare_ef_dependencies(
+                state,
+                &owners,
+                args["workspaceRoot"].as_str(),
+                scope.as_ref(),
+                args["type"] == "reverse_edges",
+                context.ef_dependencies.get(&key),
+                &key,
+            )
+            .map_err(QueryFailure::internal)?;
+            context.ef_dependencies.insert(key, proof.clone());
+            if context
+                .ef_sources
+                .as_ref()
+                .is_some_and(|sources| sources != proof.sources())
+            {
+                context.invalidate_derived_catalogs();
+            }
+            // The first prepared catalog may contain stale source evidence even
+            // when no source was published in this attempt (notably deletion).
+            context.restrict_ef_sources(proof.sources());
+            Some(proof)
+        } else {
+            None
+        };
         let index = state.workspace_index_read();
         if evidence
             .iter()
             .all(|proof| proof.publication_is_current(&index))
+            && ef.as_ref().is_none_or(|proof| proof.current(&index))
         {
-            return Ok(evidence);
+            return Ok((evidence, ef));
         }
     }
+}
+
+fn ef_request(args: &Value) -> bool {
+    args["domain"] == "dotnet"
+        && ((args["type"] == "forward_edges" && args["entity_type"] == "DbContext")
+            || (args["type"] == "reverse_edges" && args["entity_type"] == "Entity"))
 }

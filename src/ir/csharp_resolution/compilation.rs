@@ -54,6 +54,14 @@ pub(crate) struct CSharpCompilationUnit {
     classes: Vec<ClassInput>,
 }
 
+#[cfg(feature = "csharp")]
+impl CSharpCompilationUnit {
+    /// Neutral declaration evidence for producer-owned reference obligations.
+    pub(crate) fn declaration_parts(&self) -> impl Iterator<Item = &CSharpDeclarationPart> {
+        self.classes.iter().map(|input| &input.part)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ClassInput {
     part: CSharpDeclarationPart,

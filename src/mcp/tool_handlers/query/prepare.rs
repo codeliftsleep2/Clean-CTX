@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 type IndexedEvaluator = Box<dyn FnOnce(&WorkspaceIndex) -> QueryResult>;
+#[cfg(feature = "csharp")]
+type PublicationValidator = Box<dyn Fn(&WorkspaceIndex) -> bool>;
 
 pub(super) enum PreparedQuery {
     Indexed(IndexedEvaluator),
@@ -20,6 +22,7 @@ pub(super) enum PreparedQuery {
     Validated(
         IndexedEvaluator,
         crate::mcp::semantic_compilation::dependencies::PublicationStamp,
+        PublicationValidator,
     ),
     Ready(QueryResult),
 }
@@ -45,15 +48,16 @@ impl PreparedQuery {
     #[cfg(feature = "csharp")]
     pub(super) fn validated(
         stamp: crate::mcp::semantic_compilation::dependencies::PublicationStamp,
+        validator: impl Fn(&WorkspaceIndex) -> bool + 'static,
         evaluator: impl FnOnce(&WorkspaceIndex) -> QueryResult + 'static,
     ) -> Self {
-        Self::Validated(Box::new(evaluator), stamp)
+        Self::Validated(Box::new(evaluator), stamp, Box::new(validator))
     }
 
     pub(super) fn publication_is_current(&self, index: &WorkspaceIndex) -> bool {
         #[cfg(feature = "csharp")]
-        if let Self::Validated(_, stamp) = self {
-            return stamp.is_current(index);
+        if let Self::Validated(_, stamp, validator) = self {
+            return stamp.is_current(index) && validator(index);
         }
         let _ = index;
         true
@@ -67,9 +71,9 @@ impl PreparedQuery {
             }
             Self::Ready(result) => result,
             #[cfg(feature = "csharp")]
-            Self::Validated(evaluator, stamp) => {
+            Self::Validated(evaluator, stamp, validator) => {
                 let index = state.workspace_index_read();
-                if !stamp.is_current(&index) {
+                if !stamp.is_current(&index) || !validator(&index) {
                     return Err(QueryFailure::internal(
                         "Semantic publication changed; retry",
                     ));
@@ -83,8 +87,8 @@ impl PreparedQuery {
         match self {
             Self::Indexed(evaluator) => evaluator(index),
             #[cfg(feature = "csharp")]
-            Self::Validated(evaluator, stamp) => {
-                if !stamp.is_current(index) {
+            Self::Validated(evaluator, stamp, validator) => {
+                if !stamp.is_current(index) || !validator(index) {
                     return Err(QueryFailure::internal(
                         "Semantic publication changed; retry",
                     ));
@@ -107,9 +111,16 @@ struct HydrationKey {
 /// Shared, request-local preparation state. It is deliberately neither stored
 /// in `McpState` nor synchronized: one coordinator owns it for one request.
 pub(super) struct PreparationContext {
+    #[cfg(feature = "csharp")]
+    pub(super) ef_dependencies: HashMap<String, super::csharp_resolution::EfDependencyEvidence>,
+    pub(super) ef_sources: Option<std::collections::BTreeSet<String>>,
+    #[cfg(feature = "csharp")]
+    pub(super) ef_view_revision: usize,
     scope: Option<Result<Option<WorkspaceScope>, String>>,
     hydration: HashMap<HydrationKey, Result<HydrationReport, String>>,
     csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
+    #[cfg(feature = "csharp")]
+    csharp_catalog_generation: Option<u64>,
     efcore_catalog: Option<Arc<super::csharp_resolution::EfCoreCatalog>>,
     angular_catalogs: [Option<Arc<super::angular_templates::Catalog>>; 2],
     #[cfg(feature = "csharp")]
@@ -117,11 +128,30 @@ pub(super) struct PreparationContext {
 }
 
 impl PreparationContext {
+    #[cfg(feature = "csharp")]
+    pub(super) fn restrict_ef_sources(&mut self, sources: &std::collections::BTreeSet<String>) {
+        if self
+            .csharp_catalog
+            .as_ref()
+            .is_some_and(|catalog| catalog.has_stale_ef_sources(sources))
+        {
+            self.efcore_catalog = None;
+            self.ef_view_revision = self.ef_view_revision.wrapping_add(1);
+        }
+        self.ef_sources = Some(sources.clone());
+    }
     pub(super) fn new() -> Self {
         Self {
+            #[cfg(feature = "csharp")]
+            ef_dependencies: HashMap::new(),
+            ef_sources: None,
+            #[cfg(feature = "csharp")]
+            ef_view_revision: 0,
             scope: None,
             hydration: HashMap::new(),
             csharp_catalog: None,
+            #[cfg(feature = "csharp")]
+            csharp_catalog_generation: None,
             efcore_catalog: None,
             angular_catalogs: [None, None],
             #[cfg(feature = "csharp")]
@@ -279,6 +309,13 @@ impl PreparationContext {
             super::work_metrics::record_csharp_catalog_reuse();
             return catalog.clone();
         }
+        #[cfg(feature = "csharp")]
+        {
+            let generation = state.csharp_authority_generation();
+            self.csharp_catalog_generation = index
+                .has_csharp_publication_generation(generation)
+                .then_some(generation);
+        }
         self.csharp_catalog
             .get_or_insert_with(|| {
                 Arc::new(super::csharp_resolution::Catalog::build(
@@ -314,6 +351,14 @@ impl PreparationContext {
         index: &WorkspaceIndex,
         scope: Option<&WorkspaceScope>,
     ) -> Arc<super::csharp_resolution::EfCoreCatalog> {
+        #[cfg(feature = "csharp")]
+        if self.csharp_catalog.is_some()
+            && self.csharp_catalog_generation != Some(state.csharp_authority_generation())
+        {
+            // Another preparation path may publish without calling this
+            // context's hydrate method. Rebuild EF from the surviving sources.
+            self.invalidate_derived_catalogs();
+        }
         if let Some(catalog) = &self.efcore_catalog {
             #[cfg(test)]
             super::work_metrics::record_ef_catalog_reuse();
@@ -323,7 +368,9 @@ impl PreparationContext {
         self.efcore_catalog
             .get_or_insert_with(|| {
                 Arc::new(super::csharp_resolution::EfCoreCatalog::build(
-                    &csharp, index,
+                    &csharp,
+                    index,
+                    self.ef_sources.as_ref(),
                 ))
             })
             .clone()
@@ -339,6 +386,10 @@ impl PreparationContext {
             super::work_metrics::record_derived_catalog_invalidation();
         }
         self.csharp_catalog = None;
+        #[cfg(feature = "csharp")]
+        {
+            self.csharp_catalog_generation = None;
+        }
         self.efcore_catalog = None;
         self.angular_catalogs = [None, None];
     }

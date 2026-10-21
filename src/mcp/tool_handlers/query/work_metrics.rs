@@ -5,6 +5,10 @@
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct QueryWorkCounts {
+    pub(crate) ef_dependency_catalog_builds: usize,
+    pub(crate) ef_dependency_files_parsed: usize,
+    pub(crate) ef_dependency_inventories: usize,
+    pub(crate) ef_dependency_syntax_parses: usize,
     pub(crate) csharp_catalog_builds: usize,
     pub(crate) csharp_catalog_reuses: usize,
     pub(crate) csharp_files_considered: usize,
@@ -47,6 +51,10 @@ pub(crate) struct QueryWorkCounts {
 thread_local! {
     static COUNTS: std::cell::Cell<QueryWorkCounts> =
         const { std::cell::Cell::new(QueryWorkCounts {
+            ef_dependency_catalog_builds: 0,
+            ef_dependency_files_parsed: 0,
+            ef_dependency_inventories: 0,
+            ef_dependency_syntax_parses: 0,
             csharp_catalog_builds: 0,
             csharp_catalog_reuses: 0,
             csharp_files_considered: 0,
@@ -101,6 +109,22 @@ fn update(update: impl FnOnce(&mut QueryWorkCounts)) {
         update(&mut counts);
         cell.set(counts);
     });
+}
+
+pub(crate) fn record_ef_dependency_catalog_build() {
+    update(|counts| counts.ef_dependency_catalog_builds += 1);
+}
+
+pub(crate) fn record_ef_dependency_file_parsed() {
+    update(|counts| counts.ef_dependency_files_parsed += 1);
+}
+
+pub(crate) fn record_ef_dependency_inventory() {
+    update(|counts| counts.ef_dependency_inventories += 1);
+}
+
+pub(crate) fn record_ef_dependency_syntax_parse() {
+    update(|counts| counts.ef_dependency_syntax_parses += 1);
 }
 
 pub(crate) fn record_csharp_catalog_build() {

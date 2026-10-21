@@ -10,6 +10,10 @@ pub(super) struct ReferenceCandidateIndex {
 
 impl ReferenceCandidateIndex {
     pub(super) fn build(references: &[BaseReference]) -> Self {
+        Self::build_mode(references, true)
+    }
+
+    pub(super) fn build_mode(references: &[BaseReference], _projection: bool) -> Self {
         let mut index = Self::default();
         for (position, reference) in references.iter().enumerate() {
             index
@@ -21,7 +25,7 @@ impl ReferenceCandidateIndex {
                 .push(position);
         }
         #[cfg(test)]
-        {
+        if _projection {
             let bucket_sizes = index
                 .by_file_owner
                 .values()

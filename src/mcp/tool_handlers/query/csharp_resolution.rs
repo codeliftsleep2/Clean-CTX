@@ -14,6 +14,10 @@ mod declaration_candidates;
 mod dependencies;
 mod reference_candidates;
 mod using_aliases;
+#[cfg(feature = "csharp")]
+pub(super) use dependencies::EfDependencyEvidence;
+#[cfg(feature = "csharp")]
+pub(super) use dependencies::prepare_ef_dependencies;
 pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
 pub(super) use reference_candidates::terminal_lookup_name;
 
@@ -62,6 +66,8 @@ pub(super) struct Catalog {
     references: Vec<BaseReference>,
     declaration_candidates: declaration_candidates::DeclarationCandidateIndex,
     reference_candidates: reference_candidates::ReferenceCandidateIndex,
+    source_parts: Vec<crate::ir::csharp_symbols::CSharpDeclarationPart>,
+    declaration_scopes: std::collections::HashMap<(String, Vec<String>, usize), BaseReference>,
 }
 
 #[derive(Clone, Debug)]
@@ -76,19 +82,78 @@ impl Catalog {
         index: &WorkspaceIndex,
         scope: Option<&WorkspaceScope>,
     ) -> Self {
+        Self::build_mode(state, index, scope, false, None)
+    }
+
+    #[cfg(feature = "csharp")]
+    fn build_dependency(
+        state: &McpState,
+        index: &WorkspaceIndex,
+        scope: Option<&WorkspaceScope>,
+        inventory: &crate::mcp::acquisition::InventoryManifest,
+    ) -> Self {
+        Self::build_mode(state, index, scope, true, Some(inventory))
+    }
+
+    fn build_mode(
+        state: &McpState,
+        index: &WorkspaceIndex,
+        scope: Option<&WorkspaceScope>,
+        dependency: bool,
+        inventory: Option<&crate::mcp::acquisition::InventoryManifest>,
+    ) -> Self {
         #[cfg(test)]
-        super::work_metrics::record_csharp_catalog_build();
+        if dependency {
+            super::work_metrics::record_ef_dependency_catalog_build();
+        } else {
+            super::work_metrics::record_csharp_catalog_build();
+        }
         let mut catalog = Self::default();
+        let _observed = inventory.map(|inventory| {
+            inventory
+                .entries
+                .iter()
+                .map(|entry| (entry.owner.as_str(), entry.source_hash.as_str()))
+                .collect::<std::collections::HashMap<_, _>>()
+        });
         for file in index.file_map().keys().filter(|file| {
             file.to_ascii_lowercase().ends_with(".cs")
                 && scope.is_none_or(|scope| scope.admits(file))
         }) {
+            #[cfg(feature = "csharp")]
+            if _observed.as_ref().is_some_and(|observed| {
+                !observed.get(file.as_str()).is_some_and(|hash| {
+                    state
+                        .csharp_call_authority
+                        .artifact(file)
+                        .is_some_and(|artifact| artifact.source_hash() == *hash)
+                        && state.cached_source_snapshot(file).is_some_and(|source| {
+                            crate::cache::content_hash(source.as_bytes()).as_str() == *hash
+                        })
+                })
+            }) {
+                continue;
+            }
             #[cfg(test)]
-            super::work_metrics::record_csharp_file_considered();
+            if !dependency {
+                super::work_metrics::record_csharp_file_considered();
+            }
             let Some(source) = state.cached_source_snapshot(file) else {
                 continue;
             };
-            catalog.add_file(file, &source);
+            #[cfg(feature = "csharp")]
+            if let Some(artifact) = state.csharp_call_authority.artifact(file)
+                && let Some(unit) = artifact.csharp_resolution_unit()
+            {
+                catalog
+                    .source_parts
+                    .extend(unit.declaration_parts().cloned());
+            }
+            if dependency {
+                catalog.parse_file(file, &source, true);
+            } else {
+                catalog.add_file(file, &source);
+            }
         }
         catalog.declarations.sort_by(|left, right| {
             (&left.path, left.arity, left.kind.entity_type(), &left.file).cmp(&(
@@ -99,11 +164,29 @@ impl Catalog {
             ))
         });
         catalog.declarations.dedup();
-        catalog.declaration_candidates =
-            declaration_candidates::DeclarationCandidateIndex::build(&catalog.declarations);
-        catalog.reference_candidates =
-            reference_candidates::ReferenceCandidateIndex::build(&catalog.references);
+        if !dependency {
+            catalog.declaration_candidates =
+                declaration_candidates::DeclarationCandidateIndex::build(&catalog.declarations);
+            catalog.reference_candidates =
+                reference_candidates::ReferenceCandidateIndex::build(&catalog.references);
+        } else {
+            catalog.reference_candidates =
+                reference_candidates::ReferenceCandidateIndex::build_mode(
+                    &catalog.references,
+                    false,
+                );
+        }
         catalog
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(super) fn has_stale_ef_sources(
+        &self,
+        sources: &std::collections::BTreeSet<String>,
+    ) -> bool {
+        self.declarations
+            .iter()
+            .any(|declaration| !sources.contains(&declaration.file))
     }
 
     pub(super) fn recognizes_edge(&self, edge: &SemanticEdge) -> bool {
@@ -157,6 +240,10 @@ impl Catalog {
     }
 
     fn add_file(&mut self, file: &str, source: &str) {
+        self.parse_file(file, source, false);
+    }
+
+    fn parse_file(&mut self, file: &str, source: &str, _dependency: bool) {
         let Some(language) = crate::compression::language::safe_csharp_language() else {
             return;
         };
@@ -168,7 +255,11 @@ impl Catalog {
             return;
         };
         #[cfg(test)]
-        super::work_metrics::record_csharp_file_parsed();
+        if _dependency {
+            super::work_metrics::record_ef_dependency_file_parsed();
+        } else {
+            super::work_metrics::record_csharp_file_parsed();
+        }
         visit_container(
             tree.root_node(),
             source.as_bytes(),
@@ -327,6 +418,23 @@ fn visit_type(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &m
     let mut path = scope.namespace.clone();
     path.extend(scope.nesting.iter().cloned());
     path.push(name.clone());
+    catalog.declaration_scopes.insert(
+        (scope.file.clone(), path.clone(), arity),
+        BaseReference {
+            file: scope.file.clone(),
+            owner: name.clone(),
+            namespace: scope.namespace.clone(),
+            nesting: scope.nesting.clone(),
+            written: name.clone(),
+            shape: TypeShape {
+                qualifier: Vec::new(),
+                name: name.clone(),
+                arity,
+            },
+            imports: scope.imports.clone(),
+            aliases: scope.aliases.clone(),
+        },
+    );
     catalog.declarations.push(Declaration {
         kind,
         file: scope.file.clone(),

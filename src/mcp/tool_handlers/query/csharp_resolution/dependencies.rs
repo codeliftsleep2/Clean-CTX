@@ -9,6 +9,10 @@ use tree_sitter::Node;
 
 mod efcore;
 pub(in crate::mcp::tool_handlers::query) use efcore::EfCoreCatalog;
+#[cfg(feature = "csharp")]
+pub(in crate::mcp::tool_handlers::query) use efcore::EfDependencyEvidence;
+#[cfg(feature = "csharp")]
+pub(in crate::mcp::tool_handlers::query) use efcore::prepare as prepare_ef_dependencies;
 
 const CLASS: &str = "Class";
 const DOMAIN: &str = "builtin";

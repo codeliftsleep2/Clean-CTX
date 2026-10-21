@@ -385,7 +385,11 @@ fn attempt_once(
     })
 }
 
-fn publish(state: &McpState, frontier: &[String], root: Option<&str>) -> Result<bool, String> {
+pub(in crate::mcp::tool_handlers) fn publish(
+    state: &McpState,
+    frontier: &[String],
+    root: Option<&str>,
+) -> Result<bool, String> {
     let pending: Vec<_> = frontier
         .iter()
         .filter(|file| {

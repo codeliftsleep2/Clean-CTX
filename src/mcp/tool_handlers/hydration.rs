@@ -26,6 +26,8 @@ mod acquisition;
 #[cfg(feature = "csharp")]
 mod dependencies;
 #[cfg(feature = "csharp")]
+pub(super) use dependencies::publish as publish_dependency_frontier;
+#[cfg(feature = "csharp")]
 pub(crate) use dependencies::{DependencyEvidence, acquire_csharp_dependencies};
 mod execution;
 #[cfg(all(test, feature = "rust"))]
@@ -33,7 +35,9 @@ pub(super) use execution::hydrate_workspace_index;
 pub(super) use execution::{hydrate_workspace_index_for, hydrate_workspace_index_for_acquisition};
 
 mod filesystem;
-#[cfg(all(test, feature = "rust"))]
+#[cfg(feature = "csharp")]
+pub(super) use filesystem::configured_roots as dependency_roots;
+#[cfg(any(feature = "csharp", all(test, feature = "rust")))]
 pub(crate) use filesystem::source_inventory;
 use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key, scan};
 pub(crate) use filesystem::{effective_refresh_roots, source_candidates_containing};

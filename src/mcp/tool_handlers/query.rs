@@ -367,6 +367,14 @@ mod publication_test_support;
 #[path = "../../tests/mcp/workspace_query_issue_155_blockers.rs"]
 mod tests_issue_155_blockers;
 
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_issue_156.rs"]
+mod tests_issue_156;
+
+#[cfg(all(test, feature = "dotnet", feature = "csharp"))]
+#[path = "../../tests/mcp/workspace_query_issue_156_dependencies.rs"]
+mod tests_issue_156_dependencies;
+
 #[cfg(all(test, feature = "rust", feature = "java", feature = "spring_boot"))]
 #[path = "../../tests/mcp/workspace_query_legacy_edit_adequacy.rs"]
 mod tests_legacy_edit_adequacy;
