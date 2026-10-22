@@ -38,6 +38,8 @@ EXTERNAL-ORACLE CONFORMANCE
         ↓
 LIVE LLM VERIFICATION
         ↓
+DUAL SIGN-OFF
+        ↓
 CERTIFIED
 ```
 
@@ -82,11 +84,15 @@ CERTIFIED =
   + ADVERSARIAL PROOF
   + CONFORMANCE PROOF WHERE FEASIBLE
   + LIVE CONSUMER PROOF
+  + AGENT APPROVAL
+  + CLEAN-CTX OWNER APPROVAL
 ```
 
 A capability that is implemented but cannot answer the canonical question that justified it is incomplete.
 
 A capability that can answer a question but cannot prove why the answer is authoritative, current, and complete to the claimed degree is incorrect.
+
+Neither agent approval nor owner approval is sufficient alone. Certification requires both.
 
 ## 4. Required Certification Gates
 
@@ -94,19 +100,9 @@ A capability that can answer a question but cannot prove why the answer is autho
 
 Before certification, define the semantic envelope explicitly.
 
-The declaration MUST identify:
+The declaration MUST identify supported language/framework versions or version families, project/configuration forms, syntax and semantic constructs relevant to Clean-CTX claims, package/module/composition mechanisms, known exclusions, intentionally unsupported constructs, and degradation behavior outside the supported envelope.
 
-- supported language/framework versions or version families;
-- supported project/configuration forms;
-- supported syntax and semantic constructs relevant to Clean-CTX claims;
-- supported package/module/composition mechanisms;
-- known exclusions;
-- intentionally unsupported constructs;
-- degradation behavior when evidence falls outside the supported envelope.
-
-Broad labels such as `TypeScript support`, `Angular support`, or `EF support` are insufficient.
-
-The supported envelope is the boundary of the claim.
+Broad labels such as `TypeScript support`, `Angular support`, or `EF support` are insufficient. The supported envelope is the boundary of the claim.
 
 ### Gate 2 — Canonical Question Matrix
 
@@ -132,18 +128,7 @@ COMPLETENESS CONTRACT
 ADVERSARIAL / LIFECYCLE PROOF
 ```
 
-Required question classes should be considered where applicable:
-
-- Identity
-- Forward relationships
-- Reverse relationships
-- Why / provenance
-- Scope / visibility
-- Composition
-- Impact / change
-- Completeness
-- Lifecycle / currentness
-- Cross-layer relationships
+Required question classes should be considered where applicable: Identity, Forward, Reverse, Why/Provenance, Scope/Visibility, Composition, Impact/Change, Completeness, Lifecycle, and Cross-Layer.
 
 No semantic capability is complete merely because its internal data structure exists.
 
@@ -153,36 +138,13 @@ For every fact produced by the layer, define what evidence is permitted to estab
 
 The implementation MUST distinguish authoritative evidence from heuristics, hints, acquisition accelerators, and presentation conveniences.
 
-The following MUST NOT silently become authority unless the supported ecosystem itself defines them as authoritative for the claimed fact:
-
-- names;
-- filenames;
-- path proximity;
-- decorator/annotation spelling;
-- package-name resemblance;
-- framework-looking syntax;
-- previously cached conclusions;
-- optional provider output;
-- model inference.
+Names, filenames, path proximity, decorator/annotation spelling, package-name resemblance, framework-looking syntax, cached conclusions, optional provider output, and model inference MUST NOT silently become authority unless the supported ecosystem itself defines them as authoritative for the claimed fact.
 
 ### Gate 4 — Canonical Identity Model
 
 Define how relevant entities obtain durable semantic identity.
 
-The model MUST address all identity-changing or identity-obscuring mechanisms inside the supported envelope, including where applicable:
-
-- files and physical/logical source identity;
-- declarations;
-- aliases;
-- imports and exports;
-- re-exports and barrels;
-- packages and package instances;
-- projects;
-- namespaces/modules;
-- declaration merging;
-- generated or synthesized framework constructs;
-- framework roles;
-- composition boundaries.
+The model MUST address all identity-changing or identity-obscuring mechanisms inside the supported envelope, including where applicable files and physical/logical source identity, declarations, aliases, imports/exports, re-exports/barrels, packages/package instances, projects, namespaces/modules, declaration merging, generated/synthesized framework constructs, framework roles, and composition boundaries.
 
 A new language or meta-layer MUST reuse existing lower-layer canonical identity where that authority already exists. It MUST NOT create a competing identity system for the same semantic entity.
 
@@ -190,15 +152,7 @@ A new language or meta-layer MUST reuse existing lower-layer canonical identity 
 
 Prove that Clean-CTX acquires all evidence required to answer each claimed canonical question.
 
-Certification MUST establish:
-
-- required source acquisition;
-- configuration acquisition;
-- manifest/package metadata acquisition;
-- dependency traversal requirements;
-- transitive closure requirements;
-- framework composition requirements;
-- evidence dependencies for derived facts.
+Certification MUST establish required source, configuration and manifest/package acquisition; dependency traversal and transitive closure; framework composition requirements; and evidence dependencies for derived facts.
 
 Result limits, display filters, or query scope MUST NOT prevent acquisition of evidence required for semantic correctness.
 
@@ -207,8 +161,6 @@ Result limits, display filters, or query scope MUST NOT prevent acquisition of e
 Implement the semantics necessary to answer the declared canonical questions inside the supported envelope.
 
 Clean-CTX does **not** need to reimplement an entire compiler, framework, runtime, IDE, or language service.
-
-The implementation boundary is:
 
 ```text
 CANONICAL QUESTION
@@ -234,16 +186,7 @@ Conversely, a known semantic requirement inside the declared envelope MUST NOT b
 
 Every authoritative derived fact MUST be traceable to the authoritative evidence that established it to the degree required by its claim.
 
-Where applicable, retained proof should identify:
-
-- source snapshot or exact bytes/hash;
-- declaration/source span;
-- project/configuration context;
-- package/module context;
-- authority version or semantic contract version;
-- dependency witnesses;
-- composition witnesses;
-- generation/publication identity.
+Where applicable, retained proof should identify source snapshot/exact bytes/hash, declaration/source span, project/configuration context, package/module context, authority or semantic-contract version, dependency/composition witnesses, and generation/publication identity.
 
 The system must be able to explain **why** a fact is believed, not merely return the fact.
 
@@ -251,44 +194,17 @@ The system must be able to explain **why** a fact is believed, not merely return
 
 Certification MUST prove that semantic truth changes when authoritative evidence changes.
 
-Tests MUST include applicable mutations such as:
-
-- edit;
-- rename;
-- move;
-- delete;
-- dependency change;
-- configuration change;
-- package/version change;
-- composition change;
-- authority loss;
-- ambiguity introduction/removal.
+Tests MUST include applicable mutations such as edit, rename, move, delete, dependency/configuration/package/version/composition changes, authority loss, and ambiguity introduction/removal.
 
 Affected semantic facts MUST update or retract correctly.
 
-Equivalent truth MUST NOT depend on:
-
-- warm versus cold state;
-- previous query order;
-- batching;
-- cache population;
-- root order;
-- partial prior acquisition;
-- optional provider state.
+Equivalent truth MUST NOT depend on warm versus cold state, previous query order, batching, cache population, root order, partial prior acquisition, or optional provider state.
 
 ### Gate 9 — Persistence and Publication
 
 If semantic knowledge survives beyond immediate computation, prove that retained/public state corresponds to the authoritative generation from which it was derived.
 
-Certification MUST address:
-
-- persistence format;
-- semantic dependency retention;
-- invalidation;
-- publication ordering;
-- stale-fact retraction;
-- generation compatibility;
-- reconstruction after restart where applicable.
+Certification MUST address persistence format, semantic dependency retention, invalidation, publication ordering, stale-fact retraction, generation compatibility, and reconstruction after restart where applicable.
 
 Intermediate correctness does not certify final published state.
 
@@ -322,16 +238,7 @@ An internal fact that cannot be queried through the production path is not a com
 
 Every public answer MUST classify its completeness honestly.
 
-The layer MUST distinguish, where applicable:
-
-- exact/complete;
-- complete within a declared bound;
-- incomplete/partial;
-- ambiguous;
-- unsupported;
-- authority unavailable;
-- stale/not-current;
-- indeterminate.
+The layer MUST distinguish, where applicable: exact/complete, complete within a declared bound, incomplete/partial, ambiguous, unsupported, authority unavailable, stale/not-current, and indeterminate.
 
 `These are the results found` MUST NOT be represented as `these are all results` without proof of the required closure.
 
@@ -339,29 +246,7 @@ The layer MUST distinguish, where applicable:
 
 The certification suite MUST deliberately attempt to falsify the implementation.
 
-Applicable cases include:
-
-- identity collisions;
-- same-name unrelated entities;
-- aliases;
-- re-exports;
-- cycles;
-- shadowing;
-- declaration merging;
-- ambiguous resolution;
-- type/value or equivalent semantic spaces;
-- malformed/partial source;
-- unsupported versions;
-- missing dependencies;
-- partial acquisition;
-- configuration conflicts;
-- mutation/deletion;
-- cold/warm transitions;
-- cache invalidation;
-- query ordering;
-- batch ordering;
-- persistence/restart;
-- framework-specific edge cases.
+Applicable cases include identity collisions, same-name unrelated entities, aliases, re-exports, cycles, shadowing, declaration merging, ambiguous resolution, type/value or equivalent semantic spaces, malformed/partial source, unsupported versions, missing dependencies, partial acquisition, configuration conflicts, mutation/deletion, cold/warm transitions, cache invalidation, query/batch ordering, persistence/restart, and framework-specific edge cases.
 
 Every discovered semantic failure MUST become a regression when it represents an in-envelope correctness requirement.
 
@@ -393,13 +278,7 @@ The external implementation is a **development-time oracle**, not a production d
                             regression/repair
 ```
 
-A mismatch MUST be investigated rather than automatically classified as a Clean-CTX defect. The investigation must determine whether:
-
-- the fixture is inside the Clean-CTX supported envelope;
-- both systems consumed equivalent source/configuration/package/version evidence;
-- the two systems are answering the same semantic question;
-- the external implementation has version-specific behavior;
-- Clean-CTX is incorrect.
+A mismatch MUST be investigated rather than automatically classified as a Clean-CTX defect. The investigation must determine whether the fixture is inside the supported envelope, both systems consumed equivalent evidence, both answer the same semantic question, external behavior is version-specific, or Clean-CTX is incorrect.
 
 #### ORACLE-CONFORMANCE-001
 
@@ -408,8 +287,6 @@ A mismatch MUST be investigated rather than automatically classified as a Clean-
 #### Conformance Scope Rule
 
 > Conformance scope follows Clean-CTX's declared semantic envelope. Clean-CTX does not implement semantics merely because an external compiler or framework implements them.
-
-This preserves the production boundary:
 
 ```text
 PRODUCTION
@@ -425,17 +302,7 @@ Fixture → Clean-CTX ───────────────┘
 
 Performance work follows semantic correctness.
 
-Certification SHOULD characterize:
-
-- cold acquisition cost;
-- warm acquisition cost;
-- semantic derivation cost;
-- persistence/publication cost;
-- query cost;
-- batch-query cost;
-- repeated work;
-- memory impact;
-- invalidation/recomputation behavior.
+Certification SHOULD characterize cold/warm acquisition cost, semantic derivation cost, persistence/publication cost, query and batch-query cost, repeated work, memory impact, and invalidation/recomputation behavior.
 
 Optimizations MUST remove redundant work without weakening required acquisition, authority, provenance, currentness, or completeness.
 
@@ -443,18 +310,11 @@ Optimizations MUST remove redundant work without weakening required acquisition,
 
 Where the layer exists to support model reasoning, certification MUST include representative live consumer verification.
 
-The verification should force the consumer to answer canonical architectural questions using the production representation/query path and establish that:
-
-- the required knowledge is actually available;
-- identity survives presentation;
-- ambiguity is preserved rather than silently collapsed;
-- completeness metadata is usable;
-- provenance can support reasoning where required;
-- the consumer can reach the intended conclusion without reconstructing missing semantics from raw source.
+The verification should force the consumer to answer canonical architectural questions using the production representation/query path and establish that required knowledge is available; identity survives presentation; ambiguity is preserved; completeness metadata is usable; provenance supports reasoning where required; and the consumer can reach the intended conclusion without reconstructing missing semantics from raw source.
 
 Presence of semantic data is not sufficient if the intended consumer cannot correctly use it.
 
-### Gate 16 — Certification Artifact and Sign-Off
+### Gate 16 — Certification Artifact and Dual Sign-Off
 
 Certification MUST produce a durable evidence artifact containing at least:
 
@@ -475,32 +335,21 @@ Certification MUST produce a durable evidence artifact containing at least:
 - performance characterization;
 - live consumer verification;
 - unresolved limitations;
-- final certification verdict.
+- proposed certification verdict;
+- agent attestation;
+- Clean-CTX owner approval.
 
-Certification is not complete until the evidence artifact supports the claimed verdict.
+Certification is not complete until the evidence artifact supports the claimed verdict **and both required sign-offs approve the same certification scope**.
+
+Neither the implementation/investigation agent nor the Clean-CTX owner may unilaterally certify a layer.
 
 ## 5. Language-Layer Certification
 
 A language layer establishes language-level authority consumed by higher layers.
 
-Depending on the language and supported envelope, certification may require authority for:
+Depending on the language and supported envelope, certification may require authority for syntax/declarations, lexical scope, symbol/declaration identity, imports/exports/modules, package/project resolution, aliases/re-exports, type/value or equivalent semantic spaces, inheritance/implementation relationships, references, dependency relationships, declaration merging/augmentation, and configuration-driven semantics.
 
-- syntax and declarations;
-- lexical scope;
-- symbol/declaration identity;
-- imports/exports/modules;
-- package/project resolution;
-- aliases/re-exports;
-- type/value or equivalent semantic spaces;
-- inheritance/implementation relationships;
-- references;
-- dependency relationships;
-- declaration merging/augmentation;
-- configuration-driven semantics.
-
-A language layer MUST expose authoritative identity and relationships in a form reusable by dependent meta-layers.
-
-Higher layers MUST NOT independently rediscover language identity when certified language authority already exists.
+A language layer MUST expose authoritative identity and relationships in a form reusable by dependent meta-layers. Higher layers MUST NOT independently rediscover language identity when certified language authority already exists.
 
 ## 6. Meta-Layer Certification
 
@@ -522,8 +371,6 @@ FRAMEWORK CANONICAL QUESTIONS
 
 A meta-layer MUST declare its authority dependencies explicitly.
 
-Example:
-
 ```text
 NgRx Meta-Layer
     requires → Angular Composition Authority
@@ -539,15 +386,7 @@ If a required lower-layer capability is uncertified, unsupported, stale, ambiguo
 
 Clean-CTX SHOULD treat certified semantic layers as a dependency graph rather than isolated feature modules.
 
-Each certification artifact should identify:
-
-- authorities it consumes;
-- facts it produces;
-- downstream layers that may consume those facts;
-- invalidation dependencies;
-- certification prerequisites.
-
-This enables Clean-CTX to answer not only whether a feature exists, but whether the complete authority chain required by that feature is certified.
+Each certification artifact should identify authorities it consumes, facts it produces, downstream layers that may consume those facts, invalidation dependencies, and certification prerequisites.
 
 ```text
 Language Identity Authority
@@ -565,34 +404,27 @@ Canonical Questions
 
 Clean-CTX's production architecture SHOULD remain independent of heavyweight ecosystem compilers/framework runtimes unless a separate architecture decision explicitly changes that rule.
 
-The preferred model is:
-
 > Implement only the semantics Clean-CTX needs to prove its declared architectural claims, and use official implementations during development to verify that those semantics match where the claims overlap.
-
-This prevents ecosystem growth from turning Clean-CTX into an orchestration shell around an unbounded set of external runtimes.
 
 Adding support for a new ecosystem MUST NOT automatically imply shipping or requiring that ecosystem's compiler, framework compiler, runtime, language server, package manager, or development environment.
 
 ## 9. Required Certification Checklist
 
-A reviewer MUST be able to mark every applicable item below before certification is granted.
+A reviewer MUST be able to mark every applicable item before certification is granted.
 
 ### Scope
-
 - [ ] Supported semantic envelope is explicitly documented.
 - [ ] Supported versions/version families are documented.
 - [ ] Known exclusions and degradation behavior are documented.
 - [ ] No broad support claim exceeds the declared envelope.
 
 ### Canonical Questions
-
 - [ ] Material capabilities map to canonical questions.
 - [ ] Required question classes have been considered.
 - [ ] Every in-envelope question maps to required semantic facts.
 - [ ] Every in-envelope question has a production query path.
 
 ### Authority and Identity
-
 - [ ] Authoritative evidence is explicitly defined.
 - [ ] Heuristics/hints are distinguished from authority.
 - [ ] Canonical identity is defined for relevant entities.
@@ -600,19 +432,16 @@ A reviewer MUST be able to mark every applicable item below before certification
 - [ ] Existing lower-layer identity is reused rather than duplicated.
 
 ### Acquisition
-
 - [ ] Required source/configuration/package evidence is acquired.
 - [ ] Dependency closure is proven for claimed questions.
 - [ ] Result limits cannot truncate required authority acquisition.
 
 ### Semantics
-
 - [ ] Required in-envelope semantics are implemented.
 - [ ] Known in-envelope gaps are resolved or the envelope is explicitly narrowed.
 - [ ] No unnecessary attempt has been made to reimplement semantics unrelated to Clean-CTX claims.
 
 ### Provenance and Lifecycle
-
 - [ ] Derived facts retain sufficient provenance/witnesses.
 - [ ] Mutation updates affected facts.
 - [ ] Deletion retracts affected facts.
@@ -621,21 +450,18 @@ A reviewer MUST be able to mark every applicable item below before certification
 - [ ] Query/batch/root order does not change truth.
 
 ### Persistence and Publication
-
 - [ ] Persisted/public facts correspond to authoritative generations.
 - [ ] Semantic dependencies participate in invalidation.
 - [ ] Restart/reload behavior is verified where applicable.
 - [ ] Final published state, not merely intermediate state, is certified.
 
 ### Completeness
-
 - [ ] Public answers classify completeness correctly.
 - [ ] Partial results cannot masquerade as complete results.
 - [ ] Ambiguity is preserved.
 - [ ] Unsupported/out-of-envelope evidence is represented honestly.
 
 ### Adversarial Verification
-
 - [ ] Identity collisions are tested.
 - [ ] Alias/re-export/merge/shadowing cases are tested where applicable.
 - [ ] Cycles and ambiguity are tested where applicable.
@@ -645,7 +471,6 @@ A reviewer MUST be able to mark every applicable item below before certification
 - [ ] Discovered in-envelope failures have regression coverage.
 
 ### Differential Conformance
-
 - [ ] Applicable official implementation/oracle has been identified.
 - [ ] Differential conformance is implemented where technically feasible.
 - [ ] Oracle version and fixture environment are recorded.
@@ -654,38 +479,126 @@ A reviewer MUST be able to mark every applicable item below before certification
 - [ ] Conformance scope does not expand the Clean-CTX semantic envelope unnecessarily.
 
 ### Consumer Verification
-
 - [ ] Canonical questions are answered through the production interface.
 - [ ] Live consumer/LLM verification exists where applicable.
 - [ ] The consumer can use identity, ambiguity, provenance, and completeness correctly.
 
 ### Sign-Off
-
 - [ ] Certification artifact exists.
 - [ ] All required evidence is referenced.
 - [ ] Known limitations are explicit.
 - [ ] Lower-layer certification prerequisites are satisfied.
+- [ ] Agent attestation is complete.
+- [ ] Clean-CTX owner approval is complete.
+- [ ] Both approvals cover the same semantic envelope and verdict.
 - [ ] Final verdict is recorded as CERTIFIED, BOUNDED CERTIFIED, or NOT CERTIFIED.
 
 ## 10. Certification Verdicts
 
 ### CERTIFIED
 
-All required gates are satisfied for the declared envelope and no known limitation weakens the claimed completeness or authority contract.
+All required gates are satisfied for the declared envelope and no known limitation weakens the claimed completeness or authority contract. Both required sign-offs approve this scope.
 
 ### BOUNDED CERTIFIED
 
-All required gates are satisfied for an explicitly constrained envelope. The boundary is public, testable, and preserved in query/completeness behavior.
+All required gates are satisfied for an explicitly constrained envelope. The boundary is public, testable, preserved in query/completeness behavior, and approved by both required signatories.
 
 This is a valid production state. It MUST NOT be marketed or represented as broader support.
 
 ### NOT CERTIFIED
 
-One or more required gates remain unsatisfied, required authority is unavailable, production queryability is missing, lifecycle correctness is unproven, or completeness claims exceed evidence.
+One or more required gates remain unsatisfied, required authority is unavailable, production queryability is missing, lifecycle correctness is unproven, completeness claims exceed evidence, or both required approvals have not been obtained.
 
 A parser, prototype, experimental semantic producer, or partially migrated meta-layer may be useful while remaining NOT CERTIFIED.
 
-## 11. Definition of Done
+## 11. Dual Certification Sign-Off
+
+Certification requires independent approval from both the implementation/investigation agent and the Clean-CTX owner.
+
+The two signatories serve different purposes. The agent attests that the technical investigation and evidence support the claimed verdict. The owner explicitly accepts that proven scope into Clean-CTX's production semantic contract.
+
+Neither approval is sufficient alone.
+
+### Agent Attestation
+
+```text
+Agent: __________________________
+Role: ___________________________
+Date: ___________________________
+Evidence revision/commit: _______
+
+I attest that:
+
+- I evaluated every applicable certification gate.
+- I disclosed all known failures, ambiguities, unsupported cases,
+  contradictory evidence, and unresolved semantic risks discovered
+  during certification.
+- The cited evidence supports the declared certification verdict.
+- I did not treat passing tests as proof beyond the scope they exercise.
+- I did not knowingly omit evidence that weakens or contradicts the claim.
+- External-oracle agreement, where used, was treated as conformance
+  evidence rather than production authority.
+- The supported envelope does not exceed what the evidence proves.
+
+Agent verdict:
+
+[ ] CERTIFIED
+[ ] BOUNDED CERTIFIED
+[ ] NOT CERTIFIED
+
+Agent signature/identifier: __________________
+```
+
+### Clean-CTX Owner Approval
+
+```text
+Owner: __________________________
+Date: ___________________________
+Reviewed revision/commit: _______
+
+I have reviewed:
+
+- the declared supported envelope;
+- Canonical Question Matrix coverage;
+- authority and identity model;
+- acquisition/dependency closure;
+- lifecycle/currentness evidence;
+- completeness contract;
+- adversarial findings;
+- differential-conformance evidence where applicable;
+- production query reachability;
+- live consumer verification where applicable;
+- known limitations and exclusions;
+- final certification verdict.
+
+Owner decision:
+
+[ ] APPROVED
+[ ] APPROVED AS BOUNDED CERTIFIED
+[ ] REJECTED / ADDITIONAL EVIDENCE REQUIRED
+
+Owner signature: __________________
+```
+
+### Final Certification State
+
+```text
+AGENT APPROVAL + OWNER APPROVAL = CERTIFICATION
+
+Either approval missing = NOT YET CERTIFIED
+
+Scope mismatch between approvals = NOT YET CERTIFIED
+```
+
+A layer MUST NOT enter `CERTIFIED` or `BOUNDED CERTIFIED` state unless both attestations approve the same semantic envelope and compatible verdict.
+
+### RECERTIFICATION-001
+
+> Any material change to a certified layer's semantic envelope, authority model, canonical identity model, completeness contract, authority dependencies, or production truth path requires recertification of the affected scope.
+
+A change that cannot affect the certified semantic contract does not automatically require full recertification, but the certification artifact MUST identify the basis for treating the existing certification as still applicable.
+
+## 12. Definition of Done
 
 A new language or meta-layer is done only when:
 
@@ -709,8 +622,12 @@ ADVERSARIAL / LIFECYCLE VERIFICATION
 DIFFERENTIAL CONFORMANCE WHERE FEASIBLE
     +
 LIVE CONSUMER VERIFICATION WHERE APPLICABLE
+    +
+AGENT ATTESTATION
+    +
+CLEAN-CTX OWNER APPROVAL
     =
-CERTIFIABLE LANGUAGE / META-LAYER
+CERTIFIED LANGUAGE / META-LAYER
 ```
 
 The governing question is not:
@@ -719,6 +636,6 @@ The governing question is not:
 
 It is:
 
-> Can Clean-CTX prove the architectural facts it claims to know about this ecosystem, keep those facts current, expose them through the production interface with an honest completeness contract, and demonstrate that the intended consumer can rely on them?
+> Can Clean-CTX prove the architectural facts it claims to know about this ecosystem, keep those facts current, expose them through the production interface with an honest completeness contract, demonstrate that the intended consumer can rely on them, and obtain independent agent and owner approval of that exact claim?
 
 Only then is the layer complete.
