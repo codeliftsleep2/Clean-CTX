@@ -49,6 +49,8 @@ pub mod replay;
 pub mod semantic_projection;
 pub mod string_table;
 pub mod symbol_table;
+#[cfg(feature = "typescript")]
+pub(crate) mod typescript_binding_pattern;
 pub(crate) mod typescript_identifier_binding;
 pub(crate) mod typescript_object_members;
 #[cfg(feature = "typescript")]

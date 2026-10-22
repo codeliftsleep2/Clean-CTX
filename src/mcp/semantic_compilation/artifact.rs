@@ -62,6 +62,7 @@ impl SemanticCompilationArtifact {
         config: &crate::config::CleanCtxConfig,
         extension: &str,
         authorized_roots: &[std::path::PathBuf],
+        typescript_project: Option<&std::path::Path>,
     ) -> Result<Self, crate::error::CleanCtxError> {
         let producer_generations = ProducerGenerationFingerprint::current(source, path, config)
             .map_err(|error| crate::error::CleanCtxError::Ir(error.to_string()))?;
@@ -83,17 +84,26 @@ impl SemanticCompilationArtifact {
         #[cfg(not(feature = "csharp"))]
         let _ = extension;
         #[cfg(not(feature = "typescript"))]
-        let _ = authorized_roots;
+        let _ = (authorized_roots, typescript_project);
 
         Ok(Self {
             #[cfg(feature = "typescript")]
             typescript_authority: matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
                 .then(|| {
-                    crate::ir::typescript_resolution::TypeScriptAuthority::capture(
-                        path,
-                        source,
-                        authorized_roots,
-                    )
+                    if let Some(project) = typescript_project {
+                        crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_project(
+                            path,
+                            source,
+                            authorized_roots,
+                            Some(project),
+                        )
+                    } else {
+                        crate::ir::typescript_resolution::TypeScriptAuthority::capture(
+                            path,
+                            source,
+                            authorized_roots,
+                        )
+                    }
                 }),
             identity: ArtifactIdentity {
                 canonical_owner,

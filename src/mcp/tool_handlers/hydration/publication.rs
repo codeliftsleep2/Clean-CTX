@@ -259,6 +259,7 @@ fn prepare_candidate(
     let previous_version = state.file_version(&path_alias).unwrap_or(0);
     let job = CompilationJob {
         authorized_roots: super::filesystem::configured_roots(state, workspace_root),
+        typescript_project: None,
         file_path: validated.clone(),
         source,
         fidelity,

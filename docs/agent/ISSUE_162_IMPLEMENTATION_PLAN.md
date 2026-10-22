@@ -2,9 +2,24 @@
 
 Agent: Agent MaxHeadRoom
 
+## Governing scope decision — owner accepted 2026-10-22
+
+The owner accepted Verdict B and the question-driven interpretation in the
+[semantic boundary reassessment](ISSUE_162_SEMANTIC_BOUNDARY_REASSESSMENT.md).
+
+> No new TypeScript semantic frontier enters implementation merely because it differs from `tsc`. It must have a demonstrated canonical-question → required-fact → authority/dependency → consumer chain. Existing established requirements remain frozen, and publication, persistence, consumer migration, production queryability, completeness, and live verification remain mandatory.
+
+Execution priority now increasingly favors carrying authoritative knowledge
+through the existing artifact, persistent owner and publication lifecycle to
+real consumers and production answers. Phase 2 does not expand automatically
+from compiler mismatches; demonstrated required identity blockers remain work.
+All AQ01–AQ26 and established requirements remain intact. This decision is not
+Phase 2 completion, certification, approval of a new public contract, or removal
+of any later phase gate.
+
 Updated: 2026-10-21
 
-Overall status: **IN PROGRESS — foundation and consumer migration incomplete**.
+Overall status: **IN PROGRESS â€” foundation and consumer migration incomplete**.
 Foundation design: **APPROVED AND FROZEN by the maintainer**.
 Runtime GREEN: **NOT ESTABLISHED**. No agent-started Cargo, binary, MCP/provider
 process or live verification is authorized. This plan is the working execution
@@ -54,12 +69,12 @@ behavioral assertions. The frozen #162 test remains byte-identical.
 | Frozen regression SHA-256 | `B63883E818FC70DF0990D23E2C31AC9D318FED458DA74B70B693C393DBA86379` |
 | Frozen test + registration | Preserved before production edits in stash `6a82efdb5036df0b6d24e40266737d3d16b6885c`, name `issue-162 frozen RED B63883E818FC70DF` |
 | Working tree regression state | Original #162 test and registration are currently stashed, not restored; a filtered run now must not be mistaken for the full foundation suite |
-| New native source | `src/ir/typescript_resolution/{mod,host,project,project_config,syntax,resolver,package,capture}.rs`: implementation in progress, not conformance-certified |
+| New native source | `src/ir/typescript_resolution/`: snapshot/project/config/ownership/version and resolution modules; implementation in progress, not conformance-certified |
 | Real compiler entry | ir/mod.rs registers the module; SemanticCompilationArtifact captures neutral TS evidence |
-| Scope integration | Root transport implemented, UNVERIFIED: primary + additional roots pass from existing hydration policy through direct/file/edit and batch requests to artifact capture; no parent-derived workspace authorization |
+| Scope integration | Root transport implemented, UNVERIFIED: primary + additional roots reach artifact capture. Explicit TS project input now passes through compilation requests/jobs; ordinary callers still infer context, pending producer-owned explicit selection |
 | Retained identity lifecycle | INCOMPLETE: source-owned neutral capture enters artifact, but into_parts currently drops it; canonical Angular facts, durable payload and consumer joins are not implemented |
 | Consumer migration | No Angular family is yet certified migrated; old authority paths remain outstanding work |
-| Supplemental source tests | Eight initial resolver tests, eleven project/host tests (two Unix-only), three compilation-scope tests authored; all NOT RUN |
+| Supplemental source tests | Eight initial resolver, eleven project/host (two Unix-only), four compilation-scope, eight project-ownership (one Windows-only), twelve config-conformance, nine project-context (two Unix-only) and four Windows host tests authored; all NOT RUN |
 | Supplemental test SHA-256 at checkpoint | `01A6CCC19BCA0C294C8E1F5D078C6552783D89AD9B54ED7071BEC60F5530F74A`; may change during ordinary supplemental development |
 | Static formatting | Direct rustfmt performed on the initial native files/artifact edits; this is not compilation or test evidence |
 | Runtime after implementation | NOT RUN; no compilation, warning-free or behavioral GREEN claim |
@@ -126,7 +141,7 @@ their own frozen behavioral receipt; never weaken a captured oracle to get GREEN
 
 ## 4. Phased execution
 
-### Phase 0 — Baseline, design freeze and RED preservation
+### Phase 0 â€” Baseline, design freeze and RED preservation
 
 Status: **COMPLETE AND FROZEN for baseline/design/RED preservation**, by maintainer
 instruction on 2026-10-21.
@@ -143,7 +158,7 @@ This freeze does not certify or freeze the unfinished Phase 1 production work.
 - [x] Maintainer approves/freezes the native and retained-identity design.
 - [x] Preserve exact #162 regression and registration before production edits.
 - [x] Record Angular-wide migration as a mandatory acceptance criterion.
-- [x] Record the hard Canonical Question Matrix gate and initial AQ01–AQ26
+- [x] Record the hard Canonical Question Matrix gate and initial AQ01â€“AQ26
   requirements, consumer mapping and pending public-query contracts in section 6A.
 
 Restoration is a deferred Phase 7 prerequisite, not an unperformed Phase 0 action:
@@ -151,7 +166,7 @@ Restoration is a deferred Phase 7 prerequisite, not an unperformed Phase 0 actio
 - [ ] Restore the exact regression and registration after the relevant repair;
   normalize only checkout line endings if necessary to recover the exact hash.
 
-#### Phase 0 receipt — Agent MaxHeadRoom, 2026-10-21
+#### Phase 0 receipt â€” Agent MaxHeadRoom, 2026-10-21
 
 Bounded filesystem/Git inspection reconfirmed:
 
@@ -178,9 +193,13 @@ No Cargo, binary, MCP/provider process or live verification was run. Runtime
 GREEN remains **NOT ESTABLISHED**. The saved RED is sufficient for preservation;
 no redundant operator RED rerun is requested.
 
-### Phase 1 — Authorized snapshot/project host
+### Phase 1 â€” Authorized snapshot/project host
 
-Status: **IN PROGRESS**.
+Status: **IMPLEMENTED / UNVERIFIED at the input-host checkpoint**.
+The [consolidated host audit](ISSUE_162_PHASE_1_HOST_AUDIT.md) traces the actual
+production path and assigns remaining resolution, persistence, consumer and
+verification obligations. Phase 1 is not frozen/runtime-accepted and this does
+not certify complete TS conformance or any Angular canonical question.
 
 Implementation tasks:
 
@@ -190,9 +209,9 @@ Implementation tasks:
 - [x] Carry the request's actual authorized roots through
   compilation jobs and direct/in-memory candidate compilation. Do not infer a
   workspace from a source parent or promote a path mapping to authorization.
-- [ ] Reconcile physical alias, symlink, missing-path, file/directory and access
+- [x] Implement physical alias, symlink, missing-path, file/directory and access
   error observations against established path authority on all platforms.
-- [ ] Handle full project ownership/config inheritance: package extends, multiple
+- [x] Implement project ownership/config inheritance mechanics: package extends, multiple
   extends option merging, config-relative origins, include/exclude/references,
   compiler/version/mode defaults and ambiguity.
 - [x] Distinguish source-only capture from closed project authority; no missing
@@ -202,7 +221,22 @@ Gate: explicit-root, same-snapshot, out-of-scope/link, unreadable-vs-absent and
 config-appearance/mutation tests. All IO used to prove authority is observable.
 No runtime gate has run.
 
-#### Phase 1 implementation receipt — Agent MaxHeadRoom, 2026-10-21
+Checkboxes record implemented mechanisms and authored controls, not passed
+conformance tests. Remaining interpretation of retained resolution options is
+Phase 2 work; persistence/publication and producer/consumer integration remain
+required in Phases 3â€“6. Material conformance findings remain obligations until
+fixed and verified; no envelope reduction is authorized by this checkpoint.
+
+Consolidated audit corrections: effective compiler options and declaring origins
+now survive in neutral artifact capture; Unit parsing/caching and captured source
+use physical identity consistently; the original source route stays separate.
+Lossy physical path identities fail closed in the new host. Four additional
+tracked regressions and their hashes are recorded in the audit. None has run.
+Phase 2 can now consume these retained host inputs without treating them as a
+blanket resolution certificate. In particular, preserveSymlinks and mode-specific
+policies still require implementation, not an ignored-option fallback.
+
+#### Phase 1 implementation receipt â€” Agent MaxHeadRoom, 2026-10-21
 
 Implemented the root-transport and consumed-snapshot slice:
 
@@ -257,25 +291,279 @@ was consulted for mode distinctions. No current-document default is applied
 without project/compiler evidence. No Cargo, tests, binaries, MCP/provider
 processes or live verification ran; runtime GREEN is **NOT ESTABLISHED**.
 
-### Phase 2 — Canonical TypeScript lexical/module/export authority
+#### Phase 1 continuation receipt â€” project ownership and version evidence
 
-Status: **IN PROGRESS — initial implementation only**.
+Agent MaxHeadRoom, 2026-10-21. Status: **IN PROGRESS; runtime unverified**.
+
+- `project_config.rs` now retains inherited files/include/exclude with their
+  declaring directories separately from compiler options. References belong to
+  their declaring config and are not inherited. Ignored inherited references
+  do not trigger out-of-scope resolution or source reads.
+- New `project_membership.rs` evaluates the queried source against configured
+  root-file lists/patterns and traverses explicit reference configs within
+  authorized roots. Active/completed sets distinguish reference cycles from
+  repeated shared projects. Multiple root owners fail closed rather than using
+  traversal order. The retained ownership record identifies consulted configs,
+  root candidates and whether the source is a root member. Root-file exclusion
+  does not revoke source authorization or prove an imported dependency irrelevant.
+- `project_version.rs` reads installed TypeScript package identity/version through
+  the same host. Missing compiler candidates and consumed manifests participate
+  in invalidation. Defaults are derived only for the currently encoded stable
+  TypeScript 4.7â€“5.9 rules; unknown/prerelease versions stay unresolved. Explicit
+  moduleResolution remains distinct from a version-derived default. Missing
+  module settings use the versioned target/module rule for those encoded versions.
+- Artifact capture retains ownership and compiler-version data beside its existing
+  project identity. These are authority prerequisites for AQ01/AQ25 and all shared
+  closure/currentness controls, not completed public answers. Phase 3 still owns
+  retention beyond `into_parts`, publication and durable integration.
+- Added eight tracked tests in
+  `src/tests/ir/typescript_project_ownership_issue_162.rs` (one Windows-only).
+  They cover reference selection/retarget, overlapping owners, inherited patterns
+  and explicit files, non-inherited references/cycles, missing/deleted reference
+  recovery, installed-version default changes and Windows case/extended paths.
+  SHA-256: `498D3BDA658C76D1AD81357D11ED92BD6A32E52F65466A5F9DCF9A6AC707717D`.
+  All eight are **NOT RUN**; they do not establish runtime behavior.
+
+Static checks: direct rustfmt, UTF-8/no-BOM, active-file size ceiling and
+`git diff --check` passed. No Cargo, tests, binaries, MCP/provider or live
+verification ran. Public-path query evidence remains pending.
+
+Remaining Phase 1 work includes newer installed-compiler version/default rules
+(particularly TypeScript 6+), complete config compatibility and root-pattern
+conformance, and Windows reparse/access error/retarget handling. The new Windows
+test covers ordinary case and extended paths only. Do not promote this slice to
+full project closure or certify Phase 1 complete. These are required implementation
+gaps, not approved exclusions from #162.
+
+Semantic references consulted: [TSConfig reference](https://www.typescriptlang.org/tsconfig/),
+[compiler options](https://microsoft.github.io/TypeScript-New-Handbook/reference/compiler-options/),
+and [TypeScript 6.0 release notes](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-6-0.html).
+Version changes require source-backed rules; the current documentation is not a
+substitute for evidence about an installed older compiler.
+
+#### Phase 1 continuation receipt â€” TS 6, config patterns and opened Windows files
+
+Agent MaxHeadRoom, 2026-10-21. Status: **IN PROGRESS; runtime unverified**.
+
+Implemented:
+
+- `project_version.rs`: distinct TypeScript 6.0 resolution defaults, checked
+  against pinned 6.0.2 compiler source rather than projecting older defaults.
+  CommonJS/ESM choose bundler; legacy non-ESM module kinds retain classic;
+  Node kinds retain their matching mode. Version parsing rejects prerelease,
+  malformed and unreviewed release evidence rather than silently adopting rules.
+- `project_options.rs`: validation of authority-consumed boolean/path options,
+  Node module/resolution compatibility, custom conditions and version-backed
+  CommonJS/bundler compatibility. The `node` resolution alias normalizes to
+  `node10`. This validates relevant configuration; it does not implement every
+  TypeScript compiler diagnostic or type-check the project.
+- `project_config.rs`: structured, version-backed `${configDir}` substitution
+  for retained path options/root lists, relative to the consuming configuration.
+  Inherited plain relative paths keep their declaring-directory origin. Missing
+  compiler evidence cannot grant template-variable interpretation.
+- `project_membership.rs`: separate include/exclude wildcard behavior, hidden
+  paths, implicit versus explicit dependency-directory inclusion, directory-prefix
+  exclusions, invalid recursive patterns, checkJs/allowJs precedence and implicit
+  minified-file exclusion. Membership examines the known source, not a guessed
+  workspace-wide candidate universe.
+- `host_windows.rs` and `host.rs`: open the source, obtain its final handle path,
+  check that path against authorized physical roots, then read bytes through the
+  same handle. Native API errors fail closed. The path buffer follows the OS's
+  required length; no global path cap or retry budget was added. Existing typed
+  source hashes and physical-route witnesses retain the consumed evidence.
+- `typescript_project_conformance_issue_162.rs`: eight authored regressions for
+  TS 6/default compatibility, invalid settings, root patterns, checkJs/minified
+  files and configDir inheritance. SHA-256:
+  `CF32CD968F2A22345028DE7931E3BFC383E5EBFE1A810B66BFC8F1E3B01F7A24`.
+- `typescript_windows_host_issue_162.rs`: three authored Windows regressions for
+  junction escape, in-root junction retarget and sharing-denial/recovery. Fixtures
+  use native mount-point reparse data, no shell helper or developer-mode symlink
+  privilege. SHA-256:
+  `355F50C9A53938B2152089DA47773F537D646BD3DD2151113AE686ACBC20D566`.
+
+All eleven tests are **NOT RUN**. Native FFI and platform behavior are not
+compile-certified or runtime-certified. Direct rustfmt, strict UTF-8/no-BOM,
+active-file size checks and `git diff --check` passed. No Cargo, test, binary,
+MCP/provider process or live verification ran. Runtime GREEN is NOT ESTABLISHED.
+
+Question linkage remains AQ01/AQ25 and all A/D/L prerequisites. These regressions
+do not prove a public question answer, surviving publication or durable reopening.
+Those consumers and owners remain the later required integration work.
+
+Phase 1 is not frozen complete: finish the version/config/platform conformance
+audit, including other materially required compiler releases and remaining
+configuration forms. An unreviewed installed compiler currently produces an
+unresolved default; this is a safety boundary, not permission to exclude a
+required project. Final currentness/publication validation must consume retained
+scope and handle/source witnesses in Phase 3.
+
+Primary references: [TypeScript 6.0.2 computed options and wildcard matching](https://github.com/microsoft/TypeScript/blob/v6.0.2/src/compiler/utilities.ts),
+[configuration parser](https://github.com/microsoft/TypeScript/blob/v6.0.2/src/compiler/commandLineParser.ts),
+[TypeScript 5.5 configDir semantics](https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-5.html),
+and [GetFinalPathNameByHandleW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew).
+
+#### Phase 1 continuation receipt â€” concrete config/default corrections
+
+Agent MaxHeadRoom, 2026-10-21. Status: **IN PROGRESS; runtime unverified**.
+
+- Corrected configDir interpretation to prefix-only, single replacement with
+  normalized consuming-directory resolution, following the pinned compiler's
+  parser. Embedded template-looking text stays literal and does not create a
+  compiler-version requirement. Added regression coverage for both distinctions.
+- Removed duplicate lexical path normalization from membership interpretation;
+  the host's shared component-based normalizer now feeds both membership and
+  config template paths.
+- Added stable TypeScript 4.0â€“4.6 default rules alongside the existing version
+  groups, with older-compiler rejection of newer bundler/Node16/NodeNext/module
+  settings and custom conditions. Shared effective-module computation feeds both
+  default derivation and compatibility checks, including implicit module defaults.
+  TS 6's implicit module calculation follows its target-sensitive compiler rule.
+- Config JSONC parsing ignores a workspace config's BOM while the host hashes
+  and retains the original consumed bytes, including that BOM. Repository source
+  files remain UTF-8 without BOM. Added a mutation/invalidation regression.
+- Added four conformance regressions (twelve total in that supplemental file).
+  Enriched unrun positive supplemental configs with explicit ESNext module
+  settings where bundler mode requires them. Strengthened the unrun TS 5.3
+  `preserve` negative from an unresolved mode to rejection of an invalid setting.
+  Corrected two supplemental Windows path comparisons to compare physical targets
+  rather than extended-prefix spelling. No observed/frozen oracle was changed.
+
+Current supplemental SHA-256 values (supersede earlier snapshots of these
+unrun files only):
+
+- `typescript_project_conformance_issue_162.rs`:
+  `B2FBCCFDA5F2750EB138D5BF23E9D2BDEAA3D5551B79EDABFD611CF3A2BC4EE4`.
+- `typescript_project_ownership_issue_162.rs`:
+  `80D7CE7E6B5E519E1740F88E8C0F02D56AA110181BD880329BE0A185C0E60A84`.
+
+Direct rustfmt, UTF-8/no-BOM, active-file size checks and `git diff --check`
+passed. No compilation, tests, binaries, MCP/provider or live verification ran.
+Runtime GREEN remains **NOT ESTABLISHED**. AQ01/AQ25 prerequisites progressed;
+public query, persistent owner and publication proof remain unestablished.
+
+Remaining Phase 1 audit items must now be tracked concretely: jsconfig ownership
+and defaults; nullable config/inheritance semantics; explicit project-context
+selection versus inferred nearest-config ownership; and other installed compiler
+release rules when materially required. These are implementation obligations,
+not approved exclusions. Keep scope/public-contract decisions inside the frozen
+design and review any actual public query contract change before implementing it.
+
+Primary source checks: [config template parser](https://github.com/microsoft/TypeScript/blob/v6.0.2/src/compiler/commandLineParser.ts),
+[TypeScript 4.0.8 defaults](https://github.com/microsoft/TypeScript/blob/v4.0.8/src/compiler/utilities.ts),
+and [TypeScript 4.6.4 defaults](https://github.com/microsoft/TypeScript/blob/v4.6.4/src/compiler/utilities.ts).
+
+#### Phase 1 continuation receipt â€” jsconfig, nullable inheritance and explicit context
+
+Agent MaxHeadRoom, 2026-10-21. Status: **IN PROGRESS; runtime unverified**.
+
+- Discovery now checks tsconfig then jsconfig at each ancestor. A previously
+  absent tsconfig remains a negative witness when jsconfig supplies context.
+  Jsconfig's own compiler defaults override inherited settings before its
+  explicit options; explicit allowJs false wins over its default.
+- Nullable root lists inherit existing base lists; null extends/references and
+  null compilerOptions objects are treated as absent. Individual null compiler
+  options remain reset markers through all extends merges, then disappear from
+  effective options. Keeping resets until final consumption prevents an earlier
+  sibling base from restoring a deliberately cleared option.
+- `CompilationRequest` and `CompilationJob` now carry optional `typescript_project`
+  through the actual executor/compiler/artifact path. No public request parameter,
+  tool schema or global project-selection policy was introduced. Ordinary existing
+  production call sites explicitly pass None; producer-owned selection remains
+  required when Angular/project evidence establishes a particular build context.
+- Resolver/project/capture share that explicit input for target and contributor
+  resolution. Inferred overlapping owners still fail closed. Explicit input
+  selects the requested authorized config and retains `selected_explicitly`,
+  consulted configs and root-membership evidence. Selecting a config does not
+  authorize its directory or a foreign dependency root.
+- Added six project-context regressions and one real compilation-executor
+  regression. Nonempty controls distinguish inferred and explicit aliases of
+  the same reference, proving different config inputs reach artifact capture.
+  These tests are authored only; no public-query proof is claimed.
+
+Supplemental snapshots:
+
+- `typescript_project_context_issue_162.rs`, six tests:
+  `2A1B85041CCF05E11334E250B38EF590B22618C83CD0BBA1BCE935652B0BCF11`.
+- `semantic_compilation_scope_issue_162.rs`, four total tests:
+  `2DABEFC0058AA0DFAD5C72CD41B5758C6F25B781A7656A868151DDD651BA2F1B`.
+
+All tests remain NOT RUN. Direct rustfmt, UTF-8/no-BOM, active-file sizes and
+`git diff --check` passed. Frozen RED hash rechecked unchanged. No Cargo, test,
+binary, MCP/provider or live verification ran; runtime GREEN is NOT ESTABLISHED.
+
+AQ01/AQ25 authority prerequisites now retain explicit context at the artifact
+boundary. Phase 3 must include context in retained proof, reuse and publication
+identity; source hash equality alone cannot equate different project inputs.
+Angular producers/consumers must actually supply and consume this evidence in
+later migration slices. The optional input's existence is not integration proof.
+
+The three concrete prior audit items are implemented at the host boundary.
+Phase 1 still requires its consolidated conformance/lifecycle audit before being
+frozen complete; operator gates remain scheduled in Phase 7. Keep any newly
+identified material config/version/platform gaps explicit rather than treating
+an unrun regression or a helper's existence as completion.
+
+Primary reference: [pinned TypeScript configuration parsing, defaults and inheritance](https://github.com/microsoft/TypeScript/blob/v6.0.2/src/compiler/commandLineParser.ts).
+
+### Phase 2 â€” Canonical TypeScript lexical/module/export authority
+
+Status: **IN PROGRESS â€” initial implementation only**.
+
+Current checkpoint (2026-10-22): the operator reports consolidated TypeScript
+GREEN through program globals/libraries, enum group parity and statement-owned
+import-type resolution modes. Counts/logs were not supplied for recent checkpoints.
+Import-type expression contracts are now authored and UNRUN. Earlier UNVERIFIED
+notes below are historical authoring states; the Phase 2 progress record retains
+the chronological evidence. Phase 2 remains open for occurrence/mode conformance,
+merge compatibility, project mapping, witness coverage and consolidated exit
+evidence. No numeric completion estimate or public integration acceptance is
+established.
 
 Implementation tasks:
 
 - [x] Initial source/hash/span declaration IDs and direct named/aliased bindings.
 - [x] Initial named/star export traversal, rooted-cycle traversal and contender sets.
 - [x] Initial relative/index, paths, package exports/imports and ordered condition capture.
+- Exact type occurrence capture now joins the existing value-occurrence path,
+  including qualified module namespaces, generics/block shadowing and mapped/
+  conditional binding scope. Nine supplemental regressions are authored; runtime
+  verification is pending. This does not close all occurrence forms below.
 - [ ] Bind actual reference occurrences by exact span and namespace, including
   lexical shadowing; a top-level name map is not the final reference API.
+- Declared namespace bodies require declaration-owned scope identity beyond the
+  existing imported-module file targets. Seven focused namespace-merge contracts
+  produced operator RED and were frozen byte-identically before repair. Declared
+  scope extraction, shared member traversal, merge validation and artifact scope
+  evidence now have operator-reported GREEN after the statement-wrapper repair.
+  Three additional dotted-namespace contracts are authored and UNRUN. Remaining
+  namespace lexical/global forms are still open.
 - [ ] Complete namespace/default/re-export forms and legal declaration merging;
   type/value eligibility must be explicit for each declaration kind.
+- Classic lookup implementation and type-star grammar compatibility are now
+  authored in a consolidated slice; runtime verification is pending. See the
+  Phase 2 progress record for six Classic and three frontend regressions plus
+  the unchanged operator-reported chained-namespace failure.
+- Explicit request kinds, syntax-owned module-request capture and import-equals/
+  export-assignment identity are authored with eight supplemental regressions.
+  The request-mode batch is runtime UNVERIFIED; all remaining mode conformance
+  obligations below remain open.
 - [ ] Complete mode fidelity: bundler versus node10/node16/nodenext/classic,
   import/require and importing-file format, substitutions and extension/index rules.
+- Compiler-version routing now has authored prerelease/build precedence and
+  partial-version floor conformance, shared by conditions and typesVersions.
+  Four supplemental controls and one corrected supplemental wildcard assumption
+  remain runtime UNVERIFIED; no prerelease compiler defaults are inferred.
+- Versioned package type routing is authored through a shared stable range
+  matcher, typesVersions redirect engine and lazy ordered package-map selector.
+  Ten supplemental regressions cover currentness and canonical identities; the
+  consolidated batch remains runtime UNVERIFIED. Full conformance below is open.
 - [ ] Complete configuration-dependent lookup precedence, fallback ordering,
   packages/self-reference, exports barriers, imports external targets, type
   routing and supported compiler conditions. Do not treat the current native
   scaffold's unresolved branches as final support exclusions.
+- Logical lookup routes now honor consumed preserveSymlinks while canonical
+  declarations and snapshots retain physical identity. Six export-cycle controls
+  and three logical-route controls are authored; the batch is runtime UNVERIFIED.
 - [ ] Validate export SCC/fixed-point behavior, explicit-export precedence,
   conflicting stars versus multiple routes to the same declaration.
 - [ ] Capture every negative/search/ambiguity witness that affects the answer.
@@ -284,7 +572,7 @@ Gate: conformance/adversarial tests plus exact-source/hash proof. Source-local
 binding helpers must feed this boundary rather than remaining competing answers.
 A file path alone never satisfies this phase's declaration identity contract.
 
-### Phase 3 — Retained canonical evidence, snapshot and publication plumbing
+### Phase 3 â€” Retained canonical evidence, snapshot and publication plumbing
 
 Status: **PENDING beyond initial artifact capture**.
 
@@ -306,7 +594,7 @@ Gate: end-to-end creation -> returned artifact -> persistent owner -> lifecycle 
 consumer -> MCP response. Include same-name facts that old dedup would collapse.
 Source cache, canonical source IR and derived authority validity remain distinct.
 
-### Phase 4 — Angular declaration/API authority
+### Phase 4 â€” Angular declaration/API authority
 
 Status: **PENDING**.
 
@@ -325,7 +613,7 @@ Status: **PENDING**.
 Gate: canonical package/API positives and foreign/aliased/shadowed/type-only
 negatives through production dispatch. The frozen #162 test is not modified.
 
-### Phase 5 — Shared composition and visibility
+### Phase 5 â€” Shared composition and visibility
 
 Status: **PENDING**.
 
@@ -344,7 +632,7 @@ Gate: initial positive controls + lifecycle/order/batch/config/export retargetin
 same terminal names and selectors outside the visible universe must not leak in.
 The 12-test foundation suite is necessary but not sufficient.
 
-### Phase 6 — Angular-wide consumer migration and P0/P1 completion
+### Phase 6 â€” Angular-wide consumer migration and P0/P1 completion
 
 Status: **PENDING for every family until section 6 records concrete evidence**.
 
@@ -364,7 +652,7 @@ integrated; do not union weaker positives back into canonical results.
 Gate: every row in section 6 has production call-path/removal/dependency/test
 evidence, or a concrete source-local exception proof. No unexplained bypass remains.
 
-### Phase 7 — Batched local acceptance and final architectural audit
+### Phase 7 â€” Batched local acceptance and final architectural audit
 
 Status: **PENDING / operator runtime boundary in force**.
 
@@ -380,7 +668,7 @@ Status: **PENDING / operator runtime boundary in force**.
 The initial native supplemental suite is uncompiled. Do not infer GREEN or
 test-selection counts from authored registrations alone.
 
-### Phase 8 — Consolidated production-boundary MCP/field verification
+### Phase 8 â€” Consolidated production-boundary MCP/field verification
 
 Status: **PENDING**.
 
@@ -449,7 +737,7 @@ An exception entry must cite the inspected function, its authoritative inputs,
 its output, and why it answers no TS/API/declaration/scope question. Merely being
 source-local is insufficient if it classifies a foreign API by spelling.
 
-## 6A. Angular Canonical Question Matrix — hard completion gate
+## 6A. Angular Canonical Question Matrix â€” hard completion gate
 
 This matrix applies the [Canonical Question Matrix Standard](../Clean-CTX_Canonical_Question_Matrix_Standard.md).
 Each ID joins the requirements table, delivery/evidence table and Section 6
@@ -598,10 +886,10 @@ entire row from a forward-only test while its reverse question is unanswered.
 | Marker / rendering helpers | AQ18, AQ26 and every upstream question rendered |
 | Other discovered Angular consumers | Assign/extend IDs before implementation; inventory remains open, no exemption |
 
-Phases 1–3 must preserve authority/closure/retained representation for all IDs,
+Phases 1â€“3 must preserve authority/closure/retained representation for all IDs,
 especially AQ01/AQ25. Phase 4 gates AQ01 and family API roles. Phase 5 gates
-AQ02–AQ07. Phase 6 gates all remaining families and cross-layer questions.
-Phases 7–8 require per-question regression/public-path receipts and applicable
+AQ02â€“AQ07. Phase 6 gates all remaining families and cross-layer questions.
+Phases 7â€“8 require per-question regression/public-path receipts and applicable
 operator/live evidence. A phase cannot certify a question assigned to a later
 phase merely because its underlying mechanics exist.
 
@@ -647,6 +935,25 @@ not evidence of GREEN. The eight authored supplemental tests would add to the
 twelve frozen tests after restoration; further authoring may change that total.
 
 ## 8. Update and completion discipline
+
+Phase 2 implementation receipts and its current operator checkpoint are maintained in
+[ISSUE_162_PHASE_2_AUTHORITY_PROGRESS.md](ISSUE_162_PHASE_2_AUTHORITY_PROGRESS.md).
+Subsequent operator-reported focused GREEN checkpoints include lexical/callable
+binding, declaration groups, class/interface augmentation, JSX parsing,
+namespace uniqueness, package target validation, explicit export conflicts and
+quoted/escaped symbol values. Those reports carried no new measured counts/logs;
+new edits after each report require their own verification. See the progress
+record for current UNRUN work. None establishes all Angular consumer migration.
+
+Latest captured TypeScript checkpoint: **195 passed, 0 failed** (71.01 seconds);
+this is focused foundation evidence, not Phase 2 or #162 completion.
+That result includes the package-scope and export/local-reference regressions.
+That includes the four shared scope/occurrence regressions. The completed NgRx
+run reported 152 passed/10 failed. Test-contract corrections distinguish private
+carriers from claims and align stale generation pins with committed generation
+27; those corrections remain UNRUN. No production repair was made for these
+failures. See the Phase 2 progress record.
+The phase remains IN PROGRESS; all remaining Phase 2 tasks above remain required.
 
 For each implementation slice, append a short receipt: date, exact files,
 production call path reached, duplicate authority removed, retained owner,

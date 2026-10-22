@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 pub(crate) struct CompilationJob {
     pub(crate) authorized_roots: Vec<std::path::PathBuf>,
+    pub(crate) typescript_project: Option<std::path::PathBuf>,
     pub(crate) file_path: String,
     pub(crate) source: Arc<String>,
     pub(crate) fidelity: crate::compression::Fidelity,
@@ -66,6 +67,7 @@ impl SemanticCompilerExecutor {
                             fidelity: job.fidelity,
                             config,
                             authorized_roots: &job.authorized_roots,
+                            typescript_project: job.typescript_project.as_deref(),
                             focus: None,
                             skip_set: job.skip_set.as_ref(),
                             path_alias: &job.path_alias,

@@ -380,6 +380,7 @@ pub(crate) fn compile_source_ir_focused_with_identity(
             fidelity,
             config: &state.config,
             authorized_roots,
+            typescript_project: None,
             focus,
             skip_set: skip_set.as_ref(),
             path_alias,

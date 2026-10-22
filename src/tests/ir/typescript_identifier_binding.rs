@@ -18,6 +18,88 @@ fn binding(source: &str, reference: SourceSpan) -> super::ReferenceBinding {
         .expect("direct value identifier must bind")
 }
 
+fn canonical_binding(source: &str, reference: SourceSpan) -> super::ReferenceBinding {
+    let language = crate::compression::language::safe_typescript_language().unwrap();
+    let mut parser = tree_sitter::Parser::new();
+    parser.set_language(&language).unwrap();
+    let tree = parser.parse(source, None).unwrap();
+    super::bind_value_identifier_in_tree("Fixture.ts", source, reference, tree.root_node())
+        .expect("canonical declaration binding")
+}
+
+#[test]
+fn issue_162_catch_parameter_shadows_only_its_catch_and_keeps_legacy_role_boundary() {
+    let source = "const error = 1; try {} catch (error) { use(error); } use(error);";
+    let inside = nth_span(source, "error", 2);
+    let outside = nth_span(source, "error", 3);
+    let canonical = canonical_binding(source, inside);
+    assert_eq!(
+        canonical.declaration_kind(),
+        ValueDeclarationKind::CatchParameter
+    );
+    assert_eq!(canonical.declaration_span(), nth_span(source, "error", 1));
+    assert!(bind_direct_value_identifier("Fixture.ts", source, inside).is_none());
+    assert_eq!(
+        binding(source, outside).declaration_span(),
+        nth_span(source, "error", 0)
+    );
+}
+
+#[test]
+fn issue_162_optional_catch_binding_does_not_invent_a_shadow() {
+    let source = "const error = 1; try {} catch { use(error); }";
+    assert_eq!(
+        canonical_binding(source, nth_span(source, "error", 1)).declaration_span(),
+        nth_span(source, "error", 0)
+    );
+}
+
+#[test]
+fn issue_162_var_binding_hoists_through_blocks_but_not_nested_functions() {
+    let source = "function f() { if (flag) { var item = 1; } use(item); } function g() { var item = 2; use(item); }";
+    let first = canonical_binding(source, nth_span(source, "item", 1));
+    let second = canonical_binding(source, nth_span(source, "item", 3));
+    assert_eq!(first.declaration_span(), nth_span(source, "item", 0));
+    assert_eq!(second.declaration_span(), nth_span(source, "item", 2));
+    assert_eq!(first.declaration_kind(), ValueDeclarationKind::FunctionVar);
+    assert_eq!(second.declaration_kind(), ValueDeclarationKind::FunctionVar);
+}
+
+#[test]
+fn issue_162_block_let_shadows_function_var_without_retargeting_outer_uses() {
+    let source = "function f() { var item = 1; { let item = 2; use(item); } use(item); }";
+    assert_eq!(
+        canonical_binding(source, nth_span(source, "item", 2)).declaration_kind(),
+        ValueDeclarationKind::LexicalLet
+    );
+    assert_eq!(
+        canonical_binding(source, nth_span(source, "item", 3)).declaration_span(),
+        nth_span(source, "item", 0)
+    );
+}
+
+#[test]
+fn issue_162_loop_header_let_does_not_shadow_an_outer_reference_after_the_loop() {
+    let source = "const item = 1; for (let item = 0; item < 2; item++) { use(item); } use(item);";
+    let outer = binding(source, nth_span(source, "item", 5));
+    assert_eq!(outer.declaration_span(), nth_span(source, "item", 0));
+    let inner = binding(source, nth_span(source, "item", 4));
+    assert_eq!(inner.declaration_span(), nth_span(source, "item", 1));
+    assert_eq!(inner.declaration_kind(), ValueDeclarationKind::LexicalLet);
+}
+
+#[test]
+fn issue_162_expression_arrow_parameter_keeps_its_own_lexical_scope() {
+    let source = "const item = 1; const f = (item: number) => item; use(item);";
+    let inner = binding(source, nth_span(source, "item", 2));
+    assert_eq!(inner.declaration_span(), nth_span(source, "item", 1));
+    assert_eq!(inner.declaration_kind(), ValueDeclarationKind::Parameter);
+    assert_eq!(
+        binding(source, nth_span(source, "item", 3)).declaration_span(),
+        nth_span(source, "item", 0)
+    );
+}
+
 #[test]
 fn top_level_local_and_parameter_shadowing_bind_exact_declarations() {
     let source = concat!(

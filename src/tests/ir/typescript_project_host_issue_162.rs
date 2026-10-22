@@ -9,6 +9,26 @@ fn write(root: &Path, name: &str, text: &str) {
 }
 
 #[test]
+fn issue_162_existing_file_normalization_preserves_readable_file_path() {
+    let root = tempfile::tempdir().unwrap();
+    let source = "export class Leaf {}";
+    write(root.path(), "leaf.ts", source);
+    let file = root.path().join("leaf.ts");
+    for authorized in [root.path().to_path_buf(), file.clone()] {
+        let mut host = Host::new(&[authorized]).unwrap();
+        let normalized = host.normalized(&file).expect("authorized existing file");
+        assert!(
+            normalized.is_file(),
+            "normalized file became unreadable: {normalized:?}"
+        );
+        assert_eq!(std::fs::read_to_string(&normalized).unwrap(), source);
+        assert_eq!(host.read(&file).unwrap().as_ref(), source);
+        assert_eq!(host.normalized(&normalized).unwrap(), normalized);
+        assert!(host.current());
+    }
+}
+
+#[test]
 fn issue_162_project_host_consumed_snapshot_cannot_be_reseeded() {
     let root = tempfile::tempdir().unwrap();
     write(root.path(), "app.ts", "export class Before {}");

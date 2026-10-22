@@ -52,9 +52,45 @@ fn action_declarations(edges: &[SemanticEdge]) -> Vec<&str> {
 fn transitions(edges: &[SemanticEdge]) -> Vec<(&str, &str)> {
     edges
         .iter()
-        .filter(|edge| edge.relation == SemanticRelation::TriggersReducer)
+        .filter(|edge| {
+            edge.relation == SemanticRelation::TriggersReducer
+                && edge.subject.domain == "ngrx"
+                && edge.subject.entity_type == "Action"
+                && edge.object.domain == "ngrx"
+                && edge.object.entity_type == "Reducer"
+        })
         .map(|edge| (edge.subject.name.as_str(), edge.object.name.as_str()))
         .collect()
+}
+
+#[test]
+fn issue_162_private_value_carriers_do_not_establish_claimed_action_transitions() {
+    for (import, claimed) in [
+        ("import { Action } from '@ngrx/store';", true),
+        ("import { Action } from './fake-action';", false),
+    ] {
+        let edges = compile(&source(
+            import,
+            "action: Action",
+            "action.type",
+            "SET_AUDIT",
+        ));
+        let carriers: Vec<_> = edges
+            .iter()
+            .filter(|edge| {
+                edge.layer == crate::angular_meta::ngrx::object_actions::SWITCH_VALUE_LAYER
+                    && edge.relation == SemanticRelation::TriggersReducer
+            })
+            .collect();
+        assert_eq!(
+            carriers.len(),
+            1,
+            "private source-local carrier remains available"
+        );
+        assert_ne!(carriers[0].subject.domain, "ngrx");
+        assert_eq!(transitions(&edges).len(), usize::from(claimed));
+        assert_eq!(action_declarations(&edges).len(), usize::from(claimed));
+    }
 }
 
 #[test]

@@ -7,6 +7,66 @@ fn occurrence(source: &str, needle: &str) -> SourceSpan {
     let start = source.rfind(needle).expect("reference occurrence");
     SourceSpan::new(start, start + needle.len()).expect("ordered span")
 }
+
+#[test]
+fn issue_162_namespace_import_cannot_bypass_an_iteration_binding_shadow() {
+    let source = "import * as Actions from './actions'; for (const Actions of values) { use(Actions.saveThing); }";
+    assert!(
+        bind_direct_namespace_value_import(
+            "/fixture.ts",
+            source,
+            occurrence(source, "Actions.saveThing")
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn issue_162_ambiguous_local_bindings_cannot_be_reinterpreted_as_an_import_reference() {
+    let source = "import { saveThing } from './actions'; { let saveThing = 1; let saveThing = 2; use(saveThing); }";
+    assert!(
+        super::bind_named_value_import_allow_alias(
+            "/fixture.ts",
+            source,
+            occurrence(source, "saveThing")
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn issue_162_shared_tree_import_binding_preserves_existing_scope_decisions() {
+    for source in [
+        "import { saveThing } from './actions'; useValue(saveThing);",
+        "import { saveThing as save } from './actions'; useValue(save);",
+        "import type { saveThing as save } from './actions'; useValue(save);",
+        "import { saveThing as save } from './actions'; function f(save: unknown) { useValue(save); }",
+        "import { saveThing as save } from './actions'; { const save = 1; useValue(save); }",
+    ] {
+        let name = if source.contains("useValue(saveThing)") {
+            "saveThing"
+        } else {
+            "save"
+        };
+        let span = occurrence(source, name);
+        let language = crate::compression::language::safe_typescript_language().unwrap();
+        let mut parser = tree_sitter::Parser::new();
+        parser.set_language(&language).unwrap();
+        let tree = parser.parse(source, None).unwrap();
+        assert_eq!(
+            super::bind_named_value_import_allow_alias("/fixture.ts", source, span),
+            super::bind_named_value_import_in_tree(
+                "/fixture.ts",
+                source,
+                span,
+                false,
+                true,
+                tree.root_node()
+            ),
+            "{source}",
+        );
+    }
+}
 #[test]
 fn exact_direct_named_value_import_binds_without_framework_classification() {
     let source = "import { saveThing } from './actions';\nuseValue(saveThing);";

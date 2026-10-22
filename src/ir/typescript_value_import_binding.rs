@@ -124,35 +124,49 @@ fn bind_named_value_import_with_scope(
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&language).ok()?;
     let tree = parser.parse(source, None)?;
-    if tree.root_node().has_error() {
+    bind_named_value_import_in_tree(
+        source_id,
+        source,
+        reference_span,
+        relative_only,
+        allow_alias,
+        tree.root_node(),
+    )
+}
+
+pub(crate) fn bind_named_value_import_in_tree(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+    relative_only: bool,
+    allow_alias: bool,
+    root: tree_sitter::Node<'_>,
+) -> Option<ValueImportBinding> {
+    if root.has_error() {
         return None;
     }
-    let reference = tree
-        .root_node()
+    let reference = root
         .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())?;
     if !matches!(
         reference.kind(),
         "identifier" | "shorthand_property_identifier"
     ) || reference.start_byte() != reference_span.start_byte()
         || reference.end_byte() != reference_span.end_byte()
-        || crate::ir::typescript_identifier_binding::bind_direct_value_identifier(
-            source_id,
-            source,
-            reference_span,
+        || !matches!(
+            crate::ir::typescript_identifier_binding::lookup_value_identifier_in_tree(
+                source_id,
+                source,
+                reference_span,
+                root,
+            ),
+            Ok(None)
         )
-        .is_some()
     {
         return None;
     }
     let name = reference.utf8_text(source.as_bytes()).ok()?;
     let mut matches = Vec::new();
-    collect_imports(
-        tree.root_node(),
-        name,
-        source.as_bytes(),
-        relative_only,
-        &mut matches,
-    );
+    collect_imports(root, name, source.as_bytes(), relative_only, &mut matches);
     let [(module, imported_name)] = matches.as_slice() else {
         return None;
     };
@@ -197,12 +211,15 @@ pub(crate) fn bind_direct_namespace_value_import(
     let member = reference.child_by_field_name("property")?;
     if namespace.kind() != "identifier"
         || member.kind() != "property_identifier"
-        || crate::ir::typescript_identifier_binding::bind_direct_value_identifier(
-            source_id,
-            source,
-            SourceSpan::new(namespace.start_byte(), namespace.end_byte()).ok()?,
+        || !matches!(
+            crate::ir::typescript_identifier_binding::lookup_value_identifier_in_tree(
+                source_id,
+                source,
+                SourceSpan::new(namespace.start_byte(), namespace.end_byte()).ok()?,
+                tree.root_node(),
+            ),
+            Ok(None)
         )
-        .is_some()
     {
         return None;
     }

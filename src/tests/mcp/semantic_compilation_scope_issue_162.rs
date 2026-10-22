@@ -89,6 +89,7 @@ fn issue_162_compilation_batch_preserves_authorized_primary_root() {
         &config,
         vec![CompilationJob {
             authorized_roots: vec![root.path().to_path_buf()],
+            typescript_project: None,
             file_path: file.clone(),
             source: Arc::new(source),
             fidelity: Fidelity::High,
@@ -100,4 +101,72 @@ fn issue_162_compilation_batch_preserves_authorized_primary_root() {
     );
     assert_eq!(results.len(), 1);
     assert_leaf(results[0].result.as_ref().unwrap());
+}
+
+#[test]
+fn issue_162_compilation_batch_retains_requested_project_and_resolves_in_that_context() {
+    let root = tempfile::tempdir().unwrap();
+    let (file, _) = fixture(root.path());
+    std::fs::write(root.path().join("a.ts"), "export class Leaf {}").unwrap();
+    std::fs::write(root.path().join("b.ts"), "export class Leaf {}").unwrap();
+    let source = "import { Leaf } from '@leaf'; export class App {}";
+    std::fs::write(&file, source).unwrap();
+    for (name, target) in [("tsconfig.json", "./b.ts"), ("project-a.json", "./a.ts")] {
+        std::fs::write(
+            root.path().join(name),
+            serde_json::json!({"compilerOptions":{
+                "module":"esnext", "moduleResolution":"bundler", "paths":{"@leaf":[target]}
+            }})
+            .to_string(),
+        )
+        .unwrap();
+    }
+    let executor = SemanticCompilerExecutor::new(1);
+    let config = crate::tests::test_config();
+    for (project, expected) in [
+        (None, "b.ts"),
+        (Some(root.path().join("project-a.json")), "a.ts"),
+    ] {
+        let explicit = project.is_some();
+        let results = executor.compile(
+            &config,
+            vec![CompilationJob {
+                authorized_roots: vec![root.path().to_path_buf()],
+                typescript_project: project,
+                file_path: file.clone(),
+                source: Arc::new(source.to_string()),
+                fidelity: Fidelity::High,
+                path_alias: file.clone(),
+                previous_version: 0,
+                canonical_owner: file.clone(),
+                skip_set: None,
+            }],
+        );
+        let evidence = results[0].result.as_ref().unwrap().typescript_authority();
+        assert!(evidence.disposition.is_none(), "{:?}", evidence.disposition);
+        assert_eq!(
+            evidence
+                .project_ownership
+                .as_ref()
+                .unwrap()
+                .selected_explicitly,
+            explicit
+        );
+        assert!(evidence.references.iter().any(|(name, _, resolution)| {
+            name == "Leaf"
+                && matches!(resolution, Resolution::Resolved(id) if id.source.ends_with(expected))
+        }));
+        if explicit {
+            assert!(
+                evidence
+                    .project
+                    .as_ref()
+                    .unwrap()
+                    .1
+                    .as_ref()
+                    .unwrap()
+                    .ends_with("project-a.json")
+            );
+        }
+    }
 }

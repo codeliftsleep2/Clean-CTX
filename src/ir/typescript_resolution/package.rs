@@ -3,6 +3,7 @@ use serde::Deserialize;
 
 #[derive(Clone, Debug)]
 pub(super) enum Ordered {
+    Null,
     String(String),
     Array(Vec<Self>),
     Object(Vec<(String, Self)>),
@@ -59,7 +60,7 @@ impl<'de> Deserialize<'de> for Ordered {
                 Ok(Ordered::Other)
             }
             fn visit_unit<E: serde::de::Error>(self) -> Result<Self::Value, E> {
-                Ok(Ordered::Other)
+                Ok(Ordered::Null)
             }
             fn visit_seq<A: serde::de::SeqAccess<'de>>(
                 self,

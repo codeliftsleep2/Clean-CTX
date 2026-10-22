@@ -5,15 +5,28 @@ use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug)]
 pub(super) struct Project {
+    pub extensions: super::probe::FileExtensions,
     pub root: PathBuf,
     pub config: Option<PathBuf>,
     pub mode: String,
     pub base: PathBuf,
     pub paths: BTreeMap<String, Vec<PathBuf>>,
     pub conditions: Vec<String>,
+    pub ownership: Option<super::project_membership::Ownership>,
+    pub compiler_version: Option<String>,
+    pub options: BTreeMap<String, super::CompilerOption>,
 }
 
 impl Project {
+    pub(super) fn explicit(host: &mut Host, config: &Path, file: &Path) -> Result<Self, String> {
+        let file = host
+            .normalized(file)
+            .ok_or("Source outside authorized roots")?;
+        let (config, ownership) = super::project_membership::explicit(host, config, &file)?;
+        let mut project = Self::load(host, &config, &mut BTreeSet::new())?;
+        project.ownership = Some(ownership);
+        Ok(project)
+    }
     pub(super) fn discover(host: &mut Host, file: &Path) -> Result<Self, String> {
         let file = host
             .normalized(file)
@@ -26,9 +39,16 @@ impl Project {
         }
         let mut directory = file.parent().ok_or("Source has no directory")?;
         loop {
-            let config = directory.join("tsconfig.json");
-            if host.file(&config) {
-                return Self::load(host, &config, &mut BTreeSet::new());
+            for name in ["tsconfig.json", "jsconfig.json"] {
+                let config = directory.join(name);
+                if !host.file(&config) {
+                    continue;
+                }
+                let (selected, ownership) =
+                    super::project_membership::select(host, &config, &file)?;
+                let mut project = Self::load(host, &selected, &mut BTreeSet::new())?;
+                project.ownership = Some(ownership);
+                return Ok(project);
             }
             if directory == boundary {
                 break;
@@ -40,12 +60,16 @@ impl Project {
 
     fn source_only(boundary: PathBuf) -> Self {
         Self {
+            extensions: super::probe::FileExtensions::All,
             root: boundary.clone(),
             config: None,
             mode: "unresolved".into(),
             base: boundary,
             paths: BTreeMap::new(),
             conditions: vec!["types".into(), "import".into(), "default".into()],
+            ownership: None,
+            compiler_version: None,
+            options: BTreeMap::new(),
         }
     }
 
@@ -57,15 +81,32 @@ impl Project {
             .parent()
             .ok_or("Configuration has no parent")?
             .to_path_buf();
-        let options = super::project_config::options(host, &path, active)?;
+        let mut document = super::project_config::document(host, &path, active)?;
+        document.options.retain(|_, option| !option.value.is_null());
         let mut project = Self::source_only(directory.clone());
         project.config = Some(path);
+        project.compiler_version = super::project_version::installed(host, &directory)?;
+        super::project_config::substitute_config_dir(
+            &mut document,
+            &directory,
+            project.compiler_version.as_deref(),
+        )?;
+        let options = document.options;
+        if let Some(mode) = super::project_version::resolution_default(
+            &options,
+            project.compiler_version.as_deref(),
+        ) {
+            project.mode = mode.to_string();
+        }
         if let Some(option) = options.get("moduleResolution") {
             project.mode = option
                 .value
                 .as_str()
                 .ok_or("Invalid moduleResolution")?
                 .to_ascii_lowercase();
+            if project.mode == "node" {
+                project.mode = "node10".to_string();
+            }
         }
         if let Some(option) = options.get("baseUrl") {
             project.base = option
@@ -106,6 +147,12 @@ impl Project {
         ) {
             return Err("Unknown moduleResolution".into());
         }
+        super::project_options::validate(
+            &options,
+            &project.mode,
+            project.compiler_version.as_deref(),
+        )?;
+        project.options = options;
         Ok(project)
     }
 }
@@ -116,6 +163,9 @@ pub(super) fn jsonc(source: &str) -> Result<Value, String> {
 }
 
 pub(super) fn clean_jsonc(source: &str) -> Result<Vec<u8>, String> {
+    // A workspace config may carry a BOM even though repository source files
+    // forbid one. Parsing ignores it; the host still hashes the original bytes.
+    let source = source.strip_prefix('\u{feff}').unwrap_or(source);
     let bytes = source.as_bytes();
     let mut output = bytes.to_vec();
     let mut index = 0;

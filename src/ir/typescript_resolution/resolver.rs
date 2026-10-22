@@ -1,4 +1,3 @@
-use super::package::Ordered;
 use super::project::Project;
 use super::syntax::{Binding, Unit, admits};
 use super::{DeclarationId, Host, Namespace};
@@ -8,17 +7,94 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Resolution {
     Resolved(DeclarationId),
+    /// One source-owned symbol with every contributing declaration retained.
+    Merged(Vec<DeclarationId>),
     Ambiguous(Vec<DeclarationId>),
     Unresolved(String),
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(super) enum ExportSlot {
+    Named(String),
+    Assignment,
+}
+pub(super) type ExportVisit = (PathBuf, ExportSlot, Namespace);
+
 pub(crate) struct Resolver {
     pub host: Host,
+    pub(super) type_version_active: BTreeSet<(PathBuf, String)>,
+    pub(super) alias_active: BTreeSet<(
+        super::declared_scopes::NamespaceScope,
+        Vec<String>,
+        Namespace,
+    )>,
     units: BTreeMap<PathBuf, Option<Unit>>,
+    pub(super) programs: BTreeMap<PathBuf, Result<Vec<Unit>, String>>,
+    pub(super) library_evidence: Vec<super::compiler_libraries::LibraryRequest>,
+    pub(super) automatic_type_evidence: Vec<super::automatic_types::AutomaticTypeRequest>,
+    pub(super) directive_evidence: Vec<super::program_directives::DirectiveRequest>,
+    pub(super) program_active: BTreeSet<PathBuf>,
+    pub(super) scope_export_active:
+        BTreeSet<(super::declared_scopes::NamespaceScope, String, Namespace)>,
+    pub(super) program_evidence: BTreeMap<PathBuf, super::program::ProgramEvidence>,
     projects: BTreeMap<PathBuf, Result<Project, String>>,
+    requested_project: Option<PathBuf>,
+    project_context: Option<Result<Project, String>>,
 }
 
 impl Resolver {
+    pub(super) fn in_source_project<T>(
+        &mut self,
+        file: &Path,
+        action: impl FnOnce(&mut Self) -> T,
+    ) -> T {
+        let inherited = self.project_context.take();
+        self.project_context = Some(
+            inherited
+                .clone()
+                .unwrap_or_else(|| self.project_identity(file)),
+        );
+        let result = action(self);
+        self.project_context = inherited;
+        result
+    }
+
+    pub(super) fn request_project(&mut self, file: &Path) -> Result<Project, String> {
+        self.project_context
+            .clone()
+            .unwrap_or_else(|| self.project_identity(file))
+    }
+    pub(super) fn resolution_file(&mut self, file: &Path) -> Option<PathBuf> {
+        let project = self.request_project(file).ok();
+        if project.as_ref().is_some_and(|project| {
+            project
+                .options
+                .get("preserveSymlinks")
+                .and_then(|option| option.value.as_bool())
+                == Some(true)
+        }) {
+            self.host.logical(file)
+        } else {
+            self.host.normalized(file)
+        }
+    }
+
+    pub(super) fn project_path(&mut self, path: &Path, project: &Project) -> Option<PathBuf> {
+        if project
+            .options
+            .get("preserveSymlinks")
+            .and_then(|option| option.value.as_bool())
+            == Some(true)
+        {
+            self.host.logical(path)
+        } else {
+            self.host.normalized(path)
+        }
+    }
+
+    pub(super) fn source_tree(&mut self, file: &Path) -> Option<tree_sitter::Tree> {
+        self.unit(file)?.tree
+    }
     pub(super) fn source_declarations(
         &mut self,
         file: &Path,
@@ -26,15 +102,7 @@ impl Resolver {
         let unit = self
             .unit(file)
             .ok_or("TypeScript source syntax has no supported binding unit")?;
-        Ok(unit
-            .locals
-            .values()
-            .flatten()
-            .filter_map(|binding| match binding {
-                Binding::Declaration(declaration, _) => Some(declaration.clone()),
-                _ => None,
-            })
-            .collect())
+        Ok(unit.inventory().into_iter().collect())
     }
 
     pub(super) fn source_names(&mut self, file: &Path) -> Vec<String> {
@@ -43,50 +111,81 @@ impl Resolver {
             .unwrap_or_default()
     }
 
-    pub(super) fn project_identity(
-        &mut self,
-        file: &Path,
-    ) -> Result<(PathBuf, Option<PathBuf>, String), String> {
-        let project = Project::discover(&mut self.host, file)?;
-        Ok((project.root, project.config, project.mode))
+    pub(super) fn project_identity(&mut self, file: &Path) -> Result<Project, String> {
+        let file = self.host.normalized(file).ok_or("Source outside scope")?;
+        if let Some(project) = self.projects.get(&file) {
+            return project.clone();
+        }
+        let project = match self.requested_project.as_deref() {
+            Some(config) => Project::explicit(&mut self.host, config, &file),
+            None => Project::discover(&mut self.host, &file),
+        };
+        self.projects.insert(file, project.clone());
+        project
     }
     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
+        Self::with_project(roots, None)
+    }
+    pub(crate) fn with_project(roots: &[PathBuf], project: Option<&Path>) -> Result<Self, String> {
         Ok(Self {
             host: Host::new(roots)?,
+            type_version_active: BTreeSet::new(),
+            alias_active: BTreeSet::new(),
+            scope_export_active: BTreeSet::new(),
             units: BTreeMap::new(),
+            programs: BTreeMap::new(),
+            program_active: BTreeSet::new(),
+            directive_evidence: Vec::new(),
+            automatic_type_evidence: Vec::new(),
+            library_evidence: Vec::new(),
+            program_evidence: BTreeMap::new(),
             projects: BTreeMap::new(),
+            requested_project: project.map(Path::to_path_buf),
+            project_context: None,
         })
     }
 
     pub(crate) fn local(&mut self, file: &Path, name: &str, namespace: Namespace) -> Resolution {
-        let Some(file) = self.host.normalized(file) else {
+        let Some(file) = self.resolution_file(file) else {
             return Resolution::Unresolved("Source outside scope".into());
         };
-        let mut active = BTreeSet::new();
-        let (declarations, complete) = self.local_set(&file, name, namespace, &mut active);
-        Self::outcome(declarations, complete)
+        self.in_source_project(&file, |resolver| {
+            let mut active = BTreeSet::new();
+            let (declarations, complete) = resolver.local_set(&file, name, namespace, &mut active);
+            resolver.outcome(declarations, complete)
+        })
     }
 
-    fn outcome(declarations: BTreeSet<DeclarationId>, complete: bool) -> Resolution {
+    pub(super) fn outcome(
+        &self,
+        declarations: BTreeSet<DeclarationId>,
+        complete: bool,
+    ) -> Resolution {
         if !complete {
             return Resolution::Unresolved("Resolution has unproven contributors".into());
         }
         match declarations.len() {
             0 => Resolution::Unresolved("No declaration".into()),
             1 => Resolution::Resolved(declarations.into_iter().next().expect("one declaration")),
+            _ if super::declaration_groups::mergeable(&declarations)
+                || self.program_group_proven(&declarations) =>
+            {
+                Resolution::Merged(declarations.into_iter().collect())
+            }
             _ => Resolution::Ambiguous(declarations.into_iter().collect()),
         }
     }
 
-    fn unit(&mut self, file: &Path) -> Option<Unit> {
-        if !self.units.contains_key(file) {
+    pub(super) fn unit(&mut self, file: &Path) -> Option<Unit> {
+        let file = self.host.normalized(file)?;
+        if !self.units.contains_key(&file) {
             let unit = self
                 .host
-                .read(file)
-                .and_then(|source| Unit::parse(file, &source));
+                .read(&file)
+                .and_then(|source| Unit::parse(&file, &source));
             self.units.insert(file.to_path_buf(), unit);
         }
-        self.units.get(file).cloned().flatten()
+        self.units.get(&file).cloned().flatten()
     }
 
     fn local_set(
@@ -94,43 +193,105 @@ impl Resolver {
         file: &Path,
         name: &str,
         namespace: Namespace,
-        active: &mut BTreeSet<(PathBuf, String, Namespace)>,
+        active: &mut BTreeSet<ExportVisit>,
     ) -> (BTreeSet<DeclarationId>, bool) {
         let Some(unit) = self.unit(file) else {
             return (BTreeSet::new(), false);
         };
         let Some(bindings) = unit.locals.get(name) else {
-            return (BTreeSet::new(), true);
+            return self.global_bindings(file, name, namespace, active);
         };
-        // Duplicate lexical bindings are not a valid way to choose a declaration.
-        if bindings.len() != 1 {
+        let Ok(project) = self.request_project(file) else {
             return (BTreeSet::new(), false);
+        };
+        if project.config.is_some() {
+            match self.program_source_external(&unit, &project) {
+                Ok(false) => return self.global_bindings(file, name, namespace, active),
+                Err(_) => return (BTreeSet::new(), false),
+                _ => {}
+            }
         }
-        self.binding(file, &bindings[0], namespace, active)
+        // Type and value spaces may legally contain different declarations.
+        // Multiple contributors within one space still require merge authority;
+        // never choose the first declaration as a substitute for that proof.
+        let eligible: Vec<_> = bindings
+            .iter()
+            .filter(|binding| admits(binding, namespace))
+            .collect();
+        if eligible.is_empty() {
+            if bindings
+                .iter()
+                .all(|binding| matches!(binding, Binding::Declaration(..)))
+            {
+                return self.global_bindings(file, name, namespace, active);
+            }
+            return (BTreeSet::new(), true);
+        }
+        if eligible.len() != 1 {
+            let declarations: BTreeSet<_> = eligible
+                .iter()
+                .filter_map(|binding| match binding {
+                    Binding::Declaration(id, _) => Some(id.clone()),
+                    _ => None,
+                })
+                .collect();
+            let complete = declarations.len() == eligible.len()
+                && super::declaration_groups::mergeable(&declarations);
+            return (declarations, complete);
+        }
+        self.binding(file, eligible[0], namespace, active)
     }
 
-    fn binding(
+    pub(super) fn binding(
         &mut self,
         file: &Path,
         binding: &Binding,
         namespace: Namespace,
-        active: &mut BTreeSet<(PathBuf, String, Namespace)>,
+        active: &mut BTreeSet<ExportVisit>,
     ) -> (BTreeSet<DeclarationId>, bool) {
         if !admits(binding, namespace) {
             return (BTreeSet::new(), true);
         }
         match binding {
+            Binding::Alias(path) => self.alias_declaration(
+                &super::declared_scopes::NamespaceScope::module(file),
+                path,
+                namespace,
+            ),
             Binding::Declaration(declaration, _) => (BTreeSet::from([declaration.clone()]), true),
             Binding::Import {
                 module, imported, ..
             } if module.is_empty() => self.local_set(file, imported, namespace, active),
             Binding::Import {
-                module, imported, ..
+                module,
+                imported,
+                mode,
+                ..
             } => {
-                let Ok(target) = self.module(file, module) else {
+                let Ok(target) = self.module_scope(file, module, *mode) else {
                     return (BTreeSet::new(), false);
                 };
-                self.export_set(&target, imported, namespace, active)
+                if target.blocks.is_empty() {
+                    self.export_set(&target.file, imported, namespace, active)
+                } else {
+                    match self.scope_export(&target, imported, namespace) {
+                        Resolution::Resolved(id) => (BTreeSet::from([id]), true),
+                        Resolution::Merged(ids) | Resolution::Ambiguous(ids) => {
+                            (ids.into_iter().collect(), true)
+                        }
+                        Resolution::Unresolved(_) => (BTreeSet::new(), false),
+                    }
+                }
+            }
+            Binding::Require { module, .. } => {
+                let Ok(target) = self.module_request(
+                    file,
+                    module,
+                    super::module_resolution::ModuleRequestKind::Require,
+                ) else {
+                    return (BTreeSet::new(), false);
+                };
+                self.assignment_set(&target, namespace, active)
             }
             Binding::Namespace { module, .. } => {
                 // A module namespace is not an exported declaration. Resolve
@@ -141,14 +302,41 @@ impl Resolver {
         }
     }
 
-    fn export_set(
+    fn assignment_set(
+        &mut self,
+        file: &Path,
+        namespace: Namespace,
+        active: &mut BTreeSet<ExportVisit>,
+    ) -> (BTreeSet<DeclarationId>, bool) {
+        let key = (file.to_path_buf(), ExportSlot::Assignment, namespace);
+        if !active.insert(key.clone()) {
+            return (BTreeSet::new(), true);
+        }
+        let result = if let Some(unit) = self.unit(file) {
+            if unit.assignment.len() == 1 {
+                self.binding(file, &unit.assignment[0], namespace, active)
+            } else {
+                (BTreeSet::new(), false)
+            }
+        } else {
+            (BTreeSet::new(), false)
+        };
+        active.remove(&key);
+        result
+    }
+
+    pub(super) fn export_set(
         &mut self,
         file: &Path,
         name: &str,
         namespace: Namespace,
-        active: &mut BTreeSet<(PathBuf, String, Namespace)>,
+        active: &mut BTreeSet<ExportVisit>,
     ) -> (BTreeSet<DeclarationId>, bool) {
-        let key = (file.to_path_buf(), name.to_string(), namespace);
+        let key = (
+            file.to_path_buf(),
+            ExportSlot::Named(name.to_string()),
+            namespace,
+        );
         // No early-empty result is memoized: each rooted DFS explores all
         // reachable exports. Cyclic routes supply no new rooted declaration.
         if !active.insert(key.clone()) {
@@ -161,6 +349,20 @@ impl Resolver {
             let mut declarations = BTreeSet::new();
             let mut complete = true;
             if let Some(bindings) = unit.exports.get(name) {
+                let eligible: Vec<_> = bindings
+                    .iter()
+                    .filter(|binding| admits(binding, namespace))
+                    .collect();
+                // Repeated explicit aliases are conflicting export bindings,
+                // even when traversal would deduplicate their terminal target.
+                // Written declaration groups are classified by outcome instead.
+                if eligible.len() > 1
+                    && eligible
+                        .iter()
+                        .any(|binding| !matches!(binding, Binding::Declaration(..)))
+                {
+                    return (BTreeSet::new(), false);
+                }
                 for binding in bindings {
                     let (found, closed) = self.binding(file, binding, namespace, active);
                     declarations.extend(found);
@@ -181,217 +383,12 @@ impl Resolver {
                     }
                 }
             }
+            if namespace == Namespace::Type {
+                complete &= self.augment_type(file, name, &mut declarations);
+            }
             (declarations, complete)
         })();
         active.remove(&key);
         result
-    }
-
-    pub(crate) fn module(&mut self, file: &Path, specifier: &str) -> Result<PathBuf, String> {
-        let file = self.host.normalized(file).ok_or("Source outside scope")?;
-        if !self.projects.contains_key(&file) {
-            let project = Project::discover(&mut self.host, &file);
-            self.projects.insert(file.clone(), project);
-        }
-        let project = self
-            .projects
-            .get(&file)
-            .expect("inserted project")
-            .clone()?;
-        if !matches!(project.mode.as_str(), "bundler" | "node10" | "node") {
-            return Err(format!(
-                "{} resolution semantics pending conformance",
-                project.mode
-            ));
-        }
-        let directory = file.parent().ok_or("Source has no parent")?;
-        if specifier.starts_with('.') {
-            return self
-                .probe(&directory.join(specifier))
-                .ok_or_else(|| "Relative module absent".into());
-        }
-        let mut mappings: Vec<_> = project
-            .paths
-            .iter()
-            .filter_map(|(pattern, targets)| {
-                if pattern == specifier {
-                    return Some((usize::MAX, String::new(), targets));
-                }
-                let (prefix, suffix) = pattern.split_once('*')?;
-                let middle = specifier.strip_prefix(prefix)?.strip_suffix(suffix)?;
-                Some((prefix.len(), middle.to_string(), targets))
-            })
-            .collect();
-        mappings.sort_by(|left, right| right.0.cmp(&left.0));
-        if let Some((_, middle, targets)) = mappings.first() {
-            for target in *targets {
-                let target = PathBuf::from(target.to_string_lossy().replace('*', middle));
-                if let Some(file) = self.probe(&target) {
-                    return Ok(file);
-                }
-            }
-        }
-        if project.base != project.root
-            && let Some(target) = self.probe(&project.base.join(specifier))
-        {
-            return Ok(target);
-        }
-        if specifier.starts_with('#') {
-            let (_, manifest) = self
-                .nearest_manifest(directory)
-                .ok_or("No package imports owner")?;
-            let owner = manifest.0;
-            let json = manifest.1;
-            let target = Self::mapped(
-                json.get("imports").ok_or("No imports map")?,
-                specifier,
-                &project.conditions,
-            )
-            .ok_or("Package import not exported")?;
-            if !target.starts_with("./") {
-                return Err("External package imports targets pending conformance".into());
-            }
-            return self
-                .probe(&owner.join(target))
-                .ok_or_else(|| "Package imports target absent".into());
-        }
-        let pieces: Vec<_> = specifier.split('/').collect();
-        let count = if specifier.starts_with('@') { 2 } else { 1 };
-        if pieces.len() < count {
-            return Err("Invalid package specifier".into());
-        }
-        let package = pieces[..count].join("/");
-        let subpath = if pieces.len() == count {
-            ".".to_string()
-        } else {
-            format!("./{}", pieces[count..].join("/"))
-        };
-        let boundary = self.host.boundary(&file).ok_or("Missing source scope")?;
-        let mut ancestor = directory;
-        loop {
-            let owner = ancestor.join("node_modules").join(&package);
-            let manifest = owner.join("package.json");
-            if let Some(source) = self.host.read(&manifest) {
-                let json = Ordered::parse(&source)?;
-                if let Some(exports) = json.get("exports") {
-                    let target = Self::mapped(exports, &subpath, &project.conditions)
-                        .ok_or("Package export blocked")?;
-                    if !target.starts_with("./") {
-                        return Err("Invalid package export target".into());
-                    }
-                    let normalized = self
-                        .host
-                        .normalized(&owner.join(&target))
-                        .ok_or("Export target outside scope")?;
-                    if !normalized.starts_with(&owner) {
-                        return Err("Package export escapes package".into());
-                    }
-                    return self
-                        .probe(&normalized)
-                        .ok_or_else(|| "Package export target absent".into());
-                }
-                if subpath != "." {
-                    return self
-                        .probe(&owner.join(subpath.trim_start_matches("./")))
-                        .ok_or_else(|| "Package subpath absent".into());
-                }
-                for field in ["types", "typings", "main"] {
-                    if let Some(target) = json.get(field).and_then(Ordered::string)
-                        && let Some(file) = self.probe(&owner.join(target))
-                    {
-                        return Ok(file);
-                    }
-                }
-                return self
-                    .probe(&owner.join("index"))
-                    .ok_or_else(|| "Package entry absent".into());
-            }
-            if ancestor == boundary {
-                break;
-            }
-            ancestor = ancestor.parent().ok_or("Missing package boundary")?;
-        }
-        Err("Package absent".into())
-    }
-
-    fn probe(&mut self, path: &Path) -> Option<PathBuf> {
-        if self.host.file(path) {
-            return path.canonicalize().ok();
-        }
-        for extension in ["ts", "tsx", "d.ts", "mts", "cts", "js", "jsx"] {
-            let candidate = PathBuf::from(format!("{}.{extension}", path.to_string_lossy()));
-            if self.host.file(&candidate) {
-                return candidate.canonicalize().ok();
-            }
-        }
-        for extension in ["ts", "tsx", "d.ts", "js"] {
-            let candidate = path.join(format!("index.{extension}"));
-            if self.host.file(&candidate) {
-                return candidate.canonicalize().ok();
-            }
-        }
-        None
-    }
-
-    fn nearest_manifest(&mut self, directory: &Path) -> Option<(PathBuf, (PathBuf, Ordered))> {
-        let boundary = self.host.boundary(directory)?;
-        let mut directory = directory;
-        loop {
-            let path = directory.join("package.json");
-            if let Some(source) = self.host.read(&path) {
-                return Some((
-                    path,
-                    (directory.to_path_buf(), Ordered::parse(&source).ok()?),
-                ));
-            }
-            if directory == boundary {
-                return None;
-            }
-            directory = directory.parent()?;
-        }
-    }
-
-    fn mapped(value: &Ordered, key: &str, conditions: &[String]) -> Option<String> {
-        if let Ordered::Object(object) = value
-            && object
-                .iter()
-                .any(|(name, _)| name.starts_with('.') || name.starts_with('#'))
-        {
-            if let Some(exact) = value.get(key) {
-                return Self::condition(exact, conditions);
-            }
-            let mut patterns: Vec<_> = object
-                .iter()
-                .filter_map(|(pattern, target)| {
-                    let (prefix, suffix) = pattern.split_once('*')?;
-                    Some((
-                        prefix.len(),
-                        suffix.len(),
-                        key.strip_prefix(prefix)?.strip_suffix(suffix)?.to_string(),
-                        target,
-                    ))
-                })
-                .collect();
-            patterns.sort_by_key(|item| std::cmp::Reverse((item.0, item.1)));
-            let (_, _, middle, target) = patterns.first()?;
-            return Some(Self::condition(target, conditions)?.replace('*', middle));
-        }
-        (key == ".")
-            .then(|| Self::condition(value, conditions))
-            .flatten()
-    }
-
-    fn condition(value: &Ordered, conditions: &[String]) -> Option<String> {
-        match value {
-            Ordered::String(target) => Some(target.clone()),
-            Ordered::Array(array) => array
-                .iter()
-                .find_map(|target| Self::condition(target, conditions)),
-            Ordered::Object(entries) => entries
-                .iter()
-                .find(|(key, _)| key == "default" || conditions.contains(key))
-                .and_then(|(_, target)| Self::condition(target, conditions)),
-            Ordered::Other => None,
-        }
     }
 }
