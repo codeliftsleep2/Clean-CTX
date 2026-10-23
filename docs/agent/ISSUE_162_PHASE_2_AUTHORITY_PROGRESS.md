@@ -1,9 +1,2286 @@
 # Issue #162 Phase 2 authority progress
 
+## 2026-10-23: generation-42 focused member controls GREEN
+
+Agent: Agent MaxHeadRoom
+
+The four operator member42-*.log receipts confirm 2 member-authority regressions,
+6 member-semantics controls and both compatibility controls (1 each) passing:
+10 passed, 0 failed, 0 ignored, no reported warnings. Later assertions in the
+previously failing tests are verified. This supersedes the member UNRUN
+checkpoints below. Member identity/lifecycle, generation-42 binary acceptance
+and final field verification remain open. No production edit was made here.
+
+## 2026-10-23: shared-mechanism doctrine integrated for all layer migrations
+
+Agent: Agent MaxHeadRoom
+
+The owner's doctrine is integrated as DOCUMENTED MECHANISM-REUSE-001 in the
+architectural invariants, with linked certification, architecture audit and
+canonical-question review items. Equivalent authority/lifecycle/correctness
+mechanics should be reused; specialized meaning retains its actual owner.
+Parallel equivalent machinery requires an explicit architectural reason. No
+universal abstraction, new runtime gate or repository-wide refactor was added.
+
+ISSUE_162_MECHANISM_REUSE_REVIEW.md records confirmed exact-span lookup duplication,
+likely legacy authority duplication, legitimate semantic specialization and
+insufficient evidence separately, including all twelve ownership questions for
+the current member consumer. The current authored member repair remains runtime
+UNRUN; this documentation work changes no code, tests or supported envelope.
+
+## 2026-10-23: AQ10 member authority 2 REDs preserved; first admission repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator member-authority-red.log records 0 passed, 2 failed, 0 ignored: aliases
+lose all member facts; foreign package-looking imports still grant facts. Ordinary
+nonempty controls passed first. Exact test/registration stash:
+a71514787ddc3812f98052cde88ae6aca7d80b7b, restored byte-identically.
+
+The existing member projector now consumes retained exact API/package references
+and class-role authority, preserving direct initializer guards, output shape,
+no-authority compatibility and the separate functional-inject path. No new
+persistent identity or public schema. Generation 42; post-repair tests UNRUN.
+Canonical member IDs, aliases, inheritance/template joins and full AQ10 closure
+remain required. See ISSUE_162_MEMBER_AUTHORITY_PROGRESS.md for the bounded slice.
+
+## 2026-10-23: expanded binary acceptance PASS 525/525; AQ10 regressions authored
+
+Agent: Agent MaxHeadRoom
+
+Operator report 2026-10-23T21-56-31-017Z-11520 under
+target/live-acceptance/issue-162 records PASS, 525/525 checks, three FINISHED
+sessions, no errors. Rebuilt binary SHA-256:
+ac5b06141f715b5be557127cb903bd3bbada130b36c4cf51074412d7d2af9c6a.
+This is binary/stdio evidence, not Rust/CI, completeness or final field acceptance.
+No Phase 3/#162 closure follows; the remaining canonical question consumers stay
+required. See the string-token decision for the complete bounded receipt.
+
+The next located gap is AQ10 member API/owner admission. Its default projector
+still uses written names and bounded import spelling independently of retained
+class-role authority. Two tracked public-query tests are authored for barrel/
+namespace aliases and package-spelling redirection amid mixed source noise.
+Both are UNRUN; no production repair precedes their RED. See
+ISSUE_162_MEMBER_AUTHORITY_PROGRESS.md. No new compiler-parity frontier is admitted.
+
+## 2026-10-23: post-lint native/string preservation and zero-warning gate GREEN
+
+Agent: Agent MaxHeadRoom
+
+Operator string41-native-postlint.log: 317 passed, with the preserved erased
+namespace frontier explicitly skipped. string41-postlint.log: 12 string tests
+passed. No failures/ignored. string41-clippy-rerun.log records successful
+all-target/all-feature Clippy with -D warnings. The 111-test index receipt remains
+valid for its unchanged index implementation. These checks supersede the earlier
+failed Clippy attempt; no new production edit follows this checkpoint.
+
+The expanded existing three-session binary driver is authored and UNRUN, ready
+for an explicit all-feature rebuild and operator-run provenance-preserving
+acceptance. Full repository/phase closure and final Claude field acceptance are
+not established. See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md.
+
+## 2026-10-23: native/index preservation GREEN; mechanical Clippy corrections authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string41-native.log: 317 passed with the preserved erased namespace
+frontier explicitly skipped. string41-index.log: 111 passed. No failures/ignored
+reported. All-feature/all-target Clippy then failed on 17 diagnostics, including
+older TS resolver/test code. Mechanical fixes use Option::zip, collapsed conditions,
+equivalent stable reverse-sort keys/version predicates, a manifest return alias
+and 11 borrowed singleton slices. No suppressions or assertion changes.
+
+Focused post-edit native/string preservation and Clippy are UNRUN; these edits
+postdate prior GREEN receipts. Binary acceptance remains pending. No semantic
+generation or scope change is intended; the unresolved erased frontier is intact.
+
+## 2026-10-23: corrected string lifecycle 3 GREEN; binary driver extension authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string-lifecycle-rerun.log records 3 passed, 0 failed, 0 ignored with
+no reported warnings. Exact durable proof, stale refusal, mutation/reacquisition,
+source replacement and documented external-deletion refresh now pass. The earlier
+invalid deletion trigger remains preserved; no production repair followed it.
+
+The existing three-session binary driver now adds two string owners to the same
+five-source checkpoint and records its new helper hash. It covers mixed derived
+values, escape equivalence, equal-description object distinction, API guards,
+provider labels, restart, mutation and stale restore. It is authored and UNRUN.
+Native/index preservation and zero-warning checks precede rebuilt-binary acceptance;
+the final Claude gate remains last. No phase/certification completion follows.
+
+## 2026-10-23: durable string controls 2 GREEN; external-delete test trigger corrected
+
+Agent: Agent MaxHeadRoom
+
+Operator string-lifecycle.log records 2 passed, 1 failed, 0 ignored. Exact restart
+proof and stale initializer refusal/reacquisition pass. The remaining test reaches
+past mutation/repair and source replacement, then fails after external deletion
+without the documented refresh_workspace event (tooling.md external-edit rule).
+This is an invalid trigger, not established production RED. Original test/log
+bytes and hashes are retained under string-lifecycle-refresh-correction in target.
+
+The test now calls the registered refresh tool after deletion; its zero-provider
+and surviving-neighbor assertions are unchanged. No production change or global
+lifecycle policy change was made. The corrected lifecycle batch is UNRUN; later
+assertions remain unclassified. See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md.
+
+## 2026-10-23: generation-41 deterministic batch GREEN; durable string lifecycle authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string41-*.log records 81 semantic-compilation tests, 6 provider controls,
+3 acquisition controls and both compatibility controls (1 each) passing, with no
+failures, ignored tests or reported warnings. Unchanged alias regressions pass
+their later dependency mutation/restoration assertions. Earlier compile-error
+attempts are superseded. This is deterministic evidence, not live acceptance.
+
+Three new tracked registered string lifecycle controls exercise real production
+compress/SQLite/restore/query paths with separate same-named owners and mixed
+barrel/namespace/trivia/noise source forms. They require exact full authority and
+endpoint restoration before queries, stale initializer refusal, current-value
+mutation/retraction, and independent source replacement/deletion. All are UNRUN;
+no production change was made for this batch. See
+ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for the current bounded checkpoint.
+Binary/stdio and final batched live verification remain pending.
+
+## 2026-10-23: alias behavioral RED preserved; demanded immutable route repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string-alias-red.log records 1 passed, 2 failed, 0 ignored. Constructor
+ALIAS/local endpoints and provider local/missing namespace value are the observed
+failures; the unsafe-derivation string-proof control passes. Later mutation
+assertions remain unclassified. Exact test/registration frozen in isolated stash
+302c2e9f5dd5cd083373a16b6d5486d67d8e59f1, then restored byte-identically.
+
+Native demand now includes retained constructor decorator argument references.
+Existing immutable Host/project acquisition carries initializer/reference facets
+and witnesses. Shared retained-fact string lookup follows unique const routes;
+mutable, cyclic, missing/competing and arbitrary-call routes yield no string proof.
+Both Angular consumers and neutral endpoint admission use the same value lookup.
+Use-site proof, source ownership, witness currentness and publication are retained
+through the existing architecture. No cache, registry, field API widening or
+general constant evaluator is introduced. Semantic generation is now 41.
+
+All post-repair runtime gates are UNRUN; generation-40 receipts precede these
+production edits. Durable restoration, route/witness preservation, broader query
+lifecycle, binary acceptance and final live verification remain required.
+See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for the bounded checkpoint.
+
+
+## 2026-10-23: generation-40 focused string controls GREEN; alias regressions authored
+
+Agent: Agent MaxHeadRoom
+
+Fresh operator string40-*-rerun.log receipts record string-token 6/6,
+provider preservation 6/6 and both compatibility controls 1/1 each, with no
+failures, ignored tests or reported warnings. This supersedes the earlier E0061
+handoff; the original exact public-query RED tests are now GREEN. It is focused
+evidence, not full preservation, lifecycle, binary or final live acceptance.
+
+Three tracked registered public-query tests now target immutable string routes
+through const/local aliases, named barrels and namespaces, mixed with equal-
+description object tokens and unrelated generic/method/string noise. Later
+assertions require unchanged-source dependency mutation and restoration. A
+separate control refuses string-value proof for mutable, cyclic, call, erased
+and foreign sites without claiming legacy symbolic/object migration complete.
+All three new tests are UNRUN. No further production repair was made before RED.
+See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for receipts and bounded scope.
+
+
+## 2026-10-23: literal acquisition GREEN; canonical string carrier and first consumers authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string-literal-acquisition.log: 3 passed, 0 failed, 0 ignored. This
+precedes the carrier repair and is not verification of the new changes.
+Original public-query RED tests were frozen again with isolated registration in
+stash a24f8a32422ad600ea1e7d2fb47cdeec69689072 and restored byte-identically.
+
+CanonicalEndpoint now distinguishes declaration evidence from exact UTF-16 string
+values with source/hash/span proof. Declaration durable shape/key meaning remain;
+string index keys separate value equality from retained occurrence proof. Existing
+durable snapshots carry the full endpoint. Native admission refuses mismatched
+labels, values, spans and source/hash. Constructor Inject and direct literal
+provider registration consume their respective API/owner/native occurrence proof.
+Provider strategy projections remain noncanonical, with corrected token labels.
+Field inject is unchanged. No EntityRef equality or public schema change.
+
+Generation 40 compatibility and two tracked carrier controls are authored; all
+post-repair runtime verification is pending. Four old tests have mechanical enum
+accessor updates only, with behavioral assertions preserved. Const/alias string
+derivation, expanded adversarial/lifecycle controls, full persistence restoration,
+preservation, binary acceptance and final live field verification remain required.
+See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for the complete bounded checkpoint.
+No agent-run Cargo, runtime or normal-index staging occurred.
+
+
+## 2026-10-23: string-token behavioral RED preserved; exact literal acquisition authored
+
+Agent: Agent MaxHeadRoom
+
+Operator string-token-authority-red.log: 2 passed, 2 failed, 0 ignored. Constructor
+mixed literal identity and provider cooked-label assertions fail. Distinct object
+tokens and the field API guard pass. No later assertions are inferred. Exact tests
+were frozen with isolated registration in stash e0eafd50085ebacf6956fb65489c83b30f08a25a
+and restored byte-identically; normal index and HEAD untouched.
+
+The first repair step retains constructor literal UTF-16 units under existing
+owner/hash/span evidence, sharing decoder mechanics without widening module-name
+Unicode representation. It does not yet change canonical relation identity or
+provider labels. Three tracked decoder/real-capture/complete-JSON-round-trip
+controls are authored and UNRUN. Angular semantic generation is now 39; previous
+generation-38 receipts do not verify these edits. Both public REDs remain open.
+See ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for scope and exact evidence.
+No Cargo, binary, server or oracle was run by the agent.
+
+
+## 2026-10-23: string-token extension APPROVED with API guardrail; first public regressions authored
+
+Agent: Agent MaxHeadRoom
+
+Owner approval authorizes distinct typed string-value identity and quoted labels
+through the existing lifecycle, with an explicit per-Angular-API admission rule.
+No constructor approval is stretched into arbitrary string support for every DI
+surface. Official Angular 20 Inject and ValueProvider docs establish the initial
+constructor/provide forms; inject's separate ProviderToken/HostAttributeToken
+surface is recorded without adding direct-string field positives. See the API
+ledger in ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md for linked primary evidence.
+No external compiler/runtime/oracle was executed.
+
+Four tracked registered public-query tests are authored: a nonempty class control
+followed by mixed literal equivalence/distinction and class namesake assertions;
+provider/constructor quoted-value labels; distinct equal-description InjectionToken
+objects through a barrel; and a field API guard preserving a valid class token
+beside an unsupported string call. The mixed source includes aliases/namespace
+APIs, modifiers, unrelated missing imports, generic/method/string/foreign-call
+noise. All four tests are UNRUN. No RED, warm result or later assertion success
+is inferred. Const/alias value derivation and full lifecycle cases remain required.
+
+The current canonical creation/transport/serialization/admission/EdgeKey/retirement
+boundaries are inventoried in the decision record before choosing a Rust carrier.
+No carrier, production behavior, public schema, generation, normal index or HEAD
+was changed in this test-authoring step. API-specific string-value identity must
+remain separate from occurrence proof and provider satisfaction.
+
+## 2026-10-23: generation-38 consolidated/binary GREEN; string-token identity decision prepared
+
+Agent: Agent MaxHeadRoom
+
+Captured consolidated-38 logs record semantic_compilation 75 passed,
+angular_di_inject_token 7 passed and each changed compatibility assertion 1 passed,
+with zero failed/ignored tests and no warnings. This includes exact merged-family
+session/index restoration and post-restore runtime-class removal. No production
+edit followed those results.
+
+Latest binary receipt target/live-acceptance/issue-162/
+2026-10-23T19-37-24-272Z-1664/report.json records PASS, 459/459 checks,
+all three sessions FINISHED and zero errors. Executable SHA-256:
+e1c98d6dfc90c5327438a7a39ba4c9b1b46cba873fb50788916350e0e4d26694.
+These are operator binary/stdio receipts, distinct from tracked regressions,
+full repository gates and final Claude field acceptance.
+
+Next required non-reference token form exposes an identity boundary: string-valued
+Inject tokens have no declaration, while the canonical relation carrier only
+represents declaration endpoints. Providers already parse string syntax without
+shared cooked-value proof. The constructor approval explicitly left primitive
+interpretation undecided. ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md proposes a
+bounded string-token variant through existing ownership/persistence/indexing and
+quoted literal presentation in existing name fields. No declaration spoofing,
+parallel registry, global EntityRef change or public schema change is proposed.
+This identity/presentation extension awaits owner decision under the Architectural
+Approval Gate. No production repair or new RED is claimed for it. All remaining
+constructor/provider forms and reverse/completeness obligations remain in scope.
+
+## 2026-10-23: generation-38 focused merge GREEN; durable and binary controls prepared
+
+Agent: Agent MaxHeadRoom
+
+Captured merge-38 logs record constructor_authority 5 passed and
+constructor_decorator 3 passed, with zero failures/ignored tests and no warnings.
+The unchanged merged-family RED now passes including all previously unexecuted
+contributor-retention, duplicate-class refusal and restoration assertions.
+No production edit followed this focused checkpoint.
+
+A new tracked durable test requires complete merged constructor type/value
+contributors and witnesses to round-trip into session and the real index before
+query acquisition. Two canonical facts must restore; removing only the runtime
+class while retaining its interface must retract only that token afterwards.
+The test is authored and UNRUN. The existing binary driver also adds legal
+interface augmentation, duplicate-class ambiguity, repair and a merged-family
+checkpoint within its existing three sessions. No new runtime boundary or retry
+is introduced. Those binary assertions are UNRUN.
+
+Next operator batch consolidates semantic compilation, inject preservation and
+changed producer compatibility assertions, then performs syntax preflight,
+explicit binary rebuild and the extended three-session run. Native acquisition/
+shared binder implementation was not changed by the merge repair; their prior
+315/21 receipts remain the latest such evidence, not a new generation-38 run.
+This is not the full repository gate or final Claude field acceptance.
+
+## 2026-10-23: legal class/interface constructor RED preserved; bounded gate repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator constructor-merged-family-red.log records 0 passed / 1 failed at the
+expected legal-augmentation assertion: only the right token survives where two
+canonical owners are required. The nonempty initial control passed; later family
+retention/duplicate-class/restoration assertions remain unclassified. Test and
+isolated registration were frozen absent during repair in temporary-index stash
+7dc5bea87d193d76e96a192337e0fe671422f34d, then restored byte-identically.
+Test SHA-256: 1a71389220c082365583f5102be79647cdabe9f329c513de8896cf4226aa1d77.
+Normal index and HEAD were untouched.
+
+Constructor runtime eligibility now allows additional type-only interface
+contributors only when both independent successful meanings have exactly one
+identical class, all value contributors remain in the type group, and the existing
+native same-source merge predicate accepts that type group. Every additional
+type contributor must be an interface. No contributor is removed from retained
+proof. Ambiguous/duplicate-class or unsupported family differences remain refused;
+there is no textual/class-name rescue or general type compatibility engine.
+
+Existing Angular semantic generation advances to 38, with matching generation
+assertions. The relation validator consumes the same runtime eligibility method.
+No new publication/transport/public contract is introduced. Repair is authored
+and UNRUN; focused merged-family and constructor/decorator regressions are next.
+Previous generation-37 414/414 binary acceptance predates this production edit.
+Remaining required DI forms, reverse closure, completeness and final field gate
+remain open; no constructor or phase completion is claimed.
+
+## 2026-10-23: generation-37 binary 414/414 PASS; class/interface consumer frontier authored
+
+Agent: Agent MaxHeadRoom
+
+Latest captured binary receipt target/live-acceptance/issue-162/
+2026-10-23T19-14-38-052Z-25916/report.json records PASS, 414/414 checks,
+all three sessions FINISHED and zero errors. Binary SHA-256:
+ba54e4b015f8d630a894cf537a6ccd9f9e7408edc8c9a5a8370127a15740d911.
+The exercised constructor/default-token/override and field/module/standalone
+lifecycle scenarios are operator binary evidence, distinct from tracked tests
+and final full repository/Claude field gates. No completion claim follows.
+
+The next remaining approved constructor obligation is relevant declaration-family
+compatibility. Existing native class/interface merge regressions already prove
+separate type contributors and runtime class identity. The consumer's exact-set
+equality can reject these different but compatible type/value meanings. This is
+a concrete AQ08/AQ09/AQ25 dependency, not compiler-parity expansion.
+
+A new tracked public-query regression combines two same-named class owners,
+alias/barrel routes, modifiers, repeated field use and unrelated missing/generic/
+method/string noise. After a nonempty control, legal class/interface augmentation
+must retain both token owners and all type contributor IDs; duplicate class bodies
+must retract only that token; repairing the family must restore it without owner
+source edits. It is authored and UNRUN; later assertions remain unclassified until
+reached. No production repair was made in this checkpoint.
+
+## 2026-10-23: generation-37 consolidated tracked GREEN; constructor binary scenarios authored
+
+Agent: Agent MaxHeadRoom
+
+Captured consolidated-37 operator logs record semantic_compilation 73 passed,
+typescript_resolution 315 passed (explicit unresolved erased-query exclusion),
+typescript_identifier_binding 21 passed, angular_di_inject_token 7 passed, and
+the Angular/NgRx producer-generation checks 1 passed each. All six logs have zero
+failures/ignored tests and no warnings. The decorator lifecycle test therefore
+passed as part of the compiled/run semantic batch, including exact durable
+facets, public role/token barrel mutations and stale restore refusal.
+
+No Rust production edit followed those results. The existing tracked binary
+acceptance driver/helper now includes separate typed-constructor and explicit-
+override consumers in the same mixed di.ts source and same three server sessions.
+Exact token files/counts distinguish constructor defects from already-present
+field facts. It checks namespace/alias targets, constructor-field convergence,
+foreign decorator barrel retargeting, type-only token barrel refusal with
+independent facts preserved, restart, package changes and stale restore. No new
+server/session policy or external dependency is introduced. The extended helper
+remains covered by existing input hashes.
+
+Syntax checks, explicit binary rebuild and extended binary execution are pending
+operator gates. The old generation-35 264/264 receipt is historical for these
+constructor production changes. Remaining expression/decorator/merge semantics,
+reverse closure, completeness and final batched Claude field verification remain
+required. No phase, constructor-slice completion or certification is claimed.
+
+## 2026-10-23: decorator/constructor/legacy focused GREEN; lifecycle and consolidation next
+
+Agent: Agent MaxHeadRoom
+
+Captured decorator-37 logs record 2 passed for constructor_decorator_authority,
+4 passed for constructor_authority, and 4 passed for red_di8. Each has zero
+failed/ignored tests and no warnings. This includes the unchanged original
+public-query decorator regression and the supplementary runtime eligibility/
+evaluation-scope controls. No production edit followed these receipts.
+
+A tracked decorator lifecycle case now requires exact retained facets after
+restart and pre-query canonical constructor/field convergence, then independently
+retargets the decorator API barrel to a foreign Inject and back. A token barrel
+then becomes type-only and returns, requiring runtime fact retraction/restoration.
+A fresh process must reject the subsequently stale durable token proof. Public
+answers compare exact name/file multiplicity, with unchanged owner bytes and
+method/string noise. The case is authored and UNRUN.
+
+Next operator batch includes that test, all semantic compilation retention and
+consumer tests, native resolution (explicit unresolved erased-query exclusion)
+and shared lexical binder preservation. These are distinct from the stale prior
+generation-35 binary receipt and final full repository/Claude field gates.
+Remaining constructor expression/decorator/merge forms and reverse/completeness
+obligations remain required; no phase or certification claim follows.
+
+## 2026-10-23: constructor decorator RED frozen; retained role/argument repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator constructor-decorator-authority-red.log records the intended first-case
+failure: public dependency name Left rather than canonical Dependency. Later
+alias/namespace/foreign/Optional assertions remain unclassified. The observed
+test/isolated registration were frozen absent during repair in temporary-index
+stash 3da290a2b14f30bb8131dceca095e4da051a43ab, then restored exactly.
+Test SHA-256: 88b0bc443f938533090981bfdeb71c097813c3e13006656ace691de15fcb7b03.
+A separate supplemental test module was added afterwards. Normal index/HEAD
+were untouched and no runtime process was started by the agent.
+
+Native constructor facets retain exact parameter-decorator callee/argument
+runtime resolutions; source-reference collection includes those occurrences.
+The shared binder has a separate definition-time constructor-decorator entry
+that skips constructor parameter bindings, while outer lexical scopes still
+apply. This prevents parameter names from incorrectly shadowing decorator token
+expressions. Type-site eligibility and ordinary identifier entry paths stay
+separate. All references use existing immutable Host/project acquisition.
+
+Angular selects an override only from exact core Inject API/package proof and
+one successfully resolved runtime reference argument. Interface or absent
+annotations do not supply that argument's proof. Duplicate overrides and failed
+runtime arguments cannot fall back to the annotation. Proved foreign decorators
+cannot impersonate Inject; Optional leaves class-token identity intact.
+Non-reference/Attribute/unsupported forms remain explicitly legacy noncanonical
+pending their required dedicated interpretation; they are not claimed complete.
+Existing type-based legacy tests and markers were not rewritten.
+
+Producer generation advances to 37. Existing source-owned payload/persistence/
+compatibility/publication paths carry the added facets and witnesses. Supplemental
+controls cover interface annotation overrides, definition-time parameter-name
+shadowing, runtime refusal of erased/interface arguments and duplicate overrides.
+Both original and supplemental tests await operator execution. Previous focused
+and binary receipts predate this production edit and do not verify the repair.
+
+## 2026-10-23: constructor lifecycle GREEN; decorator-role public regression authored
+
+Agent: Agent MaxHeadRoom
+
+Captured operator constructor-authority-lifecycle.log records 1 passed, zero
+failed/ignored tests and no warnings. Exact constructor facets and canonical
+facts survive restart; interface mutation, negative preferred-candidate appearance/
+deletion, configuration endpoint convergence and restoration pass without owner
+source edits. No production repair followed this receipt.
+
+Next AQ08/AQ09/AQ25 obligation is parameter-decorator interpretation. Existing
+legacy extraction/edge tests deliberately use the parameter type for Inject.
+Their assertions are preserved. Angular's official Inject API describes the
+custom token and annotation fallback when Inject is absent:
+https://angular.dev/api/core/Inject (reviewed as framework semantics, not an oracle
+run or claim covering all supported Angular versions).
+
+A new tracked registered public-query regression requires canonical actual-token
+identity for aliased/namespace Inject, foreign Inject refusing override authority,
+and Optional retaining the canonical annotation class. The cases mix alias roles,
+same-named distinct token owners, modifiers, generic functions/methods and misleading
+strings. The test is authored and UNRUN; later loop cases remain unclassified until
+reached. No production decorator repair or change to legacy tests was made.
+Existing approved constructor/runtime eligibility contract governs the next slice;
+all remaining constructor forms and acceptance obligations remain mandatory.
+
+## 2026-10-23: constructor identity/refusal GREEN; durable/config/negative-candidate control authored
+
+Agent: Agent MaxHeadRoom
+
+Captured operator constructor-authority-rerun.log records 3 passed, zero failures/
+ignored tests and no warnings: both original alias/namespace/fact-convergence REDs
+and the supplemental mixed type/value/shadow refusals pass. Separately,
+constructor-inject-preservation.log records 7/7 legacy inject cases passing.
+These are focused tracked receipts; no broader constructor completion follows.
+
+A new tracked lifecycle test retains three constructor parameter facets across
+actual persistence/restart and checks two canonical index facts before query
+reacquisition. With initiating source unchanged it then requires independent
+interface retraction/restoration, appearance/deletion of a previously missing
+preferred paths candidate, configuration retargeting that merges two token uses
+onto one canonical declaration, and restoration of the distinct endpoint.
+Alias/modifier/repeated-field/string/method noise remains present. Test is authored
+and UNRUN. No production edit followed the reported GREENs. Parameter decorator/
+explicit override interpretation and the remaining broader acceptance obligations
+are still required follow-up work. Prior generation-35 binary receipt does not
+verify generation-36 constructor production changes.
+
+## 2026-10-23: constructor contract APPROVED; first retained eligibility repair authored
+
+Agent: Agent MaxHeadRoom
+
+The owner's attached constructor-token approval authorizes demanded typed
+constructor facets, independent type/value eligibility and shared canonical
+constructor/field fact identity through existing lifecycle machinery. No new
+approval is inferred for broader compiler semantics or public contracts.
+
+Observed constructor tests were re-frozen absent during repair using temporary
+index stash d0eb2db8a15448c14dbe9d3d809aa74560f6783b, then restored with exact
+SHA-256 77be9959e6ea0ce692a58df473a879f6ab1572fa84c00a7795b471edda4b15c5.
+The original assertions were not edited. One isolated new test registration was
+added after restoration; normal index and HEAD remain untouched.
+
+Native capture now retains constructor/parameter/annotation spans and owner IDs,
+annotation shapes, independent type/value resolutions and bare closed absence.
+The existing lexical binder has a separate type-site entry that queries value
+bindings; its ordinary identifier entry remains unchanged. Exact lexical value
+shadows remain distinct from module/import candidates. Runtime class projection
+requires matching independent results; merged sets retain all contributors and
+only identical complete sets with one class currently qualify. Other merge cases
+remain unresolved, not compiler-complete conformance. Relation validation admits
+constructor endpoints only through this same eligibility check.
+
+Angular constructs constructor and field facts with the same canonical builder.
+Only the TS-authority path replaces the old constructor Injects projection;
+non-TypeScript paths remain. Parameter-decorated and complex annotation forms
+are explicitly retained as noncanonical legacy projections pending their required
+Angular interpretation. Named/qualified failed proof cannot invoke that legacy
+branch. Bare symbolic absence remains distinct from erased/imported/interface/
+generic/shadow failures. This is an initial slice, not complete constructor DI.
+
+Existing Angular semantic generation advances 35 to 36. Retained constructor
+facets default absent for old records and use existing payload serialization,
+source ownership, witnesses and publication. New hostile controls combine one
+valid token with type-only/interface/generic/value-shadow/unavailable neighbors,
+plus misleading constructor strings and unrelated methods. No Cargo/runtime
+execution is claimed; original constructor RED and new controls await operator
+verification. Previous binary acceptance predates this production repair.
+
+## 2026-10-23: constructor canonical joins RED; bounded eligibility decision prepared
+
+Agent: Agent MaxHeadRoom
+
+Operator constructor-authority-red.log records 0 passed / 2 failed: written alias
+identity survives in the first case; the second returns three constructor/field
+facts instead of two canonical token owners. Nonempty initial constructor control
+passed. Later assertions remain unclassified. Tests and isolated registration
+were frozen in stash 9f1f08607e3a48227be27e8f764f889d35daa272 and restored
+byte-identically. Normal index and HEAD were untouched.
+
+See ISSUE_162_CONSTRUCTOR_TOKEN_EVIDENCE_DECISION.md for the concrete demanded
+constructor type/value eligibility and retained occurrence contract. Existing
+type endpoints alone are not runtime token authority. No constructor repair or
+public schema/identity/persistence policy change has been made. The proposed
+facet extension awaits owner decision under the Architectural Approval Gate;
+this application of the gate is explicitly distinguished from the rule text.
+The generation-35 264/264 binary receipt remains evidence of the exercised prior
+module/standalone/field-inject slices, not constructor completion or certification.
+
+## 2026-10-23: generation-35 binary PASS; constructor consumer regressions authored
+
+Agent: Agent MaxHeadRoom
+
+Captured binary receipt target/live-acceptance/issue-162/
+2026-10-23T17-37-15-860Z-29528/report.json records PASS, 264/264 checks,
+all three sessions FINISHED and zero errors. Executable SHA-256:
+2f69d17d9f398432439d2d5059444ad477cff717823315e165e36eaf1fce622a.
+This establishes operator binary/stdio acceptance of the exercised module,
+standalone and mixed field-inject lifecycle scenarios. It is separate from Rust
+regressions, final repository gates, reverse completeness and Claude field testing.
+The earlier failed checkpoint receipt remains preserved.
+
+Next question-driven consumer: AQ08/AQ09/AQ25 constructor dependency identity.
+Static trace: angular_semantic uses canonical class-role admission but still
+calls extract_constructor_injects and class_to_semantic_edges with written type
+strings. The constructor helper takes only leading identifier characters;
+namespace qualification and alias targets do not establish canonical endpoints.
+Field inject now consumes retained endpoints separately, so shared constructor/
+field token joins also need direct evidence. Two tracked public-query regressions
+are authored: a nonempty constructor control followed by repeated aliases of two
+same-named declarations amid unrelated missing imports/generic methods/string
+noise; and a namespace constructor plus repeated field use requiring exactly two
+canonical token facts. Both are UNRUN. No constructor production repair or
+semantic expansion has been made. Existing symbolic preservation remains required.
+
+## 2026-10-23: binary receipt FAIL localized to stale session checkpoint; driver corrected
+
+Agent: Agent MaxHeadRoom
+
+Despite the conversational all-pass report, the latest captured binary receipt
+2026-10-23T17-31-36-732Z-632/report.json is FAIL: 165/165 assertions reached passed,
+but session 2 failed at save_context(app.ts), and session 3 never ran. Binary
+SHA-256: 2f69d17d9f398432439d2d5059444ad477cff717823315e165e36eaf1fce622a.
+The RPC response is -32603, Missing authoritative semantic-edge state. This
+cannot be recorded as binary acceptance.
+
+The new ambient file mutations changed an input consumed by restored session
+snapshots. Public query acquisition updated the index, not those session
+snapshots. The driver incorrectly attempted to save the old session without
+reacquisition. It now explicitly requires that stale save refusal, then obtains
+new session snapshots for all three owners through the existing compression
+entry, rechecks facts, and checkpoints them. No production currentness rule or
+assertion about required semantic facts was relaxed. No automatic retry or new
+session was introduced. Corrected binary driver is UNRUN; production binary
+inputs are unchanged, so no rebuild is required solely for this driver edit.
+The failed receipt remains retained. Final live/phase completion is not claimed.
+
+## 2026-10-23: symbolic ambient lifecycle GREEN; generation-35 binary driver extended
+
+Agent: Agent MaxHeadRoom
+
+Captured operator inject-symbolic-global-lifecycle.log records 1 passed, 0 failed,
+0 ignored and no warnings. The tracked test establishes exact absence retention
+through restart, pre-query symbolic publication, and independent ambient class/
+interface/absence/deletion transitions with unchanged initiating source. This is
+additional focused evidence after the consolidated 65/315/1/1 checkpoint; no
+production edit followed that checkpoint.
+
+The existing verification/live-acceptance/issue_162_live_acceptance.mjs now
+includes mixed inject cases within its same three sessions, using a tracked
+issue-162/inject-scenario.mjs helper. It covers API/barrel/namespace aliases,
+same-named token owners and repeated uses, symbolic compatibility, bad neighbors,
+restart, ambient class/interface/absence transitions and stale restore refusal.
+It retains the helper hash with existing binary/source/transport hashes. Existing
+module/standalone scenarios and runtime bounds are preserved. The helper and
+extended binary driver are authored and UNRUN; neither syntax nor runtime
+acceptance is claimed. An explicitly rebuilt binary is required. Final Claude
+field verification remains deferred until the remaining required work is batched.
+
+## 2026-10-23: generation-35 consolidated GREEN; symbolic ambient lifecycle control authored
+
+Agent: Agent MaxHeadRoom
+
+Captured operator consolidated-35 logs record semantic_compilation 65 passed,
+typescript_resolution 315 passed (explicit erased_namespace_query exclusion),
+and each Angular/NgRx generation compatibility test 1 passed. All four logs
+have zero failed/ignored tests and no captured warnings. These are tracked-test
+receipts, not a full repository gate, binary acceptance or field certification.
+
+Next uncovered obligation is currentness of symbolic absence itself. A tracked
+inject lifecycle regression now combines a genuine canonical dependency with
+symbolic, erased, foreign and shadowed neighbors. It requires exact retained
+absence payload after durable restart, symbolic publication before query
+reacquisition, and unchanged-source ambient mutations: absent to runtime class,
+to interface (no symbolic rescue), to class, back to absence, then dependency
+deletion. It inspects canonical annotations in the real index so a two-edge count
+cannot disguise stale symbolic evidence when a runtime declaration appears.
+The test is authored and UNRUN; no production repair has been made for it.
+It extends the already-approved witness/persistence/consumer regression scope.
+No new public contract or semantic frontier is proposed.
+
+## 2026-10-23: symbolic boundary controls GREEN; consolidated generation-35 verification pending
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-symbolic-boundary-rerun.log records 5 passed, 0 failed, 0 ignored,
+with no captured warnings. All mixed public-query controls and the supplemental
+producer/pipeline authority-boundary test passed. Separately, inject-token-
+preservation-symbolic-rerun.log records 7/7 established legacy cases passing.
+The supplemental corrected tests are focused GREEN evidence, not an unchanged
+RED-to-GREEN claim. The original symbolic relationship omission and byte receipts
+remain preserved in the historical entries above.
+
+Next consolidated operator batch covers semantic_compilation (retention, restore,
+publication, module/standalone and inject consumers), native typescript_resolution
+with only the explicitly unresolved erased_namespace_query frontier skipped, and
+the Angular/NgRx producer-generation compatibility assertions. These runs are
+pending. Prior binary/stdio generation-33 acceptance predates the inject and
+symbolic changes and is not current acceptance. Reverse closure, remaining
+consumers, public completeness and final batched live verification remain required.
+No runtime commands, staging, commit or push were performed by the agent.
+
+## 2026-10-23: mixed 4/5; evaluator-versus-pipeline provenance assertion repaired
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-symbolic-corrected.log records 4 passed / 1 failed with no
+captured warnings. The four public-query mixed tests passed. The supplemental
+artifact test incorrectly required object.file to remain absent: MetaLayerPass
+attaches asserting-source provenance before SemanticCompilationArtifact creation,
+not just at WorkspaceIndex insertion. This was an agent test-design error.
+
+No production behavior changed. The artifact assertion now checks equivalent
+asserting-source provenance using existing path identity normalization; the no
+native declaration, no Defines and no canonical annotations assertions remain.
+The test also invokes the real inject evaluator with the artifact's authority
+and invocation evidence plus existing CoreIR class captures, and requires no
+file or canonical annotation there, before pipeline normalization. This follows
+the existing trace-test seam; it introduces no test-only production interface.
+Earlier test bytes are retained in inject-symbolic-provenance-correction/
+test-artifact-before.raw. The corrected supplemental test is UNRUN; no unchanged
+RED-to-GREEN claim is made. Legacy 7/7 and mixed public 4/4 remain distinct receipts.
+
+## 2026-10-23: symbolic legacy preservation GREEN; incorrect provenance assertion corrected
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-token-preservation-symbolic-rerun.log records 7 passed, 0 failed,
+0 ignored, with no captured warnings. The mixed rerun records 3 passed / 1 failed.
+Its original missing-relationship assertion now passes; the later assertion
+incorrectly treated public object.file as declaration authority. Existing
+WorkspaceIndex::add_edges attaches the asserting file to legacy references with
+no file (edges.rs), so that assertion was invalid for the established contract.
+No shared indexing/provenance behavior was changed to satisfy it.
+
+The invalid assertion now checks the established asserting-source provenance.
+A separate production-compilation regression checks the actual authority boundary:
+no MissingService declaration or Defines fact, one retained unbound occurrence,
+and a symbolic Injects object with no file or canonical endpoint before index
+normalization. The earlier required count of two mixed relationships is unchanged.
+Original test bytes are retained under target/issue-162/inject-symbolic-provenance-
+correction/test-before.raw. This corrected/supplemental test batch is UNRUN and
+must not be called an unchanged RED-to-GREEN receipt. No production repair was
+made in this correction. Prior 7/7 legacy evidence remains applicable.
+
+## 2026-10-23: symbolic mixed RED preserved; compatibility repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-symbolic-mixed-red.log records the intended behavioral RED:
+one canonical left-owned fact survives, but MissingService's established symbolic
+relationship is omitted (1 returned, 2 required). Later assertions did not run.
+The observed four-test file and isolated registration were frozen using a temporary
+index in stash 7a05b7526ff1f7c8e2921e9a9aa955910ef66df0, removed during repair,
+then restored byte-identically. Test SHA-256:
+60f80348ef60749bfaae9afe1daac4533db41ed5b2fba10093a6aae605afcd6f.
+
+The native exact-reference path now records a separate unbound-value observation
+only after its lexical/scope guards pass, with no binding in the initiating source
+and closed empty global value/type lookups under the existing project/Host. It
+retains exact occurrence/name evidence alongside the existing capture witnesses.
+It does not parse unresolved strings, reinterpret erased imports, add declarations,
+or change Resolution meanings. Persisted records missing this field default to
+no absence evidence. The Angular consumer still requires canonical class and API
+proof, then preserves the existing noncanonical symbolic edge without a token
+file or canonical annotations. Canonical resolved edges retain their prior proof.
+Existing source ownership/currentness and durable transport carry the payload;
+no new owner/cache/publication path or public schema is introduced.
+
+The existing Angular semantic producer generation advances from 34 to 35;
+marker and canonical pipeline generations remain unchanged. Observed RED tests
+and original symbolic assertions were not weakened. Runtime verification of this
+repair is pending: mixed controls and established inject-token preservation next.
+No Cargo/runtime command was executed by the agent. No phase closure is claimed.
+
+## 2026-10-23: mixed namespace repair GREEN; symbolic compatibility falsification
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-mixed-rerun.log records all 3 mixed-source tests passing, with
+zero failures/ignored tests and no warnings in the captured log. This includes
+canonical namespace admission and ordinary/optional member refusal amid noise.
+This is focused tracked evidence, not a final or live gate.
+
+The next preserved obligation is the existing symbolic inject relationship.
+Static inspection located a lossy distinction: resolver::outcome turns a complete
+empty declaration set into Unresolved("No declaration"), while local_set can also
+produce a complete empty set for an ineligible type-only import. Therefore that
+reason string cannot safely authorize symbolic compatibility. No such fallback
+has been added. Any implementation must preserve typed lexical/binding reasons,
+reject erased/unavailable imports and keep symbolic facts outside declaration
+identity; existing canonical payload/owner/currentness remains the transport.
+
+A supplemental mixed-source regression now demands the established MissingService
+relationship beside the genuine left-owned fact and all existing rejected
+neighbors. It additionally refuses a declaration file on the symbolic endpoint.
+It is authored and UNRUN; the original legacy symbolic RED remains unchanged.
+No production repair for symbolic compatibility has been made.
+
+## 2026-10-23: mixed-source namespace RED preserved; canonical callee repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-mixed.log records 1 passed / 1 failed. The noisy barrel/alias
+case survived unrelated dependency kind changes and deletion, and retracted on
+its own endpoint mutation. The namespace variation returned only the left token;
+its expected second, right-owned token was omitted. The consumer explicitly
+accepted only free callees. It now requests the exact full member-callee span
+from retained native value references and still requires canonical Angular API
+proof. No terminal-name or receiver-spelling fallback was added.
+
+Observed tests and registration were frozen with an isolated temporary index in
+stash 4fcfe7af57551e9b14e5e714b277717981f1f473, then restored byte-identically.
+Test SHA-256: 672eb8a9100b6f8e1243080e5dbf58be038c9ff3d4f0afc7dd58a754a1c7b273.
+Normal index and HEAD were untouched. Repair runtime verification is pending;
+the separate symbolic compatibility RED remains open. No phase closure follows.
+
+## 2026-10-23: legacy preservation 6 GREEN / symbolic RED; mixed-source controls
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-token-preservation-rerun.log records 6 passed / 1 failed after
+fixture prerequisites. The remaining test is the established symbolic unresolved
+relationship contract: MissingService must remain visible without Defines
+(declaration) authority. Its later MY_TOKEN iteration remains unclassified.
+No symbolic fallback, assertion removal or production change was made here.
+
+The owner explicitly requires difficult, realistic mixed-source tests rather
+than only isolated perfect forms. New tracked cases combine genuine barrel API/
+token aliases, duplicate fields, unrelated missing imports, foreign API namesakes,
+type-only values, optional/nested calls, shadowing methods and functions, generic
+noise, misleading comments/strings and multiple same-named token owners. One case
+requires the good canonical fact to survive unrelated interface mutation/deletion,
+then retract and restore when its own endpoint changes. Another requires a real
+namespace API variation alongside that noise to preserve both endpoint owners.
+They are authored and UNRUN; no outcome is inferred from simpler cases.
+
+The symbolic discrepancy is a preserved compatibility obligation, not permission
+to invent a runtime declaration for an unresolved identifier. Any repair must
+retain canonical API proof, distinguish proved absent symbolic names from erased,
+shadowed, unavailable or unresolved imported bindings, keep noncanonical evidence
+out of canonical endpoint proof, and preserve existing source ownership/currentness.
+A public-contract or shared-authority expansion, if required after tracing that
+boundary, must return to the architectural gate. The mixed cases are independent
+useful work and are ready for operator execution before any further production edit.
+
+
+## 2026-10-23: inject lifecycle/native GREEN; legacy fixture prerequisite correction
+
+Agent: Agent MaxHeadRoom
+
+Operator receipts: inject-semantic-consolidated.log 56 passed; inject-resolver-
+preservation.log 315 passed (preserved erased-query frontier excluded);
+inject-token-preservation.log 2 passed / 5 failed. No compiler warnings reported.
+The migrated consumer's duplicate/same-name token identity, exact durable evidence,
+restart adoption, independent interface/deletion retraction and shadow/optional/
+nested controls passed. Broader legacy preservation is not yet GREEN.
+
+The failed legacy fixtures supply written Angular imports but no package manifest
+or declarations; failures show no Angular owner indexed. Added canonical package
+and isolated resolver prerequisites through the existing shared test helper to
+both legacy fixture files. Their behavioral assertions, marker checks, source
+invariants and original expected dependency lists remain unchanged. Original
+bytes and hash receipt are under target/issue-162/inject-preservation-fixtures/.
+No production repair was made in this step.
+
+One existing contract explicitly preserves symbolic MissingService/MY_TOKEN
+relationships without granting Defines authority. That expectation remains frozen.
+Its current outcome after adding the fixture prerequisites is UNRUN. This batch
+does not infer a canonical runtime declaration from an unresolved token, add
+fallback authority or silently remove the symbolic requirement. Next gate reruns
+the bounded legacy selection to separate prerequisite failures from any remaining
+symbolic-versus-canonical publication discrepancy.
+
+
+## 2026-10-23: field-reference and inject authority focused GREEN
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-field-reference-repair.log records 4 passed, no failures or
+warnings reported. This includes the production-boundary trace and original
+alias/foreign/type-only regressions. It verifies the bounded native class-field
+reference repair through the migrated public-query consumer.
+
+Two supplemental tracked tests are now authored for repeated-token aggregation,
+same-named distinct token owners, exact SQLite retained evidence and restart
+publication before query acquisition, value-to-interface retraction, restoration,
+deletion, optional/parenthesized/nested call refusal and lexical parameter shadow.
+The shadow control additionally requires the actual native parameter endpoint,
+so absence of an Angular owner alone cannot satisfy that proof. These tests are
+UNRUN. No additional production repair was made. Next consolidate semantic
+compilation (including these cases), native occurrence preservation and existing
+inject-token preservation. The prior binary and broad GREEN receipts predate the
+class-field consumer change and are not current verification for it.
+
+
+## 2026-10-23: trace locates missing field references; bounded adapter repair
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-authority-trace.log confirms direct and artifact Injects edges
+are empty despite valid class/field/call associations. The retained reference
+inventory contains only Injectable's decorator callee, not inject or Dependency
+inside the field. Static inspection locates the native occurrence adapter's
+blanket class_body guard after lexical binding. Thus the new consumer cannot
+receive the required value endpoints; no textual fallback would be valid.
+
+Trace and original authority tests/registration were frozen together in isolated
+stash `8ade4ee438efce1ad948de6efe8aa8dc5b207ece`; trace SHA-256
+`bf4d40e39b658aa1a726a0d9ba87924dbcecdb9a175fe4297d77178422e92999`.
+They were restored byte-exactly after repair; normal index/HEAD untouched.
+
+The adapter now permits a reference beneath the value of a direct public field
+in a declared/abstract class to cross that class_body boundary. It still uses the
+existing tree-taking lexical lookup first. Other lexical/function/method/static-
+block guards remain; member fields are not treated as unqualified bindings.
+This is the established AQ08 required-fact dependency demonstrated by the trace,
+not compiler-parity expansion or new framework meaning in the language layer.
+The repair is authored and UNRUN. Static formatting, UTF-8/no-BOM, diff, active
+Rust sizes and exact frozen restoration passed. Next operator selection includes
+the trace and original three authority tests together.
+
+
+## 2026-10-23: inject positive control regressed; production-boundary trace authored
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-authority-repair.log: 0 passed / 3 failed. All now stop at their
+first unaliased positive control (zero Injects edges); the repaired negative and
+alias outcomes have not executed. The missing first handoff log was subsequently
+provided; no result was inferred from the initial absent file.
+
+No speculative production repair was added. A separate tracked diagnostic test
+uses the real compilation artifact, retained value/package/facet evidence and
+invocation records, plus the established CoreIR lowering helper for initializer
+associations. It reports direct-projector versus artifact edges, class/field
+spans, calls and retained proof at the failed assertion. It is authored and UNRUN.
+The three observed tests remain unchanged. Next selection: angular_inject_trace_tests.
+
+
+## 2026-10-23: inject authority three REDs preserved; class-field repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator inject-authority.log records 0 passed / 3 failed after each canonical
+owner and unaliased extraction control completed. Alias through a barrel returned
+zero edges; foreign inject spelling and a type-only token incorrectly produced
+dependency facts. Later restoration/endpoint assertions remain unclassified.
+Frozen isolated stash `1c17b3ba1a1511dad424e853b594cde287bda769`, test SHA-256
+`117d358b3c6e987bf920bd92c5e3a65158c1032dbdc9894d90c2a97fc7f0fb71`.
+The exact tests and registration were restored after production repair; normal
+index and HEAD remain unstaged/uncommitted.
+
+The migrated class-field path now uses source-bound invocation spans, actual
+canonical owner role, the exact retained value endpoint for the callee, witnessed
+@angular/core public inject identity, and an exact runtime-value token endpoint.
+It does not authorize by terminal spelling, receiver name or a package-looking
+import string. Direct/optional/argument boundaries use existing capture evidence;
+a syntax-only optional-call flag also protects aliased optional invocations.
+Generic legacy written-token classification remains for unmigrated callers but
+is not used as authority when the canonical payload is present. Constructor,
+functional-guard inject and signal/member consumers remain separate required
+migration work; no fallback was added to failed canonical field proof.
+
+Dependency endpoint/site annotations use the approved existing relation carrier.
+The owner-to-token fact retains existing duplicate-field aggregation; exact
+canonical token endpoints remain distinct even with equal presentation names.
+Retained relation admission also accepts exact captured value-reference IDs;
+type-reference evidence is not promoted into runtime proof. Lossless native-ID
+conversion into the neutral carrier is now shared by both migrated producers.
+Angular semantic generation advances to 34 with current/prior fixture pins.
+
+Static formatting, diff/UTF-8/no-BOM, Rust size limits and exact RED restoration
+passed. No Cargo/runtime ran. Next operator selection is the unchanged three-test
+inject-authority suite. All prior GREEN/binary receipts predate this production
+change and do not verify the migrated field consumer.
+
+
+## 2026-10-23: standalone binary PASS and next inject API authority regression
+
+Agent: Agent MaxHeadRoom
+
+Saved operator receipt
+`target/live-acceptance/issue-162/2026-10-23T12-45-26-985Z-24844/report.json`
+records PASS, 193/193 checks, all three sessions FINISHED, no failed checks or
+errors. Binary SHA-256:
+`00724ccd038a4d50d5f7bbf1a5f3cb0b62fe8a1c7866ecc366d6f2ac7b40ae0b`.
+This extends binary/stdio evidence through standalone restart, dependency
+mutation/deletion, explicit target refusal and package-version default retraction.
+It is not the final field gate, full repository gate or query-completeness proof.
+
+Next demonstrated chain: AQ08/AQ25 -> actual inject API use and runtime token
+endpoint -> retained exact value-reference and package/export proof -> Angular
+class-initializer consumer -> workspace_query Injects. Static trace: generic
+initializer evidence classifies written inject callees, and angular_semantic's
+class path consumes admitted written tokens. Functional inject/member consumers
+also retain written-import checks, but are separate migration slices. No new
+TypeScript semantics or provider/injector evaluation is proposed by this batch.
+
+Three tracked public-query regressions are authored: aliased inject API through
+a barrel with exact token endpoint, foreign inject spelling refusal, and type-only
+token refusal. Every case establishes a canonical Service owner and unaliased
+nonempty control first. Later assertions remain UNRUN until operator execution.
+Only tests/registration and this receipt changed; no production repair was made.
+Next selection: angular_inject_authority_tests. The qualified erased-alias
+frontier remains untouched and unresolved.
+
+
+## 2026-10-23: standalone durable and semantic consolidation GREEN
+
+Agent: Agent MaxHeadRoom
+
+Operator standalone-semantic-consolidated.log records 50 passed, zero failures,
+zero ignored, with no compiler warnings reported. This includes the new exact
+standalone Boolean/identity SQLite round-trip, restart index adoption before
+query acquisition, stale dependency proof refusal and import restoration.
+The restored foundation suite previously passed all 12 original assertions.
+
+The existing three-session binary driver is now extended in place for default
+standalone Dashboard imports using the same canonical leaf/module identities.
+Both owners are compressed/checkpointed/restored; target type-only/false/deletion
+mutations and core-package version 20-to-18-to-20 default changes are checked
+without owner edits. Public JSON privacy, exact endpoint multiplicity and stale
+restore refusal apply to both owners. No extra process sessions or production
+changes were added. The extended driver is authored and UNRUN; its prior 96-check
+PASS predates this extension and the standalone production change.
+
+Static diff/UTF-8/size review passed. Node syntax validation, binary rebuild and
+stdio execution remain operator-owned. Final field verification, completeness,
+reverse closure and remaining consumer families are still mandatory and open.
+
+
+## 2026-10-22: original foundation and standalone controls GREEN
+
+Agent: Agent MaxHeadRoom
+
+Captured operator results: foundation-standalone-repair.log 12 passed;
+standalone-authority.log 2 passed, no failures or warnings in either log. Both
+iterations of the original explicit/version-default standalone requirement now
+execute successfully. This closes that tracked foundation RED, not the full
+AQ03 eligibility/completeness or all Angular consumers.
+
+A supplemental tracked standalone test now checks real compression/SQLite,
+exact retained Boolean and declaration evidence, restart restoration and index
+publication before query acquisition, stale-proof refusal after target metadata
+mutation, unchanged initiating source and positive restoration. It is authored
+and UNRUN. Existing standalone test dispatch helper was factored to exercise
+compress/restore with the same registered dispatcher and error checks. No new
+production repair was made. Next operator selection consolidates semantic
+compilation including the new durable standalone case; earlier generation-32
+binary receipt remains historical for the generation-33 standalone work.
+
+
+## 2026-10-22: restored foundation 11 GREEN / standalone RED; shared repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator foundation-restored.log: 11 passed, 1 failed. Standalone composition
+failed at its first explicit-owner iteration: Component Dashboard was present,
+but the required ImportsModule edge to Leaf Directive was absent. The default
+iteration had not executed and remained unclassified. Exact original suite and
+registration were frozen in isolated stash
+`8680f5ff030e2dba0047fafd942eae44419b1e59`, SHA-256
+`b63883e818fc70df0990d23e2c31ac9d318fed458da74b70b693c393dba86379`, then restored
+byte-exactly after repair. Normal index and HEAD were untouched.
+
+Required chain: AQ03/AQ05 -> standalone owner/import eligibility and composition
+-> exact declaration facets plus actual defining API package/version -> shared
+module metadata projector -> existing workspace_query ImportsModule relation.
+The shared canonical projector now accepts eligible Component owners for imports
+only, reuses existing recursive arrays/spreads and canonical relation evidence,
+and requires direct Component/Directive/Pipe targets to be standalone. NgModule
+targets remain eligible. No spelling/filesystem fallback or second resolver was
+introduced. Existing module behavior remains unchanged by this slice.
+
+Neutral demanded facets now retain Boolean values and the requested standalone
+field. Angular evaluates explicit booleans (including captured constant aliases)
+and uses the exact decorator API's witnessed package version only when the field
+is absent. Duplicate/unknown/computed/spread metadata cannot prove eligibility.
+Only validated stable three-part versions establish the default; prerelease or
+unrecognized version forms remain unresolved in this slice. This is a truthful
+remaining coverage boundary, not a completion claim. Official requirement source:
+https://angular.dev/guide/components/importing (before 19.0.0 defaults false).
+Angular semantic producer generation advances from 32 to 33.
+
+Two supplemental public-query regressions cover package-version default mutation
+with unchanged initiating source, explicit flags across versions, false owner/
+target flags, erased decorator refusal and restoration. They are authored and
+UNRUN. Original assertions were not changed. Static formatting, diff, UTF-8/no-BOM,
+active Rust sizes and frozen SHA verification passed. No Cargo/runtime was run.
+The prior 96-check binary receipt and consolidated GREEN predate these production
+changes and do not verify this slice; field and complete question gates remain open.
+
+
+## 2026-10-22: binary publication receipt PASS; original foundation suite restored
+
+Agent: Agent MaxHeadRoom
+
+Operator reported syntax/build/driver all pass. Saved binary receipt verified:
+`target/live-acceptance/issue-162/2026-10-23T03-28-34-684Z-29060/report.json`
+records PASS, 96/96 checks, all three sessions FINISHED, no failed checks/errors.
+Binary SHA-256: `6014a091e5ab01dd4c5a73a755a6c9e824670a5b3a967f3492b17784d1175755`.
+This is operator binary/stdio evidence, separate from the 47/111/87/315 tracked
+suite results, the final repository gate and final Claude field verification.
+The UTC receipt date rolls into October 23; the local owner session is October 22.
+
+Next required consumer chain is AQ03/AQ05 -> standalone explicit/default
+eligibility and imports -> existing shared composition consumer/public relation.
+The original twelve-test foundation suite already contains that requirement,
+so no duplicate replacement regression was authored. Restored
+src/tests/mcp/workspace_query_issue_162.rs byte-for-byte from the frozen stash
+`6a82efdb5036df0b6d24e40266737d3d16b6885c` third parent. SHA-256 verified exactly:
+`b63883e818fc70df0990d23e2c31ac9d318fed458da74b70b693c393dba86379`.
+Restored only its isolated registration at the existing query module; no other
+stash changes were applied and normal index/HEAD remain untouched.
+
+The original suite is now present, unlike the historical plan checkpoint. Its
+current behavior, including standalone/default and later lifecycle assertions,
+is UNRUN and not inferred from newer focused tests. No production repair was
+made in this step. Its fixtures/assertions remain unchanged. Operator execution
+of this bounded original suite is the next requirement reconciliation gate.
+
+
+## 2026-10-22: canonical publication consolidated GREEN; binary asset authored
+
+Agent: Agent MaxHeadRoom
+
+Captured operator results after the canonical identity and typed-absence repairs:
+
+- canonical-semantic-consolidated.log: 47 passed.
+- canonical-index-consolidated.log: 111 passed.
+- canonical-hydration-consolidated.log: 87 passed, 1 ignored.
+- canonical-resolver-consolidated.log: 315 passed; explicitly unresolved
+  erased-namespace-query frontier excluded as stated in the handoff.
+
+All selected suites report zero failures and no compiler warnings in the logs.
+This is not a full repository gate. The recorded one ignored hydration test is
+not counted as passed. The deferred frontier remains unchanged and unresolved.
+
+A tracked three-session binary/stdio driver is authored at
+verification/live-acceptance/issue_162_live_acceptance.mjs, with its scenario and
+operator contract under verification/live-acceptance/issue-162/README.md. It
+reuses the existing McpClient transport, checks rebuilt binary/input provenance,
+registered tools/schema, exact same-name endpoint multiplicity and module aliases,
+durable restart, independent mutation/deletion and stale-restore refusal. Explicit
+save_context checkpoints use the real production path. Fixtures, SQLite state,
+RPC and receipts remain under target. No Node/build/runtime was started by the
+agent; syntax and execution remain operator-owned. No binary/live or phase
+completion is claimed. Final Claude field verification remains deferred until
+required local deterministic and binary evidence is consolidated.
+
+
+## 2026-10-22: canonical endpoint deletion and output barriers focused GREEN
+
+Agent: Agent MaxHeadRoom
+
+Captured operator results: canonical-relations-deletion-repair.log 1 passed;
+output-barriers-preservation.log 3 passed; no failures or warnings reported.
+The complete supplemental lifecycle test now passes through prepublication
+identity, duplicate insertion, retirement/replacement, actual SQLite round-trip,
+public restart, independent role mutation, restoration and endpoint deletion.
+The earlier module-relations-repair.log records 2 public-query tests passing.
+
+These are focused tracked Rust-test receipts, not consolidated preservation,
+binary/stdio, reverse-closure or live-consumer proof. Next consolidate semantic
+compilation, index and hydration after the canonical-key/currentness changes,
+plus native resolver coverage after typed relative absence. The explicitly
+unresolved erased-namespace-query frontier remains preserved and excluded from
+that bounded resolver selection; this is not a full repository test gate or an
+envelope reduction. No tests/runtime were started by the agent.
+
+
+## 2026-10-22: canonical relation GREEN; deletion proof isolation repair authored
+
+Agent: Agent MaxHeadRoom
+
+Operator module-relations-repair.log: 2 passed. The supplemental lifecycle test
+reached its final deletion assertion after prepublication, duplicate insertion,
+SQLite round-trip, public restart and role-mutation assertions passed. Deleting
+right.ts returned zero memberships instead of preserving the unrelated left fact.
+The whole supplemental test/registration was frozen in isolated stash
+`e223e8f5ab2b000724d18426bb9850f23737d787`; test SHA-256
+`c56b5f489573edad357f6051d3dc0d4229de8bf537793bac39fbabf34b51269e`.
+It was restored byte-exactly after repair; HEAD and normal index remain untouched.
+
+Required chain remains AQ02/AQ05/AQ25 -> independently owned membership survives
+other endpoint deletion -> native dependency proof -> existing module consumer.
+This is a demonstrated required-fact blocker, not compiler-parity expansion.
+Program acquisition previously aborted for every failed import, poisoning all
+module scopes. Relative probing now returns typed Found/Absent outcomes while
+preserving hard probe/config/authorization errors. Only proven relative absence
+is retained as a missing-module request in program evidence and contributes no
+unit; ambient fallback remains honored. Negative and physical witnesses remain
+consumed and currentness-checked. Ordinary module lookup still reports the
+missing import unresolved. No generic error-string matching or fallback was added.
+Other unresolved package/unsupported acquisition failures remain fail-closed.
+
+Static formatting, UTF-8/no-BOM, active Rust file ceilings, diff checks and exact
+restoration passed. The deletion repair is authored and UNRUN. Earlier passing
+results predate this resolver change; no aggregate or lifecycle GREEN is claimed.
+
+
+## 2026-10-22: supplemental canonical lifecycle test compile correction
+
+Agent: Agent MaxHeadRoom
+
+Both operator logs stopped at E0433 in the new supplemental test, before any
+behavioral test ran. Corrected the durable snapshot type path to the actual
+mcp::state::durable_semantics module, verified against its declaration and
+existing production imports. No production change or behavioral RED/GREEN is
+claimed. The exact observed relation regression remains unchanged.
+
+
+## 2026-10-22: approved canonical relation identity repair authored
+
+Agent: Agent MaxHeadRoom
+
+Owner approval of the canonical relation publication decision was read in full.
+Optional typed endpoint/declaring-site annotations now propagate with existing
+SemanticEdge ownership, survive durable snapshots, and refine migrated EdgeKey
+construction/matching. Public JSON and EntityRef equality/hash are unchanged.
+Admission validates annotations against retained native authority; missing proof
+cannot promote annotations. Angular semantic generation is 32; current-generation
+fixture pins advance and prior-generation compatibility remains explicitly old.
+
+Frozen stash `bdde4dae6a773edec14182c1054b858a6e80fbc4`, corrected test SHA-256
+`bb69c96057e8ede3409f65f097973f8fa7f3ba621a5e1e4f79fb4d8aefaf2b99`.
+The exact test/registration were restored after repair. Original observed RED
+bytes remain unchanged in target/issue-162/module-relations-red. Normal index
+and HEAD were not staged or committed. Supplemental production-boundary tests
+cover prepublication identity, repeated insertion, durable restart, independent
+mutation/deletion and refusal of mismatched/missing proof. They are UNRUN.
+
+Static formatting, strict UTF-8/no-BOM, active Rust file ceilings, diff checks
+and exact frozen-test restoration passed. Operator execution owns the next gates.
+Earlier 44/111/87 GREEN predates this production repair and is superseded for
+current-code verification. No live acceptance, reverse closure or phase completion
+is claimed.
+
+
+## 2026-10-22: canonical relation collision RED; architectural decision prepared
+
+Agent: Agent MaxHeadRoom
+
+`module-relations.log`: 0 passed, 2 failed. One is a Windows extended-path
+fixture assertion, now corrected with repository normalization (later controls
+UNRUN). The other is a behavioral public-query RED: two distinct Leaf endpoint
+owners collapse to one module membership. The shared index EdgeKey omits endpoint
+declaration identity, making these same-asserting-source facts equal. No global
+EntityRef or production change was made. Original test/registration bytes and
+hash receipt remain under target/issue-162/module-relations-red/.
+
+The bounded proposal and alternatives are in
+[canonical relation publication decision](ISSUE_162_CANONICAL_RELATION_PUBLICATION_DECISION.md).
+Owner approval is required by the shared identity/index/persistence gate before
+production implementation. Consolidated 44/111/87 GREEN remains the checkpoint
+before these newly authored relation controls, not evidence that this RED passes.
+
+
+## 2026-10-22: consolidated preservation GREEN and next module relation controls
+
+Agent: Agent MaxHeadRoom
+
+Captured operator logs record semantic compilation 44 passed, workspace index
+111 passed, and hydration 87 passed / 1 ignored; no failures or warnings are
+reported in those logs. These results cover the current publication repair.
+They are Rust-test evidence, not binary/stdio or live acceptance.
+
+Next demonstrated chain: AQ02/AQ05/AQ25 -> module import/export membership with
+canonical endpoint ownership -> existing module metadata consumer -> registered
+workspace_query forward edges. Two new tracked tests exercise aliased barrel
+module imports with erased dependency mutation/restoration, and same-spelled
+declarations in different files exported through shared arrays/spreads with
+independent role mutation. Tests are authored and UNRUN. No production repair
+was made; any behavioral RED must be observed and frozen before repair.
+
+
+## 2026-10-22: durable facets and hydration preservation focused GREEN
+
+Agent: Agent MaxHeadRoom
+
+Captured operator results:
+
+- `hydration-filesystem-2.log`: 1 passed, 0 failed, 0 ignored.
+- `module-durable-rerun.log`: 3 passed, 0 failed, 0 ignored.
+- Prior focused `hydration-completeness.log`: 6 passed.
+- Prior focused `hydration-cardinality.log`: 1 passed.
+
+The durable regression covers exact retained facets in restored session/index,
+stale dependency rejection before adoption, and post-restore dependency mutation
+retracting membership. These are tracked Rust-test results through production
+handlers, not binary/stdio or live-consumer certification. All previously
+reported hydration failures now have focused passing receipts; a fresh aggregate
+hydration receipt remains pending. Earlier semantic-compilation/index GREEN
+predates the latest publication repair and must be reconsolidated before moving
+to the next consumer. No tests or runtime were started by the agent.
+
+
+## 2026-10-22: focused hydration results and ignored-program fixture boundary
+
+Agent: Agent MaxHeadRoom
+
+Operator logs: hydration-completeness 6 passed; hydration-cardinality 1 passed;
+hydration-filesystem 1 failed. The retained diagnostic proves ServiceA has its
+canonical Service role. Consumer's Component callee is unresolved with unproven
+contributors. Its project includes the intentionally ignored consumer subtree,
+whose relative dependency is absent. The fixture now explicitly excludes that
+subtree and node_modules from automatic project membership, while imported
+package declarations remain resolvable. Assertions and production code are
+unchanged. The remaining filesystem test awaits a rerun; durable-facet latest
+repair still needs its own fresh result.
+
+
+## 2026-10-22: hydration prerequisite correction and remaining diagnostic
+
+Agent: Agent MaxHeadRoom
+
+`hydration-rerun-2.log` records 80 passed, 7 failed, 1 ignored. Six failures
+now stop at discovery counters: added dependency declarations were discovered
+as extra source candidates. Their fixture repositories now explicitly ignore
+those declaration inputs for discovery; resolution still consumes the inputs.
+Count assertions are preserved. The remaining filesystem reverse-edge failure
+has a diagnostic-only failure branch reporting retained owner proof and entities.
+No production repair or GREEN is claimed. Next run is limited to the affected
+seven tests using their existing module/name filters.
+
+
+## 2026-10-22: hydration rerun narrows missing dependency prerequisites
+
+Agent: Agent MaxHeadRoom
+
+Operator log `target/issue-162/hydration-rerun.log`: 80 passed, 7 failed,
+1 ignored. Seven prior failures cleared after supplying Angular package inputs.
+Remaining failed fixtures import a nonexistent `./ServiceA` module. Added a
+minimal declaration to the two mocked-discovery fixture helpers when no service
+implementation exists, and to the additional-root filesystem fixture. The
+filesystem declaration is ignored for discovery while remaining available to
+authorized resolution; candidate-count assertions remain unchanged. Existing
+assertions and production code are unchanged. Pre-edit bytes are preserved as
+`*.rerun.raw` under the prior fixture-authority receipt directory. This is a
+further prerequisite correction; no passing runtime result is claimed.
+
+
+## 2026-10-22: hydration preservation run and fixture authority prerequisites
+
+Agent: Agent MaxHeadRoom
+
+Operator log `target/issue-162/hydration-failures.log` records 73 passed,
+14 failed and 1 ignored. Failures concern Angular Service/Injects preservation.
+The six affected fixture files used Angular imports without package declaration
+and manifest evidence. Their expected semantic assertions remain unchanged.
+A shared test-only helper now supplies witnessed Component/Injectable exports
+and an isolated resolver configuration; fixture roots call it before acquisition.
+No production fallback or production repair was added in this batch.
+
+Original fixture bytes and SHA-256 receipt are preserved under
+`target/issue-162/hydration-fixture-authority/`. Static formatting, strict UTF-8
+and diff review were performed; Cargo execution remains operator-owned. This is
+a fixture prerequisite correction, not a claimed production RED-to-GREEN result.
+Hydration preservation and the latest durable-facet repair await fresh results.
+
+
 Agent: Agent MaxHeadRoom
 
 Status: **IN PROGRESS; latest declaration alias checkpoint operator-reported GREEN; program augmentation checkpoint operator-reported GREEN; explicit detection checkpoint operator-reported GREEN; default-policy checkpoint operator-reported GREEN; directive checkpoint operator-reported GREEN; automatic type checkpoint operator-reported GREEN; library preservation checkpoint operator-reported GREEN; override checkpoint operator-reported GREEN; type-mode checkpoint operator-reported GREEN; global binding checkpoint operator-reported GREEN; merge-group checkpoint operator-reported GREEN; enum parity checkpoint operator-reported GREEN; statement import-type checkpoint operator-reported GREEN; qualified import-type checkpoint operator-reported GREEN; typeof checkpoint operator-reported GREEN; ambient-module checkpoint operator-reported GREEN; ambient conformance checkpoint operator-reported GREEN; acquisition precedence checkpoint operator-reported GREEN; project output checkpoint operator-reported GREEN; output barrier checkpoint operator-reported GREEN; local package input checkpoint operator-reported GREEN; local input option checkpoint operator-reported GREEN; erased namespace query contracts UNRUN**. Runtime receipts below distinguish historical failures, authoring and subsequent operator results. No Phase 2 completion, Angular consumer migration or public canonical-question completeness is claimed.
 
+
+## 2026-10-22: post-restore mutation still RED; retained-owner revalidation authored
+
+The operator reported the post-restore mutation assertion twice: membership
+remained one instead of retracting. No complete summary or other test outcomes
+were supplied. This is one repeated unresolved assertion, not two feature
+failures. No restoration-after-mutation outcome is inferred.
+
+The unchanged durable-facet test and isolated registration were frozen in stash
+`4e18dab1c8e4ddb7720f3baefc8d4566a7a2b9fe` with SHA-256
+`c8b2b82100e273b82881e3fcc426453fbb83d3087718a443fc202318c05c7daf`,
+then removed during repair and restored byte-identically. Normal index and HEAD
+were untouched.
+
+Static tracing found that completed filesystem discovery returns no candidate
+paths on a cache hit. Thus a restored typed owner could escape even the existing
+fresh source/hash/witness checks when discovery was reused. Hydration now adds
+existing retained TS owners within the configured authorized roots as
+revalidation candidates before the normal candidate/currentness/publication
+path. Index presence grants no declaration or discovery authority. The provider
+cache, root discovery rules and discovery counters remain unchanged; this adds
+no whole-program capture, retry, cache, lock or registry. Non-TS owners are not
+added by this typed-evidence path. Actual revalidation work is unmeasured.
+
+Only direct formatting and static diff/encoding/size inspection were run. The
+unchanged durable regression and semantic-compilation/hydration preservation
+remain operator-owned. Runtime GREEN is NOT ESTABLISHED for this edit.
+
+## 2026-10-22: durable facet RED frozen; compatible publication repair authored
+
+The operator observed exact facet restoration succeeding through session proof
+but failing at index proof retention, and post-restore dependency mutation
+leaving public membership present. The initial actual SQLite and nonempty
+membership controls completed. The separate stale-before-restore test and later
+restoration assertions are not classified from these excerpts. No complete
+count/log was supplied.
+
+The exact test source and isolated registration were frozen in stash
+`8d7a949c65aded6a1ae3861097985c7fd5d9932b`, SHA-256
+`c8b2b82100e273b82881e3fcc426453fbb83d3087718a443fc202318c05c7daf`.
+A temporary index and raw backups preserved normal index/HEAD. Tests were
+absent during production repair and restored byte-identically afterward.
+
+Compatible semantic publication now carries the same typed payload into the
+existing retained index replacement and session snapshot. It validates fresh
+typed evidence before admission and propagates index validation failure through
+the existing restore/replay/delta/recovery error paths. The index lock is released
+before storing the session snapshot; the existing publication ticket/owner scope
+is reused. No new owner, cache, registry, identity policy or lock order was added.
+Absent legacy/non-TS proof retains the existing compatible projection behavior.
+
+This is a lifecycle transport correction; compiled semantic producer generations
+are unchanged. Only direct formatting and static encoding/size/diff checks were
+run by the agent. The unchanged durable-facet batch and semantic-compilation
+preservation selection require operator execution. Runtime GREEN is NOT
+ESTABLISHED, and no phase/completeness/certification claim follows.
+
+## 2026-10-22: index/module preservation GREEN; durable facet contracts authored
+
+The operator reported GREEN for the hydration-order trace, followed by the
+workspace::index and mcp::semantic_compilation preservation selections. This
+includes the original module authority regressions and supplemental facet
+controls at this checkpoint. No counts, duration or logs were supplied.
+
+The next approved lifecycle requirement is actual durable restoration with
+nonempty dependency facets. Static inspection still finds that compatible
+projection restoration retains typed proof in the session snapshot but drops it
+when replacing the index projection. Three tracked tests now exercise actual
+compress/SQLite bytes, process-state recreation and registered restore_context:
+exact session/index proof preservation, stale dependency refusal before restore,
+and post-restore public membership retraction/restoration with unchanged owner
+bytes. Each fixture first proves nonempty dependency facets, exact SQLite payload
+and public membership. These tests are UNRUN; no new production repair was made.
+Later lifecycle assertions remain unclassified until reached. No phase or
+completeness claim follows from the focused GREEN checkpoint.
+
+## 2026-10-22: hydration-order RED isolates index publisher bookkeeping
+
+The operator's hydration-order trace proves that the fresh artifact has a
+Directive/Leaf Defines record, exact alias/decorator facets, successful canonical
+and direct role admission, capture_current true and no stale witnesses. Before
+the final file query, current coverage is false and file entities are empty.
+The public result nevertheless contains only builtin/Class. Thus this receipt
+locates the remaining loss after authoritative extraction, not in alias binding.
+
+Static inspection found register_entity returning early for an existing physical
+entity occurrence before recording the current publisher's file key. A prior
+AppModule membership can register Directive/Leaf with leaf.ts provenance; Leaf's
+own later Defines then skips its file_map key. entities_in_file consults those
+keys, so the valid occurrence becomes invisible in its own source query.
+
+The observed module/trace test sources, supplemental index regression and their
+isolated registrations were frozen using a temporary index in stash
+`60cce06d599762904deebd04bd44f3829624dad3`. Normal index and HEAD were untouched.
+The two observed-RED test files were absent during repair and restored
+byte-identically. The new unrun index test was formatted without assertion or
+fixture changes after restoration; it is supporting coverage, not claimed RED.
+
+register_entity now records the publisher key before occurrence deduplication.
+Entity/edge identity and duplicate occurrence semantics remain unchanged; final
+file_map key deduplication stays at the existing add_edges boundary. This is a
+demonstrated shared publication-bookkeeping correction, not an Angular spelling
+exception or new registry/identity policy. The supplemental test covers prior
+target registration, own publication/replacement, removal of the referring owner
+and a single surviving occurrence.
+
+Only direct formatting and static UTF-8/no-BOM/mojibake/size/diff checks were run.
+The public trace, original module tests and workspace-index/semantic-compilation
+preservation require operator execution. Runtime GREEN is NOT ESTABLISHED.
+
+## 2026-10-22: isolated alias trace GREEN; hydration-order trace authored
+
+The operator reported GREEN for the isolated exported-role mutation trace.
+This does not supersede the original module test's RED: the isolated trace did
+not first hydrate module membership. No count/log was supplied.
+
+The trace now shares its original assertions with a second case that performs
+the original owner-file query and a nonempty module forward-edge query before
+mutating the target. Its failure receipt includes fresh artifact/facet/role
+evidence plus index entities and current-coverage state before the final public
+file query. The original isolated test name and required positive remain intact;
+the observed three-test module regression is unchanged. The added hydration-
+order case is UNRUN. No new production edit or causal conclusion is claimed.
+
+## 2026-10-22: exported target alias still RED; bounded stage trace authored
+
+The operator supplied the same exported-target alias failure twice, at the
+target's own public Directive role assertion. These are repeated evidence for
+one unresolved assertion, not two distinct failures or a completed suite count.
+No other outcomes are inferred. The membership assertion remains unreached in
+that test. No further production repair was made from this receipt.
+
+A supplemental tracked regression now reproduces the unaliased-to-exported-
+alias source mutation and reports the fresh artifact's exact dependency facets,
+canonical role interpretation, direct span admission, semantic edges, stale
+witnesses and registered public response if the role is lost. This is a bounded
+synthetic stage trace, not a replacement for or modification of the unchanged
+observed-RED batch. It is UNRUN and is needed to distinguish capture/admission
+from publication before another production change. No speculative fallback or
+oracle weakening was added.
+
+## 2026-10-22: module rerun RED; hydration transport and class-site repair authored
+
+The operator reported the target-alias test stopping at the target's own public
+role assertion, before its new membership assertion. The foreign-target test
+still retained membership after target mutation. No completed summary or other
+test outcomes were supplied. Neither the supplemental facet controls nor the
+broader preservation selection is inferred to have run.
+
+The same three-test source and isolated registration were frozen again in
+stash `96ea902a370a9ce2afe6a807d5327ad931e0720a`, with unchanged source SHA-256
+`96354c9a0d2b1227bdd07b9f6c061b366c4c7e229ad59c0dd9e008cfddc19c94`.
+Normal index/HEAD were untouched. Tests were absent during repair and restored
+byte-identically. Existing earlier RED receipts remain preserved.
+
+Static tracing located a real missing production boundary: graph hydration's
+commit_candidate published edges/ordinary dependencies while discarding typed
+TS evidence. Currentness could then reuse the initiating source without its
+dependency facets/witnesses. Hydration now takes the existing retained payload,
+checks it inside the existing publication ticket and installs it through the
+same retained WorkspaceIndex replacement used by explicit-file queries. C#
+artifact retention and non-TS ordinary dependency/fidelity behavior remain on
+their existing paths; no new publication lock or owner is introduced.
+
+Class-role admission now consumes the exact retained declaration/decorator
+sites instead of reparsing a separate raw class view. Metadata argument bytes
+are sliced from the same supplied source at those retained AST coordinates.
+Canonical role/package checks and source/hash/currentness guards remain; no
+written-name fallback is introduced. This unifies the class and composition
+consumers at the newly approved facet boundary. Behavioral resolution of the
+reported alias failure still requires the operator rerun.
+
+Angular semantic generation advances 30 -> 31 with current-generation test
+pins and previous-generation compatibility updated. The supplemental public
+spread control now also requires graph hydration to retain a current nonempty
+dependency facet in the real index. This added assertion is UNRUN, not a claimed
+RED/GREEN receipt. Static formatting/encoding/size/diff checks are the only
+agent verification. Current runtime GREEN is NOT ESTABLISHED.
+
+## 2026-10-22: dependency-facet extension approved; module repair authored
+
+The owner explicitly approved demanded dependency-declaration facets and their
+module-composition consumption, with the exclusions recorded in the decision
+document. The frozen three-test batch was removed during implementation, then
+restored byte-identically from its raw backup. The original stash and SHA remain
+unchanged. A separate supplemental file adds two unrun evidence/preservation
+controls; it does not alter the observed RED assertions.
+
+Native declaration_facets now acquires exact class/decorator callee and argument
+sites plus demanded object/array/reference structure through the same Resolver,
+source tree and immutable Host snapshots. Angular supplies the requested
+declarations/imports/exports field names; the language layer assigns no framework
+roles. Dependencies are visited through those demanded references and const
+initializers with a declaration-ID cycle guard. Facets retain native resolution
+outcomes, exact source/hash/span identity and package/export evidence, not whole
+dependency source text or arbitrary expression evaluation. Shared witnesses
+include the newly consumed dependency/config/package/negative/physical evidence.
+
+The migrated module_metadata path interprets canonical roles for both owner and
+target, traverses retained const arrays/spreads, and emits existing membership
+edges with physical target owners. It neither calls Contributors nor falls back
+to written decorators. The old reader remains only behind unmigrated syntax
+helpers/diagnostics. Typed facets travel inside existing TypeScriptAuthority and
+its source-owned session/durable/currentness machinery. No cache, registry,
+publication owner, lock order or public schema was added. Old missing facets
+do not supply canonical membership proof.
+
+Angular semantic generation advances 29 -> 30 with current-generation pins and
+the prior-generation compatibility control updated accordingly. Marker and
+canonical pipeline generations remain unchanged. Focused encoding inspection
+also restored corrupted comment punctuation in the active meta-layer module to
+its original Unicode characters.
+
+The supplemental controls require exact dependency/API sites and complete typed
+serialization round-trip, and cold/warm public imported-array/spread membership.
+Actual durable restart with nonempty facets, further shadow/type-only/negative
+candidate controls, context/platform conformance and measured performance remain
+required follow-up evidence. The original three tests include foreign mutation
+and restoration, whose post-repair outcomes remain unclassified until execution.
+
+Only direct formatting and focused diff/UTF-8/no-BOM/size inspection were run by
+the agent. Runtime GREEN is NOT ESTABLISHED for this repair or the supplemental
+controls. No phase, complete composition envelope, public-question completeness
+or certification is claimed.
+
+## 2026-10-22: module composition RED; retained dependency-facet decision
+
+The operator observed all three intended module-authority failures after the
+nonempty role/membership controls. Owner and target aliases lose membership;
+the foreign-decorated target gains it. Later restoration is unclassified.
+No count/log was supplied. Exact tests/registration were frozen in stash
+`71d8d4cd99b4ba3decee665d909eb27044501bfc` and restored byte-identically;
+SHA-256 `96354c9a0d2b1227bdd07b9f6c061b366c4c7e229ad59c0dd9e008cfddc19c94`.
+
+Static tracing found a separate relative-path/filesystem reader and repeated
+written-role admission in module composition. The initiating native capture
+does not retain the dependency declaration's decorator/API proof. A proposed
+retained dependency-facet boundary and alternatives are recorded in
+[the decision proposal](ISSUE_162_MODULE_DECLARATION_EVIDENCE_DECISION.md).
+The owner decision is requested before changing this cross-file retained
+authority contract. No production repair, test rewrite, runtime execution or
+completion claim was made.
+
+## 2026-10-22: class-role checkpoint operator GREEN; module consumer contracts
+
+The operator reported GREEN for the requested class-role and semantic-compilation
+checkpoint. No counts/logs were supplied. The previous repair's UNVERIFIED
+classification is superseded for those focused selections only.
+
+Next required chain: AQ02/AQ05/AQ25 -> NgModule declaration membership -> exact
+owner/API and target declaration/role authority -> existing module_metadata
+composition consumer -> source-owned edges -> registered forward_edges answers.
+Static inspection finds that this consumer still reclassifies both owner and
+target from written decorator spelling after canonical class-role admission.
+
+Three tracked tests in angular_module_authority_issue_162.rs require owner alias
+preservation, target decorator alias preservation and foreign target refusal
+with restoration. Each first proves a real public class role and nonempty
+unaliased membership. These tests add no array/expression semantics or public
+schema. They are authored and UNRUN; earlier controls or lifecycle assertions
+remain unclassified until reached. No production repair was made in this batch.
+Broader composition closure, reverse completeness and live acceptance stay open.
+
+## 2026-10-22: observed class-role RED frozen; shared canonical admission authored
+
+The operator supplied failures for the unaliased Directive public declaration,
+foreign Injectable/NgModule/Pipe admission and Injectable/NgModule alias loss.
+The duplicated Module failure supplies no additional outcome. Pipe alias,
+foreign Directive and unreached erasure assertions are not classified from
+these excerpts. No completed count, duration or log was supplied.
+
+The exact eight-test source and isolated registration were frozen with a
+temporary index and branchless baseline in stash
+`3a7f6c7b9a2902ef894d67ca5c2e1b8039e2c2a0`. Test SHA-256:
+`b1bdf33a5465d0c88db26d54cf8ee63932a18cb8c82a69b556d8fb2bdb8b92e6`.
+Raw backups were preserved; normal index and HEAD were untouched. The tests
+were absent during repair, then restored byte-identically with registration.
+
+The Component admission helper is now class_role_authority: the existing exact
+callee/source/package/public-export comparison maps canonical Component,
+Injectable, NgModule, Directive and Pipe endpoints into Angular class roles.
+The authorized pipeline does not fall back to written role names when that
+proof fails. Existing metadata helpers consume admitted selector/pipe-name
+arguments. Directive joins the existing declaration registration carrier, so
+its public entity no longer requires an unrelated constructor relationship.
+No parallel authority owner or new TypeScript semantics were introduced.
+
+Angular semantic generation advances 28 -> 29; current generation pins follow,
+and the transition compatibility control compares against 28. Canonical and
+marker generations remain unchanged. Direct syntax-only entry points and
+marker rendering have not been migrated; NgModule composition, provider/member
+interpretation and remaining family consumers still require their own canonical
+integration. Class-role admission is not those capabilities' completion.
+
+Formatting, strict UTF-8/no-BOM, active-size and focused diff checks are static
+evidence only. The unchanged class-role batch, earlier Component preservation
+and retained-authority selection require operator verification after this edit.
+Runtime GREEN is NOT ESTABLISHED. No certification, question completeness or
+Phase 3 completion is claimed.
+
+## 2026-10-22: Component boundaries operator GREEN; remaining class-role contracts
+
+The operator reported GREEN for the seven-test Component selection. No retained
+count/log was supplied. This supersedes the four boundary controls' UNRUN status.
+
+The next AQ01/AQ25 requirement chain is the remaining existing class-role
+producer: actual Injectable/NgModule/Directive/Pipe export identity and runtime
+eligibility -> Angular Service/Module/Directive/Pipe classification -> existing
+source-owned semantic publication -> registered entities_in_file answers.
+Static tracing still finds written-name admission for these roles. Directive
+also lacks an independent entity carrier when no other relationship is emitted.
+
+Eight tracked tests in angular_class_role_authority_issue_162.rs specify each
+role separately: real unaliased public declaration, alias and warm alias,
+type-only retraction, and foreign-spelling refusal with a nonempty exact native
+foreign endpoint control. The unaliased Directive case intentionally requires
+the declaration itself to be publicly represented without invented DI evidence.
+These are required question/consumer contracts, not compiler-parity expansion.
+Tests are authored and UNRUN; static hypotheses are not observed RED. Earlier
+assertion failures may leave later assertions unclassified. No production
+repair, marker migration, completeness or phase completion is claimed.
+
+## 2026-10-22: warning cleanup operator GREEN; Component boundary controls authored
+
+The operator reported GREEN for the focused Component rerun after removal of
+the unused import, with no further warning reported. The preceding retention
+selection remains operator-reported GREEN. No counts or logs were supplied.
+
+The next bounded AQ01/AQ25 batch completes additional controls explicitly
+required by the approved retained-authority contract: public Component identity
+through a barrel alias, refusal to borrow an imported role across a parameter
+shadow, refusal of a type-only runtime decorator, and warm public-query
+retraction/restoration after package-name mutation with unchanged consumer bytes.
+Each test first runs the existing nonempty native/public API controls. The
+lifecycle test requires a cold and warm positive before mutation; later
+assertions are unclassified until reached.
+
+These four tracked tests are authored and UNRUN. No production repair or new
+TypeScript semantics were added. The original three Component assertions remain
+unchanged. This batch does not close the other Angular families, marker
+migration, reverse closure, completeness or live acceptance.
+
+## 2026-10-22: Component consumer and retention operator GREEN; unused import removed
+
+The operator reported GREEN for both `issue_162_angular_component_authority_`
+and `mcp::semantic_compilation`. No count, duration or retained log was supplied.
+The run reported an unused `serde_json::Value` import in the Component test.
+Only that unused import was removed afterward; assertions, fixtures and
+production behavior are unchanged. The original observed-RED bytes remain in
+the recorded stash. Zero-warning compilation after this cleanup remains
+operator-owned and unverified. These focused results do not establish complete
+Angular migration, Phase 3 completion, full preservation or live acceptance.
+
+## 2026-10-22: Component consumer RED frozen; canonical role repair authored
+
+The operator observed all three intended Component consumer failures: the real
+API alias lost its public Component role, while a foreign namesake and a
+paths-redirected package-looking import gained it. The preceding native
+declaration/hash/span/package-witness and unaliased public controls completed.
+No complete test count or duration was supplied.
+
+The unchanged three-test batch and isolated registration were frozen in stash
+`605d3d91eca6fa90dabc669d7e34f433fb7a9856` using a temporary index and branchless
+baseline. The normal index and HEAD were untouched. Raw-byte backups were also
+preserved. Test SHA-256:
+`e89228498c88268fbbdb194023621ad31054e3232ed60e957c4106a3b1f80a03`.
+Tests/registration were absent during production repair and restored exactly.
+
+AQ01/AQ25's demonstrated chain now enters the existing semantic class-role
+producer: authorized compilation captures native TS evidence before the default
+pipeline, moves it through PassContext, lends it to the Angular evaluator, then
+returns the same capture to the artifact and established retained lifecycle.
+There is no second post-pipeline capture or parallel publication owner.
+
+Neutral package-export records retain the exact endpoint, nearest admitted
+physical manifest/hash/name/version and comparison with that package's public
+value export under the initiating project. Reads and negative observations use
+the same Host. Source-only authorization does not grant ancestor reads.
+Angular interprets this evidence: a parser-owned decorator callee span must
+resolve to the witnessed package's actual public Component endpoint. Written
+decorator or module spelling alone cannot grant that semantic role. Existing
+selector/metadata projection follows admission; no source rewriting or terminal
+name rescue was added.
+
+The existing Angular semantic producer advances from 27 to 28 so earlier
+spelling-based semantic facts are incompatible. Current-generation test pins
+advance accordingly, and the transition compatibility control compares against
+27. Marker generation remains 6 and canonical pipeline generation remains 1.
+Compatibility applicability conservatively includes decorated TS classes so
+aliases retain the relevant producer/config fingerprint; applicability grants
+no framework role. A once-valid capture that becomes stale before extraction
+is retained for admission to reject, rather than silently converted to absence.
+
+This is the first Component semantic consumer slice. Existing marker rendering,
+other decorator/family consumers, compiled declaration metadata, composition,
+complete package/version envelopes, reverse closure and live verification remain
+open. Standalone syntax helpers remain preservation paths, not migrated
+canonical authority. No Angular-wide migration, Phase 3 completion, question
+completeness or certification is claimed. Qualified erased aliases remain
+UNRESOLVED and unchanged.
+
+Direct formatting and focused static inspection are the only agent checks.
+The restored regression and affected preservation selections require operator
+execution; runtime GREEN is NOT ESTABLISHED for this repair. Earlier retention
+GREEN receipts predate the capture-timing/package-evidence changes.
+
+## 2026-10-22: declaration/query operator GREEN; first Angular consumer contracts
+
+The operator reported GREEN after the corrected declaration matrix and
+query-retention selections. No counts/logs were supplied, and no outcome for
+other earlier selections is inferred.
+
+Agent MaxHeadRoom traced the first real framework consumer. AQ01 requires the
+actual Angular declaration/API role, not a written decorator spelling. The
+default MetaLayerPass invokes layers/meta/angular_semantic.rs, which calls
+decorators::extract_graph_entries and class_to_semantic_edges. Component role
+classification currently uses written decorator kind, while TypeScriptAuthority
+is captured later at artifact construction. Thus transport alone has not migrated
+this consumer; a nondefault helper or retained getter would not close the gap.
+
+The demonstrated requirement chain is AQ01 (and AQ25 endpoint provenance) ->
+actual Component API use -> canonical value declaration/export plus package and
+project dependency proof -> existing Angular class-role consumer -> source-owned
+component fact -> registered entities_in_file response. Angular owns the API role
+and decorator interpretation; TS supplies identity/eligibility/context. This is
+an established question, not admission of a new compiler-parity frontier.
+
+Three tracked public-path contracts in angular_component_authority_issue_162.rs
+cover an aliased real Component API, a same-spelling foreign export, and an
+@angular/core-looking import redirected by configured paths to a foreign target.
+Each fixture supplies an explicit synthetic Angular 20 package/declaration and
+bounded TS config. Before the intended assertion, controls require the exact
+decorator occurrence's declaration/hash/span, consumed package manifest witness,
+and a nonempty ordinary real Component result through registered MCP dispatch.
+If those controls fail, that is not the intended consumer RED. No actual Angular
+package installation, compiler runtime or new version-default policy is involved.
+
+Minimum semantics for the next slice are Component API role binding and alias/
+namesake separation using retained proof on the default path. The stopping
+condition is these actual source-owned public facts with current evidence;
+other decorators, library metadata, composition and Angular-family obligations
+remain required. No consumer or pipeline production repair was authored yet.
+The three contracts/registration are UNRUN. Formatting, diff, UTF-8/no-BOM and
+active-size checks passed. Next operator gate is issue_162_angular_component_authority_.
+
+## 2026-10-22: unused observer warning fixed; declaration oracle corrected
+
+The operator reported an unused retained_typescript_authority method and the
+remaining ordinary.ts declaration-matrix failure. No outcomes for other
+selections are inferred from that partial output.
+
+Static tracing corrected the earlier hypothesis that this was private evidence
+leakage. The unchanged typescript_object_members producer explicitly emits a
+source-owned self-Defines record for top-level string values. WorkspaceIndex's
+unchanged insertion boundary registers such records as declarations, excluding
+only semantic-role registration records. ordinary.ts contains that real value
+declaration; the declarations API is domain-neutral, not NgRx-only. The neutral
+producer and insertion path have no working-tree change.
+
+The original observed assertion is preserved in stash
+081edcd7eb718b5689253d6b89fdc31546bae81a. The supplemental matrix oracle is now
+corrected: all negative cases still forbid NgRx declarations; ordinary.ts must
+additionally contain exactly its TypeScript ValueDeclaration with exact name and
+physical asserting file, while use-only cases remain empty. Positive Selector/
+Action multiplicity/name/file assertions are unchanged. This is an identified
+oracle correction, not a production semantic repair or a production RED-to-GREEN
+claim. Its corrected expectation remains UNRUN.
+
+The observer is currently used only by tracked tests after the generic reuse
+gate was removed, so it is compiled only for TypeScript tests. No warning
+suppression or artificial production call was added. Retained payload storage
+and currentness validation remain production code; actual Angular consumption
+still is not complete.
+
+Direct rustfmt, diff, UTF-8/no-BOM and active-size checks passed. No Cargo/runtime
+execution occurred. The corrected declaration selection and query-retention
+preservation selection remain pending operator verification; zero-warning runtime
+compilation is not claimed from static checks alone.
+
+## 2026-10-22: query preservation REDs; reuse and fidelity corrections authored
+
+The operator supplied three preservation failures: a provided High projection
+was unnecessarily recompiled for a Low entity query; ordinary.ts appeared as a
+TypeScript ValueDeclaration in the declaration matrix; and Low C# publication
+exposed GetAll. No outcome for the new query-retention selection is inferred.
+
+The two unchanged preservation files and only their registrations were frozen
+with an isolated index/branchless baseline in stash
+081edcd7eb718b5689253d6b89fdc31546bae81a, excluding earlier implementation work.
+They were absent during repair. Normal index and HEAD were untouched. Scoped
+elevated Git object writes succeeded.
+
+Restoration detail: Git's text filter normalized pre-existing mixed newlines in
+workspace_query_entities_auto_compile.rs and mcp/mod.rs. Their restored canonical
+Git content is identical to the frozen blob/HEAD, with no source diff or assertion
+change; raw byte identity is NOT claimed for those two files. The auto-compile
+test's original raw SHA was
+f9188ead518f8b4bb4e52e4949977496ea6fac9bf727256d89822e305d5d7065;
+restored canonical SHA is
+5f49af41d986c8bec7e5a269479572f2ffcf2763e0f63b7abd1069ce5528cce2.
+The declaration test and query.rs registration were restored byte-identically.
+The receipt under target/issue-162/query-preservation-red-freeze.json retains all
+original raw hashes. This is a newline restoration limitation, not an oracle fix.
+
+The new generic warm-query gate incorrectly required a typed payload even when
+the existing projection was compatible and no canonical TS consumer requested
+that proof. That forced unnecessary compilation and changed legacy projection
+reuse. Generic projection validity and typed authority availability are now
+separate again: absent proof grants no canonical TS claim; present proof must
+still be current. Provide's High/Medium/Low publication now carries its existing
+payload into the same index record, preserving both proof and no-recompile reuse.
+The ordinary declaration matrix's outcome remains pending the preservation rerun;
+its assertions were not changed.
+
+C# reconciliation already selects the publication fidelity, but its generation
+projector used the retained artifact's fidelity instead. A bounded explicit-
+fidelity projection entry now passes the selected fidelity to the existing
+fidelity-aware .NET producers. Existing callers retain their artifact-fidelity
+entry point. This preserves the established Low-versus-Medium contract rather
+than adding a C# semantic capability or changing global fidelity policy.
+
+Direct formatting, diff, strict UTF-8/no-BOM and active-size checks passed. No
+Cargo/runtime execution occurred. The new query-retention and three affected
+preservation selections remain UNVERIFIED after these corrections. No phase
+completion, Angular role migration or certification is claimed.
+
+## 2026-10-22: file-query RED frozen; typed index handoff authored
+
+The operator supplied both intended cold query-retention failures after real
+compilation controls and registered query dispatch. Warm reuse and dependency
+mutation assertions remained unreached; no count/log is inferred.
+
+The exact two-test file and isolated registration were preserved in stash
+42ae8c4c7b2bc269295f71731a82c8b2b4d15e02 with a temporary index and branchless
+registration baseline, excluding prior work and mechanical interface preparation.
+Normal index and HEAD were untouched; scoped elevated object writes succeeded.
+Tests/registration were absent during repair, then restored byte-identically.
+Test SHA-256: 25dbeee040ac72fc3d2e3385ae9976a34f3abc27bc1857c26e93d6c45db41207.
+
+Entity/declaration query preparation now takes typed evidence before artifact
+decomposition and publishes it into the existing per-file semantic_coverage
+record with its projection. The shared file-query handoff checks typed currentness
+and source hash under existing source-owner publication locking. Index replacement
+validates the payload before replacing the record; current indexed proof lookup
+also checks ordinary and typed dependencies. TS warm query preparation requires
+retained proof, so a projection-only entry cannot satisfy that acquisition step.
+C# retained-artifact behavior and non-TS warm eligibility are preserved.
+
+No alias, session IR, parallel registry, public schema or new completeness
+promotion was introduced. Canonical-only calls_in_file remains unchanged. The
+new proof is available to future real Angular consumers; transporting it alone
+does not establish framework API roles or canonical-question acceptance. Session
+publication paths can still require query reacquisition of index-owned proof;
+that overhead has not been measured or claimed eliminated.
+
+Direct formatting, diff, strict UTF-8/no-BOM, active-size and frozen-test hash
+checks passed. No Cargo/runtime execution occurred. New query retention and
+existing entity/declaration query preservation remain UNVERIFIED after repair.
+No Phase 3 completion, full lifecycle closure or certification is claimed.
+
+## 2026-10-22: consolidated retention operator GREEN; query-owner contracts authored
+
+The operator reported GREEN for mcp::semantic_compilation, including the new
+retirement control and earlier capture/retention tests. No count/log was
+supplied. No binary/stdio, actual Angular consumer or certification result is
+inferred.
+
+Inspection of the existing entities_in_file contract confirms cold queries must
+not create session contexts. Query acquisition already owns its file projection
+in WorkspaceIndex::semantic_coverage. The next slice therefore uses an optional
+typed field in that existing per-file record, not a new map/registry or session
+alias. Mechanical interface preparation adds the optional field initialized to
+None, currentness interpretation if populated, and a test-only observer. No
+producer populates the field yet. The unused private PartialEq/Eq derive on
+SemanticCoverage was removed because the typed capture is not an Eq object;
+global EntityRef equality and query contracts are unchanged.
+
+Two tracked registered-query tests in typescript_query_retention_issue_162.rs
+cover entities_in_file and declarations_in_file. A nonempty real-compilation
+control precedes cold retained payload equality, no-session-alias assertions,
+warm reuse and dependency-only mutation/reacquisition. These are consumer-path
+retention contracts, not new public response fields or exactness promotion.
+Calls-in-file and edit's prior-source IR probe remain canonical-only consumers.
+
+The mechanical interface and regressions are authored; production transport into
+the index field remains unimplemented. No behavioral RED or GREEN is yet claimed
+for the new selection. Static formatting, diff, UTF-8/no-BOM and active sizes
+passed. Next operator gate is issue_162_query_retention_. Later assertions remain
+unclassified if cold retention fails. Actual Angular role consumers, package
+role proof and canonical completeness remain mandatory subsequent work.
+
+## 2026-10-22: checkpoint operator GREEN; acquisition audit and retirement control
+
+The operator reported GREEN after the checkpoint-retention and save_context
+selections. No counts/logs were supplied. Their executed outcomes do not certify
+the remaining query/consumer/lifecycle path.
+
+Agent MaxHeadRoom classified remaining decomposition callers. calls_in_file is
+explicitly a read-only canonical-IR candidate and installs no semantic owner;
+discarding its unused semantic payload is intentional. apply_edit's pre-edit IR
+candidate is also canonical-only. Entity/declaration preparation publishes into
+WorkspaceIndex but still drops the TS payload and uses projection-only warm
+checks. Those publishing callers need an explicit typed owner/currentness handoff
+before a canonical Angular consumer can rely on their acquisition. No alias,
+index identity or completeness policy was changed during this audit.
+
+One new tracked retirement control in typescript_retirement_issue_162.rs uses
+registered provide/delete_context/restore. It requires deletion of only the
+selected owner's session and durable proof, unchanged source bytes, and exact
+surviving proof for a second owner before and after restart. This tests the new
+payload through existing deletion ownership rather than creating a new removal
+mechanism. The test is UNRUN and no deletion production change was made.
+
+Formatting, diff, UTF-8/no-BOM and active-size checks passed. Next operator gate
+consolidates mcp::semantic_compilation, covering the authored retirement control,
+all retained-authority regressions and earlier compilation controls together.
+No expected test count is asserted. Query acquisition, reset/crash race coverage,
+actual Angular consumers and public canonical completeness remain open.
+
+## 2026-10-22: checkpoint/no-op RED frozen; payload replacement repair authored
+
+The operator supplied intended failures for both tests: explicit checkpoint
+returned a durable record with no typed payload; no-op delta left the session
+proof bound to the previous source hash. The no-op fixture's branch-selection
+assertion completed. Later restart assertions remain unclassified; no full test
+count is inferred.
+
+The exact test/registration were frozen with an isolated index and branchless
+registration baseline in stash 2bbf3920e3997d9ff7dcc18e0621ae314d7a4c34.
+Earlier working-tree edits were excluded; normal index and HEAD were untouched.
+Scoped elevated object writes succeeded. Both were absent during repair, then
+restored. Test SHA-256 remains
+9e7fad49bfeead389286be9d8cc47ed4fd2faf7556ae4bd2e48c5bec4b62998e.
+
+Explicit save now takes the retained session payload into its existing durable
+comparison and save transaction. Typed currentness is checked before checkpoint
+write. An otherwise identical record without that proof is not treated as the
+same retained state. The obsolete edges-only compatible save wrapper was removed
+after its final production caller migrated.
+
+The TS no-op delta branch now replaces the source-owned session payload/hash and
+updates its existing indexed semantic projection without advancing IR version.
+Absent new proof also replaces an earlier proof; it cannot resurrect old source
+evidence. Non-TS no-op behavior is unchanged. This does not introduce an implicit
+durable checkpoint or reset delta history: explicit save retains that existing
+responsibility, and restore still checks the persisted source hash.
+
+Direct formatting, diff, strict UTF-8/no-BOM, active sizes and frozen-test hash
+checks passed. No Cargo/runtime execution occurred. The unchanged checkpoint
+selection and existing save_context controls remain UNVERIFIED after repair.
+Other query acquisition paths, deletion/reset coverage, consumer migration and
+canonical completeness/live gates remain open. No Phase 3 completion is claimed.
+
+## 2026-10-22: checkpoint/no-op delta transport contracts authored
+
+Agent MaxHeadRoom audited remaining source-owned transport and found two concrete
+gaps: explicit save_context rebuilds persistence from edges/dependencies without
+retained proof, and source-changed/no-IR-delta generation advances the session
+hash without replacing its typed snapshot. Two new tracked tests in
+typescript_checkpoint_retention_issue_162.rs exercise registered provide/save/
+restore and registered no-op delta followed by checkpoint/restart. Producer
+controls require a nonempty canonical aliased endpoint. Checkpoint inspection
+uses the same current-context owner selection as production restoration.
+
+The no-op fixture adds a trailing newline and explicitly requires a no-op delta;
+that branch selection must be confirmed before a failure can be called the
+intended semantic RED. Later save/restart assertions remain unclassified if
+earlier source-hash proof replacement fails. No production repair or new language
+semantics were authored. Tests and registration are UNRUN; formatting, diff,
+strict UTF-8/no-BOM and active-size checks passed. Next operator selection is
+issue_162_checkpoint_retention_. Other query acquisition callers and actual
+Angular API/member consumers remain open; this is not transport completion.
+
+## 2026-10-22: transition/preservation operator GREEN; three expected ignores
+
+The operator reported all three handed-off selections GREEN: transition
+retention, apply_edit preservation and edit_recovery. The apply_edit selection
+reported three ignored tests. Static inspection locates exactly three ignored
+e2e_apply_edit tests in src/tests/mcp/apply_edit_e2e.rs: round-trip/complete
+context, repeated same-unit rejection and different-unit success. That file
+explicitly requires a separately built clean-ctx binary and persistent stdio
+JSON-RPC execution, so these are intentionally excluded from ordinary Cargo
+test runs. They were not executed or passed in this receipt.
+
+No counts/logs beyond the three ignores were supplied. These GREEN reports
+verify the executed selections only; binary/stdio acceptance remains pending
+and should be batched at the appropriate later verification boundary. No
+ignored annotation was introduced or changed for #162, and no runtime process
+was started by the agent.
+
+## 2026-10-22: edit/delta RED frozen; transition transport repair authored
+
+The operator reported both intended post-transition missing-authority failures.
+The baseline proof and tool operations completed before session payload checks
+failed. Subsequent durable equality and restart assertions remain unclassified.
+No complete test count was supplied.
+
+The exact two-test file and isolated registration were frozen with a temporary
+index and branchless baseline in stash
+5fe40118c0f2c6497c8aa0a7461da9493e92dc9b, excluding earlier transport changes.
+Normal index and HEAD were untouched. Scoped elevated object writes succeeded.
+Both test and registration were absent during repair, then restored with exact
+test SHA-256 b602e5a52cc23ea11ea1f42cacc1cf488fc2e33b6ac11e40cc28020d814a9ff0.
+
+apply_edit now takes target authority before decomposition, carries it through
+the existing durable intent/commit and source-owned session replacement, and
+validates consumed evidence before live publication. Its persistence helpers
+were extracted into edit_persistence.rs to keep active code within the ceiling.
+Intent payload is untrusted while the staged file temporarily changes directory
+inventory; final commit and compatible recovery revalidate after replacement
+consumes that staged file. Legacy intents retain absent proof.
+
+Delta generation now retains authority in its existing pending compatible
+projection; pending admission/lookup and acceptance check current typed proof.
+Accepted delta persistence carries the payload into the existing transaction,
+and source-owner publication preserves it. Initial delta baselines also carry
+the payload through their existing persistence helper. The obsolete edges-only
+compatible-projection constructor was removed after its last caller migrated.
+No parallel cache, registry, global retry or new TypeScript semantic frontier
+was introduced.
+
+Direct rustfmt, diff, strict UTF-8/no-BOM, active-size and frozen-test hash checks
+passed. No Cargo/runtime execution occurred. The transition batch, apply_edit
+preservation and edit_recovery selections remain UNVERIFIED after this repair.
+No claim covers all no-op delta, reset/deletion or crash timing combinations;
+remaining lifecycle, actual Angular consumption and query completeness still
+require evidence. Phase 3 and #162 remain incomplete.
+
+## 2026-10-22: restoration/compatibility operator GREEN; transitions authored
+
+The operator reported GREEN after the restoration and existing compatibility
+validation selections were handed off. No counts/logs were supplied. This is
+evidence for those selections, not full Phase 3 completion or live certification.
+
+Agent MaxHeadRoom traced the next two source-changing paths. apply_edit still
+decomposes its candidate without transporting typed proof into its crash-recovery
+intent, and delta's pending semantic projection is built without retained proof.
+Two tracked contracts in typescript_transition_retention_issue_162.rs now use
+registered provide to establish a nonempty aliased endpoint, then registered
+apply_edit or delta_code_context/apply_delta. They require replacement with the
+new source hash, exact endpoint preservation, durable payload equality and
+fresh-state registered restoration. A simple numeric method-body change avoids
+introducing a new TypeScript semantic frontier. Later persistence/restore checks
+remain unclassified if an earlier session assertion fails.
+
+The two tests and registration are authored, UNRUN; no edit/delta production
+repair was made. Static formatting, diff, UTF-8/no-BOM and active-size checks
+passed. No Cargo/runtime execution occurred. The next operator selection is
+issue_162_transition_retention_. Existing erased-alias RED and all mandatory
+consumer/query/completeness/live obligations remain unchanged.
+
+## 2026-10-22: restoration RED frozen; compatibility/owner repair authored
+
+The operator supplied two intended failures: current restarted restoration lost
+typed authority, and dependency-mutated restoration returned success. The
+nonempty producer controls completed. No full count or outcome for the separate
+legacy control was supplied; those are not inferred.
+
+The exact three-test file and isolated registration were frozen using a temporary
+index and branchless registration baseline in stash
+a9f6a3d524a27e7798ff75ea6d3c7963dbf773ed. Earlier working-tree transport repairs
+were excluded. Normal index and branch HEAD were untouched; scoped elevated
+object writes succeeded. Test and registration were absent during production
+repair and restored afterward. Exact restored SHA-256:
+e12358196e0307a49cab70faa1d944b1247580fb6499c17da840fd7a658533ad.
+
+SQLite load now carries the decoded payload as untrusted authority. Existing
+semantic compatibility validation checks retained owner hash/capture disposition
+and fresh consumed witnesses, in addition to existing config/producer identities
+and ordinary dependency checks. Stale typed proof uses the existing semantic
+dependency-stale failure. CompatibleSemanticProjection carries accepted proof
+into the same source-owned session snapshot. Restore and historical replay
+recheck retained currentness in their existing publication-ticket predicate.
+Absent legacy proof remains absent while existing compatible projection behavior
+is retained. The existing compatibility-test fixture gains a default absent
+payload field; no assertion was changed.
+
+Direct formatting, diff, strict UTF-8/no-BOM, active sizes and frozen-test hash
+checks passed. No Cargo/runtime execution occurred. The repaired three-test
+restoration batch and existing compatibility validation tests remain UNVERIFIED.
+This does not complete edit/delta/recovery lifecycle, Angular consumption,
+public query reachability or completeness. No certification is claimed.
+
+## 2026-10-22: provide operator GREEN; durable admission contracts authored
+
+The operator reported GREEN for issue_162_provide_retention_cold_warm_and_dependency_mutation.
+No count/log was supplied. Its cold/warm payload and consumed-dependency mutation
+assertions are verified by that report; no other lifecycle completion is inferred.
+
+Static tracing of restoration finds that SQLite deserialization reads the typed
+snapshot but UntrustedDurableContext/CompatibleSemanticProjection do not carry
+it onward, and publication retains only edges/ordinary dependencies. Three new
+tracked tests in typescript_restore_retention_issue_162.rs exercise registered
+compression followed by a fresh McpState and registered restore_context. They
+require exact retained proof on restart, dependency-only mutation rejection
+before live alias adoption, and compatible legacy projection without inventing
+authority when the typed payload is absent. Each fixture checks a nonempty exact
+producer endpoint. The legacy fixture removes only the payload field from a
+normally persisted record; it does not seed positive authority.
+
+The three contracts and registration are authored, UNRUN. No restoration or
+compatibility production repair was made. Next operator gate is the
+issue_162_restore_retention_ selection. Earlier compression/provide GREEN does
+not establish these new restoration outcomes. Qualified erased-alias scope and
+all remaining consumer/query/completeness obligations remain unchanged.
+
+## 2026-10-22: provide cold-retention RED frozen; cold/warm repair authored
+
+The operator reported the intended missing retained-authority panic at line 28
+after the nonempty compilation control and registered provide call. Warm reuse,
+dependency mutation and reacquisition assertions were not reached; no complete
+suite result is inferred.
+
+The exact test and isolated registration were frozen in stash
+07807ee888428dd5939e22be7f70e9e3ff3cfad4. A temporary index and branchless
+registration baseline excluded the earlier compression repair and registration.
+Normal index and HEAD were untouched. Scoped elevated object writes succeeded.
+The test/registration were absent during provide production edits and restored
+afterward. Restored test SHA-256:
+e6a188c8af6f54434141ce1070948c9702fda0bbdcd48aa80a3be99aacf5f80c.
+
+provide/evaluate.rs now transports typed authority from cold compilation and
+warm session snapshots into the same source-owned publication and durable
+baseline path as compression. Warm TS snapshots without proof require fresh
+compilation. Source-unchanged reuse still checks consumed witnesses through the
+snapshot owner, and publication validation includes retained authority. Session
+replacement carries the payload/hash with its edges/dependencies. Non-TS cached
+projection behavior remains; no new cache, registry or retry policy was added.
+The now-unused edges-only read-baseline wrapper was removed after both callers
+migrated. Edit/delta, restore admission, other consumers and query completeness
+remain required work; this does not close Phase 3.
+
+Direct rustfmt, diff checks, UTF-8/no-BOM, active-size and frozen-test hash checks
+passed. No Cargo/runtime process was started. The repair is runtime UNVERIFIED;
+next operator selection is issue_162_provide_retention_cold_warm_and_dependency_mutation.
+The compression receipt remains historical GREEN, not verification of this edit.
+
+## 2026-10-22: compression retention operator GREEN; provide lifecycle contract authored
+
+The operator reported GREEN for the unchanged focused compression retention
+regression. No count/log was supplied. This verifies that test's registered
+compression-to-SQLite payload/deserialize assertions; it does not certify full
+restore admission, Angular consumption or Phase 3 completion.
+
+Agent MaxHeadRoom traced provide/evaluate.rs: cold compilation still decomposes
+without taking retained authority, and the warm source-unchanged path projects
+only edges/dependencies from its session snapshot. The next tracked regression,
+typescript_provide_retention_issue_162.rs, uses registered provide dispatch and
+the existing session owner. A nonempty real-compilation control precedes cold
+retention, warm payload equality, dependency-only mutation invalidation and
+reacquisition with unchanged initiating source. Later assertions must not be
+classified as passed if an earlier retention assertion stops execution.
+
+Only the new test/registration and this receipt were authored for the next
+slice. No provide production repair or Cargo/runtime run occurred. The new
+regression remains UNRUN; the next operator gate is its focused selection.
+The earlier compression GREEN is not evidence for this still-unmigrated path.
+
+## 2026-10-22: production-boundary retention RED frozen; compression repair authored
+
+The corrected operator run reached the missing typed-payload assertion at line
+76, with left None. Exact capture/currentness/witness controls and registered
+MCP compression/SQLite read completed first. Deserialization remained unreached.
+No completed suite count is inferred.
+
+The exact regression and isolated registration were preserved in stash
+2dfdfb2eaf26089323f768700269d9ad6593870d using a temporary index. Normal index
+and HEAD were not changed. Scoped elevated Git object writes succeeded. Both
+test and registration were absent during production edits and restored afterward;
+test SHA-256 remains
+7397754d27b4cf9f056b218d1641b0f61b42b77b8e5e1a268277634dd5046835.
+
+Registered compression now takes typed authority before artifact decomposition
+and carries it into the existing source-owned session snapshot and SQLite
+semantic snapshot transaction. RetainedAuthority is a serialized payload, not a
+registry/cache or new lifecycle. Existing payloads default to absent evidence;
+absence never certifies an inventory. Failed/noncurrent captures are not admitted
+as retained authority; ordinary compatible projections retain their old behavior.
+Consumed witnesses and the owner source hash are checked at extraction and before
+publication/persistence; session reads also check retained evidence currentness.
+Existing compatibility derivation and source-owner publication ordering remain.
+No TypeScript semantic frontier or global EntityRef equality changed.
+
+This is the first compression transport slice, not the full contract. Provide,
+edit, delta, compatibility-restoration admission, other query/acquisition callers,
+Angular consumers and public completeness still require migration and lifecycle
+evidence. Delta's existing snapshot initializer explicitly carries absent proof;
+it does not inherit an earlier generation's authority. Durable decoding alone
+is not restored canonical admission or proof of currentness.
+
+Direct rustfmt, focused diff checks, strict UTF-8/no-BOM and active-size checks
+passed. No Cargo/runtime process was run. Compilation and the unchanged focused
+regression remain UNVERIFIED pending operator execution. The qualified erased
+alias frontier and its RED remain unchanged.
+
+## 2026-10-22: retention failure observed; test boundary corrected
+
+The operator reached the intended missing-payload assertion with left None;
+the preceding exact capture/witness controls passed. Subsequent inspection
+identified an authored regression defect: manually calling the edges-only
+durable constructor cannot receive the typed payload even after production
+transport is repaired. That failure is preserved as historical evidence but is
+not sufficient RED for the production repair.
+
+Agent MaxHeadRoom corrected the test to invoke registered compress_code_context
+dispatch, flush normal persistence, and read the actual semantic_edge_snapshots
+SQLite payload. The independent capture remains an oracle only. Exact endpoint,
+typed payload equality and deserialization assertions are retained. No production
+code changed. Per architecture.md's invalid-test procedure, behavioral RED must
+be re-established with the corrected test before freezing it and repairing
+production. Earlier constructor-test SHA and authoring receipt remain historical.
+No Cargo or runtime process was started by the agent.
+
+## 2026-10-22: first retained-authority regression authored
+
+The owner approved the retained authority contract and regression sequence.
+Agent MaxHeadRoom authored and registered one tracked test in
+src/tests/mcp/typescript_authority_retention_issue_162.rs. It compiles an aliased
+nonempty exact reference through the real compilation helper, checks capture
+currentness and dependency witnesses, consumes into_parts, and requires the
+existing durable snapshot serialization and deserialization to retain the whole
+typed capture. The expected capture is used only as an oracle, never injected
+into the snapshot. No production transport or interface repair was made.
+
+This probes the artifact-to-durable representation gap, not complete publication,
+session ownership or SQLite restoration. Those lifecycle gates remain required.
+Test SHA-256: 572eae0cf6b00efa4254c90c255121ef9c68c33cd5590923d3b327cb03de6a36.
+Strict UTF-8/no-BOM, active file sizes and focused diff checks passed. The test
+is UNRUN; behavioral RED must be observed by the operator before the narrow
+freeze/stash and production repair sequence. The erased-alias RED is unchanged.
 
 ## 2026-10-22: explicit owner decision and retained authority contract
 
@@ -3349,4 +5626,3 @@ artifact/public query integration remains unfinished as recorded in Phase 3.
 No Angular consumer migration row becomes complete from this internal change.
 Direct rustfmt completed; no Cargo, binary, provider or live process was run.
 The original frozen public-dispatch regression remains untouched in its stash.
-

@@ -6,7 +6,7 @@ fn issue_162_declaration_alias_class_and_interface_preserve_namespace_eligibilit
     let root = tempfile::tempdir().unwrap();
     let file = root.path().join("fixture.ts");
     std::fs::write(&file, "namespace API { export class Leaf {} export interface Shape {} } import Selected = API.Leaf; import Type = API.Shape;").unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     for ns in [Namespace::Value, Namespace::Type] {
         let direct = resolver.namespace_member(&file, "API", "Leaf", ns);
         assert!(
@@ -33,7 +33,7 @@ fn issue_162_declaration_alias_exported_member_uses_declaring_namespace() {
     let file = root.path().join("fixture.ts");
     let source = "namespace Core { export class Leaf {} } namespace API { export namespace Core { export class Leaf {} } export import Selected = Core.Leaf; }";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     let direct = resolver.namespace_chain(&file, "API", &["Core", "Leaf"], Namespace::Value);
     let Resolution::Resolved(id) = &direct else {
         panic!("control: {direct:?}");
@@ -52,7 +52,7 @@ fn issue_162_declaration_alias_outward_namespace_lookup_stops_at_runtime_shadow(
     for shadow in [false, true] {
         let local = if shadow { "const Core = {};" } else { "" };
         std::fs::write(&file, format!("namespace Core {{ export class Leaf {{}} }} namespace API {{ {local} export import Selected = Core; }}")).unwrap();
-        let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+        let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
         let direct = resolver.namespace_member(&file, "Core", "Leaf", Namespace::Value);
         assert!(
             matches!(direct, Resolution::Resolved(_)),
@@ -77,7 +77,7 @@ fn issue_162_declaration_alias_export_retarget_retracts_value_identity() {
             "namespace API {{ export {kind} Leaf {{}} }} export import Selected = API.Leaf;"
         );
         std::fs::write(&file, &source).unwrap();
-        let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+        let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
         let direct = resolver.namespace_member(&file, "API", "Leaf", Namespace::Type);
         let Resolution::Resolved(id) = &direct else {
             panic!("control: {direct:?}");

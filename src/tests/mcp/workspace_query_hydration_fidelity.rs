@@ -117,6 +117,7 @@ fn current_at(state: &McpState, path: &std::path::Path, fidelity: SemanticFideli
 fn assert_hard_link_provide_and_hydration_publish_one_alias_and_occurrence() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let owner = root.path().join("consumer.service.ts");
     let alternate = root.path().join("consumer.alias.ts");
     std::fs::write(&owner, SOURCE).expect("fixture");
@@ -205,6 +206,7 @@ fn unix_hard_link_provide_and_hydration_publish_one_alias_and_occurrence() {
 fn current_low_projection_upgrades_for_angular_injects_query() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("consumer.service.ts");
     std::fs::write(&path, SOURCE).expect("fixture");
     let state = state();
@@ -226,6 +228,7 @@ fn current_low_projection_upgrades_for_angular_injects_query() {
 fn initially_unindexed_angular_injects_query_compiles_at_high_coverage() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("consumer.service.ts");
     std::fs::write(&path, SOURCE).expect("fixture");
     let state = state();
@@ -239,6 +242,7 @@ fn initially_unindexed_angular_injects_query_compiles_at_high_coverage() {
 fn legacy_discovery_completion_does_not_suppress_high_angular_hydration() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("consumer.service.ts");
     std::fs::write(&path, SOURCE).expect("fixture");
     let state = state();

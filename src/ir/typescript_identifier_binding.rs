@@ -102,16 +102,51 @@ pub(crate) fn lookup_value_identifier_in_tree(
     reference_span: SourceSpan,
     root: tree_sitter::Node<'_>,
 ) -> Result<Option<ReferenceBinding>, ()> {
+    lookup_value_site(source_id, source, reference_span, root, false, false)
+}
+
+/// Query the value binding at a type-name site without promoting its type
+/// interpretation. Used only by demanded constructor eligibility acquisition.
+#[cfg(feature = "typescript")]
+pub(crate) fn lookup_value_at_type_site_in_tree(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+    root: tree_sitter::Node<'_>,
+) -> Result<Option<ReferenceBinding>, ()> {
+    lookup_value_site(source_id, source, reference_span, root, true, false)
+}
+
+/// Constructor decorators evaluate outside the constructor parameter scope.
+#[cfg(feature = "typescript")]
+pub(crate) fn lookup_constructor_decorator_value_in_tree(
+    source_id: &str,
+    source: &str,
+    span: SourceSpan,
+    root: tree_sitter::Node<'_>,
+) -> Result<Option<ReferenceBinding>, ()> {
+    lookup_value_site(source_id, source, span, root, false, true)
+}
+
+fn lookup_value_site(
+    source_id: &str,
+    source: &str,
+    reference_span: SourceSpan,
+    root: tree_sitter::Node<'_>,
+    allow_type_site: bool,
+    skip_constructor: bool,
+) -> Result<Option<ReferenceBinding>, ()> {
     if root.has_error() {
         return Err(());
     }
     let reference = root
         .named_descendant_for_byte_range(reference_span.start_byte(), reference_span.end_byte())
         .ok_or(())?;
-    if !matches!(
+    if !(matches!(
         reference.kind(),
         "identifier" | "shorthand_property_identifier"
-    ) || reference.start_byte() != reference_span.start_byte()
+    ) || (allow_type_site && reference.kind() == "type_identifier"))
+        || reference.start_byte() != reference_span.start_byte()
         || reference.end_byte() != reference_span.end_byte()
         || is_declaration_name(reference)
     {
@@ -119,7 +154,7 @@ pub(crate) fn lookup_value_identifier_in_tree(
     }
 
     let name = reference.utf8_text(source.as_bytes()).map_err(|_| ())?;
-    let mut scope = nearest_lexical_scope(reference).ok_or(())?;
+    let mut scope = value_scope(reference, skip_constructor, source).ok_or(())?;
     loop {
         let mut candidates = Vec::new();
         collect_scope_declarations(scope, scope, name, source.as_bytes(), &mut candidates);
@@ -161,7 +196,10 @@ pub(crate) fn lookup_value_identifier_in_tree(
                     declaration_kind: *declaration_kind,
                 }));
             }
-            [] => match scope.parent().and_then(nearest_lexical_scope) {
+            [] => match scope
+                .parent()
+                .and_then(|parent| value_scope(parent, skip_constructor, source))
+            {
                 Some(parent) => scope = parent,
                 None => return Ok(None),
             },
@@ -376,3 +414,23 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/ir/typescript_identifier_binding_fixtures.rs"]
 mod fixture_tests;
+
+fn value_scope<'tree>(
+    mut node: tree_sitter::Node<'tree>,
+    skip_constructor: bool,
+    source: &str,
+) -> Option<tree_sitter::Node<'tree>> {
+    loop {
+        let scope = nearest_lexical_scope(node)?;
+        if skip_constructor
+            && scope.kind() == "method_definition"
+            && scope
+                .child_by_field_name("name")
+                .is_some_and(|name| name.utf8_text(source.as_bytes()).ok() == Some("constructor"))
+        {
+            node = scope.parent()?;
+        } else {
+            return Some(scope);
+        }
+    }
+}

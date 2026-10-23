@@ -88,6 +88,10 @@ impl IRPass for MetaLayerPass {
             .expect("compilation-local evidence matches its source");
         // Some(empty) is authoritative: never reparse a production source.
         context.invocation_evidence = Some(&invocation_view);
+        #[cfg(feature = "typescript")]
+        {
+            context.typescript_authority = state.typescript_authority.as_ref();
+        }
         if state.query_string == crate::queries::TS_QUERY {
             context.angular_initializers = Some(&state.angular_initializers);
             context.ngrx_class_actions = Some(&state.ngrx_class_actions);

@@ -166,7 +166,24 @@ fn declarations_in_file_selector_and_action_matrix() {
                     path.to_string_lossy().as_ref()
                 );
             }
-            None => assert!(entities(&declarations).is_empty(), "{file}: {declarations}"),
+            None => {
+                assert!(
+                    entities(&declarations)
+                        .iter()
+                        .all(|entity| entity["domain"] != "ngrx"),
+                    "ordinary values and use sites must not acquire NgRx roles: {file}: {declarations}"
+                );
+                if file == "ordinary.ts" {
+                    let declared = entities(&declarations);
+                    assert_eq!(declared.len(), 1, "{file}: {declarations}");
+                    assert_eq!(declared[0]["domain"], "typescript");
+                    assert_eq!(declared[0]["entity_type"], "ValueDeclaration");
+                    assert_eq!(declared[0]["name"], "selectAudit");
+                    assert_eq!(declared[0]["file"], path.to_string_lossy().as_ref());
+                } else {
+                    assert!(entities(&declarations).is_empty(), "{file}: {declarations}");
+                }
+            }
         }
     }
 }

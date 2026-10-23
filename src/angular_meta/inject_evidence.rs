@@ -24,6 +24,9 @@ pub(crate) struct InjectInitializerEvidence {
     pub field_span: SourceSpan,
     pub initializer_span: SourceSpan,
     pub invocation_span: Option<SourceSpan>,
+    /// Syntactic qualifier, independent of whether a callee spells inject.
+    #[cfg(feature = "typescript")]
+    pub optional_call: bool,
     pub dependency_argument: Option<SourceSpan>,
     /// Exact written expression; no module, namespace or runtime resolution.
     pub written_token: Option<String>,
@@ -176,6 +179,8 @@ pub(crate) fn collect(
             field_span: span(field),
             initializer_span: initializer,
             invocation_span: call.map(InvocationOccurrence::span),
+            #[cfg(feature = "typescript")]
+            optional_call: call.is_some_and(|call| optional.contains(&call.span())),
             dependency_argument: argument.map(|argument| argument.span()),
             written_token: argument
                 .and_then(|argument| {

@@ -7,11 +7,14 @@ mod automatic_type_capture_tests;
 mod capture;
 mod classic;
 mod compiler_libraries;
+mod constant_strings;
+pub(crate) mod constructor_parameters;
 
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_library_override_capture_issue_162.rs"]
 mod library_override_capture_tests;
 
+pub(crate) mod declaration_facets;
 mod declaration_groups;
 mod declared_scopes;
 mod global_bindings;
@@ -25,10 +28,13 @@ mod module_references;
 mod module_resolution;
 mod namespace;
 mod package;
+mod package_evidence;
 mod package_lookup;
 mod package_map;
+mod parameter_decorators;
 mod probe;
 mod program;
+mod relation_evidence;
 
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_global_binding_capture_issue_162.rs"]
@@ -55,7 +61,12 @@ mod references;
 mod relative;
 mod resolver;
 mod source_classification;
+mod string_literal;
 mod string_value;
+
+#[cfg(test)]
+#[path = "../../tests/ir/typescript_string_literals_issue_162.rs"]
+mod string_literal_tests;
 mod syntax;
 mod syntax_ambient;
 mod syntax_frontend;

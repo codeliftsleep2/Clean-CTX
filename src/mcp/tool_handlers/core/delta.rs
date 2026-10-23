@@ -220,9 +220,12 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     drop(ir_ctx); // Release lock before expensive compile
 
     // Source changed or no baseline - compile
-    let (mut compiled, semantic_edges, semantic_dependencies, source_hash) =
+    let ((mut compiled, semantic_edges, semantic_dependencies, source_hash), authority) =
         match compile_file_ir_candidate(&resolved_path, fidelity, state, workspace_root) {
-            Ok(artifact) => artifact.into_parts(),
+            Ok(mut artifact) => {
+                let authority = artifact.take_retained_authority();
+                (artifact.into_parts(), authority)
+            }
             Err(e) => {
                 send_response(&to_jsonrpc_error(id, &e));
                 return;
@@ -235,11 +238,14 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
 
     let canonical_path = semantic_owner;
     let expected_source_hash = source_hash.clone();
+    let expected_authority = authority.clone();
     let committed = publication.commit(
         || {
-            Ok::<_, String>(state.read_source(&resolved_path).is_ok_and(|current| {
-                state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
-            }))
+            Ok::<_, String>(
+                state.read_source(&resolved_path).is_ok_and(|current| {
+                    state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
+                }) && expected_authority.is_current(&expected_source_hash),
+            )
         },
         || {
             let mut ir_ctx = state.ir_context_lock();
@@ -263,9 +269,7 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     prev_version,
                     prev_instructions.clone(),
                 )?;
-                let previous_hash = previous_hash
-                    .clone()
-                    .unwrap_or_else(|| source_hash.clone());
+                let previous_hash = previous_hash.clone().unwrap_or_else(|| source_hash.clone());
                 if super::provide_persistence::read_checkpoint_required(state, fidelity) {
                     ensure_persisted_baseline(
                         state,
@@ -293,21 +297,54 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     &durable_owner,
                     delta,
                     source_hash.clone(),
-                    crate::mcp::compatibility::validator::CompatibleSemanticProjection::from_current_compilation_with_dependencies(
-                        semantic_edges.clone(),
-                        semantic_dependencies.clone(),
-                        source_hash.clone(),
+                    crate::mcp::compatibility::validator::CompatibleSemanticProjection {
+                        authority: authority.clone(),
+                        semantic_edges: semantic_edges.clone(),
+                        semantic_dependencies: semantic_dependencies.clone(),
+                        source_hash: source_hash.clone(),
                         fidelity,
-                    ),
+                    },
                     compatibility,
                 )?;
             } else if previous_authority.is_some() {
                 ir_ctx.set_source_hash(&path_alias, source_hash.clone());
+                #[cfg(feature = "typescript")]
+                if matches!(
+                    std::path::Path::new(&resolved_path)
+                        .extension()
+                        .and_then(|ext| ext.to_str()),
+                    Some("ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
+                ) {
+                    state.remember_retained_semantic_projection(
+                        &path_alias,
+                        crate::mcp::state::durable_semantics::SemanticSnapshot {
+                            authority: authority.clone(),
+                            source_hash: source_hash.clone(),
+                            edges: semantic_edges.clone(),
+                            dependencies: semantic_dependencies.clone(),
+                        },
+                    );
+                    if let Some(semantic_fidelity) =
+                        crate::workspace::index::SemanticFidelity::from_compilation(fidelity)
+                    {
+                        state
+                            .workspace_index_lock()
+                            .replace_semantic_projection_with_dependencies(
+                                &canonical_path,
+                                semantic_edges.clone(),
+                                semantic_fidelity,
+                                source_hash.clone(),
+                                semantic_dependencies.clone(),
+                            );
+                    }
+                }
             } else {
                 let checkpoint_required =
                     super::provide_persistence::read_checkpoint_required(state, fidelity);
                 if checkpoint_required {
                     let semantic = crate::mcp::state::durable_semantics::SemanticSnapshot {
+                        authority: authority.clone(),
+                        source_hash: source_hash.clone(),
                         edges: semantic_edges.clone(),
                         dependencies: semantic_dependencies.clone(),
                     };
@@ -330,10 +367,14 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     idx.remove_file(&canonical_path);
                     idx.add_edges(&canonical_path, semantic_edges.clone());
                 }
-                state.remember_semantic_projection(
+                state.remember_retained_semantic_projection(
                     &committed_alias,
-                    semantic_edges.clone(),
-                    semantic_dependencies.clone(),
+                    crate::mcp::state::durable_semantics::SemanticSnapshot {
+                        authority: authority.clone(),
+                        source_hash: source_hash.clone(),
+                        edges: semantic_edges.clone(),
+                        dependencies: semantic_dependencies.clone(),
+                    },
                 );
                 if state.persistence_store_lock().is_some() {
                     state.remember_persisted_path(&committed_alias, &resolved_path);

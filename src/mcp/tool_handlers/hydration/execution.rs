@@ -160,6 +160,20 @@ fn hydrate_workspace_index_for_target_attempt(
     candidate_paths.dedup();
     let mut project_coverage = outcome.project_coverage;
     let discovered = candidate_paths.len();
+    // Reuse discovery, but independently revalidate already retained TS owners.
+    // These paths still pass the existing authorized candidate/source/currentness
+    // checks; an index entry supplies no declaration or acquisition authority.
+    #[cfg(feature = "typescript")]
+    {
+        let roots = configured_roots(state, workspace_root);
+        candidate_paths.extend(
+            state
+                .workspace_index_read()
+                .retained_typescript_owners_in_roots(&roots),
+        );
+        candidate_paths.sort();
+        candidate_paths.dedup();
+    }
     let selected = select_candidates(state, candidate_paths, requirement);
     let mut compiled = 0;
     let mut publication_failed = false;

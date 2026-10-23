@@ -14,7 +14,7 @@ fn issue_162_dotted_namespace_retains_member_identity_and_private_boundary() {
     let file = root.path().join("fixture.ts");
     let source = "class Control {} namespace API.Core { export class Leaf {} class Hidden {} }";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     exact(resolver.local(&file, "Control", Namespace::Value));
     let leaf = exact(resolver.namespace_chain(&file, "API", &["Core", "Leaf"], Namespace::Value));
     assert_eq!(&source[leaf.start..leaf.end], "class Leaf {}");
@@ -38,7 +38,7 @@ fn issue_162_dotted_namespace_merges_with_explicit_scope_without_name_conflation
     let file = root.path().join("fixture.ts");
     let source = "namespace API.Core { export class Leaf {} } namespace API { export namespace Core { export interface Shape {} } } namespace Other.Core { export class Leaf {} }";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     let a = exact(resolver.namespace_chain(&file, "API", &["Core", "Leaf"], Namespace::Value));
     let b = exact(resolver.namespace_chain(&file, "Other", &["Core", "Leaf"], Namespace::Value));
     assert_ne!(a, b);

@@ -157,6 +157,24 @@ Look for: code smells, anti-patterns, unnecessary complexity, performance
 bottlenecks, security vulnerabilities, unnecessary synchronization, unnecessary
 cloning, ownership workarounds, duplicate logic, dead architectural paths.
 
+### Shared mechanics and specialized semantics
+
+Apply [MECHANISM-REUSE-001](../ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners)
+to every material language/meta-layer consumer touched by the migration. Trace its
+identity/authority, acquisition/provenance, currentness/persistence/restoration,
+publication/deduplication/selection/replacement/retirement and completeness to
+actual production owners. Identify which contracts are shared infrastructure and
+which require specialized semantic interpretation.
+
+Compare actual authority, lifecycle and correctness contracts before extracting
+or duplicating mechanics. Reuse equivalent lower authority; justify parallel
+implementations explicitly. Record confirmed equivalent duplication, likely
+duplication needing investigation, legitimate specialization and insufficient
+evidence separately. Point-test agreement does not establish correct ownership.
+This review is not an instruction to build universal abstractions, remove distinct
+producers or refactor unrelated historical paths. Certification uses the linked
+invariant and its existing §9 checklist rather than a separate review framework.
+
 ### Rust best practices
 
 Check for: idiomatic ownership and borrowing, appropriate error handling,
@@ -193,6 +211,8 @@ Framework resemblance remains insufficient. Completing a meta-layer means buildi
 When a migration is complete:
 
 - The new architecture must be the sole production path.
+- This applies to the contract being replaced. Legitimate specialized producers
+  with materially different contracts remain valid under MECHANISM-REUSE-001.
 - The old implementation must be removed or reduced to legitimate
   orchestration.
 - No duplicate execution paths may remain; no old implementation may

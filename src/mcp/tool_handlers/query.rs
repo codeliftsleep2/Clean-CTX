@@ -479,3 +479,7 @@ mod tests_issue_157_dependencies;
 
 #[cfg(feature = "angular")]
 mod angular_modules;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/workspace_query_issue_162.rs"]
+mod tests_issue_162;

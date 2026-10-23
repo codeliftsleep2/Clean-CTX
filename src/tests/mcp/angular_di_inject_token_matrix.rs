@@ -50,6 +50,7 @@ fn assert_edges(
 fn check(fields: &str, decorator: &str, kind: &str, expected: &[&str]) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_inject_apis(root.path());
     let path = root.path().join("consumer.ts");
     let source = source(fields, decorator);
     std::fs::write(&path, &source).unwrap();
@@ -197,6 +198,7 @@ fn angular_di_inject_token_symbolic_unresolved_is_not_a_declaration() {
 fn angular_di_inject_token_refresh_replaces_removes_and_deletes() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_inject_apis(root.path());
     let path = root.path().join("consumer.ts");
     let mut config = crate::tests::test_config();
     config

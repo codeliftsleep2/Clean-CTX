@@ -36,19 +36,26 @@ impl PendingSemanticTransition {
 
 #[derive(Debug, Clone)]
 pub(crate) struct SemanticSnapshot {
+    pub authority: crate::mcp::semantic_compilation::retained::RetainedAuthority,
+    pub source_hash: String,
     pub edges: Vec<SemanticEdge>,
     pub dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 impl SemanticSnapshot {
     fn is_current(&self) -> bool {
-        self.dependencies
-            .iter()
-            .all(|dependency| dependency.is_current())
+        self.authority.is_current(&self.source_hash)
+            && self.authority.admits_relation_evidence(&self.edges)
+            && self
+                .dependencies
+                .iter()
+                .all(|dependency| dependency.is_current())
     }
 }
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct DurableSemanticSnapshot {
+    #[serde(default, flatten)]
+    pub authority: crate::mcp::semantic_compilation::retained::RetainedAuthority,
     pub file_path: String,
     pub source_hash: String,
     pub version: u64,
@@ -68,6 +75,8 @@ pub(crate) struct DurableSemanticEdge {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 struct DurableEntityRef {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    canonical: Option<crate::layers::meta::canonical_endpoint::CanonicalEndpoint>,
     domain: String,
     entity_type: String,
     name: String,
@@ -96,6 +105,7 @@ impl DurableSemanticSnapshot {
             file_path,
             source_hash,
             version,
+            authority: Default::default(),
             edges: edges.iter().map(DurableSemanticEdge::from).collect(),
             dependencies: dependencies.to_vec(),
         }
@@ -125,6 +135,7 @@ impl From<&EntityRef> for DurableEntityRef {
             entity_type: entity.entity_type.to_string(),
             name: entity.name.clone(),
             file: entity.file.clone(),
+            canonical: entity.canonical.clone(),
         }
     }
 }
@@ -164,6 +175,7 @@ impl DurableEntityRef {
             entity_type: intern_label(&self.entity_type)?,
             name: self.name.clone(),
             file: self.file.clone(),
+            canonical: self.canonical.clone(),
         })
     }
 }
@@ -256,9 +268,10 @@ impl super::McpState {
                 .load_ir(ir, Some(canonical.source_hash));
             self.remember_persisted_path(&alias, file_path);
             self.remember_context_fidelity(&alias, canonical.fidelity);
-            self.publish_compatible_semantic_projection(&alias, file_path, semantic);
+            self.publish_compatible_semantic_projection(&alias, file_path, semantic)?;
             self.llm_text_cache_lock().remove(&alias);
-        });
+            Ok::<_, String>(())
+        })?;
         #[cfg(feature = "csharp")]
         self.mark_csharp_call_authority_dirty_for_file(file_path)?;
         Ok(())
@@ -313,37 +326,67 @@ impl super::McpState {
         .insert(
             alias.to_string(),
             SemanticSnapshot {
+                authority: Default::default(),
+                source_hash: String::new(),
                 edges,
                 dependencies,
             },
         );
     }
+    pub(crate) fn remember_retained_semantic_projection(
+        &self,
+        alias: &str,
+        snapshot: SemanticSnapshot,
+    ) {
+        lock_or_recover!(
+            self.semantic_edge_snapshots.lock(),
+            "semantic_edge_snapshots"
+        )
+        .insert(alias.to_string(), snapshot);
+    }
+
     pub(crate) fn publish_compatible_semantic_projection(
         &self,
         alias: &str,
         file_path: &str,
         projection: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
-    ) {
-        self.remember_semantic_projection(
-            alias,
-            projection.semantic_edges.clone(),
-            projection.semantic_dependencies.clone(),
-        );
+    ) -> Result<(), String> {
+        if !projection.authority.is_current(&projection.source_hash)
+            || !projection
+                .authority
+                .admits_relation_evidence(&projection.semantic_edges)
+        {
+            return Err("Typed authority changed before compatible publication".into());
+        }
+        let snapshot = SemanticSnapshot {
+            authority: projection.authority.clone(),
+            source_hash: projection.source_hash.clone(),
+            edges: projection.semantic_edges.clone(),
+            dependencies: projection.semantic_dependencies.clone(),
+        };
         let canonical_path = self.semantic_owner_path(file_path);
-        let mut index = self.workspace_index_lock();
-        match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
-            Some(fidelity) => index.replace_semantic_projection_with_dependencies(
-                &canonical_path,
-                projection.semantic_edges,
-                fidelity,
-                projection.source_hash,
-                projection.semantic_dependencies,
-            ),
-            None => {
-                index.remove_file(&canonical_path);
-                index.add_edges(&canonical_path, projection.semantic_edges);
+        {
+            let mut index = self.workspace_index_lock();
+            match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
+                Some(fidelity) => index
+                    .replace_semantic_projection_with_retained_authority(
+                        &canonical_path,
+                        projection.semantic_edges,
+                        fidelity,
+                        projection.source_hash,
+                        projection.semantic_dependencies,
+                        #[cfg(feature = "typescript")]
+                        projection.authority.typescript_authority,
+                    )
+                    .map_err(str::to_string)?,
+                None => {
+                    index.remove_file(&canonical_path);
+                    index.add_edges(&canonical_path, projection.semantic_edges);
+                }
             }
         }
+        self.remember_retained_semantic_projection(alias, snapshot);
+        Ok(())
     }
 
     pub(crate) fn semantic_snapshot(&self, alias: &str) -> Option<SemanticSnapshot> {
@@ -373,6 +416,13 @@ impl super::McpState {
         }
         if semantic.source_hash != target_source_hash {
             return Err("generated semantic projection has wrong target hash".to_string());
+        }
+        if !semantic.authority.is_current(&target_source_hash)
+            || !semantic
+                .authority
+                .admits_relation_evidence(&semantic.semantic_edges)
+        {
+            return Err("generated TypeScript authority is stale".to_string());
         }
         let key = PendingTransitionKey {
             alias: alias.to_string(),
@@ -425,6 +475,13 @@ impl super::McpState {
             return Err(
                 "pending semantic-edge snapshot does not match delta transition".to_string(),
             );
+        }
+        if !transition
+            .semantic
+            .authority
+            .is_current(&transition.target_source_hash)
+        {
+            return Err("pending TypeScript authority is stale".to_string());
         }
         Ok(transition)
     }

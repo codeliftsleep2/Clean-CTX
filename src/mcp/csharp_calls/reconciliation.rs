@@ -126,8 +126,11 @@ impl McpState {
                 .workspace_index_read()
                 .semantic_projection_fidelity(&file)
                 .unwrap_or_else(|| semantic_fidelity(artifact.fidelity()));
-            let edges =
-                artifact.project_csharp_generation_semantics(&authority, &resolved_classes)?;
+            let edges = artifact.project_csharp_generation_semantics_for_fidelity(
+                &authority,
+                &resolved_classes,
+                compilation_fidelity(fidelity),
+            )?;
             let mut dependencies = artifact.semantic_dependencies_owned();
             dependencies.extend(dependency_footprints.remove(&file).unwrap_or_default());
             projections.push(Projection {

@@ -42,6 +42,19 @@ pub(crate) struct SemanticCompilationArtifact {
 }
 
 impl SemanticCompilationArtifact {
+    pub(crate) fn take_retained_authority(&mut self) -> super::retained::RetainedAuthority {
+        super::retained::RetainedAuthority {
+            #[cfg(feature = "typescript")]
+            typescript_authority: self.typescript_authority.take().filter(|authority| {
+                // Preserve a once-valid capture if a dependency became stale.
+                // Admission must reject it, rather than turn it into absent proof.
+                authority.capture_current
+                    && authority.disposition.is_none()
+                    && authority.source_hash == self.identity.source_hash
+            }),
+        }
+    }
+
     #[cfg(all(test, feature = "typescript"))]
     pub(crate) fn typescript_authority(
         &self,
@@ -83,28 +96,11 @@ impl SemanticCompilationArtifact {
         });
         #[cfg(not(feature = "csharp"))]
         let _ = extension;
-        #[cfg(not(feature = "typescript"))]
         let _ = (authorized_roots, typescript_project);
 
         Ok(Self {
             #[cfg(feature = "typescript")]
-            typescript_authority: matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
-                .then(|| {
-                    if let Some(project) = typescript_project {
-                        crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_project(
-                            path,
-                            source,
-                            authorized_roots,
-                            Some(project),
-                        )
-                    } else {
-                        crate::ir::typescript_resolution::TypeScriptAuthority::capture(
-                            path,
-                            source,
-                            authorized_roots,
-                        )
-                    }
-                }),
+            typescript_authority: compiler.typescript_authority.take(),
             identity: ArtifactIdentity {
                 canonical_owner,
                 source_hash,
@@ -283,6 +279,20 @@ impl SemanticCompilationArtifact {
         authority: &[crate::ir::csharp_exact_calls::Declaration],
         resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     ) -> Result<Vec<SemanticEdge>, String> {
+        self.project_csharp_generation_semantics_for_fidelity(
+            authority,
+            resolved_classes,
+            self.fidelity(),
+        )
+    }
+
+    #[cfg(feature = "csharp")]
+    pub(crate) fn project_csharp_generation_semantics_for_fidelity(
+        &self,
+        authority: &[crate::ir::csharp_exact_calls::Declaration],
+        resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
+        fidelity: crate::compression::Fidelity,
+    ) -> Result<Vec<SemanticEdge>, String> {
         let mut edges = self.project_exact_csharp_calls(authority)?;
         edges.retain(|edge| {
             if edge.subject.domain != "dotnet" {
@@ -318,7 +328,7 @@ impl SemanticCompilationArtifact {
             crate::dotnet_meta::semantic::project_resolved_dbcontext_edges(
                 resolved_classes,
                 self.canonical_owner(),
-                self.fidelity(),
+                fidelity,
             ),
         );
         edges.extend(
@@ -331,13 +341,13 @@ impl SemanticCompilationArtifact {
             crate::dotnet_meta::semantic::project_resolved_signalr_edges(
                 resolved_classes,
                 self.canonical_owner(),
-                self.fidelity(),
+                fidelity,
             ),
         );
         edges.extend(crate::dotnet_meta::semantic::project_resolved_aspnet_edges(
             resolved_classes,
             self.canonical_owner(),
-            self.fidelity(),
+            fidelity,
         ));
         if self.dotnet_testing_enabled {
             edges.extend(crate::dotnet_meta::semantic::project_resolved_mstest_edges(

@@ -59,6 +59,10 @@ pub(super) struct EdgeKey {
     /// Not part of semantic entity identity; not part of the semantic triple.
     pub(super) asserting_file: String,
     relation: SemanticRelation,
+    // Optional migrated evidence refines only those facts carrying it. Legacy
+    // keys remain equal exactly when their pre-existing fields are equal.
+    canonical_subject: Option<crate::layers::meta::canonical_endpoint::CanonicalKey>,
+    canonical_object: Option<crate::layers::meta::canonical_endpoint::CanonicalKey>,
     subject_domain: String,
     subject_type: String,
     subject_name: String,
@@ -83,6 +87,16 @@ impl EdgeKey {
         Self {
             asserting_file: asserting_file.to_string(),
             relation: edge.relation,
+            canonical_subject: edge
+                .subject
+                .canonical
+                .as_ref()
+                .map(|endpoint| endpoint.key()),
+            canonical_object: edge
+                .object
+                .canonical
+                .as_ref()
+                .map(|endpoint| endpoint.key()),
             subject_domain: edge.subject.domain.to_string(),
             subject_type: edge.subject.entity_type.to_string(),
             subject_name: edge.subject.name.clone(),
@@ -127,7 +141,19 @@ impl EdgeKey {
     /// relation carries evidence) the same call evidence — written argument
     /// count AND spread qualifier?
     fn same_triple(&self, edge: &SemanticEdge) -> bool {
-        self.relation == edge.relation
+        self.canonical_subject
+            == edge
+                .subject
+                .canonical
+                .as_ref()
+                .map(|endpoint| endpoint.key())
+            && self.canonical_object
+                == edge
+                    .object
+                    .canonical
+                    .as_ref()
+                    .map(|endpoint| endpoint.key())
+            && self.relation == edge.relation
             && self.subject_domain == edge.subject.domain
             && self.subject_type == edge.subject.entity_type
             && self.subject_name == edge.subject.name

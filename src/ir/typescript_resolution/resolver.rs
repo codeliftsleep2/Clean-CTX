@@ -22,6 +22,7 @@ pub(super) type ExportVisit = (PathBuf, ExportSlot, Namespace);
 
 pub(crate) struct Resolver {
     pub host: Host,
+    pub(super) unbound_value_sites: BTreeSet<(PathBuf, usize, usize, String)>,
     pub(super) type_version_active: BTreeSet<(PathBuf, String)>,
     pub(super) alias_active: BTreeSet<(
         super::declared_scopes::NamespaceScope,
@@ -129,6 +130,7 @@ impl Resolver {
     pub(crate) fn with_project(roots: &[PathBuf], project: Option<&Path>) -> Result<Self, String> {
         Ok(Self {
             host: Host::new(roots)?,
+            unbound_value_sites: BTreeSet::new(),
             type_version_active: BTreeSet::new(),
             alias_active: BTreeSet::new(),
             scope_export_active: BTreeSet::new(),

@@ -286,15 +286,17 @@ fn commit_candidate(
     compiled: CompilationBatchResult,
 ) -> Result<CandidatePublication, String> {
     debug_assert_eq!(compiled.file_path, publication.validated);
-    let Ok(artifact) = compiled.result else {
+    let Ok(mut artifact) = compiled.result else {
         return Ok(CandidatePublication::Failed);
     };
+    let authority = artifact.take_retained_authority();
     let (semantic_edges, semantic_dependencies, compiled_hash) = artifact.published_semantics();
     #[cfg(feature = "csharp")]
     let retained = (publication.published_outcome == CandidatePublication::PublishedCSharp)
         .then(|| Arc::new(artifact));
     let expected_hash = compiled_hash.clone();
     let expected_dependencies = semantic_dependencies.clone();
+    let expected_authority = authority.clone();
     publication
         .ticket
         .commit(
@@ -303,6 +305,7 @@ fn commit_candidate(
                     .read_source(&publication.validated)
                     .map(|current| {
                         crate::cache::content_hash(current.as_bytes()) == expected_hash
+                            && expected_authority.is_current(&expected_hash)
                             && expected_dependencies
                                 .iter()
                                 .all(|dependency| dependency.is_current())
@@ -316,13 +319,15 @@ fn commit_candidate(
                 }
                 state
                     .workspace_index_lock()
-                    .replace_semantic_projection_with_dependencies(
+                    .replace_semantic_projection_with_retained_authority(
                         &publication.canonical,
                         semantic_edges,
                         publication.coverage,
                         compiled_hash,
                         semantic_dependencies,
-                    );
+                        #[cfg(feature = "typescript")]
+                        authority.typescript_authority,
+                    )?;
                 #[cfg(feature = "csharp")]
                 if publication.published_outcome == CandidatePublication::PublishedCSharp {
                     state.mark_csharp_authority_dirty();

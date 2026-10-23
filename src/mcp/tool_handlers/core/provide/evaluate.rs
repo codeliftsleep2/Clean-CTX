@@ -221,18 +221,35 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         None
     };
     let ir_result = if let Some((instructions, version)) = cached_ir {
-        state.semantic_snapshot(&alias).map(|snapshot| {
-            super::super::common::compiled_from_tuples(alias.clone(), version, instructions).map(
-                |ir| {
-                    (
-                        ir,
-                        snapshot.edges,
-                        snapshot.dependencies,
-                        source_hash.clone(),
-                    )
-                },
-            )
-        })
+        state
+            .semantic_snapshot(&alias)
+            .filter(|snapshot| {
+                #[cfg(feature = "typescript")]
+                if matches!(
+                    std::path::Path::new(&resolved_path)
+                        .extension()
+                        .and_then(|ext| ext.to_str()),
+                    Some("ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
+                ) {
+                    return snapshot.authority.typescript_authority.is_some();
+                }
+                let _ = snapshot;
+                true
+            })
+            .map(|snapshot| {
+                super::super::common::compiled_from_tuples(alias.clone(), version, instructions)
+                    .map(|ir| {
+                        (
+                            (
+                                ir,
+                                snapshot.edges,
+                                snapshot.dependencies,
+                                source_hash.clone(),
+                            ),
+                            snapshot.authority,
+                        )
+                    })
+            })
     } else {
         None
     }
@@ -245,20 +262,23 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             workspace_root,
         )
         .map_err(|error| error.to_string())
-        .and_then(|artifact| {
+        .and_then(|mut artifact| {
+            let authority = artifact.take_retained_authority();
             #[cfg(feature = "csharp")]
             {
                 crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+                    .map(|parts| (parts, authority))
             }
             #[cfg(not(feature = "csharp"))]
             {
-                Ok(artifact.into_parts())
+                Ok((artifact.into_parts(), authority))
             }
         })
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-    let (mut ir, semantic_edges, semantic_dependencies, source_hash) = match ir_result {
+    let ((mut ir, semantic_edges, semantic_dependencies, source_hash), authority) = match ir_result
+    {
         Ok(compiled) => compiled,
         Err(error) => {
             tracing::warn!(
@@ -310,25 +330,28 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         crate::workspace::index::SemanticFidelity::from_compilation(effective_fidelity);
     let expected_source_hash = source_hash.clone();
     let expected_dependencies = semantic_dependencies.clone();
+    let expected_authority = authority.clone();
     let published = publication
         .commit(
             || {
                 Ok::<_, &'static str>(
                     state.read_source(&resolved_path).is_ok_and(|current| {
                         state.cache_read().compute_hash(current.as_bytes()) == expected_source_hash
-                    }) && expected_dependencies
-                        .iter()
-                        .all(|dependency| dependency.is_current()),
+                    }) && expected_authority.is_current(&expected_source_hash)
+                        && expected_dependencies
+                            .iter()
+                            .all(|dependency| dependency.is_current()),
                 )
             },
             || {
-                super::super::provide_persistence::persist_read_baseline(
+                super::super::provide_persistence::persist_read_baseline_with_authority(
                     state,
                     &durable_owner,
                     effective_fidelity,
                     &ir,
                     &semantic_edges,
                     &semantic_dependencies,
+                    &authority,
                     &source_hash,
                     source,
                     raw_tokens,
@@ -344,23 +367,29 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                         effective_fidelity,
                     ) {
                         Some(semantic_fidelity) => index
-                            .replace_semantic_projection_with_dependencies(
+                            .replace_semantic_projection_with_retained_authority(
                                 &canonical_path,
                                 semantic_edges.clone(),
                                 semantic_fidelity,
-                                source_hash,
+                                source_hash.clone(),
                                 semantic_dependencies.clone(),
-                            ),
+                                #[cfg(feature = "typescript")]
+                                authority.typescript_authority.clone(),
+                            )?,
                         None => {
                             index.remove_file(&canonical_path);
                             index.add_edges(&canonical_path, semantic_edges.clone());
                         }
                     }
                 }
-                state.remember_semantic_projection(
+                state.remember_retained_semantic_projection(
                     &ir.file_id,
-                    semantic_edges,
-                    semantic_dependencies,
+                    crate::mcp::state::durable_semantics::SemanticSnapshot {
+                        edges: semantic_edges,
+                        dependencies: semantic_dependencies,
+                        source_hash,
+                        authority,
+                    },
                 );
                 state
                     .llm_text_cache_lock()

@@ -67,29 +67,45 @@ impl SqliteStore {
         &mut self,
         intent: &EditIntent,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.insert_edit_intent(intent, None)
+        self.insert_edit_intent(intent, &Default::default(), None)
     }
 
+    #[cfg(test)]
     pub(crate) fn establish_compatible_edit_intent(
         &mut self,
         intent: &EditIntent,
         identities: &CompatibilityIdentities,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.insert_edit_intent(intent, Some(identities))
+        self.insert_edit_intent(intent, &Default::default(), Some(identities))
+    }
+
+    pub(crate) fn establish_retained_edit_intent(
+        &mut self,
+        intent: &EditIntent,
+        authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
+        identities: &CompatibilityIdentities,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.insert_edit_intent(intent, authority, Some(identities))
     }
 
     fn insert_edit_intent(
         &mut self,
         intent: &EditIntent,
+        authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
         identities: Option<&CompatibilityIdentities>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let snapshot = DurableSemanticSnapshot::new_with_dependencies(
+        // The staged file temporarily changes the directory inventory. This
+        // intent is untrusted recovery data, not a live semantic publication.
+        // The source-owner predicate checked proof before staging; final commit
+        // and recovery revalidate it after the staged file has been consumed.
+        let mut snapshot = DurableSemanticSnapshot::new_with_dependencies(
             intent.file_path.clone(),
             intent.target_hash.clone(),
             intent.target_version,
             &intent.target_edges,
             &intent.target_dependencies,
         );
+        snapshot.authority = authority.clone();
         self.conn.execute(
             "INSERT INTO edit_intents
              (file_path, transition_id, prior_hash, target_hash, prior_version,
@@ -195,7 +211,7 @@ impl SqliteStore {
         }
         let edges = snapshot.restore_edges()?;
         if let Some(identities) = complete_identities(&stored.compatibility)? {
-            self.save_context_with_dependency_semantics(
+            self.save_context_with_retained_semantics(
                 file_path,
                 stored.intent.fidelity,
                 "",
@@ -204,6 +220,7 @@ impl SqliteStore {
                 stored.intent.target_version,
                 &edges,
                 &snapshot.dependencies,
+                &snapshot.authority,
                 0,
                 0,
                 &identities,

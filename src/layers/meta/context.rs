@@ -26,6 +26,9 @@ pub struct MetaLayerEvaluation {
 
 /// Immutable inputs and shared lexical evidence for one meta-layer pass.
 pub struct MetaLayerContext<'a> {
+    #[cfg(feature = "typescript")]
+    pub(crate) typescript_authority:
+        Option<&'a crate::ir::typescript_resolution::TypeScriptAuthority>,
     pub source: &'a str,
     pub path: &'a Path,
     pub class_captures: &'a [String],
@@ -75,6 +78,8 @@ impl<'a> MetaLayerContext<'a> {
             path,
             class_captures,
             paired_class_captures,
+            #[cfg(feature = "typescript")]
+            typescript_authority: None,
             structured_declarations: None,
             structured_class_bases: None,
             #[cfg(feature = "csharp")]

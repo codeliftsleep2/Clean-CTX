@@ -156,6 +156,11 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
         ));
         return;
     }
+    if pending_transition.as_ref().is_some_and(|transition|
+        !transition.semantic.authority.is_current(&transition.target_source_hash)) {
+        send_response(&invalid_session_ir_response(id, "pending TypeScript authority changed before delta acceptance"));
+        return;
+    }
     let mut ir_ctx = state.ir_context_lock();
     let mut candidate = ir_ctx.clone();
     let applied = match &delta {
@@ -213,7 +218,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                 debug_assert_eq!(transition.from, from);
                 debug_assert_eq!(transition.to, new_version);
                 if persistence_enabled {
-                    let snapshot =
+                    let mut snapshot =
                         crate::mcp::state::durable_semantics::DurableSemanticSnapshot::new_with_dependencies(
                             durable_file.clone(),
                             source_hash.clone(),
@@ -221,6 +226,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
                             &transition.semantic.semantic_edges,
                             &transition.semantic.semantic_dependencies,
                         );
+                    snapshot.authority = transition.semantic.authority.clone();
                     let persisted = persisted_context.as_ref().is_some_and(|context_id| {
                         state
                             .persistence_store_lock()
@@ -274,11 +280,14 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             *ir_ctx = candidate;
             drop(ir_ctx);
             if let Some(transition) = pending_transition {
-                state.publish_compatible_semantic_projection(
+                if let Err(error) = state.publish_compatible_semantic_projection(
                     &file,
                     &durable_file,
                     transition.semantic,
-                );
+                ) {
+                    send_response(&invalid_session_ir_response(id, &error));
+                    return;
+                }
                 state.consume_pending_transition(&file, from, new_version);
             }
             #[cfg(feature = "csharp")]

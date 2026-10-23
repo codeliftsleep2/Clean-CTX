@@ -131,22 +131,26 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
     let ir_result =
         compile_file_ir_candidate(&resolved_path, effective_fidelity, state, workspace_root)
             .map_err(|error| error.to_string())
-            .and_then(|artifact| {
+            .and_then(|mut artifact| {
+                let authority = artifact.take_retained_authority();
                 #[cfg(feature = "csharp")]
                 {
                     crate::mcp::semantic_compilation::dependencies::current_parts(artifact, state)
+                        .map(|parts| (parts, authority))
                 }
                 #[cfg(not(feature = "csharp"))]
                 {
-                    Ok(artifact.into_parts())
+                    Ok((artifact.into_parts(), authority))
                 }
             });
 
     // P3-2: Build response using extracted helpers
     // If IR compilation fails, fall back to legacy compression but log
     // the structured error for diagnostics (4.4 audit fix).
-    let mut response = if let Ok((mut ir, semantic_edges, semantic_dependencies, source_hash)) =
-        ir_result
+    let mut response = if let Ok((
+        (mut ir, semantic_edges, semantic_dependencies, source_hash),
+        authority,
+    )) = ir_result
     {
         let hir = match checked_hierarchy_or_respond(id, &ir) {
             Some(hierarchy) => hierarchy,
@@ -174,15 +178,19 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         );
 
         let published = state.with_semantic_authority_update(&canonical_path, || {
+            if !authority.is_current(&source_hash) {
+                return Err("TypeScript consumed authority changed before publication".to_string());
+            }
             // Required durable baselines and live authority advance inside
             // one owner-ordered mutation.
-            super::provide_persistence::persist_read_baseline(
+            super::provide_persistence::persist_read_baseline_with_authority(
                 state,
                 &durable_owner,
                 effective_fidelity,
                 &durable_candidate,
                 &semantic_edges,
                 &semantic_dependencies,
+                &authority,
                 &source_hash,
                 source_text,
                 raw_tokens,
@@ -197,10 +205,14 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 idx.remove_file(&canonical_path);
                 idx.add_edges(&canonical_path, semantic_edges.clone());
             }
-            state.remember_semantic_projection(
+            state.remember_retained_semantic_projection(
                 &path_alias,
-                semantic_edges.clone(),
-                semantic_dependencies.clone(),
+                crate::mcp::state::durable_semantics::SemanticSnapshot {
+                    edges: semantic_edges.clone(),
+                    dependencies: semantic_dependencies.clone(),
+                    source_hash: source_hash.clone(),
+                    authority: authority.clone(),
+                },
             );
             if state.persistence_store_lock().is_some() {
                 state.remember_persisted_path(&path_alias, &canonical_path);

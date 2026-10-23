@@ -61,6 +61,9 @@ pub struct EntityRef {
     pub name: String,
     /// Originating file (pipeline file_id). None for local-only entities.
     pub file: Option<String>,
+    /// Internal canonical evidence; presentation equality and JSON stay unchanged.
+    #[serde(skip)]
+    pub(crate) canonical: Option<super::canonical_endpoint::CanonicalEndpoint>,
 }
 
 /// Provenance marker for a self-`Defines` registration record that represents
@@ -77,6 +80,7 @@ impl EntityRef {
             entity_type,
             name: name.into(),
             file: None,
+            canonical: None,
         }
     }
 
@@ -133,7 +137,7 @@ pub enum SemanticRelation {
     HasStyle,
     /// NgModule declares a component/directive/pipe.
     DeclaresInModule,
-    /// NgModule imports another module.
+    /// NgModule or standalone Component imports an eligible module/declaration.
     ImportsModule,
     /// NgModule re-exports from another module.
     ExportsFromModule,

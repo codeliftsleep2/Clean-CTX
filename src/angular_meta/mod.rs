@@ -23,6 +23,10 @@
 // - `footer`     : `§ΦMAP` workspace footer formatter
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
+#[cfg(feature = "typescript")]
+pub(crate) mod class_role_authority;
+#[cfg(feature = "typescript")]
+pub(crate) mod constructor_authority;
 pub(crate) mod constructor_injects;
 pub(crate) mod decorator_args;
 pub(crate) mod decorator_scan;
@@ -31,8 +35,12 @@ pub(crate) mod detect;
 #[cfg(test)]
 mod detect_metrics;
 pub mod formly;
+#[cfg(feature = "typescript")]
+pub(crate) mod inject_authority;
 pub(crate) mod inject_evidence;
 pub(crate) mod markers;
+#[cfg(feature = "typescript")]
+pub(crate) mod member_authority;
 pub(crate) mod member_semantics;
 pub(crate) mod module_metadata;
 pub mod ngrx;
@@ -43,6 +51,8 @@ pub mod routing;
 pub mod rx;
 pub mod semantic;
 pub mod signals;
+#[cfg(feature = "typescript")]
+pub(crate) mod string_token_authority;
 pub mod style;
 pub mod template;
 pub mod template_compress;

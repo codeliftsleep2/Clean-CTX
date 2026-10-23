@@ -128,6 +128,7 @@ fn call_query(
 }
 
 fn write_service(root: &Path) {
+    crate::tests::angular_authority_fixture::install(root);
     std::fs::write(
         root.join("ServiceA.ts"),
         "import { Injectable } from '@angular/core';\n@Injectable()\nexport class ServiceA {}\n",
@@ -136,6 +137,7 @@ fn write_service(root: &Path) {
 }
 
 fn write_consumer(root: &Path, file: &str, class_name: &str) {
+    crate::tests::angular_authority_fixture::install(root);
     std::fs::write(
         root.join(file),
         format!(

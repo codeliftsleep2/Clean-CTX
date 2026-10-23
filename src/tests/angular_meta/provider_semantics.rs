@@ -90,8 +90,14 @@ fn provider_structural_authorities_are_joined() {
         .named_children(&mut cursor)
         .next()
         .expect("provider array entry");
-    let binding = super::parse_provider("standalone-typescript", source, tree.root_node(), entry)
-        .expect("provider token/strategy endpoint authority");
+    let binding = super::parse_provider(
+        "standalone-typescript",
+        source,
+        tree.root_node(),
+        entry,
+        None,
+    )
+    .expect("provider token/strategy endpoint authority");
     assert_eq!(binding.token, "ApiClient");
     assert_eq!(binding.endpoint, "ApiClient");
 }

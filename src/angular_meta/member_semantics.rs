@@ -5,10 +5,20 @@ use crate::ir::invocation_evidence::{
 };
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
+#[cfg(test)]
 pub(crate) fn project(
     source_id: &str,
     source: &str,
     evidence: &InvocationEvidenceView<'_>,
+) -> Vec<SemanticEdge> {
+    project_with_authority(source_id, source, evidence, None)
+}
+
+pub(crate) fn project_with_authority(
+    source_id: &str,
+    source: &str,
+    evidence: &InvocationEvidenceView<'_>,
+    authority: Option<&crate::ir::typescript_resolution::TypeScriptAuthority>,
 ) -> Vec<SemanticEdge> {
     let Some(language) = crate::compression::language::safe_typescript_language() else {
         return Vec::new();
@@ -26,7 +36,7 @@ pub(crate) fn project(
     let mut edges = Vec::new();
     for call in evidence.occurrences() {
         if let Some((owner_type, owner, member, kind)) =
-            signal_call(source_id, source, tree.root_node(), call)
+            signal_call(source_id, source, tree.root_node(), call, authority)
         {
             let subject = EntityRef::new("angular", owner_type, owner);
             if matches!(kind, SignalApi::Input | SignalApi::Model) {
@@ -75,36 +85,48 @@ fn signal_call(
     source: &str,
     root: tree_sitter::Node<'_>,
     call: &InvocationOccurrence,
+    authority: Option<&crate::ir::typescript_resolution::TypeScriptAuthority>,
 ) -> Option<(&'static str, String, String, SignalApi)> {
     if call.parent().is_some() {
         return None;
     }
-    let (binding_span, imported_name, kind) = match call.callee() {
-        WrittenCallee::Free { terminal } => {
-            let name = slice(source, *terminal)?;
-            let kind = match name {
-                "input" => SignalApi::Input,
-                "output" => SignalApi::Output,
-                "model" => SignalApi::Model,
-                _ => return None,
-            };
-            (*terminal, name, kind)
+    let kind = if let Some(authority) = authority {
+        match super::member_authority::api(authority, source, call)? {
+            "input" => SignalApi::Input,
+            "output" => SignalApi::Output,
+            "model" => SignalApi::Model,
+            _ => return None,
         }
-        WrittenCallee::Member { receiver, terminal }
-            if slice(source, *receiver)? == "input" && slice(source, *terminal)? == "required" =>
-        {
-            (*receiver, "input", SignalApi::Input)
+    } else {
+        let (binding_span, imported_name, kind) = match call.callee() {
+            WrittenCallee::Free { terminal } => {
+                let name = slice(source, *terminal)?;
+                let kind = match name {
+                    "input" => SignalApi::Input,
+                    "output" => SignalApi::Output,
+                    "model" => SignalApi::Model,
+                    _ => return None,
+                };
+                (*terminal, name, kind)
+            }
+            WrittenCallee::Member { receiver, terminal }
+                if slice(source, *receiver)? == "input"
+                    && slice(source, *terminal)? == "required" =>
+            {
+                (*receiver, "input", SignalApi::Input)
+            }
+            _ => return None,
+        };
+        let binding = crate::ir::typescript_value_import_binding::bind_named_value_import(
+            source_id,
+            source,
+            binding_span,
+        )?;
+        if binding.module_specifier != "@angular/core" || binding.imported_name != imported_name {
+            return None;
         }
-        _ => return None,
+        kind
     };
-    let binding = crate::ir::typescript_value_import_binding::bind_named_value_import(
-        source_id,
-        source,
-        binding_span,
-    )?;
-    if binding.module_specifier != "@angular/core" || binding.imported_name != imported_name {
-        return None;
-    }
     let context = call.declaration_context()?;
     if !matches!(
         context.kind(),
@@ -131,7 +153,10 @@ fn signal_call(
         .utf8_text(source.as_bytes())
         .ok()?
         .to_owned();
-    let owner_type = angular_declaration_type(source_id, source, class)?;
+    let owner_type = match authority {
+        Some(authority) => super::member_authority::owner(authority, source, class)?,
+        None => angular_declaration_type(source_id, source, class)?,
+    };
     Some((owner_type, owner, member, kind))
 }
 

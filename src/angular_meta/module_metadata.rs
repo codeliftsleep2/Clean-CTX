@@ -5,6 +5,28 @@ use crate::layers::meta::semantic::{
 };
 use std::path::Path;
 
+#[cfg(feature = "typescript")]
+mod canonical;
+#[cfg(feature = "typescript")]
+mod standalone;
+#[cfg(feature = "typescript")]
+pub(crate) const DECLARATION_FIELDS: &[&str] = &[
+    "declarations",
+    "imports",
+    "exports",
+    "standalone",
+    "providers",
+    "provide",
+];
+#[cfg(feature = "typescript")]
+pub(crate) fn project_authoritative(
+    authority: &crate::ir::typescript_resolution::TypeScriptAuthority,
+    start: usize,
+    end: usize,
+) -> ModuleProjection {
+    canonical::project(authority, start, end)
+}
+
 mod sources;
 use sources::Contributors;
 

@@ -43,10 +43,8 @@ impl Resolver {
         }
         // Only declarations gathered from this admitted global scope can gain
         // cross-source merge proof. Ordinary same-name file groups stay separate.
-        if complete && ids.len() > 1 {
-            if self.prove_program_binding_group(file, &ids, namespace) {
-                self.record_program_group(file, &ids);
-            }
+        if complete && ids.len() > 1 && self.prove_program_binding_group(file, &ids, namespace) {
+            self.record_program_group(file, &ids);
         }
         (ids, complete)
     }

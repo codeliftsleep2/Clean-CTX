@@ -108,6 +108,9 @@ pub trait IRPass {
 /// Context passed through the pipeline.
 /// Each pass reads from and writes to this context.
 pub struct PassContext {
+    #[cfg(feature = "typescript")]
+    pub(crate) typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
+
     /// The core instruction stream (pure facts)
     pub instructions: Vec<CoreOp>,
     /// Language-specific context
@@ -209,6 +212,8 @@ impl PassContext {
             pattern_recognizers: Vec::new(),
             captures: Vec::new(),
             csharp_declarations: CSharpDeclarationInputs::default(),
+            #[cfg(feature = "typescript")]
+            typescript_authority: None,
             invocation_occurrences: Vec::new(),
             angular_initializers: Vec::new(),
             ngrx_class_actions: Vec::new(),

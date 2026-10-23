@@ -11,6 +11,9 @@ use std::{
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ProgramEvidence {
     pub config: PathBuf,
+    /// Requests whose relative candidate inventory was proved absent.
+    #[serde(default)]
+    pub missing_modules: Vec<(PathBuf, super::module_references::ModuleReference)>,
     pub sources: Vec<PathBuf>,
     pub groups: Vec<Vec<DeclarationId>>,
     pub augmentations: Vec<AugmentationEvidence>,
@@ -129,6 +132,7 @@ impl Resolver {
             let mut units = BTreeMap::new();
             let mut module_requests: Vec<(PathBuf, super::module_references::ModuleReference)> =
                 Vec::new();
+            let mut missing_modules = Vec::new();
             let mut defaults_considered = false;
             let mut suppress_default = false;
             loop {
@@ -157,8 +161,17 @@ impl Resolver {
                         }) {
                             continue;
                         }
-                        match self.module_request(&owner, &request.specifier, request.kind) {
-                            Ok(target) => pending.push(target),
+                        match self.module_request_target(&owner, &request.specifier, request.kind) {
+                            Ok(super::module_resolution::ModuleTarget::Found(target)) => {
+                                pending.push(target)
+                            }
+                            Ok(super::module_resolution::ModuleTarget::Absent(_))
+                                if ambient.is_some() => {}
+                            Ok(super::module_resolution::ModuleTarget::Absent(reason)) => {
+                                let mut request = request;
+                                request.resolved = Err(reason.into());
+                                missing_modules.push((owner, request));
+                            }
                             Err(_) if ambient.is_some() => {}
                             Err(error) => return Err(error),
                         }
@@ -209,6 +222,7 @@ impl Resolver {
                 .entry(config.clone())
                 .or_insert(ProgramEvidence {
                     config: config.clone(),
+                    missing_modules,
                     sources: units.keys().cloned().collect(),
                     groups: Vec::new(),
                     augmentations: Vec::new(),

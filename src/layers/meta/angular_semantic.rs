@@ -6,6 +6,8 @@ use crate::layers::meta::semantic::SemanticEdge;
 
 #[derive(Default)]
 pub(super) struct ProjectionEvidence<'a> {
+    #[cfg(feature = "typescript")]
+    typescript_authority: Option<&'a crate::ir::typescript_resolution::TypeScriptAuthority>,
     module_dependencies: Option<&'a mut Vec<crate::layers::meta::semantic::SemanticDependency>>,
     lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
@@ -39,22 +41,60 @@ pub(super) fn extract_non_testing_edges(
                     (
                         Some(class.consumer.as_str()),
                         class.raw_class.as_str(),
-                        class.admitted_tokens(),
+                        {
+                            let tokens = class.admitted_tokens();
+                            #[cfg(feature = "typescript")]
+                            let tokens = if evidence.typescript_authority.is_some() {
+                                Vec::new()
+                            } else {
+                                tokens
+                            };
+                            tokens
+                        },
+                        class
+                            .class_span
+                            .end_byte()
+                            .checked_sub(class.raw_class.len()),
                     )
                 })
                 .collect(),
             None => class_captures
                 .iter()
-                .map(|raw| (None, raw.as_str(), Vec::new()))
+                .map(|raw| (None, raw.as_str(), Vec::new(), None))
                 .collect(),
         };
-        for (owner, raw_class, tokens) in classes {
-            if let Some((class_name, kind, selector, mut injects, pipe_name)) =
-                crate::angular_meta::decorators::extract_graph_entries(raw_class)
-            {
+        for (owner, raw_class, tokens, start) in classes {
+            let entries = crate::angular_meta::decorators::extract_graph_entries(raw_class);
+            #[cfg(feature = "typescript")]
+            let entries = if let Some(authority) = evidence.typescript_authority {
+                match start.and_then(|start| {
+                    crate::angular_meta::class_role_authority::class_role(
+                        source, raw_class, start, authority,
+                    )
+                }) {
+                    Some(role) => owner.map(|owner| {
+                        (
+                            owner.to_string(),
+                            role.kind,
+                            role.selector,
+                            crate::angular_meta::constructor_injects::extract_constructor_injects(
+                                raw_class,
+                            )
+                            .unwrap_or_default(),
+                            role.pipe_name,
+                        )
+                    }),
+                    None => None,
+                }
+            } else {
+                entries
+            };
+            #[cfg(not(feature = "typescript"))]
+            let _ = start;
+            if let Some((class_name, kind, selector, mut injects, pipe_name)) = entries {
                 let class_name = owner.unwrap_or(&class_name);
                 injects.extend(tokens);
-                edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
+                let projected = crate::angular_meta::semantic::class_to_semantic_edges(
                     class_name,
                     kind,
                     selector.as_deref(),
@@ -62,15 +102,47 @@ pub(super) fn extract_non_testing_edges(
                     pipe_name.as_deref(),
                     raw_class,
                     fidelity,
-                ));
-                if kind == crate::angular_meta::decorators::ClassKind::Module {
-                    let projection = crate::angular_meta::module_metadata::project(
-                        class_name,
-                        raw_class,
-                        source,
-                        declaring_path,
-                        class_captures,
-                    );
+                );
+                #[cfg(feature = "typescript")]
+                let projected: Vec<_> = projected
+                    .into_iter()
+                    .filter(|edge| {
+                        evidence.typescript_authority.is_none()
+                            || edge.relation
+                                != crate::layers::meta::semantic::SemanticRelation::Injects
+                    })
+                    .collect();
+                edges.extend(projected);
+                if matches!(
+                    kind,
+                    crate::angular_meta::decorators::ClassKind::Module
+                        | crate::angular_meta::decorators::ClassKind::Component
+                ) {
+                    #[cfg(feature = "typescript")]
+                    let canonical = evidence.typescript_authority.map(|authority| {
+                        start
+                            .map(|start| {
+                                crate::angular_meta::module_metadata::project_authoritative(
+                                    authority,
+                                    start,
+                                    start + raw_class.len(),
+                                )
+                            })
+                            .unwrap_or_default()
+                    });
+                    #[cfg(not(feature = "typescript"))]
+                    let canonical: Option<
+                        crate::angular_meta::module_metadata::ModuleProjection,
+                    > = None;
+                    let projection = canonical.unwrap_or_else(|| {
+                        crate::angular_meta::module_metadata::project(
+                            class_name,
+                            raw_class,
+                            source,
+                            declaring_path,
+                            class_captures,
+                        )
+                    });
                     edges.extend(projection.edges);
                     if let Some(dependencies) = module_dependencies.as_deref_mut() {
                         dependencies.extend(projection.dependencies);
@@ -79,9 +151,15 @@ pub(super) fn extract_non_testing_edges(
                 let source_id = declaring_path
                     .map(|path| path.to_string_lossy())
                     .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
-                edges.extend(crate::angular_meta::provider_semantics::project(
-                    &source_id, source, class_name, kind,
-                ));
+                edges.extend(
+                    crate::angular_meta::provider_semantics::project_with_authority(
+                        &source_id,
+                        source,
+                        class_name,
+                        kind,
+                        evidence.typescript_authority,
+                    ),
+                );
                 if let Some(path) = declaring_path
                     && let Some(edge) = crate::angular_meta::semantic::component_template_edge(
                         class_name, kind, raw_class, path,
@@ -93,15 +171,40 @@ pub(super) fn extract_non_testing_edges(
         }
     }
 
+    #[cfg(feature = "typescript")]
+    if let (Some(authority), Some(classes)) = (evidence.typescript_authority, evidence.initializers)
+    {
+        edges.extend(crate::angular_meta::constructor_authority::project(
+            source, authority, classes,
+        ));
+    }
+
+    #[cfg(feature = "typescript")]
+    if let (Some(authority), Some(classes), Some(invocations)) = (
+        evidence.typescript_authority,
+        evidence.initializers,
+        evidence.invocations,
+    ) {
+        edges.extend(crate::angular_meta::inject_authority::project(
+            source,
+            authority,
+            classes,
+            invocations,
+        ));
+    }
+
     if let Some(invocations) = evidence.invocations {
         let source_id = declaring_path
             .map(|path| path.to_string_lossy())
             .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
-        edges.extend(crate::angular_meta::member_semantics::project(
-            &source_id,
-            source,
-            invocations,
-        ));
+        edges.extend(
+            crate::angular_meta::member_semantics::project_with_authority(
+                &source_id,
+                source,
+                invocations,
+                evidence.typescript_authority,
+            ),
+        );
     }
 
     let ngrx_shape = match evidence.ngrx {
@@ -284,6 +387,8 @@ pub(super) fn evaluate(
         context.config,
         Some(context.path),
         ProjectionEvidence {
+            #[cfg(feature = "typescript")]
+            typescript_authority: context.typescript_authority,
             module_dependencies: Some(&mut module_dependencies),
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),
@@ -379,6 +484,11 @@ pub(super) fn evaluate_if_applicable(
         context.source,
         context.lexical_regions,
     );
+    #[cfg(feature = "typescript")]
+    let is_angular = is_angular
+        || context
+            .typescript_authority
+            .is_some_and(crate::angular_meta::class_role_authority::has_class_role);
     let testing_enabled = meta_config
         .map(|config| config.testing.enabled)
         .unwrap_or(true);

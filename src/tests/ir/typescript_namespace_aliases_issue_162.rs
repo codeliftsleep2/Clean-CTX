@@ -7,7 +7,7 @@ fn issue_162_namespace_alias_qualified_target_preserves_both_namespaces() {
     let file = root.path().join("fixture.ts");
     let source = "namespace API.Core { export class Leaf {} } import Selected = API.Core;";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     for ns in [Namespace::Value, Namespace::Type] {
         let direct = resolver.namespace_chain(&file, "API", &["Core", "Leaf"], ns);
         assert!(
@@ -27,7 +27,7 @@ fn issue_162_namespace_alias_exported_nested_alias_keeps_lexical_owner() {
     let file = root.path().join("fixture.ts");
     let source = "namespace Core { export class Leaf {} } namespace API { export namespace Core { export class Leaf {} } export import Selected = Core; }";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     let direct = resolver.namespace_chain(&file, "API", &["Core", "Leaf"], Namespace::Value);
     let Resolution::Resolved(id) = &direct else {
         panic!("direct control: {direct:?}");
@@ -51,7 +51,7 @@ fn issue_162_namespace_alias_cycles_refuse_and_retarget_restores_identity() {
         ("import Other = Core; import Selected = Other;", true),
     ] {
         std::fs::write(&file, format!("{prefix}{suffix}")).unwrap();
-        let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+        let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
         let result = resolver.namespace_member(&file, "Selected", "Leaf", Namespace::Value);
         if positive {
             let direct = resolver.namespace_member(&file, "Core", "Leaf", Namespace::Value);

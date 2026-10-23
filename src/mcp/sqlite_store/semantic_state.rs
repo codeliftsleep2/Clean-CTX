@@ -60,11 +60,12 @@ impl SqliteStore {
             raw_tokens,
             compressed_tokens,
             Some(identities),
+            &Default::default(),
         )
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub(crate) fn save_context_with_dependency_semantics(
+    pub(crate) fn save_context_with_retained_semantics(
         &mut self,
         file_path: &str,
         fidelity: Fidelity,
@@ -74,6 +75,7 @@ impl SqliteStore {
         version: u64,
         semantic_edges: &[SemanticEdge],
         semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+        authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
         raw_tokens: u64,
         compressed_tokens: u64,
         identities: &CompatibilityIdentities,
@@ -90,6 +92,7 @@ impl SqliteStore {
             raw_tokens,
             compressed_tokens,
             Some(identities),
+            authority,
         )
     }
     #[allow(clippy::too_many_arguments)]
@@ -118,6 +121,7 @@ impl SqliteStore {
             raw_tokens,
             compressed_tokens,
             None,
+            &Default::default(),
         )
     }
     #[allow(clippy::too_many_arguments)]
@@ -131,6 +135,7 @@ impl SqliteStore {
         version: u64,
         semantic_edges: &[SemanticEdge],
         semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+        authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
         identities: &CompatibilityIdentities,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         if !self.checkpoint_matches(file_path, fidelity, compact_output, ir_binary, source_hash)? {
@@ -161,13 +166,15 @@ impl SqliteStore {
                 },
             )
             .optional()?;
-        let expected = serde_json::to_string(&DurableSemanticSnapshot::new_with_dependencies(
+        let mut expected_snapshot = DurableSemanticSnapshot::new_with_dependencies(
             file_path.to_string(),
             source_hash.to_string(),
             version,
             semantic_edges,
             semantic_dependencies,
-        ))?;
+        );
+        expected_snapshot.authority = authority.clone();
+        let expected = serde_json::to_string(&expected_snapshot)?;
         let expected_identities = (
             Some(serde_json::to_string(&identities.canonical_config)?),
             Some(serde_json::to_string(&identities.canonical_producers)?),
@@ -205,6 +212,7 @@ impl SqliteStore {
             raw_tokens,
             compressed_tokens,
             None,
+            &Default::default(),
         )
     }
 
@@ -222,7 +230,11 @@ impl SqliteStore {
         raw_tokens: u64,
         compressed_tokens: u64,
         identities: Option<&CompatibilityIdentities>,
+        authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
     ) -> Result<String, Box<dyn std::error::Error>> {
+        if !authority.is_current(source_hash) {
+            return Err("Typed authority changed before persistence".into());
+        }
         self.begin_transaction()?;
         let result = (|| {
             let context_id = ContextStore::save_context(
@@ -235,13 +247,14 @@ impl SqliteStore {
                 raw_tokens,
                 compressed_tokens,
             )?;
-            let snapshot = DurableSemanticSnapshot::new_with_dependencies(
+            let mut snapshot = DurableSemanticSnapshot::new_with_dependencies(
                 file_path.to_string(),
                 source_hash.to_string(),
                 version,
                 semantic_edges,
                 semantic_dependencies,
             );
+            snapshot.authority = authority.clone();
             if let Some(identities) = identities {
                 self.conn.execute(
                     "UPDATE contexts
@@ -279,6 +292,9 @@ impl SqliteStore {
         snapshot: &DurableSemanticSnapshot,
         identities: &CompatibilityIdentities,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        if !snapshot.authority.is_current(&snapshot.source_hash) {
+            return Err("Typed authority changed before delta persistence".into());
+        }
         self.begin_transaction()?;
         let result = (|| {
             let persisted_file = self
@@ -388,6 +404,7 @@ impl SqliteStore {
         }
         let semantic_edges = snapshot.restore_edges().map_err(structural_error)?;
         Ok(Some(UntrustedDurableContext {
+            authority: snapshot.authority,
             ir,
             semantic_edges,
             semantic_dependencies: snapshot.dependencies,

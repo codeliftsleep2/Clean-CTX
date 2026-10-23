@@ -164,17 +164,19 @@ pub(crate) fn handle_restore_context(id: &Value, params: &Value, state: &McpStat
 
     #[cfg(test)]
     historical_adoption_race_test_support::pause_before_live_adoption(&durable_path);
+    let expected_authority = semantic.authority.clone();
+    let expected_source_hash = semantic.source_hash.clone();
     let published = publication.commit(
         // Compatibility validation above owns historical eligibility. The
         // ticket orders this restore operation, not the age of its snapshot.
-        || Ok::<_, String>(true),
+        || Ok::<_, String>(expected_authority.is_current(&expected_source_hash)),
         || {
             state
                 .ir_context_lock()
                 .load_ir(session_ir.clone(), Some(canonical.source_hash.clone()));
             state.remember_persisted_path(&alias, &durable_path);
             state.remember_context_fidelity(&alias, canonical.fidelity);
-            state.publish_compatible_semantic_projection(&alias, &durable_path, semantic);
+            state.publish_compatible_semantic_projection(&alias, &durable_path, semantic)?;
             state
                 .llm_text_cache_lock()
                 .insert(alias.clone(), full.clone());

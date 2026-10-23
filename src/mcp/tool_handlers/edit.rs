@@ -7,6 +7,10 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
 
+#[path = "edit_persistence.rs"]
+mod persistence;
+use persistence::{clear_edit_intent_best_effort, commit_edit_semantics, establish_edit_intent};
+
 use crate::compression::Fidelity;
 use crate::edit::apply::{self, EditError};
 use crate::edit::locate::UnitTable;
@@ -226,7 +230,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
-    let (mut target_ir, semantic_edges, semantic_dependencies, new_hash) =
+    let ((mut target_ir, semantic_edges, semantic_dependencies, new_hash), authority) =
         match compile_source_ir_candidate(
             &resolved_path,
             &report.new_source,
@@ -234,7 +238,10 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
             state,
             workspace_root,
         ) {
-            Ok(candidate) => candidate.into_parts(),
+            Ok(mut candidate) => {
+                let authority = candidate.take_retained_authority();
+                (candidate.into_parts(), authority)
+            }
             Err(error) => return err_response(id, -32603, error.to_string(), None),
         };
     if let Err(error) = crate::ir::hierarchical::try_ir_to_hierarchical(&target_ir) {
@@ -260,8 +267,10 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
     race_test_support::pause_before_commit(&resolved_path);
     // ── Crash-recoverable commit critical section ────────────────────
     let _commit_guard = commit_lock().lock().unwrap_or_else(|p| p.into_inner());
+    let expected_authority = authority.clone();
     let committed = publication.commit(
-    || Ok::<_, ()>(std::fs::read(&resolved_path).is_ok_and(|bytes| bytes == prior_bytes)),
+    || Ok::<_, ()>(std::fs::read(&resolved_path).is_ok_and(|bytes| bytes == prior_bytes)
+        && expected_authority.is_current(&new_hash)),
     || {
     let staged = match stage_exact_bytes(&resolved_path, target_bytes) {
         Ok(staged) => staged,
@@ -313,7 +322,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         fidelity: Fidelity::Edit,
         stage_path,
     };
-    if let Err(error) = establish_edit_intent(state, &intent, &compatibility) {
+    if let Err(error) = establish_edit_intent(state, &intent, &authority, &compatibility) {
         err_response(id, -32603, error, None);
         return Err(());
     }
@@ -337,6 +346,7 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         target_ir.version,
         &semantic_edges,
         &semantic_dependencies,
+        &authority,
         &compatibility,
     ) {
         if let Err(recovery_error) = atomic_replace_exact(&resolved_path, &prior_bytes) {
@@ -367,10 +377,14 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .ir_context_lock()
         .load_ir(target_ir, Some(new_hash.clone()));
     state.remember_context_fidelity(&alias, Fidelity::Edit);
-    state.remember_semantic_projection(
+    state.remember_retained_semantic_projection(
         &alias,
-        semantic_edges.clone(),
-        semantic_dependencies,
+        crate::mcp::state::durable_semantics::SemanticSnapshot {
+            authority,
+            source_hash: new_hash.clone(),
+            edges: semantic_edges.clone(),
+            dependencies: semantic_dependencies,
+        },
     );
     state.forget_pending_transitions(&alias);
     if state.persistence_store_lock().is_some() {
@@ -535,71 +549,6 @@ fn edit_transition_id(
         format!("edit:v1:{file_path}:{prior_hash}:{target_hash}:{prior_version}:{target_version}")
             .as_bytes(),
     )
-}
-
-fn establish_edit_intent(
-    state: &McpState,
-    intent: &crate::mcp::sqlite_store::EditIntent,
-    compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
-) -> Result<(), String> {
-    let guard = state.persistence_store_lock();
-    let Some(store) = guard.as_ref() else {
-        return Ok(());
-    };
-    store
-        .sqlite()
-        .ok_or_else(|| "Persistence DB is unavailable".to_string())?
-        .establish_compatible_edit_intent(intent, compatibility)
-        .map_err(|error| format!("Cannot establish durable edit intent: {error}"))
-}
-
-#[allow(clippy::too_many_arguments)]
-fn commit_edit_semantics(
-    state: &McpState,
-    file_path: &str,
-    transition_id: &str,
-    target_binary: &[u8],
-    target_hash: &str,
-    target_version: u64,
-    semantic_edges: &[crate::layers::meta::semantic::SemanticEdge],
-    semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
-    compatibility: &crate::mcp::compatibility::identity::CompatibilityIdentities,
-) -> Result<(), String> {
-    let guard = state.persistence_store_lock();
-    let Some(store) = guard.as_ref() else {
-        return Ok(());
-    };
-    let mut sqlite = store
-        .sqlite()
-        .ok_or_else(|| "Persistence DB is unavailable".to_string())?;
-    sqlite
-        .save_context_with_dependency_semantics(
-            file_path,
-            Fidelity::Edit,
-            "",
-            target_binary,
-            target_hash,
-            target_version,
-            semantic_edges,
-            semantic_dependencies,
-            0,
-            0,
-            compatibility,
-        )
-        .map_err(|error| format!("Atomic durable semantic commit failed: {error}"))?;
-    if let Err(error) = sqlite.clear_edit_intent(file_path, transition_id) {
-        tracing::warn!(%error, %file_path, "committed edit intent retained for idempotent recovery");
-    }
-    Ok(())
-}
-
-fn clear_edit_intent_best_effort(state: &McpState, file_path: &str, transition_id: &str) {
-    let guard = state.persistence_store_lock();
-    if let Some(store) = guard.as_ref()
-        && let Some(mut sqlite) = store.sqlite()
-    {
-        let _ = sqlite.clear_edit_intent(file_path, transition_id);
-    }
 }
 
 #[cfg(test)]

@@ -22,11 +22,22 @@ struct ProviderBinding {
     endpoint: String,
 }
 
+#[cfg(test)]
 pub(crate) fn project(
     source_id: &str,
     source: &str,
     owner_name: &str,
     owner_kind: ClassKind,
+) -> Vec<SemanticEdge> {
+    project_with_authority(source_id, source, owner_name, owner_kind, None)
+}
+
+pub(crate) fn project_with_authority(
+    source_id: &str,
+    source: &str,
+    owner_name: &str,
+    owner_kind: ClassKind,
+    authority: Option<&crate::ir::typescript_resolution::TypeScriptAuthority>,
 ) -> Vec<SemanticEdge> {
     if !matches!(owner_kind, ClassKind::Component | ClassKind::Module) {
         return Vec::new();
@@ -47,7 +58,18 @@ pub(crate) fn project(
     let Some(class) = find_named_class(tree.root_node(), owner_name, source.as_bytes()) else {
         return Vec::new();
     };
-    let Some(provider_array) = provider_array(source_id, source, class) else {
+    let retained = authority
+        .and_then(|authority| super::string_token_authority::provider_array(authority, owner_name));
+    let array = retained.and_then(|(_, expression)| {
+        tree.root_node()
+            .descendant_for_byte_range(expression.start, expression.end)
+            .filter(|node| {
+                node.kind() == "array"
+                    && node.start_byte() == expression.start
+                    && node.end_byte() == expression.end
+            })
+    });
+    let Some(provider_array) = array.or_else(|| provider_array(source_id, source, class)) else {
         return Vec::new();
     };
     let owner_type = if owner_kind == ClassKind::Module {
@@ -59,13 +81,51 @@ pub(crate) fn project(
     let mut edges = Vec::new();
     let mut cursor = provider_array.walk();
     for entry in provider_array.named_children(&mut cursor) {
-        let Some(binding) = parse_provider(source_id, source, tree.root_node(), entry) else {
+        let mut canonical = None;
+        if let Some(authority) = authority
+            && let Some(token_node) = pair_value(entry, "provide", source.as_bytes())
+            && matches!(
+                token_node.kind(),
+                "string" | "identifier" | "member_expression"
+            )
+        {
+            canonical = retained.and_then(|(id, array)| {
+                super::string_token_authority::provider_literal(
+                    authority,
+                    array,
+                    token_node.start_byte(),
+                    token_node.end_byte(),
+                )
+                .map(|(expression, units)| {
+                    (
+                        super::string_token_authority::owner(id, owner_type),
+                        super::string_token_authority::token(
+                            id,
+                            expression,
+                            &units,
+                            "ProviderToken",
+                        ),
+                    )
+                })
+            });
+            if canonical.is_none() && token_node.kind() == "string" {
+                continue;
+            }
+        }
+        let token_label = canonical.as_ref().map(|(_, token)| token.name.clone());
+        let Some(binding) = parse_provider(source_id, source, tree.root_node(), entry, token_label)
+        else {
             continue;
         };
-        let token = EntityRef::new("angular", "ProviderToken", &binding.token);
+        let (registration_owner, token) = canonical.unwrap_or_else(|| {
+            (
+                owner.clone(),
+                EntityRef::new("angular", "ProviderToken", &binding.token),
+            )
+        });
         edges.push(SemanticEdge {
             relation: SemanticRelation::RegistersProvider,
-            subject: owner.clone(),
+            subject: registration_owner,
             object: token.clone(),
             layer: "angular",
             call_evidence: None,
@@ -75,9 +135,13 @@ pub(crate) fn project(
             ProviderStrategy::Factory => (SemanticRelation::ProviderUsesFactory, "ProviderFactory"),
             ProviderStrategy::Value => (SemanticRelation::ProviderUsesValue, "ProviderValue"),
         };
+        // Strategy facts retain their established noncanonical representation;
+        // token-value equality does not certify a strategy endpoint or scope.
+        let mut strategy_token = token;
+        strategy_token.canonical = None;
         edges.push(SemanticEdge {
             relation,
-            subject: token,
+            subject: strategy_token,
             object: EntityRef::new("angular", endpoint_type, binding.endpoint),
             layer: "angular",
             call_evidence: None,
@@ -164,6 +228,7 @@ fn parse_provider(
     source: &str,
     root: tree_sitter::Node<'_>,
     entry: tree_sitter::Node<'_>,
+    proved_token_label: Option<String>,
 ) -> Option<ProviderBinding> {
     if entry.kind() == "identifier" {
         let identity = reference_identity(source_id, source, root, entry)?;
@@ -177,7 +242,8 @@ fn parse_provider(
         return None;
     }
     let token_node = pair_value(entry, "provide", source.as_bytes())?;
-    let token = token_identity(source_id, source, root, token_node)?;
+    let token =
+        proved_token_label.or_else(|| token_identity(source_id, source, root, token_node))?;
     let strategies = [
         ("useClass", ProviderStrategy::Class),
         ("useFactory", ProviderStrategy::Factory),

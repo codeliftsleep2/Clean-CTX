@@ -712,6 +712,55 @@ Name, spelling, proximity, or shared storage never supplies a missing authority.
 
 **Enforcement:** producer-specific extraction plus exact Angular/C# refinement.
 
+### MECHANISM-REUSE-001 Equivalent Mechanics Are Shared; Semantics Keep Their Owners
+
+**Status:** DOCUMENTED (architectural and certification review; not a new executable gate)
+
+Cross-cutting semantic mechanics SHOULD be shared across language and meta-layers
+whenever their authority, lifecycle and correctness contracts are equivalent.
+Specialized layers own semantic interpretation and policy; they SHOULD NOT
+independently recreate equivalent lower-layer authority or shared infrastructure.
+A parallel implementation of equivalent machinery requires an explicit architectural
+reason. Equivalence of contract, rather than similarity of code, governs reuse.
+
+When a lower layer already establishes a fact authoritatively, a higher layer
+MUST NOT manufacture competing authority for that fact merely for convenience.
+Prove at the lowest authoritative owner, retain and transport the evidence,
+reuse it, then specialize its meaning above that boundary. This complements
+AUTH-001, ARCH-002/003/004 and the question-driven semantic envelope; it does not
+replace any authority, identity, completeness or production-integration obligation.
+
+For each material addition, first distinguish mechanics from semantic interpretation.
+For mechanics, inspect existing acquisition/snapshots, project context, identity
+transport, provenance/witnesses, dependencies/currentness, generations/compatibility,
+persistence/restoration, publication, relation deduplication/selection/replacement/
+retirement, completeness and query transport. Reuse or extend an existing mechanism
+when those contracts match. When none matches, choose the smallest correctly owned
+mechanism justified by demonstrated consumers. Interpret specialized meaning at its
+authoritative layer: language binding in the language authority, Angular roles in
+Angular, and DI/NgRx/forms/routes or other specialized relationships in their owners.
+
+Different evidence, authority, lifecycle dependencies, identity forms, completeness,
+publication, invalidation or query contracts can justify specialized implementations.
+Record the actual difference; a shared consumer does not by itself require a shared
+producer. Repeated code is a review signal, not automatic proof of a defect. Compare
+concrete requirements before extracting common mechanics; do not build a universal
+framework around hypothetical future layers or remove specialized machinery before
+equivalence has been demonstrated.
+
+Material consumer reviews MUST identify identity/authority origins; acquisition and
+retained provenance; currentness and persistence/restoration; publication, duplicate
+prevention and retirement; completeness representation; shared infrastructure and
+specialized interpretation. Explain equivalent parallel paths and planned migration
+or their explicit architectural justification. Correct point answers alone do not
+prove correct ownership. Review applies to every layer/meta-layer touched, while
+unrelated historical debt remains separately recorded rather than triggering an
+unbounded repository-wide refactor.
+
+**Enforcement:** existing architecture audit and Language/Meta-Layer Certification
+Standard §9 review. This convention does not claim automatic enforcement, certify
+current implementations, authorize a redesign or change the existing runtime gate.
+
 ### WSC-012 Workspace Tuple Identity Is Not Exact Declaration Identity
 
 **Status:** ENFORCED

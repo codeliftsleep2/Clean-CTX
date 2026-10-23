@@ -113,6 +113,7 @@ fn save_context_snapshot<'a>(
             return None;
         }
     };
+    let authority = semantic_snapshot.authority;
     let semantic_edges = semantic_snapshot.edges;
     let semantic_dependencies = semantic_snapshot.dependencies;
     let compact = crate::mcp::tool_handlers::core::content::presentation_document(
@@ -155,6 +156,9 @@ fn save_context_snapshot<'a>(
     };
 
     Some(move || {
+        if !authority.is_current(&source_hash) {
+            return send_persistence_error(id, "Retained authority changed before checkpoint");
+        }
         let store_guard = state.persistence_store_lock();
         let Some(store) = store_guard.as_ref() else {
             return send_persistence_error(id, "Persistence is not enabled");
@@ -170,6 +174,7 @@ fn save_context_snapshot<'a>(
                     version,
                     &semantic_edges,
                     &semantic_dependencies,
+                    &authority,
                     &identities,
                 )
                 .unwrap_or(false)
@@ -179,7 +184,7 @@ fn save_context_snapshot<'a>(
         } else {
             let persisted = store.sqlite().is_some_and(|mut sqlite| {
                 sqlite
-                    .save_context_with_dependency_semantics(
+                    .save_context_with_retained_semantics(
                         &durable_path,
                         fidelity,
                         &compact,
@@ -188,6 +193,7 @@ fn save_context_snapshot<'a>(
                         version,
                         &semantic_edges,
                         &semantic_dependencies,
+                        &authority,
                         raw_tokens,
                         compressed_tokens,
                         &identities,

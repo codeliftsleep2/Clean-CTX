@@ -272,12 +272,15 @@ impl WorkspaceIndex {
         // multiply occurrences. An entity mentioned by N edges in one file
         // is registered once for that file (occurrence identity:
         // (domain, entity_type, name, file)).
+        // Track this publisher even when another publisher already registered
+        // the same physical entity occurrence. File queries and replacement use
+        // these keys; occurrence deduplication must not discard their ownership.
+        file_entity_keys.push(key.clone());
         let occurrences = self.entities.entry(key.clone()).or_default();
         if occurrences.iter().any(|e| e.file == entity.file) {
             return;
         }
         occurrences.push(entity);
-        file_entity_keys.push(key.clone());
     }
     // ── Core queries (Phase 4a) ──────────────────────────────────────
 
@@ -558,6 +561,10 @@ impl Default for WorkspaceIndex {
 #[cfg(test)]
 #[path = "../tests/workspace/index.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/entity_registration_ownership_issue_162.rs"]
+mod entity_registration_ownership_tests;
 
 #[cfg(test)]
 #[path = "../tests/workspace/index_support.rs"]

@@ -273,6 +273,7 @@ fn try_prepare_entities_in_file(
     state
         .preflight_semantic_publication(&resolved_path)
         .map_err(QueryFailure::internal)?;
+    let authority;
     let (semantic_edges, semantic_dependencies, compiled_hash) =
         match crate::mcp::tool_helpers::compile_file_ir_candidate(
             &resolved_path,
@@ -280,7 +281,8 @@ fn try_prepare_entities_in_file(
             state,
             workspace_root,
         ) {
-            Ok(artifact) => {
+            Ok(mut artifact) => {
+                authority = artifact.take_retained_authority();
                 #[cfg(feature = "csharp")]
                 if artifact.csharp_resolution_unit().is_some() {
                     let semantics = artifact.published_semantics();
@@ -309,16 +311,18 @@ fn try_prepare_entities_in_file(
         ));
     }
     context.invalidate_derived_catalogs();
-    {
-        let mut idx = state.workspace_index_lock();
-        idx.replace_semantic_projection_with_dependencies(
-            &canonical_path,
-            semantic_edges,
-            workspace_fidelity,
-            compiled_hash.clone(),
-            semantic_dependencies,
-        );
-    }
+    publish_file_projection(
+        state,
+        &resolved_path,
+        &canonical_path,
+        workspace_fidelity,
+        crate::mcp::state::durable_semantics::SemanticSnapshot {
+            edges: semantic_edges,
+            dependencies: semantic_dependencies,
+            source_hash: compiled_hash.clone(),
+            authority,
+        },
+    )?;
     #[cfg(feature = "csharp")]
     state
         .mark_csharp_call_authority_dirty_for_file(&canonical_path)
@@ -436,24 +440,27 @@ fn try_prepare_declarations_in_file(
         state
             .preflight_semantic_publication(&resolved_path)
             .map_err(QueryFailure::internal)?;
-        let (_, semantic_edges, semantic_dependencies, compiled_hash) =
-            crate::mcp::tool_helpers::compile_file_ir_candidate(
-                &resolved_path,
-                fidelity,
-                state,
-                workspace_root,
-            )
-            .map_err(|error| QueryFailure::internal(error.to_string()))?
-            .into_parts();
-        state
-            .workspace_index_lock()
-            .replace_semantic_projection_with_dependencies(
-                &canonical_path,
-                semantic_edges,
-                workspace_fidelity,
-                compiled_hash,
-                semantic_dependencies,
-            );
+        let mut artifact = crate::mcp::tool_helpers::compile_file_ir_candidate(
+            &resolved_path,
+            fidelity,
+            state,
+            workspace_root,
+        )
+        .map_err(|error| QueryFailure::internal(error.to_string()))?;
+        let authority = artifact.take_retained_authority();
+        let (_, edges, dependencies, source_hash) = artifact.into_parts();
+        publish_file_projection(
+            state,
+            &resolved_path,
+            &canonical_path,
+            workspace_fidelity,
+            crate::mcp::state::durable_semantics::SemanticSnapshot {
+                edges,
+                dependencies,
+                source_hash,
+                authority,
+            },
+        )?;
         #[cfg(feature = "csharp")]
         state
             .mark_csharp_call_authority_dirty_for_file(&canonical_path)
@@ -509,4 +516,43 @@ fn ensure_supported_file(path: &str) -> Result<(), QueryFailure> {
         "Requested file type is not supported by workspace_query.",
         Some(serde_json::json!({ "reason": "unsupported_file_type" })),
     ))
+}
+
+fn publish_file_projection(
+    state: &McpState,
+    source_path: &str,
+    owner: &str,
+    fidelity: crate::workspace::index::SemanticFidelity,
+    snapshot: crate::mcp::state::durable_semantics::SemanticSnapshot,
+) -> Result<(), QueryFailure> {
+    state.with_semantic_authority_update(owner, || {
+        if !snapshot.authority.is_current(&snapshot.source_hash) {
+            return Err(QueryFailure::internal(
+                "Typed authority changed before query publication",
+            ));
+        }
+        #[cfg(feature = "typescript")]
+        if snapshot.authority.typescript_authority.is_some()
+            && !state.read_source(source_path).is_ok_and(|source| {
+                crate::cache::content_hash(source.as_bytes()) == snapshot.source_hash
+            })
+        {
+            return Err(QueryFailure::internal(
+                "Query source changed before typed publication",
+            ));
+        }
+        let _ = source_path;
+        state
+            .workspace_index_lock()
+            .replace_semantic_projection_with_retained_authority(
+                owner,
+                snapshot.edges,
+                fidelity,
+                snapshot.source_hash,
+                snapshot.dependencies,
+                #[cfg(feature = "typescript")]
+                snapshot.authority.typescript_authority,
+            )
+            .map_err(QueryFailure::internal)
+    })
 }

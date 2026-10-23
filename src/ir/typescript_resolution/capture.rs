@@ -8,11 +8,21 @@ pub(crate) struct TypeScriptAuthority {
     pub source_route: PathBuf,
     pub source_hash: String,
     pub declarations: Vec<DeclarationId>,
+    #[serde(default)]
+    pub constructor_parameters: Vec<super::constructor_parameters::ConstructorParameter>,
+    #[serde(default)]
+    pub declaration_facets: Vec<super::declaration_facets::DeclarationFacet>,
     pub references: Vec<(String, Namespace, Resolution)>,
     /// Exact value occurrences proven by shared lexical/import mechanics.
     pub reference_sites: Vec<(usize, usize, Resolution)>,
+    /// Bare value occurrences with no source binding and a closed empty global
+    /// lookup. Symbolic compatibility only; never declaration authority.
+    #[serde(default)]
+    pub unbound_value_sites: Vec<(usize, usize, String)>,
     /// Exact type occurrences remain distinct from runtime value references.
     pub type_reference_sites: Vec<(usize, usize, Resolution)>,
+    #[serde(default)]
+    pub package_exports: Vec<super::package_evidence::PackageExportEvidence>,
     pub module_requests: Vec<super::module_references::ModuleReference>,
     pub compiler_libraries: Vec<super::compiler_libraries::LibraryRequest>,
     pub automatic_types: Vec<super::automatic_types::AutomaticTypeRequest>,
@@ -33,6 +43,26 @@ pub(crate) struct TypeScriptAuthority {
 }
 
 impl TypeScriptAuthority {
+    /// Select a unique resolved value occurrence, without assigning a consumer role.
+    /// Type occurrences and competing entries cannot supply this evidence.
+    pub(crate) fn value_reference_at(
+        &self,
+        span: crate::ir::invocation_evidence::SourceSpan,
+    ) -> Option<&DeclarationId> {
+        let mut sites = self
+            .reference_sites
+            .iter()
+            .filter(|(start, end, _)| *start == span.start_byte() && *end == span.end_byte());
+        let (_, _, resolution) = sites.next()?;
+        if sites.next().is_some() {
+            return None;
+        }
+        let Resolution::Resolved(id) = resolution else {
+            return None;
+        };
+        Some(id)
+    }
+
     pub(crate) fn capture(file: &Path, source: &str, roots: &[PathBuf]) -> Self {
         Self::capture_in_project(file, source, roots, None)
     }
@@ -43,14 +73,28 @@ impl TypeScriptAuthority {
         roots: &[PathBuf],
         project: Option<&Path>,
     ) -> Self {
+        Self::capture_with_declaration_fields(file, source, roots, project, &[])
+    }
+
+    pub(crate) fn capture_with_declaration_fields(
+        file: &Path,
+        source: &str,
+        roots: &[PathBuf],
+        project: Option<&Path>,
+        fields: &[&str],
+    ) -> Self {
         let mut result = Self {
             source: file.to_path_buf(),
             source_route: file.to_path_buf(),
             source_hash: crate::cache::content_hash(source.as_bytes()),
             declarations: Vec::new(),
+            constructor_parameters: Vec::new(),
+            declaration_facets: Vec::new(),
             references: Vec::new(),
             reference_sites: Vec::new(),
+            unbound_value_sites: Vec::new(),
             type_reference_sites: Vec::new(),
+            package_exports: Vec::new(),
             module_requests: Vec::new(),
             namespace_scopes: Vec::new(),
             programs: Vec::new(),
@@ -91,6 +135,12 @@ impl TypeScriptAuthority {
                 .ok_or("Source outside authorized roots")?;
             resolver.host.seed(file, source)?;
             result.declarations = resolver.source_declarations(file)?;
+            result.constructor_parameters = super::constructor_parameters::capture(
+                &mut resolver,
+                file,
+                source,
+                &result.declarations,
+            );
             result.reference_sites = reference_sites(&mut resolver, file, source)?;
             result.type_reference_sites = type_reference_sites(&mut resolver, file, source)?;
             result.module_requests =
@@ -126,8 +176,31 @@ impl TypeScriptAuthority {
                         .push((name.clone(), namespace, resolution));
                 }
             }
+            result.package_exports =
+                super::package_evidence::capture(&mut resolver, file, &result.reference_sites);
+            let (facets, packages) = super::declaration_facets::capture(
+                &mut resolver,
+                file,
+                &result.declarations,
+                fields,
+                &result.constructor_parameters,
+            );
+            result.declaration_facets = facets;
+            result.package_exports.extend(packages);
             Ok::<_, String>(())
         })();
+        result.unbound_value_sites = resolver
+            .unbound_value_sites
+            .iter()
+            .filter(|(owner, start, end, _)| {
+                owner == &result.source
+                    && result
+                        .reference_sites
+                        .iter()
+                        .any(|(s, e, _)| s == start && e == end)
+            })
+            .map(|(_, start, end, name)| (*start, *end, name.clone()))
+            .collect();
         result.compiler_libraries = resolver.library_evidence.clone();
         result.automatic_types = resolver.automatic_type_evidence.clone();
         result.program_directives = resolver.directive_evidence.clone();

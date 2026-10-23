@@ -48,7 +48,10 @@ pub fn class_to_semantic_edges(
     // it is normalized into an entity occurrence, never a graph self-edge.
     // NgModule ownership must survive an empty/retracted membership projection
     // so its contributor footprint can invalidate and restore relationships.
-    if matches!(kind, ClassKind::Service | ClassKind::Module) {
+    if matches!(
+        kind,
+        ClassKind::Service | ClassKind::Module | ClassKind::Directive
+    ) {
         edges.push(SemanticEdge {
             relation: SemanticRelation::Defines,
             subject: subject.clone(),
@@ -58,7 +61,7 @@ pub fn class_to_semantic_edges(
         });
     }
 
-    // Pipe → HasPipeName → pipe-name-string
+    // Pipe â†’ HasPipeName â†’ pipe-name-string
     if kind == ClassKind::Pipe {
         if let Some(pn) = pipe_name {
             edges.push(SemanticEdge {
@@ -71,7 +74,7 @@ pub fn class_to_semantic_edges(
         }
     }
 
-    // Component → HasSelector → selector-string
+    // Component â†’ HasSelector â†’ selector-string
     if kind == ClassKind::Component {
         if let Some(sel) = selector {
             edges.push(SemanticEdge {
@@ -108,8 +111,8 @@ pub fn class_to_semantic_edges(
         }
     }
 
-    // Component → HasInput → InputField
-    // Component → HasOutput → OutputField
+    // Component â†’ HasInput â†’ InputField
+    // Component â†’ HasOutput â†’ OutputField
     if kind == ClassKind::Component {
         let io_fields = crate::angular_meta::decorators::extract_io_fields(raw_class, fidelity);
         for (is_input, field_name) in &io_fields {

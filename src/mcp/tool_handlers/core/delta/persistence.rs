@@ -45,7 +45,7 @@ fn persist_baseline_with_identities(
     if let Some(ref store) = *state.persistence_store_lock() {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_dependency_semantics(
+                .save_context_with_retained_semantics(
                     file_path,
                     fidelity,
                     "",
@@ -54,6 +54,7 @@ fn persist_baseline_with_identities(
                     compiled.version,
                     &semantic.edges,
                     &semantic.dependencies,
+                    &semantic.authority,
                     0,
                     0,
                     identities,

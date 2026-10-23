@@ -64,8 +64,17 @@ impl Resolver {
         }) {
             return None;
         }
+        let constructor_decorator =
+            super::parameter_decorators::is_constructor_decorator_site(reference, source);
         let lookup = if reference.kind() == "member_expression" {
             Ok(None)
+        } else if constructor_decorator {
+            crate::ir::typescript_identifier_binding::lookup_constructor_decorator_value_in_tree(
+                file.to_str()?,
+                source,
+                span,
+                tree.root_node(),
+            )
         } else {
             crate::ir::typescript_identifier_binding::lookup_value_identifier_in_tree(
                 file.to_str()?,
@@ -207,6 +216,8 @@ impl Resolver {
             return Some(Resolution::Unresolved("Lexical scope is unresolved".into()));
         }
         let mut ancestor = reference.parent();
+        let mut direct_field_initializer = false;
+        let mut parameter_decorator = constructor_decorator;
         let mut namespace_owners = Vec::new();
         while let Some(node) = ancestor {
             if node.kind() == "internal_module" {
@@ -235,6 +246,34 @@ impl Resolver {
                     .parent()
                     .is_some_and(|parent| parent.kind() == "internal_module")
             {
+                ancestor = node.parent();
+                continue;
+            }
+            // A direct class-field value is evaluated in the enclosing lexical
+            // environment. Class members do not introduce unqualified value
+            // bindings. The tree-taking lexical binder above has already checked
+            // local candidates; method/function/static-block guards still apply.
+            if node.kind() == "public_field_definition" {
+                direct_field_initializer = node.child_by_field_name("value").is_some_and(|value| {
+                    value.start_byte() <= reference.start_byte()
+                        && reference.end_byte() <= value.end_byte()
+                });
+            }
+            if node.kind() == "formal_parameters" && parameter_decorator {
+                ancestor = node.parent();
+                continue;
+            }
+            if node.kind() == "class_body"
+                && (direct_field_initializer || parameter_decorator)
+                && node.parent().is_some_and(|owner| {
+                    matches!(
+                        owner.kind(),
+                        "class_declaration" | "abstract_class_declaration"
+                    )
+                })
+            {
+                direct_field_initializer = false;
+                parameter_decorator = false;
                 ancestor = node.parent();
                 continue;
             }
@@ -317,7 +356,42 @@ impl Resolver {
         Some(if type_query {
             self.query_value_binding(file, name, &[])
         } else {
-            self.local(file, name, Namespace::Value)
+            // Record bare absence only after exact lexical/scope checks above.
+            // An ineligible import or type declaration is still a binding and
+            // must never become a symbolic runtime token by this route.
+            self.in_source_project(file, |resolver| {
+                if resolver
+                    .unit(file)
+                    .is_some_and(|unit| !unit.locals.contains_key(name))
+                {
+                    let (globals, complete) = resolver.global_bindings(
+                        file,
+                        name,
+                        Namespace::Value,
+                        &mut std::collections::BTreeSet::new(),
+                    );
+                    let (types, types_complete) = resolver.global_bindings(
+                        file,
+                        name,
+                        Namespace::Type,
+                        &mut std::collections::BTreeSet::new(),
+                    );
+                    if complete
+                        && types_complete
+                        && types.is_empty()
+                        && globals.is_empty()
+                        && let Some(owner) = resolver.host.normalized(file)
+                    {
+                        resolver.unbound_value_sites.insert((
+                            owner,
+                            span.start_byte(),
+                            span.end_byte(),
+                            name.to_owned(),
+                        ));
+                    }
+                }
+                resolver.local(file, name, Namespace::Value)
+            })
         })
     }
 }

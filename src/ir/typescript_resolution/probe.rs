@@ -20,7 +20,7 @@ impl Resolver {
             .flatten()
     }
 
-    fn probe_directory(
+    pub(super) fn probe_directory(
         &mut self,
         path: &Path,
         project: &Project,
@@ -65,7 +65,11 @@ impl Resolver {
     }
 
     // Ok(None) permits ordinary fallback. Err blocks a selected/unproved target.
-    fn probe_file_result(&mut self, path: &Path, project: &Project) -> Result<Option<PathBuf>, ()> {
+    pub(super) fn probe_file_result(
+        &mut self,
+        path: &Path,
+        project: &Project,
+    ) -> Result<Option<PathBuf>, ()> {
         let written = path.to_str().ok_or(())?;
         let (stem, extensions): (&str, &[&str]) = if let Some(stem) = written.strip_suffix(".d.mts")
         {

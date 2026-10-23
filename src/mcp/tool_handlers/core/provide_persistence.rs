@@ -12,18 +12,22 @@ pub(super) fn read_checkpoint_required(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(super) fn persist_read_baseline(
+pub(super) fn persist_read_baseline_with_authority(
     state: &McpState,
     owner_path: &str,
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
     semantic_dependencies: &[SemanticDependency],
+    authority: &crate::mcp::semantic_compilation::retained::RetainedAuthority,
     source_hash: &str,
     source: &str,
     raw_tokens: usize,
     compressed_tokens: usize,
 ) -> Result<(), &'static str> {
+    if !authority.is_current(source_hash) {
+        return Err("Typed authority changed before durable publication");
+    }
     if !read_checkpoint_required(state, fidelity) {
         return Ok(());
     }
@@ -41,7 +45,7 @@ pub(super) fn persist_read_baseline(
     .map_err(|_| "Durable compatibility identity derivation failed")?;
     let persisted = store.sqlite().is_some_and(|mut sqlite| {
         sqlite
-            .save_context_with_dependency_semantics(
+            .save_context_with_retained_semantics(
                 owner_path,
                 fidelity,
                 "",
@@ -50,6 +54,7 @@ pub(super) fn persist_read_baseline(
                 compiled.version,
                 semantic_edges,
                 semantic_dependencies,
+                authority,
                 raw_tokens as u64,
                 compressed_tokens as u64,
                 &identities,

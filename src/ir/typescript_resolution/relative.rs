@@ -12,12 +12,26 @@ impl Resolver {
         project: &Project,
         directory_lookup: bool,
     ) -> Result<PathBuf, String> {
+        match self.relative_module_target(directory, specifier, project, directory_lookup)? {
+            super::module_resolution::ModuleTarget::Found(path) => Ok(path),
+            super::module_resolution::ModuleTarget::Absent(reason) => Err(reason.into()),
+        }
+    }
+
+    pub(super) fn relative_module_target(
+        &mut self,
+        directory: &Path,
+        specifier: &str,
+        project: &Project,
+        directory_lookup: bool,
+    ) -> Result<super::module_resolution::ModuleTarget, String> {
+        use super::module_resolution::ModuleTarget;
         let candidate = lexical(&directory.join(specifier));
-        if let Some(file) = self.relative_candidate(&candidate, project, directory_lookup) {
-            return Ok(file);
+        if let Some(file) = self.relative_candidate(&candidate, project, directory_lookup)? {
+            return Ok(ModuleTarget::Found(file));
         }
         let Some(option) = project.options.get("rootDirs") else {
-            return Err("Relative module absent".into());
+            return Ok(ModuleTarget::Absent("Relative module absent"));
         };
         let roots = option
             .value
@@ -43,7 +57,9 @@ impl Resolver {
             })
             .max_by_key(|(_, root)| root.components().count());
         let Some((selected, root)) = matched else {
-            return Err("Relative module absent from virtual roots".into());
+            return Ok(ModuleTarget::Absent(
+                "Relative module absent from virtual roots",
+            ));
         };
         let suffix: PathBuf = candidate
             .components()
@@ -56,12 +72,14 @@ impl Resolver {
                 continue;
             }
             if let Some(file) =
-                self.relative_candidate(&root.join(&suffix), project, directory_lookup)
+                self.relative_candidate(&root.join(&suffix), project, directory_lookup)?
             {
-                return Ok(file);
+                return Ok(ModuleTarget::Found(file));
             }
         }
-        Err("Relative module absent from virtual roots".into())
+        Ok(ModuleTarget::Absent(
+            "Relative module absent from virtual roots",
+        ))
     }
 
     fn relative_candidate(
@@ -69,11 +87,20 @@ impl Resolver {
         path: &Path,
         project: &Project,
         directory_lookup: bool,
-    ) -> Option<PathBuf> {
-        if directory_lookup {
-            self.probe(path, project)
+    ) -> Result<Option<PathBuf>, String> {
+        let observation_start = self.host.witnesses.len();
+        let result = if directory_lookup {
+            self.probe_directory(path, project, &mut std::collections::BTreeSet::new())
         } else {
-            self.probe_file(path, project)
+            self.probe_file_result(path, project)
+        };
+        let target = result.map_err(|()| "Relative module probe has unproven input".to_string())?;
+        if !self.host.witnesses[observation_start..]
+            .iter()
+            .all(super::Witness::current)
+        {
+            return Err("Relative module probe has unavailable or changed evidence".into());
         }
+        Ok(target)
     }
 }

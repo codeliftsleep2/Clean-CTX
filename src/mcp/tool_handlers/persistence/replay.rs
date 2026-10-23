@@ -115,17 +115,19 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
     } else {
         (compact(), false)
     };
+    let expected_authority = semantic.authority.clone();
+    let expected_source_hash = semantic.source_hash.clone();
     let published = publication.commit(
         // Compatibility validation above owns historical eligibility. The
         // ticket orders this replay operation, not the age of its snapshot.
-        || Ok::<_, String>(true),
+        || Ok::<_, String>(expected_authority.is_current(&expected_source_hash)),
         || {
             state
                 .ir_context_lock()
                 .load_ir(ir.clone(), Some(canonical.source_hash));
             state.remember_persisted_path(&path_alias, file_path);
             state.remember_context_fidelity(&path_alias, canonical.fidelity);
-            state.publish_compatible_semantic_projection(&path_alias, file_path, semantic);
+            state.publish_compatible_semantic_projection(&path_alias, file_path, semantic)?;
             state
                 .llm_text_cache_lock()
                 .insert(path_alias, rendered.clone());

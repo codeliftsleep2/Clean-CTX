@@ -580,6 +580,7 @@ Before approving any semantic implementation, reviewers MUST ask:
 9.  **Will that mutation actually invalidate/retract the answer?**
 10. **Does another meta-layer still answer the same question through
     weaker mechanics?**
+    Apply [MECHANISM-REUSE-001](ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): compare actual authority, lifecycle and correctness contracts, reuse equivalent mechanics and document justified specialization.
 11. **Can the answer survive cold/warm, ordering, batching, persistence,
     and restoration?**
 12. **Would the LLM still need raw source to reconstruct something

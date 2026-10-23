@@ -215,7 +215,11 @@ fn type_id(file: &Path, source: &str, node: tree_sitter::Node<'_>, name: &str) -
     }
 }
 
-fn type_path<'a>(node: tree_sitter::Node<'_>, source: &'a str, parts: &mut Vec<&'a str>) -> bool {
+pub(super) fn type_path<'a>(
+    node: tree_sitter::Node<'_>,
+    source: &'a str,
+    parts: &mut Vec<&'a str>,
+) -> bool {
     if matches!(
         node.kind(),
         "identifier" | "type_identifier" | "property_identifier"

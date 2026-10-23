@@ -12,6 +12,7 @@ use std::path::Path;
 
 #[derive(Debug, Clone)]
 pub(crate) struct UntrustedDurableContext {
+    pub authority: crate::mcp::semantic_compilation::retained::RetainedAuthority,
     pub ir: CompiledIR,
     pub semantic_edges: Vec<SemanticEdge>,
     pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
@@ -29,26 +30,11 @@ pub(crate) struct CompatibleCanonicalState {
 
 #[derive(Debug, Clone)]
 pub(crate) struct CompatibleSemanticProjection {
+    pub authority: crate::mcp::semantic_compilation::retained::RetainedAuthority,
     pub semantic_edges: Vec<SemanticEdge>,
     pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     pub source_hash: String,
     pub fidelity: Fidelity,
-}
-
-impl CompatibleSemanticProjection {
-    pub(crate) fn from_current_compilation_with_dependencies(
-        semantic_edges: Vec<SemanticEdge>,
-        semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
-        source_hash: String,
-        fidelity: Fidelity,
-    ) -> Self {
-        Self {
-            semantic_edges,
-            semantic_dependencies,
-            source_hash,
-            fidelity,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -238,6 +224,13 @@ pub(crate) fn validate_semantic(
     if persisted_producers != &current.semantic_producers {
         return Err(CompatibilityFailure::SemanticProducerIncompatible);
     }
+    if !loaded.authority.is_current(&loaded.source_hash)
+        || !loaded
+            .authority
+            .admits_relation_evidence(&loaded.semantic_edges)
+    {
+        return Err(CompatibilityFailure::SemanticDependencyStale);
+    }
     if !loaded
         .semantic_dependencies
         .iter()
@@ -246,6 +239,7 @@ pub(crate) fn validate_semantic(
         return Err(CompatibilityFailure::SemanticDependencyStale);
     }
     Ok(CompatibleSemanticProjection {
+        authority: loaded.authority.clone(),
         semantic_edges: loaded.semantic_edges.clone(),
         semantic_dependencies: loaded.semantic_dependencies.clone(),
         source_hash: loaded.source_hash.clone(),

@@ -2,11 +2,18 @@ use super::package::Ordered;
 use super::resolver::Resolver;
 use std::path::{Path, PathBuf};
 
+pub(super) type ManifestScope = (PathBuf, (PathBuf, Ordered));
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum ModuleRequestKind {
     StaticImport,
     Import,
     Require,
+}
+
+pub(super) enum ModuleTarget {
+    Found(PathBuf),
+    Absent(&'static str),
 }
 
 impl Resolver {
@@ -20,6 +27,18 @@ impl Resolver {
         specifier: &str,
         kind: ModuleRequestKind,
     ) -> Result<PathBuf, String> {
+        match self.module_request_target(file, specifier, kind)? {
+            ModuleTarget::Found(path) => Ok(path),
+            ModuleTarget::Absent(reason) => Err(reason.into()),
+        }
+    }
+
+    pub(super) fn module_request_target(
+        &mut self,
+        file: &Path,
+        specifier: &str,
+        kind: ModuleRequestKind,
+    ) -> Result<ModuleTarget, String> {
         let file = self.resolution_file(file).ok_or("Source outside scope")?;
         let mut project = self.request_project(&file)?;
         if !matches!(
@@ -33,7 +52,9 @@ impl Resolver {
         }
         let directory = file.parent().ok_or("Source has no parent")?;
         if project.mode == "classic" {
-            return self.classic_module(directory, specifier, &project);
+            return self
+                .classic_module(directory, specifier, &project)
+                .map(ModuleTarget::Found);
         }
         let node = matches!(project.mode.as_str(), "node16" | "nodenext");
         let esm = self.apply_request_conditions(&file, kind, &mut project)?;
@@ -52,20 +73,23 @@ impl Resolver {
             if node && esm && Path::new(specifier).extension().is_none() {
                 return Err("Node ESM relative references require an explicit extension".into());
             }
-            return self.relative_module(directory, specifier, &project, !(node && esm));
+            return self.relative_module_target(directory, specifier, &project, !(node && esm));
         }
         if let Some(target) = self.optional_module(specifier, &project, true) {
-            return Ok(target);
+            return Ok(ModuleTarget::Found(target));
         }
         if specifier.starts_with('#') && imports_enabled {
-            return self.package_import(
-                directory,
-                specifier,
-                &project,
-                &mut std::collections::BTreeSet::new(),
-            );
+            return self
+                .package_import(
+                    directory,
+                    specifier,
+                    &project,
+                    &mut std::collections::BTreeSet::new(),
+                )
+                .map(ModuleTarget::Found);
         }
         self.package_reference(directory, specifier, &project, exports_enabled)
+            .map(ModuleTarget::Found)
     }
 
     pub(super) fn apply_request_conditions(
@@ -132,7 +156,7 @@ impl Resolver {
                 Some((prefix.len(), middle.to_string(), targets))
             })
             .collect();
-        mappings.sort_by(|left, right| right.0.cmp(&left.0));
+        mappings.sort_by_key(|mapping| std::cmp::Reverse(mapping.0));
         if let Some((_, middle, targets)) = mappings.first() {
             for target in *targets {
                 let target = PathBuf::from(target.to_string_lossy().replace('*', middle));
@@ -166,7 +190,7 @@ impl Resolver {
     pub(super) fn nearest_manifest(
         &mut self,
         directory: &Path,
-    ) -> Result<Option<(PathBuf, (PathBuf, Ordered))>, String> {
+    ) -> Result<Option<ManifestScope>, String> {
         let boundary = self
             .host
             .boundary(directory)

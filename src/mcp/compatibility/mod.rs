@@ -113,8 +113,21 @@ struct FrameworkApplicability {
 impl FrameworkApplicability {
     fn derive(source: &str, path: &Path, config: &CleanCtxConfig) -> Self {
         let registry = crate::layers::LayerRegistry::global();
+        let angular = framework_applies(registry.meta_layers(), "angular", source, path, config);
+        // Aliased decorators can produce Angular facts after canonical binding.
+        // Include the producer/config conservatively; syntax grants no role.
+        #[cfg(all(feature = "angular", feature = "typescript"))]
+        let angular = angular
+            || (matches!(
+                path.extension().and_then(|ext| ext.to_str()),
+                Some("ts" | "tsx" | "js" | "jsx" | "mts" | "cts")
+            ) && config
+                .meta_layers
+                .get("angular")
+                .is_none_or(|layer| layer.enabled)
+                && crate::angular_meta::class_role_authority::has_decorated_class(source));
         Self {
-            angular: framework_applies(registry.meta_layers(), "angular", source, path, config),
+            angular,
             dotnet: framework_applies(registry.meta_layers(), "dotnet", source, path, config),
             spring: framework_applies(registry.meta_layers(), "spring_boot", source, path, config),
         }

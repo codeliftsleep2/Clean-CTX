@@ -36,14 +36,104 @@ impl SemanticFidelity {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(super) struct SemanticCoverage {
+    #[cfg(feature = "typescript")]
+    pub(super) typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
     pub(super) fidelity: SemanticFidelity,
     pub(super) source_hash: String,
     pub(super) dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 impl WorkspaceIndex {
+    /// Known owners are revalidation candidates, never discovery/completeness
+    /// proof. Cached discovery cannot certify their consumed TS dependencies.
+    #[cfg(feature = "typescript")]
+    pub(crate) fn retained_typescript_owners_in_roots(
+        &self,
+        roots: &[std::path::PathBuf],
+    ) -> Vec<String> {
+        self.semantic_coverage
+            .iter()
+            .filter(|(owner, coverage)| {
+                coverage.typescript_authority.is_some()
+                    && roots.iter().any(|root| {
+                        crate::workspace::path_identity::is_within_root(
+                            owner,
+                            &root.to_string_lossy(),
+                        )
+                    })
+            })
+            .map(|(owner, _)| owner.clone())
+            .collect()
+    }
+
+    #[cfg(all(test, feature = "typescript"))]
+    pub(crate) fn retained_typescript_authority(
+        &self,
+        file: &str,
+    ) -> Option<&crate::ir::typescript_resolution::TypeScriptAuthority> {
+        let coverage = self.semantic_coverage.get(file)?;
+        if !self.has_current_semantic_projection(file, coverage.fidelity, &coverage.source_hash) {
+            return None;
+        }
+        coverage.typescript_authority.as_ref()
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn replace_semantic_projection_with_retained_authority(
+        &mut self,
+        file: &str,
+        edges: Vec<SemanticEdge>,
+        fidelity: SemanticFidelity,
+        source_hash: String,
+        dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+        #[cfg(feature = "typescript")] authority: Option<
+            crate::ir::typescript_resolution::TypeScriptAuthority,
+        >,
+    ) -> Result<(), &'static str> {
+        #[cfg(feature = "typescript")]
+        if let Some(proof) = &authority
+            && (proof.source_hash != source_hash
+                || !proof.capture_current
+                || proof.disposition.is_some()
+                || !proof.witnesses.iter().all(|witness| witness.current()))
+        {
+            return Err("TypeScript authority changed before index publication");
+        }
+        #[cfg(feature = "typescript")]
+        let relation_evidence_admitted = authority.as_ref().map_or_else(
+            || {
+                edges
+                    .iter()
+                    .all(|edge| edge.subject.canonical.is_none() && edge.object.canonical.is_none())
+            },
+            |proof| proof.admits_relation_evidence(&edges),
+        );
+        #[cfg(not(feature = "typescript"))]
+        let relation_evidence_admitted = edges
+            .iter()
+            .all(|edge| edge.subject.canonical.is_none() && edge.object.canonical.is_none());
+        if !relation_evidence_admitted {
+            return Err("Canonical relation evidence has no matching retained authority");
+        }
+        self.replace_semantic_projection_with_dependencies(
+            file,
+            edges,
+            fidelity,
+            source_hash,
+            dependencies,
+        );
+        #[cfg(feature = "typescript")]
+        {
+            self.semantic_coverage
+                .get_mut(file)
+                .expect("inserted source coverage")
+                .typescript_authority = authority;
+        }
+        Ok(())
+    }
+
     #[cfg(feature = "angular")]
     pub(crate) fn semantic_dependencies_for_file(
         &self,
@@ -103,6 +193,15 @@ impl WorkspaceIndex {
         self.semantic_coverage
             .get(file_path)
             .is_some_and(|coverage| {
+                #[cfg(feature = "typescript")]
+                if let Some(authority) = &coverage.typescript_authority
+                    && (authority.source_hash != source_hash
+                        || !authority.capture_current
+                        || authority.disposition.is_some()
+                        || !authority.witnesses.iter().all(|witness| witness.current()))
+                {
+                    return false;
+                }
                 coverage.source_hash == source_hash
                     && coverage.fidelity >= fidelity
                     && coverage
@@ -154,6 +253,8 @@ impl WorkspaceIndex {
         self.semantic_coverage.insert(
             file_path.to_string(),
             SemanticCoverage {
+                #[cfg(feature = "typescript")]
+                typescript_authority: None,
                 fidelity,
                 source_hash,
                 dependencies,

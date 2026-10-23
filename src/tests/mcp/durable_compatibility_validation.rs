@@ -35,6 +35,7 @@ fn persisted(identities: &CompatibilityIdentities) -> PersistedCompatibilityIden
 
 fn loaded(identities: PersistedCompatibilityIdentities) -> UntrustedDurableContext {
     UntrustedDurableContext {
+        authority: Default::default(),
         ir: CompiledIR {
             file_id: FILE.to_string(),
             version: 1,

@@ -50,6 +50,7 @@ The following rules apply throughout certification:
 - Correctness over compression.
 - Resolve by identity, render by position.
 - Share mechanics, specialize semantics.
+- Apply [MECHANISM-REUSE-001](ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): reuse equivalent authority/lifecycle/correctness mechanics and justify genuine specialization; correct answers alone do not prove correct ownership.
 - Names are not identities.
 - Proximity is not ownership.
 - Framework syntax is not framework authority.
@@ -436,6 +437,13 @@ A reviewer MUST be able to mark every applicable item before certification is gr
 - [ ] Dependency closure is proven for claimed questions.
 - [ ] Result limits cannot truncate required authority acquisition.
 
+### Mechanism Reuse and Specialized Semantics
+- [ ] Each material consumer traces identity/authority origins, acquisition, provenance, currentness, persistence/restoration, publication, deduplication, selection/replacement/retirement and completeness to their actual owners.
+- [ ] Available lower-layer authority is retained, transported and consumed rather than independently reconstructed through competing paths.
+- [ ] Equivalent cross-cutting contracts reuse shared machinery; parallel implementations have an explicit architectural reason or are recorded as unresolved architectural defects, not silently certified by passing point tests.
+- [ ] Specialized producers identify the evidence, authority, lifecycle, identity, completeness or query contract that requires their difference; source similarity or a common consumer alone is not grounds for consolidation.
+- [ ] Proposed sharing follows demonstrated requirements and preserves behavioral/integration obligations; no hypothetical universal framework or unexplained independent lifecycle was introduced.
+
 ### Semantics
 - [ ] Required in-envelope semantics are implemented.
 - [ ] Known in-envelope gaps are resolved or the envelope is explicitly narrowed.
@@ -561,6 +569,7 @@ I have reviewed:
 - the declared supported envelope;
 - Canonical Question Matrix coverage;
 - authority and identity model;
+- mechanism reuse and justified semantic specialization, including explained parallel authority/lifecycle paths;
 - acquisition/dependency closure;
 - lifecycle/currentness evidence;
 - completeness contract;

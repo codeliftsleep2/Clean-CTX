@@ -44,7 +44,7 @@ fn issue_162_namespace_augmentation_before_its_class_does_not_grant_a_merge() {
     let root = tempfile::tempdir().unwrap();
     let file = root.path().join("fixture.ts");
     std::fs::write(&file, "namespace API { export class Leaf {} } class API {}").unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     assert!(matches!(
         resolver.local(&file, "API", Namespace::Value),
         Resolution::Ambiguous(_) | Resolution::Unresolved(_)
@@ -61,7 +61,7 @@ fn issue_162_distinct_nested_namespace_scopes_do_not_collapse_same_spelling_memb
     let file = root.path().join("fixture.ts");
     let source = "namespace A { export class Leaf {} } namespace B { export class Leaf {} }";
     std::fs::write(&file, source).unwrap();
-    let mut resolver = Resolver::new(&[file.clone()]).unwrap();
+    let mut resolver = Resolver::new(std::slice::from_ref(&file)).unwrap();
     let Resolution::Resolved(a) = resolver.namespace_member(&file, "A", "Leaf", Namespace::Value)
     else {
         panic!("A.Leaf");

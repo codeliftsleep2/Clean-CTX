@@ -66,6 +66,33 @@ pub(crate) fn compile_source_artifact(
     let source_hash = crate::cache::content_hash(request.source.as_bytes());
     let mut compiler = IRCompiler::new();
     compiler.set_config(request.config.clone());
+    #[cfg(feature = "typescript")]
+    {
+        compiler.typescript_authority =
+            matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts").then(|| {
+                #[cfg(feature = "angular")]
+                if request.config.meta_layers.get("angular").is_none_or(|layer| layer.enabled) {
+                    return crate::ir::typescript_resolution::TypeScriptAuthority::capture_with_declaration_fields(
+                        path, request.source, request.authorized_roots, request.typescript_project,
+                        crate::angular_meta::module_metadata::DECLARATION_FIELDS,
+                    );
+                }
+                if let Some(project) = request.typescript_project {
+                    crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_project(
+                        path,
+                        request.source,
+                        request.authorized_roots,
+                        Some(project),
+                    )
+                } else {
+                    crate::ir::typescript_resolution::TypeScriptAuthority::capture(
+                        path,
+                        request.source,
+                        request.authorized_roots,
+                    )
+                }
+            });
+    }
     #[cfg(feature = "csharp")]
     if let Some(authority) = request.csharp_authority {
         compiler.set_csharp_declaration_authority(authority.to_vec());

@@ -113,8 +113,7 @@ pub(super) fn known_release(version: &str) -> Option<(u32, u32)> {
     let [major, minor, _patch] = parts.as_slice() else {
         return None;
     };
-    let known =
-        (*major == 4 && *minor <= 9) || (*major == 5 && *minor <= 9) || (*major, *minor) == (6, 0);
+    let known = (matches!(*major, 4 | 5) && *minor <= 9) || (*major, *minor) == (6, 0);
     known.then_some((*major, *minor))
 }
 

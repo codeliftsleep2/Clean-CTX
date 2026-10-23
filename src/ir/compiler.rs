@@ -93,6 +93,9 @@ pub struct IRCompiler {
     /// Source-bound invocation evidence from the most recent successful compile.
     /// This side output is never part of CompiledIR or durable state.
     pub(crate) invocation_evidence: Option<InvocationEvidenceSet>,
+    #[cfg(feature = "typescript")]
+    pub(crate) typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
+
     #[cfg(feature = "csharp")]
     csharp_declaration_authority: Option<Vec<crate::ir::csharp_exact_calls::Declaration>>,
     /// Framework-neutral syntax facts captured by the most recent C# compile.
@@ -112,6 +115,8 @@ impl IRCompiler {
             semantic_edges: Vec::new(),
             semantic_dependencies: Vec::new(),
             invocation_evidence: None,
+            #[cfg(feature = "typescript")]
+            typescript_authority: None,
             #[cfg(feature = "csharp")]
             csharp_declaration_authority: None,
             #[cfg(feature = "csharp")]
@@ -257,6 +262,10 @@ impl IRCompiler {
 
         // Construct PassContext with per-compilation state
         let mut ctx = PassContext::new(source.to_string(), file_id.to_string(), fidelity);
+        #[cfg(feature = "typescript")]
+        {
+            ctx.typescript_authority = self.typescript_authority.take();
+        }
         ctx.config = self.config.clone();
         ctx.canonical_path = canonical_path.map(|p| p.to_string());
         ctx.language = Some(language);
@@ -285,6 +294,10 @@ impl IRCompiler {
         // Capture semantic edges produced by MetaLayerPass (Pass 3) before
         // PassContext is dropped. This is the boundary where meta-layer
         // semantic facts survive the production compilation lifecycle.
+        #[cfg(feature = "typescript")]
+        {
+            self.typescript_authority = ctx.typescript_authority.take();
+        }
         self.semantic_edges = std::mem::take(&mut ctx.semantic_edges);
         self.semantic_dependencies = std::mem::take(&mut ctx.semantic_dependencies);
 

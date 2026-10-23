@@ -329,11 +329,26 @@ fn red_r5_no_cbm_reverse_edges_remain_authoritative() {
     let _serial = serial_guard();
     let primary = repository();
     let additional = repository();
+    crate::tests::angular_authority_fixture::install(primary.path());
+    crate::tests::angular_authority_fixture::install(additional.path());
+    // Discovery ignores this subtree; the fixture's TS program must also exclude
+    // its intentionally incomplete imports rather than consume them as proof.
+    write(
+        &additional.path().join("tsconfig.json"),
+        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"exclude":["ignored","node_modules"]}"#,
+    );
     write(
         &primary.path().join("src/ServiceA.ts"),
         "import { Injectable } from '@angular/core';\n@Injectable()\nexport class ServiceA {}\n",
     );
-    write(&additional.path().join(".gitignore"), "ignored/\n");
+    write(
+        &additional.path().join(".gitignore"),
+        "ignored/\nServiceA.d.ts\n",
+    );
+    write(
+        &additional.path().join("src/ServiceA.d.ts"),
+        "export declare class ServiceA {}\n",
+    );
     let consumer = "import { Component } from '@angular/core';\nimport { ServiceA } from './ServiceA';\n@Component({ selector: 'x-consumer' })\nexport class Consumer { constructor(private service: ServiceA) {} }\n";
     write(&additional.path().join("src/Consumer.ts"), consumer);
     write(
@@ -355,6 +370,30 @@ fn red_r5_no_cbm_reverse_edges_remain_authoritative() {
     assert_eq!(report.discovery_status, "completed");
     assert_eq!(report.candidates_discovered, 2);
     assert_eq!(report.candidates_compiled, 2);
+    #[cfg(feature = "typescript")]
+    if index
+        .reverse_edges_by_identity("angular", "Service", "ServiceA")
+        .is_empty()
+    {
+        let owners = [
+            primary.path().join("src/ServiceA.ts"),
+            additional.path().join("src/Consumer.ts"),
+        ];
+        let proof: Vec<_> = owners
+            .iter()
+            .map(|path| {
+                let owner = hydration_state.semantic_owner_path(&path.to_string_lossy());
+                serde_json::json!({"owner":owner,
+                "entities":index.entities_in_file(&owner),
+                "authority":index.retained_typescript_authority(&owner)})
+            })
+            .collect();
+        panic!(
+            "missing Injects edge after filesystem hydration: {}",
+            serde_json::json!(proof)
+        );
+    }
+
     assert_eq!(
         index
             .reverse_edges_by_identity("angular", "Service", "ServiceA")

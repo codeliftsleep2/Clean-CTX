@@ -14,6 +14,7 @@ fn call(state: &crate::mcp::McpState, tool: &str, args: Value) -> Value {
 fn angular_di_inject_token_receiver_is_not_the_dependency() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_inject_apis(root.path());
     let path = root.path().join("consumer.ts");
     let source = format!(
         "import {{ Injectable, inject }} from '@angular/core';\n\

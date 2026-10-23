@@ -100,7 +100,7 @@ fn find_constructor_open_paren(body: &str, body_start: usize) -> Option<usize> {
 /// The parse is deliberately tolerant of formatting: leading parameter
 /// decorators and parameter-property modifiers may be separated from the
 /// parameter name by spaces, tabs, or newlines.
-fn constructor_param_inject_type(param: &str) -> Option<String> {
+pub(crate) fn constructor_param_inject_type(param: &str) -> Option<String> {
     let rest = strip_parameter_modifiers(strip_parameter_decorators(param));
     let colon = rest.find(':')?;
     let type_part = rest[colon + 1..].trim();
