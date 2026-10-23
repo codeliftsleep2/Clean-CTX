@@ -34,6 +34,8 @@ COMPLETENESS CONTRACT
         ↓
 ADVERSARIAL VERIFICATION
         ↓
+ECOLOGICAL / REAL-REPOSITORY VERIFICATION
+        ↓
 EXTERNAL-ORACLE CONFORMANCE
         ↓
 LIVE LLM VERIFICATION
@@ -63,6 +65,8 @@ The following rules apply throughout certification:
 - Result filtering is not an acquisition budget.
 - Warm state may improve performance. It must never improve or degrade truth.
 - Equivalent authoritative evidence under equivalent semantic requirements must converge to equivalent truth regardless of cold/warm state, query order, batching, root order, cache population, or optional acquisition accelerators.
+- Semantic correctness is not happy-path correctness. Real repository messiness is part of the supported input domain.
+- Semantically irrelevant evidence must not change authoritative truth; changes to authoritative evidence must update or retract affected truth.
 
 ## 3. Certification Definition
 
@@ -82,6 +86,7 @@ CERTIFIED =
   + PUBLIC QUERYABILITY
   + COMPLETENESS
   + ADVERSARIAL PROOF
+  + ECOLOGICAL / REAL-REPOSITORY PROOF WHERE FEASIBLE
   + CONFORMANCE PROOF WHERE FEASIBLE
   + LIVE CONSUMER PROOF
   + AGENT APPROVAL
@@ -242,11 +247,78 @@ The layer MUST distinguish, where applicable: exact/complete, complete within a 
 
 `These are the results found` MUST NOT be represented as `these are all results` without proof of the required closure.
 
-### Gate 12 — Adversarial Regression Suite
+### Gate 12 — Adversarial, Non-Happy-Path, and Ecological Verification
 
-The certification suite MUST deliberately attempt to falsify the implementation.
+The certification suite MUST deliberately attempt to falsify the implementation. Minimal deterministic fixtures are necessary for isolation and reproducibility, but they are not sufficient evidence of production semantic correctness.
 
-Applicable cases include identity collisions, same-name unrelated entities, aliases, re-exports, cycles, shadowing, declaration merging, ambiguous resolution, type/value or equivalent semantic spaces, malformed/partial source, unsupported versions, missing dependencies, partial acquisition, configuration conflicts, mutation/deletion, cold/warm transitions, cache invalidation, query/batch ordering, persistence/restart, and framework-specific edge cases.
+Certification MUST distinguish three proof classes:
+
+1. **Deterministic harness proof** — the smallest controlled fixture that proves or falsifies the semantic rule.
+2. **Adversarial/non-happy-path proof** — the same capability under noise, indirection, ambiguity, mutation, competing evidence, and supported syntactic/project variation.
+3. **Ecological/real-repository proof** — where feasible, representative real software whose structure was not authored specifically to make Clean-CTX succeed.
+
+Applicable adversarial cases include identity collisions, same-name unrelated entities, aliases and multi-hop aliases, re-exports/barrels, cycles, shadowing, namespace qualification, declaration merging, ambiguous and negative candidates, type/value or equivalent semantic spaces, type-only forms, malformed/partial source, unsupported versions, missing dependencies, irrelevant neighboring files/imports/declarations, multiple source roots/projects/configurations, generated/declaration files, partial acquisition, configuration conflicts, mutation/deletion/replacement, stale durable state, cold/warm transitions, cache invalidation, query/batch/root ordering, persistence/restart, duplicate extraction, multiple simultaneous valid relationships, and framework-specific edge cases.
+
+Fixture diversity SHOULD deliberately vary naming, declaration ordering, file organization, import style, alias depth, nearby noise, project layout, dependency route, and equivalent supported syntax. Clean-CTX must understand the supported semantics, not an accidental grammar created by its test fixtures.
+
+#### ECOLOGICAL-VALIDITY-001
+
+> A semantic capability is not certified merely because it succeeds on minimal, idealized, or implementation-shaped fixtures. Where feasible, Clean-CTX MUST demonstrate correctness under adversarial variation and against representative real-world repository structures not constructed specifically to satisfy the implementation.
+
+Real-world repository messiness is part of the supported input domain when the constructs involved are inside the declared envelope. Ordinary aliases, barrels, duplicate names, generated code, multiple configurations, historical patterns, irrelevant neighbors, indirection, mixed styles, and combinations of valid constructs MUST NOT be dismissed merely because minimal fixtures did not contain them.
+
+#### NOISE-INVARIANCE-001
+
+> Semantically irrelevant repository evidence MUST NOT alter an authoritative answer.
+
+If evidence `E` establishes authoritative answer `A`, adding evidence `N` that is semantically irrelevant to that claim must preserve equivalent truth:
+
+```text
+E     → A
+E + N → A
+```
+
+A change caused solely by irrelevant neighbors is evidence that the implementation may be relying on proximity, enumeration order, terminal names, first-match behavior, accidental acquisition state, or another non-authoritative signal.
+
+The inverse is equally required: mutation of evidence that is authoritative to the claim MUST update, retract, degrade, or make ambiguous the answer as required by the semantic contract.
+
+```text
+IRRELEVANT CHANGE
+      ↓
+SAME TRUTH
+
+AUTHORITATIVE CHANGE
+      ↓
+UPDATED TRUTH
+```
+
+Where practical, adversarial verification SHOULD perturb semantically equivalent inputs by renaming aliases, reordering declarations, routing through barrels, adding unrelated namesakes/packages, varying equivalent syntax, changing query order, changing warm-state history, restarting/restoring, or performing unrelated acquisition first. Equivalent authoritative evidence must converge to equivalent truth.
+
+#### LIVE-FAILURE-REGRESSION-001
+
+> A live or ecological verification failure that exposes a previously unmodeled in-envelope condition MUST be reduced into permanent deterministic and adversarial regression evidence before the affected capability may be certified.
+
+A GREEN synthetic harness does not overrule a contradictory live failure. The required response is:
+
+```text
+LIVE / ECOLOGICAL FAILURE
+        ↓
+MINIMIZE THE FAILURE
+        ↓
+IDENTIFY THE HIDDEN ASSUMPTION
+        ↓
+CREATE DETERMINISTIC REGRESSION
+        ↓
+CREATE ADVERSARIAL VARIANT(S)
+        ↓
+REPAIR AUTHORITY / SEMANTICS
+        ↓
+RE-RUN DETERMINISTIC PROOF
+        ↓
+RE-RUN ECOLOGICAL CASE
+```
+
+The purpose is not to patch one repository. The purpose is to convert the real-world failure into permanent knowledge about the supported semantic envelope.
 
 Every discovered semantic failure MUST become a regression when it represents an in-envelope correctness requirement.
 
@@ -312,6 +384,8 @@ Where the layer exists to support model reasoning, certification MUST include re
 
 The verification should force the consumer to answer canonical architectural questions using the production representation/query path and establish that required knowledge is available; identity survives presentation; ambiguity is preserved; completeness metadata is usable; provenance supports reasoning where required; and the consumer can reach the intended conclusion without reconstructing missing semantics from raw source.
 
+Live verification SHOULD include representative real-world repository conditions rather than only repositories or prompts constructed to mirror deterministic harness fixtures. A live failure that contradicts synthetic GREEN evidence MUST be investigated under `LIVE-FAILURE-REGRESSION-001`; synthetic success does not supersede ecological failure.
+
 Presence of semantic data is not sufficient if the intended consumer cannot correctly use it.
 
 ### Gate 16 — Certification Artifact and Dual Sign-Off
@@ -330,6 +404,7 @@ Certification MUST produce a durable evidence artifact containing at least:
 - completeness classifications;
 - lifecycle/currentness evidence;
 - adversarial suite evidence;
+- ecological/real-repository verification evidence or an explicit statement of infeasibility;
 - external oracle(s) and oracle version(s), where used;
 - differential-conformance results;
 - performance characterization;
@@ -461,13 +536,18 @@ A reviewer MUST be able to mark every applicable item before certification is gr
 - [ ] Ambiguity is preserved.
 - [ ] Unsupported/out-of-envelope evidence is represented honestly.
 
-### Adversarial Verification
+### Adversarial and Ecological Verification
 - [ ] Identity collisions are tested.
 - [ ] Alias/re-export/merge/shadowing cases are tested where applicable.
 - [ ] Cycles and ambiguity are tested where applicable.
 - [ ] Missing/partial evidence is tested.
 - [ ] Mutation/deletion/configuration changes are tested.
 - [ ] Cache/order/batching/lifecycle behavior is tested.
+- [ ] Irrelevant-noise perturbations preserve authoritative answers.
+- [ ] Authoritative mutations update or retract affected answers.
+- [ ] Fixture structure varies enough to avoid implementation-shaped happy paths.
+- [ ] Representative real-repository/ecological verification exists where feasible, or infeasibility is explicit.
+- [ ] Live/ecological failures have been reduced into deterministic and adversarial regressions where in-envelope.
 - [ ] Discovered in-envelope failures have regression coverage.
 
 ### Differential Conformance
@@ -481,6 +561,7 @@ A reviewer MUST be able to mark every applicable item before certification is gr
 ### Consumer Verification
 - [ ] Canonical questions are answered through the production interface.
 - [ ] Live consumer/LLM verification exists where applicable.
+- [ ] Live verification includes representative non-happy-path/real-repository conditions where feasible.
 - [ ] The consumer can use identity, ambiguity, provenance, and completeness correctly.
 
 ### Sign-Off
@@ -535,7 +616,9 @@ I attest that:
   during certification.
 - The cited evidence supports the declared certification verdict.
 - I did not treat passing tests as proof beyond the scope they exercise.
-- I did not knowingly omit evidence that weakens or contradicts the claim.
+- I did not treat idealized harness success as proof of ecological correctness.
+- I disclosed contradictory live/ecological failures and reduced applicable
+  in-envelope failures into permanent regression evidence.
 - External-oracle agreement, where used, was treated as conformance
   evidence rather than production authority.
 - The supported envelope does not exceed what the evidence proves.
@@ -565,6 +648,7 @@ I have reviewed:
 - lifecycle/currentness evidence;
 - completeness contract;
 - adversarial findings;
+- ecological/real-repository evidence where feasible;
 - differential-conformance evidence where applicable;
 - production query reachability;
 - live consumer verification where applicable;
@@ -619,6 +703,8 @@ CORRECT COMPLETENESS SEMANTICS
     +
 ADVERSARIAL / LIFECYCLE VERIFICATION
     +
+ECOLOGICAL / REAL-REPOSITORY VERIFICATION WHERE FEASIBLE
+    +
 DIFFERENTIAL CONFORMANCE WHERE FEASIBLE
     +
 LIVE CONSUMER VERIFICATION WHERE APPLICABLE
@@ -636,6 +722,6 @@ The governing question is not:
 
 It is:
 
-> Can Clean-CTX prove the architectural facts it claims to know about this ecosystem, keep those facts current, expose them through the production interface with an honest completeness contract, demonstrate that the intended consumer can rely on them, and obtain independent agent and owner approval of that exact claim?
+> Can Clean-CTX prove the architectural facts it claims to know about this ecosystem, keep those facts current, expose them through the production interface with an honest completeness contract, survive adversarial and representative real-world repository conditions, demonstrate that the intended consumer can rely on them, and obtain independent agent and owner approval of that exact claim?
 
 Only then is the layer complete.
