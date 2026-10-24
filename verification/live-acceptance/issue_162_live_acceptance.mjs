@@ -7,11 +7,12 @@ import { McpClient } from './csharp-compilation-identity/client.mjs';
 import { injectFixture, injectAssertions, constructorAssertions } from './issue-162/inject-scenario.mjs';
 import { stringFixture, stringValues, stringAssertions } from './issue-162/string-scenario.mjs';
 import { memberFixture, memberApi, foreignMemberApi, memberSource, memberAssertions } from './issue-162/member-scenario.mjs';
+import { functionalFixture, functionalApi, functionalSource, commonManifest, functionalAssertions } from './issue-162/functional-scenario.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(repo, 'target/live-acceptance/issue-162', `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${process.pid}`);
 const root = path.join(output, 'workspace');
-const checkpointFiles = ['app.ts', 'dashboard.ts', 'di.ts', 'strings.ts', 'string-neighbor.ts', 'members.ts', 'member-neighbor.ts'];
+const checkpointFiles = ['app.ts', 'dashboard.ts', 'di.ts', 'strings.ts', 'string-neighbor.ts', 'members.ts', 'member-neighbor.ts', 'functional.ts', 'functional-neighbor.ts'];
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const report = { agent: 'Agent MaxHeadRoom', category: 'operator binary/stdio; not Rust/CI or Claude field acceptance', status: 'INCOMPLETE', sessions: [], checks: [], errors: [], mutations: [] };
 fs.mkdirSync(root, { recursive: true });
@@ -101,7 +102,8 @@ async function session(binary, name, action) {
     const constructorFacts = constructorAssertions({ call, check, root, normalize, hash, fs, name });
     const stringFacts = stringAssertions({ call, check, root, normalize, hash, fs, name });
     const memberFacts = memberAssertions({ call, check, root, normalize, name });
-    await action({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, client });
+    const functionalFacts = functionalAssertions({ call, check, root, normalize, name });
+    await action({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, functionalFacts, client });
     const health = await client.request('tools/list', {}, 'final-health');
     check(`${name}/final-health`, !health.error && Array.isArray(health.result?.tools));
     record.status = 'FINISHED';
@@ -125,6 +127,7 @@ try {
     ...['Cargo.toml', 'Cargo.lock', 'build.rs'].map((file) => path.join(repo, file)).filter(fs.existsSync)];
   const tracked = [...build, fileURLToPath(import.meta.url), path.join(repo, 'verification/live-acceptance/issue-162/inject-scenario.mjs'), path.join(repo, 'verification/live-acceptance/issue-162/string-scenario.mjs'), path.join(repo, 'verification/live-acceptance/csharp-compilation-identity/client.mjs')];
   tracked.push(path.join(repo, 'verification/live-acceptance/issue-162/member-scenario.mjs'));
+  tracked.push(path.join(repo, 'verification/live-acceptance/issue-162/functional-scenario.mjs'));
   report.binary = { path: binary, sha256: hash(fs.readFileSync(binary)), mtime: stat.mtime.toISOString() };
   report.inputs = tracked.map((file) => ({ file: path.relative(repo, file), sha256: hash(fs.readFileSync(file)) }));
   if (build.some((file) => fs.statSync(file).mtimeMs > stat.mtimeMs)) throw new Error('binary predates Rust/build inputs; rebuild');
@@ -138,24 +141,41 @@ try {
     'left.ts': leaf, 'right.ts': leaf,
     'feature.ts': "import { NgModule as Mod } from '@angular/core'; @Mod({}) export class FeatureModule {}",
     'barrel.ts': "export { FeatureModule as PublicFeature } from './feature';",
-    'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture, ...memberFixture,
+    'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture, ...memberFixture, ...functionalFixture,
   };
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare class InjectionToken<T> { constructor(description: string); }';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare function input<T>(value:T):unknown; export declare function output<T>():unknown;';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare const model: {required:<T>()=>unknown;};';
   for (const [name, text] of Object.entries(fixture)) write(name, text);
   report.fixture = fixture; report.ownerHash = hash(Buffer.from(app)); report.dashboardHash = hash(Buffer.from(dashboard)); save();
-  await session(binary, 'cold-warm-checkpoint', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts }) => {
+  await session(binary, 'cold-warm-checkpoint', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, functionalFacts }) => {
     for (const file of checkpointFiles) await call('compress_code_context', { filePath: path.join(root, file), fidelity: 'high' });
     await facts(['left.ts', 'right.ts']); await facts(['left.ts', 'right.ts']);
     await injectFacts(); await injectFacts();
     await constructorFacts(); await constructorFacts();
     await stringFacts(); await stringFacts();
     await memberFacts(); await memberFacts();
+    await functionalFacts(); await functionalFacts();
     for (const file of checkpointFiles) await call('save_context', { filePath: path.join(root, file) });
   });
-  await session(binary, 'restart-mutation-deletion', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, client }) => {
+  await session(binary, 'restart-mutation-deletion', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, functionalFacts, client }) => {
     for (const file of checkpointFiles) await call('restore_context', { filePath: path.join(root, file) });
+    await functionalFacts();
+    mutate('functional-right.ts', 'export interface AuditApi {}'); await functionalFacts({tokens:['functional-left.ts']});
+    mutate('functional-right.ts', 'export class AuditApi {}'); await functionalFacts();
+    mutate('node_modules/@angular/common/package.json', commonManifest(false)); await functionalFacts({http:false});
+    mutate('node_modules/@angular/common/package.json', commonManifest()); await functionalFacts();
+    mutate('functional-api.ts', functionalApi('@angular/common')); await functionalFacts({http:false});
+    mutate('functional-api.ts', functionalApi()); await functionalFacts();
+    const redirected = JSON.parse(fixture['tsconfig.json']);
+    redirected.compilerOptions.paths = {'@angular/common/http':['./functional-foreign.ts']};
+    mutate('tsconfig.json', JSON.stringify(redirected)); await functionalFacts({http:false});
+    mutate('tsconfig.json', fixture['tsconfig.json']); await functionalFacts();
+    mutate('functional.ts', 'export const ordinary=()=>true;'); await functionalFacts({owners:['functional-neighbor.ts']});
+    mutate('functional.ts', functionalSource); await functionalFacts();
+    mutate('functional.ts', functionalSource.replace("from '@angular/core'", "from './provider-foreign'"));
+    await functionalFacts({providerOwners:['functional-neighbor.ts']});
+    mutate('functional.ts', functionalSource); await functionalFacts();
     await memberFacts();
     mutate('member-api.ts', foreignMemberApi); await memberFacts([]);
     mutate('member-api.ts', memberApi); await memberFacts();
@@ -212,11 +232,14 @@ try {
   mutate('token-right.ts', 'export interface Dependency {}');
   mutate('string-values.ts', stringValues('other.api'));
   mutate('member-api.ts', foreignMemberApi);
-  await session(binary, 'stale-restore-refusal', async ({ client, facts, injectFacts, constructorFacts, stringFacts, memberFacts }) => {
+  mutate('node_modules/@angular/common/package.json', commonManifest(true, '20.0.1'));
+  await session(binary, 'stale-restore-refusal', async ({ client, facts, injectFacts, constructorFacts, stringFacts, memberFacts, functionalFacts }) => {
     for (const file of checkpointFiles) {
       const response = await client.request('tools/call', { name: 'restore_context', arguments: { workspaceRoot: root, filePath: path.join(root, file) } }, `stale-restore/${file}`);
       check(`stale-restore/rejected/${file}`, !!response.error || response.result?.isError === true, response);
     }
+    await functionalFacts();
+    mutate('node_modules/@angular/common/package.json', commonManifest()); await functionalFacts();
     await facts(['left.ts']);
     await memberFacts([]);
     mutate('member-api.ts', memberApi); await memberFacts();

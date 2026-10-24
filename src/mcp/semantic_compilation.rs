@@ -145,3 +145,15 @@ mod angular_functional_lifecycle_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_functional_roles_issue_162.rs"]
 mod angular_functional_roles_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_public_entry_lifecycle_issue_162.rs"]
+mod angular_public_entry_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_declaration_identity_issue_162.rs"]
+mod angular_provider_declaration_identity_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_declaration_lifecycle_issue_162.rs"]
+mod angular_provider_declaration_lifecycle_tests;

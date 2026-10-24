@@ -112,6 +112,32 @@ pub(crate) fn project_with_authority(
                 continue;
             }
         }
+        if canonical.is_none()
+            && let (Some(_), Some((id, array))) = (authority, retained)
+            && let Some(token_node) =
+                pair_value(entry, "provide", source.as_bytes()).or_else(|| {
+                    matches!(entry.kind(), "identifier" | "member_expression").then_some(entry)
+                })
+            && let Some(expression) = super::string_token_authority::provider_value(
+                array,
+                token_node.start_byte(),
+                token_node.end_byte(),
+            )
+            && let crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
+                crate::ir::typescript_resolution::Resolution::Resolved(token_id),
+            ) = &expression.value
+            && (entry.kind() == "object" || token_id.kind == "class_declaration")
+        {
+            let mut token = EntityRef::new("angular", "ProviderToken", &token_id.name)
+                .with_file(token_id.source.to_string_lossy().into_owned());
+            token.canonical = Some(
+                crate::layers::meta::canonical_endpoint::CanonicalEndpoint::Declaration {
+                    declaration: token_id.into(),
+                    site: None,
+                },
+            );
+            canonical = Some((super::string_token_authority::owner(id, owner_type), token));
+        }
         let token_label = canonical.as_ref().map(|(_, token)| token.name.clone());
         let Some(binding) = parse_provider(source_id, source, tree.root_node(), entry, token_label)
         else {
@@ -230,8 +256,11 @@ fn parse_provider(
     entry: tree_sitter::Node<'_>,
     proved_token_label: Option<String>,
 ) -> Option<ProviderBinding> {
-    if entry.kind() == "identifier" {
-        let identity = reference_identity(source_id, source, root, entry)?;
+    if entry.kind() == "identifier"
+        || (entry.kind() == "member_expression" && proved_token_label.is_some())
+    {
+        let identity =
+            proved_token_label.or_else(|| reference_identity(source_id, source, root, entry))?;
         return Some(ProviderBinding {
             token: identity.clone(),
             strategy: ProviderStrategy::Class,

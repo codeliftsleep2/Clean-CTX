@@ -6,6 +6,10 @@ use super::project::Project;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+#[path = "../../tests/ir/typescript_blocked_package_entry_issue_162.rs"]
+mod blocked_entry_tests;
+
 impl Resolver {
     pub(super) fn package_document(&mut self, path: &Path) -> Result<Option<Ordered>, String> {
         if let Some(source) = self.host.read(path) {
@@ -80,6 +84,20 @@ impl Resolver {
         project: &Project,
         exports_enabled: bool,
     ) -> Result<PathBuf, String> {
+        match self.package_reference_target(directory, specifier, project, exports_enabled)? {
+            super::module_resolution::ModuleTarget::Found(path) => Ok(path),
+            super::module_resolution::ModuleTarget::Absent(reason) => Err(reason.into()),
+        }
+    }
+
+    pub(super) fn package_reference_target(
+        &mut self,
+        directory: &Path,
+        specifier: &str,
+        project: &Project,
+        exports_enabled: bool,
+    ) -> Result<super::module_resolution::ModuleTarget, String> {
+        use super::module_resolution::ModuleTarget;
         let (package, subpath) = package_parts(specifier)?;
         if exports_enabled
             && let Some((_, (owner, json))) = self.nearest_manifest(directory)?
@@ -90,8 +108,16 @@ impl Resolver {
         {
             // A matching package self-reference is authoritative, including
             // blocked exports. Do not fall through to another installed copy.
-            let target = Self::mapped(exports, &subpath, project)?.ok_or("Self export blocked")?;
-            return self.package_target(&owner, &target, project);
+            let Some(target) = Self::mapped(exports, &subpath, project)? else {
+                return if explicit_export_block(exports, &subpath) {
+                    Ok(ModuleTarget::Absent("Self export blocked"))
+                } else {
+                    Err("Self export blocked".into())
+                };
+            };
+            return self
+                .package_target(&owner, &target, project)
+                .map(ModuleTarget::Found);
         }
         let boundary = self
             .host
@@ -105,28 +131,39 @@ impl Resolver {
                     .get("exports")
                     .filter(|value| exports_enabled && !matches!(value, Ordered::Null))
                 {
-                    let target = Self::mapped(exports, &subpath, project)?
-                        .ok_or("Package export blocked")?;
-                    return self.package_target(&owner, &target, project);
+                    let Some(target) = Self::mapped(exports, &subpath, project)? else {
+                        return if explicit_export_block(exports, &subpath) {
+                            Ok(ModuleTarget::Absent("Package export blocked"))
+                        } else {
+                            Err("Package export blocked".into())
+                        };
+                    };
+                    return self
+                        .package_target(&owner, &target, project)
+                        .map(ModuleTarget::Found);
                 }
                 let request = super::type_versions::entry_request(&json, &subpath);
                 if let Some(target) = self.type_version_target(&owner, &json, &request, project)? {
-                    return target.ok_or_else(|| "Versioned package target absent".into());
+                    return target
+                        .map(ModuleTarget::Found)
+                        .ok_or_else(|| "Versioned package target absent".into());
                 }
                 if subpath != "." {
                     return self
                         .probe(&owner.join(&subpath[2..]), project)
+                        .map(ModuleTarget::Found)
                         .ok_or_else(|| "Package subpath absent".into());
                 }
                 for field in ["types", "typings", "main"] {
                     if let Some(target) = json.get(field).and_then(Ordered::string)
                         && let Some(file) = self.probe(&owner.join(target), project)
                     {
-                        return Ok(file);
+                        return Ok(ModuleTarget::Found(file));
                     }
                 }
                 return self
                     .probe(&owner.join("index"), project)
+                    .map(ModuleTarget::Found)
                     .ok_or_else(|| "Package entry absent".into());
             }
             let candidate = if subpath == "." {
@@ -135,7 +172,7 @@ impl Resolver {
                 owner.join(&subpath[2..])
             };
             if let Some(file) = self.probe(&candidate, project) {
-                return Ok(file);
+                return Ok(ModuleTarget::Found(file));
             }
             if ancestor == boundary {
                 break;
@@ -173,6 +210,13 @@ impl Resolver {
         self.probe_file(&candidate, project)
             .ok_or_else(|| "Package target absent".into())
     }
+}
+
+/// Exact null subpaths in a valid subpath-keyed map prove absence. Other
+/// unmatched/unsupported mappings keep their existing error contract.
+fn explicit_export_block(exports: &Ordered, subpath: &str) -> bool {
+    matches!(exports, Ordered::Object(entries) if entries.iter().all(|(key,_)| key.starts_with('.')))
+        && matches!(exports.get(subpath), Some(Ordered::Null))
 }
 
 pub(super) fn package_parts(specifier: &str) -> Result<(String, String), String> {

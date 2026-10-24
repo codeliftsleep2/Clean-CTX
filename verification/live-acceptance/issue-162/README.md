@@ -2,6 +2,27 @@
 
 Agent: Agent MaxHeadRoom
 
+The provider declaration extension reuses both functional checkpoint sources
+and their existing token/interface mutation, restart, source replacement and
+stale-restore phases. FunctionalProviderHost registers two same-named tokens
+through aliases, repeats one registration and includes a refused type-only
+token. Exact public token-file/owner pairs and private endpoint separation are
+checked, including foreign-owner retraction without losing functional DI.
+No new sessions or runtime policy are added. This extension is UNRUN; it does
+not establish provider precedence, scope closure or consumer satisfaction.
+
+The functional/public-entry extension adds functional.ts and
+functional-neighbor.ts checkpoints and a hashed functional-scenario helper in
+the same three sessions. It checks CanMatchFn, generic ResolveFn and HTTP
+interceptor roles, distinct same-named token identities, deduplication, private
+canonical separation, inner-role decoy refusal, restart, token mutation,
+independent owner replacement, wrong HTTP entry/export-map/config mutation and
+package-version stale restore before reacquisition. The HTTP entry belongs to
+the separate @angular/common owning package. All fixture inputs exist before
+capture. This extension is authored and UNRUN; prior binary receipts cannot
+verify it. It is operator acceptance evidence, not tracked regression coverage
+or framework-wide completeness.
+
 The member extension adds two checkpoint sources and a hashed member-scenario
 helper inside the same three sessions. It checks exact HasInput/HasOutput sets
 for independent same-named owners, barrel/local/namespace APIs amid noise,
@@ -118,6 +139,15 @@ bounded existing native declaration-family case, not general type-checking parit
 The tracked merged-family durable test separately checks complete retained IDs/
 witnesses in session and index before query acquisition and retraction when the
 runtime class is removed.
+
+The generation-52 provider extension adds a separate shorthand-only owner to
+the existing functional helper. Local and namespace references must preserve two
+same-named class identities, deduplicate repeated registration and refuse a
+type-only token through restart, dependency mutation and foreign-owner refusal.
+Object-provider assertions remain independent. A rebuilt generation-52 binary
+receipt verifies this extension: report 2026-10-24T20-18-22-338Z-17500 records
+845/845 checks, three FINISHED sessions and no errors. This is operator binary
+evidence, separate from tracked Rust controls and final field acceptance.
 
 The generation-41 extension uses the same three fresh processes and database,
 adding strings.ts and string-neighbor.ts to the five-source checkpoint. Two

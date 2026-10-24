@@ -11,7 +11,7 @@ use std::{
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ProgramEvidence {
     pub config: PathBuf,
-    /// Requests whose relative candidate inventory was proved absent.
+    /// Requests proved absent by candidate inventory or an applicable export map.
     #[serde(default)]
     pub missing_modules: Vec<(PathBuf, super::module_references::ModuleReference)>,
     pub sources: Vec<PathBuf>,

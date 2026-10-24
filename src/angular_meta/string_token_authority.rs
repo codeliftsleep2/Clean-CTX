@@ -104,11 +104,28 @@ pub(super) fn provider_literal<'a>(
     start: usize,
     end: usize,
 ) -> Option<(&'a ExpressionFacet, Vec<u16>)> {
+    let value = provider_value(array, start, end)?;
+    authority.string_value(value).map(|units| (value, units))
+}
+
+/// Exact provider-position evidence is shared by string and declaration tokens.
+pub(super) fn provider_value(
+    array: &ExpressionFacet,
+    start: usize,
+    end: usize,
+) -> Option<&ExpressionFacet> {
     let ExpressionValue::Array(entries) = &array.value else {
         return None;
     };
     let mut candidates = Vec::new();
     for entry in entries {
+        if entry.start == start
+            && entry.end == end
+            && matches!(entry.value, ExpressionValue::Reference(_))
+        {
+            candidates.push(entry);
+            continue;
+        }
         let ExpressionValue::Object(fields) = &entry.value else {
             continue;
         };
@@ -119,12 +136,8 @@ pub(super) fn provider_literal<'a>(
         let Some((_, value)) = tokens.next() else {
             continue;
         };
-        if tokens.next().is_none()
-            && value.start == start
-            && value.end == end
-            && let Some(units) = authority.string_value(value)
-        {
-            candidates.push((value, units));
+        if tokens.next().is_none() && value.start == start && value.end == end {
+            candidates.push(value);
         }
     }
     if candidates.len() == 1 {

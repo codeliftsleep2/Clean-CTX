@@ -97,8 +97,7 @@ impl Resolver {
                 )
                 .map(ModuleTarget::Found);
         }
-        self.package_reference(directory, specifier, &project, exports_enabled)
-            .map(ModuleTarget::Found)
+        self.package_reference_target(directory, specifier, &project, exports_enabled)
     }
 
     pub(super) fn apply_request_conditions(
