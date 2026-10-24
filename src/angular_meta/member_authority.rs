@@ -25,7 +25,7 @@ pub(super) fn api<'a>(
     };
     let id = authority.value_reference_at(span)?;
     if !matches!(id.name.as_str(), "input" | "output" | "model")
-        || (required && id.name != "input")
+        || (required && !matches!(id.name.as_str(), "input" | "model"))
         || !roles::public_api(authority, id, "@angular/core", &id.name)
     {
         return None;

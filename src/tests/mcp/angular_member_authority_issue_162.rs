@@ -159,3 +159,50 @@ fn issue_162_member_authority_package_spelling_cannot_restore_foreign_owner_or_a
     );
     assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
 }
+
+#[test]
+fn issue_162_member_required_model_aliases_cannot_borrow_foreign_or_object_roles() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (root, state) = fixture();
+    let p = root.path();
+    std::fs::write(p.join("app.ts"), control()).unwrap();
+    assert_eq!(
+        members(&state, p),
+        expected(),
+        "nonempty established control"
+    );
+    let source = r#"
+import {Component} from '@angular/core';
+import {bind as localModel} from './api';
+import * as api from './api';
+import {model as foreignModel} from './foreign';
+const ordinary = {required:()=>0};
+const misleading = "selected=localModel.required();";
+function noise<T>(localModel:T) { return localModel; }
+@Component({}) export class Panel {
+ selected=localModel.required<string>();
+ other=api.bind.required<number>();
+ foreign=foreignModel.required<string>();
+ object=ordinary.required();
+ method(localModel:{required:()=>unknown}) { return localModel.required(); }
+}
+"#;
+    std::fs::write(p.join("app.ts"), source).unwrap();
+    let wanted: Vec<_> = [
+        ("HasInput", "other"),
+        ("HasInput", "selected"),
+        ("HasOutput", "other"),
+        ("HasOutput", "selected"),
+    ]
+    .into_iter()
+    .map(|(relation, member)| (relation.to_owned(), member.to_owned()))
+    .collect();
+    for _ in 0..2 {
+        assert_eq!(
+            members(&state, p),
+            wanted,
+            "required models retain the existing member projection through exact APIs"
+        );
+    }
+    assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
+}

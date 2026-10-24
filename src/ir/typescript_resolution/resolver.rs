@@ -21,6 +21,7 @@ pub(super) enum ExportSlot {
 pub(super) type ExportVisit = (PathBuf, ExportSlot, Namespace);
 
 pub(crate) struct Resolver {
+    pub(super) consumed_entries: Vec<super::package_evidence::ConsumedModuleEntry>,
     pub host: Host,
     pub(super) unbound_value_sites: BTreeSet<(PathBuf, usize, usize, String)>,
     pub(super) type_version_active: BTreeSet<(PathBuf, String)>,
@@ -130,6 +131,7 @@ impl Resolver {
     pub(crate) fn with_project(roots: &[PathBuf], project: Option<&Path>) -> Result<Self, String> {
         Ok(Self {
             host: Host::new(roots)?,
+            consumed_entries: Vec::new(),
             unbound_value_sites: BTreeSet::new(),
             type_version_active: BTreeSet::new(),
             alias_active: BTreeSet::new(),

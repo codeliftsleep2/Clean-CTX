@@ -6,6 +6,14 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
+            if matches!(
+                edge.relation,
+                crate::layers::meta::semantic::SemanticRelation::HasInput
+                    | crate::layers::meta::semantic::SemanticRelation::HasOutput
+            ) && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
+            {
+                return self.admits_member_pair(edge);
+            }
             let (subject, object) = match (&edge.subject.canonical, &edge.object.canonical) {
                 (None, None) => return true,
                 (Some(subject), Some(object)) => (subject, object),
@@ -20,6 +28,42 @@ impl TypeScriptAuthority {
                 && self.admits_endpoint(&edge.subject, subject)
                 && self.admits_endpoint(&edge.object, object)
         })
+    }
+
+    fn admits_member_pair(&self, edge: &SemanticEdge) -> bool {
+        let (
+            Some(CanonicalEndpoint::Declaration {
+                declaration: owner,
+                site: owner_site,
+            }),
+            Some(CanonicalEndpoint::Declaration {
+                declaration: member,
+                site: Some((start, end)),
+            }),
+        ) = (&edge.subject.canonical, &edge.object.canonical)
+        else {
+            return false;
+        };
+        let (Ok(field), Ok(initializer)) = (
+            crate::ir::invocation_evidence::SourceSpan::new(member.start, member.end),
+            crate::ir::invocation_evidence::SourceSpan::new(*start, *end),
+        ) else {
+            return false;
+        };
+        let Some(pair) = self.member_at(field, initializer) else {
+            return false;
+        };
+        let expected_owner: crate::layers::meta::canonical_endpoint::CanonicalDeclaration =
+            (&pair.owner).into();
+        let expected_member: crate::layers::meta::canonical_endpoint::CanonicalDeclaration =
+            (&pair.member).into();
+        *owner == expected_owner
+            && *member == expected_member
+            && *owner_site == Some((pair.owner.start, pair.owner.end))
+            && edge.subject.name == pair.owner.name
+            && edge.object.name == pair.member.name
+            && edge.subject.file.as_deref() == pair.owner.source.to_str()
+            && edge.object.file.as_deref() == pair.member.source.to_str()
     }
 
     fn admits_endpoint(&self, entity: &EntityRef, endpoint: &CanonicalEndpoint) -> bool {

@@ -46,6 +46,32 @@ pub(crate) fn decorator_role(
         .flatten()
 }
 
+/// A subpath claim requires consumed entry proof in addition to ownership.
+pub(crate) fn public_entry_api(
+    authority: &TypeScriptAuthority,
+    endpoint: &crate::ir::typescript_resolution::DeclarationId,
+    owner_package: &str,
+    entry: &str,
+    export_name: &str,
+    namespace: crate::ir::typescript_resolution::Namespace,
+) -> bool {
+    endpoint.name == export_name && authority.package_exports.iter().any(|package|
+        package.declaration == *endpoint && package.name == owner_package
+        && package.version.as_ref().is_some_and(|version| !version.is_empty())
+        && authority.witnesses.iter().any(|witness| matches!(witness,
+            Witness::Content {path,hash} if path == &package.manifest && hash == &package.manifest_hash))
+        && package.public_entries.iter().any(|proof|
+            proof.route.specifier == entry && proof.namespace == namespace
+            && proof.export_name == export_name && proof.route.resolution.is_ok()
+            && proof.public_export == Resolution::Resolved(endpoint.clone())
+            && ((proof.route.request == authority.source && proof.request_hash == authority.source_hash)
+                || authority.witnesses.iter().any(|witness| matches!(witness,
+                    Witness::Content {path,hash} if path == &proof.route.request && hash == &proof.request_hash)))
+            && proof.route.resolution.as_ref().is_ok_and(|target|
+                authority.witnesses.iter().any(|witness| matches!(witness,
+                    Witness::Content {path,hash} if path == target && hash == &proof.entry_hash)))))
+}
+
 pub(crate) fn declaration_role(
     authority: &TypeScriptAuthority,
     id: &crate::ir::typescript_resolution::DeclarationId,

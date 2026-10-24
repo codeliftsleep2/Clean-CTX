@@ -38,6 +38,21 @@ pub(crate) fn project_with_authority(
         if let Some((owner_type, owner, member, kind)) =
             signal_call(source_id, source, tree.root_node(), call, authority)
         {
+            let member_evidence = if let Some(authority) = authority {
+                let Some(context) = call.declaration_context() else {
+                    continue;
+                };
+                let Some(evidence) = authority.member_at(context.declaration(), call.span()) else {
+                    continue;
+                };
+                if evidence.owner.name != owner || evidence.member.name != member {
+                    continue;
+                }
+                Some(evidence)
+            } else {
+                None
+            };
+            let first = edges.len();
             let subject = EntityRef::new("angular", owner_type, owner);
             if matches!(kind, SignalApi::Input | SignalApi::Model) {
                 edges.push(SemanticEdge {
@@ -57,8 +72,29 @@ pub(crate) fn project_with_authority(
                     call_evidence: None,
                 });
             }
+            if let Some(evidence) = member_evidence {
+                use crate::layers::meta::canonical_endpoint::CanonicalEndpoint;
+                for edge in &mut edges[first..] {
+                    edge.subject.file = Some(evidence.owner.source.to_string_lossy().into_owned());
+                    edge.object.file = Some(evidence.member.source.to_string_lossy().into_owned());
+                    edge.subject.canonical = Some(CanonicalEndpoint::Declaration {
+                        declaration: (&evidence.owner).into(),
+                        site: Some((evidence.owner.start, evidence.owner.end)),
+                    });
+                    edge.object.canonical = Some(CanonicalEndpoint::Declaration {
+                        declaration: (&evidence.member).into(),
+                        site: Some(evidence.initializer),
+                    });
+                }
+            }
         }
-        if let Some((owner_type, owner, token)) =
+        if let Some(authority) = authority {
+            if let Some(edge) =
+                super::functional_authority::project(authority, tree.root_node(), call)
+            {
+                edges.push(edge);
+            }
+        } else if let Some((owner_type, owner, token)) =
             functional_inject(source_id, source, tree.root_node(), evidence, call)
         {
             edges.push(SemanticEdge {

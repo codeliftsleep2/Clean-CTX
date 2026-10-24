@@ -27,10 +27,19 @@ impl Resolver {
         specifier: &str,
         kind: ModuleRequestKind,
     ) -> Result<PathBuf, String> {
-        match self.module_request_target(file, specifier, kind)? {
-            ModuleTarget::Found(path) => Ok(path),
-            ModuleTarget::Absent(reason) => Err(reason.into()),
-        }
+        let resolution = match self.module_request_target(file, specifier, kind) {
+            Ok(ModuleTarget::Found(path)) => Ok(path),
+            Ok(ModuleTarget::Absent(reason)) => Err(reason.into()),
+            Err(error) => Err(error),
+        };
+        self.consumed_entries
+            .push(super::package_evidence::ConsumedModuleEntry {
+                request: file.to_path_buf(),
+                specifier: specifier.to_owned(),
+                kind,
+                resolution: resolution.clone(),
+            });
+        resolution
     }
 
     pub(super) fn module_request_target(

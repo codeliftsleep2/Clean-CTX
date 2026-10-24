@@ -3,6 +3,24 @@ use super::{DeclarationId, Namespace, Resolution, Resolver};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub(crate) struct ConsumedModuleEntry {
+    pub request: PathBuf,
+    pub specifier: String,
+    pub kind: super::module_resolution::ModuleRequestKind,
+    pub resolution: Result<PathBuf, String>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub(crate) struct PublicEntryEvidence {
+    pub route: ConsumedModuleEntry,
+    pub request_hash: String,
+    pub entry_hash: String,
+    pub namespace: Namespace,
+    pub export_name: String,
+    pub public_export: Resolution,
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub(crate) struct PackageExportEvidence {
     pub declaration: DeclarationId,
@@ -11,12 +29,23 @@ pub(crate) struct PackageExportEvidence {
     pub name: String,
     pub version: Option<String>,
     pub public_export: Resolution,
+    #[serde(default)]
+    pub public_entries: Vec<PublicEntryEvidence>,
 }
 
 pub(super) fn capture(
     resolver: &mut Resolver,
     request: &Path,
     sites: &[(usize, usize, Resolution)],
+) -> Vec<PackageExportEvidence> {
+    capture_in_namespace(resolver, request, sites, Namespace::Value)
+}
+
+pub(super) fn capture_in_namespace(
+    resolver: &mut Resolver,
+    request: &Path,
+    sites: &[(usize, usize, Resolution)],
+    namespace: Namespace,
 ) -> Vec<PackageExportEvidence> {
     let ids: BTreeSet<_> = sites
         .iter()
@@ -56,12 +85,48 @@ pub(super) fn capture(
                     .get("version")
                     .and_then(|value| value.string())
                     .map(str::to_string);
+                // Only already-consumed module requests supply entry demands.
+                // Do not derive entries from declaration paths or enumerate exports.
+                let mut routes = Vec::new();
+                for route in &resolver.consumed_entries {
+                    if (route.specifier == name || route.specifier.starts_with(&format!("{name}/")))
+                        && !routes.contains(route)
+                    {
+                        routes.push(route.clone());
+                    }
+                }
+                let mut public_entries = Vec::new();
+                for route in routes {
+                    let Ok(entry) = &route.resolution else {
+                        continue;
+                    };
+                    let Some(request_text) = resolver.host.read(&route.request) else {
+                        continue;
+                    };
+                    let Some(entry_text) = resolver.host.read(entry) else {
+                        continue;
+                    };
+                    let (ids, complete) = resolver.export_set(
+                        entry,
+                        &declaration.name,
+                        namespace,
+                        &mut BTreeSet::new(),
+                    );
+                    public_entries.push(PublicEntryEvidence {
+                        request_hash: crate::cache::content_hash(request_text.as_bytes()),
+                        entry_hash: crate::cache::content_hash(entry_text.as_bytes()),
+                        route,
+                        namespace,
+                        export_name: declaration.name.clone(),
+                        public_export: resolver.outcome(ids, complete),
+                    });
+                }
                 let public_export = match resolver.module(request, &name) {
                     Ok(entry) => {
                         let (ids, complete) = resolver.export_set(
                             &entry,
                             &declaration.name,
-                            Namespace::Value,
+                            namespace,
                             &mut BTreeSet::new(),
                         );
                         resolver.outcome(ids, complete)
@@ -75,6 +140,7 @@ pub(super) fn capture(
                     name,
                     version,
                     public_export,
+                    public_entries,
                 })
             })
             .collect()

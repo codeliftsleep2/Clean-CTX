@@ -121,3 +121,27 @@ mod angular_member_authority_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_member_lifecycle_issue_162.rs"]
 mod angular_member_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_member_identity_admission_issue_162.rs"]
+mod angular_member_identity_admission_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_functional_inject_authority_issue_162.rs"]
+mod angular_functional_inject_authority_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_functional_native_capture_issue_162.rs"]
+mod angular_functional_native_capture_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_functional_identity_issue_162.rs"]
+mod angular_functional_identity_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_functional_lifecycle_issue_162.rs"]
+mod angular_functional_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_functional_roles_issue_162.rs"]
+mod angular_functional_roles_tests;

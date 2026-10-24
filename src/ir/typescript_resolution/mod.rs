@@ -9,6 +9,7 @@ mod classic;
 mod compiler_libraries;
 mod constant_strings;
 pub(crate) mod constructor_parameters;
+pub(crate) mod member_declarations;
 
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_library_override_capture_issue_162.rs"]

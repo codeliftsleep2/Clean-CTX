@@ -2,6 +2,14 @@
 
 Agent: Agent MaxHeadRoom
 
+The member extension adds two checkpoint sources and a hashed member-scenario
+helper inside the same three sessions. It checks exact HasInput/HasOutput sets
+for independent same-named owners, barrel/local/namespace APIs amid noise,
+restart, foreign API mutation/repair, independent source replacement and stale
+restore before reacquisition. It certifies neither canonical member identity nor
+full AQ10 completeness. This extension is authored; execution requires a fresh
+operator receipt.
+
 This operator-run driver uses the established McpClient stdio transport and
 Node built-ins. It starts only the explicitly supplied binary; it does not build,
 install dependencies, start CBM, or contact external services. This is binary/MCP

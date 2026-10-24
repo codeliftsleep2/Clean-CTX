@@ -254,7 +254,9 @@ fn issue_162_inject_symbolic_payload_has_no_declaration_or_canonical_endpoint() 
         .collect();
     assert_eq!(symbolic.len(), 1);
     assert_eq!(
-        crate::dictionary::path::canonical_identity_key(symbolic[0].object.file.as_deref().unwrap()),
+        crate::dictionary::path::canonical_identity_key(
+            symbolic[0].object.file.as_deref().unwrap()
+        ),
         crate::dictionary::path::canonical_identity_key(&file.to_string_lossy()),
         "the compilation pipeline attaches asserting-source provenance"
     );

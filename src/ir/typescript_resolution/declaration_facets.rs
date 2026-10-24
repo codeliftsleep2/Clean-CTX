@@ -77,6 +77,24 @@ pub(super) fn capture(
         }) {
             demand.declaration(id);
         }
+        // Directly annotated source-owned callable declarations are demanded
+        // owners for the established functional consumers. Retain declaration
+        // proof without evaluating function bodies or visiting dependency owners.
+        if let Some(tree) = demand.resolver.source_tree(request) {
+            for id in declarations
+                .iter()
+                .filter(|id| id.kind == "variable_declarator")
+            {
+                if exact(tree.root_node(), id).is_some_and(|node| {
+                    node.child_by_field_name("type").is_some()
+                        && node.child_by_field_name("value").is_some_and(|value| {
+                            matches!(value.kind(), "arrow_function" | "function_expression")
+                        })
+                }) {
+                    demand.declaration(id);
+                }
+            }
+        }
         // Only references demanded by retained parameter decorators are roots;
         // this does not enumerate unrelated program initializers.
         for argument in parameters

@@ -486,9 +486,10 @@ pub(super) fn evaluate_if_applicable(
     );
     #[cfg(feature = "typescript")]
     let is_angular = is_angular
-        || context
-            .typescript_authority
-            .is_some_and(crate::angular_meta::class_role_authority::has_class_role);
+        || context.typescript_authority.is_some_and(|authority| {
+            crate::angular_meta::class_role_authority::has_class_role(authority)
+                || crate::angular_meta::functional_authority::has_role(authority)
+        });
     let testing_enabled = meta_config
         .map(|config| config.testing.enabled)
         .unwrap_or(true);

@@ -9,6 +9,8 @@ pub(crate) struct TypeScriptAuthority {
     pub source_hash: String,
     pub declarations: Vec<DeclarationId>,
     #[serde(default)]
+    pub member_declarations: Vec<super::member_declarations::MemberDeclaration>,
+    #[serde(default)]
     pub constructor_parameters: Vec<super::constructor_parameters::ConstructorParameter>,
     #[serde(default)]
     pub declaration_facets: Vec<super::declaration_facets::DeclarationFacet>,
@@ -88,6 +90,7 @@ impl TypeScriptAuthority {
             source_route: file.to_path_buf(),
             source_hash: crate::cache::content_hash(source.as_bytes()),
             declarations: Vec::new(),
+            member_declarations: Vec::new(),
             constructor_parameters: Vec::new(),
             declaration_facets: Vec::new(),
             references: Vec::new(),
@@ -135,6 +138,18 @@ impl TypeScriptAuthority {
                 .ok_or("Source outside authorized roots")?;
             resolver.host.seed(file, source)?;
             result.declarations = resolver.source_declarations(file)?;
+            result.member_declarations = super::member_declarations::capture(
+                &mut resolver,
+                file,
+                source,
+                &result.declarations,
+            );
+            result.declarations.extend(
+                result
+                    .member_declarations
+                    .iter()
+                    .map(|entry| entry.member.clone()),
+            );
             result.constructor_parameters = super::constructor_parameters::capture(
                 &mut resolver,
                 file,
@@ -178,6 +193,14 @@ impl TypeScriptAuthority {
             }
             result.package_exports =
                 super::package_evidence::capture(&mut resolver, file, &result.reference_sites);
+            result
+                .package_exports
+                .extend(super::package_evidence::capture_in_namespace(
+                    &mut resolver,
+                    file,
+                    &result.type_reference_sites,
+                    Namespace::Type,
+                ));
             let (facets, packages) = super::declaration_facets::capture(
                 &mut resolver,
                 file,

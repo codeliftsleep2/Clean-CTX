@@ -22,7 +22,9 @@ fn issue_162_retained_authority_survives_artifact_decomposition_into_durable_pay
     let mut config = crate::tests::test_config();
     config.persistence.enabled = true;
     config.persistence.db_path = database.to_string_lossy().into_owned();
-    config.additional_roots.push(root.path().to_string_lossy().into_owned());
+    config
+        .additional_roots
+        .push(root.path().to_string_lossy().into_owned());
     let state = crate::mcp::McpState::new(config);
     let artifact = crate::mcp::tool_helpers::compile_source_ir_candidate(
         file,
@@ -34,18 +36,26 @@ fn issue_162_retained_authority_survives_artifact_decomposition_into_durable_pay
     .expect("real compilation artifact");
 
     let authority = artifact.typescript_authority();
-    assert!(authority.disposition.is_none(), "{:?}", authority.disposition);
+    assert!(
+        authority.disposition.is_none(),
+        "{:?}",
+        authority.disposition
+    );
     assert!(authority.capture_current);
     let start = source.rfind("Local").unwrap();
-    assert!(authority.reference_sites.iter().any(|(from, to, result)| {
-        *from == start
-            && *to == start + "Local".len()
-            && matches!(result, Resolution::Resolved(id)
+    assert!(
+        authority.reference_sites.iter().any(|(from, to, result)| {
+            *from == start
+                && *to == start + "Local".len()
+                && matches!(result, Resolution::Resolved(id)
                 if id.name == "Leaf"
                     && id.source.ends_with("leaf.ts")
                     && id.source_hash == crate::cache::content_hash(leaf.as_bytes())
                     && id.start < id.end)
-    }), "nonempty exact aliased endpoint control: {:?}", authority.reference_sites);
+        }),
+        "nonempty exact aliased endpoint control: {:?}",
+        authority.reference_sites
+    );
     assert!(!authority.witnesses.is_empty());
     assert!(authority.witnesses.iter().all(|witness| witness.current()));
     let expected = serde_json::to_value(authority).unwrap();
@@ -63,15 +73,19 @@ fn issue_162_retained_authority_survives_artifact_decomposition_into_durable_pay
         }}),
         &state,
     );
-    let response = crate::protocol::captured_responses().pop().expect("MCP response");
+    let response = crate::protocol::captured_responses()
+        .pop()
+        .expect("MCP response");
     assert!(response.get("error").is_none(), "{response}");
     state.flush_persistence();
     let connection = rusqlite::Connection::open(&database).unwrap();
-    let persisted: String = connection.query_row(
-        "SELECT edges_json FROM semantic_edge_snapshots WHERE file_path = ?1",
-        [file],
-        |row| row.get(0),
-    ).expect("production persisted semantic snapshot");
+    let persisted: String = connection
+        .query_row(
+            "SELECT edges_json FROM semantic_edge_snapshots WHERE file_path = ?1",
+            [file],
+            |row| row.get(0),
+        )
+        .expect("production persisted semantic snapshot");
     let encoded: serde_json::Value = serde_json::from_str(&persisted).unwrap();
     assert_eq!(
         encoded.get("typescript_authority"),
@@ -80,7 +94,9 @@ fn issue_162_retained_authority_survives_artifact_decomposition_into_durable_pay
     );
     let restored: DurableSemanticSnapshot = serde_json::from_value(encoded).unwrap();
     assert_eq!(
-        serde_json::to_value(restored).unwrap().get("typescript_authority"),
+        serde_json::to_value(restored)
+            .unwrap()
+            .get("typescript_authority"),
         Some(&expected),
         "restoration must preserve all typed authority evidence"
     );

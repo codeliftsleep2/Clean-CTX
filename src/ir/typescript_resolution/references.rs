@@ -3,6 +3,85 @@ use super::{DeclarationId, Namespace, Resolution, Resolver};
 use crate::ir::typescript_identifier_binding::ValueDeclarationKind;
 use std::path::Path;
 
+/// Reuse lexical shadow proof before crossing a source-owned callable scope.
+/// This grants no import/API meaning and does not certify arbitrary scopes.
+fn callable_import_scope(
+    reference: tree_sitter::Node<'_>,
+    file: &Path,
+    source: &str,
+    root: tree_sitter::Node<'_>,
+) -> bool {
+    let mut receiver = reference;
+    while receiver.kind() == "member_expression" {
+        let Some(object) = receiver.child_by_field_name("object") else {
+            return false;
+        };
+        receiver = object;
+    }
+    if receiver.kind() != "identifier" {
+        return false;
+    }
+    let Some(file) = file.to_str() else {
+        return false;
+    };
+    let Ok(span) =
+        crate::ir::invocation_evidence::SourceSpan::new(receiver.start_byte(), receiver.end_byte())
+    else {
+        return false;
+    };
+    if !matches!(
+        crate::ir::typescript_identifier_binding::lookup_value_identifier_in_tree(
+            file, source, span, root
+        ),
+        Ok(None)
+    ) {
+        return false;
+    }
+    let Ok(name) = receiver.utf8_text(source.as_bytes()) else {
+        return false;
+    };
+    let mut parent = reference.parent();
+    let mut callable = false;
+    while let Some(node) = parent {
+        match node.kind() {
+            "program" => return callable,
+            "arrow_function" | "function_expression" => callable = true,
+            "class_body"
+            | "method_definition"
+            | "function_declaration"
+            | "generator_function"
+            | "generator_function_declaration"
+            | "for_statement"
+            | "for_in_statement"
+            | "catch_clause"
+            | "internal_module"
+            | "module" => return false,
+            "statement_block" => {
+                // The shared variable binder does not certify block-scoped
+                // class/function/enum declarations; refuse their names here.
+                let mut cursor = node.walk();
+                if node.named_children(&mut cursor).any(|child| {
+                    matches!(
+                        child.kind(),
+                        "class_declaration"
+                            | "abstract_class_declaration"
+                            | "function_declaration"
+                            | "enum_declaration"
+                    ) && child
+                        .child_by_field_name("name")
+                        .and_then(|id| id.utf8_text(source.as_bytes()).ok())
+                        == Some(name)
+                }) {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+        parent = node.parent();
+    }
+    false
+}
+
 impl Resolver {
     pub(super) fn value_reference(
         &mut self,
@@ -215,6 +294,7 @@ impl Resolver {
             }
             return Some(Resolution::Unresolved("Lexical scope is unresolved".into()));
         }
+        let callable_closed = callable_import_scope(reference, file, source, tree.root_node());
         let mut ancestor = reference.parent();
         let mut direct_field_initializer = false;
         let mut parameter_decorator = constructor_decorator;
@@ -277,7 +357,16 @@ impl Resolver {
                 ancestor = node.parent();
                 continue;
             }
-            // Nested lexical environments are not certified by this initial
+            if callable_closed
+                && matches!(
+                    node.kind(),
+                    "statement_block" | "arrow_function" | "function_expression"
+                )
+            {
+                ancestor = node.parent();
+                continue;
+            }
+            // Other nested lexical environments are not certified by this
             // occurrence adapter. Do not mistake an unsupported shadow for
             // the absence of a shadow and fall back to a module import.
             if matches!(

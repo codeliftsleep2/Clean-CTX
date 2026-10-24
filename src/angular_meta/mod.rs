@@ -35,6 +35,7 @@ pub(crate) mod detect;
 #[cfg(test)]
 mod detect_metrics;
 pub mod formly;
+pub(crate) mod functional_authority;
 #[cfg(feature = "typescript")]
 pub(crate) mod inject_authority;
 pub(crate) mod inject_evidence;

@@ -6,11 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { McpClient } from './csharp-compilation-identity/client.mjs';
 import { injectFixture, injectAssertions, constructorAssertions } from './issue-162/inject-scenario.mjs';
 import { stringFixture, stringValues, stringAssertions } from './issue-162/string-scenario.mjs';
+import { memberFixture, memberApi, foreignMemberApi, memberSource, memberAssertions } from './issue-162/member-scenario.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const output = path.join(repo, 'target/live-acceptance/issue-162', `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${process.pid}`);
 const root = path.join(output, 'workspace');
-const checkpointFiles = ['app.ts', 'dashboard.ts', 'di.ts', 'strings.ts', 'string-neighbor.ts'];
+const checkpointFiles = ['app.ts', 'dashboard.ts', 'di.ts', 'strings.ts', 'string-neighbor.ts', 'members.ts', 'member-neighbor.ts'];
 const hash = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
 const report = { agent: 'Agent MaxHeadRoom', category: 'operator binary/stdio; not Rust/CI or Claude field acceptance', status: 'INCOMPLETE', sessions: [], checks: [], errors: [], mutations: [] };
 fs.mkdirSync(root, { recursive: true });
@@ -99,7 +100,8 @@ async function session(binary, name, action) {
     const injectFacts = injectAssertions({ call, check, root, normalize, hash, fs, name });
     const constructorFacts = constructorAssertions({ call, check, root, normalize, hash, fs, name });
     const stringFacts = stringAssertions({ call, check, root, normalize, hash, fs, name });
-    await action({ call, facts, injectFacts, constructorFacts, stringFacts, client });
+    const memberFacts = memberAssertions({ call, check, root, normalize, name });
+    await action({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, client });
     const health = await client.request('tools/list', {}, 'final-health');
     check(`${name}/final-health`, !health.error && Array.isArray(health.result?.tools));
     record.status = 'FINISHED';
@@ -122,6 +124,7 @@ try {
   const build = [...inputs(path.join(repo, 'src')).filter((file) => file.endsWith('.rs')),
     ...['Cargo.toml', 'Cargo.lock', 'build.rs'].map((file) => path.join(repo, file)).filter(fs.existsSync)];
   const tracked = [...build, fileURLToPath(import.meta.url), path.join(repo, 'verification/live-acceptance/issue-162/inject-scenario.mjs'), path.join(repo, 'verification/live-acceptance/issue-162/string-scenario.mjs'), path.join(repo, 'verification/live-acceptance/csharp-compilation-identity/client.mjs')];
+  tracked.push(path.join(repo, 'verification/live-acceptance/issue-162/member-scenario.mjs'));
   report.binary = { path: binary, sha256: hash(fs.readFileSync(binary)), mtime: stat.mtime.toISOString() };
   report.inputs = tracked.map((file) => ({ file: path.relative(repo, file), sha256: hash(fs.readFileSync(file)) }));
   if (build.some((file) => fs.statSync(file).mtimeMs > stat.mtimeMs)) throw new Error('binary predates Rust/build inputs; rebuild');
@@ -135,21 +138,29 @@ try {
     'left.ts': leaf, 'right.ts': leaf,
     'feature.ts': "import { NgModule as Mod } from '@angular/core'; @Mod({}) export class FeatureModule {}",
     'barrel.ts': "export { FeatureModule as PublicFeature } from './feature';",
-    'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture,
+    'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture, ...memberFixture,
   };
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare class InjectionToken<T> { constructor(description: string); }';
+  fixture['node_modules/@angular/core/index.d.ts'] += ' export declare function input<T>(value:T):unknown; export declare function output<T>():unknown;';
+  fixture['node_modules/@angular/core/index.d.ts'] += ' export declare const model: {required:<T>()=>unknown;};';
   for (const [name, text] of Object.entries(fixture)) write(name, text);
   report.fixture = fixture; report.ownerHash = hash(Buffer.from(app)); report.dashboardHash = hash(Buffer.from(dashboard)); save();
-  await session(binary, 'cold-warm-checkpoint', async ({ call, facts, injectFacts, constructorFacts, stringFacts }) => {
+  await session(binary, 'cold-warm-checkpoint', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts }) => {
     for (const file of checkpointFiles) await call('compress_code_context', { filePath: path.join(root, file), fidelity: 'high' });
     await facts(['left.ts', 'right.ts']); await facts(['left.ts', 'right.ts']);
     await injectFacts(); await injectFacts();
     await constructorFacts(); await constructorFacts();
     await stringFacts(); await stringFacts();
+    await memberFacts(); await memberFacts();
     for (const file of checkpointFiles) await call('save_context', { filePath: path.join(root, file) });
   });
-  await session(binary, 'restart-mutation-deletion', async ({ call, facts, injectFacts, constructorFacts, stringFacts, client }) => {
+  await session(binary, 'restart-mutation-deletion', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, client }) => {
     for (const file of checkpointFiles) await call('restore_context', { filePath: path.join(root, file) });
+    await memberFacts();
+    mutate('member-api.ts', foreignMemberApi); await memberFacts([]);
+    mutate('member-api.ts', memberApi); await memberFacts();
+    mutate('members.ts', 'export class MemberPanel {}'); await memberFacts(['member-neighbor.ts']);
+    mutate('members.ts', memberSource); await memberFacts();
     await stringFacts();
     mutate('string-values.ts', stringValues('other.api')); await stringFacts('other.api');
     mutate('string-values.ts', stringValues()); await stringFacts();
@@ -200,12 +211,15 @@ try {
   mutate('right.ts', "export class Leaf {}");
   mutate('token-right.ts', 'export interface Dependency {}');
   mutate('string-values.ts', stringValues('other.api'));
-  await session(binary, 'stale-restore-refusal', async ({ client, facts, injectFacts, constructorFacts, stringFacts }) => {
+  mutate('member-api.ts', foreignMemberApi);
+  await session(binary, 'stale-restore-refusal', async ({ client, facts, injectFacts, constructorFacts, stringFacts, memberFacts }) => {
     for (const file of checkpointFiles) {
       const response = await client.request('tools/call', { name: 'restore_context', arguments: { workspaceRoot: root, filePath: path.join(root, file) } }, `stale-restore/${file}`);
       check(`stale-restore/rejected/${file}`, !!response.error || response.result?.isError === true, response);
     }
     await facts(['left.ts']);
+    await memberFacts([]);
+    mutate('member-api.ts', memberApi); await memberFacts();
     await injectFacts(['token-left.ts']);
     await constructorFacts([], ['token-left.ts']);
     await stringFacts('other.api');

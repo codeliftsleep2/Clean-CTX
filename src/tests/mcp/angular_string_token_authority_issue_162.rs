@@ -115,7 +115,9 @@ function unrelated<T>(value:T) {return value;}
             4,
             "equivalent strings deduplicate, distinct strings and a declaration remain distinct: {edges:?}"
         );
-        let mut expected = ["\"audit.api\"", "\"other.api\"", "\"AuditApi\"", "AuditApi"].map(str::to_owned).to_vec();
+        let mut expected = ["\"audit.api\"", "\"other.api\"", "\"AuditApi\"", "AuditApi"]
+            .map(str::to_owned)
+            .to_vec();
         expected.sort();
         assert_eq!(names(&edges), expected);
         assert!(
