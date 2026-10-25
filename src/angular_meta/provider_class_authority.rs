@@ -11,7 +11,11 @@ pub(super) fn pair(
     end: usize,
 ) -> Option<(EntityRef, EntityRef)> {
     let (owner, array) = super::string_token_authority::provider_array(authority, owner_name)?;
-    if owner.source != authority.source || owner.source_hash != authority.source_hash {
+    if owner.source != authority.source
+        || owner.source_hash != authority.source_hash
+        || array.start >= array.end
+        || array.end > owner.end
+    {
         return None;
     }
     let ExpressionValue::Array(entries) = &array.value else {
@@ -21,7 +25,7 @@ pub(super) fn pair(
         .iter()
         .filter(|entry| entry.start == start && entry.end == end);
     let entry = matches.next()?;
-    if matches.next().is_some() {
+    if matches.next().is_some() || !contains(array, entry) {
         return None;
     }
     let (token, target) = match &entry.value {
@@ -41,6 +45,15 @@ pub(super) fn pair(
         }
         _ => return None,
     };
+    if !contains(entry, token) || !contains(entry, target) {
+        return None;
+    }
+    if matches!(entry.value, ExpressionValue::Object(_))
+        && token.start < target.end
+        && target.start < token.end
+    {
+        return None;
+    }
     let ExpressionValue::Reference(Resolution::Resolved(target_id)) = &target.value else {
         return None;
     };
@@ -56,6 +69,10 @@ pub(super) fn pair(
         declaration_entity(id, "ProviderToken")
     };
     Some((token, declaration_entity(target_id, "ProviderClass")))
+}
+
+fn contains(container: &ExpressionFacet, value: &ExpressionFacet) -> bool {
+    container.start <= value.start && value.start < value.end && value.end <= container.end
 }
 
 fn declaration_entity(

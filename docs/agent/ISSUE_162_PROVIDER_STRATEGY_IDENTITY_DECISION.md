@@ -1,9 +1,52 @@
 # Issue #162: provider strategy relation identity
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-54 focused/pair/lifecycle controls GREEN; corrected binary acceptance PASS; remaining approval obligations open.
+Status: owner APPROVED; generation-55 focused controls GREEN and rebuilt binary acceptance PASS; broader certification remains open.
 
 ## Approved implementation checkpoint
+
+Generation-55 rebuilt binary report
+target/live-acceptance/issue-162/2026-10-25T03-42-21-209Z-24324/report.json records
+PASS: 1102 checks, 0 failed, no errors and all three sessions FINISHED. Binary
+SHA-256 5d43e0d52ce10fff41bbebb170ad8300b17e6371e3331d87777af032c19ae44a;
+mtime 2026-10-25T03:42:19.381Z. The operator also reports fmt and all-target/
+all-feature Clippy with -D warnings GREEN; separate gate receipt paths were not
+supplied. This supersedes post-repair pending statements below within the
+recorded scope. No production changes accompanied this receipt. Broader provider
+certification, the full repository final gate and final Claude field acceptance
+remain open.
+
+Operator provider55-*.log receipts record 51 passing test executions:
+17 provider, 6 provider semantics, 12 string, 14 module and both compatibility
+controls (1 each), with 0 failures/ignored and no reported warnings. The unchanged
+empty-span regression now passes, alongside pair/currentness/durable controls.
+This supersedes the repair's UNRUN checkpoint below. Post-repair lint and a
+rebuilt generation-55 binary run remain pending; generation-54 binary evidence
+does not verify this admission edit. No production change accompanied this receipt.
+
+The operator observed the occurrence-forgery test fail after its nonempty
+canonical baseline: an empty retained useClass span was admitted despite valid
+endpoints/source hash. Later claims about other malformed spans do not follow
+from that observation. Exact tests/isolated registration were frozen in stash
+349fb7344c2d4c1cdb093221d52c03e9c0f6bd05 and restored byte-identically:
+SHA-256 e75c1b5e3f3d33dd7902d1ae28d3204456c2db1890da319a68f0f2ff7ec15300.
+Normal index and HEAD were untouched.
+
+Generation 55 adds provider-local nonempty span/containment checks for the array,
+entry, token and target, and refuses overlapping token/strategy value occurrences
+in object entries. Decorator metadata can precede the class keyword; no false
+requirement places its array inside the written class body. The existing owner
+role/source/hash proof remains, with array end bounded by the owner end. No new
+carrier, resolver, cache, lifecycle or global admission rule was introduced.
+Compatibility advances because admission meaning changed. All post-repair
+controls are UNRUN; prior generation-54 binary receipts do not verify this edit.
+
+A further tracked occurrence-forgery control now requires a nonempty canonical
+class-strategy baseline, then corrupts only the retained useClass expression span
+while preserving resolved endpoints and asserting source/hash. Admission must
+refuse that pair. This control is UNRUN; no production change accompanies it.
+It directly tests the approval's exact provider occurrence requirement beyond
+the already verified crossed-pair and missing-field refusals.
 
 The operator reports fmt and all-target/all-feature Clippy with -D warnings
 GREEN after the additional currentness test. No separate gate receipt paths

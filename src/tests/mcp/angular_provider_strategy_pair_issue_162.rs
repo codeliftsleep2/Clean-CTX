@@ -2,6 +2,82 @@ use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 use serde_json::json;
 
 #[test]
+fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let p = root.path();
+    crate::tests::angular_authority_fixture::install(p);
+    std::fs::write(p.join("app.ts"), "import {Component} from '@angular/core'; class Token {} class Implementation {} @Component({providers:[{provide:Token,useClass:Implementation}]}) export class ProviderHost {}").unwrap();
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    config
+        .additional_roots
+        .push(p.to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    crate::protocol::captured_responses().clear();
+    crate::mcp::tools::dispatch_tools_call(
+        &json!(162),
+        "compress_code_context",
+        &json!({"arguments":{"workspaceRoot":p,"filePath":p.join("app.ts"),"fidelity":"high"}}),
+        &state,
+    );
+    let response = crate::protocol::captured_responses().pop().unwrap();
+    assert!(response.get("error").is_none(), "{response}");
+    let alias = state
+        .alias_for_path(&p.join("app.ts").to_string_lossy())
+        .unwrap();
+    let snapshot = state.semantic_snapshot(&alias).unwrap();
+    let pairs: Vec<_> = snapshot
+        .edges
+        .iter()
+        .filter(|edge| edge.relation == SemanticRelation::ProviderUsesClass)
+        .cloned()
+        .collect();
+    assert_eq!(pairs.len(), 1, "nonempty canonical class strategy control");
+    assert!(snapshot.authority.admits_relation_evidence(&pairs));
+    let mut forged = snapshot.authority.clone();
+    let mut changed = 0;
+    for facet in &mut forged
+        .typescript_authority
+        .as_mut()
+        .unwrap()
+        .declaration_facets
+    {
+        for decorator in &mut facet.decorators {
+            for argument in &mut decorator.arguments {
+                changed += corrupt_strategy_span(argument);
+            }
+        }
+    }
+    assert_eq!(changed, 1, "corrupt only the exact useClass occurrence");
+    assert!(
+        !forged.admits_relation_evidence(&pairs),
+        "valid endpoints and source hash cannot authorize a forged strategy occurrence span"
+    );
+}
+
+fn corrupt_strategy_span(
+    expression: &mut crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+) -> usize {
+    use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
+    match &mut expression.value {
+        ExpressionValue::Object(fields) => fields
+            .iter_mut()
+            .map(|(key, value)| {
+                if key == "useClass" {
+                    value.start = value.end;
+                    1
+                } else {
+                    corrupt_strategy_span(value)
+                }
+            })
+            .sum(),
+        ExpressionValue::Array(entries) => entries.iter_mut().map(corrupt_strategy_span).sum(),
+        _ => 0,
+    }
+}
+
+#[test]
 fn issue_162_provider_strategy_pair_refuses_crossed_and_missing_occurrences() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();

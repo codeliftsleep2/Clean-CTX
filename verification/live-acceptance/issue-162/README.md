@@ -151,6 +151,13 @@ sessions and no errors. The interface-mutation expectation correction and
 original failed evidence are documented in the provider strategy identity
 decision. This is operator binary evidence, not a Rust/CI or final field gate.
 
+After provider occurrence-span admission repair, generation-55 report
+2026-10-25T03-42-21-209Z-24324 records PASS: 1102/1102 checks, three FINISHED
+sessions and no errors, using rebuilt binary SHA-256
+5d43e0d52ce10fff41bbebb170ad8300b17e6371e3331d87777af032c19ae44a.
+The tracked forged-span regression is separate Rust evidence; no full repository
+or final field gate is implied by this operator acceptance run.
+
 The generation-53 extension adds an independent strategy-provider owner with
 namespace/barrel useClass and useFactory. Its registrations share the existing
 restart and mutation scenarios and additionally retract on a type-only strategy
