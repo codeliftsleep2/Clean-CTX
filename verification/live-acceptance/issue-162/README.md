@@ -158,6 +158,13 @@ sessions and no errors, using rebuilt binary SHA-256
 The tracked forged-span regression is separate Rust evidence; no full repository
 or final field gate is implied by this operator acceptance run.
 
+After the exact native value-reference occurrence join, generation-56 report
+2026-10-25T14-09-56-640Z-24816 records PASS: 1102/1102 checks, three FINISHED
+sessions and no errors. Rebuilt binary SHA-256:
+699bc887fb489df3ec1c9013cac67fca874de0705384c6a6039745200a7210ea.
+The tracked shifted-span regression is distinct Rust evidence; this receipt
+does not establish the full repository or final field gate.
+
 The generation-53 extension adds an independent strategy-provider owner with
 namespace/barrel useClass and useFactory. Its registrations share the existing
 restart and mutation scenarios and additionally retract on a type-only strategy

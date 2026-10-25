@@ -3,6 +3,15 @@ use serde_json::json;
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
+    forged_strategy_span(false);
+}
+
+#[test]
+fn issue_162_provider_strategy_pair_refuses_shifted_nonempty_occurrence_span() {
+    forged_strategy_span(true);
+}
+
+fn forged_strategy_span(shifted: bool) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
@@ -45,7 +54,7 @@ fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
     {
         for decorator in &mut facet.decorators {
             for argument in &mut decorator.arguments {
-                changed += corrupt_strategy_span(argument);
+                changed += corrupt_strategy_span(argument, shifted);
             }
         }
     }
@@ -58,6 +67,7 @@ fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
 
 fn corrupt_strategy_span(
     expression: &mut crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    shifted: bool,
 ) -> usize {
     use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
     match &mut expression.value {
@@ -65,14 +75,22 @@ fn corrupt_strategy_span(
             .iter_mut()
             .map(|(key, value)| {
                 if key == "useClass" {
-                    value.start = value.end;
+                    if shifted {
+                        value.start += 1;
+                        assert!(value.start < value.end, "forged span stays nonempty");
+                    } else {
+                        value.start = value.end;
+                    }
                     1
                 } else {
-                    corrupt_strategy_span(value)
+                    corrupt_strategy_span(value, shifted)
                 }
             })
             .sum(),
-        ExpressionValue::Array(entries) => entries.iter_mut().map(corrupt_strategy_span).sum(),
+        ExpressionValue::Array(entries) => entries
+            .iter_mut()
+            .map(|entry| corrupt_strategy_span(entry, shifted))
+            .sum(),
         _ => 0,
     }
 }

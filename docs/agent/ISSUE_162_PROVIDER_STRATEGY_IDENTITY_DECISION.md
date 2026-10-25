@@ -1,9 +1,51 @@
 # Issue #162: provider strategy relation identity
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-55 focused controls GREEN and rebuilt binary acceptance PASS; broader certification remains open.
+Status: owner APPROVED; generation-56 focused controls GREEN and rebuilt binary acceptance PASS; broader certification remains open.
 
 ## Approved implementation checkpoint
+
+Generation-56 rebuilt binary report
+target/live-acceptance/issue-162/2026-10-25T14-09-56-640Z-24816/report.json records
+PASS: 1102 checks, 0 failed, no errors and all three sessions FINISHED. Binary
+SHA-256 699bc887fb489df3ec1c9013cac67fca874de0705384c6a6039745200a7210ea;
+mtime 2026-10-25T14:09:51.644Z. Fmt and all-target/all-feature Clippy with
+-D warnings are operator-reported GREEN without separate receipt paths.
+This supersedes the post-repair pending checkpoints below. No production changes
+accompanied the receipt; no full repository gate, broader provider certification,
+final Claude field acceptance or #162 closure is claimed.
+
+Operator provider56-*.log receipts record 52 passing test executions:
+18 provider, 6 provider semantics, 12 string, 14 module and both compatibility
+controls (1 each), with 0 failures/ignored and no reported warnings. The unchanged
+shifted-span regression now passes alongside the empty-span, pairing and durable
+currentness controls. This supersedes the exact-reference repair's UNRUN
+checkpoint below. Post-repair lint and rebuilt generation-56 binary acceptance
+remain pending. No production changes accompanied this receipt.
+
+provider55-shifted-span-red.log records 0 passed, 1 failed, 0 ignored after its
+nonempty canonical baseline. A shifted nonempty strategy span was admitted.
+Exact tests/isolated registration were frozen in stash
+262373a6ca17bca90cdb8daebf511bcabfcd1c34 and restored byte-identically:
+SHA-256 cbaf1856c756c74227a45093e64275c4a9755a3d6d1a092bf7530a8e5652154c.
+Normal index and HEAD were untouched.
+
+Generation 56 joins the retained target expression span/ID to the existing
+TypeScriptAuthority::value_reference_at exact native value occurrence. Resolved
+reference tokens require that same join before string/declaration interpretation.
+Missing, competing or differently resolved occurrences cannot authorize the pair.
+This reuses the neutral accessor and existing captured reference_sites rather
+than adding a resolver, inventory or lifecycle. The prior containment guards
+remain; direct string-token proof retains its existing contract. Compatibility
+advances for changed admission meaning. All post-repair runtime controls are
+UNRUN; generation-55 GREEN/binary receipts do not verify this production edit.
+
+The next tracked occurrence control shifts the retained useClass start by one
+byte while preserving a nonempty span inside its entry, resolved endpoints and
+source/hash. It reuses the original malformed-span fixture; the empty-span test
+and all its assertions remain. This new control is UNRUN; no production change
+accompanies it. Bounds checking alone must not be claimed as exact occurrence
+validation until this separate obligation is resolved.
 
 Generation-55 rebuilt binary report
 target/live-acceptance/issue-162/2026-10-25T03-42-21-209Z-24324/report.json records

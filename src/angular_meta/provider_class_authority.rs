@@ -60,6 +60,18 @@ pub(super) fn pair(
     if target_id.kind != "class_declaration" {
         return None;
     }
+    let target_span =
+        crate::ir::invocation_evidence::SourceSpan::new(target.start, target.end).ok()?;
+    if authority.value_reference_at(target_span) != Some(target_id) {
+        return None;
+    }
+    if let ExpressionValue::Reference(Resolution::Resolved(id)) = &token.value {
+        let token_span =
+            crate::ir::invocation_evidence::SourceSpan::new(token.start, token.end).ok()?;
+        if authority.value_reference_at(token_span) != Some(id) {
+            return None;
+        }
+    }
     let token = if let Some(units) = authority.string_value(token) {
         super::string_token_authority::token(owner, token, &units, "ProviderToken")
     } else {

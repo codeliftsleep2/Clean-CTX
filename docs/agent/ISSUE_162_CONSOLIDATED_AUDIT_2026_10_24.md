@@ -28,7 +28,7 @@ specialized semantics, and trace contracts before removing compatibility paths.
 | Functional DI | Exact type-role/value API/token evidence and canonical declaration projection are integrated. Tracked guard/resolver/interceptor controls and functional lifecycle scenarios pass in their recorded scopes. This is not complete functional syntax or injector closure. |
 | Public package entry | Owning package and consumed public entry remain distinct. Wrong-root/foreign/corrupted proof and HTTP SQLite/config/export/version controls pass. Exact null export blocking preserves unrelated guard/resolver proof in the tracked mixed-role test. Other unproved map outcomes remain errors. |
 | Current native preservation/lint | Generation-50 native cohort: 318 passed with explicit erased_namespace_query exclusion. Generation-50 all-target/all-feature Clippy: successful, zero diagnostics. The excluded frontier is unresolved, not a full native gate pass. |
-| Current operator binary acceptance | Generation-55 report 2026-10-25T03-42-21-209Z-24324: 1102/1102 checks, three FINISHED sessions, no errors. Binary SHA-256 5d43e0d52ce10fff41bbebb170ad8300b17e6371e3331d87777af032c19ae44a. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
+| Current operator binary acceptance | Generation-56 report 2026-10-25T14-09-56-640Z-24816: 1102/1102 checks, three FINISHED sessions, no errors. Binary SHA-256 699bc887fb489df3ec1c9013cac67fca874de0705384c6a6039745200a7210ea. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
 
 The earlier binary mixed-role failure remains preserved; the unchanged driver
 passed only after the production repair. Test-trigger corrections in earlier
@@ -67,6 +67,25 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 ## Next demonstrated consumer dependency
 
 ### Provider strategy declaration identity control
+
+Generation-56 rebuilt binary acceptance is PASS: report
+2026-10-25T14-09-56-640Z-24816 records 1102/1102 checks, three FINISHED sessions
+and no errors. Fmt/Clippy GREEN are operator-reported without separate receipts.
+This supersedes the pending lint/binary statements below within the exercised
+scope. No production changes accompanied this receipt.
+
+Generation-56 focused receipts are GREEN: 52 passing test executions, no failures/
+ignored or reported warnings, including the unchanged shifted-span regression.
+This supersedes its post-repair UNRUN checkpoint below. Lint and rebuilt
+generation-56 binary acceptance remain pending; no production change accompanied
+the receipts.
+
+The shifted nonempty occurrence-span control exposed a further RED after the
+canonical baseline. Its unchanged bytes are frozen/restored, and generation 56
+now joins retained strategy/reference-token spans to the existing exact native
+value-reference accessor. No new acquisition owner or lifecycle was added.
+Post-repair verification is UNRUN; prior generation-55 receipts remain historical
+evidence for their narrower checks. See the strategy decision for exact hashes.
 
 Generation-55 rebuilt acceptance is PASS: report
 2026-10-25T03-42-21-209Z-24324 records 1102/1102 checks, three FINISHED sessions
