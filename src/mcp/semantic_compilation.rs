@@ -167,5 +167,13 @@ mod angular_provider_strategy_currentness_tests;
 mod angular_provider_factory_identity_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_value_identity_issue_162.rs"]
+mod angular_provider_value_identity_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_value_admission_issue_162.rs"]
+mod angular_provider_value_admission_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_provider_declaration_lifecycle_issue_162.rs"]
 mod angular_provider_declaration_lifecycle_tests;

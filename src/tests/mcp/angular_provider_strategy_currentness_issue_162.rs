@@ -20,7 +20,10 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
 
 fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str) {
     let factory = field == "useFactory";
-    let relation = if field == "useExisting" {
+    let value = field == "useValue";
+    let relation = if value {
+        "RegistersProvider"
+    } else if field == "useExisting" {
         "ProviderUsesExisting"
     } else if factory {
         "ProviderUsesFactory"
@@ -38,7 +41,7 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str)
         state,
         root,
         "workspace_query",
-        json!({"type":"forward_edges","domain":"angular","entity_type":"ProviderToken","name":"Token"}),
+        json!({"type":"forward_edges","domain":"angular","entity_type":if value {"Component"} else {"ProviderToken"},"name":if value {"ProviderHost"} else {"Token"}}),
     );
     assert!(response.get("error").is_none(), "{response}");
     let mut actual: Vec<_> = response["result"]["structuredContent"]["edges"]
@@ -47,6 +50,11 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str)
         .iter()
         .filter(|edge| edge["relation"] == relation)
         .map(|edge| {
+            if value {
+                return crate::dictionary::path::canonical_identity_key(
+                    edge["object"]["file"].as_str().unwrap(),
+                );
+            }
             assert_eq!(edge["object"]["name"], "Implementation");
             assert_eq!(
                 crate::dictionary::path::canonical_identity_key(
@@ -65,7 +73,11 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str)
     let mut expected = vec![crate::dictionary::path::canonical_identity_key(
         &root.join("local.ts").to_string_lossy(),
     )];
-    if remote {
+    if remote && value {
+        expected.push(crate::dictionary::path::canonical_identity_key(
+            &root.join("local.ts").to_string_lossy(),
+        ));
+    } else if remote {
         expected.push(crate::dictionary::path::canonical_identity_key(
             &root
                 .join(if factory {
@@ -98,6 +110,11 @@ fn issue_162_provider_existing_currentness_package_config_and_ambiguity() {
     currentness("useExisting");
 }
 
+#[test]
+fn issue_162_provider_value_currentness_package_config_and_ambiguity() {
+    currentness("useValue");
+}
+
 fn currentness(field: &str) {
     let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
@@ -121,12 +138,22 @@ fn currentness(field: &str) {
             if factory {
                 "export class Token {} export function Implementation(){return {};}"
             } else {
-                "export class Token {} export class Implementation {}"
+                "export class Token {} export class OtherToken {} export class Implementation {}"
             },
         )
         .unwrap();
         std::fs::write(p.join("erased.ts"), "export interface Implementation {}").unwrap();
         let source = SOURCE.replace("useClass", field);
+        let source = if field == "useValue" {
+            source
+                .replace("{Token,Implementation", "{Token,OtherToken,Implementation")
+                .replace(
+                    "provide:Token,useValue:remote",
+                    "provide:OtherToken,useValue:remote",
+                )
+        } else {
+            source
+        };
         std::fs::write(p.join("app.ts"), &source).unwrap();
         let original_config = std::fs::read(p.join("tsconfig.json")).unwrap();
         let mut config = crate::tests::test_config();

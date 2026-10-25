@@ -99,7 +99,23 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
         .iter()
         .map(|edge| (&edge.subject.canonical, &edge.object.canonical))
         .collect();
-    json!({"authority":snapshot.authority,"source_hash":snapshot.source_hash,"endpoints":endpoints,"strategies":strategies})
+    let values: Vec<_> = snapshot
+        .edges
+        .iter()
+        .filter(|edge| {
+            edge.relation == crate::layers::meta::semantic::SemanticRelation::ProviderUsesValue
+        })
+        .map(|edge| {
+            assert!(edge.subject.canonical.is_none() && edge.object.canonical.is_none());
+            (
+                &edge.subject.name,
+                &edge.subject.file,
+                &edge.object.name,
+                &edge.object.file,
+            )
+        })
+        .collect();
+    json!({"authority":snapshot.authority,"source_hash":snapshot.source_hash,"endpoints":endpoints,"strategies":strategies,"values":values})
 }
 
 fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
@@ -195,6 +211,25 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             proof["strategies"],
             "complete SQLite class strategy endpoints"
         );
+        let values: Vec<_> = durable["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|edge| edge["relation"] == "ProviderUsesValue")
+            .map(|edge| {
+                json!([
+                    edge["subject"]["name"],
+                    edge["subject"]["file"],
+                    edge["object"]["name"],
+                    edge["object"]["file"]
+                ])
+            })
+            .collect();
+        assert_eq!(
+            json!(values),
+            proof["values"],
+            "complete noncanonical value presentation"
+        );
     }
     drop(database);
     (root, config, expected)
@@ -268,7 +303,7 @@ fn strategy_answers(
     owners: usize,
     tokens: &[&str],
 ) {
-    if source == SOURCE {
+    if source.contains("useValue:") {
         return;
     }
     let factory = source.contains("useFactory:");
@@ -364,6 +399,11 @@ fn issue_162_provider_existing_lifecycle_restart_retains_exact_pairs() {
     restart(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
 }
 
+#[test]
+fn issue_162_provider_value_lifecycle_restart_retains_registration_and_legacy_projection() {
+    restart(&FACTORY_SOURCE.replace("useFactory", "useValue"));
+}
+
 fn restart(source: &str) {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config, expected) = setup(source);
@@ -378,7 +418,7 @@ fn restart(source: &str) {
         );
         assert!(response.get("error").is_none(), "{response}");
         assert_eq!(proof(&state, &file), expected, "before query reacquisition");
-        if source != SOURCE {
+        if !source.contains("useValue:") {
             assert_eq!(expected["strategies"].as_array().unwrap().len(), 3);
         }
         let owner = state.semantic_owner_path(&file);
@@ -420,6 +460,11 @@ fn issue_162_provider_factory_lifecycle_stale_repair_and_independent_retirement(
 #[test]
 fn issue_162_provider_existing_lifecycle_stale_repair_and_independent_retirement() {
     stale_tokens_repair_and_retirement(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
+}
+
+#[test]
+fn issue_162_provider_value_lifecycle_stale_repair_and_independent_retirement() {
+    stale_tokens_repair_and_retirement(&FACTORY_SOURCE.replace("useFactory", "useValue"));
 }
 
 #[test]

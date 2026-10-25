@@ -45,6 +45,9 @@ export class FactoryPairProviderHost {}
  {provide:Right,useExisting:factoryRight.makeAudit},{provide:Left,useExisting:'audit.target'},
  {provide:'audit.alias',useExisting:Left},{provide:'audit.source',useExisting:'audit.target'}]})
 export class ExistingPairProviderHost {}
+@View({providers:[{provide:Left,useValue:factoryLeft.makeAudit},
+ {provide:Right,useValue:factoryRight.makeAudit},{provide:Left,useValue:factoryLeft.makeAudit}]})
+export class ValueReferenceProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
@@ -83,14 +86,16 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/${kind}/exact-owner-token-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/${kind}/canonical-private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
-    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost']) {
+    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost','ValueReferenceProviderHost']) {
       const providers = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Component',name:providerName});
       const registrations = providers.structuredContent?.edges;
       check(`${label}/${providerName}/structured`,Array.isArray(registrations),providers);
       const selectedProviders = registrations.filter(edge => edge.relation === 'RegistersProvider');
       const actualProviders = selectedProviders.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
       const registrationTokens = providerName === 'StrategyProviderHost' && !implementation
-        ? tokens.filter(token => token !== 'functional-left.ts') : tokens;
+        ? tokens.filter(token => token !== 'functional-left.ts')
+        : providerName === 'ValueReferenceProviderHost' && !factoryRight
+          ? tokens.filter(token => token !== 'functional-right.ts') : tokens;
       const expectedProviders = (providerName === 'StrategyProviderHost' ? strategyOwners : providerOwners).flatMap(file => registrationTokens.map(token =>
         [normalize(path.join(root,file)),'AuditApi',normalize(path.join(root,token))])).sort();
       check(`${label}/${providerName}/exact-declaration-identities`,JSON.stringify(actualProviders) === JSON.stringify(expectedProviders),{actualProviders,expectedProviders});
@@ -167,6 +172,17 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/existing-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/existing-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
+    const values = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:'AuditApi'});
+    const valueEdges = values.structuredContent?.edges;
+    check(`${label}/value-reference/structured`,Array.isArray(valueEdges),values);
+    const valueProjection = valueEdges.filter(edge => edge.relation === 'ProviderUsesValue' && edge.object.name === 'makeAudit');
+    // This legacy projection intentionally cannot distinguish equal value labels.
+    const valueOwners = tokens.includes('functional-left.ts') || (factoryRight && tokens.includes('functional-right.ts')) ? providerOwners : [];
+    check(`${label}/value-reference/legacy-count`,valueProjection.length === valueOwners.length,valueProjection);
+    check(`${label}/value-reference/private`,valueProjection.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)),valueProjection);
+    const valueProvenance = valueProjection.map(edge => normalize(edge.object.file)).sort();
+    const expectedValueProvenance = valueOwners.map(owner => normalize(path.join(root,owner))).sort();
+    check(`${label}/value-reference/asserting-source`,JSON.stringify(valueProvenance) === JSON.stringify(expectedValueProvenance),{valueProvenance,expectedValueProvenance});
     const decoy = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Guard',name:'loose'});
     const edges = decoy.structuredContent?.edges;
     check(`${label}/decoy-structured`,Array.isArray(edges),decoy);

@@ -183,6 +183,15 @@ checks, three FINISHED sessions and no errors. Rebuilt binary SHA-256:
 4533863e18facb9552e0a9fc4ee4042ff6f64bb9dbd1c18f034b6701e494410c.
 This is operator binary evidence, distinct from Rust/CI and final field gates.
 
+The generation-59 reference-value extension verifies canonical registration
+origins through the existing sessions and separately checks the legacy value
+presentation's same-label deduplication and asserting-source metadata. The first
+run's incorrect absent-file expectation is preserved in the value-reference
+decision record. Corrected report 2026-10-25T19-21-16-341Z-16680 records PASS:
+1660/1660 checks, three FINISHED sessions and no errors. Rebuilt binary SHA-256:
+aa2a64437fc940fd01f620ada9228018bbdb65745d6d302a10a53e3f127ef685.
+This does not establish canonical runtime-value identity or injector closure.
+
 The generation-53 extension adds an independent strategy-provider owner with
 namespace/barrel useClass and useFactory. Its registrations share the existing
 restart and mutation scenarios and additionally retract on a type-only strategy

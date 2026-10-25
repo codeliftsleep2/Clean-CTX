@@ -4,6 +4,12 @@ Agent: Agent MaxHeadRoom
 Date: 2026-10-24
 Status: bounded source/receipt reconciliation; migration remains IN PROGRESS.
 
+For the current owner-facing work breakdown and finish criteria, use the
+[remaining-work checklist](ISSUE_162_REMAINING_WORK.md). It maps all 26 AQ
+questions into 12 implementation packages and 3 final gates, distinguishes
+bounded verified slices from open broad contracts, and locates the current
+useValue RED. This audit remains the chronological evidence record.
+
 ## Governing scope and evidence limits
 
 The owner-accepted question-driven scope in
@@ -28,7 +34,7 @@ specialized semantics, and trace contracts before removing compatibility paths.
 | Functional DI | Exact type-role/value API/token evidence and canonical declaration projection are integrated. Tracked guard/resolver/interceptor controls and functional lifecycle scenarios pass in their recorded scopes. This is not complete functional syntax or injector closure. |
 | Public package entry | Owning package and consumed public entry remain distinct. Wrong-root/foreign/corrupted proof and HTTP SQLite/config/export/version controls pass. Exact null export blocking preserves unrelated guard/resolver proof in the tracked mixed-role test. Other unproved map outcomes remain errors. |
 | Current native preservation/lint | Generation-50 native cohort: 318 passed with explicit erased_namespace_query exclusion. Generation-50 all-target/all-feature Clippy: successful, zero diagnostics. The excluded frontier is unresolved, not a full native gate pass. |
-| Current operator binary acceptance | Generation-58 report 2026-10-25T17-34-16-718Z-26952: 1499/1499 checks, three FINISHED sessions, no errors. Binary SHA-256 4533863e18facb9552e0a9fc4ee4042ff6f64bb9dbd1c18f034b6701e494410c. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
+| Current operator binary acceptance | Generation-59 corrected report 2026-10-25T19-21-16-341Z-16680: 1660/1660 checks, three FINISHED sessions, no errors. Binary SHA-256 aa2a64437fc940fd01f620ada9228018bbdb65745d6d302a10a53e3f127ef685. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
 
 The earlier binary mixed-role failure remains preserved; the unchanged driver
 passed only after the production repair. Test-trigger corrections in earlier
@@ -48,7 +54,7 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Template ownership | Current evaluator still calls component_template_edge from class metadata. Complete retained template-source ownership/lifecycle not established by this audit. |
 | Selector resolution | Required closed visible-declaration universe remains open. No new source conformance review performed here. |
 | Routing | Default evaluator still delegates to routing shape extraction. Full API/target/config migration is required and not certified here. |
-| Providers/DI | Declaration/string registration and shorthand slices have bounded GREEN receipts. Strategy references still use legacy identifier lookup; namespace strategy preservation is the next tracked control below. Injector closure remains open. |
+| Providers/DI | Declaration/string registration, class/factory declaration strategies and useExisting aliases have bounded GREEN receipts through generation 58. useValue reference admission is the current valid RED and owner decision; broad provider forms, scope/precedence and injector closure remain open. |
 | Member semantics | Direct signal-member declarations and functional consumption are bounded GREEN; public aliases, inherited members and related full question contracts remain open. |
 | Signals | signals.rs still uses source/import text to nominate extraction. Complete API-role/reference migration and versioned forms remain unverified. |
 | NgRx | Default evaluator still delegates to existing NgRx shape/edge producers; object-action code retains bounded import helpers. #152 preservation does not certify the #162-wide canonical neighborhood. |
@@ -65,6 +71,57 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Other discovered consumers | Inventory is not closed. New consumers must be added against their canonical questions without compiler-parity drift. |
 
 ## Next demonstrated consumer dependency
+
+### Reference-valued provider control
+
+V4 corrected binary acceptance is PASS: report 2026-10-25T19-21-16-341Z-16680
+records 1660/1660 checks, three FINISHED sessions and no errors. Fmt/Clippy/
+syntax GREEN are operator-reported without separate receipt paths. V1–V4 closes
+the bounded reference-admission slice only. W04's remaining six obligation
+groups are reconciled in the remaining-work checklist; no new implementation
+slice was selected during that reconciliation.
+
+V2/V3 batched deterministic verification is GREEN: provider59-*.log records
+73 passing test executions, no failures/ignored or reported warnings. The valid
+unchanged RED and the authored refusal/durable/currentness controls pass. V4
+lint/rebuilt acceptance is pending; no production changes accompanied receipts.
+
+W04 V1 is explicitly approved. Generation-59 native reference admission and
+batched V2/V3 refusal/durable/currentness controls are authored; unchanged RED
+bytes are frozen/restored. The V4 helper extension is also authored. All runtime
+verification is pending. See the value-reference decision and remaining-work
+checklist for exact scope and the requirement to reconcile W04 after V4.
+
+The corrected run is valid RED: provider-value-reference-red-rerun.log records
+0 passed, 1 failed, 0 ignored after the ordinary control passed. Mixed alias/
+namespace value references returned zero registrations instead of two; later
+assertions remain unclassified. The
+[reference admission decision](ISSUE_162_PROVIDER_VALUE_REFERENCE_DECISION.md)
+requests native reference admission only, explicitly deferring canonical runtime
+value identity. Owner approval is pending; no production repair was made.
+
+The first run failed at the ordinary control (0 registrations instead of 2),
+before the intended mixed-route assertion. This is not valid behavioral RED
+for that assertion. The control incorrectly used aliased value imports even
+though provider_semantics::reference_identity calls bind_named_value_import
+with allow_alias=false. Original test/log bytes and hashes are preserved under
+target/issue-162/provider-value-control-correction/.
+
+The ordinary control now uses an unaliased imported value and two distinct
+tokens (one imported, one local), still requiring two registrations. The later
+aliased/namespace scenario, expected count, provenance and repeated-query
+assertions are unchanged. This is a control correction, not production repair
+or GREEN evidence. The corrected test is UNRUN; no production code changed.
+
+AQ08 also requires useValue. A new tracked control first requires two ordinary
+reference-valued provider registrations, then uses a namespace/barrel value
+reference with same-named declarations, repeated registration and unrelated
+generic/prose noise. It checks only registration preservation/provenance, not
+literal value equality, evaluation, runtime construction or injector satisfaction.
+The current value_identity helper accepts identifier references and selected
+literal spellings but not namespace references. This control is UNRUN; no
+production repair or new value-identity policy accompanies it. Value strategy
+authority remains outside prior class/factory/alias approvals.
 
 ### Existing-provider registration control
 

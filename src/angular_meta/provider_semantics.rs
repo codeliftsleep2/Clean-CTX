@@ -166,13 +166,21 @@ pub(crate) fn project_with_authority(
             canonical = Some((super::string_token_authority::owner(id, owner_type), token));
         }
         let token_label = canonical.as_ref().map(|(_, token)| token.name.clone());
+        if authority.is_some()
+            && retained.is_some()
+            && canonical.is_none()
+            && pair_value(entry, "useValue", source.as_bytes())
+                .is_some_and(|node| matches!(node.kind(), "identifier" | "member_expression"))
+        {
+            continue;
+        }
         let Some(binding) = parse_provider(
             source_id,
             source,
             tree.root_node(),
             entry,
             token_label,
-            retained.map(|(_, array)| array),
+            retained.and_then(|(_, array)| authority.map(|authority| (authority, array))),
         ) else {
             continue;
         };
@@ -321,7 +329,10 @@ fn parse_provider(
     root: tree_sitter::Node<'_>,
     entry: tree_sitter::Node<'_>,
     proved_token_label: Option<String>,
-    retained_array: Option<&crate::ir::typescript_resolution::declaration_facets::ExpressionFacet>,
+    retained_array: Option<(
+        &crate::ir::typescript_resolution::TypeScriptAuthority,
+        &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    )>,
 ) -> Option<ProviderBinding> {
     if entry.kind() == "identifier"
         || (entry.kind() == "member_expression" && proved_token_label.is_some())
@@ -354,35 +365,70 @@ fn parse_provider(
     }
     let endpoint = match strategy {
         ProviderStrategy::Class | ProviderStrategy::Factory => {
-            if let Some(array) = retained_array {
+            if let Some((authority, array)) = retained_array {
                 let field = if matches!(strategy, ProviderStrategy::Class) {
                     "useClass"
                 } else {
                     "useFactory"
                 };
-                let expression = super::string_token_authority::provider_field(
+                proved_reference(
+                    authority,
                     array,
                     field,
-                    endpoint_node.start_byte(),
-                    endpoint_node.end_byte(),
-                )?;
-                let crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
-                    crate::ir::typescript_resolution::Resolution::Resolved(id),
-                ) = &expression.value else {
-                    return None;
-                };
-                id.name.clone()
+                    SourceSpan::new(endpoint_node.start_byte(), endpoint_node.end_byte()).ok()?,
+                )?
+                .name
+                .clone()
             } else {
                 reference_identity(source_id, source, root, endpoint_node)?
             }
         }
-        ProviderStrategy::Value => value_identity(source_id, source, root, endpoint_node)?,
+        ProviderStrategy::Value => {
+            if let Some((authority, array)) = retained_array
+                && matches!(endpoint_node.kind(), "identifier" | "member_expression")
+            {
+                proved_reference(
+                    authority,
+                    array,
+                    "useValue",
+                    SourceSpan::new(endpoint_node.start_byte(), endpoint_node.end_byte()).ok()?,
+                )?
+                .name
+                .clone()
+            } else {
+                value_identity(source_id, source, root, endpoint_node)?
+            }
+        }
     };
     Some(ProviderBinding {
         token,
         strategy,
         endpoint,
     })
+}
+
+/// Retained provider fields and the exact native occurrence must agree.
+pub(crate) fn proved_reference<'a>(
+    authority: &'a crate::ir::typescript_resolution::TypeScriptAuthority,
+    array: &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    field: &str,
+    span: SourceSpan,
+) -> Option<&'a crate::ir::typescript_resolution::DeclarationId> {
+    let expression = super::string_token_authority::provider_field(
+        array,
+        field,
+        span.start_byte(),
+        span.end_byte(),
+    )?;
+    let crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
+        crate::ir::typescript_resolution::Resolution::Resolved(id),
+    ) = &expression.value
+    else {
+        return None;
+    };
+    authority
+        .value_reference_at(span)
+        .filter(|native| *native == id)
 }
 
 fn token_identity(
