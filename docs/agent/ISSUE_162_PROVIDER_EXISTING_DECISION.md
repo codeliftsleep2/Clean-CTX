@@ -5,6 +5,30 @@ Status: owner APPROVED; generation-58 focused/pair/durable/currentness controls 
 
 ## Approved implementation checkpoint
 
+The operator reports post-boundary-extension fmt and all-target/all-feature
+Clippy with -D warnings GREEN. Separate receipt paths were not supplied. This
+supersedes the unreported lint checkpoint below. No production change or binary
+rebuild was required for this test-only extension; broader certification and
+final field acceptance remain open.
+
+Operator provider58-boundary.log records 30 passed, 0 failed, 0 ignored with
+no reported warnings. The boundary_ filter selected additional repository tests
+alongside the two provider boundary cases; this count is not a provider-only
+count. Both alias and factory boundary controls completed, including refusal/
+repair and callable-object token versus factory compatibility assertions.
+This supersedes the post-checkpoint boundary control's UNRUN statement below.
+No production change accompanied the test extension. Its post-extension fmt/
+Clippy gates remain unreported; the generation-58 binary receipt continues to
+verify the unchanged production/harness scope recorded below.
+
+Post-checkpoint boundary control: the existing provider refusal fixture now has
+an explicit alias case requiring foreign owner, type-only/missing target,
+duplicate/competing fields, missing provide/strategy and call-expression refusal,
+with repair after each. Callable variable targets must remain canonical tokens
+for aliases while retaining noncanonical factory compatibility behavior. This
+distinguishes token identity from invocation semantics. The new control is
+UNRUN; no production change or semantic generation advance accompanies it.
+
 Generation-58 rebuilt binary report
 target/live-acceptance/issue-162/2026-10-25T17-34-16-718Z-26952/report.json records
 PASS: 1499 checks, 0 failed, no errors and all three sessions FINISHED. Binary

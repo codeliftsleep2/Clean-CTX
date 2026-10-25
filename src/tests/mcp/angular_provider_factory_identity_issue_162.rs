@@ -13,6 +13,15 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
 
 #[test]
 fn issue_162_provider_factory_callable_boundary_preserves_legacy_and_refuses_bad_roles() {
+    provider_boundary(false);
+}
+
+#[test]
+fn issue_162_provider_existing_boundary_refuses_invalid_owner_fields_and_targets() {
+    provider_boundary(true);
+}
+
+fn provider_boundary(existing: bool) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
@@ -26,6 +35,18 @@ fn issue_162_provider_factory_callable_boundary_preserves_legacy_and_refuses_bad
     let declaration = "export function makeAudit(){return {};}";
     std::fs::write(p.join("factory.ts"), declaration).unwrap();
     let source = "import {Component as View} from '@angular/core'; import {Token} from './token'; import {makeAudit as Build} from './factory'; @View({providers:[{provide:Token,useFactory:Build}]}) export class ProviderHost {}";
+    let field = if existing {
+        "useExisting"
+    } else {
+        "useFactory"
+    };
+    let source = source.replace("useFactory", field);
+    let source = source.as_str();
+    let relation = if existing {
+        SemanticRelation::ProviderUsesExisting
+    } else {
+        SemanticRelation::ProviderUsesFactory
+    };
     std::fs::write(p.join("app.ts"), source).unwrap();
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
@@ -47,7 +68,7 @@ fn issue_162_provider_factory_callable_boundary_preserves_legacy_and_refuses_bad
         snapshot
             .edges
             .iter()
-            .filter(|edge| edge.relation == SemanticRelation::ProviderUsesFactory)
+            .filter(|edge| edge.relation == relation)
             .cloned()
             .collect::<Vec<_>>()
     };
@@ -66,21 +87,32 @@ fn issue_162_provider_factory_callable_boundary_preserves_legacy_and_refuses_bad
             "preserve existing callable-variable projection"
         );
         assert_eq!(legacy[0].object.name, "makeAudit");
-        assert!(
-            legacy[0].subject.canonical.is_none() && legacy[0].object.canonical.is_none(),
-            "callable variables gain no canonical factory authority"
-        );
+        if existing {
+            assert!(
+                legacy[0].subject.canonical.is_some() && legacy[0].object.canonical.is_some(),
+                "alias target is the callable object token, without factory execution"
+            );
+        } else {
+            assert!(
+                legacy[0].subject.canonical.is_none() && legacy[0].object.canonical.is_none(),
+                "callable variables gain no canonical factory authority"
+            );
+        }
     }
     std::fs::write(p.join("factory.ts"), declaration).unwrap();
+    let written = format!("{field}:Build");
     for refused in [
         source.replace("from '@angular/core'", "from './foreign'"),
         source.replace(
             "import {makeAudit as Build}",
             "import type {makeAudit as Build}",
         ),
-        source.replace("useFactory:Build", "useFactory:Build,useFactory:Build"),
-        source.replace("useFactory:Build", "useFactory:Build,useClass:Token"),
-        source.replace("useFactory:Build", "useFactory:Missing"),
+        source.replace(&written, &format!("{written},{written}")),
+        source.replace(&written, &format!("{written},useClass:Token")),
+        source.replace(&written, &format!("{field}:Missing")),
+        source.replace(&written, &format!("{field}:Build()")),
+        source.replace("provide:Token,", ""),
+        source.replace(&format!(",{written}"), ""),
     ] {
         std::fs::write(p.join("app.ts"), refused).unwrap();
         assert!(

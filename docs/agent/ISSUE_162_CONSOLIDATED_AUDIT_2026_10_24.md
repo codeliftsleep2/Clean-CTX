@@ -68,6 +68,12 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 
 ### Existing-provider registration control
 
+Post-checkpoint boundary_ batch is GREEN: provider58-boundary.log records
+30 passed, no failures/ignored or reported warnings. This filter includes other
+repository boundary tests as well as the alias/factory provider cases; it is
+not a provider-only count. No production change accompanied this test extension.
+Post-extension fmt/Clippy remains unreported.
+
 Generation-58 rebuilt acceptance is PASS: report
 2026-10-25T17-34-16-718Z-26952 records 1499/1499 checks, three FINISHED sessions
 and no errors. The operator reports the preceding fmt/Clippy/syntax/build handoff
