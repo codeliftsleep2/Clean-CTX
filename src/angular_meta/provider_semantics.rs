@@ -81,6 +81,33 @@ pub(crate) fn project_with_authority(
     let mut edges = Vec::new();
     let mut cursor = provider_array.walk();
     for entry in provider_array.named_children(&mut cursor) {
+        if pair_value(entry, "useExisting", source.as_bytes()).is_some() {
+            if let (Some(authority), Some((id, _))) = (authority, retained)
+                && let Some((token, target)) = super::provider_pair_authority::pair(
+                    authority,
+                    owner_name,
+                    entry.start_byte(),
+                    entry.end_byte(),
+                    super::provider_pair_authority::Strategy::Existing,
+                )
+            {
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::RegistersProvider,
+                    subject: super::string_token_authority::owner(id, owner_type),
+                    object: token.clone(),
+                    layer: "angular",
+                    call_evidence: None,
+                });
+                edges.push(SemanticEdge {
+                    relation: SemanticRelation::ProviderUsesExisting,
+                    subject: token,
+                    object: target,
+                    layer: "angular",
+                    call_evidence: None,
+                });
+            }
+            continue;
+        }
         let mut canonical = None;
         if let Some(authority) = authority
             && let Some(token_node) = pair_value(entry, "provide", source.as_bytes())

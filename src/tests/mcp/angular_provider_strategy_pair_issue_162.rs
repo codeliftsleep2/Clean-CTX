@@ -3,25 +3,45 @@ use serde_json::json;
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
-    forged_strategy_span(false, false);
+    forged_strategy_span(false, "useClass");
 }
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_shifted_nonempty_occurrence_span() {
-    forged_strategy_span(true, false);
+    forged_strategy_span(true, "useClass");
 }
 
 #[test]
 fn issue_162_provider_factory_pair_refuses_empty_occurrence_span() {
-    forged_strategy_span(false, true);
+    forged_strategy_span(false, "useFactory");
 }
 
 #[test]
 fn issue_162_provider_factory_pair_refuses_shifted_occurrence_span() {
-    forged_strategy_span(true, true);
+    forged_strategy_span(true, "useFactory");
 }
 
-fn forged_strategy_span(shifted: bool, factory: bool) {
+#[test]
+fn issue_162_provider_existing_pair_refuses_empty_occurrence_span() {
+    forged_strategy_span(false, "useExisting");
+}
+
+#[test]
+fn issue_162_provider_existing_pair_refuses_shifted_occurrence_span() {
+    forged_strategy_span(true, "useExisting");
+}
+
+fn relation_for(field: &str) -> SemanticRelation {
+    match field {
+        "useClass" => SemanticRelation::ProviderUsesClass,
+        "useFactory" => SemanticRelation::ProviderUsesFactory,
+        "useExisting" => SemanticRelation::ProviderUsesExisting,
+        _ => panic!("unexpected test strategy"),
+    }
+}
+
+fn forged_strategy_span(shifted: bool, field: &str) {
+    let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
@@ -37,13 +57,8 @@ fn forged_strategy_span(shifted: bool, factory: bool) {
     } else {
         source.to_owned()
     };
-    std::fs::write(p.join("app.ts"), source).unwrap();
-    let relation = if factory {
-        SemanticRelation::ProviderUsesFactory
-    } else {
-        SemanticRelation::ProviderUsesClass
-    };
-    let field = if factory { "useFactory" } else { "useClass" };
+    std::fs::write(p.join("app.ts"), source.replace("useClass", field)).unwrap();
+    let relation = relation_for(field);
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
     config
@@ -125,15 +140,22 @@ fn corrupt_strategy_span(
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_crossed_and_missing_occurrences() {
-    pair_refusals(false);
+    pair_refusals("useClass");
 }
 
 #[test]
 fn issue_162_provider_factory_pair_refuses_crossed_and_missing_occurrences() {
-    pair_refusals(true);
+    pair_refusals("useFactory");
 }
 
-fn pair_refusals(factory: bool) {
+#[test]
+fn issue_162_provider_existing_pair_refuses_crossed_missing_and_untyped_proof() {
+    pair_refusals("useExisting");
+}
+
+fn pair_refusals(field: &str) {
+    let factory = field == "useFactory";
+    let existing = field == "useExisting";
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
@@ -164,7 +186,10 @@ function noise<T>(left:T){return left;}
  {provide:'audit.api',useClass:left.Implementation}
 ]}) export class ProviderHost {}
 "#
-        .replace("useClass", if factory { "useFactory" } else { "useClass" }),
+        .replace("useClass", field)
+        .replace("{provide:'audit.api'", if existing {
+            "{provide:left.Token,useExisting:'target.api'},{provide:'source.api',useExisting:'target.api'},{provide:'audit.api'"
+        } else { "{provide:'audit.api'" }),
     )
     .unwrap();
     let mut config = crate::tests::test_config();
@@ -186,11 +211,7 @@ function noise<T>(left:T){return left;}
         .alias_for_path(&p.join("app.ts").to_string_lossy())
         .unwrap();
     let snapshot = state.semantic_snapshot(&alias).unwrap();
-    let relation = if factory {
-        SemanticRelation::ProviderUsesFactory
-    } else {
-        SemanticRelation::ProviderUsesClass
-    };
+    let relation = relation_for(field);
     let pairs: Vec<SemanticEdge> = snapshot
         .edges
         .iter()
@@ -199,19 +220,41 @@ function noise<T>(left:T){return left;}
         .collect();
     assert_eq!(
         pairs.len(),
-        4,
+        if existing { 6 } else { 4 },
         "nonempty declaration, repeated and string pairs"
     );
     assert!(snapshot.authority.admits_relation_evidence(&pairs));
     assert_eq!(pairs[0].subject.canonical, pairs[2].subject.canonical);
     assert_eq!(pairs[0].object.canonical, pairs[2].object.canonical);
-    assert_eq!(pairs[3].subject.name, "\"audit.api\"");
+    assert_eq!(
+        pairs[if existing { 5 } else { 3 }].subject.name,
+        "\"audit.api\""
+    );
+    if existing {
+        assert_eq!(pairs[3].object.name, "\"target.api\"");
+        assert_eq!(pairs[4].subject.name, "\"source.api\"");
+        assert_eq!(pairs[4].object.name, "\"target.api\"");
+        let encoded = serde_json::to_value(relation).unwrap();
+        assert_eq!(encoded, "ProviderUsesExisting");
+        assert_eq!(
+            serde_json::from_value::<SemanticRelation>(encoded).unwrap(),
+            relation
+        );
+        let mut untyped = pairs[0].clone();
+        untyped.subject.canonical = None;
+        untyped.object.canonical = None;
+        assert!(!snapshot.authority.admits_relation_evidence(&[untyped]));
+        assert!(
+            !crate::mcp::semantic_compilation::retained::RetainedAuthority::default()
+                .admits_relation_evidence(&pairs)
+        );
+    }
     for change in 0..6 {
         let mut forged = pairs[0].clone();
         match change {
             0 => forged.object = pairs[1].object.clone(),
             1 => forged.subject = pairs[1].subject.clone(),
-            2 => forged.subject = pairs[3].subject.clone(),
+            2 => forged.subject = pairs[if existing { 5 } else { 3 }].subject.clone(),
             3 => {
                 forged
                     .object
@@ -239,7 +282,7 @@ function noise<T>(left:T){return left;}
     for facet in &mut authority.declaration_facets {
         for decorator in &mut facet.decorators {
             for argument in &mut decorator.arguments {
-                remove_strategy(argument, if factory { "useFactory" } else { "useClass" });
+                remove_strategy(argument, field);
             }
         }
     }

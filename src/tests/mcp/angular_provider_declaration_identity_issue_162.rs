@@ -2,6 +2,80 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 #[test]
+fn issue_162_provider_existing_alias_preserves_distinct_registration_tokens() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let p = root.path();
+    crate::tests::angular_authority_fixture::install(p);
+    std::fs::write(p.join("token.ts"), "export class AuditApi {}").unwrap();
+    std::fs::write(p.join("existing.ts"), "export class ExistingApi {}").unwrap();
+    std::fs::write(
+        p.join("api.ts"),
+        "export {Component as View} from '@angular/core';",
+    )
+    .unwrap();
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    config
+        .additional_roots
+        .push(p.to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    let control = "import {Component} from '@angular/core'; import {AuditApi} from './token'; import {ExistingApi} from './existing'; @Component({providers:[ExistingApi,{provide:AuditApi,useClass:ExistingApi}]}) export class ProviderHost {}";
+    std::fs::write(p.join("app.ts"), control).unwrap();
+    let ordinary = registrations(&state, p);
+    assert_eq!(
+        ordinary.len(),
+        2,
+        "nonempty established class-provider control"
+    );
+    let source = r#"
+import {View} from './api';
+import {AuditApi as Token} from './token';
+import * as existing from './existing';
+const prose='useExisting:Phantom';
+function noise<T>(existing:T){return existing;}
+@View({providers:[existing.ExistingApi,
+ {provide:Token,useExisting:existing.ExistingApi},
+ {provide:Token,useExisting:existing.ExistingApi}]})
+export class ProviderHost {}
+"#;
+    std::fs::write(p.join("app.ts"), source).unwrap();
+    for _ in 0..2 {
+        let found = registrations(&state, p);
+        assert_eq!(
+            found.len(),
+            2,
+            "alias registration retains its own token; no injector satisfaction inferred: {found:?}"
+        );
+        let actual: std::collections::BTreeSet<_> = found
+            .iter()
+            .map(|edge| {
+                (
+                    edge["object"]["name"].as_str().unwrap().to_owned(),
+                    crate::dictionary::path::canonical_identity_key(
+                        edge["object"]["file"].as_str().unwrap(),
+                    ),
+                )
+            })
+            .collect();
+        let expected: std::collections::BTreeSet<_> =
+            [("AuditApi", "token.ts"), ("ExistingApi", "existing.ts")]
+                .into_iter()
+                .map(|(name, file)| {
+                    (
+                        name.to_owned(),
+                        crate::dictionary::path::canonical_identity_key(
+                            &p.join(file).to_string_lossy(),
+                        ),
+                    )
+                })
+                .collect();
+        assert_eq!(actual, expected);
+    }
+    assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
+}
+
+#[test]
 fn issue_162_provider_strategy_same_named_classes_retain_declaration_identity() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();

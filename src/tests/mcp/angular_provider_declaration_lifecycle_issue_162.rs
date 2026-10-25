@@ -82,6 +82,7 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
                 edge.relation,
                 crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
                     | crate::layers::meta::semantic::SemanticRelation::ProviderUsesFactory
+                    | crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
             )
         })
         .collect();
@@ -183,7 +184,9 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             .unwrap()
             .iter()
             .filter(|edge| {
-                edge["relation"] == "ProviderUsesClass" || edge["relation"] == "ProviderUsesFactory"
+                edge["relation"] == "ProviderUsesClass"
+                    || edge["relation"] == "ProviderUsesFactory"
+                    || edge["relation"] == "ProviderUsesExisting"
             })
             .map(|edge| json!([edge["subject"]["canonical"], edge["object"]["canonical"]]))
             .collect();
@@ -269,7 +272,10 @@ fn strategy_answers(
         return;
     }
     let factory = source.contains("useFactory:");
-    let relation = if factory {
+    let existing = source.contains("useExisting:");
+    let relation = if existing {
+        "ProviderUsesExisting"
+    } else if factory {
         "ProviderUsesFactory"
     } else {
         "ProviderUsesClass"
@@ -291,7 +297,11 @@ fn strategy_answers(
             assert!(edge["object"].get("canonical").is_none());
             assert_eq!(
                 edge["object"]["name"],
-                if factory { "makeAudit" } else { "AuditApi" }
+                if factory || existing {
+                    "makeAudit"
+                } else {
+                    "AuditApi"
+                }
             );
             let token = crate::dictionary::path::canonical_identity_key(
                 edge["subject"]["file"].as_str().unwrap(),
@@ -306,7 +316,7 @@ fn strategy_answers(
     let mut expected: Vec<_> = (0..owners)
         .flat_map(|_| {
             tokens.iter().map(|token| {
-                let target = if factory {
+                let target = if factory || existing {
                     format!("factory-{token}")
                 } else {
                     (*token).to_owned()
@@ -347,6 +357,11 @@ fn issue_162_provider_class_strategy_lifecycle_restart_retains_exact_pairs() {
 #[test]
 fn issue_162_provider_factory_lifecycle_restart_retains_exact_pairs() {
     restart(FACTORY_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_existing_lifecycle_restart_retains_exact_pairs() {
+    restart(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
 }
 
 fn restart(source: &str) {
@@ -400,6 +415,11 @@ fn issue_162_provider_class_strategy_lifecycle_stale_repair_and_independent_reti
 #[test]
 fn issue_162_provider_factory_lifecycle_stale_repair_and_independent_retirement() {
     stale_tokens_repair_and_retirement(FACTORY_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_existing_lifecycle_stale_repair_and_independent_retirement() {
+    stale_tokens_repair_and_retirement(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
 }
 
 #[test]

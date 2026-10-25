@@ -12,6 +12,90 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
 }
 
 #[test]
+fn issue_162_provider_factory_callable_boundary_preserves_legacy_and_refuses_bad_roles() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    let p = root.path();
+    crate::tests::angular_authority_fixture::install(p);
+    std::fs::write(p.join("token.ts"), "export class Token {}").unwrap();
+    std::fs::write(
+        p.join("foreign.ts"),
+        "export function Component(metadata:unknown){return metadata;}",
+    )
+    .unwrap();
+    let declaration = "export function makeAudit(){return {};}";
+    std::fs::write(p.join("factory.ts"), declaration).unwrap();
+    let source = "import {Component as View} from '@angular/core'; import {Token} from './token'; import {makeAudit as Build} from './factory'; @View({providers:[{provide:Token,useFactory:Build}]}) export class ProviderHost {}";
+    std::fs::write(p.join("app.ts"), source).unwrap();
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    config
+        .additional_roots
+        .push(p.to_string_lossy().into_owned());
+    let state = crate::mcp::McpState::new(config);
+    let capture = || {
+        call(
+            &state,
+            p,
+            "compress_code_context",
+            json!({"filePath":p.join("app.ts"),"fidelity":"high"}),
+        );
+        let alias = state
+            .alias_for_path(&p.join("app.ts").to_string_lossy())
+            .unwrap();
+        let snapshot = state.semantic_snapshot(&alias).unwrap();
+        snapshot
+            .edges
+            .iter()
+            .filter(|edge| edge.relation == SemanticRelation::ProviderUsesFactory)
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    let baseline = capture();
+    assert_eq!(baseline.len(), 1, "nonempty declared factory control");
+    assert!(baseline[0].subject.canonical.is_some() && baseline[0].object.canonical.is_some());
+    for callable in [
+        "export const makeAudit=()=>({});",
+        "export const makeAudit=function(){return {};};",
+    ] {
+        std::fs::write(p.join("factory.ts"), callable).unwrap();
+        let legacy = capture();
+        assert_eq!(
+            legacy.len(),
+            1,
+            "preserve existing callable-variable projection"
+        );
+        assert_eq!(legacy[0].object.name, "makeAudit");
+        assert!(
+            legacy[0].subject.canonical.is_none() && legacy[0].object.canonical.is_none(),
+            "callable variables gain no canonical factory authority"
+        );
+    }
+    std::fs::write(p.join("factory.ts"), declaration).unwrap();
+    for refused in [
+        source.replace("from '@angular/core'", "from './foreign'"),
+        source.replace(
+            "import {makeAudit as Build}",
+            "import type {makeAudit as Build}",
+        ),
+        source.replace("useFactory:Build", "useFactory:Build,useFactory:Build"),
+        source.replace("useFactory:Build", "useFactory:Build,useClass:Token"),
+        source.replace("useFactory:Build", "useFactory:Missing"),
+    ] {
+        std::fs::write(p.join("app.ts"), refused).unwrap();
+        assert!(
+            capture().is_empty(),
+            "invalid factory proof cannot publish a strategy"
+        );
+        std::fs::write(p.join("app.ts"), source).unwrap();
+        let restored = capture();
+        assert_eq!(restored.len(), 1, "source repair");
+        assert!(restored[0].subject.canonical.is_some() && restored[0].object.canonical.is_some());
+    }
+    assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
+}
+
+#[test]
 fn issue_162_provider_factory_same_named_functions_retain_exact_identity() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();

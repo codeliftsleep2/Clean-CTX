@@ -174,6 +174,15 @@ sessions and no errors, using rebuilt binary SHA-256
 872e4a541f7706b839f461072fdbc76473f54346d34f39c9b6c233bc613ae00b.
 This is operator binary evidence, separate from Rust/CI and final field gates.
 
+The generation-58 alias extension adds an independent useExisting owner and
+requires exact ProviderUsesExisting endpoints for declaration/string positions
+and repeated pairs through the existing three-session mutations and restart.
+It does not infer target registration, alias-chain resolution or satisfaction.
+Generation-58 report 2026-10-25T17-34-16-718Z-26952 records PASS: 1499/1499
+checks, three FINISHED sessions and no errors. Rebuilt binary SHA-256:
+4533863e18facb9552e0a9fc4ee4042ff6f64bb9dbd1c18f034b6701e494410c.
+This is operator binary evidence, distinct from Rust/CI and final field gates.
+
 The generation-53 extension adds an independent strategy-provider owner with
 namespace/barrel useClass and useFactory. Its registrations share the existing
 restart and mutation scenarios and additionally retract on a type-only strategy

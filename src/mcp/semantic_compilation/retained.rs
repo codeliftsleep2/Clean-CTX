@@ -15,9 +15,11 @@ impl RetainedAuthority {
         if let Some(authority) = &self.typescript_authority {
             return authority.admits_relation_evidence(edges);
         }
-        edges
-            .iter()
-            .all(|edge| edge.subject.canonical.is_none() && edge.object.canonical.is_none())
+        edges.iter().all(|edge| {
+            edge.relation != crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
+                && edge.subject.canonical.is_none()
+                && edge.object.canonical.is_none()
+        })
     }
 
     pub(crate) fn is_current(&self, source_hash: &str) -> bool {

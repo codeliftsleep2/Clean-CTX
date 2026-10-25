@@ -28,7 +28,7 @@ specialized semantics, and trace contracts before removing compatibility paths.
 | Functional DI | Exact type-role/value API/token evidence and canonical declaration projection are integrated. Tracked guard/resolver/interceptor controls and functional lifecycle scenarios pass in their recorded scopes. This is not complete functional syntax or injector closure. |
 | Public package entry | Owning package and consumed public entry remain distinct. Wrong-root/foreign/corrupted proof and HTTP SQLite/config/export/version controls pass. Exact null export blocking preserves unrelated guard/resolver proof in the tracked mixed-role test. Other unproved map outcomes remain errors. |
 | Current native preservation/lint | Generation-50 native cohort: 318 passed with explicit erased_namespace_query exclusion. Generation-50 all-target/all-feature Clippy: successful, zero diagnostics. The excluded frontier is unresolved, not a full native gate pass. |
-| Current operator binary acceptance | Generation-57 report 2026-10-25T15-44-43-046Z-9404: 1292/1292 checks, three FINISHED sessions, no errors. Binary SHA-256 872e4a541f7706b839f461072fdbc76473f54346d34f39c9b6c233bc613ae00b. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
+| Current operator binary acceptance | Generation-58 report 2026-10-25T17-34-16-718Z-26952: 1499/1499 checks, three FINISHED sessions, no errors. Binary SHA-256 4533863e18facb9552e0a9fc4ee4042ff6f64bb9dbd1c18f034b6701e494410c. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
 
 The earlier binary mixed-role failure remains preserved; the unchanged driver
 passed only after the production repair. Test-trigger corrections in earlier
@@ -65,6 +65,46 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Other discovered consumers | Inventory is not closed. New consumers must be added against their canonical questions without compiler-parity drift. |
 
 ## Next demonstrated consumer dependency
+
+### Existing-provider registration control
+
+Generation-58 rebuilt acceptance is PASS: report
+2026-10-25T17-34-16-718Z-26952 records 1499/1499 checks, three FINISHED sessions
+and no errors. The operator reports the preceding fmt/Clippy/syntax/build handoff
+completed, without separate lint/preflight receipt paths. This supersedes the
+alias binary extension's pending checkpoints below. See the useExisting decision
+for provenance and remaining certification limits.
+
+Inspected alias currentness batch is GREEN: provider58-existing-currentness.log
+records 33 passed, no failures/ignored. The existing binary helper is extended
+for public alias relation/string/declaration facts and is UNRUN. No production
+change accompanies this extension; see the useExisting decision for scope.
+
+Owner approval is granted for canonical alias registration and the dedicated
+ProviderUsesExisting public relation. Generation 58 extends the shared provider
+pair policy and existing typed transport; the unchanged RED is frozen/restored.
+All post-repair controls are UNRUN. See the useExisting decision for exact hashes,
+static consumer audit and remaining adversarial/lifecycle/public obligations.
+Approval-pending statements below describe the earlier decision point.
+
+Observed RED: 0 passed, 1 failed, 0 ignored after the ordinary two-registration
+control. The alias token registration is omitted; later assertions remain
+unclassified. The [useExisting decision](ISSUE_162_PROVIDER_EXISTING_DECISION.md)
+requests bounded registration/alias authority, including an explicit proposed
+public relation value. No production repair has been made; owner approval is
+pending independently of class/factory approvals.
+
+AQ08 includes useExisting separately from class construction and factories.
+A new tracked public-query control first requires two ordinary class-provider
+registrations, then requires a useExisting registration to retain its own token
+beside a namespace shorthand target registration, with repeated registration and
+noise. The parser currently selects only useClass/useFactory/useValue. This
+control is UNRUN; no production change, new relation type, alias-target identity
+contract or scope/satisfaction claim accompanies it. Required useExisting
+semantics remain outside the prior class/factory approvals.
+
+The final factory callable-boundary control is GREEN: its inspected log records
+1 passed, 0 failed, 0 ignored, with later refusal/repair assertions completed.
 
 ### Factory identity control
 

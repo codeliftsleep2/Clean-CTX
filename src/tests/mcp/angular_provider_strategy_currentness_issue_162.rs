@@ -18,8 +18,11 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
     crate::protocol::captured_responses().pop().unwrap()
 }
 
-fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, factory: bool) {
-    let relation = if factory {
+fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str) {
+    let factory = field == "useFactory";
+    let relation = if field == "useExisting" {
+        "ProviderUsesExisting"
+    } else if factory {
         "ProviderUsesFactory"
     } else {
         "ProviderUsesClass"
@@ -82,15 +85,21 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, factory: boo
 
 #[test]
 fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
-    currentness(false);
+    currentness("useClass");
 }
 
 #[test]
 fn issue_162_provider_factory_currentness_package_config_and_ambiguity() {
-    currentness(true);
+    currentness("useFactory");
 }
 
-fn currentness(factory: bool) {
+#[test]
+fn issue_162_provider_existing_currentness_package_config_and_ambiguity() {
+    currentness("useExisting");
+}
+
+fn currentness(field: &str) {
+    let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
     for mutation in ["exports", "config", "version", "ambiguity"] {
         let root = tempfile::tempdir().unwrap();
@@ -117,7 +126,7 @@ fn currentness(factory: bool) {
         )
         .unwrap();
         std::fs::write(p.join("erased.ts"), "export interface Implementation {}").unwrap();
-        let source = SOURCE.replace("useClass", if factory { "useFactory" } else { "useClass" });
+        let source = SOURCE.replace("useClass", field);
         std::fs::write(p.join("app.ts"), &source).unwrap();
         let original_config = std::fs::read(p.join("tsconfig.json")).unwrap();
         let mut config = crate::tests::test_config();
@@ -132,7 +141,7 @@ fn currentness(factory: bool) {
             .push(p.to_string_lossy().into_owned());
         {
             let state = crate::mcp::McpState::new(config.clone());
-            targets(&state, p, true, factory);
+            targets(&state, p, true, field);
             let response = call(
                 &state,
                 p,
@@ -178,11 +187,11 @@ fn currentness(factory: bool) {
                 .alias_for_path(&p.join("app.ts").to_string_lossy())
                 .is_none()
         );
-        targets(&state, p, mutation == "version", factory);
+        targets(&state, p, mutation == "version", field);
         std::fs::write(package.join("package.json"), &manifest).unwrap();
         std::fs::write(package.join(file), declaration).unwrap();
         std::fs::write(p.join("tsconfig.json"), &original_config).unwrap();
-        targets(&state, p, true, factory);
+        targets(&state, p, true, field);
         assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
     }
 }

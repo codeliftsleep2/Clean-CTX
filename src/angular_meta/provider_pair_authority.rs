@@ -8,6 +8,7 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 pub(super) enum Strategy {
     Class,
     Factory,
+    Existing,
 }
 
 impl Strategy {
@@ -15,18 +16,21 @@ impl Strategy {
         match self {
             Self::Class => "useClass",
             Self::Factory => "useFactory",
+            Self::Existing => "useExisting",
         }
     }
-    fn target_kind(self) -> &'static str {
+    fn target_kind(self) -> Option<&'static str> {
         match self {
-            Self::Class => "class_declaration",
-            Self::Factory => "function_declaration",
+            Self::Class => Some("class_declaration"),
+            Self::Factory => Some("function_declaration"),
+            Self::Existing => None,
         }
     }
     fn entity_type(self) -> &'static str {
         match self {
             Self::Class => "ProviderClass",
             Self::Factory => "ProviderFactory",
+            Self::Existing => "ProviderToken",
         }
     }
 }
@@ -86,10 +90,16 @@ pub(super) fn pair(
     {
         return None;
     }
+    if matches!(strategy, Strategy::Existing) {
+        return Some((
+            canonical_token(authority, owner, token)?,
+            canonical_token(authority, owner, target)?,
+        ));
+    }
     let ExpressionValue::Reference(Resolution::Resolved(target_id)) = &target.value else {
         return None;
     };
-    if target_id.kind != strategy.target_kind() {
+    if Some(target_id.kind.as_str()) != strategy.target_kind() {
         return None;
     }
     let target_span =
@@ -97,6 +107,17 @@ pub(super) fn pair(
     if authority.value_reference_at(target_span) != Some(target_id) {
         return None;
     }
+    Some((
+        canonical_token(authority, owner, token)?,
+        declaration_entity(target_id, strategy.entity_type()),
+    ))
+}
+
+fn canonical_token(
+    authority: &TypeScriptAuthority,
+    owner: &crate::ir::typescript_resolution::DeclarationId,
+    token: &ExpressionFacet,
+) -> Option<EntityRef> {
     if let ExpressionValue::Reference(Resolution::Resolved(id)) = &token.value {
         let token_span =
             crate::ir::invocation_evidence::SourceSpan::new(token.start, token.end).ok()?;
@@ -112,7 +133,7 @@ pub(super) fn pair(
         };
         declaration_entity(id, "ProviderToken")
     };
-    Some((token, declaration_entity(target_id, strategy.entity_type())))
+    Some(token)
 }
 
 fn contains(container: &ExpressionFacet, value: &ExpressionFacet) -> bool {
@@ -138,6 +159,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
     let strategy = match edge.relation {
         SemanticRelation::ProviderUsesClass => Strategy::Class,
         SemanticRelation::ProviderUsesFactory => Strategy::Factory,
+        SemanticRelation::ProviderUsesExisting => Strategy::Existing,
         _ => return false,
     };
     if edge.layer != "angular" {

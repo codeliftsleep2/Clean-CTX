@@ -5,6 +5,19 @@ Status: owner APPROVED; generation-57 focused/pair/durable/currentness controls 
 
 ## Approved implementation checkpoint
 
+Operator provider57-callable-boundary.log records 1 passed, 0 failed, 0 ignored.
+The baseline, callable-variable legacy preservation, refusal and repair cases
+all completed. This supersedes the boundary control's UNRUN checkpoint below.
+No production change accompanied the control; post-extension fmt/Clippy have
+not been separately reported yet.
+
+Post-checkpoint boundary control: a new tracked test requires a canonical
+function-declaration baseline, then preserves existing arrow/function-expression
+variable projections without granting canonical authority. Separate mutations
+require foreign Angular owner, type-only target, duplicate/competing strategy
+fields and missing target refusal, with repair after each. This control is
+UNRUN; no production change or generation advance accompanies it.
+
 Generation-57 rebuilt binary report
 target/live-acceptance/issue-162/2026-10-25T15-44-43-046Z-9404/report.json records
 PASS: 1292 checks, 0 failed, no errors and all three sessions FINISHED. Binary

@@ -123,6 +123,8 @@ pub enum SemanticRelation {
     ProviderUsesFactory,
     /// A proven provider token is backed by a value reference or literal.
     ProviderUsesValue,
+    /// A provider occurrence aliases its token to another token; no satisfaction implied.
+    ProviderUsesExisting,
     /// Component declares an `@Input` field.
     HasInput,
     /// Component declares an `@Output` field.

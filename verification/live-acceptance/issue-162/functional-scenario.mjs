@@ -41,6 +41,10 @@ export class ClassPairProviderHost {}
  {provide:Right,useFactory:factoryRight.makeAudit},{provide:Left,useFactory:factoryLeft.makeAudit},
  {provide:'audit.factory',useFactory:factoryLeft.makeAudit}]})
 export class FactoryPairProviderHost {}
+@View({providers:[{provide:Left,useExisting:Right},{provide:Left,useExisting:Right},
+ {provide:Right,useExisting:factoryRight.makeAudit},{provide:Left,useExisting:'audit.target'},
+ {provide:'audit.alias',useExisting:Left},{provide:'audit.source',useExisting:'audit.target'}]})
+export class ExistingPairProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
@@ -136,6 +140,32 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       expected.sort();
       check(`${label}/factory-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/factory-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
+    }
+    for (const tokenName of ['AuditApi','"audit.alias"','"audit.source"']) {
+      const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
+      const edges = response.structuredContent?.edges;
+      check(`${label}/existing-pairs/${tokenName}/structured`,Array.isArray(edges),response);
+      const selected = edges.filter(edge => edge.relation === 'ProviderUsesExisting');
+      const actual = selected.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
+      const expected = [];
+      for (const owner of providerOwners) {
+        if (tokenName === 'AuditApi') {
+          if (tokens.includes('functional-left.ts') && tokens.includes('functional-right.ts')) {
+            expected.push([normalize(path.join(root,'functional-left.ts')),'AuditApi',normalize(path.join(root,'functional-right.ts'))]);
+          }
+          if (tokens.includes('functional-right.ts') && factoryRight) {
+            expected.push([normalize(path.join(root,'functional-right.ts')),'makeAudit',normalize(path.join(root,'factory-right.ts'))]);
+          }
+          if (tokens.includes('functional-left.ts')) {
+            expected.push([normalize(path.join(root,'functional-left.ts')),'"audit.target"',normalize(path.join(root,owner))]);
+          }
+        } else if (tokenName === '"audit.alias"') {
+          if (tokens.includes('functional-left.ts')) expected.push([normalize(path.join(root,owner)),'AuditApi',normalize(path.join(root,'functional-left.ts'))]);
+        } else expected.push([normalize(path.join(root,owner)),'"audit.target"',normalize(path.join(root,owner))]);
+      }
+      expected.sort();
+      check(`${label}/existing-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
+      check(`${label}/existing-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
     const decoy = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Guard',name:'loose'});
     const edges = decoy.structuredContent?.edges;
