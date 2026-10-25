@@ -159,5 +159,9 @@ mod angular_provider_declaration_identity_tests;
 mod angular_provider_strategy_pair_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_strategy_currentness_issue_162.rs"]
+mod angular_provider_strategy_currentness_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_provider_declaration_lifecycle_issue_162.rs"]
 mod angular_provider_declaration_lifecycle_tests;

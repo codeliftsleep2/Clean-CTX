@@ -68,6 +68,13 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 
 ### Provider strategy declaration identity control
 
+Additional tracked currentness control is GREEN: provider54-currentness.log
+records 1 passed, no failures/ignored or reported warnings across package export
+blocking, config redirection, package version and ambiguous-target mutations.
+Each case refuses stale restore before queries, preserves the local strategy and
+repairs without editing the consumer. No production change accompanied this
+post-commit extension; it is separate from existing binary acceptance evidence.
+
 The corrected generation-54 binary extension passed: report
 2026-10-25T02-45-45-417Z-28364 records 1102/1102 checks, three FINISHED sessions
 and no errors. The original expectation failure remains preserved; no Rust

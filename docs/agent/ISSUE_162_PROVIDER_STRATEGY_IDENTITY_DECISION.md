@@ -5,6 +5,27 @@ Status: owner APPROVED; generation-54 focused/pair/lifecycle controls GREEN; cor
 
 ## Approved implementation checkpoint
 
+The operator reports fmt and all-target/all-feature Clippy with -D warnings
+GREEN after the additional currentness test. No separate gate receipt paths
+were supplied. This is a test-only checkpoint; no production change or binary
+rebuild was required for this extension. Broader completion claims remain
+bounded by the evidence recorded below.
+
+Operator provider54-currentness.log records 1 passed, 0 failed, 0 ignored and
+no reported warnings. All four package/config/version/ambiguity scenarios and
+their later repair assertions completed. This supersedes the post-commit
+control's UNRUN checkpoint below. No production changes accompanied this test
+extension; the existing generation-54 binary receipt remains evidence for its
+recorded harness, not for these additional Rust-only mutation scenarios.
+
+Post-commit controls: one additional tracked durable test now exercises package
+export blocking, project paths redirection to a type-only target, package version
+mutation and competing implementation declarations. Each case requires a
+nonempty public local/remote strategy baseline, stale restore refusal before
+query reacquisition, survival of the local strategy, appropriate remote outcome
+and repair with unchanged provider bytes. This test is UNRUN; no production
+change or semantic generation advance accompanies it.
+
 Corrected generation-54 binary report
 target/live-acceptance/issue-162/2026-10-25T02-45-45-417Z-28364/report.json records
 PASS: 1102 checks, 0 failed, no errors and all three sessions FINISHED. Binary
