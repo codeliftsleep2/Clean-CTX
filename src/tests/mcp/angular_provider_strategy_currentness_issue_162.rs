@@ -18,7 +18,12 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
     crate::protocol::captured_responses().pop().unwrap()
 }
 
-fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool) {
+fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, factory: bool) {
+    let relation = if factory {
+        "ProviderUsesFactory"
+    } else {
+        "ProviderUsesClass"
+    };
     let response = call(
         state,
         root,
@@ -37,7 +42,7 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool) {
         .as_array()
         .unwrap()
         .iter()
-        .filter(|edge| edge["relation"] == "ProviderUsesClass")
+        .filter(|edge| edge["relation"] == relation)
         .map(|edge| {
             assert_eq!(edge["object"]["name"], "Implementation");
             assert_eq!(
@@ -60,7 +65,11 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool) {
     if remote {
         expected.push(crate::dictionary::path::canonical_identity_key(
             &root
-                .join("node_modules/audit-implementation/index.d.ts")
+                .join(if factory {
+                    "node_modules/audit-implementation/index.ts"
+                } else {
+                    "node_modules/audit-implementation/index.d.ts"
+                })
                 .to_string_lossy(),
         ));
     }
@@ -73,6 +82,15 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool) {
 
 #[test]
 fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
+    currentness(false);
+}
+
+#[test]
+fn issue_162_provider_factory_currentness_package_config_and_ambiguity() {
+    currentness(true);
+}
+
+fn currentness(factory: bool) {
     let _serial = crate::protocol::handler_response_serial();
     for mutation in ["exports", "config", "version", "ambiguity"] {
         let root = tempfile::tempdir().unwrap();
@@ -80,17 +98,27 @@ fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
         crate::tests::angular_authority_fixture::install(p);
         let package = p.join("node_modules/audit-implementation");
         std::fs::create_dir_all(&package).unwrap();
-        let manifest = json!({"name":"audit-implementation","version":"1.0.0","types":"index.d.ts","exports":{".":{"types":"./index.d.ts"}}}).to_string();
+        let file = if factory { "index.ts" } else { "index.d.ts" };
+        let manifest = json!({"name":"audit-implementation","version":"1.0.0","types":file,"exports":{".":{"types":format!("./{file}")}}}).to_string();
         std::fs::write(package.join("package.json"), &manifest).unwrap();
-        let declaration = "export declare class Implementation {}";
-        std::fs::write(package.join("index.d.ts"), declaration).unwrap();
+        let declaration = if factory {
+            "export function Implementation(){return {};}"
+        } else {
+            "export declare class Implementation {}"
+        };
+        std::fs::write(package.join(file), declaration).unwrap();
         std::fs::write(
             p.join("local.ts"),
-            "export class Token {} export class Implementation {}",
+            if factory {
+                "export class Token {} export function Implementation(){return {};}"
+            } else {
+                "export class Token {} export class Implementation {}"
+            },
         )
         .unwrap();
         std::fs::write(p.join("erased.ts"), "export interface Implementation {}").unwrap();
-        std::fs::write(p.join("app.ts"), SOURCE).unwrap();
+        let source = SOURCE.replace("useClass", if factory { "useFactory" } else { "useClass" });
+        std::fs::write(p.join("app.ts"), &source).unwrap();
         let original_config = std::fs::read(p.join("tsconfig.json")).unwrap();
         let mut config = crate::tests::test_config();
         config.cbm.enabled = false;
@@ -104,7 +132,7 @@ fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
             .push(p.to_string_lossy().into_owned());
         {
             let state = crate::mcp::McpState::new(config.clone());
-            targets(&state, p, true);
+            targets(&state, p, true, factory);
             let response = call(
                 &state,
                 p,
@@ -130,11 +158,9 @@ fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
                 manifest.replace("1.0.0", "1.0.1"),
             )
             .unwrap(),
-            _ => std::fs::write(
-                package.join("index.d.ts"),
-                "export declare class Implementation {} export declare class Implementation {}",
-            )
-            .unwrap(),
+            _ => {
+                std::fs::write(package.join(file), format!("{declaration} {declaration}")).unwrap()
+            }
         }
         let state = crate::mcp::McpState::new(config);
         let response = call(
@@ -152,11 +178,11 @@ fn issue_162_provider_strategy_currentness_package_config_and_ambiguity() {
                 .alias_for_path(&p.join("app.ts").to_string_lossy())
                 .is_none()
         );
-        targets(&state, p, mutation == "version");
+        targets(&state, p, mutation == "version", factory);
         std::fs::write(package.join("package.json"), &manifest).unwrap();
-        std::fs::write(package.join("index.d.ts"), declaration).unwrap();
+        std::fs::write(package.join(file), declaration).unwrap();
         std::fs::write(p.join("tsconfig.json"), &original_config).unwrap();
-        targets(&state, p, true);
-        assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), SOURCE);
+        targets(&state, p, true, factory);
+        assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
     }
 }

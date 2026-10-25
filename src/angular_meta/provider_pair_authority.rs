@@ -1,14 +1,42 @@
-//! Exact source-owned provider occurrences authorize class strategy pairs.
+//! Shared exact provider-position mechanics with explicit strategy policies.
 use crate::ir::typescript_resolution::declaration_facets::{ExpressionFacet, ExpressionValue};
 use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
 use crate::layers::meta::canonical_endpoint::CanonicalEndpoint;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
+
+#[derive(Clone, Copy)]
+pub(super) enum Strategy {
+    Class,
+    Factory,
+}
+
+impl Strategy {
+    fn field(self) -> &'static str {
+        match self {
+            Self::Class => "useClass",
+            Self::Factory => "useFactory",
+        }
+    }
+    fn target_kind(self) -> &'static str {
+        match self {
+            Self::Class => "class_declaration",
+            Self::Factory => "function_declaration",
+        }
+    }
+    fn entity_type(self) -> &'static str {
+        match self {
+            Self::Class => "ProviderClass",
+            Self::Factory => "ProviderFactory",
+        }
+    }
+}
 
 pub(super) fn pair(
     authority: &TypeScriptAuthority,
     owner_name: &str,
     start: usize,
     end: usize,
+    strategy: Strategy,
 ) -> Option<(EntityRef, EntityRef)> {
     let (owner, array) = super::string_token_authority::provider_array(authority, owner_name)?;
     if owner.source != authority.source
@@ -29,10 +57,14 @@ pub(super) fn pair(
         return None;
     }
     let (token, target) = match &entry.value {
-        ExpressionValue::Reference(_) => (entry, entry),
+        ExpressionValue::Reference(_) if matches!(strategy, Strategy::Class) => (entry, entry),
         ExpressionValue::Object(fields) => {
             if fields.iter().any(|(key, _)| {
-                matches!(key.as_str(), "" | "useFactory" | "useValue" | "useExisting")
+                key.is_empty()
+                    || (matches!(
+                        key.as_str(),
+                        "useClass" | "useFactory" | "useValue" | "useExisting"
+                    ) && key != strategy.field())
             }) {
                 return None;
             }
@@ -41,7 +73,7 @@ pub(super) fn pair(
                 let (_, value) = found.next()?;
                 found.next().is_none().then_some(value)
             };
-            (unique("provide")?, unique("useClass")?)
+            (unique("provide")?, unique(strategy.field())?)
         }
         _ => return None,
     };
@@ -57,7 +89,7 @@ pub(super) fn pair(
     let ExpressionValue::Reference(Resolution::Resolved(target_id)) = &target.value else {
         return None;
     };
-    if target_id.kind != "class_declaration" {
+    if target_id.kind != strategy.target_kind() {
         return None;
     }
     let target_span =
@@ -80,7 +112,7 @@ pub(super) fn pair(
         };
         declaration_entity(id, "ProviderToken")
     };
-    Some((token, declaration_entity(target_id, "ProviderClass")))
+    Some((token, declaration_entity(target_id, strategy.entity_type())))
 }
 
 fn contains(container: &ExpressionFacet, value: &ExpressionFacet) -> bool {
@@ -102,6 +134,12 @@ fn declaration_entity(
 
 /// Replay the exact retained provider positions, never an endpoint cross-product.
 pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+    use crate::layers::meta::semantic::SemanticRelation;
+    let strategy = match edge.relation {
+        SemanticRelation::ProviderUsesClass => Strategy::Class,
+        SemanticRelation::ProviderUsesFactory => Strategy::Factory,
+        _ => return false,
+    };
     if edge.layer != "angular" {
         return false;
     }
@@ -129,9 +167,16 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
                 return false;
             };
             entries.iter().any(|entry| {
-                pair(authority, &facet.declaration.name, entry.start, entry.end).is_some_and(
-                    |(token, target)| same(&edge.subject, &token) && same(&edge.object, &target),
+                pair(
+                    authority,
+                    &facet.declaration.name,
+                    entry.start,
+                    entry.end,
+                    strategy,
                 )
+                .is_some_and(|(token, target)| {
+                    same(&edge.subject, &token) && same(&edge.object, &target)
+                })
             })
         })
 }

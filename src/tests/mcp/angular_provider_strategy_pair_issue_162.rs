@@ -3,20 +3,47 @@ use serde_json::json;
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_forged_strategy_occurrence_span() {
-    forged_strategy_span(false);
+    forged_strategy_span(false, false);
 }
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_shifted_nonempty_occurrence_span() {
-    forged_strategy_span(true);
+    forged_strategy_span(true, false);
 }
 
-fn forged_strategy_span(shifted: bool) {
+#[test]
+fn issue_162_provider_factory_pair_refuses_empty_occurrence_span() {
+    forged_strategy_span(false, true);
+}
+
+#[test]
+fn issue_162_provider_factory_pair_refuses_shifted_occurrence_span() {
+    forged_strategy_span(true, true);
+}
+
+fn forged_strategy_span(shifted: bool, factory: bool) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
-    std::fs::write(p.join("app.ts"), "import {Component} from '@angular/core'; class Token {} class Implementation {} @Component({providers:[{provide:Token,useClass:Implementation}]}) export class ProviderHost {}").unwrap();
+    let source = "import {Component} from '@angular/core'; class Token {} class Implementation {} @Component({providers:[{provide:Token,useClass:Implementation}]}) export class ProviderHost {}";
+    let source = if factory {
+        source
+            .replace(
+                "class Implementation {}",
+                "function Implementation(){return {};}",
+            )
+            .replace("useClass", "useFactory")
+    } else {
+        source.to_owned()
+    };
+    std::fs::write(p.join("app.ts"), source).unwrap();
+    let relation = if factory {
+        SemanticRelation::ProviderUsesFactory
+    } else {
+        SemanticRelation::ProviderUsesClass
+    };
+    let field = if factory { "useFactory" } else { "useClass" };
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
     config
@@ -39,7 +66,7 @@ fn forged_strategy_span(shifted: bool) {
     let pairs: Vec<_> = snapshot
         .edges
         .iter()
-        .filter(|edge| edge.relation == SemanticRelation::ProviderUsesClass)
+        .filter(|edge| edge.relation == relation)
         .cloned()
         .collect();
     assert_eq!(pairs.len(), 1, "nonempty canonical class strategy control");
@@ -54,7 +81,7 @@ fn forged_strategy_span(shifted: bool) {
     {
         for decorator in &mut facet.decorators {
             for argument in &mut decorator.arguments {
-                changed += corrupt_strategy_span(argument, shifted);
+                changed += corrupt_strategy_span(argument, shifted, field);
             }
         }
     }
@@ -68,13 +95,14 @@ fn forged_strategy_span(shifted: bool) {
 fn corrupt_strategy_span(
     expression: &mut crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
     shifted: bool,
+    field: &str,
 ) -> usize {
     use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
     match &mut expression.value {
         ExpressionValue::Object(fields) => fields
             .iter_mut()
             .map(|(key, value)| {
-                if key == "useClass" {
+                if key == field {
                     if shifted {
                         value.start += 1;
                         assert!(value.start < value.end, "forged span stays nonempty");
@@ -83,13 +111,13 @@ fn corrupt_strategy_span(
                     }
                     1
                 } else {
-                    corrupt_strategy_span(value, shifted)
+                    corrupt_strategy_span(value, shifted, field)
                 }
             })
             .sum(),
         ExpressionValue::Array(entries) => entries
             .iter_mut()
-            .map(|entry| corrupt_strategy_span(entry, shifted))
+            .map(|entry| corrupt_strategy_span(entry, shifted, field))
             .sum(),
         _ => 0,
     }
@@ -97,6 +125,15 @@ fn corrupt_strategy_span(
 
 #[test]
 fn issue_162_provider_strategy_pair_refuses_crossed_and_missing_occurrences() {
+    pair_refusals(false);
+}
+
+#[test]
+fn issue_162_provider_factory_pair_refuses_crossed_and_missing_occurrences() {
+    pair_refusals(true);
+}
+
+fn pair_refusals(factory: bool) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
@@ -104,7 +141,11 @@ fn issue_162_provider_strategy_pair_refuses_crossed_and_missing_occurrences() {
     for name in ["left.ts", "right.ts"] {
         std::fs::write(
             p.join(name),
-            "export class Token {} export class Implementation {}",
+            if factory {
+                "export class Token {} export function Implementation(){return {};}"
+            } else {
+                "export class Token {} export class Implementation {}"
+            },
         )
         .unwrap();
     }
@@ -122,7 +163,8 @@ function noise<T>(left:T){return left;}
  {provide:left.Token,useClass:left.Implementation},
  {provide:'audit.api',useClass:left.Implementation}
 ]}) export class ProviderHost {}
-"#,
+"#
+        .replace("useClass", if factory { "useFactory" } else { "useClass" }),
     )
     .unwrap();
     let mut config = crate::tests::test_config();
@@ -144,10 +186,15 @@ function noise<T>(left:T){return left;}
         .alias_for_path(&p.join("app.ts").to_string_lossy())
         .unwrap();
     let snapshot = state.semantic_snapshot(&alias).unwrap();
+    let relation = if factory {
+        SemanticRelation::ProviderUsesFactory
+    } else {
+        SemanticRelation::ProviderUsesClass
+    };
     let pairs: Vec<SemanticEdge> = snapshot
         .edges
         .iter()
-        .filter(|edge| edge.relation == SemanticRelation::ProviderUsesClass)
+        .filter(|edge| edge.relation == relation)
         .cloned()
         .collect();
     assert_eq!(
@@ -192,7 +239,7 @@ function noise<T>(left:T){return left;}
     for facet in &mut authority.declaration_facets {
         for decorator in &mut facet.decorators {
             for argument in &mut decorator.arguments {
-                remove_strategy(argument);
+                remove_strategy(argument, if factory { "useFactory" } else { "useClass" });
             }
         }
     }
@@ -204,18 +251,19 @@ function noise<T>(left:T){return left;}
 
 fn remove_strategy(
     expression: &mut crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    field: &str,
 ) {
     use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
     match &mut expression.value {
         ExpressionValue::Object(fields) => {
-            fields.retain(|(name, _)| name != "useClass");
+            fields.retain(|(name, _)| name != field);
             for (_, value) in fields {
-                remove_strategy(value);
+                remove_strategy(value, field);
             }
         }
         ExpressionValue::Array(entries) => {
             for entry in entries {
-                remove_strategy(entry);
+                remove_strategy(entry, field);
             }
         }
         _ => {}

@@ -169,6 +169,8 @@ try {
     mutate('provider-implementation.ts', 'export interface Implementation {} export function makeAudit(){return {};}');
     await functionalFacts({implementation:false});
     mutate('provider-implementation.ts', fixture['provider-implementation.ts']); await functionalFacts();
+    mutate('factory-right.ts', 'export interface makeAudit {}'); await functionalFacts({factoryRight:false});
+    mutate('factory-right.ts', fixture['factory-right.ts']); await functionalFacts();
     mutate('node_modules/@angular/common/package.json', commonManifest(false)); await functionalFacts({http:false});
     mutate('node_modules/@angular/common/package.json', commonManifest()); await functionalFacts();
     mutate('functional-api.ts', functionalApi('@angular/common')); await functionalFacts({http:false});

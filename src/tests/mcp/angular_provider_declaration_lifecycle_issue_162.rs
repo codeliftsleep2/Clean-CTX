@@ -39,6 +39,18 @@ function noise<T>(Left:T){return Left;}
 export class ProviderHost {}
 "#;
 
+const FACTORY_SOURCE: &str = r#"
+import {View} from './api';
+import {AuditApi as Left} from './left';
+import {AuditApi as Right} from './right';
+import {makeAudit as Build} from './factory-left';
+import * as factories from './factory-right';
+function noise<T>(Build:T){return Build;}
+@View({providers:[{provide:Left,useFactory:Build},
+ {provide:Right,useFactory:factories.makeAudit},{provide:Left,useFactory:Build}]})
+export class ProviderHost {}
+"#;
+
 fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
     let alias = state.alias_for_path(file).unwrap();
     let snapshot = state.semantic_snapshot(&alias).unwrap();
@@ -66,7 +78,11 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
         .edges
         .iter()
         .filter(|edge| {
-            edge.relation == crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
+            matches!(
+                edge.relation,
+                crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
+                    | crate::layers::meta::semantic::SemanticRelation::ProviderUsesFactory
+            )
         })
         .collect();
     assert!(snapshot.authority.admits_relation_evidence(&snapshot.edges));
@@ -96,6 +112,9 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
     .unwrap();
     for name in ["left.ts", "right.ts"] {
         std::fs::write(p.join(name), "export class AuditApi {}").unwrap();
+    }
+    for name in ["factory-left.ts", "factory-right.ts"] {
+        std::fs::write(p.join(name), "export function makeAudit(){return {};}").unwrap();
     }
     std::fs::write(
         p.join("api.ts"),
@@ -163,7 +182,9 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             .as_array()
             .unwrap()
             .iter()
-            .filter(|edge| edge["relation"] == "ProviderUsesClass")
+            .filter(|edge| {
+                edge["relation"] == "ProviderUsesClass" || edge["relation"] == "ProviderUsesFactory"
+            })
             .map(|edge| json!([edge["subject"]["canonical"], edge["object"]["canonical"]]))
             .collect();
         assert_eq!(
@@ -247,6 +268,12 @@ fn strategy_answers(
     if source == SOURCE {
         return;
     }
+    let factory = source.contains("useFactory:");
+    let relation = if factory {
+        "ProviderUsesFactory"
+    } else {
+        "ProviderUsesClass"
+    };
     let response = call(
         state,
         root,
@@ -258,26 +285,40 @@ fn strategy_answers(
         .as_array()
         .unwrap()
         .iter()
-        .filter(|edge| edge["relation"] == "ProviderUsesClass")
+        .filter(|edge| edge["relation"] == relation)
         .map(|edge| {
             assert!(edge["subject"].get("canonical").is_none());
             assert!(edge["object"].get("canonical").is_none());
-            assert_eq!(edge["object"]["name"], "AuditApi");
+            assert_eq!(
+                edge["object"]["name"],
+                if factory { "makeAudit" } else { "AuditApi" }
+            );
             let token = crate::dictionary::path::canonical_identity_key(
                 edge["subject"]["file"].as_str().unwrap(),
             );
             let target = crate::dictionary::path::canonical_identity_key(
                 edge["object"]["file"].as_str().unwrap(),
             );
-            assert_eq!(token, target, "exact class strategy target");
-            target
+            (token, target)
         })
         .collect();
     actual.sort();
     let mut expected: Vec<_> = (0..owners)
         .flat_map(|_| {
             tokens.iter().map(|token| {
-                crate::dictionary::path::canonical_identity_key(&root.join(token).to_string_lossy())
+                let target = if factory {
+                    format!("factory-{token}")
+                } else {
+                    (*token).to_owned()
+                };
+                (
+                    crate::dictionary::path::canonical_identity_key(
+                        &root.join(token).to_string_lossy(),
+                    ),
+                    crate::dictionary::path::canonical_identity_key(
+                        &root.join(target).to_string_lossy(),
+                    ),
+                )
             })
         })
         .collect();
@@ -301,6 +342,11 @@ fn issue_162_provider_shorthand_lifecycle_restart_retains_exact_authority_and_en
 #[test]
 fn issue_162_provider_class_strategy_lifecycle_restart_retains_exact_pairs() {
     restart(CLASS_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_factory_lifecycle_restart_retains_exact_pairs() {
+    restart(FACTORY_SOURCE);
 }
 
 fn restart(source: &str) {
@@ -349,6 +395,11 @@ fn issue_162_provider_shorthand_lifecycle_stale_tokens_repair_and_independent_re
 #[test]
 fn issue_162_provider_class_strategy_lifecycle_stale_repair_and_independent_retirement() {
     stale_tokens_repair_and_retirement(CLASS_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_factory_lifecycle_stale_repair_and_independent_retirement() {
+    stale_tokens_repair_and_retirement(FACTORY_SOURCE);
 }
 
 #[test]

@@ -167,15 +167,28 @@ pub(crate) fn project_with_authority(
             ProviderStrategy::Factory => (SemanticRelation::ProviderUsesFactory, "ProviderFactory"),
             ProviderStrategy::Value => (SemanticRelation::ProviderUsesValue, "ProviderValue"),
         };
-        if matches!(binding.strategy, ProviderStrategy::Class)
+        let factory_declaration = retained.and_then(|(_, array)| {
+            let node = pair_value(entry, "useFactory", source.as_bytes())?;
+            super::string_token_authority::provider_field(array, "useFactory", node.start_byte(), node.end_byte())
+        }).is_some_and(|expression| matches!(&expression.value,
+            crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
+                crate::ir::typescript_resolution::Resolution::Resolved(id)) if id.kind == "function_declaration"));
+        if (matches!(binding.strategy, ProviderStrategy::Class)
+            || (matches!(binding.strategy, ProviderStrategy::Factory) && factory_declaration))
             && let Some(authority) = authority
             && retained.is_some()
         {
-            if let Some((subject, object)) = super::provider_class_authority::pair(
+            let strategy = if matches!(binding.strategy, ProviderStrategy::Class) {
+                super::provider_pair_authority::Strategy::Class
+            } else {
+                super::provider_pair_authority::Strategy::Factory
+            };
+            if let Some((subject, object)) = super::provider_pair_authority::pair(
                 authority,
                 owner_name,
                 entry.start_byte(),
                 entry.end_byte(),
+                strategy,
             ) {
                 edges.push(SemanticEdge {
                     relation,
@@ -187,7 +200,7 @@ pub(crate) fn project_with_authority(
             }
             continue;
         }
-        // Strategy facts retain their established noncanonical representation;
+        // Unmigrated strategy forms retain their noncanonical representation;
         // token-value equality does not certify a strategy endpoint or scope.
         let mut strategy_token = token;
         strategy_token.canonical = None;

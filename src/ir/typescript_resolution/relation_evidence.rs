@@ -6,12 +6,15 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
-            if edge.relation == crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
-                && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
+            if matches!(
+                edge.relation,
+                crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
+                    | crate::layers::meta::semantic::SemanticRelation::ProviderUsesFactory
+            ) && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::provider_class_authority::admits(self, edge);
+                    return crate::angular_meta::provider_pair_authority::admits(self, edge);
                 }
                 #[cfg(not(feature = "angular"))]
                 {

@@ -28,7 +28,7 @@ specialized semantics, and trace contracts before removing compatibility paths.
 | Functional DI | Exact type-role/value API/token evidence and canonical declaration projection are integrated. Tracked guard/resolver/interceptor controls and functional lifecycle scenarios pass in their recorded scopes. This is not complete functional syntax or injector closure. |
 | Public package entry | Owning package and consumed public entry remain distinct. Wrong-root/foreign/corrupted proof and HTTP SQLite/config/export/version controls pass. Exact null export blocking preserves unrelated guard/resolver proof in the tracked mixed-role test. Other unproved map outcomes remain errors. |
 | Current native preservation/lint | Generation-50 native cohort: 318 passed with explicit erased_namespace_query exclusion. Generation-50 all-target/all-feature Clippy: successful, zero diagnostics. The excluded frontier is unresolved, not a full native gate pass. |
-| Current operator binary acceptance | Generation-56 report 2026-10-25T14-09-56-640Z-24816: 1102/1102 checks, three FINISHED sessions, no errors. Binary SHA-256 699bc887fb489df3ec1c9013cac67fca874de0705384c6a6039745200a7210ea. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
+| Current operator binary acceptance | Generation-57 report 2026-10-25T15-44-43-046Z-9404: 1292/1292 checks, three FINISHED sessions, no errors. Binary SHA-256 872e4a541f7706b839f461072fdbc76473f54346d34f39c9b6c233bc613ae00b. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
 
 The earlier binary mixed-role failure remains preserved; the unchanged driver
 passed only after the production repair. Test-trigger corrections in earlier
@@ -65,6 +65,43 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Other discovered consumers | Inventory is not closed. New consumers must be added against their canonical questions without compiler-parity drift. |
 
 ## Next demonstrated consumer dependency
+
+### Factory identity control
+
+Generation-57 rebuilt factory acceptance is PASS: report
+2026-10-25T15-44-43-046Z-9404 records 1292/1292 checks, three FINISHED sessions
+and no errors. Fmt/Clippy/syntax GREEN are operator-reported without separate
+receipts. This supersedes binary-pending statements below within the exercised
+scope; no production changes accompanied the receipt. See the factory decision
+for binary provenance and limits.
+
+Generation-57 factory controls now include an inspected combined 25-test GREEN
+receipt (provider57-factory-currentness.log), with no failures/ignored or warnings.
+The binary helper is extended for factory pairs/string/function-target mutation
+through existing sessions and is UNRUN. See the factory decision for exact scope;
+no production change accompanied this harness extension.
+
+Factory approval is now granted for resolved function-declaration targets.
+Generation 57 extends the existing provider-pair interpreter with explicit
+class/factory policies; the unchanged RED is frozen/restored. Post-repair
+runtime controls are UNRUN. See the factory decision for exact evidence,
+compatibility preservation and remaining approval obligations. Approval-pending
+statements below record the earlier boundary.
+
+The factory control is observed RED: 0 passed, 1 failed, 0 ignored after its
+nonempty registration and retained-occurrence controls. Canonical token identity
+is missing; later target/admission assertions remain unclassified. The bounded
+[factory identity decision](ISSUE_162_PROVIDER_FACTORY_IDENTITY_DECISION.md)
+awaits explicit owner approval. No production repair was made.
+
+The useClass approval explicitly excludes factory identity. A new tracked
+public-query/retained-snapshot control now requires a nonempty useFactory
+registration, then exact token/function identities for two same-named exported
+function declarations through alias/barrel/namespace routes, with repeated
+registration and unrelated generic/prose noise. This control is UNRUN; no
+production change or semantic generation advance accompanies it. It makes no
+factory execution, return-type, deps, scope or injector-satisfaction claim.
+Any required factory authority extension remains a separate owner decision.
 
 ### Provider strategy declaration identity control
 

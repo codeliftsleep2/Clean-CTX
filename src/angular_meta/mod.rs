@@ -47,7 +47,7 @@ pub(crate) mod module_metadata;
 pub mod ngrx;
 pub mod phi;
 #[cfg(feature = "typescript")]
-pub(crate) mod provider_class_authority;
+pub(crate) mod provider_pair_authority;
 pub(crate) mod provider_semantics;
 pub mod reactive_forms;
 pub mod routing;

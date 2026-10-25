@@ -165,6 +165,15 @@ sessions and no errors. Rebuilt binary SHA-256:
 The tracked shifted-span regression is distinct Rust evidence; this receipt
 does not establish the full repository or final field gate.
 
+The generation-57 factory extension requires exact token/function origins for
+same-named functions, repeated pairs and a string token, with independent
+function-target interface mutation/repair. Existing three-session lifecycle,
+owner/package and class-strategy assertions remain. Generation-57 report
+2026-10-25T15-44-43-046Z-9404 records PASS: 1292/1292 checks, three FINISHED
+sessions and no errors, using rebuilt binary SHA-256
+872e4a541f7706b839f461072fdbc76473f54346d34f39c9b6c233bc613ae00b.
+This is operator binary evidence, separate from Rust/CI and final field gates.
+
 The generation-53 extension adds an independent strategy-provider owner with
 namespace/barrel useClass and useFactory. Its registrations share the existing
 restart and mutation scenarios and additionally retract on a type-only strategy

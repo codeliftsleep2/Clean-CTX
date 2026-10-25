@@ -17,6 +17,8 @@ import {AuditApi as Left} from './functional-left';
 import {AuditApi as Right} from './functional-right';
 import * as right from './functional-right';
 import * as strategies from './provider-strategies';
+import * as factoryLeft from './factory-left';
+import * as factoryRight from './factory-right';
 import type {RefusedApi as OnlyType} from './provider-type-only';
 const prose="api.obtain(Phantom); Intercept";
 function noise<T>(Left:T){return Left;}
@@ -35,6 +37,10 @@ export class StrategyProviderHost {}
 @View({providers:[{provide:Left,useClass:Left},{provide:Right,useClass:right.AuditApi},
  {provide:Left,useClass:Left},{provide:'audit.class',useClass:strategies.Implementation}]})
 export class ClassPairProviderHost {}
+@View({providers:[{provide:Left,useFactory:factoryLeft.makeAudit},
+ {provide:Right,useFactory:factoryRight.makeAudit},{provide:Left,useFactory:factoryLeft.makeAudit},
+ {provide:'audit.factory',useFactory:factoryLeft.makeAudit}]})
+export class FactoryPairProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
@@ -43,6 +49,8 @@ export const functionalFixture = {
   'provider-type-only.ts':'export class RefusedApi {}',
   'provider-implementation.ts':'export class Implementation {} export function makeAudit(){return new Implementation();}',
   'provider-strategies.ts':"export {Implementation,makeAudit} from './provider-implementation';",
+  'factory-left.ts':'export function makeAudit(){return {};}',
+  'factory-right.ts':'export function makeAudit(){return {};}',
   'provider-foreign.ts':'export function Component(metadata:unknown){return metadata;}',
   'functional-foreign.ts':'export type HttpInterceptorFn=(...args:unknown[])=>unknown;',
   'node_modules/@angular/router/package.json':JSON.stringify({name:'@angular/router',version:'20.0.0',types:'index.d.ts'}),
@@ -55,7 +63,7 @@ export function functionalAssertions({call,check,root,normalize,name}) {
   let sequence = 0;
   return async ({tokens = ['functional-left.ts','functional-right.ts'], http = true,
     owners = ['functional.ts','functional-neighbor.ts'], providerOwners = owners,
-    strategyOwners = providerOwners, implementation = true} = {}) => {
+    strategyOwners = providerOwners, implementation = true, factoryRight = true} = {}) => {
     const label = `${name}/functional/${++sequence}`;
     for (const file of ['functional.ts','functional-neighbor.ts']) {
       await call('workspace_query',{type:'entities_in_file',file_path:path.join(root,file),fidelity:'high'});
@@ -105,6 +113,29 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       expected.sort();
       check(`${label}/class-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/class-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
+    }
+    for (const tokenName of ['AuditApi','"audit.factory"']) {
+      const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
+      const edges = response.structuredContent?.edges;
+      check(`${label}/factory-pairs/${tokenName}/structured`,Array.isArray(edges),response);
+      const selected = edges.filter(edge => edge.relation === 'ProviderUsesFactory');
+      const actual = selected.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
+      const expected = [];
+      if (tokenName === 'AuditApi') {
+        for (const owner of providerOwners) for (const token of tokens) {
+          if (token === 'functional-right.ts' && !factoryRight) continue;
+          const target = token === 'functional-left.ts' ? 'factory-left.ts' : 'factory-right.ts';
+          expected.push([normalize(path.join(root,token)),'makeAudit',normalize(path.join(root,target))]);
+        }
+        if (tokens.includes('functional-right.ts')) for (const owner of strategyOwners) {
+          expected.push([normalize(path.join(root,'functional-right.ts')),'makeAudit',normalize(path.join(root,'provider-implementation.ts'))]);
+        }
+      } else for (const owner of providerOwners) {
+        expected.push([normalize(path.join(root,owner)),'makeAudit',normalize(path.join(root,'factory-left.ts'))]);
+      }
+      expected.sort();
+      check(`${label}/factory-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
+      check(`${label}/factory-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
     const decoy = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Guard',name:'loose'});
     const edges = decoy.structuredContent?.edges;
