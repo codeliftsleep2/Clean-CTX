@@ -114,12 +114,23 @@ pub(super) fn provider_value(
     start: usize,
     end: usize,
 ) -> Option<&ExpressionFacet> {
+    provider_field(array, "provide", start, end)
+}
+
+/// One exact retained provider field; duplicate fields never supply proof.
+pub(super) fn provider_field<'a>(
+    array: &'a ExpressionFacet,
+    field: &str,
+    start: usize,
+    end: usize,
+) -> Option<&'a ExpressionFacet> {
     let ExpressionValue::Array(entries) = &array.value else {
         return None;
     };
     let mut candidates = Vec::new();
     for entry in entries {
-        if entry.start == start
+        if field == "provide"
+            && entry.start == start
             && entry.end == end
             && matches!(entry.value, ExpressionValue::Reference(_))
         {
@@ -132,7 +143,7 @@ pub(super) fn provider_value(
         if fields.iter().any(|(key, _)| key.is_empty()) {
             continue;
         }
-        let mut tokens = fields.iter().filter(|(key, _)| key == "provide");
+        let mut tokens = fields.iter().filter(|(key, _)| key == field);
         let Some((_, value)) = tokens.next() else {
             continue;
         };

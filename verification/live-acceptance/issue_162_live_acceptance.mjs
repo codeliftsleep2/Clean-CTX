@@ -163,6 +163,12 @@ try {
     await functionalFacts();
     mutate('functional-right.ts', 'export interface AuditApi {}'); await functionalFacts({tokens:['functional-left.ts']});
     mutate('functional-right.ts', 'export class AuditApi {}'); await functionalFacts();
+    mutate('provider-strategies.ts', "export type {Implementation,makeAudit} from './provider-implementation';");
+    await functionalFacts({strategyOwners:[]});
+    mutate('provider-strategies.ts', fixture['provider-strategies.ts']); await functionalFacts();
+    mutate('provider-implementation.ts', 'export interface Implementation {} export function makeAudit(){return {};}');
+    await functionalFacts({implementation:false});
+    mutate('provider-implementation.ts', fixture['provider-implementation.ts']); await functionalFacts();
     mutate('node_modules/@angular/common/package.json', commonManifest(false)); await functionalFacts({http:false});
     mutate('node_modules/@angular/common/package.json', commonManifest()); await functionalFacts();
     mutate('functional-api.ts', functionalApi('@angular/common')); await functionalFacts({http:false});

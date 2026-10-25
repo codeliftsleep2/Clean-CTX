@@ -28,7 +28,7 @@ specialized semantics, and trace contracts before removing compatibility paths.
 | Functional DI | Exact type-role/value API/token evidence and canonical declaration projection are integrated. Tracked guard/resolver/interceptor controls and functional lifecycle scenarios pass in their recorded scopes. This is not complete functional syntax or injector closure. |
 | Public package entry | Owning package and consumed public entry remain distinct. Wrong-root/foreign/corrupted proof and HTTP SQLite/config/export/version controls pass. Exact null export blocking preserves unrelated guard/resolver proof in the tracked mixed-role test. Other unproved map outcomes remain errors. |
 | Current native preservation/lint | Generation-50 native cohort: 318 passed with explicit erased_namespace_query exclusion. Generation-50 all-target/all-feature Clippy: successful, zero diagnostics. The excluded frontier is unresolved, not a full native gate pass. |
-| Current operator binary acceptance | Generation-52 report 2026-10-24T20-18-22-338Z-17500: 845/845 checks, three FINISHED sessions, no errors. Binary SHA-256 188c0b53abc6c7b232a5b4eca9ccf3b599a83017015009295c3915083ab3765c. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
+| Current operator binary acceptance | Corrected generation-54 report 2026-10-25T02-45-45-417Z-28364: 1102/1102 checks, three FINISHED sessions, no errors. Binary SHA-256 c628366128a33289af30b91f8d6a0f9a74f984291df9695b79775a8e3784b204. This is distinct from Rust tests, CI and final real-workspace field acceptance. |
 
 The earlier binary mixed-role failure remains preserved; the unchanged driver
 passed only after the production repair. Test-trigger corrections in earlier
@@ -48,7 +48,7 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Template ownership | Current evaluator still calls component_template_edge from class metadata. Complete retained template-source ownership/lifecycle not established by this audit. |
 | Selector resolution | Required closed visible-declaration universe remains open. No new source conformance review performed here. |
 | Routing | Default evaluator still delegates to routing shape extraction. Full API/target/config migration is required and not certified here. |
-| Providers/DI | Migrated consumption and string registration slices coexist with nonmigrated registration/strategy paths. Concrete class-token provider identity gap is the next candidate below. |
+| Providers/DI | Declaration/string registration and shorthand slices have bounded GREEN receipts. Strategy references still use legacy identifier lookup; namespace strategy preservation is the next tracked control below. Injector closure remains open. |
 | Member semantics | Direct signal-member declarations and functional consumption are bounded GREEN; public aliases, inherited members and related full question contracts remain open. |
 | Signals | signals.rs still uses source/import text to nominate extraction. Complete API-role/reference migration and versioned forms remain unverified. |
 | NgRx | Default evaluator still delegates to existing NgRx shape/edge producers; object-action code retains bounded import helpers. #152 preservation does not certify the #162-wide canonical neighborhood. |
@@ -65,6 +65,131 @@ row is explicitly unreviewed, not deemed absent, defective or complete.
 | Other discovered consumers | Inventory is not closed. New consumers must be added against their canonical questions without compiler-parity drift. |
 
 ## Next demonstrated consumer dependency
+
+### Provider strategy declaration identity control
+
+The corrected generation-54 binary extension passed: report
+2026-10-25T02-45-45-417Z-28364 records 1102/1102 checks, three FINISHED sessions
+and no errors. The original expectation failure remains preserved; no Rust
+repair accompanied its correction. See the strategy decision for binary
+provenance and outstanding owner-approval obligations. Historical UNRUN and
+unclassified binary statements below are superseded within this exercised scope.
+
+Generation-54 binary extension first failed on an invalid interface-mutation
+registration expectation; the preserved report and correction are detailed in
+the strategy decision. The corrected harness is UNRUN, with no production repair
+or generation change. Later binary assertions are not claimed passed.
+
+Inspected provider54-target-lifecycle.log records 15 passed, no failures/ignored
+or reported warnings, including complete strategy pair persistence and independent
+implementation-only mutation/repair. The generation-54 binary helper extension
+is authored and UNRUN; see the strategy decision for its pair/string/target scope.
+
+The pair-adversarial batch is GREEN: provider54-pair-adversarial.log records
+12 passed with no failures/ignored or reported warnings. Class-strategy durable
+proof/public-answer assertions and two explicit useClass lifecycle controls are
+now authored and UNRUN, reusing the existing source-owned SQLite fixture. See
+the strategy decision for scope and remaining independent-target obligations.
+
+Generation-54 focused receipts record 45 passing test executions, 0 failures/
+ignored and no reported warnings, including the unchanged identity regression's
+target-origin and admission assertions. A separate tracked pair-adversarial
+control is now authored and UNRUN; see the decision checkpoint for its exact
+crossed-pair, string-token, repeated-occurrence and missing-proof boundaries.
+
+Owner approval is now granted for bounded useClass/class-shorthand pair authority.
+The [decision checkpoint](ISSUE_162_PROVIDER_STRATEGY_IDENTITY_DECISION.md)
+records generation-54 implementation and immutable RED restoration. Its shared
+Angular provider-position interpreter produces and validates canonical pairs
+against specific retained source-owned occurrences; no generic admission
+weakening or new lifecycle was introduced. All post-repair runtime controls
+remain UNRUN. Prior approval-pending statements below are historical.
+
+The operator observed 0 passed, 1 failed, 0 ignored: public registration and two
+retained strategy occurrences passed, then typed token identity was missing.
+Later target/admission assertions remain unclassified. The bounded
+[strategy identity decision](ISSUE_162_PROVIDER_STRATEGY_IDENTITY_DECISION.md)
+records the required source-owned provider-pair authority contract and awaits
+explicit approval. No production repair was made.
+
+A new tracked test first requires a nonempty public registration for one token
+with two same-named useClass targets from distinct files through alias/namespace
+references. It then requires both retained strategy occurrences to carry typed
+token and target declaration endpoints, distinct target origins and neutral
+admission. This is UNRUN. The current producer explicitly clears strategy token
+canonical evidence and constructs its target from a display name, so registration
+GREEN does not establish this identity contract. No production change accompanies
+the control. Choosing a canonical strategy relation contract remains a separate
+authority decision if the observed failure confirms that boundary; no injector
+scope, registration precedence or provider satisfaction is inferred.
+
+### Provider strategy namespace control
+
+Generation-53 operator binary report
+target/live-acceptance/issue-162/2026-10-24T23-21-30-640Z-3972/report.json records
+PASS: 936 checks, 0 failed, no errors and all three sessions FINISHED, including
+57 StrategyProviderHost checks. Binary SHA-256:
+fde4aac5881c4257866a54874520fb4781a280d4cdc55d5de02c11a258b43965;
+mtime: 2026-10-24T23:21:24.403Z. This supersedes the strategy binary extension's
+UNRUN checkpoint below. The operator also reports fmt, all-target/all-feature
+Clippy with -D warnings and both syntax preflights GREEN; separate gate receipt
+paths were not supplied. No production changes followed these results.
+This bounded checkpoint does not certify canonical strategy endpoint identity,
+injector closure, the full repository gate or final field acceptance.
+
+Operator provider53-adversarial.log records 10 passed, 0 failed, 0 ignored with
+no reported warnings. The new type-only/duplicate-field refusal and repair
+control passes for both useClass and useFactory. This supersedes its UNRUN
+checkpoint below.
+
+The existing binary helper now has an independent StrategyProviderHost using
+namespace/barrel useClass and useFactory references. Its token registrations
+must survive the existing restart/source/token scenarios, retract on a type-only
+strategy barrel and restore after repair while object/shorthand owners remain.
+No new session or runtime policy is added. This extension is UNRUN; generation-52
+binary results do not verify generation 53. Strategy endpoint identity and
+injector closure remain open.
+
+Operator provider53-*.log receipts record 43 passing test executions: 9 provider,
+6 provider semantics, 12 string, 14 module and both compatibility controls
+(1 each), with 0 failures/ignored and no reported warnings. The unchanged
+namespace regression now passes both useClass and useFactory, including its
+later repeated-query/provenance assertions. This supersedes the repair's UNRUN
+checkpoint below; it does not verify generation-53 binary acceptance.
+
+An additional tracked control now requires each namespace strategy to retract
+after its barrel becomes type-only, restore after dependency repair without
+editing consumer bytes, refuse duplicate strategy fields, and recover after
+source repair. This control is UNRUN; no production change accompanied it.
+
+The operator observed the ordinary useClass control pass, then namespace
+useClass returned zero registrations instead of one. Later factory assertions
+remain unclassified. Exact tests/registration were frozen in isolated-index stash
+0a230150af2a5a6c11add0d1cd5d21416e577136 and restored byte-identically:
+SHA-256 7cc3e4e26e62904f73a059df40387744863c92a61adcab3591708a2b5d445e08.
+Normal index and HEAD were untouched.
+
+Generation 53 demands useClass/useFactory through the existing native decorator
+field capture. The existing provider-position accessor now shares exact unique
+field lookup with these strategy references; the migrated parser requires its
+retained resolved occurrence instead of identifier spelling. No new native
+evidence type, acquisition owner or lifecycle is introduced. The no-authority
+compatibility path and existing noncanonical strategy projection remain. This
+does not establish canonical strategy endpoint identity, runtime construction,
+provider satisfaction or scope/precedence. Compatibility expectations advance
+with the payload meaning. All post-repair runtime controls are UNRUN; prior
+generation-52 receipts do not verify this production edit.
+
+A new tracked public-query control in angular_provider_declaration_identity_issue_162.rs
+first requires ordinary useClass/useFactory registration answers, then requires
+the same token registration through namespace/barrel strategy references and an
+aliased Component API. Repeated queries, token provenance, unrelated generic
+shadows and misleading prose are included. It tests registration preservation,
+not strategy endpoint identity or injector satisfaction. Source inspection finds
+parse_provider still delegates strategy references to the identifier-only legacy
+reference_identity helper. The new control is UNRUN; no production repair or
+generation change has been made. Later strategy cases remain unclassified if
+an earlier assertion fails.
 
 ### Provider declaration checkpoint
 

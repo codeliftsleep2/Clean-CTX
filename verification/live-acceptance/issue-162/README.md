@@ -140,6 +140,25 @@ The tracked merged-family durable test separately checks complete retained IDs/
 witnesses in session and index before query acquisition and retraction when the
 runtime class is removed.
 
+The generation-54 extension checks canonical class-strategy pairs for explicit
+and shorthand forms, repeated registrations, same-named targets and a string
+token. An implementation-only interface mutation retracts its class strategies
+and the registration requiring that runtime class; the unrelated factory
+registration survives. Existing sessions and transport
+policy are reused. Corrected generation-54 report
+2026-10-25T02-45-45-417Z-28364 records PASS: 1102/1102 checks, three FINISHED
+sessions and no errors. The interface-mutation expectation correction and
+original failed evidence are documented in the provider strategy identity
+decision. This is operator binary evidence, not a Rust/CI or final field gate.
+
+The generation-53 extension adds an independent strategy-provider owner with
+namespace/barrel useClass and useFactory. Its registrations share the existing
+restart and mutation scenarios and additionally retract on a type-only strategy
+barrel, recovering after repair without removing object/shorthand neighbors.
+Generation-53 report 2026-10-24T23-21-30-640Z-3972 records PASS: 936/936 checks,
+three FINISHED sessions and no errors. This is operator binary evidence,
+separate from tracked Rust results and final field acceptance.
+
 The generation-52 provider extension adds a separate shorthand-only owner to
 the existing functional helper. Local and namespace references must preserve two
 same-named class identities, deduplicate repeated registration and refuse a

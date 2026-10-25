@@ -16,6 +16,7 @@ import type {Match, Resolution, Intercept} from './functional-api';
 import {AuditApi as Left} from './functional-left';
 import {AuditApi as Right} from './functional-right';
 import * as right from './functional-right';
+import * as strategies from './provider-strategies';
 import type {RefusedApi as OnlyType} from './provider-type-only';
 const prose="api.obtain(Phantom); Intercept";
 function noise<T>(Left:T){return Left;}
@@ -28,12 +29,20 @@ export const loose=()=>{const decoy:Match=()=>true;api.obtain(Left);return decoy
 export class FunctionalProviderHost {}
 @View({providers:[Left,right.AuditApi,Left,OnlyType]})
 export class ShorthandProviderHost {}
+@View({providers:[{provide:Left,useClass:strategies.Implementation},
+ {provide:Right,useFactory:strategies.makeAudit}]})
+export class StrategyProviderHost {}
+@View({providers:[{provide:Left,useClass:Left},{provide:Right,useClass:right.AuditApi},
+ {provide:Left,useClass:Left},{provide:'audit.class',useClass:strategies.Implementation}]})
+export class ClassPairProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
   'functional-left.ts':'export class AuditApi {}', 'functional-right.ts':'export class AuditApi {}',
   'functional-api.ts':functionalApi(),
   'provider-type-only.ts':'export class RefusedApi {}',
+  'provider-implementation.ts':'export class Implementation {} export function makeAudit(){return new Implementation();}',
+  'provider-strategies.ts':"export {Implementation,makeAudit} from './provider-implementation';",
   'provider-foreign.ts':'export function Component(metadata:unknown){return metadata;}',
   'functional-foreign.ts':'export type HttpInterceptorFn=(...args:unknown[])=>unknown;',
   'node_modules/@angular/router/package.json':JSON.stringify({name:'@angular/router',version:'20.0.0',types:'index.d.ts'}),
@@ -45,7 +54,8 @@ export const functionalFixture = {
 export function functionalAssertions({call,check,root,normalize,name}) {
   let sequence = 0;
   return async ({tokens = ['functional-left.ts','functional-right.ts'], http = true,
-    owners = ['functional.ts','functional-neighbor.ts'], providerOwners = owners} = {}) => {
+    owners = ['functional.ts','functional-neighbor.ts'], providerOwners = owners,
+    strategyOwners = providerOwners, implementation = true} = {}) => {
     const label = `${name}/functional/${++sequence}`;
     for (const file of ['functional.ts','functional-neighbor.ts']) {
       await call('workspace_query',{type:'entities_in_file',file_path:path.join(root,file),fidelity:'high'});
@@ -61,16 +71,40 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/${kind}/exact-owner-token-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/${kind}/canonical-private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
-    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost']) {
+    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost']) {
       const providers = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Component',name:providerName});
       const registrations = providers.structuredContent?.edges;
       check(`${label}/${providerName}/structured`,Array.isArray(registrations),providers);
       const selectedProviders = registrations.filter(edge => edge.relation === 'RegistersProvider');
       const actualProviders = selectedProviders.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
-      const expectedProviders = providerOwners.flatMap(file => tokens.map(token =>
+      const registrationTokens = providerName === 'StrategyProviderHost' && !implementation
+        ? tokens.filter(token => token !== 'functional-left.ts') : tokens;
+      const expectedProviders = (providerName === 'StrategyProviderHost' ? strategyOwners : providerOwners).flatMap(file => registrationTokens.map(token =>
         [normalize(path.join(root,file)),'AuditApi',normalize(path.join(root,token))])).sort();
       check(`${label}/${providerName}/exact-declaration-identities`,JSON.stringify(actualProviders) === JSON.stringify(expectedProviders),{actualProviders,expectedProviders});
       check(`${label}/${providerName}/canonical-private`,selectedProviders.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
+    }
+    for (const tokenName of ['AuditApi','"audit.class"']) {
+      const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
+      const classEdges = response.structuredContent?.edges;
+      check(`${label}/class-pairs/${tokenName}/structured`,Array.isArray(classEdges),response);
+      const selected = classEdges.filter(edge => edge.relation === 'ProviderUsesClass');
+      const actual = selected.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
+      const expected = [];
+      if (tokenName === 'AuditApi') {
+        // Equal explicit/shorthand triples deduplicate within one asserting file.
+        for (const owner of providerOwners) for (const token of tokens) {
+          expected.push([normalize(path.join(root,token)),'AuditApi',normalize(path.join(root,token))]);
+        }
+        if (implementation && tokens.includes('functional-left.ts')) for (const owner of strategyOwners) {
+          expected.push([normalize(path.join(root,'functional-left.ts')),'Implementation',normalize(path.join(root,'provider-implementation.ts'))]);
+        }
+      } else if (implementation) for (const owner of strategyOwners) {
+        expected.push([normalize(path.join(root,owner)),'Implementation',normalize(path.join(root,'provider-implementation.ts'))]);
+      }
+      expected.sort();
+      check(`${label}/class-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
+      check(`${label}/class-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
     const decoy = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Guard',name:'loose'});
     const edges = decoy.structuredContent?.edges;

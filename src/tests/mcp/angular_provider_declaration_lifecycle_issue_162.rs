@@ -28,6 +28,17 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
     crate::protocol::captured_responses().pop().unwrap()
 }
 
+const CLASS_SOURCE: &str = r#"
+import {View} from './api';
+import {AuditApi as Left} from './left';
+import * as right from './right';
+const misleading="useClass:Phantom";
+function noise<T>(Left:T){return Left;}
+@View({providers:[{provide:Left,useClass:Left},
+ {provide:right.AuditApi,useClass:right.AuditApi},{provide:Left,useClass:Left}]})
+export class ProviderHost {}
+"#;
+
 fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
     let alias = state.alias_for_path(file).unwrap();
     let snapshot = state.semantic_snapshot(&alias).unwrap();
@@ -51,7 +62,27 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
             .iter()
             .all(|(owner, token)| owner.is_some() && token.is_some())
     );
-    json!({"authority":snapshot.authority,"source_hash":snapshot.source_hash,"endpoints":endpoints})
+    let strategies: Vec<_> = snapshot
+        .edges
+        .iter()
+        .filter(|edge| {
+            edge.relation == crate::layers::meta::semantic::SemanticRelation::ProviderUsesClass
+        })
+        .collect();
+    assert!(snapshot.authority.admits_relation_evidence(&snapshot.edges));
+    if !strategies.is_empty() {
+        assert_eq!(strategies.len(), 3, "retain all class strategy occurrences");
+        assert!(
+            strategies
+                .iter()
+                .all(|edge| edge.subject.canonical.is_some() && edge.object.canonical.is_some())
+        );
+    }
+    let strategies: Vec<_> = strategies
+        .iter()
+        .map(|edge| (&edge.subject.canonical, &edge.object.canonical))
+        .collect();
+    json!({"authority":snapshot.authority,"source_hash":snapshot.source_hash,"endpoints":endpoints,"strategies":strategies})
 }
 
 fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
@@ -128,6 +159,18 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             proof["endpoints"],
             "complete SQLite endpoints"
         );
+        let strategies: Vec<_> = durable["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|edge| edge["relation"] == "ProviderUsesClass")
+            .map(|edge| json!([edge["subject"]["canonical"], edge["object"]["canonical"]]))
+            .collect();
+        assert_eq!(
+            json!(strategies),
+            proof["strategies"],
+            "complete SQLite class strategy endpoints"
+        );
     }
     drop(database);
     (root, config, expected)
@@ -194,6 +237,57 @@ fn answers(state: &crate::mcp::McpState, root: &Path, owners: &[&str], tokens: &
     );
 }
 
+fn strategy_answers(
+    state: &crate::mcp::McpState,
+    root: &Path,
+    source: &str,
+    owners: usize,
+    tokens: &[&str],
+) {
+    if source == SOURCE {
+        return;
+    }
+    let response = call(
+        state,
+        root,
+        "workspace_query",
+        json!({"type":"forward_edges","domain":"angular","entity_type":"ProviderToken","name":"AuditApi"}),
+    );
+    assert!(response.get("error").is_none(), "{response}");
+    let mut actual: Vec<_> = response["result"]["structuredContent"]["edges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|edge| edge["relation"] == "ProviderUsesClass")
+        .map(|edge| {
+            assert!(edge["subject"].get("canonical").is_none());
+            assert!(edge["object"].get("canonical").is_none());
+            assert_eq!(edge["object"]["name"], "AuditApi");
+            let token = crate::dictionary::path::canonical_identity_key(
+                edge["subject"]["file"].as_str().unwrap(),
+            );
+            let target = crate::dictionary::path::canonical_identity_key(
+                edge["object"]["file"].as_str().unwrap(),
+            );
+            assert_eq!(token, target, "exact class strategy target");
+            target
+        })
+        .collect();
+    actual.sort();
+    let mut expected: Vec<_> = (0..owners)
+        .flat_map(|_| {
+            tokens.iter().map(|token| {
+                crate::dictionary::path::canonical_identity_key(&root.join(token).to_string_lossy())
+            })
+        })
+        .collect();
+    expected.sort();
+    assert_eq!(
+        actual, expected,
+        "source-owned class strategy occurrences after lifecycle transition"
+    );
+}
+
 #[test]
 fn issue_162_provider_declaration_lifecycle_restart_retains_exact_authority_and_endpoints() {
     restart(SOURCE);
@@ -202,6 +296,11 @@ fn issue_162_provider_declaration_lifecycle_restart_retains_exact_authority_and_
 #[test]
 fn issue_162_provider_shorthand_lifecycle_restart_retains_exact_authority_and_endpoints() {
     restart(SHORTHAND_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_class_strategy_lifecycle_restart_retains_exact_pairs() {
+    restart(CLASS_SOURCE);
 }
 
 fn restart(source: &str) {
@@ -218,6 +317,9 @@ fn restart(source: &str) {
         );
         assert!(response.get("error").is_none(), "{response}");
         assert_eq!(proof(&state, &file), expected, "before query reacquisition");
+        if source != SOURCE {
+            assert_eq!(expected["strategies"].as_array().unwrap().len(), 3);
+        }
         let owner = state.semantic_owner_path(&file);
         let index = state.workspace_index_read();
         assert_eq!(
@@ -231,6 +333,7 @@ fn restart(source: &str) {
         &["app.ts", "neighbor.ts"],
         &["left.ts", "right.ts"],
     );
+    strategy_answers(&state, root.path(), source, 2, &["left.ts", "right.ts"]);
 }
 
 #[test]
@@ -241,6 +344,82 @@ fn issue_162_provider_declaration_lifecycle_stale_tokens_repair_and_independent_
 #[test]
 fn issue_162_provider_shorthand_lifecycle_stale_tokens_repair_and_independent_retirement() {
     stale_tokens_repair_and_retirement(SHORTHAND_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_class_strategy_lifecycle_stale_repair_and_independent_retirement() {
+    stale_tokens_repair_and_retirement(CLASS_SOURCE);
+}
+
+#[test]
+fn issue_162_provider_class_strategy_lifecycle_independent_target_stale_restore_and_repair() {
+    let _serial = crate::protocol::handler_response_serial();
+    let source = CLASS_SOURCE.replace("provide:right.AuditApi", "provide:Left");
+    let (root, config, _) = setup(&source);
+    let p = root.path();
+    std::fs::write(p.join("right.ts"), "export interface AuditApi {}").unwrap();
+    let state = crate::mcp::McpState::new(config);
+    // Refuse stale adoption before any query can reacquire the provider proof.
+    for name in ["app.ts", "neighbor.ts"] {
+        let file = p.join(name).to_string_lossy().into_owned();
+        let response = call(&state, p, "restore_context", json!({"filePath":file}));
+        assert!(
+            response.get("error").is_some(),
+            "stale target adopted: {response}"
+        );
+        assert!(state.alias_for_path(&file).is_none());
+    }
+    for restored in [false, true] {
+        if restored {
+            std::fs::write(p.join("right.ts"), "export class AuditApi {}").unwrap();
+        }
+        answers(&state, p, &["app.ts", "neighbor.ts"], &["left.ts"]);
+        let response = call(
+            &state,
+            p,
+            "workspace_query",
+            json!({"type":"forward_edges","domain":"angular","entity_type":"ProviderToken","name":"AuditApi"}),
+        );
+        assert!(response.get("error").is_none(), "{response}");
+        let mut targets: Vec<_> = response["result"]["structuredContent"]["edges"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|edge| edge["relation"] == "ProviderUsesClass")
+            .map(|edge| {
+                assert_eq!(
+                    crate::dictionary::path::canonical_identity_key(
+                        edge["subject"]["file"].as_str().unwrap()
+                    ),
+                    crate::dictionary::path::canonical_identity_key(
+                        &p.join("left.ts").to_string_lossy()
+                    ),
+                    "token stays independent of target edits"
+                );
+                crate::dictionary::path::canonical_identity_key(
+                    edge["object"]["file"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        targets.sort();
+        let names = if restored {
+            vec!["left.ts", "right.ts"]
+        } else {
+            vec!["left.ts"]
+        };
+        let mut expected: Vec<_> = (0..2)
+            .flat_map(|_| {
+                names.iter().map(|name| {
+                    crate::dictionary::path::canonical_identity_key(&p.join(name).to_string_lossy())
+                })
+            })
+            .collect();
+        expected.sort();
+        assert_eq!(targets, expected, "independent target retraction/repair");
+        for name in ["app.ts", "neighbor.ts"] {
+            assert_eq!(std::fs::read_to_string(p.join(name)).unwrap(), source);
+        }
+    }
 }
 
 fn stale_tokens_repair_and_retirement(source: &str) {
@@ -259,6 +438,7 @@ fn stale_tokens_repair_and_retirement(source: &str) {
         assert!(state.alias_for_path(&file).is_none());
     }
     answers(&state, p, &["app.ts", "neighbor.ts"], &["left.ts"]);
+    strategy_answers(&state, p, source, 2, &["left.ts"]);
     std::fs::write(p.join("right.ts"), "export class AuditApi {}").unwrap();
     answers(
         &state,
@@ -267,6 +447,7 @@ fn stale_tokens_repair_and_retirement(source: &str) {
         &["left.ts", "right.ts"],
     );
     assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
+    strategy_answers(&state, p, source, 2, &["left.ts", "right.ts"]);
     assert_eq!(
         std::fs::read_to_string(p.join("neighbor.ts")).unwrap(),
         source
@@ -280,8 +461,10 @@ fn stale_tokens_repair_and_retirement(source: &str) {
     );
     assert!(response.get("error").is_none(), "{response}");
     answers(&state, p, &["neighbor.ts"], &["left.ts", "right.ts"]);
+    strategy_answers(&state, p, source, 1, &["left.ts", "right.ts"]);
     std::fs::remove_file(p.join("neighbor.ts")).unwrap();
     let response = call(&state, p, "refresh_workspace", json!({}));
     assert!(response.get("error").is_none(), "{response}");
     answers(&state, p, &[], &[]);
+    strategy_answers(&state, p, source, 0, &[]);
 }

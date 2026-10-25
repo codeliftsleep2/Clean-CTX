@@ -17,6 +17,10 @@ pub(crate) const DECLARATION_FIELDS: &[&str] = &[
     "standalone",
     "providers",
     "provide",
+    "useClass",
+    "useFactory",
+    "useValue",
+    "useExisting",
 ];
 #[cfg(feature = "typescript")]
 pub(crate) fn project_authoritative(

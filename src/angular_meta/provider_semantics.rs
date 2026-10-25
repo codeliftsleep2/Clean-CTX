@@ -139,8 +139,14 @@ pub(crate) fn project_with_authority(
             canonical = Some((super::string_token_authority::owner(id, owner_type), token));
         }
         let token_label = canonical.as_ref().map(|(_, token)| token.name.clone());
-        let Some(binding) = parse_provider(source_id, source, tree.root_node(), entry, token_label)
-        else {
+        let Some(binding) = parse_provider(
+            source_id,
+            source,
+            tree.root_node(),
+            entry,
+            token_label,
+            retained.map(|(_, array)| array),
+        ) else {
             continue;
         };
         let (registration_owner, token) = canonical.unwrap_or_else(|| {
@@ -161,6 +167,26 @@ pub(crate) fn project_with_authority(
             ProviderStrategy::Factory => (SemanticRelation::ProviderUsesFactory, "ProviderFactory"),
             ProviderStrategy::Value => (SemanticRelation::ProviderUsesValue, "ProviderValue"),
         };
+        if matches!(binding.strategy, ProviderStrategy::Class)
+            && let Some(authority) = authority
+            && retained.is_some()
+        {
+            if let Some((subject, object)) = super::provider_class_authority::pair(
+                authority,
+                owner_name,
+                entry.start_byte(),
+                entry.end_byte(),
+            ) {
+                edges.push(SemanticEdge {
+                    relation,
+                    subject,
+                    object,
+                    layer: "angular",
+                    call_evidence: None,
+                });
+            }
+            continue;
+        }
         // Strategy facts retain their established noncanonical representation;
         // token-value equality does not certify a strategy endpoint or scope.
         let mut strategy_token = token;
@@ -255,6 +281,7 @@ fn parse_provider(
     root: tree_sitter::Node<'_>,
     entry: tree_sitter::Node<'_>,
     proved_token_label: Option<String>,
+    retained_array: Option<&crate::ir::typescript_resolution::declaration_facets::ExpressionFacet>,
 ) -> Option<ProviderBinding> {
     if entry.kind() == "identifier"
         || (entry.kind() == "member_expression" && proved_token_label.is_some())
@@ -287,7 +314,27 @@ fn parse_provider(
     }
     let endpoint = match strategy {
         ProviderStrategy::Class | ProviderStrategy::Factory => {
-            reference_identity(source_id, source, root, endpoint_node)?
+            if let Some(array) = retained_array {
+                let field = if matches!(strategy, ProviderStrategy::Class) {
+                    "useClass"
+                } else {
+                    "useFactory"
+                };
+                let expression = super::string_token_authority::provider_field(
+                    array,
+                    field,
+                    endpoint_node.start_byte(),
+                    endpoint_node.end_byte(),
+                )?;
+                let crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
+                    crate::ir::typescript_resolution::Resolution::Resolved(id),
+                ) = &expression.value else {
+                    return None;
+                };
+                id.name.clone()
+            } else {
+                reference_identity(source_id, source, root, endpoint_node)?
+            }
         }
         ProviderStrategy::Value => value_identity(source_id, source, root, endpoint_node)?,
     };

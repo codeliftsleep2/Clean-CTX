@@ -96,6 +96,7 @@ fn provider_structural_authorities_are_joined() {
         tree.root_node(),
         entry,
         None,
+        None,
     )
     .expect("provider token/strategy endpoint authority");
     assert_eq!(binding.token, "ApiClient");
