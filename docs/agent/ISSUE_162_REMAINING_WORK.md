@@ -4,6 +4,24 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-25
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Combined C2/C3 binary acceptance inspected PASS
+
+Inspected the operator receipts: provider-imported-owners PASS, 332 checks;
+provider-composition preservation PASS, 190 checks. Each records zero failed
+checks/errors, three FINISHED sessions and the 500-check maximum. Both use binary
+SHA-256 b5a820fbe59fce1b4b695da0e807f9aaecf5216659cdd3070d780b7c9151236b,
+mtime 2026-10-26T19:36:00.297Z, and the same recorded input hash. Summary and
+receipt hashes are retained at target/issue-162/composition65-binary-receipt.json.
+The full logs are under target/issue-162/composition65-binary-20261026-153511/;
+syntax preflight passed 27 JavaScript files and the all-feature binary build
+finished without warnings/errors.
+
+This supersedes the binary UNRUN/deferred checkpoints below for these two suites.
+It verifies the bounded imported Component and Directive/Module composition
+production boundary and affected same-source preservation. No other live suite,
+full repository gate or final Claude field result is inferred. No production or
+harness change accompanies inspection. Broader P1/W04/#162 closure remains open.
+
 ## Where we are
 
 **We have a working, repeatedly verified foundation and several migrated Angular
@@ -153,7 +171,7 @@ answer portions; trace them before implementing replacements.
 
 | ID | Remaining obligation | Current evidence boundary | Exit needed for W04 |
 | --- | --- | --- | --- |
-| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component composition has generation-64 focused/preservation Rust and lint GREEN; binary acceptance is deferred. Directive/Module composition is approved and authored at generation 65, UNRUN; route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
+| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component and Directive/Module composition have scoped Rust/lint GREEN and inspected generation-65 binary PASS (332 imported-owner checks, 190 same-source preservation checks); route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
 | P2 | Strategy/form coverage and value meaning | Class shorthand/useClass, function-declaration useFactory and useExisting have bounded canonical pair evidence. Other callable forms retain classified compatibility behavior. useValue reference admission is verified; its strategy presentation remains noncanonical. | Reconcile each required form with its actual question and public fact. Only propose richer target/value identity when a demonstrated question requires it; do not assume a general evaluator. Record genuine unsupported forms and resolve required capabilities rather than silently excluding them. |
 | P3 | Injector/application context | Local token/pair identity does not identify the applicable injector or connect its owner to the actual application/configuration hierarchy. | Establish the required owner/application/injector context and visibility proof, with distinct applications/scopes and current dependency paths. This is a prerequisite for effective-provider claims. |
 | P4 | Multi, overrides and precedence | Existing deduplication preserves semantic fact identity; it is not an ordered registration/multi/override model. No winning-provider claim follows from existing edges. | Define and verify the required order/multi/override questions against real registration context, with explicit runtime uncertainty. Architectural changes require the actual bounded owner decision. |

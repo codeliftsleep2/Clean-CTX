@@ -13,6 +13,7 @@ export const suites = [
   "provider-directive",
   "provider-positions",
   "provider-composition",
+  "provider-imported-owners",
   "provider-class",
   "provider-factory",
   "provider-existing",

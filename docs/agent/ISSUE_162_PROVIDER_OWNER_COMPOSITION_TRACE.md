@@ -1,7 +1,7 @@
 # Issue #162: Directive/NgModule provider composition
 
 Agent: Agent MaxHeadRoom
-Status: P1.C3 owner APPROVED; generation-65 scoped Rust checkpoint GREEN (135 passing executions; invalid control corrected), fmt/Clippy GREEN; integrated binary acceptance pending.
+Status: P1.C3 owner APPROVED; generation-65 scoped Rust/lint GREEN; combined C2/C3 binary acceptance inspected PASS (332 + 190 checks); broader gates open.
 
 The operator log now records 0 passed, 12 failed, 0 ignored. All reached the
 composed-owner count assertion after direct-owner and matching composed-Component
@@ -10,6 +10,24 @@ records exact byte evidence, admission implications and one integrated proposal
 for both owners. Historical UNRUN statements below describe initial authorship.
 The approved implementation checkpoint is now recorded in that decision;
 historical pre-repair statements below do not certify its runtime acceptance.
+
+## Combined C2/C3 binary acceptance inspected PASS
+
+Inspected the operator receipts: provider-imported-owners PASS, 332 checks;
+provider-composition preservation PASS, 190 checks. Each records zero failed
+checks/errors, three FINISHED sessions and the 500-check maximum. Both use binary
+SHA-256 b5a820fbe59fce1b4b695da0e807f9aaecf5216659cdd3070d780b7c9151236b,
+mtime 2026-10-26T19:36:00.297Z, and the same recorded input hash. Summary and
+receipt hashes are retained at target/issue-162/composition65-binary-receipt.json.
+The full logs are under target/issue-162/composition65-binary-20261026-153511/;
+syntax preflight passed 27 JavaScript files and the all-feature binary build
+finished without warnings/errors.
+
+This supersedes the binary UNRUN/deferred checkpoints below for these two suites.
+It verifies the bounded imported Component and Directive/Module composition
+production boundary and affected same-source preservation. No other live suite,
+full repository gate or final Claude field result is inferred. No production or
+harness change accompanies inspection. Broader P1/W04/#162 closure remains open.
 
 ## Canonical question and batch boundary
 

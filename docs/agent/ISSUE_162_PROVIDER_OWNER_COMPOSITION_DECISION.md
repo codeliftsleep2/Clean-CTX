@@ -1,7 +1,39 @@
 # Issue #162: Directive/NgModule declared provider composition
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-65 focused/preservation Rust checkpoint GREEN (135 passing executions; historical control failure corrected); fmt/Clippy GREEN; combined C2/C3 binary acceptance pending.
+Status: owner APPROVED; scoped Rust/lint GREEN; generation-65 combined C2/C3 binary acceptance inspected PASS (332 imported-owner + 190 preservation checks); broader repository/field gates open.
+
+## Combined C2/C3 binary acceptance inspected PASS
+
+Inspected the operator receipts: provider-imported-owners PASS, 332 checks;
+provider-composition preservation PASS, 190 checks. Each records zero failed
+checks/errors, three FINISHED sessions and the 500-check maximum. Both use binary
+SHA-256 b5a820fbe59fce1b4b695da0e807f9aaecf5216659cdd3070d780b7c9151236b,
+mtime 2026-10-26T19:36:00.297Z, and the same recorded input hash. Summary and
+receipt hashes are retained at target/issue-162/composition65-binary-receipt.json.
+The full logs are under target/issue-162/composition65-binary-20261026-153511/;
+syntax preflight passed 27 JavaScript files and the all-feature binary build
+finished without warnings/errors.
+
+This supersedes the binary UNRUN/deferred checkpoints below for these two suites.
+It verifies the bounded imported Component and Directive/Module composition
+production boundary and affected same-source preservation. No other live suite,
+full repository gate or final Claude field result is inferred. No production or
+harness change accompanies inspection. Broader P1/W04/#162 closure remains open.
+
+## Combined C2/C3 binary batch authored, UNRUN
+
+Agent MaxHeadRoom added provider-imported-owners using the existing binary/stdio
+runner, source/input hashes, three-session transport and hard 500-check ceiling.
+Nine same-named owners independently exercise alias, barrel and namespace routes
+for Component, Directive and Module. Exact public source/token/position multisets
+include local siblings and Component-only view registration. Batched restart,
+contributor/token/barrel mutation, cycles, field/source retirement, stale restore
+refusal before queries, configuration/package mutation and unchanged-owner repair
+are selected together. Existing provider-composition is the affected preservation
+suite. The logged operator handoff rebuilds once and runs those two suites; no
+agent-run Node/build/runtime or new Rust production change accompanies authorship.
+All new binary controls remain UNRUN; existing Rust/lint evidence is unchanged.
 
 ## Generation-65 scoped Rust preservation/lint GREEN
 

@@ -151,13 +151,14 @@ try {
     'barrel.ts': "export { FeatureModule as PublicFeature } from './feature';",
     'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture, ...memberFixture, ...functionalFixture,
     'functional.ts': functionalSource, 'functional-neighbor.ts': functionalSource,
+    ...suite.fixture,
   };
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare class InjectionToken<T> { constructor(description: string); }';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare function input<T>(value:T):unknown; export declare function output<T>():unknown;';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare const model: {required:<T>()=>unknown;};';
   for (const [name, text] of Object.entries(fixture)) write(name, text);
   report.fixture = fixture; report.ownerHash = hash(Buffer.from(app)); report.dashboardHash = hash(Buffer.from(dashboard)); save();
-  await runLifecycle({session,binary,checkpointFiles,root,fixture,mutate,leaf,check,functionalSource,positionOrdinary,positionView}, suite);
+  await (suite.lifecycle ?? runLifecycle)({session,binary,checkpointFiles,root,fixture,mutate,leaf,check,functionalSource,positionOrdinary,positionView}, suite);
   check('binary-unchanged', hash(fs.readFileSync(binary)) === report.binary.sha256);
   for (const item of report.inputs) {
     if (hash(fs.readFileSync(path.join(repo, item.file))) !== item.sha256) throw new Error(`input changed: ${item.file}`);

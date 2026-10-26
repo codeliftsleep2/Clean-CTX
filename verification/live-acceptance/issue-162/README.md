@@ -10,8 +10,28 @@ hashes and maximum of 500 recorded checks. Exceeding the limit fails the suite;
 checks are never truncated into a misleading PASS. Shared fixtures, assertion
 helpers, lifecycle scenarios and the established McpClient transport are reused.
 
-For the current composition slice, select provider-composition after the
-binary has been rebuilt for the Rust changes:
+For the combined generation-65 C2/C3 major checkpoint, run the logged handoff
+from the repository root. It checks JavaScript syntax, rebuilds once with all
+features, then runs provider-imported-owners and existing provider-composition
+preservation. Each remains a separate bounded three-session receipt. Stop on
+any failure; full console output is retained under target/issue-162/.
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-composition-checkpoint.ps1
+```
+
+The imported-owner suite covers three independently selected alias/barrel/namespace
+routes for each of Component, Directive and Module, with same-named owners/tokens,
+shared contributors and local siblings. It compares exact typed relation/source
+multisets, refuses Directive/Module views, and exercises restart, mutable/cyclic/
+deleted contributors, token/type-only barrel changes, independent field/source
+retirement, stale restore before queries and unchanged-owner config/package repair.
+Generation-65 operator receipts record PASS: 332 imported-owner checks and 190
+same-source preservation checks, six FINISHED sessions, zero errors. The receipt
+summary is target/issue-162/composition65-binary-receipt.json. These results do not
+certify other suites, Rust/CI or final Claude field acceptance.
+
+For an individual same-source preservation run after an explicit rebuild:
 
 ```powershell
 node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe provider-composition
@@ -38,12 +58,13 @@ node verification/live-acceptance/issue-162/suites/provider-composition.mjs ./ta
 | provider-directive | Directive-owned registration |
 | provider-positions | Ordinary/view declaration distinction and independent field removal |
 | provider-composition | Same-source const/alias, spread/nested membership and independent mutation/retirement |
+| provider-imported-owners | Combined C2/C3 imported routes, exact actual owner/position and lifecycle |
 | provider-class | Canonical class pairs |
 | provider-factory | Canonical factory pairs |
 | provider-existing | Canonical existing-token pairs |
 | provider-value-presentation | Explicitly noncanonical value projection |
 
-The 17-suite inventory is explicit in suite-manifest.mjs. A full run is opt-in:
+The 18-suite inventory is explicit in suite-manifest.mjs. A full run is opt-in:
 
 ```powershell
 node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe all
