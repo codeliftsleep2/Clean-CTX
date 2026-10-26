@@ -5,7 +5,14 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum DemandedValue {
     Reference(Resolution),
-    Literal { kind: String, text: String },
+    Literal {
+        kind: String,
+        text: String,
+    },
+    Structure {
+        kind: String,
+        children: Vec<(String, usize, usize)>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -42,6 +49,43 @@ impl TypeScriptAuthority {
         });
         let site = sites.next()?;
         sites.next().is_none().then_some(&site.value)
+    }
+
+    pub(crate) fn admits_demanded_structure(
+        &self,
+        source: &Path,
+        hash: &str,
+        value: &super::declaration_facets::ExpressionFacet,
+    ) -> bool {
+        use super::declaration_facets::ExpressionValue;
+        let Some(DemandedValue::Structure { kind, children }) =
+            self.demanded_at(source, hash, value.start, value.end)
+        else {
+            return false;
+        };
+        let actual: Vec<_> = match &value.value {
+            ExpressionValue::Spread(child) if kind == "spread" => {
+                vec![(String::new(), child.start, child.end)]
+            }
+            ExpressionValue::Array(values) if kind == "array" => values
+                .iter()
+                .map(|v| (String::new(), v.start, v.end))
+                .collect(),
+            ExpressionValue::Object(fields) if kind == "object" => fields
+                .iter()
+                .map(|(name, v)| (name.clone(), v.start, v.end))
+                .collect(),
+            _ => return false,
+        };
+        if &actual != children {
+            return false;
+        }
+        let mut previous = value.start;
+        actual.iter().all(|(_, start, end)| {
+            let valid = previous <= *start && start < end && *end <= value.end;
+            previous = *end;
+            valid
+        })
     }
 
     pub(crate) fn demanded_reference_at(

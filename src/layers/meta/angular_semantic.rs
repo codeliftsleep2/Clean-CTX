@@ -255,6 +255,10 @@ pub(super) fn extract_non_testing_edges(
         edges.extend(shape.to_semantic_edges());
     }
 
+    #[cfg(feature = "typescript")]
+    if let Some(authority) = evidence.typescript_authority {
+        edges.extend(crate::angular_meta::route_providers::project(authority));
+    }
     edges
 }
 

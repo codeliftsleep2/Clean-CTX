@@ -7,6 +7,13 @@ impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
             #[cfg(feature = "angular")]
+            if edge.subject.entity_type == "Route"
+                && edge.relation
+                    == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
+            {
+                return crate::angular_meta::route_providers::admits(self, edge);
+            }
+            #[cfg(feature = "angular")]
             if edge.relation == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
                 && matches!(
                     edge.subject.entity_type,
@@ -107,6 +114,7 @@ impl TypeScriptAuthority {
 
     fn admits_endpoint(&self, entity: &EntityRef, endpoint: &CanonicalEndpoint) -> bool {
         let declaration = match endpoint {
+            CanonicalEndpoint::RouteOccurrence { .. } => return false,
             CanonicalEndpoint::Declaration { declaration, .. } => declaration,
             CanonicalEndpoint::StringValue {
                 string_value,

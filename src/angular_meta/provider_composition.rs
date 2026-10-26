@@ -68,7 +68,7 @@ pub(super) fn entries<'a>(
     root: &'a ExpressionFacet,
     compose: bool,
 ) -> Vec<&'a ExpressionFacet> {
-    walk(authority, root, compose, false)
+    walk(authority, root, compose, false, false)
         .into_iter()
         .map(|entry| entry.facet)
         .collect()
@@ -78,7 +78,21 @@ pub(super) fn qualified_entries<'a>(
     authority: &'a TypeScriptAuthority,
     root: &'a ExpressionFacet,
 ) -> Vec<Entry<'a>> {
-    walk(authority, root, true, true)
+    walk(authority, root, true, true, false)
+}
+
+/// Route owners require independently captured container occurrences as well.
+pub(super) fn proved_entries<'a>(
+    authority: &'a TypeScriptAuthority,
+    root: &'a ExpressionFacet,
+) -> Vec<Entry<'a>> {
+    walk(authority, root, true, true, true)
+}
+
+#[derive(Clone, Copy)]
+struct ProofPolicy {
+    imported: bool,
+    structure: bool,
 }
 
 fn walk<'a>(
@@ -86,6 +100,7 @@ fn walk<'a>(
     root: &'a ExpressionFacet,
     compose: bool,
     imported: bool,
+    structure: bool,
 ) -> Vec<Entry<'a>> {
     let mut result = Vec::new();
     let root = Entry {
@@ -99,7 +114,10 @@ fn walk<'a>(
             authority,
             root,
             false,
-            imported,
+            ProofPolicy {
+                imported,
+                structure,
+            },
             &mut BTreeSet::new(),
             &mut result,
         );
@@ -118,12 +136,21 @@ fn visit<'a>(
     authority: &'a TypeScriptAuthority,
     entry: Entry<'a>,
     inside_array: bool,
-    imported: bool,
+    policy: ProofPolicy,
     active: &mut BTreeSet<DeclarationId>,
     result: &mut Vec<Entry<'a>>,
 ) {
     let value = entry.facet;
     if value.start >= value.end {
+        return;
+    }
+    if policy.structure
+        && matches!(
+            value.value,
+            ExpressionValue::Array(_) | ExpressionValue::Object(_) | ExpressionValue::Spread(_)
+        )
+        && !authority.admits_demanded_structure(entry.source, entry.hash, value)
+    {
         return;
     }
     match &value.value {
@@ -133,7 +160,7 @@ fn visit<'a>(
                     authority,
                     Entry { facet, ..entry },
                     true,
-                    imported,
+                    policy,
                     active,
                     result,
                 );
@@ -147,7 +174,7 @@ fn visit<'a>(
                     ..entry
                 },
                 false,
-                imported,
+                policy,
                 active,
                 result,
             );
@@ -163,7 +190,7 @@ fn visit<'a>(
                     .and_then(|span| authority.value_reference_at(span))
                     == Some(id)
             } else {
-                imported
+                policy.imported
                     && authority.demanded_reference_at(
                         entry.source,
                         entry.hash,
@@ -172,7 +199,7 @@ fn visit<'a>(
                     ) == Some(id)
             };
             if !proved
-                || (!imported
+                || (!policy.imported
                     && (id.source != authority.source || id.source_hash != authority.source_hash))
                 || !active.insert(id.clone())
             {
@@ -202,7 +229,7 @@ fn visit<'a>(
                         crossed: entry.crossed || id.source.as_path() != entry.source,
                     },
                     false,
-                    imported,
+                    policy,
                     active,
                     result,
                 );

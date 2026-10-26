@@ -21,10 +21,54 @@ pub(super) fn project(
     if root.start >= root.end || root.end > owner.end {
         return Vec::new();
     }
+    project_entries(
+        authority,
+        owner,
+        super::string_token_authority::owner(owner, owner_type),
+        root,
+        true,
+        position.relation(),
+    )
+}
+
+/// Shared terminal policies; specialized owners supply only proved membership.
+pub(super) fn project_entries(
+    authority: &TypeScriptAuthority,
+    owner: &crate::ir::typescript_resolution::DeclarationId,
+    subject: EntityRef,
+    root: &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    imported_only: bool,
+    registration: SemanticRelation,
+) -> Vec<SemanticEdge> {
     let mut edges = Vec::new();
-    for occurrence in super::provider_composition::qualified_entries(authority, root) {
+    let strict = matches!(
+        subject.canonical,
+        Some(crate::layers::meta::canonical_endpoint::CanonicalEndpoint::RouteOccurrence { .. })
+    );
+    let occurrences = if strict {
+        super::provider_composition::proved_entries(authority, root)
+    } else {
+        super::provider_composition::qualified_entries(authority, root)
+    };
+    for occurrence in occurrences {
         // Existing owner-source syntax/compatibility interpretation is preserved.
-        if !occurrence.crossed {
+        if imported_only && !occurrence.crossed {
+            continue;
+        }
+        if strict
+            && let ExpressionValue::Object(fields) = &occurrence.facet.value
+            && fields
+                .iter()
+                .filter(|(key, _)| key == "useValue")
+                .any(|(_, value)| {
+                    matches!(
+                        value.value,
+                        ExpressionValue::Literal
+                            | ExpressionValue::Boolean(_)
+                            | ExpressionValue::StringValue(_)
+                    ) && occurrence.literal(authority, value).is_none()
+                })
+        {
             continue;
         }
         let Some(token) =
@@ -32,11 +76,7 @@ pub(super) fn project(
         else {
             continue;
         };
-        edges.push(edge(
-            position.relation(),
-            super::string_token_authority::owner(owner, owner_type),
-            token.clone(),
-        ));
+        edges.push(edge(registration, subject.clone(), token.clone()));
         let (strategy, relation, field) = match &occurrence.facet.value {
             ExpressionValue::Reference(_) => (
                 Some(Strategy::Class),

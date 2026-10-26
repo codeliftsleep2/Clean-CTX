@@ -212,7 +212,8 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && actual.file == expected.file
             && actual.canonical == expected.canonical
     };
-    super::provider_imported::admits(authority, edge)
+    super::route_providers::admits(authority, edge)
+        || super::provider_imported::admits(authority, edge)
         || authority
             .declaration_facets
             .iter()

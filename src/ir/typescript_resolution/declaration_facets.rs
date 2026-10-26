@@ -40,6 +40,8 @@ pub(crate) struct DeclarationFacet {
     pub declaration: DeclarationId,
     pub decorators: Vec<DecoratorFacet>,
     pub initializer: Option<ExpressionFacet>,
+    #[serde(default)]
+    pub type_annotation: Option<ExpressionFacet>,
 }
 
 struct Demand<'a> {
@@ -83,9 +85,9 @@ pub(super) fn capture(
         }) {
             demand.declaration(id);
         }
-        // Directly annotated source-owned callable declarations are demanded
-        // owners for the established functional consumers. Retain declaration
-        // proof without evaluating function bodies or visiting dependency owners.
+        // Directly annotated source-owned callables and demanded array syntax
+        // retain neutral declaration/type/initializer association. Framework
+        // consumers still prove their exact native root; no role comes from shape.
         if let Some(tree) = demand.resolver.source_tree(request) {
             for id in declarations
                 .iter()
@@ -95,6 +97,7 @@ pub(super) fn capture(
                     node.child_by_field_name("type").is_some()
                         && node.child_by_field_name("value").is_some_and(|value| {
                             matches!(value.kind(), "arrow_function" | "function_expression")
+                                || (!fields.is_empty() && value.kind() == "array")
                         })
                 }) {
                     demand.declaration(id);
@@ -226,12 +229,35 @@ impl Demand<'_> {
                 .map(|value| self.expression(value, &id.source, &source))
         })
         .flatten();
+        // Neutral exact annotation occurrence; no framework role is inferred.
+        let type_annotation = node.child_by_field_name("type").and_then(|annotation| {
+            let mut cursor = annotation.walk();
+            let mut children = annotation.named_children(&mut cursor);
+            let value = children.next()?;
+            if children.next().is_some()
+                || !matches!(value.kind(), "type_identifier" | "nested_type_identifier")
+            {
+                return None;
+            }
+            let span = crate::ir::invocation_evidence::SourceSpan::new(
+                value.start_byte(),
+                value.end_byte(),
+            )
+            .ok()?;
+            let resolution = self.resolver.type_reference(&id.source, &source, span)?;
+            Some(ExpressionFacet {
+                start: value.start_byte(),
+                end: value.end_byte(),
+                value: ExpressionValue::Reference(resolution),
+            })
+        });
         self.facets.insert(
             id.clone(),
             DeclarationFacet {
                 declaration: id.clone(),
                 decorators,
                 initializer,
+                type_annotation,
             },
         );
     }
@@ -410,6 +436,37 @@ impl Demand<'_> {
             "number" | "null" => ExpressionValue::Literal,
             _ => ExpressionValue::Unsupported(node.kind().into()),
         };
+        let structure = match &value {
+            ExpressionValue::Spread(child) => {
+                Some(("spread", vec![(String::new(), child.start, child.end)]))
+            }
+            ExpressionValue::Array(children) => Some((
+                "array",
+                children
+                    .iter()
+                    .map(|child| (String::new(), child.start, child.end))
+                    .collect(),
+            )),
+            ExpressionValue::Object(fields) => Some((
+                "object",
+                fields
+                    .iter()
+                    .map(|(name, child)| (name.clone(), child.start, child.end))
+                    .collect(),
+            )),
+            _ => None,
+        };
+        if let Some((kind, children)) = structure {
+            self.occurrence(
+                node,
+                file,
+                source,
+                DemandedValue::Structure {
+                    kind: kind.into(),
+                    children,
+                },
+            );
+        }
         ExpressionFacet {
             start: node.start_byte(),
             end: node.end_byte(),

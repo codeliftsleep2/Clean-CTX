@@ -14,6 +14,9 @@ pub(crate) struct CanonicalDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub(crate) enum CanonicalEndpoint {
+    RouteOccurrence {
+        route_occurrence: RouteOccurrence,
+    },
     Declaration {
         declaration: CanonicalDeclaration,
         site: Option<(usize, usize)>,
@@ -22,6 +25,17 @@ pub(crate) enum CanonicalEndpoint {
         string_value: Vec<u16>,
         proof: LiteralProof,
     },
+}
+
+/// A route object is an occurrence under a proved configuration declaration,
+/// never a fabricated declaration or a path-string identity.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RouteOccurrence {
+    pub root: CanonicalDeclaration,
+    pub source: std::path::PathBuf,
+    pub source_hash: String,
+    pub start: usize,
+    pub end: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -37,6 +51,7 @@ pub(crate) struct LiteralProof {
 /// Deduplication identity is separate from occurrence/provenance evidence.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum CanonicalKey {
+    RouteOccurrence(RouteOccurrence),
     Declaration(CanonicalDeclaration, Option<(usize, usize)>),
     StringValue(Vec<u16>),
 }
@@ -44,6 +59,9 @@ pub(crate) enum CanonicalKey {
 impl CanonicalEndpoint {
     pub(crate) fn key(&self) -> CanonicalKey {
         match self {
+            Self::RouteOccurrence { route_occurrence } => {
+                CanonicalKey::RouteOccurrence(route_occurrence.clone())
+            }
             Self::Declaration { declaration, site } => {
                 CanonicalKey::Declaration(declaration.clone(), *site)
             }

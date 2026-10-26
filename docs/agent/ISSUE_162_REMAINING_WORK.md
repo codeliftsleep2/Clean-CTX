@@ -224,8 +224,9 @@ is owner-approved. Generation-64 imported focused receipt records 11 passed, zer
 including all six unchanged REDs and five integrated controls. Compilation is
 operator-reported GREEN. Seven preservation receipts add 107 passing executions
 (zero failed/ignored); fmt/Clippy are GREEN. The combined scoped Rust total is
-118 passing executions. Bounded binary acceptance remains deferred and open. Node acceptance is
-batched at major integrated checkpoints after substantial deterministic work.
+118 passing executions at that generation. The later generation-65 combined C2/C3
+binary checkpoint now supplies bounded acceptance: imported owners 332 PASS and
+same-source preservation 190 PASS, with six FINISHED sessions and no errors.
 
 Next mapped batch: [P1.C3 Directive/NgModule provider composition](ISSUE_162_PROVIDER_OWNER_COMPOSITION_TRACE.md).
 Twelve tracked controls cover both ordinary-provider owners across nested/local
@@ -238,8 +239,27 @@ the twelve unchanged REDs and five integrated tests (both owners per test).
 Preservation adds 118 passing executions (67 earlier provider passes, one corrected
 control rerun and 50 remaining checks); the historical invalid-control failure is
 retained and resolved. Scoped generation-65 total: 135 passing executions;
-fmt/Clippy GREEN. P1.C2 binary acceptance remains queued for the major
-integrated C2/C3 checkpoint; no binary pass or broader closure is inferred.
+fmt/Clippy GREEN. Combined generation-65 C2/C3 binary acceptance is inspected PASS
+(332 imported-owner and 190 same-source preservation checks). These bounded
+subquestions have local acceptance; broader repository/field and P1 gates remain.
+
+Next investigation: [P1.R1 route-declared provider membership](ISSUE_162_ROUTE_PROVIDER_TRACE.md).
+Two tracked direct/imported public controls produced the intended omission REDs
+(0 passed, 2 failed), after established native Component registrations and existing
+route projection prerequisites. Exact evidence is archived; the
+[bounded route decision](ISSUE_162_ROUTE_PROVIDER_DECISION.md) is owner-approved
+with private route identity and a mandatory public-API guardrail. Generation-66
+compilation/focused checkpoint is inspected GREEN: 6 passed, zero failed/ignored,
+47.04 seconds, including the two unchanged REDs and four integrated controls.
+The additional exit controls and scoped preservation/lint/guard batch are now
+GREEN: 161 preservation passes plus six initial, four earlier exit passes and
+one corrected acquisition-control rerun yield 172 passing executions. Historical
+failure evidence is preserved; automatic removed-root rediscovery is not certified.
+Approval reconciliation, binary integration and broader repository/field gates
+remain open. No immediate Node run is requested.
+Route shape omits providers; native route-root demand and distinct route-object
+identity require tracing/approval before production extension. No injector model
+or route authority change is authorized by the previous class-owner approvals.
 
 ## What counts as closing an implementation package
 

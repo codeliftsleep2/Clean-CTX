@@ -56,6 +56,8 @@ pub(crate) mod provider_pair_authority;
 pub(crate) mod provider_position;
 pub(crate) mod provider_semantics;
 pub mod reactive_forms;
+#[cfg(feature = "typescript")]
+pub(crate) mod route_providers;
 pub mod routing;
 pub mod rx;
 pub mod semantic;
