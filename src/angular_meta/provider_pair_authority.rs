@@ -55,7 +55,7 @@ pub(super) fn pair_at(
     let entry = super::provider_composition::entry_at(
         authority,
         array,
-        super::provider_composition::component_owner(authority, owner),
+        position.owner_type(authority, owner).is_some(),
         start,
         end,
     )?;
@@ -237,7 +237,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
                     super::provider_composition::entries(
                         authority,
                         array,
-                        super::provider_composition::component_owner(authority, &facet.declaration),
+                        position.owner_type(authority, &facet.declaration).is_some(),
                     )
                     .iter()
                     .any(|entry| {

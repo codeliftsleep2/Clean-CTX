@@ -15,6 +15,22 @@ fn contributors(p: &std::path::Path) {
 }
 
 fn counts(snapshot: &crate::mcp::state::durable_semantics::SemanticSnapshot, count: usize) {
+    let authority = snapshot.authority.typescript_authority.as_ref().unwrap();
+    let owner = authority
+        .declaration_facets
+        .iter()
+        .find(|facet| facet.declaration.name == "Host")
+        .unwrap();
+    use crate::angular_meta::decorators::ClassKind;
+    let kind =
+        crate::angular_meta::class_role_authority::declaration_role(authority, &owner.declaration)
+            .unwrap();
+    let owner_type = match kind {
+        ClassKind::Component => "Component",
+        ClassKind::Directive => "Directive",
+        ClassKind::Module => "Module",
+        _ => panic!("unexpected owner"),
+    };
     for relation in [
         SemanticRelation::RegistersProvider,
         SemanticRelation::RegistersViewProvider,
@@ -24,7 +40,20 @@ fn counts(snapshot: &crate::mcp::state::durable_semantics::SemanticSnapshot, cou
             .iter()
             .filter(|edge| edge.relation == relation)
             .collect();
-        assert_eq!(edges.len(), count, "exact independently proved entries");
+        assert_eq!(
+            edges.len(),
+            if relation == SemanticRelation::RegistersViewProvider && kind != ClassKind::Component {
+                0
+            } else {
+                count
+            },
+            "exact independently proved entries"
+        );
+        assert!(
+            edges
+                .iter()
+                .all(|edge| edge.subject.entity_type == owner_type)
+        );
         assert!(edges.iter().all(|edge| edge.subject.name == "Host"
             && edge.subject.canonical.is_some()
             && edge.object.canonical.is_some()));
@@ -34,11 +63,24 @@ fn counts(snapshot: &crate::mcp::state::durable_semantics::SemanticSnapshot, cou
 
 #[test]
 fn issue_162_provider_imported_composition_mixed_strategies_alias_cycles_and_refusals() {
+    mixed_case("Component");
+}
+
+#[test]
+fn issue_162_provider_owner_composition_mixed_strategies_alias_cycles_and_refusals() {
+    for api in ["Directive", "NgModule"] {
+        mixed_case(api);
+    }
+}
+
+fn mixed_case(api: &str) {
     let _serial = crate::protocol::handler_response_serial();
     let (root, state) = fixture();
     let p = root.path();
+    std::fs::write(p.join("node_modules/@angular/core/index.d.ts"), "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any; export declare function NgModule(metadata:unknown):any;").unwrap();
+    let owner_source = OWNER.replace("Component", api);
     contributors(p);
-    let baseline = capture(&state, p, OWNER);
+    let baseline = capture(&state, p, &owner_source);
     counts(&baseline, 13);
     for relation in [
         SemanticRelation::ProviderUsesClass,
@@ -52,11 +94,11 @@ fn issue_162_provider_imported_composition_mixed_strategies_alias_cycles_and_ref
             .collect();
         assert_eq!(
             edges.len(),
-            if relation == SemanticRelation::ProviderUsesClass {
-                8
-            } else {
+            (if relation == SemanticRelation::ProviderUsesClass {
                 4
-            }
+            } else {
+                2
+            }) * if api == "Component" { 2 } else { 1 }
         );
         assert!(
             edges
@@ -82,10 +124,10 @@ fn issue_162_provider_imported_composition_mixed_strategies_alias_cycles_and_ref
     ] {
         std::fs::write(p.join("cycle.ts"), "import {GROUP as OTHER} from './group'; export const GROUP=[...OTHER];").unwrap();
         std::fs::write(p.join("group.ts"), &invalid).unwrap();
-        counts(&capture(&state, p, OWNER), 1);
-        assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), OWNER);
+        counts(&capture(&state, p, &owner_source), 1);
+        assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), owner_source);
         std::fs::write(p.join("group.ts"), GROUP).unwrap();
-        counts(&capture(&state, p, OWNER), 13);
+        counts(&capture(&state, p, &owner_source), 13);
     }
     for route in [
         "export type {ALIAS} from './alias';",
@@ -94,14 +136,14 @@ fn issue_162_provider_imported_composition_mixed_strategies_alias_cycles_and_ref
     ] {
         std::fs::write(p.join("other.ts"), "export const ALIAS=[];").unwrap();
         std::fs::write(p.join("barrel.ts"), route).unwrap();
-        counts(&capture(&state, p, OWNER), 7);
+        counts(&capture(&state, p, &owner_source), 7);
         contributors(p);
-        counts(&capture(&state, p, OWNER), 13);
+        counts(&capture(&state, p, &owner_source), 13);
     }
     // An imported alias can return to an owner-source initializer. Offsets keep
     // that actual source, while the imported route remains mandatory proof.
     let entries = GROUP.split_once("export const GROUP=").unwrap().1;
-    let owner = OWNER.replace("class Local {}", &format!("import {{Token,Target,Build}} from './token'; export const LOCAL_GROUP={entries} class Local {{}}"));
+    let owner = owner_source.replace("class Local {}", &format!("import {{Token,Target,Build}} from './token'; export const LOCAL_GROUP={entries} class Local {{}}"));
     std::fs::write(
         p.join("group.ts"),
         "import {LOCAL_GROUP} from './app'; export const GROUP=LOCAL_GROUP;",
@@ -112,11 +154,24 @@ fn issue_162_provider_imported_composition_mixed_strategies_alias_cycles_and_ref
 
 #[test]
 fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refusal() {
+    proof_case("Component");
+}
+
+#[test]
+fn issue_162_provider_owner_composition_source_hash_span_and_occurrence_refusal() {
+    for api in ["Directive", "NgModule"] {
+        proof_case(api);
+    }
+}
+
+fn proof_case(api: &str) {
     let _serial = crate::protocol::handler_response_serial();
     let (root, state) = fixture();
     let p = root.path();
+    std::fs::write(p.join("node_modules/@angular/core/index.d.ts"), "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any; export declare function NgModule(metadata:unknown):any;").unwrap();
+    let owner_source = OWNER.replace("Component", api);
     contributors(p);
-    let snapshot = capture(&state, p, OWNER);
+    let snapshot = capture(&state, p, &owner_source);
     counts(&snapshot, 13);
     let authority = snapshot.authority.typescript_authority.as_ref().unwrap();
     let encoded = serde_json::to_string(authority).unwrap();
@@ -130,6 +185,8 @@ fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refus
         "hash",
         "span",
         "initializer",
+        "container",
+        "owner-native",
         "owner-sites",
         "witness",
     ] {
@@ -162,6 +219,30 @@ fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refus
                     }
                 }
             }
+            "container" => {
+                let owner = forged
+                    .declaration_facets
+                    .iter_mut()
+                    .find(|facet| facet.declaration.name == "Host")
+                    .unwrap();
+                for decorator in &mut owner.decorators {
+                    decorator.arguments.clear();
+                }
+                assert!(
+                    crate::angular_meta::class_role_authority::declaration_role(
+                        &forged,
+                        &authority
+                            .declaration_facets
+                            .iter()
+                            .find(|facet| facet.declaration.name == "Host")
+                            .unwrap()
+                            .declaration
+                    )
+                    .is_some(),
+                    "owner identity survives missing metadata membership"
+                );
+            }
+            "owner-native" => forged.package_exports.clear(),
             "owner-sites" => forged.reference_sites.clear(),
             _ => forged.witnesses.clear(),
         }
@@ -170,6 +251,34 @@ fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refus
             "independent endpoints cannot repair {case} occurrence proof"
         );
     }
+    let registrations: Vec<_> = snapshot
+        .edges
+        .iter()
+        .filter(|edge| edge.relation == SemanticRelation::RegistersProvider)
+        .cloned()
+        .collect();
+    if api != "Component" {
+        let mut wrong_position = registrations.clone();
+        for edge in &mut wrong_position {
+            edge.relation = SemanticRelation::RegistersViewProvider;
+        }
+        assert!(
+            !authority.admits_relation_evidence(&wrong_position),
+            "ordinary owner cannot gain view position authority"
+        );
+    }
+    let mut relabeled = registrations;
+    for edge in &mut relabeled {
+        edge.subject.entity_type = if api == "Component" {
+            "Directive"
+        } else {
+            "Component"
+        };
+    }
+    assert!(
+        !authority.admits_relation_evidence(&relabeled),
+        "actual canonical owner role cannot be relabeled"
+    );
     // Numeric offsets coincide by construction; source identity must discriminate.
     std::fs::write(
         p.join("other.ts"),
@@ -179,7 +288,7 @@ fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refus
         ),
     )
     .unwrap();
-    let source = OWNER
+    let source = owner_source
         .replace(
             "import {GROUP} from './group';",
             "import {GROUP} from './group'; import {GROUP as OTHER} from './other';",
@@ -224,4 +333,44 @@ fn issue_162_provider_imported_composition_source_hash_span_and_occurrence_refus
         .map(|edge| edge.object.name.as_str())
         .collect();
     assert_eq!(class_targets, ["Target", "Token"].into_iter().collect());
+    let direct = format!(
+        "import {{{api}}} from '@angular/core'; import {{Token}} from './token'; @{api}({{providers:[{{provide:Token,useValue:1}}]}}) export class Host {{}}"
+    );
+    let direct = capture(&state, p, &direct);
+    let registrations: Vec<_> = direct
+        .edges
+        .iter()
+        .filter(|edge| edge.relation == SemanticRelation::RegistersProvider)
+        .collect();
+    assert_eq!(
+        registrations.len(),
+        1,
+        "one canonical direct ordinary registration"
+    );
+    assert!(
+        registrations
+            .iter()
+            .all(|edge| edge.subject.canonical.is_some() && edge.object.canonical.is_some())
+    );
+    assert_eq!(
+        direct
+            .edges
+            .iter()
+            .filter(|edge| edge.relation == SemanticRelation::RegistersViewProvider)
+            .count(),
+        0,
+        "direct control declares no viewProviders field"
+    );
+    assert!(direct.authority.admits_relation_evidence(&direct.edges));
+    let mut authority = direct
+        .authority
+        .typescript_authority
+        .as_ref()
+        .unwrap()
+        .clone();
+    authority.demanded_occurrences.clear();
+    assert!(
+        authority.admits_relation_evidence(&direct.edges),
+        "valid direct canonical membership does not require imported/composed occurrence proof"
+    );
 }

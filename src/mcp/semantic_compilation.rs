@@ -187,6 +187,10 @@ mod angular_provider_composition_tests;
 mod angular_provider_imported_composition_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_owner_composition_issue_162.rs"]
+mod angular_provider_owner_composition_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_provider_composition_admission_issue_162.rs"]
 mod angular_provider_composition_admission_tests;
 

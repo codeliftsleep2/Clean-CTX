@@ -234,13 +234,6 @@ pub(super) fn entry_at<'a>(
         .then_some(entry)
 }
 
-pub(super) fn component_owner(authority: &TypeScriptAuthority, owner: &DeclarationId) -> bool {
-    owner.source == authority.source
-        && owner.source_hash == authority.source_hash
-        && super::class_role_authority::declaration_role(authority, owner)
-            == Some(super::decorators::ClassKind::Component)
-}
-
 /// Only used to select the stricter retained-registration contract for composed roots.
 pub(crate) fn has_composition(authority: &TypeScriptAuthority, name: &str) -> bool {
     let Some((owner, root)) = super::string_token_authority::provider_array_at(
@@ -250,7 +243,10 @@ pub(crate) fn has_composition(authority: &TypeScriptAuthority, name: &str) -> bo
     ) else {
         return false;
     };
-    if !component_owner(authority, owner) {
+    if super::provider_position::Position::Ordinary
+        .owner_type(authority, owner)
+        .is_none()
+    {
         return false;
     }
     match &root.value {

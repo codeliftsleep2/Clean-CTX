@@ -23,6 +23,27 @@ impl Position {
             Self::View => SemanticRelation::RegistersViewProvider,
         }
     }
+    /// Exact Angular owner identity and position policy, shared by every consumer.
+    pub(super) fn owner_type(
+        self,
+        authority: &TypeScriptAuthority,
+        owner: &crate::ir::typescript_resolution::DeclarationId,
+    ) -> Option<&'static str> {
+        if owner.source != authority.source || owner.source_hash != authority.source_hash {
+            return None;
+        }
+        let kind = super::class_role_authority::declaration_role(authority, owner)?;
+        if !self.admits(kind) {
+            return None;
+        }
+        match kind {
+            ClassKind::Component => Some("Component"),
+            ClassKind::Directive => Some("Directive"),
+            ClassKind::Module => Some("Module"),
+            _ => None,
+        }
+    }
+
     pub(super) fn admits(self, kind: ClassKind) -> bool {
         match self {
             Self::Ordinary => matches!(
@@ -57,7 +78,7 @@ pub(super) fn registration_token(
     let entry = super::provider_composition::entry_at(
         authority,
         array,
-        super::provider_composition::component_owner(authority, owner),
+        position.owner_type(authority, owner).is_some(),
         start,
         end,
     )?;
@@ -164,7 +185,10 @@ pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &Semant
     else {
         return false;
     };
-    let expected = super::string_token_authority::owner(owner, "Component");
+    let Some(owner_type) = position.owner_type(authority, owner) else {
+        return false;
+    };
+    let expected = super::string_token_authority::owner(owner, owner_type);
     let same = |left: &EntityRef, right: &EntityRef| {
         left.domain == right.domain
             && left.entity_type == right.entity_type
@@ -179,7 +203,7 @@ pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &Semant
         || super::provider_composition::entries(
             authority,
             array,
-            super::provider_composition::component_owner(authority, owner),
+            position.owner_type(authority, owner).is_some(),
         )
         .iter()
         .any(|entry| {

@@ -58,9 +58,10 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
         .edges
         .iter()
         .filter(|edge| {
-            matches!(edge.subject.entity_type, "Component" | "Directive")
-                && edge.relation
-                    == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
+            matches!(
+                edge.subject.entity_type,
+                "Component" | "Directive" | "Module"
+            ) && edge.relation == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
         })
         .map(|edge| (&edge.subject.canonical, &edge.object.canonical))
         .collect();
@@ -131,7 +132,7 @@ fn setup_with_files(
     crate::tests::angular_authority_fixture::install(p);
     std::fs::write(
         p.join("node_modules/@angular/core/index.d.ts"),
-        "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any;",
+        "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any; export declare function NgModule(metadata:unknown):any;",
     )
     .unwrap();
     for name in ["left.ts", "right.ts"] {
@@ -142,7 +143,9 @@ fn setup_with_files(
     }
     std::fs::write(
         p.join("api.ts"),
-        if source.contains("// Directive owner") {
+        if source.contains("// Module owner") {
+            "export {NgModule as View} from '@angular/core';"
+        } else if source.contains("// Directive owner") {
             "export {Directive as View} from '@angular/core';"
         } else {
             "export {Component as View} from '@angular/core';"
@@ -179,7 +182,9 @@ fn setup_with_files(
         let snapshot = state
             .semantic_snapshot(&state.alias_for_path(&file).unwrap())
             .unwrap();
-        let kind = if source.contains("// Directive owner") {
+        let kind = if source.contains("// Module owner") {
+            "Module"
+        } else if source.contains("// Directive owner") {
             "Directive"
         } else {
             "Component"
@@ -218,7 +223,7 @@ fn setup_with_files(
             .filter(|edge| {
                 matches!(
                     edge["subject"]["entity_type"].as_str(),
-                    Some("Component" | "Directive")
+                    Some("Component" | "Directive" | "Module")
                 ) && edge["relation"] == "RegistersProvider"
             })
             .map(|edge| json!([edge["subject"]["canonical"], edge["object"]["canonical"]]))

@@ -153,7 +153,7 @@ answer portions; trace them before implementing replacements.
 
 | ID | Remaining obligation | Current evidence boundary | Exit needed for W04 |
 | --- | --- | --- | --- |
-| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component composition is approved and authored at generation 64, UNRUN. Other composed owners and route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
+| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component composition has generation-64 focused/preservation Rust and lint GREEN; binary acceptance is deferred. Directive/Module composition is approved and authored at generation 65, UNRUN; route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
 | P2 | Strategy/form coverage and value meaning | Class shorthand/useClass, function-declaration useFactory and useExisting have bounded canonical pair evidence. Other callable forms retain classified compatibility behavior. useValue reference admission is verified; its strategy presentation remains noncanonical. | Reconcile each required form with its actual question and public fact. Only propose richer target/value identity when a demonstrated question requires it; do not assume a general evaluator. Record genuine unsupported forms and resolve required capabilities rather than silently excluding them. |
 | P3 | Injector/application context | Local token/pair identity does not identify the applicable injector or connect its owner to the actual application/configuration hierarchy. | Establish the required owner/application/injector context and visibility proof, with distinct applications/scopes and current dependency paths. This is a prerequisite for effective-provider claims. |
 | P4 | Multi, overrides and precedence | Existing deduplication preserves semantic fact identity; it is not an ordered registration/multi/override model. No winning-provider claim follows from existing edges. | Define and verify the required order/multi/override questions against real registration context, with explicit runtime uncertainty. Architectural changes require the actual bounded owner decision. |
@@ -208,6 +208,20 @@ operator-reported GREEN. Seven preservation receipts add 107 passing executions
 (zero failed/ignored); fmt/Clippy are GREEN. The combined scoped Rust total is
 118 passing executions. Bounded binary acceptance remains deferred and open. Node acceptance is
 batched at major integrated checkpoints after substantial deterministic work.
+
+Next mapped batch: [P1.C3 Directive/NgModule provider composition](ISSUE_162_PROVIDER_OWNER_COMPOSITION_TRACE.md).
+Twelve tracked controls cover both ordinary-provider owners across nested/local
+reference/spread and imported alias/barrel/namespace forms. Each requires direct
+owner registration and matching composed Component controls before its candidate
+assertion. All twelve intended REDs are inspected and byte-preserved (0 passed,
+12 failed, 0 ignored). The [shared owner/position contract](ISSUE_162_PROVIDER_OWNER_COMPOSITION_DECISION.md)
+is owner-approved. Generation-65 focused receipt records 17 passed, zero failures/ignored, including
+the twelve unchanged REDs and five integrated tests (both owners per test).
+Preservation adds 118 passing executions (67 earlier provider passes, one corrected
+control rerun and 50 remaining checks); the historical invalid-control failure is
+retained and resolved. Scoped generation-65 total: 135 passing executions;
+fmt/Clippy GREEN. P1.C2 binary acceptance remains queued for the major
+integrated C2/C3 checkpoint; no binary pass or broader closure is inferred.
 
 ## What counts as closing an implementation package
 

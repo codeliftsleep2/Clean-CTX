@@ -24,6 +24,24 @@ pub(super) fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
         .semantic_snapshot(&state.alias_for_path(file).unwrap())
         .unwrap();
     assert!(snapshot.authority.admits_relation_evidence(&snapshot.edges));
+    let authority = snapshot.authority.typescript_authority.as_ref().unwrap();
+    let owner = authority
+        .declaration_facets
+        .iter()
+        .find(|facet| {
+            facet.declaration.name == "ProviderHost" && facet.declaration.source == authority.source
+        })
+        .unwrap();
+    use crate::angular_meta::decorators::ClassKind;
+    let kind =
+        crate::angular_meta::class_role_authority::declaration_role(authority, &owner.declaration)
+            .unwrap();
+    let owner_type = match kind {
+        ClassKind::Component => "Component",
+        ClassKind::Directive => "Directive",
+        ClassKind::Module => "Module",
+        _ => panic!("unexpected owner"),
+    };
     let registrations: Vec<_> = snapshot
         .edges
         .iter()
@@ -35,14 +53,14 @@ pub(super) fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
         })
         .map(|edge| {
             assert!(edge.subject.canonical.is_some() && edge.object.canonical.is_some());
-            assert_eq!(edge.subject.entity_type, "Component");
+            assert_eq!(edge.subject.entity_type, owner_type);
             json!([edge.relation, edge.subject.canonical, edge.object.canonical])
         })
         .collect();
     assert_eq!(
         registrations.len(),
-        6,
-        "three occurrences per position before index deduplication"
+        if kind == ClassKind::Component { 6 } else { 3 },
+        "three occurrences per admitted position before index deduplication"
     );
     json!({"authority":snapshot.authority.typescript_authority,"registrations":registrations})
 }
@@ -50,6 +68,17 @@ pub(super) fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
 pub(super) fn position_answers(
     state: &crate::mcp::McpState,
     p: &Path,
+    ordinary: &[&str],
+    view: &[&str],
+    tokens: &[&str],
+) {
+    position_answers_as(state, p, "Component", ordinary, view, tokens);
+}
+
+pub(super) fn position_answers_as(
+    state: &crate::mcp::McpState,
+    p: &Path,
+    owner_type: &str,
     ordinary: &[&str],
     view: &[&str],
     tokens: &[&str],
@@ -69,7 +98,7 @@ pub(super) fn position_answers(
         state,
         p,
         "workspace_query",
-        json!({"type":"forward_edges","domain":"angular","entity_type":"Component","name":"ProviderHost"}),
+        json!({"type":"forward_edges","domain":"angular","entity_type":owner_type,"name":"ProviderHost"}),
     );
     assert!(response.get("error").is_none(), "{response}");
     for (relation, owners) in [

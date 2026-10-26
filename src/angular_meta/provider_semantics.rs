@@ -107,14 +107,13 @@ fn project_at(
                     && node.end_byte() == expression.end
             })
     });
-    let native_component = authority
+    let native_owner = authority
         .zip(retained)
-        .is_some_and(|(authority, (owner, _))| {
-            super::provider_composition::component_owner(authority, owner)
-        });
-    let entries: Vec<_> = if native_component {
-        let (authority, (_, expression)) =
-            authority.zip(retained).expect("proved native Component");
+        .is_some_and(|(authority, (owner, _))| position.owner_type(authority, owner).is_some());
+    let entries: Vec<_> = if native_owner {
+        let (authority, (_, expression)) = authority
+            .zip(retained)
+            .expect("proved native provider owner");
         super::provider_composition::entries(authority, expression, true)
             .into_iter()
             .filter_map(|entry| {
@@ -140,7 +139,7 @@ fn project_at(
         _ => "Component",
     };
     let owner = EntityRef::new("angular", owner_type, owner_name);
-    let composed = native_component
+    let composed = native_owner
         && authority.is_some_and(|authority| {
             super::provider_composition::has_composition(authority, owner_name)
         });
@@ -335,7 +334,7 @@ fn project_at(
             call_evidence: None,
         });
     }
-    if native_component && let Some(authority) = authority {
+    if native_owner && let Some(authority) = authority {
         edges.extend(super::provider_imported::project(
             authority, owner_name, position,
         ));

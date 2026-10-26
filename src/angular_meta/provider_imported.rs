@@ -15,10 +15,10 @@ pub(super) fn project(
     else {
         return Vec::new();
     };
-    if !super::provider_composition::component_owner(authority, owner)
-        || root.start >= root.end
-        || root.end > owner.end
-    {
+    let Some(owner_type) = position.owner_type(authority, owner) else {
+        return Vec::new();
+    };
+    if root.start >= root.end || root.end > owner.end {
         return Vec::new();
     }
     let mut edges = Vec::new();
@@ -34,7 +34,7 @@ pub(super) fn project(
         };
         edges.push(edge(
             position.relation(),
-            super::string_token_authority::owner(owner, "Component"),
+            super::string_token_authority::owner(owner, owner_type),
             token.clone(),
         ));
         let (strategy, relation, field) = match &occurrence.facet.value {
@@ -126,7 +126,11 @@ pub(super) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
     authority
         .declaration_facets
         .iter()
-        .filter(|facet| super::provider_composition::component_owner(authority, &facet.declaration))
+        .filter(|facet| {
+            Position::Ordinary
+                .owner_type(authority, &facet.declaration)
+                .is_some()
+        })
         .any(|facet| {
             [Position::Ordinary, Position::View]
                 .into_iter()

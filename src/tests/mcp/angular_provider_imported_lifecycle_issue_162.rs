@@ -1,4 +1,4 @@
-use super::view_lifecycle_cases::{position_answers, view_proof};
+use super::view_lifecycle_cases::{position_answers_as, view_proof};
 use super::*;
 
 const GROUP: &str = "import {AuditApi as Left} from './left'; import {AuditApi as Right} from './right'; export const GROUP=[{provide:Left,useValue:1},{provide:Right,useValue:2},{provide:Left,useValue:3}];";
@@ -21,8 +21,47 @@ fn source() -> String {
 
 #[test]
 fn issue_162_provider_imported_composition_lifecycle_complete_sqlite_restore_and_retirement() {
+    complete_restore("Component");
+}
+
+#[test]
+fn issue_162_provider_owner_composition_lifecycle_complete_sqlite_restore_and_retirement() {
+    for api in ["Directive", "NgModule"] {
+        complete_restore(api);
+    }
+}
+
+fn owner_answers(
+    state: &crate::mcp::McpState,
+    p: &Path,
+    api: &str,
+    ordinary: &[&str],
+    view: &[&str],
+    tokens: &[&str],
+) {
+    let owner_type = if api == "NgModule" { "Module" } else { api };
+    position_answers_as(
+        state,
+        p,
+        owner_type,
+        ordinary,
+        if api == "Component" { view } else { &[] },
+        tokens,
+    );
+}
+
+fn source_for(api: &str) -> String {
+    let marker = match api {
+        "Directive" => "// Directive owner",
+        "NgModule" => "// Module owner",
+        _ => "",
+    };
+    format!("{}\n{marker}", source())
+}
+
+fn complete_restore(api: &str) {
     let _serial = crate::protocol::handler_response_serial();
-    let source = source();
+    let source = source_for(api);
     let (root, config, _) = setup_with_files(&source, FILES);
     let p = root.path();
     let database = rusqlite::Connection::open(&config.persistence.db_path).unwrap();
@@ -62,7 +101,7 @@ fn issue_162_provider_imported_composition_lifecycle_complete_sqlite_restore_and
                 ])
             })
             .collect();
-        assert_eq!(registrations.len(), 6);
+        assert_eq!(registrations.len(), if api == "Component" { 6 } else { 3 });
         expected.push(
             json!({"authority":durable["typescript_authority"],"registrations":registrations}),
         );
@@ -92,7 +131,7 @@ fn issue_162_provider_imported_composition_lifecycle_complete_sqlite_restore_and
     }
     let owners: &[&str] = &["app.ts", "neighbor.ts"];
     let tokens: &[&str] = &["left.ts", "right.ts"];
-    position_answers(&state, p, owners, owners, tokens);
+    owner_answers(&state, p, api, owners, owners, tokens);
     for (field, ordinary, view) in [
         ("providers:GROUP", &["neighbor.ts"][..], owners),
         ("viewProviders:[...[ALIAS]]", owners, &["neighbor.ts"][..]),
@@ -103,22 +142,33 @@ fn issue_162_provider_imported_composition_lifecycle_complete_sqlite_restore_and
             source.replace(field, &format!("{name}:[]")),
         )
         .unwrap();
-        position_answers(&state, p, ordinary, view, tokens);
+        owner_answers(&state, p, api, ordinary, view, tokens);
         std::fs::write(p.join("app.ts"), &source).unwrap();
-        position_answers(&state, p, owners, owners, tokens);
+        owner_answers(&state, p, api, owners, owners, tokens);
     }
     std::fs::write(p.join("app.ts"), "export class ProviderHost {}").unwrap();
-    position_answers(&state, p, &["neighbor.ts"], &["neighbor.ts"], tokens);
+    owner_answers(&state, p, api, &["neighbor.ts"], &["neighbor.ts"], tokens);
     std::fs::remove_file(p.join("neighbor.ts")).unwrap();
     let response = call(&state, p, "refresh_workspace", json!({}));
     assert!(response.get("error").is_none(), "{response}");
-    position_answers(&state, p, &[], &[], &[]);
+    owner_answers(&state, p, api, &[], &[], &[]);
 }
 
 #[test]
 fn issue_162_provider_imported_composition_stale_contributor_token_route_and_package_repair() {
+    stale_restore("Component");
+}
+
+#[test]
+fn issue_162_provider_owner_composition_stale_contributor_token_route_and_package_repair() {
+    for api in ["Directive", "NgModule"] {
+        stale_restore(api);
+    }
+}
+
+fn stale_restore(api: &str) {
     let _serial = crate::protocol::handler_response_serial();
-    let source = source();
+    let source = source_for(api);
     for mutation in [
         "entry", "mutable", "barrel", "delete", "replace", "token", "api", "version",
     ] {
@@ -183,9 +233,9 @@ fn issue_162_provider_imported_composition_stale_contributor_token_route_and_pac
             _ => &[],
         };
         let owners = &["app.ts", "neighbor.ts"];
-        position_answers(&state, p, owners, owners, tokens);
+        owner_answers(&state, p, api, owners, owners, tokens);
         std::fs::write(file, original).unwrap();
-        position_answers(&state, p, owners, owners, &["left.ts", "right.ts"]);
+        owner_answers(&state, p, api, owners, owners, &["left.ts", "right.ts"]);
         for name in owners {
             assert_eq!(std::fs::read_to_string(p.join(name)).unwrap(), source);
         }

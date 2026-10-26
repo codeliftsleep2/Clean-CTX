@@ -156,24 +156,46 @@ fn issue_162_provider_composition_currentness_export_config_version_and_ambiguit
 }
 
 fn currentness_source(field: &str, directive: bool, view: bool, composed: bool) {
-    currentness_input(field, directive, view, composed, false);
+    currentness_input(field, directive, view, composed, false, None);
 }
 
 #[test]
 fn issue_162_provider_imported_composition_currentness_export_config_version_and_ambiguity() {
     for view in [false, true] {
-        currentness_input("useValue", false, view, true, true);
+        currentness_input("useValue", false, view, true, true, None);
     }
 }
 
-fn currentness_input(field: &str, directive: bool, view: bool, composed: bool, imported: bool) {
-    let owner_type = if directive { "Directive" } else { "Component" };
+#[test]
+fn issue_162_provider_owner_composition_currentness_export_config_version_and_ambiguity() {
+    for api in ["Directive", "NgModule"] {
+        currentness_input("useValue", false, false, true, true, Some(api));
+    }
+}
+
+fn currentness_input(
+    field: &str,
+    directive: bool,
+    view: bool,
+    composed: bool,
+    imported: bool,
+    api: Option<&str>,
+) {
+    let owner_api = api.unwrap_or(if directive { "Directive" } else { "Component" });
+    let owner_type = if owner_api == "NgModule" {
+        "Module"
+    } else {
+        owner_api
+    };
     let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
     for mutation in ["exports", "config", "version", "ambiguity"] {
         let root = tempfile::tempdir().unwrap();
         let p = root.path();
         crate::tests::angular_authority_fixture::install(p);
+        if api.is_some() {
+            std::fs::write(p.join("node_modules/@angular/core/index.d.ts"), "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any; export declare function NgModule(metadata:unknown):any;").unwrap();
+        }
         if directive {
             crate::tests::angular_authority_fixture::install_inject_apis(p);
         }
@@ -204,11 +226,7 @@ fn currentness_input(field: &str, directive: bool, view: bool, composed: bool, i
         } else {
             source
         };
-        let source = if directive {
-            source.replace("Component as View", "Directive as View")
-        } else {
-            source
-        };
+        let source = source.replace("Component as View", &format!("{owner_api} as View"));
         let source = if field == "useValue" {
             source
                 .replace("{Token,Implementation", "{Token,OtherToken,Implementation")
@@ -240,7 +258,7 @@ fn currentness_input(field: &str, directive: bool, view: bool, composed: bool, i
             )
             .unwrap();
             format!(
-                "import {{Component as View}} from '@angular/core'; import * as groups from './group'; @View{}",
+                "import {{{owner_api} as View}} from '@angular/core'; import * as groups from './group'; @View{}",
                 owner.replace("...ALIAS", "...groups.ALIAS")
             )
         } else {

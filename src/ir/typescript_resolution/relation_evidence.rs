@@ -8,7 +8,10 @@ impl TypeScriptAuthority {
         edges.iter().all(|edge| {
             #[cfg(feature = "angular")]
             if edge.relation == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
-                && edge.subject.entity_type == "Component"
+                && matches!(
+                    edge.subject.entity_type,
+                    "Component" | "Directive" | "Module"
+                )
                 && edge.subject.canonical.is_some()
             {
                 return crate::angular_meta::provider_position::admits_registration(self, edge);
