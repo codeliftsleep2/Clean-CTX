@@ -166,6 +166,17 @@ opening another value-identity feature. This is sequencing guidance, not approva
 of a new injector model. No implementation for P1–P6 was added during this
 reconciliation. W04, AQ08 and AQ09 remain open.
 
+The initial [owner/context trace](ISSUE_162_PROVIDER_OWNER_CONTEXT_TRACE.md) is
+now authored. Its concrete next candidate is P1.D1: direct Directive.providers
+registration, reusing the existing pipeline. Both current provider-owner gates
+rejected Directive despite existing native role proof. The intended public RED
+is now observed and the [bounded owner extension](ISSUE_162_PROVIDER_DIRECTIVE_OWNER_DECISION.md)
+is approved. Generation-61 provider/durable/currentness and compatibility controls
+are operator-reported GREEN; the inspected rebuilt binary report passes all
+1844 checks. The bounded P1.D1 direct-registration checkpoint is verified.
+P3 injector/application context remains
+unresolved; D1 would close only that local owner-admission subquestion.
+
 ## What counts as closing an implementation package
 
 Each package must meet the implementation plan's existing acceptance rule:

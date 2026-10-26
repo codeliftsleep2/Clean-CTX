@@ -39,7 +39,10 @@ pub(crate) fn project_with_authority(
     owner_kind: ClassKind,
     authority: Option<&crate::ir::typescript_resolution::TypeScriptAuthority>,
 ) -> Vec<SemanticEdge> {
-    if !matches!(owner_kind, ClassKind::Component | ClassKind::Module) {
+    if !matches!(
+        owner_kind,
+        ClassKind::Component | ClassKind::Module | ClassKind::Directive
+    ) {
         return Vec::new();
     }
     let Some(language) = crate::compression::language::safe_typescript_language() else {
@@ -60,6 +63,18 @@ pub(crate) fn project_with_authority(
     };
     let retained = authority
         .and_then(|authority| super::string_token_authority::provider_array(authority, owner_name));
+    // Directive ownership is admitted only through exact retained native role proof.
+    if owner_kind == ClassKind::Directive
+        && !retained.is_some_and(|(id, _)| {
+            authority.is_some_and(|authority| {
+                id.source_hash == authority.source_hash
+                    && super::class_role_authority::declaration_role(authority, id)
+                        == Some(ClassKind::Directive)
+            })
+        })
+    {
+        return Vec::new();
+    }
     let array = retained.and_then(|(_, expression)| {
         tree.root_node()
             .descendant_for_byte_range(expression.start, expression.end)
@@ -69,13 +84,17 @@ pub(crate) fn project_with_authority(
                     && node.end_byte() == expression.end
             })
     });
-    let Some(provider_array) = array.or_else(|| provider_array(source_id, source, class)) else {
+    let Some(provider_array) = array.or_else(|| {
+        (owner_kind != ClassKind::Directive)
+            .then(|| provider_array(source_id, source, class))
+            .flatten()
+    }) else {
         return Vec::new();
     };
-    let owner_type = if owner_kind == ClassKind::Module {
-        "Module"
-    } else {
-        "Component"
+    let owner_type = match owner_kind {
+        ClassKind::Module => "Module",
+        ClassKind::Directive => "Directive",
+        _ => "Component",
     };
     let owner = EntityRef::new("angular", owner_type, owner_name);
     let mut edges = Vec::new();
@@ -164,6 +183,11 @@ pub(crate) fn project_with_authority(
                 },
             );
             canonical = Some((super::string_token_authority::owner(id, owner_type), token));
+        }
+        // A Directive registration must never recover rejected token proof from
+        // the legacy name binder (for example, after duplicate provide fields).
+        if owner_kind == ClassKind::Directive && canonical.is_none() {
+            continue;
         }
         let token_label = canonical.as_ref().map(|(_, token)| token.name.clone());
         if authority.is_some()

@@ -58,7 +58,7 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
         .edges
         .iter()
         .filter(|edge| {
-            edge.subject.entity_type == "Component"
+            matches!(edge.subject.entity_type, "Component" | "Directive")
                 && edge.relation
                     == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
         })
@@ -124,7 +124,7 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
     crate::tests::angular_authority_fixture::install(p);
     std::fs::write(
         p.join("node_modules/@angular/core/index.d.ts"),
-        "export declare function Component(metadata:unknown):any;",
+        "export declare function Component(metadata:unknown):any; export declare function Directive(metadata:unknown):any;",
     )
     .unwrap();
     for name in ["left.ts", "right.ts"] {
@@ -135,7 +135,11 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
     }
     std::fs::write(
         p.join("api.ts"),
-        "export {Component as View} from '@angular/core';",
+        if source.contains("// Directive owner") {
+            "export {Directive as View} from '@angular/core';"
+        } else {
+            "export {Component as View} from '@angular/core';"
+        },
     )
     .unwrap();
     for name in ["app.ts", "neighbor.ts"] {
@@ -162,6 +166,23 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             json!({"filePath":file,"fidelity":"high"}),
         );
         assert!(response.get("error").is_none(), "{response}");
+        let snapshot = state
+            .semantic_snapshot(&state.alias_for_path(&file).unwrap())
+            .unwrap();
+        let kind = if source.contains("// Directive owner") {
+            "Directive"
+        } else {
+            "Component"
+        };
+        assert!(
+            snapshot
+                .edges
+                .iter()
+                .filter(|edge| edge.relation
+                    == crate::layers::meta::semantic::SemanticRelation::RegistersProvider)
+                .all(|edge| edge.subject.entity_type == kind),
+            "owner role survives without relabeling"
+        );
         expected.push(proof(&state, &file));
     }
     state.flush_persistence();
@@ -185,8 +206,10 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
             .unwrap()
             .iter()
             .filter(|edge| {
-                edge["subject"]["entity_type"] == "Component"
-                    && edge["relation"] == "RegistersProvider"
+                matches!(
+                    edge["subject"]["entity_type"].as_str(),
+                    Some("Component" | "Directive")
+                ) && edge["relation"] == "RegistersProvider"
             })
             .map(|edge| json!([edge["subject"]["canonical"], edge["object"]["canonical"]]))
             .collect();
@@ -245,19 +268,24 @@ fn answers(state: &crate::mcp::McpState, root: &Path, owners: &[&str], tokens: &
         );
         assert!(response.get("error").is_none(), "{response}");
     }
-    let response = call(
-        state,
-        root,
-        "workspace_query",
-        json!({"type":"forward_edges","domain":"angular","entity_type":"Component","name":"ProviderHost"}),
-    );
-    assert!(response.get("error").is_none(), "{response}");
-    let selected: Vec<_> = response["result"]["structuredContent"]["edges"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .filter(|edge| edge["relation"] == "RegistersProvider")
-        .collect();
+    let mut selected = Vec::new();
+    for kind in ["Component", "Directive"] {
+        let response = call(
+            state,
+            root,
+            "workspace_query",
+            json!({"type":"forward_edges","domain":"angular","entity_type":kind,"name":"ProviderHost"}),
+        );
+        assert!(response.get("error").is_none(), "{response}");
+        selected.extend(
+            response["result"]["structuredContent"]["edges"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|edge| edge["relation"] == "RegistersProvider")
+                .cloned(),
+        );
+    }
     let mut actual: Vec<_> = selected
         .iter()
         .map(|edge| {
@@ -374,36 +402,6 @@ fn strategy_answers(
     );
 }
 
-#[test]
-fn issue_162_provider_declaration_lifecycle_restart_retains_exact_authority_and_endpoints() {
-    restart(SOURCE);
-}
-
-#[test]
-fn issue_162_provider_shorthand_lifecycle_restart_retains_exact_authority_and_endpoints() {
-    restart(SHORTHAND_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_class_strategy_lifecycle_restart_retains_exact_pairs() {
-    restart(CLASS_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_factory_lifecycle_restart_retains_exact_pairs() {
-    restart(FACTORY_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_existing_lifecycle_restart_retains_exact_pairs() {
-    restart(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
-}
-
-#[test]
-fn issue_162_provider_value_lifecycle_restart_retains_registration_and_legacy_projection() {
-    restart(&FACTORY_SOURCE.replace("useFactory", "useValue"));
-}
-
 fn restart(source: &str) {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config, expected) = setup(source);
@@ -435,36 +433,6 @@ fn restart(source: &str) {
         &["left.ts", "right.ts"],
     );
     strategy_answers(&state, root.path(), source, 2, &["left.ts", "right.ts"]);
-}
-
-#[test]
-fn issue_162_provider_declaration_lifecycle_stale_tokens_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(SOURCE);
-}
-
-#[test]
-fn issue_162_provider_shorthand_lifecycle_stale_tokens_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(SHORTHAND_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_class_strategy_lifecycle_stale_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(CLASS_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_factory_lifecycle_stale_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(FACTORY_SOURCE);
-}
-
-#[test]
-fn issue_162_provider_existing_lifecycle_stale_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(&FACTORY_SOURCE.replace("useFactory", "useExisting"));
-}
-
-#[test]
-fn issue_162_provider_value_lifecycle_stale_repair_and_independent_retirement() {
-    stale_tokens_repair_and_retirement(&FACTORY_SOURCE.replace("useFactory", "useValue"));
 }
 
 #[test]
@@ -584,3 +552,6 @@ fn stale_tokens_repair_and_retirement(source: &str) {
     answers(&state, p, &[], &[]);
     strategy_answers(&state, p, source, 0, &[]);
 }
+
+#[path = "angular_provider_lifecycle_cases_issue_162.rs"]
+mod lifecycle_cases;

@@ -18,7 +18,7 @@ fn call(state: &crate::mcp::McpState, root: &Path, tool: &str, mut args: Value) 
     crate::protocol::captured_responses().pop().unwrap()
 }
 
-fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str) {
+fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str, owner_type: &str) {
     let factory = field == "useFactory";
     let value = field == "useValue";
     let relation = if value {
@@ -41,7 +41,7 @@ fn targets(state: &crate::mcp::McpState, root: &Path, remote: bool, field: &str)
         state,
         root,
         "workspace_query",
-        json!({"type":"forward_edges","domain":"angular","entity_type":if value {"Component"} else {"ProviderToken"},"name":if value {"ProviderHost"} else {"Token"}}),
+        json!({"type":"forward_edges","domain":"angular","entity_type":if value {owner_type} else {"ProviderToken"},"name":if value {"ProviderHost"} else {"Token"}}),
     );
     assert!(response.get("error").is_none(), "{response}");
     let mut actual: Vec<_> = response["result"]["structuredContent"]["edges"]
@@ -116,12 +116,25 @@ fn issue_162_provider_value_currentness_package_config_and_ambiguity() {
 }
 
 fn currentness(field: &str) {
+    currentness_owner(field, false);
+}
+
+#[test]
+fn issue_162_provider_directive_currentness_package_config_and_ambiguity() {
+    currentness_owner("useValue", true);
+}
+
+fn currentness_owner(field: &str, directive: bool) {
+    let owner_type = if directive { "Directive" } else { "Component" };
     let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
     for mutation in ["exports", "config", "version", "ambiguity"] {
         let root = tempfile::tempdir().unwrap();
         let p = root.path();
         crate::tests::angular_authority_fixture::install(p);
+        if directive {
+            crate::tests::angular_authority_fixture::install_inject_apis(p);
+        }
         let package = p.join("node_modules/audit-implementation");
         std::fs::create_dir_all(&package).unwrap();
         let file = if factory { "index.ts" } else { "index.d.ts" };
@@ -144,6 +157,11 @@ fn currentness(field: &str) {
         .unwrap();
         std::fs::write(p.join("erased.ts"), "export interface Implementation {}").unwrap();
         let source = SOURCE.replace("useClass", field);
+        let source = if directive {
+            source.replace("Component as View", "Directive as View")
+        } else {
+            source
+        };
         let source = if field == "useValue" {
             source
                 .replace("{Token,Implementation", "{Token,OtherToken,Implementation")
@@ -168,7 +186,7 @@ fn currentness(field: &str) {
             .push(p.to_string_lossy().into_owned());
         {
             let state = crate::mcp::McpState::new(config.clone());
-            targets(&state, p, true, field);
+            targets(&state, p, true, field, owner_type);
             let response = call(
                 &state,
                 p,
@@ -214,11 +232,11 @@ fn currentness(field: &str) {
                 .alias_for_path(&p.join("app.ts").to_string_lossy())
                 .is_none()
         );
-        targets(&state, p, mutation == "version", field);
+        targets(&state, p, mutation == "version", field, owner_type);
         std::fs::write(package.join("package.json"), &manifest).unwrap();
         std::fs::write(package.join(file), declaration).unwrap();
         std::fs::write(p.join("tsconfig.json"), &original_config).unwrap();
-        targets(&state, p, true, field);
+        targets(&state, p, true, field, owner_type);
         assert_eq!(std::fs::read_to_string(p.join("app.ts")).unwrap(), source);
     }
 }

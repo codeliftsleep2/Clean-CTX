@@ -62,7 +62,7 @@ pub(super) fn provider_array<'a>(
     if owners.next().is_some()
         || !matches!(
             roles::declaration_role(authority, &facet.declaration),
-            Some(ClassKind::Component | ClassKind::Module)
+            Some(ClassKind::Component | ClassKind::Module | ClassKind::Directive)
         )
     {
         return None;
@@ -74,7 +74,7 @@ pub(super) fn provider_array<'a>(
         };
         if !matches!(
             roles::decorator_role(authority, callee),
-            Some(ClassKind::Component | ClassKind::Module)
+            Some(ClassKind::Component | ClassKind::Module | ClassKind::Directive)
         ) {
             continue;
         }

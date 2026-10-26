@@ -171,6 +171,14 @@ mod angular_provider_factory_identity_tests;
 mod angular_provider_value_identity_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_directive_owner_issue_162.rs"]
+mod angular_provider_directive_owner_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_provider_directive_admission_issue_162.rs"]
+mod angular_provider_directive_admission_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_provider_value_admission_issue_162.rs"]
 mod angular_provider_value_admission_tests;
 

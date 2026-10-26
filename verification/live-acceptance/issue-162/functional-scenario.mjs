@@ -10,7 +10,7 @@ export type {CanMatchFn as Match, ResolveFn as Resolution} from '@angular/router
 export type {HttpInterceptorFn as Intercept} from '${entry}';
 `;
 export const functionalSource = `
-import {Component as View} from '@angular/core';
+import {Component as View, Directive as Behavior} from '@angular/core';
 import * as api from './functional-api';
 import type {Match, Resolution, Intercept} from './functional-api';
 import {AuditApi as Left} from './functional-left';
@@ -48,6 +48,9 @@ export class ExistingPairProviderHost {}
 @View({providers:[{provide:Left,useValue:factoryLeft.makeAudit},
  {provide:Right,useValue:factoryRight.makeAudit},{provide:Left,useValue:factoryLeft.makeAudit}]})
 export class ValueReferenceProviderHost {}
+@Behavior({selector:'[providerProbe]',providers:[{provide:Left,useValue:1},
+ {provide:Right,useValue:2},{provide:Left,useValue:3}]})
+export class DirectiveProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
@@ -86,11 +89,13 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/${kind}/exact-owner-token-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/${kind}/canonical-private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
-    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost','ValueReferenceProviderHost']) {
-      const providers = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Component',name:providerName});
+    for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost','ValueReferenceProviderHost','DirectiveProviderHost']) {
+      const providerKind = providerName === 'DirectiveProviderHost' ? 'Directive' : 'Component';
+      const providers = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:providerKind,name:providerName});
       const registrations = providers.structuredContent?.edges;
       check(`${label}/${providerName}/structured`,Array.isArray(registrations),providers);
       const selectedProviders = registrations.filter(edge => edge.relation === 'RegistersProvider');
+      check(`${label}/${providerName}/exact-owner-role`,selectedProviders.every(edge => edge.subject.entity_type === providerKind));
       const actualProviders = selectedProviders.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
       const registrationTokens = providerName === 'StrategyProviderHost' && !implementation
         ? tokens.filter(token => token !== 'functional-left.ts')
