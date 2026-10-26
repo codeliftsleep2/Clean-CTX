@@ -50,15 +50,19 @@ pub(super) fn injection_edge(
 }
 
 /// Retained provider-array proof for one exact, uniquely admitted Angular owner.
-pub(super) fn provider_array<'a>(
+pub(super) fn provider_array_at<'a>(
     authority: &'a TypeScriptAuthority,
     name: &str,
+    position: super::provider_position::Position,
 ) -> Option<(&'a DeclarationId, &'a ExpressionFacet)> {
     use super::{class_role_authority as roles, decorators::ClassKind};
     let mut owners = authority.declaration_facets.iter().filter(|facet| {
         facet.declaration.source == authority.source && facet.declaration.name == name
     });
     let facet = owners.next()?;
+    if !position.admits(roles::declaration_role(authority, &facet.declaration)?) {
+        return None;
+    }
     if owners.next().is_some()
         || !matches!(
             roles::declaration_role(authority, &facet.declaration),
@@ -86,7 +90,7 @@ pub(super) fn provider_array<'a>(
                 arrays.extend(
                     fields
                         .iter()
-                        .filter(|(key, _)| key == "providers")
+                        .filter(|(key, _)| key == position.field())
                         .map(|(_, value)| value),
                 );
             }

@@ -117,6 +117,8 @@ pub enum SemanticRelation {
     Injects,
     /// An Angular declaration registers a provider token in its own scope.
     RegistersProvider,
+    /// A Component declares a token through its viewProviders metadata position.
+    RegistersViewProvider,
     /// A proven provider token is implemented by a class reference.
     ProviderUsesClass,
     /// A proven provider token is produced by a factory reference.

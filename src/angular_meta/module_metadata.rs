@@ -16,6 +16,7 @@ pub(crate) const DECLARATION_FIELDS: &[&str] = &[
     "exports",
     "standalone",
     "providers",
+    "viewProviders",
     "provide",
     "useClass",
     "useFactory",

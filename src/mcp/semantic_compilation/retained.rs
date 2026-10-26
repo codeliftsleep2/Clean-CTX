@@ -17,6 +17,8 @@ impl RetainedAuthority {
         }
         edges.iter().all(|edge| {
             edge.relation != crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
+                && edge.relation
+                    != crate::layers::meta::semantic::SemanticRelation::RegistersViewProvider
                 && edge.subject.canonical.is_none()
                 && edge.object.canonical.is_none()
         })

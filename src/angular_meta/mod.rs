@@ -48,6 +48,8 @@ pub mod ngrx;
 pub mod phi;
 #[cfg(feature = "typescript")]
 pub(crate) mod provider_pair_authority;
+#[cfg(feature = "typescript")]
+pub(crate) mod provider_position;
 pub(crate) mod provider_semantics;
 pub mod reactive_forms;
 pub mod routing;

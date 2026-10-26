@@ -175,7 +175,12 @@ is approved. Generation-61 provider/durable/currentness and compatibility contro
 are operator-reported GREEN; the inspected rebuilt binary report passes all
 1844 checks. The bounded P1.D1 direct-registration checkpoint is verified.
 P3 injector/application context remains
-unresolved; D1 would close only that local owner-admission subquestion.
+unresolved; D1 closes only that local owner-admission subquestion.
+
+Next candidate: [P1.VP1 Component viewProviders](ISSUE_162_VIEW_PROVIDER_TRACE.md).
+The static trace locates the missing acquisition/position interpretation and
+requires a valid public omission RED before choosing a retained/public position
+contract. No view visibility or new public carrier is approved by this trace.
 
 ## What counts as closing an implementation package
 

@@ -35,14 +35,16 @@ impl Strategy {
     }
 }
 
-pub(super) fn pair(
+pub(super) fn pair_at(
     authority: &TypeScriptAuthority,
     owner_name: &str,
     start: usize,
     end: usize,
     strategy: Strategy,
+    position: super::provider_position::Position,
 ) -> Option<(EntityRef, EntityRef)> {
-    let (owner, array) = super::string_token_authority::provider_array(authority, owner_name)?;
+    let (owner, array) =
+        super::string_token_authority::provider_array_at(authority, owner_name, position)?;
     if owner.source != authority.source
         || owner.source_hash != authority.source_hash
         || array.start >= array.end
@@ -113,7 +115,7 @@ pub(super) fn pair(
     ))
 }
 
-fn canonical_token(
+pub(super) fn canonical_token(
     authority: &TypeScriptAuthority,
     owner: &crate::ir::typescript_resolution::DeclarationId,
     token: &ExpressionFacet,
@@ -180,24 +182,34 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
                 && facet.declaration.source_hash == authority.source_hash
         })
         .any(|facet| {
-            let Some((_, array)) =
-                super::string_token_authority::provider_array(authority, &facet.declaration.name)
-            else {
-                return false;
-            };
-            let ExpressionValue::Array(entries) = &array.value else {
-                return false;
-            };
-            entries.iter().any(|entry| {
-                pair(
+            [
+                super::provider_position::Position::Ordinary,
+                super::provider_position::Position::View,
+            ]
+            .into_iter()
+            .any(|position| {
+                let Some((_, array)) = super::string_token_authority::provider_array_at(
                     authority,
                     &facet.declaration.name,
-                    entry.start,
-                    entry.end,
-                    strategy,
-                )
-                .is_some_and(|(token, target)| {
-                    same(&edge.subject, &token) && same(&edge.object, &target)
+                    position,
+                ) else {
+                    return false;
+                };
+                let ExpressionValue::Array(entries) = &array.value else {
+                    return false;
+                };
+                entries.iter().any(|entry| {
+                    pair_at(
+                        authority,
+                        &facet.declaration.name,
+                        entry.start,
+                        entry.end,
+                        strategy,
+                        position,
+                    )
+                    .is_some_and(|(token, target)| {
+                        same(&edge.subject, &token) && same(&edge.object, &target)
+                    })
                 })
             })
         })
