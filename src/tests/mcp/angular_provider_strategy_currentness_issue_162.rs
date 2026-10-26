@@ -156,6 +156,17 @@ fn issue_162_provider_composition_currentness_export_config_version_and_ambiguit
 }
 
 fn currentness_source(field: &str, directive: bool, view: bool, composed: bool) {
+    currentness_input(field, directive, view, composed, false);
+}
+
+#[test]
+fn issue_162_provider_imported_composition_currentness_export_config_version_and_ambiguity() {
+    for view in [false, true] {
+        currentness_input("useValue", false, view, true, true);
+    }
+}
+
+fn currentness_input(field: &str, directive: bool, view: bool, composed: bool, imported: bool) {
     let owner_type = if directive { "Directive" } else { "Component" };
     let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
@@ -218,6 +229,20 @@ fn currentness_source(field: &str, directive: bool, view: bool, composed: bool) 
                         "]; const ALIAS=GROUP; @View({{{position}:[...ALIAS]}})\nexport class"
                     ),
                 )
+        } else {
+            source
+        };
+        let source = if imported {
+            let (contributor, owner) = source.split_once("@View").unwrap();
+            std::fs::write(
+                p.join("group.ts"),
+                contributor.replace("const ALIAS=", "export const ALIAS="),
+            )
+            .unwrap();
+            format!(
+                "import {{Component as View}} from '@angular/core'; import * as groups from './group'; @View{}",
+                owner.replace("...ALIAS", "...groups.ALIAS")
+            )
         } else {
             source
         };

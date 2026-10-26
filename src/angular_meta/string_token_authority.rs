@@ -10,13 +10,29 @@ pub(super) fn token(
     units: &[u16],
     entity_type: &'static str,
 ) -> EntityRef {
+    token_at(
+        &owner.source,
+        &owner.source_hash,
+        expression,
+        units,
+        entity_type,
+    )
+}
+
+pub(super) fn token_at(
+    source: &std::path::Path,
+    hash: &str,
+    expression: &ExpressionFacet,
+    units: &[u16],
+    entity_type: &'static str,
+) -> EntityRef {
     let mut token = EntityRef::new("angular", entity_type, string_label(units))
-        .with_file(owner.source.to_string_lossy().into_owned());
+        .with_file(source.to_string_lossy().into_owned());
     token.canonical = Some(CanonicalEndpoint::StringValue {
         string_value: units.to_vec(),
         proof: LiteralProof {
-            source: owner.source.clone(),
-            source_hash: owner.source_hash.clone(),
+            source: source.to_path_buf(),
+            source_hash: hash.to_owned(),
             start: expression.start,
             end: expression.end,
         },

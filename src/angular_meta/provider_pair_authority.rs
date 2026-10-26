@@ -59,6 +59,26 @@ pub(super) fn pair_at(
         start,
         end,
     )?;
+    pair_entry(
+        authority,
+        owner,
+        super::provider_composition::Entry {
+            source: &authority.source,
+            hash: &authority.source_hash,
+            facet: entry,
+            crossed: false,
+        },
+        strategy,
+    )
+}
+
+pub(super) fn pair_entry(
+    authority: &TypeScriptAuthority,
+    owner: &crate::ir::typescript_resolution::DeclarationId,
+    occurrence: super::provider_composition::Entry<'_>,
+    strategy: Strategy,
+) -> Option<(EntityRef, EntityRef)> {
+    let entry = occurrence.facet;
     let (token, target) = match &entry.value {
         ExpressionValue::Reference(_) if matches!(strategy, Strategy::Class) => (entry, entry),
         ExpressionValue::Object(fields) => {
@@ -91,8 +111,8 @@ pub(super) fn pair_at(
     }
     if matches!(strategy, Strategy::Existing) {
         return Some((
-            canonical_token(authority, owner, token)?,
-            canonical_token(authority, owner, target)?,
+            canonical_token_in(authority, owner, occurrence, token)?,
+            canonical_token_in(authority, owner, occurrence, target)?,
         ));
     }
     let ExpressionValue::Reference(Resolution::Resolved(target_id)) = &target.value else {
@@ -101,14 +121,35 @@ pub(super) fn pair_at(
     if Some(target_id.kind.as_str()) != strategy.target_kind() {
         return None;
     }
-    let target_span =
-        crate::ir::invocation_evidence::SourceSpan::new(target.start, target.end).ok()?;
-    if authority.value_reference_at(target_span) != Some(target_id) {
-        return None;
-    }
+    occurrence.reference(authority, target)?;
     Some((
-        canonical_token(authority, owner, token)?,
+        canonical_token_in(authority, owner, occurrence, token)?,
         declaration_entity(target_id, strategy.entity_type()),
+    ))
+}
+
+pub(super) fn canonical_token_in(
+    authority: &TypeScriptAuthority,
+    owner: &crate::ir::typescript_resolution::DeclarationId,
+    occurrence: super::provider_composition::Entry<'_>,
+    value: &ExpressionFacet,
+) -> Option<EntityRef> {
+    if occurrence.source == authority.source.as_path() && occurrence.hash == authority.source_hash {
+        return canonical_token(authority, owner, value);
+    }
+    if let Some(units) = authority.demanded_string_value(occurrence.source, occurrence.hash, value)
+    {
+        return Some(super::string_token_authority::token_at(
+            occurrence.source,
+            occurrence.hash,
+            value,
+            &units,
+            "ProviderToken",
+        ));
+    }
+    Some(declaration_entity(
+        occurrence.reference(authority, value)?,
+        "ProviderToken",
     ))
 }
 
@@ -171,46 +212,47 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && actual.file == expected.file
             && actual.canonical == expected.canonical
     };
-    authority
-        .declaration_facets
-        .iter()
-        .filter(|facet| {
-            facet.declaration.source == authority.source
-                && facet.declaration.source_hash == authority.source_hash
-        })
-        .any(|facet| {
-            [
-                super::provider_position::Position::Ordinary,
-                super::provider_position::Position::View,
-            ]
-            .into_iter()
-            .any(|position| {
-                let Some((_, array)) = super::string_token_authority::provider_array_at(
-                    authority,
-                    &facet.declaration.name,
-                    position,
-                ) else {
-                    return false;
-                };
-                super::provider_composition::entries(
-                    authority,
-                    array,
-                    super::provider_composition::component_owner(authority, &facet.declaration),
-                )
-                .iter()
-                .any(|entry| {
-                    pair_at(
+    super::provider_imported::admits(authority, edge)
+        || authority
+            .declaration_facets
+            .iter()
+            .filter(|facet| {
+                facet.declaration.source == authority.source
+                    && facet.declaration.source_hash == authority.source_hash
+            })
+            .any(|facet| {
+                [
+                    super::provider_position::Position::Ordinary,
+                    super::provider_position::Position::View,
+                ]
+                .into_iter()
+                .any(|position| {
+                    let Some((_, array)) = super::string_token_authority::provider_array_at(
                         authority,
                         &facet.declaration.name,
-                        entry.start,
-                        entry.end,
-                        strategy,
                         position,
+                    ) else {
+                        return false;
+                    };
+                    super::provider_composition::entries(
+                        authority,
+                        array,
+                        super::provider_composition::component_owner(authority, &facet.declaration),
                     )
-                    .is_some_and(|(token, target)| {
-                        same(&edge.subject, &token) && same(&edge.object, &target)
+                    .iter()
+                    .any(|entry| {
+                        pair_at(
+                            authority,
+                            &facet.declaration.name,
+                            entry.start,
+                            entry.end,
+                            strategy,
+                            position,
+                        )
+                        .is_some_and(|(token, target)| {
+                            same(&edge.subject, &token) && same(&edge.object, &target)
+                        })
                     })
                 })
             })
-        })
 }

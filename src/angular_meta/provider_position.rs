@@ -46,7 +46,6 @@ pub(super) fn registration_token(
     end: usize,
     position: Position,
 ) -> Option<EntityRef> {
-    use super::provider_pair_authority::{Strategy, canonical_token, pair_at};
     let (owner, array) =
         super::string_token_authority::provider_array_at(authority, name, position)?;
     if owner.source != authority.source
@@ -62,9 +61,27 @@ pub(super) fn registration_token(
         start,
         end,
     )?;
+    registration_entry(
+        authority,
+        owner,
+        super::provider_composition::Entry {
+            source: &authority.source,
+            hash: &authority.source_hash,
+            facet: entry,
+            crossed: false,
+        },
+    )
+}
+
+pub(super) fn registration_entry(
+    authority: &TypeScriptAuthority,
+    owner: &crate::ir::typescript_resolution::DeclarationId,
+    occurrence: super::provider_composition::Entry<'_>,
+) -> Option<EntityRef> {
+    use super::provider_pair_authority::{Strategy, canonical_token_in, pair_entry};
+    let entry = occurrence.facet;
     if matches!(entry.value, ExpressionValue::Reference(_)) {
-        return pair_at(authority, name, start, end, Strategy::Class, position)
-            .map(|(token, _)| token);
+        return pair_entry(authority, owner, occurrence, Strategy::Class).map(|(token, _)| token);
     }
     let ExpressionValue::Object(fields) = &entry.value else {
         return None;
@@ -109,28 +126,28 @@ pub(super) fn registration_token(
             && let ExpressionValue::Reference(Resolution::Resolved(id)) = &target.value
             && id.kind == "variable_declarator"
         {
-            let span =
-                crate::ir::invocation_evidence::SourceSpan::new(target.start, target.end).ok()?;
-            return (authority.value_reference_at(span) == Some(id))
-                .then(|| canonical_token(authority, owner, token))
+            return (occurrence.reference(authority, target) == Some(id))
+                .then(|| canonical_token_in(authority, owner, occurrence, token))
                 .flatten();
         }
-        return pair_at(authority, name, start, end, strategy, position).map(|(token, _)| token);
+        return pair_entry(authority, owner, occurrence, strategy).map(|(token, _)| token);
     }
     match &target.value {
         ExpressionValue::Reference(Resolution::Resolved(id)) => {
-            let span =
-                crate::ir::invocation_evidence::SourceSpan::new(target.start, target.end).ok()?;
-            if authority.value_reference_at(span) != Some(id) {
+            if occurrence.reference(authority, target) != Some(id) {
                 return None;
             }
         }
         ExpressionValue::Literal
         | ExpressionValue::StringValue(_)
-        | ExpressionValue::Boolean(_) => {}
+        | ExpressionValue::Boolean(_) => {
+            if occurrence.source != authority.source.as_path() {
+                occurrence.literal(authority, target)?;
+            }
+        }
         _ => return None,
     }
-    canonical_token(authority, owner, token)
+    canonical_token_in(authority, owner, occurrence, token)
 }
 
 pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
@@ -158,14 +175,15 @@ pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &Semant
     if !same(&expected, &edge.subject) {
         return false;
     }
-    super::provider_composition::entries(
-        authority,
-        array,
-        super::provider_composition::component_owner(authority, owner),
-    )
-    .iter()
-    .any(|entry| {
-        registration_token(authority, &owner.name, entry.start, entry.end, position)
-            .is_some_and(|token| same(&token, &edge.object))
-    })
+    super::provider_imported::admits(authority, edge)
+        || super::provider_composition::entries(
+            authority,
+            array,
+            super::provider_composition::component_owner(authority, owner),
+        )
+        .iter()
+        .any(|entry| {
+            registration_token(authority, &owner.name, entry.start, entry.end, position)
+                .is_some_and(|token| same(&token, &edge.object))
+        })
 }

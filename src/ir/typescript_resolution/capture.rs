@@ -14,6 +14,8 @@ pub(crate) struct TypeScriptAuthority {
     pub constructor_parameters: Vec<super::constructor_parameters::ConstructorParameter>,
     #[serde(default)]
     pub declaration_facets: Vec<super::declaration_facets::DeclarationFacet>,
+    #[serde(default)]
+    pub demanded_occurrences: Vec<super::demanded_occurrences::DemandedOccurrence>,
     pub references: Vec<(String, Namespace, Resolution)>,
     /// Exact value occurrences proven by shared lexical/import mechanics.
     pub reference_sites: Vec<(usize, usize, Resolution)>,
@@ -93,6 +95,7 @@ impl TypeScriptAuthority {
             member_declarations: Vec::new(),
             constructor_parameters: Vec::new(),
             declaration_facets: Vec::new(),
+            demanded_occurrences: Vec::new(),
             references: Vec::new(),
             reference_sites: Vec::new(),
             unbound_value_sites: Vec::new(),
@@ -201,7 +204,7 @@ impl TypeScriptAuthority {
                     &result.type_reference_sites,
                     Namespace::Type,
                 ));
-            let (facets, packages) = super::declaration_facets::capture(
+            let (facets, packages, occurrences) = super::declaration_facets::capture(
                 &mut resolver,
                 file,
                 &result.declarations,
@@ -209,6 +212,7 @@ impl TypeScriptAuthority {
                 &result.constructor_parameters,
             );
             result.declaration_facets = facets;
+            result.demanded_occurrences = occurrences;
             result.package_exports.extend(packages);
             Ok::<_, String>(())
         })();

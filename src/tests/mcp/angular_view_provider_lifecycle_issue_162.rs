@@ -19,7 +19,7 @@ fn composed_positions() -> String {
         )
 }
 
-fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
+pub(super) fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
     let snapshot = state
         .semantic_snapshot(&state.alias_for_path(file).unwrap())
         .unwrap();
@@ -47,7 +47,7 @@ fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
     json!({"authority":snapshot.authority.typescript_authority,"registrations":registrations})
 }
 
-fn position_answers(
+pub(super) fn position_answers(
     state: &crate::mcp::McpState,
     p: &Path,
     ordinary: &[&str],

@@ -1,7 +1,7 @@
 use crate::layers::meta::semantic::SemanticRelation;
 use serde_json::json;
 
-fn capture(
+pub(super) fn capture(
     state: &crate::mcp::McpState,
     p: &std::path::Path,
     source: &str,
@@ -25,7 +25,7 @@ fn capture(
         .unwrap()
 }
 
-fn fixture() -> (tempfile::TempDir, crate::mcp::McpState) {
+pub(super) fn fixture() -> (tempfile::TempDir, crate::mcp::McpState) {
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);

@@ -119,6 +119,13 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
 }
 
 fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
+    setup_with_files(source, &[])
+}
+
+fn setup_with_files(
+    source: &str,
+    files: &[(&str, &str)],
+) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
@@ -142,6 +149,9 @@ fn setup(source: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec
         },
     )
     .unwrap();
+    for (name, contents) in files {
+        std::fs::write(p.join(name), contents).unwrap();
+    }
     for name in ["app.ts", "neighbor.ts"] {
         std::fs::write(p.join(name), source).unwrap();
     }
@@ -558,3 +568,6 @@ mod lifecycle_cases;
 
 #[path = "angular_view_provider_lifecycle_issue_162.rs"]
 mod view_lifecycle_cases;
+
+#[path = "angular_provider_imported_lifecycle_issue_162.rs"]
+mod imported_lifecycle_cases;

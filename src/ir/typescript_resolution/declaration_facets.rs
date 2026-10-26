@@ -1,4 +1,5 @@
 //! Demanded syntax/reference facets, acquired by the existing snapshot resolver.
+use super::demanded_occurrences::{DemandedOccurrence, DemandedValue};
 use super::{DeclarationId, Resolution, Resolver};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -47,6 +48,8 @@ struct Demand<'a> {
     facets: BTreeMap<DeclarationId, DeclarationFacet>,
     packages: Vec<super::package_evidence::PackageExportEvidence>,
     fields: BTreeSet<String>,
+    source_hashes: BTreeMap<std::path::PathBuf, String>,
+    occurrences: BTreeMap<(std::path::PathBuf, usize, usize), DemandedOccurrence>,
 }
 
 pub(super) fn capture(
@@ -58,12 +61,15 @@ pub(super) fn capture(
 ) -> (
     Vec<DeclarationFacet>,
     Vec<super::package_evidence::PackageExportEvidence>,
+    Vec<DemandedOccurrence>,
 ) {
     resolver.in_source_project(request, |resolver| {
         let mut demand = Demand {
             resolver,
             visited: BTreeSet::new(),
             facets: BTreeMap::new(),
+            occurrences: BTreeMap::new(),
+            source_hashes: BTreeMap::new(),
             packages: Vec::new(),
             fields: fields.iter().map(|field| (*field).to_string()).collect(),
         };
@@ -106,11 +112,39 @@ pub(super) fn capture(
                 demand.declaration(id);
             }
         }
-        (demand.facets.into_values().collect(), demand.packages)
+        (
+            demand.facets.into_values().collect(),
+            demand.packages,
+            demand.occurrences.into_values().collect(),
+        )
     })
 }
 
 impl Demand<'_> {
+    fn occurrence(
+        &mut self,
+        node: tree_sitter::Node<'_>,
+        file: &Path,
+        source: &str,
+        value: DemandedValue,
+    ) {
+        let hash = self
+            .source_hashes
+            .entry(file.to_path_buf())
+            .or_insert_with(|| crate::cache::content_hash(source.as_bytes()))
+            .clone();
+        self.occurrences.insert(
+            (file.to_path_buf(), node.start_byte(), node.end_byte()),
+            DemandedOccurrence {
+                source: file.to_path_buf(),
+                source_hash: hash,
+                start: node.start_byte(),
+                end: node.end_byte(),
+                value,
+            },
+        );
+    }
+
     fn declaration(&mut self, id: &DeclarationId) {
         if !matches!(
             id.kind.as_str(),
@@ -216,6 +250,12 @@ impl Demand<'_> {
                 .unwrap_or_else(|| {
                     Resolution::Unresolved("No exact runtime reference authority".into())
                 });
+        self.occurrence(
+            node,
+            file,
+            source,
+            DemandedValue::Reference(resolution.clone()),
+        );
         self.packages.extend(super::package_evidence::capture(
             self.resolver,
             file,
@@ -245,6 +285,20 @@ impl Demand<'_> {
         file: &Path,
         source: &str,
     ) -> ExpressionFacet {
+        if matches!(node.kind(), "string" | "number" | "true" | "false" | "null")
+            && !node.has_error()
+            && let Ok(raw) = node.utf8_text(source.as_bytes())
+        {
+            self.occurrence(
+                node,
+                file,
+                source,
+                DemandedValue::Literal {
+                    kind: node.kind().to_owned(),
+                    text: raw.to_owned(),
+                },
+            );
+        }
         let mut cursor = node.walk();
         let value = match node.kind() {
             "identifier" | "shorthand_property_identifier" => {

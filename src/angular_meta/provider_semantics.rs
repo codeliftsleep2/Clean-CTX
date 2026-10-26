@@ -335,6 +335,11 @@ fn project_at(
             call_evidence: None,
         });
     }
+    if native_component && let Some(authority) = authority {
+        edges.extend(super::provider_imported::project(
+            authority, owner_name, position,
+        ));
+    }
     edges
 }
 

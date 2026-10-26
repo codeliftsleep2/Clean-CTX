@@ -18,6 +18,7 @@ mod library_override_capture_tests;
 pub(crate) mod declaration_facets;
 mod declaration_groups;
 mod declared_scopes;
+pub(crate) mod demanded_occurrences;
 mod global_bindings;
 mod host;
 #[cfg(windows)]

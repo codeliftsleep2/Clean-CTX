@@ -153,7 +153,7 @@ answer portions; trace them before implementing replacements.
 
 | ID | Remaining obligation | Current evidence boundary | Exit needed for W04 |
 | --- | --- | --- | --- |
-| P1 | Provider owners and composed registrations | The migrated provider producer admits Component/Module owners and directly captured provider arrays. Directive, route, application/environment/testing contexts and composed/indirect provider inputs are not certified by this slice. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
+| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component composition is approved and authored at generation 64, UNRUN. Other composed owners and route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
 | P2 | Strategy/form coverage and value meaning | Class shorthand/useClass, function-declaration useFactory and useExisting have bounded canonical pair evidence. Other callable forms retain classified compatibility behavior. useValue reference admission is verified; its strategy presentation remains noncanonical. | Reconcile each required form with its actual question and public fact. Only propose richer target/value identity when a demonstrated question requires it; do not assume a general evaluator. Record genuine unsupported forms and resolve required capabilities rather than silently excluding them. |
 | P3 | Injector/application context | Local token/pair identity does not identify the applicable injector or connect its owner to the actual application/configuration hierarchy. | Establish the required owner/application/injector context and visibility proof, with distinct applications/scopes and current dependency paths. This is a prerequisite for effective-provider claims. |
 | P4 | Multi, overrides and precedence | Existing deduplication preserves semantic fact identity; it is not an ordered registration/multi/override model. No winning-provider claim follows from existing edges. | Define and verify the required order/multi/override questions against real registration context, with explicit runtime uncertainty. Architectural changes require the actual bounded owner decision. |
@@ -196,6 +196,18 @@ with 190 and 160 checks respectively, zero failures and six FINISHED sessions.
 P1.C1 bounded local acceptance is satisfied; full repository/final field gates and
 remaining owner/composition obligations stay open. No runtime array
 evaluation, imported contributor arrays or injector closure is authorized.
+
+Next investigation: [P1.C2 imported provider arrays](ISSUE_162_PROVIDER_IMPORTED_COMPOSITION_TRACE.md).
+Six tracked questions cover alias/barrel/namespace contributor routes in both
+Component positions, with established direct and same-source prerequisites.
+All six intended imported-stage REDs are inspected and byte-preserved (0 passed,
+6 failed, 0 ignored). The [bounded source-qualified membership decision](ISSUE_162_PROVIDER_IMPORTED_COMPOSITION_DECISION.md)
+is owner-approved. Generation-64 imported focused receipt records 11 passed, zero failures/ignored,
+including all six unchanged REDs and five integrated controls. Compilation is
+operator-reported GREEN. Seven preservation receipts add 107 passing executions
+(zero failed/ignored); fmt/Clippy are GREEN. The combined scoped Rust total is
+118 passing executions. Bounded binary acceptance remains deferred and open. Node acceptance is
+batched at major integrated checkpoints after substantial deterministic work.
 
 ## What counts as closing an implementation package
 
