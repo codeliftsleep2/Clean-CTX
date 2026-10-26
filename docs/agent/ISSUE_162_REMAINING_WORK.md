@@ -255,8 +255,12 @@ The additional exit controls and scoped preservation/lint/guard batch are now
 GREEN: 161 preservation passes plus six initial, four earlier exit passes and
 one corrected acquisition-control rerun yield 172 passing executions. Historical
 failure evidence is preserved; automatic removed-root rediscovery is not certified.
-Approval reconciliation, binary integration and broader repository/field gates
-remain open. No immediate Node run is requested.
+The approval evidence map is reconciled and generation-66 binary receipts are
+inspected PASS: route-providers 305 checks plus imported-owner preservation 332,
+zero errors and six FINISHED sessions. Bounded P1.R1 local acceptance is satisfied
+with explicit known-root reacquisition after recreation; automatic rediscovery
+of a removed route identity remains uncertified. Broader P1/W04 and repository/
+field gates remain open.
 Route shape omits providers; native route-root demand and distinct route-object
 identity require tracing/approval before production extension. No injector model
 or route authority change is authorized by the previous class-owner approvals.

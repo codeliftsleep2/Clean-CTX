@@ -10,6 +10,22 @@ hashes and maximum of 500 recorded checks. Exceeding the limit fails the suite;
 checks are never truncated into a misleading PASS. Shared fixtures, assertion
 helpers, lifecycle scenarios and the established McpClient transport are reused.
 
+For the generation-66 route membership major checkpoint, run:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-route-provider66-checkpoint.ps1
+```
+
+This checks syntax, rebuilds once, then selects route-providers and the affected
+provider-imported-owners preservation suite. Full logs remain under target/issue-162/.
+The route suite checks exact same-path/empty-path occurrence multiplicities through
+three sessions, source/dependency mutation and retirement. Recreated owner roots
+are explicitly acquired; automatic rediscovery of removed route identities is not
+claimed. Generation-66 receipts record route-providers PASS (305 checks) and imported-owner
+preservation PASS (332 checks), six FINISHED sessions and zero errors. Receipt
+summary: target/issue-162/route-provider66-binary-receipt.json. No private identity, injector
+scope or route-target authority is inferred from endpoint labels alone.
+
 For the combined generation-65 C2/C3 major checkpoint, run the logged handoff
 from the repository root. It checks JavaScript syntax, rebuilds once with all
 features, then runs provider-imported-owners and existing provider-composition
@@ -59,12 +75,13 @@ node verification/live-acceptance/issue-162/suites/provider-composition.mjs ./ta
 | provider-positions | Ordinary/view declaration distinction and independent field removal |
 | provider-composition | Same-source const/alias, spread/nested membership and independent mutation/retirement |
 | provider-imported-owners | Combined C2/C3 imported routes, exact actual owner/position and lifecycle |
+| route-providers | Native Routes roots, exact route occurrence multiplicity, children and source/dependency lifecycle |
 | provider-class | Canonical class pairs |
 | provider-factory | Canonical factory pairs |
 | provider-existing | Canonical existing-token pairs |
 | provider-value-presentation | Explicitly noncanonical value projection |
 
-The 18-suite inventory is explicit in suite-manifest.mjs. A full run is opt-in:
+The 19-suite inventory is explicit in suite-manifest.mjs. A full run is opt-in:
 
 ```powershell
 node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe all

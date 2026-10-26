@@ -14,6 +14,7 @@ export const suites = [
   "provider-positions",
   "provider-composition",
   "provider-imported-owners",
+  "route-providers",
   "provider-class",
   "provider-factory",
   "provider-existing",

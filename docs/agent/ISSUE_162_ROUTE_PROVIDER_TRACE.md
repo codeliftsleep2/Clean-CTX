@@ -1,7 +1,49 @@
 # Issue #162: route-declared provider membership
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-66 scoped Rust/lint/guard checkpoint GREEN (172 passing executions; acquisition control corrected); binary acceptance and broader gates pending.
+Status: bounded P1.R1 local acceptance GREEN; generation-66 scoped Rust/lint/guards and route binary PASS (305 + 332 preservation checks); broader repository/field gates open.
+
+## Generation-66 binary acceptance inspected PASS
+
+Inspected route-providers PASS: 305 checks, and provider-imported-owners
+preservation PASS: 332 checks. Both receipts record zero failed checks/errors,
+three FINISHED sessions and the 500-check maximum. They share binary SHA-256
+b06e07bef41ea377c25023b4c9e8616b58f1ba941ae0dfd7389d5e203e162abf,
+mtime 2026-10-26T21:35:04.237Z, and input hash
+e24125aa3ad218adb7997b3c44f07fb52d787e19d5ed3ed8dc3a15182edc5df4.
+Counts/report hashes are retained at target/issue-162/route-provider66-binary-receipt.json.
+Full logs: target/issue-162/route-provider66-binary-20261026-173424/.
+The all-feature build finished without warnings/errors; syntax preflight passed
+29 JavaScript files.
+
+This supersedes the authored binary UNRUN checkpoint for these two selected
+suites. Together with the scoped Rust/lint/guard receipts, it satisfies bounded
+P1.R1 local acceptance for the approved declared-root/object/provider forms.
+Same-path and empty-path public multiplicity survives the tested binary lifecycle;
+no public field/selector/equality change was required. Known-owner reacquisition
+after external root recreation remains explicit; automatic removed-identity
+rediscovery is not certified. No other binary suite, full repository gate,
+activation/injector answer, AQ12/AQ13, broader P1/W04/#162 or final field acceptance
+is inferred. No production/harness change accompanied inspection.
+
+## Major route binary checkpoint authored, UNRUN
+
+The route-providers suite reuses the existing runner/stdio transport, private
+workspaces, three-session lifecycle, binary/input hashes and 500-check ceiling.
+Two source-owned type-only aliased Routes roots exercise imported provider routes,
+repeated direct entries, same-path objects, empty-path objects and children.
+Exact public path/owner-source/token-source multisets must preserve multiplicity,
+including after restore and independent object/field removal. Batched contributor,
+token, barrel, cycle, mutable binding, deletion/replacement, config/public-export
+and owner mutations verify current facts and sibling survival. Stale restoration
+is refused before queries; recreated roots use explicit known-owner acquisition.
+
+The logged handoff rebuilds once and selects route-providers plus existing
+provider-imported-owners preservation. See the [approval acceptance map](ISSUE_162_ROUTE_PROVIDER_ACCEPTANCE.md)
+for all 43 required controls and their tracked/binary evidence boundaries.
+Only harness/docs changed; the generation-66 Rust/lint checkpoint remains as
+recorded. New binary acceptance is UNRUN and not inferred from earlier generations.
+No full inventory, public contract extension or final field switch is requested.
 
 ## Generation-66 scoped preservation/lint GREEN
 
