@@ -2,6 +2,74 @@
 
 Agent: Agent MaxHeadRoom
 
+## Independent suites: maximum 500 checks each
+
+The former monolithic driver is replaced by explicit suite selection. Each
+entrypoint under suites/ has its own three-session workspace, report, binary/input
+hashes and maximum of 500 recorded checks. Exceeding the limit fails the suite;
+checks are never truncated into a misleading PASS. Shared fixtures, assertion
+helpers, lifecycle scenarios and the established McpClient transport are reused.
+
+For the current declared-position slice, run only provider-positions after the
+binary has been rebuilt for the Rust changes:
+
+```powershell
+node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe provider-positions
+```
+
+An entrypoint can also run directly:
+
+```powershell
+node verification/live-acceptance/issue-162/suites/provider-positions.mjs ./target/debug/clean-ctx.exe
+```
+
+| Suite | Selected assertions |
+| --- | --- |
+| modules | Module/standalone composition |
+| inject | Field/functional inject token controls in the DI fixture |
+| constructor | Constructor token controls |
+| strings | Exact string-token identity |
+| members | Input/output members |
+| functional-http | Guard/resolver/interceptor roles and inner-role decoys |
+| provider-registration | Object-provider registrations |
+| provider-shorthand | Class shorthand registrations |
+| provider-strategies | Class/factory reference registrations |
+| provider-value-registration | Native reference-valued registration |
+| provider-directive | Directive-owned registration |
+| provider-positions | Ordinary/view declaration distinction and independent field removal |
+| provider-class | Canonical class pairs |
+| provider-factory | Canonical factory pairs |
+| provider-existing | Canonical existing-token pairs |
+| provider-value-presentation | Explicitly noncanonical value projection |
+
+The full inventory is explicit in suite-manifest.mjs. A full run is opt-in:
+
+```powershell
+node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe all
+```
+
+The launcher writes a summary containing suite counts/statuses and receipt paths,
+not a combined thousands-of-checks array. It stops on the first failed suite.
+Unrun suites are not certified by a targeted PASS. Full runs may take longer due
+to independent session startup; targeted execution is the routine incremental
+workflow. Shared lifecycle mutations are preserved, but assertions/queries for
+unselected families are not executed. Fixture sources remain shared so existing
+cross-family noise and dependency conditions are retained.
+
+No production Rust or runtime transport policy changes accompany this split.
+The new harness organization is UNRUN pending syntax and operator acceptance.
+
+Check all suite definitions without starting an MCP runtime:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/check-syntax.ps1
+```
+
+### Historical monolithic fixture notes
+
+The following notes describe the earlier combined driver and receipts. Current
+suite selection and evidence ownership are governed by the instructions above.
+
 The provider declaration extension reuses both functional checkpoint sources
 and their existing token/interface mutation, restart, source replacement and
 stale-restore phases. FunctionalProviderHost registers two same-named tokens
@@ -41,7 +109,7 @@ Run from the repository root after completing edits:
 
 ```powershell
 cargo build --all-features --bin clean-ctx
-node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe
+node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe all
 ```
 
 On Unix pass `./target/debug/clean-ctx`. The driver rejects a binary predating

@@ -177,10 +177,12 @@ are operator-reported GREEN; the inspected rebuilt binary report passes all
 P3 injector/application context remains
 unresolved; D1 closes only that local owner-admission subquestion.
 
-Next candidate: [P1.VP1 Component viewProviders](ISSUE_162_VIEW_PROVIDER_TRACE.md).
-The static trace locates the missing acquisition/position interpretation and
-requires a valid public omission RED before choosing a retained/public position
-contract. No view visibility or new public carrier is approved by this trace.
+P1.VP1 [Component viewProviders position](ISSUE_162_VIEW_PROVIDER_POSITION_DECISION.md)
+is verified at the bounded generation-62 checkpoint: focused/durable/currentness
+and fmt/Clippy operator-reported GREEN; all 16 split binary suites inspected PASS
+(2569 checks across receipts, maximum 322 in one suite). RegistersViewProvider
+preserves declared position separately from ordinary RegistersProvider. This
+does not establish effective visibility or satisfy P3–P6; P1 and W04 remain open.
 
 ## What counts as closing an implementation package
 

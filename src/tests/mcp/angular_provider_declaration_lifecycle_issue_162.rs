@@ -555,3 +555,6 @@ fn stale_tokens_repair_and_retirement(source: &str) {
 
 #[path = "angular_provider_lifecycle_cases_issue_162.rs"]
 mod lifecycle_cases;
+
+#[path = "angular_view_provider_lifecycle_issue_162.rs"]
+mod view_lifecycle_cases;

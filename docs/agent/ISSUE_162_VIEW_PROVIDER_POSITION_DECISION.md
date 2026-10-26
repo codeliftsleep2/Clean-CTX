@@ -1,7 +1,104 @@
 # Issue #162: declared view-provider position
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-62 compilation and focused controls operator-reported GREEN; view-specific durable/currentness and binary acceptance pending.
+Status: owner APPROVED; generation-62 bounded P1.VP1 checkpoint verified; focused/durable/currentness and fmt/Clippy operator-reported GREEN; all 16 split binary suites PASS.
+
+## Bounded checkpoint verification
+
+The operator reports cargo fmt and Clippy GREEN following the full split-suite
+run. This records the requested fmt check and all-target/all-feature Clippy with
+-D warnings as operator-reported results; no separate gate receipt paths were
+supplied. It supersedes the outstanding-lint statements in historical sections
+below. No production or harness changes accompanied this report.
+
+The bounded declared-position checkpoint P1.VP1 is verified: ordinary/view
+registration distinction, retained/durable/currentness and retirement controls,
+public binary acceptance and requested zero-warning checks. This is an
+incremental commit boundary, not full repository or final Claude field acceptance.
+Effective visibility, hierarchy, precedence, winning provider and satisfaction
+remain separate P3–P6 obligations. P1, W04 and Issue #162 remain open.
+
+## Full split inventory PASS
+
+Inspected summary and all 16 child receipts under
+target/live-acceptance/issue-162/2026-10-26T03-25-27-877Z-all-summary-23788/.
+All suites record PASS, zero failed checks and zero errors, with all 48 sessions
+FINISHED. Check counts by suite: modules 208, inject 104, constructor 194,
+strings 89, members 52, functional-http 322, provider-registration 133,
+provider-shorthand 133, provider-strategies 133, provider-value-registration 133,
+provider-directive 133, provider-positions 160, provider-class 187,
+provider-factory 187, provider-existing 268 and provider-value-presentation 133.
+Total: 2569 operator binary checks across independent receipts; maximum 322 in
+one suite, below the required 500. These are not Rust test counts or CI results.
+
+Every receipt records the same binary SHA-256 as the targeted position run below;
+the full-run summary records a consistent input hash. This supersedes the other
+15 suites' UNRUN status for this inventory and establishes the one-time split
+baseline. Routine incremental work can select affected suites; full runs remain
+for shared changes and integration gates. No production/harness change accompanies
+this inspection. Final fmt/Clippy results remain unreported; no full repository,
+Claude field, W04 or Issue #162 completion is claimed.
+
+## Targeted position suite PASS
+
+Inspected summary and provider-positions/report.json under
+target/live-acceptance/issue-162/2026-10-26T03-01-35-154Z-provider-positions-summary-15140/:
+PASS, 160 checks, zero failed, errors empty, all three sessions FINISHED.
+The receipt records the 500-check maximum. Binary SHA-256:
+003f3bb355a5716238f72866f6deb6540a4da18c57ca6dd2816b553a3002b848;
+mtime 2026-10-26T02:36:55.985Z.
+
+This supersedes the position suite's UNRUN checkpoint. It verifies that selected
+suite, not the other 15 suite entrypoints or the full refactored inventory.
+No final fmt/Clippy receipt or explicit result was supplied with this report.
+No production or harness change accompanied inspection. Full repository and
+Claude field gates, broader provider context and W04/#162 closure remain open.
+
+## Operator suite split
+
+The owner requires logical live suites with no more than 500 checks each. The
+binary driver now selects independent suite entrypoints and writes separate
+bounded receipts. The current incremental acceptance command selects
+provider-positions; all is an explicit full inventory run with summary-only
+aggregation. Shared lifecycle scenarios and fixture noise are retained while
+unselected families' assertions and semantic queries are skipped. Exceeding 500
+checks is a suite failure, never truncation. This harness refactor and the
+position extension are UNRUN. No Rust production changes accompanied the split.
+
+## Durable/currentness GREEN and binary extension
+
+The operator reports the requested library compile-only check and both
+issue_162_view_provider and issue_162_provider batches GREEN. No counts or full
+receipts were supplied. This supersedes the new durable/currentness controls'
+UNRUN checkpoint below, without inferring final Clippy or binary acceptance.
+
+The existing three-session binary fixture now includes PositionProviderHost
+declaring the same canonical tokens in both arrays. Exact public relation/token/
+source multisets check both positions separately through restart and existing
+dependency/owner/source mutations. Added independent ordinary/view array removal
+and repair cases must preserve the other relation. Existing session and transport
+policies are reused. This extension is UNRUN; no Rust production changes or
+generation advance accompanied it. P1.VP1 remains open pending binary/lint gates.
+
+## View-specific durable/currentness batch authored
+
+Three additional tracked controls reuse the existing provider fixture and its
+correct parent module. Two exercise both positions for the same canonical tokens
+on two same-named Components: complete native authority/canonical endpoint SQLite
+transport, restoration and retained-index equality before query reacquisition,
+six retained occurrences versus deduplicated typed public facts, independent
+field removal/repair, source replacement and external-deletion retirement.
+Fresh fixtures test token/API/core-version stale restore refusal and unchanged
+consumer repair. A third control reuses the existing package/config fixture for
+view-only export/config/version/ambiguous-target scenarios with a surviving
+local registration. Existing ordinary-provider scenarios keep their policies.
+
+Only test fixtures and documentation changed. The new child module imports
+existing parent helpers; existing test registrations were not moved. New helpers,
+call signatures and generated metadata replacements were statically inspected.
+These controls are UNRUN, not compiler-verified or accepted by authorship. No
+production change or generation advance accompanies this batch. Binary/lint
+acceptance remains subsequent work.
 
 ## Generation-62 focused GREEN
 

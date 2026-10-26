@@ -9,6 +9,8 @@ export {inject as obtain} from '@angular/core';
 export type {CanMatchFn as Match, ResolveFn as Resolution} from '@angular/router';
 export type {HttpInterceptorFn as Intercept} from '${entry}';
 `;
+export const positionOrdinary = 'providers:[{provide:Left,useValue:101},{provide:Right,useValue:102},{provide:Left,useValue:103}]';
+export const positionView = 'viewProviders:[{provide:Left,useValue:101},{provide:Right,useValue:102},{provide:Left,useValue:103}]';
 export const functionalSource = `
 import {Component as View, Directive as Behavior} from '@angular/core';
 import * as api from './functional-api';
@@ -51,6 +53,8 @@ export class ValueReferenceProviderHost {}
 @Behavior({selector:'[providerProbe]',providers:[{provide:Left,useValue:1},
  {provide:Right,useValue:2},{provide:Left,useValue:3}]})
 export class DirectiveProviderHost {}
+@View({${positionOrdinary},${positionView}})
+export class PositionProviderHost {}
 `;
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
@@ -69,16 +73,17 @@ export const functionalFixture = {
   'node_modules/@angular/common/index.d.ts':'export type HttpInterceptorFn=(...args:unknown[])=>unknown;',
   'node_modules/@angular/common/http/index.d.ts':'export type HttpInterceptorFn=(...args:unknown[])=>unknown;',
 };
-export function functionalAssertions({call,check,root,normalize,name}) {
+export function functionalAssertions({call,check,root,normalize,name,group}) {
   let sequence = 0;
   return async ({tokens = ['functional-left.ts','functional-right.ts'], http = true,
     owners = ['functional.ts','functional-neighbor.ts'], providerOwners = owners,
-    strategyOwners = providerOwners, implementation = true, factoryRight = true} = {}) => {
+    strategyOwners = providerOwners, implementation = true, factoryRight = true,
+    ordinaryPositionOwners = providerOwners, viewPositionOwners = providerOwners} = {}) => {
     const label = `${name}/functional/${++sequence}`;
     for (const file of ['functional.ts','functional-neighbor.ts']) {
       await call('workspace_query',{type:'entities_in_file',file_path:path.join(root,file),fidelity:'high'});
     }
-    for (const [kind,owner] of [['Guard','functionalGuard'],['Resolver','functionalResolver'],['Interceptor','functionalInterceptor']]) {
+    if (group === 'roles') for (const [kind,owner] of [['Guard','functionalGuard'],['Resolver','functionalResolver'],['Interceptor','functionalInterceptor']]) {
       const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:kind,name:owner});
       const edges = response.structuredContent?.edges;
       check(`${label}/${kind}/structured`,Array.isArray(edges),response);
@@ -90,6 +95,7 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/${kind}/canonical-private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
     for (const providerName of ['FunctionalProviderHost','ShorthandProviderHost','StrategyProviderHost','ValueReferenceProviderHost','DirectiveProviderHost']) {
+      if (group !== providerName) continue;
       const providerKind = providerName === 'DirectiveProviderHost' ? 'Directive' : 'Component';
       const providers = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:providerKind,name:providerName});
       const registrations = providers.structuredContent?.edges;
@@ -106,6 +112,19 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/${providerName}/exact-declaration-identities`,JSON.stringify(actualProviders) === JSON.stringify(expectedProviders),{actualProviders,expectedProviders});
       check(`${label}/${providerName}/canonical-private`,selectedProviders.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
+    if (group === 'positions') {
+    const positions = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Component',name:'PositionProviderHost'});
+    const positionEdges = positions.structuredContent?.edges;
+    check(`${label}/positions/structured`,Array.isArray(positionEdges),positions);
+    for (const [relation,positionOwners] of [['RegistersProvider',ordinaryPositionOwners],['RegistersViewProvider',viewPositionOwners]]) {
+      const selected = positionEdges.filter(edge => edge.relation === relation);
+      const actual = selected.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
+      const expected = positionOwners.flatMap(owner => tokens.map(token => [normalize(path.join(root,owner)),'AuditApi',normalize(path.join(root,token))])).sort();
+      check(`${label}/positions/${relation}/exact-facts`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
+      check(`${label}/positions/${relation}/owner-and-private`,selected.every(edge => edge.subject.entity_type === 'Component' && !('canonical' in edge.subject) && !('canonical' in edge.object)));
+    }
+    }
+    if (group === 'class') {
     for (const tokenName of ['AuditApi','"audit.class"']) {
       const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
       const classEdges = response.structuredContent?.edges;
@@ -128,6 +147,8 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/class-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/class-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
+    }
+    if (group === 'factory') {
     for (const tokenName of ['AuditApi','"audit.factory"']) {
       const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
       const edges = response.structuredContent?.edges;
@@ -151,6 +172,8 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/factory-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/factory-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
+    }
+    if (group === 'existing') {
     for (const tokenName of ['AuditApi','"audit.alias"','"audit.source"']) {
       const response = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:tokenName});
       const edges = response.structuredContent?.edges;
@@ -177,6 +200,8 @@ export function functionalAssertions({call,check,root,normalize,name}) {
       check(`${label}/existing-pairs/${tokenName}/exact-identities`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/existing-pairs/${tokenName}/private`,selected.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
+    }
+    if (group === 'value') {
     const values = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'ProviderToken',name:'AuditApi'});
     const valueEdges = values.structuredContent?.edges;
     check(`${label}/value-reference/structured`,Array.isArray(valueEdges),values);
@@ -188,9 +213,12 @@ export function functionalAssertions({call,check,root,normalize,name}) {
     const valueProvenance = valueProjection.map(edge => normalize(edge.object.file)).sort();
     const expectedValueProvenance = valueOwners.map(owner => normalize(path.join(root,owner))).sort();
     check(`${label}/value-reference/asserting-source`,JSON.stringify(valueProvenance) === JSON.stringify(expectedValueProvenance),{valueProvenance,expectedValueProvenance});
+    }
+    if (group === 'roles') {
     const decoy = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Guard',name:'loose'});
     const edges = decoy.structuredContent?.edges;
     check(`${label}/decoy-structured`,Array.isArray(edges),decoy);
     check(`${label}/inner-role-does-not-escape`,edges.every(edge => edge.relation !== 'Injects'),edges);
+    }
   };
 }
