@@ -56,6 +56,13 @@ export class DirectiveProviderHost {}
 @View({${positionOrdinary},${positionView}})
 export class PositionProviderHost {}
 `;
+export const compositionOrdinary = 'providers:GROUP';
+export const compositionView = 'viewProviders:[...[ALIAS]]';
+export function compositionSource() {
+  const entries = positionOrdinary.slice('providers:'.length);
+  return functionalSource.replace(`@View({${positionOrdinary},${positionView}})`,
+    `const GROUP=${entries}; const ALIAS=GROUP; @View({${compositionOrdinary},${compositionView}})`);
+}
 export const functionalFixture = {
   'functional.ts':functionalSource, 'functional-neighbor.ts':functionalSource,
   'functional-left.ts':'export class AuditApi {}', 'functional-right.ts':'export class AuditApi {}',
@@ -78,7 +85,8 @@ export function functionalAssertions({call,check,root,normalize,name,group}) {
   return async ({tokens = ['functional-left.ts','functional-right.ts'], http = true,
     owners = ['functional.ts','functional-neighbor.ts'], providerOwners = owners,
     strategyOwners = providerOwners, implementation = true, factoryRight = true,
-    ordinaryPositionOwners = providerOwners, viewPositionOwners = providerOwners} = {}) => {
+    ordinaryPositionOwners = providerOwners, viewPositionOwners = providerOwners,
+    positionTokensByOwner = {}} = {}) => {
     const label = `${name}/functional/${++sequence}`;
     for (const file of ['functional.ts','functional-neighbor.ts']) {
       await call('workspace_query',{type:'entities_in_file',file_path:path.join(root,file),fidelity:'high'});
@@ -112,14 +120,14 @@ export function functionalAssertions({call,check,root,normalize,name,group}) {
       check(`${label}/${providerName}/exact-declaration-identities`,JSON.stringify(actualProviders) === JSON.stringify(expectedProviders),{actualProviders,expectedProviders});
       check(`${label}/${providerName}/canonical-private`,selectedProviders.every(edge => !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }
-    if (group === 'positions') {
+    if (group === 'positions' || group === 'composition') {
     const positions = await call('workspace_query',{type:'forward_edges',domain:'angular',entity_type:'Component',name:'PositionProviderHost'});
     const positionEdges = positions.structuredContent?.edges;
     check(`${label}/positions/structured`,Array.isArray(positionEdges),positions);
     for (const [relation,positionOwners] of [['RegistersProvider',ordinaryPositionOwners],['RegistersViewProvider',viewPositionOwners]]) {
       const selected = positionEdges.filter(edge => edge.relation === relation);
       const actual = selected.map(edge => [normalize(edge.subject.file),edge.object.name,normalize(edge.object.file)]).sort();
-      const expected = positionOwners.flatMap(owner => tokens.map(token => [normalize(path.join(root,owner)),'AuditApi',normalize(path.join(root,token))])).sort();
+      const expected = positionOwners.flatMap(owner => (positionTokensByOwner[owner] ?? tokens).map(token => [normalize(path.join(root,owner)),'AuditApi',normalize(path.join(root,token))])).sort();
       check(`${label}/positions/${relation}/exact-facts`,JSON.stringify(actual) === JSON.stringify(expected),{actual,expected});
       check(`${label}/positions/${relation}/owner-and-private`,selected.every(edge => edge.subject.entity_type === 'Component' && !('canonical' in edge.subject) && !('canonical' in edge.object)));
     }

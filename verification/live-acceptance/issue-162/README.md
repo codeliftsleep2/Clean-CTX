@@ -10,17 +10,17 @@ hashes and maximum of 500 recorded checks. Exceeding the limit fails the suite;
 checks are never truncated into a misleading PASS. Shared fixtures, assertion
 helpers, lifecycle scenarios and the established McpClient transport are reused.
 
-For the current declared-position slice, run only provider-positions after the
+For the current composition slice, select provider-composition after the
 binary has been rebuilt for the Rust changes:
 
 ```powershell
-node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe provider-positions
+node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe provider-composition
 ```
 
 An entrypoint can also run directly:
 
 ```powershell
-node verification/live-acceptance/issue-162/suites/provider-positions.mjs ./target/debug/clean-ctx.exe
+node verification/live-acceptance/issue-162/suites/provider-composition.mjs ./target/debug/clean-ctx.exe
 ```
 
 | Suite | Selected assertions |
@@ -37,12 +37,13 @@ node verification/live-acceptance/issue-162/suites/provider-positions.mjs ./targ
 | provider-value-registration | Native reference-valued registration |
 | provider-directive | Directive-owned registration |
 | provider-positions | Ordinary/view declaration distinction and independent field removal |
+| provider-composition | Same-source const/alias, spread/nested membership and independent mutation/retirement |
 | provider-class | Canonical class pairs |
 | provider-factory | Canonical factory pairs |
 | provider-existing | Canonical existing-token pairs |
 | provider-value-presentation | Explicitly noncanonical value projection |
 
-The full inventory is explicit in suite-manifest.mjs. A full run is opt-in:
+The 17-suite inventory is explicit in suite-manifest.mjs. A full run is opt-in:
 
 ```powershell
 node verification/live-acceptance/issue_162_live_acceptance.mjs ./target/debug/clean-ctx.exe all
@@ -57,7 +58,10 @@ unselected families are not executed. Fixture sources remain shared so existing
 cross-family noise and dependency conditions are retained.
 
 No production Rust or runtime transport policy changes accompany this split.
-The new harness organization is UNRUN pending syntax and operator acceptance.
+The original 16-suite split has a recorded full PASS at generation 62. The new
+composition suite now has an inspected generation-63 PASS (190 checks), alongside
+provider-positions preservation (160 checks). Both finished all three sessions
+with zero failures. Other suites are not certified at generation 63 by those runs.
 
 Check all suite definitions without starting an MCP runtime:
 

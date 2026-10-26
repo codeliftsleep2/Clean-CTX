@@ -1,9 +1,9 @@
 // Agent MaxHeadRoom: shared lifecycle scenarios, selected by each bounded suite.
 import path from 'node:path';
-import {functionalSource, functionalApi, commonManifest, positionOrdinary, positionView} from './functional-scenario.mjs';
+import {functionalApi, commonManifest} from './functional-scenario.mjs';
 import {memberSource, memberApi, foreignMemberApi} from './member-scenario.mjs';
 import {stringValues} from './string-scenario.mjs';
-export async function runLifecycle({session,binary,checkpointFiles,root,fixture,mutate,leaf,check}, suite) {
+export async function runLifecycle({session,binary,checkpointFiles,root,fixture,mutate,leaf,check,functionalSource,positionOrdinary,positionView}, suite) {
   await session(binary, 'cold-warm-checkpoint', async ({ call, facts, injectFacts, constructorFacts, stringFacts, memberFacts, functionalFacts }) => {
     for (const file of checkpointFiles) await call('compress_code_context', { filePath: path.join(root, file), fidelity: 'high' });
     await facts(['left.ts', 'right.ts']); await facts(['left.ts', 'right.ts']);
@@ -43,6 +43,17 @@ export async function runLifecycle({session,binary,checkpointFiles,root,fixture,
     mutate('functional.ts', functionalSource.replace(positionView, 'viewProviders:[]'));
     await functionalFacts({viewPositionOwners:['functional-neighbor.ts']});
     mutate('functional.ts', functionalSource); await functionalFacts();
+    if (suite.group === 'composition') {
+      mutate('functional.ts', functionalSource.replace('const GROUP=', 'let GROUP='));
+      await functionalFacts({ordinaryPositionOwners:['functional-neighbor.ts'],viewPositionOwners:['functional-neighbor.ts']});
+      mutate('functional.ts', functionalSource); await functionalFacts();
+      mutate('functional.ts', functionalSource.replace('{provide:Right,useValue:102},', ''));
+      await functionalFacts({positionTokensByOwner:{'functional.ts':['functional-left.ts']}});
+      mutate('functional.ts', functionalSource); await functionalFacts();
+      mutate('functional.ts', functionalSource.replace('const ALIAS=GROUP', 'const ALIAS=ALIAS'));
+      await functionalFacts({viewPositionOwners:['functional-neighbor.ts']});
+      mutate('functional.ts', functionalSource); await functionalFacts();
+    }
     mutate('functional.ts', functionalSource.replace("from '@angular/core'", "from './provider-foreign'"));
     await functionalFacts({providerOwners:['functional-neighbor.ts']});
     mutate('functional.ts', functionalSource); await functionalFacts();

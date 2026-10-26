@@ -190,7 +190,11 @@ Component positions. All six intended REDs are observed and frozen. The
 [bounded composition decision](ISSUE_162_PROVIDER_COMPOSITION_DECISION.md) is now
 owner-approved with the structural-authority boundary. Generation-63 compilation
 and focused composition/preservation controls are operator-reported GREEN;
-durable/currentness and targeted binary acceptance remain pending. No runtime array
+the additional durable/currentness tracked controls and lint gates are now
+operator-reported GREEN. Inspected composition and position binary receipts PASS
+with 190 and 160 checks respectively, zero failures and six FINISHED sessions.
+P1.C1 bounded local acceptance is satisfied; full repository/final field gates and
+remaining owner/composition obligations stay open. No runtime array
 evaluation, imported contributor arrays or injector closure is authorized.
 
 ## What counts as closing an implementation package

@@ -12,6 +12,7 @@ export const suites = [
   "provider-value-registration",
   "provider-directive",
   "provider-positions",
+  "provider-composition",
   "provider-class",
   "provider-factory",
   "provider-existing",

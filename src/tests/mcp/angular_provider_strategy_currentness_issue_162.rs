@@ -145,6 +145,17 @@ fn issue_162_view_provider_currentness_export_config_version_and_ambiguity() {
 }
 
 fn currentness_position(field: &str, directive: bool, view: bool) {
+    currentness_source(field, directive, view, false);
+}
+
+#[test]
+fn issue_162_provider_composition_currentness_export_config_version_and_ambiguity() {
+    for view in [false, true] {
+        currentness_source("useValue", false, view, true);
+    }
+}
+
+fn currentness_source(field: &str, directive: bool, view: bool, composed: bool) {
     let owner_type = if directive { "Directive" } else { "Component" };
     let factory = field == "useFactory";
     let _serial = crate::protocol::handler_response_serial();
@@ -193,6 +204,19 @@ fn currentness_position(field: &str, directive: bool, view: bool) {
                 .replace(
                     "provide:Token,useValue:remote",
                     "provide:OtherToken,useValue:remote",
+                )
+        } else {
+            source
+        };
+        let source = if composed {
+            let position = if view { "viewProviders" } else { "providers" };
+            source
+                .replace(&format!("@View({{{position}:["), "const GROUP=[")
+                .replace(
+                    "]})\nexport class",
+                    &format!(
+                        "]; const ALIAS=GROUP; @View({{{position}:[...ALIAS]}})\nexport class"
+                    ),
                 )
         } else {
             source

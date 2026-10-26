@@ -1,7 +1,55 @@
 # Issue #162: source-declared provider-array composition
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED with structural-authority boundary; generation-63 compilation and focused composition/preservation controls operator-reported GREEN; durable/currentness and binary acceptance pending.
+Status: owner APPROVED with structural-authority boundary; generation-63 focused/durable/currentness and lint controls operator-reported GREEN; composition and position binary receipts inspected PASS.
+
+## Generation-63 bounded local acceptance
+
+The operator reports GREEN for the requested compile-only check, provider and
+view-provider tracked test batches, syntax preflight, fmt, Clippy and rebuild.
+No complete Cargo output or test counts were supplied; those remain operator
+reports, separate from inspected binary evidence.
+
+Inspected summary and suite report.json receipts under target/live-acceptance/issue-162/:
+
+- 2026-10-26T15-41-26-799Z-provider-composition-summary-24860/: PASS,
+  190 checks, zero failed, no errors, all three sessions FINISHED.
+- 2026-10-26T15-59-48-468Z-provider-positions-summary-29176/: PASS,
+  160 checks, zero failed, no errors, all three sessions FINISHED.
+
+Both enforce the 500-check maximum and record the same binary SHA-256
+710768643d2193c68174bf1a180e629efdd12f7bc4fe0a18749d06a7541eec4a,
+mtime 2026-10-26T15:41:24.848Z, and verification inputs hash
+bc7bcdb25e011bf690b66cb5905566c98ac2aa3358eaa124f9d8f05c0b720a88.
+This supersedes this batch's UNRUN checkpoints below. No production or harness
+change accompanied receipt inspection.
+
+P1.C1's bounded local composition acceptance is satisfied by these evidence
+categories. This does not certify the other 15 live suites at generation 63,
+full repository gates, final Claude field acceptance, imported contributor arrays,
+new composed owners, runtime array values, P1, W04 or Issue #162 closure.
+
+## Composition lifecycle and binary batch authored, UNRUN
+
+Four additional tracked controls reuse the existing lifecycle/currentness fixtures.
+They cover exact retained SQLite authority and canonical endpoint restoration
+before queries, both positions on same-named owners, independent field/source
+retirement, stale token/API/package refusal and repair, and export/config/version/
+ambiguity transitions without consumer edits. Initializer, mutable-binding and
+alias mutations also preserve the Component declaration text and independently
+proved neighboring facts. Existing direct-position scenarios retain their policy.
+
+A dedicated provider-composition binary suite uses same-source GROUP/ALIAS routes
+in both positions through the existing three-session lifecycle. It adds initializer,
+mutable-binding and cyclic-alias mutations with repair and sibling preservation.
+The explicit inventory now has 17 suites; each retains the 500-check maximum.
+
+Only tracked tests, verification assets and documentation changed in this batch.
+Bounded static checks verified fixture substitutions, unchanged owner declaration
+text, module reuse, suite inventory, UTF-8, file sizes and the frozen six-test hash.
+Compilation, syntax preflight and runtime execution remain UNRUN. No production
+change or generation advance accompanies this batch; focused GREEN below does
+not verify these newly authored controls.
 
 ## Generation-63 focused GREEN
 

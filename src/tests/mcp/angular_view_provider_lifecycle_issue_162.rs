@@ -5,6 +5,20 @@ fn both_positions() -> String {
     SOURCE.replace("})\nexport class", ",viewProviders:[{provide:Left,useValue:1},{provide:Right,useValue:2},{provide:Left,useValue:3}]})\nexport class")
 }
 
+fn composed_positions() -> String {
+    let entries = "{provide:Left,useValue:1},{provide:Right,useValue:2},{provide:Left,useValue:3}";
+    both_positions()
+        .replace(
+            "@View",
+            &format!("const GROUP=[{entries}]; const ALIAS=GROUP; @View"),
+        )
+        .replace(&format!("providers:[{entries}]"), "providers:GROUP")
+        .replace(
+            &format!("viewProviders:[{entries}]"),
+            "viewProviders:[...[ALIAS]]",
+        )
+}
+
 fn view_proof(state: &crate::mcp::McpState, file: &str) -> Value {
     let snapshot = state
         .semantic_snapshot(&state.alias_for_path(file).unwrap())
@@ -102,8 +116,16 @@ fn position_answers(
 
 #[test]
 fn issue_162_view_provider_lifecycle_sqlite_restore_and_independent_position_retirement() {
+    restart_positions(both_positions(), false);
+}
+
+#[test]
+fn issue_162_provider_composition_lifecycle_sqlite_restore_and_position_retirement() {
+    restart_positions(composed_positions(), true);
+}
+
+fn restart_positions(source: String, composed: bool) {
     let _serial = crate::protocol::handler_response_serial();
-    let source = both_positions();
     let (root, config, _) = setup(&source);
     let p = root.path();
     let database = rusqlite::Connection::open(&config.persistence.db_path).unwrap();
@@ -174,9 +196,17 @@ fn issue_162_view_provider_lifecycle_sqlite_restore_and_independent_position_ret
         ("providers", &["neighbor.ts"][..], files),
         ("viewProviders", files, &["neighbor.ts"][..]),
     ] {
-        let array = format!(
-            "{field}:[{{provide:Left,useValue:1}},{{provide:Right,useValue:2}},{{provide:Left,useValue:3}}]"
-        );
+        let array = if composed {
+            if field == "providers" {
+                "providers:GROUP".to_owned()
+            } else {
+                "viewProviders:[...[ALIAS]]".to_owned()
+            }
+        } else {
+            format!(
+                "{field}:[{{provide:Left,useValue:1}},{{provide:Right,useValue:2}},{{provide:Left,useValue:3}}]"
+            )
+        };
         std::fs::write(
             p.join("app.ts"),
             source.replace(&array, &format!("{field}:[]")),
@@ -196,9 +226,17 @@ fn issue_162_view_provider_lifecycle_sqlite_restore_and_independent_position_ret
 
 #[test]
 fn issue_162_view_provider_lifecycle_stale_token_api_package_refusal_and_repair() {
+    stale_positions(both_positions());
+}
+
+#[test]
+fn issue_162_provider_composition_lifecycle_stale_token_api_package_refusal_and_repair() {
+    stale_positions(composed_positions());
+}
+
+fn stale_positions(source: String) {
     let _serial = crate::protocol::handler_response_serial();
     for mutation in ["token", "api", "version"] {
-        let source = both_positions();
         let (root, config, _) = setup(&source);
         let p = root.path();
         let (file, replacement) = match mutation {
@@ -251,6 +289,110 @@ fn issue_162_view_provider_lifecycle_stale_token_api_package_refusal_and_repair(
         );
         for name in ["app.ts", "neighbor.ts"] {
             assert_eq!(std::fs::read_to_string(p.join(name)).unwrap(), source);
+        }
+    }
+}
+
+#[test]
+fn issue_162_provider_composition_initializer_and_alias_mutation_preserves_owner_declaration() {
+    let _serial = crate::protocol::handler_response_serial();
+    for mutation in ["initializer", "mutable", "alias"] {
+        let source = composed_positions();
+        let (root, config, _) = setup(&source);
+        let p = root.path();
+        let changed = match mutation {
+            "initializer" => source.replace("{provide:Right,useValue:2},", ""),
+            "mutable" => source.replace("const GROUP=", "let GROUP="),
+            _ => source.replace("const ALIAS=GROUP", "const ALIAS=missing"),
+        };
+        assert_ne!(source, changed, "fixture must mutate its intended route");
+        assert_eq!(
+            source.split_once("@View").unwrap().1,
+            changed.split_once("@View").unwrap().1,
+            "Component declaration and metadata remain byte-identical"
+        );
+        std::fs::write(p.join("app.ts"), &changed).unwrap();
+        let state = crate::mcp::McpState::new(config);
+        let file = p.join("app.ts").to_string_lossy().into_owned();
+        let response = call(&state, p, "restore_context", json!({"filePath":file}));
+        assert!(
+            response.get("error").is_some(),
+            "changed initializer adopted stale snapshot: {response}"
+        );
+        assert!(state.alias_for_path(&file).is_none());
+        for repaired in [false, true] {
+            if repaired {
+                std::fs::write(p.join("app.ts"), &source).unwrap();
+            }
+            for name in ["app.ts", "neighbor.ts"] {
+                let response = call(
+                    &state,
+                    p,
+                    "workspace_query",
+                    json!({"type":"entities_in_file","file_path":p.join(name),"fidelity":"high"}),
+                );
+                assert!(response.get("error").is_none(), "{response}");
+            }
+            let response = call(
+                &state,
+                p,
+                "workspace_query",
+                json!({"type":"forward_edges","domain":"angular","entity_type":"Component","name":"ProviderHost"}),
+            );
+            assert!(response.get("error").is_none(), "{response}");
+            for relation in ["RegistersProvider", "RegistersViewProvider"] {
+                let mut actual: Vec<_> = response["result"]["structuredContent"]["edges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|edge| edge["relation"] == relation)
+                    .map(|edge| {
+                        (
+                            crate::dictionary::path::canonical_identity_key(
+                                edge["subject"]["file"].as_str().unwrap(),
+                            ),
+                            crate::dictionary::path::canonical_identity_key(
+                                edge["object"]["file"].as_str().unwrap(),
+                            ),
+                        )
+                    })
+                    .collect();
+                let app_tokens: &[&str] = if repaired {
+                    &["left.ts", "right.ts"]
+                } else if mutation == "initializer" {
+                    &["left.ts"]
+                } else if mutation == "alias" && relation == "RegistersProvider" {
+                    &["left.ts", "right.ts"]
+                } else {
+                    &[]
+                };
+                let mut expected: Vec<_> = [
+                    ("app.ts", app_tokens),
+                    ("neighbor.ts", &["left.ts", "right.ts"][..]),
+                ]
+                .into_iter()
+                .flat_map(|(owner, tokens)| {
+                    tokens.iter().map(move |token| {
+                        (
+                            crate::dictionary::path::canonical_identity_key(
+                                &p.join(owner).to_string_lossy(),
+                            ),
+                            crate::dictionary::path::canonical_identity_key(
+                                &p.join(token).to_string_lossy(),
+                            ),
+                        )
+                    })
+                })
+                .collect();
+                actual.sort();
+                expected.sort();
+                assert_eq!(actual, expected, "{mutation}/{relation}/repair={repaired}");
+            }
+            assert_eq!(
+                std::fs::read_to_string(p.join("neighbor.ts")).unwrap(),
+                source,
+                "independent same-named Component source remains unchanged"
+            );
         }
     }
 }

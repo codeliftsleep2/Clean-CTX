@@ -7,11 +7,14 @@ import { McpClient } from '../csharp-compilation-identity/client.mjs';
 import { injectFixture, injectAssertions, constructorAssertions } from './inject-scenario.mjs';
 import { stringFixture, stringAssertions } from './string-scenario.mjs';
 import { memberFixture, memberAssertions } from './member-scenario.mjs';
-import { functionalFixture, functionalAssertions } from './functional-scenario.mjs';
+import { functionalFixture, functionalAssertions, functionalSource as directFunctionalSource, positionOrdinary as directPositionOrdinary, positionView as directPositionView, compositionSource, compositionOrdinary, compositionView } from './functional-scenario.mjs';
 
 import { runLifecycle } from './lifecycle.mjs';
 
 export async function runSuite(suite) {
+const functionalSource = suite.group === 'composition' ? compositionSource() : directFunctionalSource;
+const positionOrdinary = suite.group === 'composition' ? compositionOrdinary : directPositionOrdinary;
+const positionView = suite.group === 'composition' ? compositionView : directPositionView;
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const output = process.env.ISSUE162_SUITE_OUTPUT ?? path.join(repo, 'target/live-acceptance/issue-162', `${new Date().toISOString().replaceAll(/[:.]/g, '-')}-${suite.name}-${process.pid}`);
 const root = path.join(output, 'workspace');
@@ -147,13 +150,14 @@ try {
     'feature.ts': "import { NgModule as Mod } from '@angular/core'; @Mod({}) export class FeatureModule {}",
     'barrel.ts': "export { FeatureModule as PublicFeature } from './feature';",
     'app.ts': app, 'dashboard.ts': dashboard, ...injectFixture, ...stringFixture, ...memberFixture, ...functionalFixture,
+    'functional.ts': functionalSource, 'functional-neighbor.ts': functionalSource,
   };
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare class InjectionToken<T> { constructor(description: string); }';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare function input<T>(value:T):unknown; export declare function output<T>():unknown;';
   fixture['node_modules/@angular/core/index.d.ts'] += ' export declare const model: {required:<T>()=>unknown;};';
   for (const [name, text] of Object.entries(fixture)) write(name, text);
   report.fixture = fixture; report.ownerHash = hash(Buffer.from(app)); report.dashboardHash = hash(Buffer.from(dashboard)); save();
-  await runLifecycle({session,binary,checkpointFiles,root,fixture,mutate,leaf,check}, suite);
+  await runLifecycle({session,binary,checkpointFiles,root,fixture,mutate,leaf,check,functionalSource,positionOrdinary,positionView}, suite);
   check('binary-unchanged', hash(fs.readFileSync(binary)) === report.binary.sha256);
   for (const item of report.inputs) {
     if (hash(fs.readFileSync(path.join(repo, item.file))) !== item.sha256) throw new Error(`input changed: ${item.file}`);
