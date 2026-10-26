@@ -11,7 +11,7 @@ fn ngrx_legacy_transition_generations_exclude_pre_transition_products() {
         source,
         path,
         &config,
-        &GenerationCatalog::current().with_generation(ProducerKey::AngularSemantic, 61),
+        &GenerationCatalog::current().with_generation(ProducerKey::AngularSemantic, 62),
     )
     .unwrap();
     assert!(
@@ -25,7 +25,7 @@ fn ngrx_legacy_transition_generations_exclude_pre_transition_products() {
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 6);
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        62
+        63
     );
     assert_eq!(crate::ir::pipeline::CANONICAL_PIPELINE_GENERATION, 1);
 }

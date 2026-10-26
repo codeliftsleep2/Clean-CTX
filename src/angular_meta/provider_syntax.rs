@@ -161,11 +161,12 @@ pub(super) fn parse_provider(
 /// Retained provider fields and the exact native occurrence must agree.
 pub(crate) fn proved_reference<'a>(
     authority: &'a crate::ir::typescript_resolution::TypeScriptAuthority,
-    array: &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    array: &'a crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
     field: &str,
     span: SourceSpan,
 ) -> Option<&'a crate::ir::typescript_resolution::DeclarationId> {
     let expression = crate::angular_meta::string_token_authority::provider_field(
+        authority,
         array,
         field,
         span.start_byte(),

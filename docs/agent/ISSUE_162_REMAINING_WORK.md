@@ -184,6 +184,15 @@ and fmt/Clippy operator-reported GREEN; all 16 split binary suites inspected PAS
 preserves declared position separately from ordinary RegistersProvider. This
 does not establish effective visibility or satisfy P3–P6; P1 and W04 remain open.
 
+Next investigation batch: [P1.C1 provider-array composition](ISSUE_162_PROVIDER_COMPOSITION_TRACE.md).
+Six tracked controls cover references, spreads and nested arrays in both admitted
+Component positions. All six intended REDs are observed and frozen. The
+[bounded composition decision](ISSUE_162_PROVIDER_COMPOSITION_DECISION.md) is now
+owner-approved with the structural-authority boundary. Generation-63 compilation
+and focused composition/preservation controls are operator-reported GREEN;
+durable/currentness and targeted binary acceptance remain pending. No runtime array
+evaluation, imported contributor arrays or injector closure is authorized.
+
 ## What counts as closing an implementation package
 
 Each package must meet the implementation plan's existing acceptance rule:

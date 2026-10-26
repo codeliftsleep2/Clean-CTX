@@ -103,36 +103,35 @@ pub(super) fn provider_array_at<'a>(
 }
 
 pub(super) fn provider_literal<'a>(
-    authority: &TypeScriptAuthority,
+    authority: &'a TypeScriptAuthority,
     array: &'a ExpressionFacet,
     start: usize,
     end: usize,
 ) -> Option<(&'a ExpressionFacet, Vec<u16>)> {
-    let value = provider_value(array, start, end)?;
+    let value = provider_value(authority, array, start, end)?;
     authority.string_value(value).map(|units| (value, units))
 }
 
 /// Exact provider-position evidence is shared by string and declaration tokens.
-pub(super) fn provider_value(
-    array: &ExpressionFacet,
+pub(super) fn provider_value<'a>(
+    authority: &'a TypeScriptAuthority,
+    array: &'a ExpressionFacet,
     start: usize,
     end: usize,
-) -> Option<&ExpressionFacet> {
-    provider_field(array, "provide", start, end)
+) -> Option<&'a ExpressionFacet> {
+    provider_field(authority, array, "provide", start, end)
 }
 
 /// One exact retained provider field; duplicate fields never supply proof.
 pub(super) fn provider_field<'a>(
+    authority: &'a TypeScriptAuthority,
     array: &'a ExpressionFacet,
     field: &str,
     start: usize,
     end: usize,
 ) -> Option<&'a ExpressionFacet> {
-    let ExpressionValue::Array(entries) = &array.value else {
-        return None;
-    };
     let mut candidates = Vec::new();
-    for entry in entries {
+    for entry in super::provider_composition::entries(authority, array, true) {
         if field == "provide"
             && entry.start == start
             && entry.end == end
@@ -155,9 +154,9 @@ pub(super) fn provider_field<'a>(
             candidates.push(value);
         }
     }
-    if candidates.len() == 1 {
-        candidates.pop()
-    } else {
-        None
-    }
+    let first = candidates.first().copied()?;
+    candidates
+        .iter()
+        .all(|candidate| std::ptr::eq(*candidate, first))
+        .then_some(first)
 }

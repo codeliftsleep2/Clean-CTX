@@ -52,16 +52,13 @@ pub(super) fn pair_at(
     {
         return None;
     }
-    let ExpressionValue::Array(entries) = &array.value else {
-        return None;
-    };
-    let mut matches = entries
-        .iter()
-        .filter(|entry| entry.start == start && entry.end == end);
-    let entry = matches.next()?;
-    if matches.next().is_some() || !contains(array, entry) {
-        return None;
-    }
+    let entry = super::provider_composition::entry_at(
+        authority,
+        array,
+        super::provider_composition::component_owner(authority, owner),
+        start,
+        end,
+    )?;
     let (token, target) = match &entry.value {
         ExpressionValue::Reference(_) if matches!(strategy, Strategy::Class) => (entry, entry),
         ExpressionValue::Object(fields) => {
@@ -195,10 +192,13 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
                 ) else {
                     return false;
                 };
-                let ExpressionValue::Array(entries) = &array.value else {
-                    return false;
-                };
-                entries.iter().any(|entry| {
+                super::provider_composition::entries(
+                    authority,
+                    array,
+                    super::provider_composition::component_owner(authority, &facet.declaration),
+                )
+                .iter()
+                .any(|entry| {
                     pair_at(
                         authority,
                         &facet.declaration.name,

@@ -107,12 +107,32 @@ fn project_at(
                     && node.end_byte() == expression.end
             })
     });
-    let Some(provider_array) = array.or_else(|| {
-        (owner_kind != ClassKind::Directive && position == Position::Ordinary)
-            .then(|| provider_array(source_id, source, class))
-            .flatten()
-    }) else {
-        return Vec::new();
+    let native_component = authority
+        .zip(retained)
+        .is_some_and(|(authority, (owner, _))| {
+            super::provider_composition::component_owner(authority, owner)
+        });
+    let entries: Vec<_> = if native_component {
+        let (authority, (_, expression)) =
+            authority.zip(retained).expect("proved native Component");
+        super::provider_composition::entries(authority, expression, true)
+            .into_iter()
+            .filter_map(|entry| {
+                tree.root_node()
+                    .descendant_for_byte_range(entry.start, entry.end)
+                    .filter(|node| node.start_byte() == entry.start && node.end_byte() == entry.end)
+            })
+            .collect()
+    } else {
+        let Some(provider_array) = array.or_else(|| {
+            (owner_kind != ClassKind::Directive && position == Position::Ordinary)
+                .then(|| provider_array(source_id, source, class))
+                .flatten()
+        }) else {
+            return Vec::new();
+        };
+        let mut cursor = provider_array.walk();
+        provider_array.named_children(&mut cursor).collect()
     };
     let owner_type = match owner_kind {
         ClassKind::Module => "Module",
@@ -120,16 +140,20 @@ fn project_at(
         _ => "Component",
     };
     let owner = EntityRef::new("angular", owner_type, owner_name);
+    let composed = native_component
+        && authority.is_some_and(|authority| {
+            super::provider_composition::has_composition(authority, owner_name)
+        });
     let mut edges = Vec::new();
-    let mut cursor = provider_array.walk();
-    for entry in provider_array.named_children(&mut cursor) {
-        if position == Position::View
+    for entry in entries {
+        if (position == Position::View || composed)
             && !authority.is_some_and(|authority| {
-                super::provider_position::view_token(
+                super::provider_position::registration_token(
                     authority,
                     owner_name,
                     entry.start_byte(),
                     entry.end_byte(),
+                    position,
                 )
                 .is_some()
             })
@@ -196,12 +220,13 @@ fn project_at(
             }
         }
         if canonical.is_none()
-            && let (Some(_), Some((id, array))) = (authority, retained)
+            && let (Some(authority), Some((id, array))) = (authority, retained)
             && let Some(token_node) =
                 pair_value(entry, "provide", source.as_bytes()).or_else(|| {
                     matches!(entry.kind(), "identifier" | "member_expression").then_some(entry)
                 })
             && let Some(expression) = super::string_token_authority::provider_value(
+                authority,
                 array,
                 token_node.start_byte(),
                 token_node.end_byte(),
@@ -266,7 +291,7 @@ fn project_at(
         };
         let factory_declaration = retained.and_then(|(_, array)| {
             let node = pair_value(entry, "useFactory", source.as_bytes())?;
-            super::string_token_authority::provider_field(array, "useFactory", node.start_byte(), node.end_byte())
+            super::string_token_authority::provider_field(authority?, array, "useFactory", node.start_byte(), node.end_byte())
         }).is_some_and(|expression| matches!(&expression.value,
             crate::ir::typescript_resolution::declaration_facets::ExpressionValue::Reference(
                 crate::ir::typescript_resolution::Resolution::Resolved(id)) if id.kind == "function_declaration"));

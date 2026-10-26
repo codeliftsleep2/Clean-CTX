@@ -47,6 +47,8 @@ pub(crate) mod module_metadata;
 pub mod ngrx;
 pub mod phi;
 #[cfg(feature = "typescript")]
+pub(crate) mod provider_composition;
+#[cfg(feature = "typescript")]
 pub(crate) mod provider_pair_authority;
 #[cfg(feature = "typescript")]
 pub(crate) mod provider_position;

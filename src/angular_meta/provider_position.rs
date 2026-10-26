@@ -38,34 +38,32 @@ fn contains(container: &ExpressionFacet, value: &ExpressionFacet) -> bool {
     container.start <= value.start && value.start < value.end && value.end <= container.end
 }
 
-/// Replay one native view-position entry; never infer association from endpoints alone.
-pub(super) fn view_token(
+/// Replay one exact position/terminal path, never an endpoint cross-product.
+pub(super) fn registration_token(
     authority: &TypeScriptAuthority,
     name: &str,
     start: usize,
     end: usize,
+    position: Position,
 ) -> Option<EntityRef> {
     use super::provider_pair_authority::{Strategy, canonical_token, pair_at};
     let (owner, array) =
-        super::string_token_authority::provider_array_at(authority, name, Position::View)?;
+        super::string_token_authority::provider_array_at(authority, name, position)?;
     if owner.source != authority.source
         || owner.source_hash != authority.source_hash
         || array.end > owner.end
     {
         return None;
     }
-    let ExpressionValue::Array(entries) = &array.value else {
-        return None;
-    };
-    let mut found = entries
-        .iter()
-        .filter(|entry| entry.start == start && entry.end == end);
-    let entry = found.next()?;
-    if found.next().is_some() || !contains(array, entry) {
-        return None;
-    }
+    let entry = super::provider_composition::entry_at(
+        authority,
+        array,
+        super::provider_composition::component_owner(authority, owner),
+        start,
+        end,
+    )?;
     if matches!(entry.value, ExpressionValue::Reference(_)) {
-        return pair_at(authority, name, start, end, Strategy::Class, Position::View)
+        return pair_at(authority, name, start, end, Strategy::Class, position)
             .map(|(token, _)| token);
     }
     let ExpressionValue::Object(fields) = &entry.value else {
@@ -105,8 +103,19 @@ pub(super) fn view_token(
         _ => None,
     };
     if let Some(strategy) = strategy {
-        return pair_at(authority, name, start, end, strategy, Position::View)
-            .map(|(token, _)| token);
+        // Existing callable-variable compatibility proves registration only;
+        // it does not acquire canonical factory-target or result identity.
+        if field == "useFactory"
+            && let ExpressionValue::Reference(Resolution::Resolved(id)) = &target.value
+            && id.kind == "variable_declarator"
+        {
+            let span =
+                crate::ir::invocation_evidence::SourceSpan::new(target.start, target.end).ok()?;
+            return (authority.value_reference_at(span) == Some(id))
+                .then(|| canonical_token(authority, owner, token))
+                .flatten();
+        }
+        return pair_at(authority, name, start, end, strategy, position).map(|(token, _)| token);
     }
     match &target.value {
         ExpressionValue::Reference(Resolution::Resolved(id)) => {
@@ -124,15 +133,18 @@ pub(super) fn view_token(
     canonical_token(authority, owner, token)
 }
 
-pub(crate) fn admits_view(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
-    if edge.layer != "angular" || edge.relation != SemanticRelation::RegistersViewProvider {
+pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+    let position = match edge.relation {
+        SemanticRelation::RegistersViewProvider => Position::View,
+        SemanticRelation::RegistersProvider => Position::Ordinary,
+        _ => return false,
+    };
+    if edge.layer != "angular" {
         return false;
     }
-    let Some((owner, array)) = super::string_token_authority::provider_array_at(
-        authority,
-        &edge.subject.name,
-        Position::View,
-    ) else {
+    let Some((owner, array)) =
+        super::string_token_authority::provider_array_at(authority, &edge.subject.name, position)
+    else {
         return false;
     };
     let expected = super::string_token_authority::owner(owner, "Component");
@@ -146,11 +158,14 @@ pub(crate) fn admits_view(authority: &TypeScriptAuthority, edge: &SemanticEdge) 
     if !same(&expected, &edge.subject) {
         return false;
     }
-    let ExpressionValue::Array(entries) = &array.value else {
-        return false;
-    };
-    entries.iter().any(|entry| {
-        view_token(authority, &owner.name, entry.start, entry.end)
+    super::provider_composition::entries(
+        authority,
+        array,
+        super::provider_composition::component_owner(authority, owner),
+    )
+    .iter()
+    .any(|entry| {
+        registration_token(authority, &owner.name, entry.start, entry.end, position)
             .is_some_and(|token| same(&token, &edge.object))
     })
 }
