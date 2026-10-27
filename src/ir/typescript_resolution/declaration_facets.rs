@@ -44,6 +44,9 @@ pub(crate) struct DeclarationFacet {
     pub type_annotation: Option<ExpressionFacet>,
 }
 
+mod invocations;
+pub(crate) use invocations::InvocationFacet;
+
 struct Demand<'a> {
     resolver: &'a mut Resolver,
     visited: BTreeSet<DeclarationId>,
@@ -52,6 +55,8 @@ struct Demand<'a> {
     fields: BTreeSet<String>,
     source_hashes: BTreeMap<std::path::PathBuf, String>,
     occurrences: BTreeMap<(std::path::PathBuf, usize, usize), DemandedOccurrence>,
+    invocations: Vec<InvocationFacet>,
+    invocation_sites: BTreeSet<(std::path::PathBuf, usize, usize)>,
 }
 
 pub(super) fn capture(
@@ -60,10 +65,12 @@ pub(super) fn capture(
     declarations: &[DeclarationId],
     fields: &[&str],
     parameters: &[super::constructor_parameters::ConstructorParameter],
+    selected_calls: &[(usize, usize)],
 ) -> (
     Vec<DeclarationFacet>,
     Vec<super::package_evidence::PackageExportEvidence>,
     Vec<DemandedOccurrence>,
+    Vec<InvocationFacet>,
 ) {
     resolver.in_source_project(request, |resolver| {
         let mut demand = Demand {
@@ -73,6 +80,8 @@ pub(super) fn capture(
             occurrences: BTreeMap::new(),
             source_hashes: BTreeMap::new(),
             packages: Vec::new(),
+            invocations: Vec::new(),
+            invocation_sites: BTreeSet::new(),
             fields: fields.iter().map(|field| (*field).to_string()).collect(),
         };
         // Source-owned decorated classes are the demand roots. Dependencies are
@@ -116,10 +125,12 @@ pub(super) fn capture(
                 demand.declaration(id);
             }
         }
+        demand.capture_invocations(request, selected_calls);
         (
             demand.facets.into_values().collect(),
             demand.packages,
             demand.occurrences.into_values().collect(),
+            demand.invocations,
         )
     })
 }
@@ -199,7 +210,7 @@ impl Demand<'_> {
                 continue;
             };
             let callee = self.reference(callee, &id.source, &source, false);
-            let arguments = call
+            let arguments: Vec<ExpressionFacet> = call
                 .child_by_field_name("arguments")
                 .map(|args| {
                     let mut cursor = args.walk();
@@ -209,6 +220,22 @@ impl Demand<'_> {
                         .collect()
                 })
                 .unwrap_or_default();
+            self.occurrence(
+                decorator,
+                &id.source,
+                &source,
+                DemandedValue::Structure {
+                    kind: "decorator".into(),
+                    children: std::iter::once(("callee".into(), callee.start, callee.end))
+                        .chain(
+                            arguments
+                                .iter()
+                                .enumerate()
+                                .map(|(i, a)| (format!("argument:{i}"), a.start, a.end)),
+                        )
+                        .collect(),
+                },
+            );
             decorators.push(DecoratorFacet {
                 start: decorator.start_byte(),
                 end: decorator.end_byte(),
@@ -246,12 +273,37 @@ impl Demand<'_> {
             )
             .ok()?;
             let resolution = self.resolver.type_reference(&id.source, &source, span)?;
+            self.occurrence(
+                value,
+                &id.source,
+                &source,
+                DemandedValue::TypeReference(resolution.clone()),
+            );
+            self.packages
+                .extend(super::package_evidence::capture_in_namespace(
+                    self.resolver,
+                    &id.source,
+                    &[(value.start_byte(), value.end_byte(), resolution.clone())],
+                    super::Namespace::Type,
+                ));
             Some(ExpressionFacet {
                 start: value.start_byte(),
                 end: value.end_byte(),
                 value: ExpressionValue::Reference(resolution),
             })
         });
+        self.occurrence(
+            node,
+            &id.source,
+            &source,
+            DemandedValue::Declaration {
+                id: id.clone(),
+                is_const: initializer.is_some(),
+                annotation: type_annotation.as_ref().map(|a| (a.start, a.end)),
+                initializer: initializer.as_ref().map(|a| (a.start, a.end)),
+                decorators: decorators.iter().map(|d| (d.start, d.end)).collect(),
+            },
+        );
         self.facets.insert(
             id.clone(),
             DeclarationFacet {
@@ -273,7 +325,18 @@ impl Demand<'_> {
         let resolution =
             crate::ir::invocation_evidence::SourceSpan::new(node.start_byte(), node.end_byte())
                 .ok()
-                .and_then(|span| self.resolver.value_reference(file, source, span))
+                .and_then(|span| {
+                    if self.invocation_sites.contains(&(
+                        file.to_path_buf(),
+                        node.start_byte(),
+                        node.end_byte(),
+                    )) {
+                        self.resolver
+                            .value_reference_for_invocation(file, source, span)
+                    } else {
+                        self.resolver.value_reference(file, source, span)
+                    }
+                })
                 .unwrap_or_else(|| {
                     Resolution::Unresolved("No exact runtime reference authority".into())
                 });
@@ -438,6 +501,16 @@ impl Demand<'_> {
             _ => ExpressionValue::Unsupported(node.kind().into()),
         };
         let structure = match &value {
+            ExpressionValue::Call(callee, args) => Some((
+                "call",
+                std::iter::once(("callee".into(), callee.start, callee.end))
+                    .chain(
+                        args.iter()
+                            .enumerate()
+                            .map(|(i, a)| (format!("argument:{i}"), a.start, a.end)),
+                    )
+                    .collect(),
+            )),
             ExpressionValue::Spread(child) => {
                 Some(("spread", vec![(String::new(), child.start, child.end)]))
             }

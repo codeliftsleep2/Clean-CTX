@@ -16,6 +16,8 @@ pub(crate) struct TypeScriptAuthority {
     pub declaration_facets: Vec<super::declaration_facets::DeclarationFacet>,
     #[serde(default)]
     pub demanded_occurrences: Vec<super::demanded_occurrences::DemandedOccurrence>,
+    #[serde(default)]
+    pub invocation_facets: Vec<super::declaration_facets::InvocationFacet>,
     pub references: Vec<(String, Namespace, Resolution)>,
     /// Exact value occurrences proven by shared lexical/import mechanics.
     pub reference_sites: Vec<(usize, usize, Resolution)>,
@@ -87,6 +89,17 @@ impl TypeScriptAuthority {
         project: Option<&Path>,
         fields: &[&str],
     ) -> Self {
+        Self::capture_with_demands(file, source, roots, project, fields, &[])
+    }
+
+    pub(crate) fn capture_with_demands(
+        file: &Path,
+        source: &str,
+        roots: &[PathBuf],
+        project: Option<&Path>,
+        fields: &[&str],
+        call_apis: &[(&str, &str)],
+    ) -> Self {
         let mut result = Self {
             source: file.to_path_buf(),
             source_route: file.to_path_buf(),
@@ -96,6 +109,7 @@ impl TypeScriptAuthority {
             constructor_parameters: Vec::new(),
             declaration_facets: Vec::new(),
             demanded_occurrences: Vec::new(),
+            invocation_facets: Vec::new(),
             references: Vec::new(),
             reference_sites: Vec::new(),
             unbound_value_sites: Vec::new(),
@@ -204,15 +218,39 @@ impl TypeScriptAuthority {
                     &result.type_reference_sites,
                     Namespace::Type,
                 ));
-            let (facets, packages, occurrences) = super::declaration_facets::capture(
+            let (sites, packages, selected) =
+                super::invocation_sites::capture(&mut resolver, file, source, call_apis);
+            for (start, end, resolution) in sites {
+                if let Some((_, _, known)) = result
+                    .reference_sites
+                    .iter_mut()
+                    .find(|(s, e, _)| *s == start && *e == end)
+                {
+                    if !matches!(
+                        known,
+                        Resolution::Resolved(_) | Resolution::Merged(_) | Resolution::Ambiguous(_)
+                    ) {
+                        *known = resolution;
+                    }
+                } else {
+                    result.reference_sites.push((start, end, resolution));
+                }
+            }
+            result
+                .reference_sites
+                .sort_by_key(|(start, end, _)| (*start, *end));
+            result.package_exports.extend(packages);
+            let (facets, packages, occurrences, invocations) = super::declaration_facets::capture(
                 &mut resolver,
                 file,
                 &result.declarations,
                 fields,
                 &result.constructor_parameters,
+                &selected,
             );
             result.declaration_facets = facets;
             result.demanded_occurrences = occurrences;
+            result.invocation_facets = invocations;
             result.package_exports.extend(packages);
             Ok::<_, String>(())
         })();

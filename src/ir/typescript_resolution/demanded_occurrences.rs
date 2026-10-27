@@ -5,6 +5,14 @@ use std::path::{Path, PathBuf};
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum DemandedValue {
     Reference(Resolution),
+    TypeReference(Resolution),
+    Declaration {
+        id: DeclarationId,
+        is_const: bool,
+        annotation: Option<(usize, usize)>,
+        initializer: Option<(usize, usize)>,
+        decorators: Vec<(usize, usize)>,
+    },
     Literal {
         kind: String,
         text: String,

@@ -59,3 +59,70 @@ pub(super) fn admits(
             initializer,
         )
 }
+
+/// Qualified native typed-object identity for an already demanded target.
+/// Owner-only inventories remain required for existing source-owned consumers.
+pub(super) fn admits_qualified(
+    authority: &TypeScriptAuthority,
+    facet: &DeclarationFacet,
+    package: &str,
+    export: &str,
+) -> bool {
+    use crate::ir::typescript_resolution::demanded_occurrences::DemandedValue;
+    let id = &facet.declaration;
+    if id.kind != "variable_declarator"
+        || authority
+            .declaration_facets
+            .iter()
+            .filter(|f| f.declaration == *id)
+            .count()
+            != 1
+    {
+        return false;
+    }
+    let (Some(annotation), Some(initializer)) = (&facet.type_annotation, &facet.initializer) else {
+        return false;
+    };
+    let Some(DemandedValue::Declaration {
+        id: actual,
+        is_const: true,
+        annotation: Some(a),
+        initializer: Some(i),
+        ..
+    }) = authority.demanded_at(&id.source, &id.source_hash, id.start, id.end)
+    else {
+        return false;
+    };
+    if actual != id
+        || *a != (annotation.start, annotation.end)
+        || *i != (initializer.start, initializer.end)
+        || !(id.start <= annotation.start
+            && annotation.start < annotation.end
+            && annotation.end <= initializer.start
+            && initializer.start < initializer.end
+            && initializer.end <= id.end)
+    {
+        return false;
+    }
+    let ExpressionValue::Reference(Resolution::Resolved(target)) = &annotation.value else {
+        return false;
+    };
+    let Some(DemandedValue::TypeReference(Resolution::Resolved(actual))) = authority.demanded_at(
+        &id.source,
+        &id.source_hash,
+        annotation.start,
+        annotation.end,
+    ) else {
+        return false;
+    };
+    actual == target
+        && super::class_role_authority::public_entry_api(
+            authority,
+            target,
+            package,
+            package,
+            export,
+            Namespace::Type,
+        )
+        && authority.admits_demanded_structure(&id.source, &id.source_hash, initializer)
+}

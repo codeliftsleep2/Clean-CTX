@@ -10,6 +10,7 @@ fn callable_import_scope(
     file: &Path,
     source: &str,
     root: tree_sitter::Node<'_>,
+    invocation: bool,
 ) -> bool {
     let mut receiver = reference;
     while receiver.kind() == "member_expression" {
@@ -44,8 +45,18 @@ fn callable_import_scope(
     let mut callable = false;
     while let Some(node) = parent {
         match node.kind() {
-            "program" => return callable,
+            "program" => return callable || invocation,
             "arrow_function" | "function_expression" => callable = true,
+            "function_declaration" if invocation => {
+                if node
+                    .child_by_field_name("name")
+                    .and_then(|id| id.utf8_text(source.as_bytes()).ok())
+                    == Some(name)
+                {
+                    return false;
+                }
+                callable = true;
+            }
             "class_body"
             | "method_definition"
             | "function_declaration"
@@ -98,6 +109,28 @@ impl Resolver {
         source: &str,
         span: crate::ir::invocation_evidence::SourceSpan,
         type_query: bool,
+    ) -> Option<Resolution> {
+        self.value_reference_with_scope(file, source, span, type_query, false)
+    }
+
+    /// Only explicitly demanded native invocation positions use this guarded
+    /// scope path. General reference/type-query consumers retain their policy.
+    pub(super) fn value_reference_for_invocation(
+        &mut self,
+        file: &Path,
+        source: &str,
+        span: crate::ir::invocation_evidence::SourceSpan,
+    ) -> Option<Resolution> {
+        self.value_reference_with_scope(file, source, span, false, true)
+    }
+
+    fn value_reference_with_scope(
+        &mut self,
+        file: &Path,
+        source: &str,
+        span: crate::ir::invocation_evidence::SourceSpan,
+        type_query: bool,
+        invocation: bool,
     ) -> Option<Resolution> {
         let captured = self.host.read(file)?;
         if captured.as_ref() != source {
@@ -294,7 +327,8 @@ impl Resolver {
             }
             return Some(Resolution::Unresolved("Lexical scope is unresolved".into()));
         }
-        let callable_closed = callable_import_scope(reference, file, source, tree.root_node());
+        let callable_closed =
+            callable_import_scope(reference, file, source, tree.root_node(), invocation);
         let mut ancestor = reference.parent();
         let mut direct_field_initializer = false;
         let mut parameter_decorator = constructor_decorator;
@@ -358,10 +392,10 @@ impl Resolver {
                 continue;
             }
             if callable_closed
-                && matches!(
+                && (matches!(
                     node.kind(),
                     "statement_block" | "arrow_function" | "function_expression"
-                )
+                ) || (invocation && node.kind() == "function_declaration"))
             {
                 ancestor = node.parent();
                 continue;

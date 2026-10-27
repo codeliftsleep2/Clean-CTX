@@ -16,7 +16,14 @@ impl RetainedAuthority {
             return authority.admits_relation_evidence(edges);
         }
         edges.iter().all(|edge| {
-            edge.relation != crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
+            edge.subject.entity_type != "ApplicationBootstrap"
+                && !matches!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot
+                        | crate::layers::meta::semantic::SemanticRelation::UsesApplicationConfig
+                )
+                && edge.relation
+                    != crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
                 && edge.relation
                     != crate::layers::meta::semantic::SemanticRelation::RegistersViewProvider
                 && edge.subject.canonical.is_none()

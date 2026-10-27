@@ -1,7 +1,7 @@
 # Issue #162: current position and remaining work
 
 Agent: Agent MaxHeadRoom
-Reconciled: 2026-10-25
+Reconciled: 2026-10-27
 Status: planning/evidence reconciliation; no production change or runtime run.
 
 ## Combined C2/C3 binary acceptance inspected PASS
@@ -41,11 +41,26 @@ closed as a whole by this reconciliation. That does not mean nothing is
 implemented: it means partial GREEN receipts cannot close larger questions.
 There is no defensible percentage-complete or time estimate yet.
 
-**Immediate state:** generation 59 is the last verified production checkpoint.
-The bounded `useValue` reference-admission slice has completed V1–V4: 73 passing
-deterministic test executions and corrected binary acceptance of 1660/1660 checks.
-W04 remains open; its remaining obligations are reconciled below. No next
-implementation slice has been selected as part of this checkpoint.
+**Immediate state:** generation 67 is the latest bounded verified production
+checkpoint. Native declared ApplicationConfig membership has 460 scoped Rust
+passing executions, clean fmt/Clippy and inspected binary PASS: config 304,
+route preservation 305 and imported-owner preservation 332 checks. Full repository
+and final field gates remain open; P1/W04/#162 are not closed.
+
+The next proposed question is [declared bootstrap root/config references](ISSUE_162_BOOTSTRAP_REFERENCE_TRACE.md).
+The [bounded decision](ISSUE_162_BOOTSTRAP_REFERENCE_DECISION.md) requires explicit
+owner approval for new public relation/occurrence meaning and retained call proof.
+Investigation/test authoring approval now has inspected evidence: the native
+prerequisite/API control passes and eleven intended root/config association REDs
+fail after all prerequisites. Exact test/log bytes are archived; the updated
+decision requests bounded production/public vocabulary/retained-carrier approval.
+The subsequent owner approval authorizes the two structural relations and bounded
+invocation proof. Generation-68 implementation now has inspected focused GREEN: 30 passing
+executions across scope-policy, twelve original controls, five integrated
+proof/lifecycle controls and compatibility filters. The scoped branch/function
+acquisition correction preserves ordinary lookup policy and both frozen test
+files remain byte-identical. Broader preservation/lint/binary and final field gates
+remain open; no AQ14/P3/P1/W04 closure follows.
 
 ## What the existing GREENs establish
 
@@ -58,7 +73,7 @@ implementation slice has been selected as part of this checkpoint.
 | Package/public-entry authority | Owning package and consumed public entry are distinct; HTTP role and selected mutation/refusal/lifecycle cases pass. | General package/API closure or every export-map/resolver frontier. |
 | Provider registration, class/factory/alias relations | Exact migrated token/pair authority, shared mechanics, adversarial and durable/currentness controls for the approved forms. | Canonical runtime `useValue` identity, all callable forms, all provider owners, multi/precedence or injector closure. |
 
-Latest inspected binary receipt:
+Historical generation-59 inspected binary receipt:
 `target/live-acceptance/issue-162/2026-10-25T19-21-16-341Z-16680/report.json`:
 **1660/1660 checks, zero errors, three FINISHED sessions**. Binary SHA-256:
 `aa2a64437fc940fd01f620ada9228018bbdb65745d6d302a10a53e3f127ef685`.
@@ -171,7 +186,7 @@ answer portions; trace them before implementing replacements.
 
 | ID | Remaining obligation | Current evidence boundary | Exit needed for W04 |
 | --- | --- | --- | --- |
-| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component and Directive/Module composition have scoped Rust/lint GREEN and inspected generation-65 binary PASS (332 imported-owner checks, 190 same-source preservation checks); Native source-owned Routes objects now have bounded generation-66 declared membership acceptance; other route roots, application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
+| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component and Directive/Module composition have scoped Rust/lint GREEN and inspected generation-65 binary PASS (332 imported-owner checks, 190 same-source preservation checks); Native source-owned Routes objects have generation-66 declared membership acceptance and named native ApplicationConfig declarations have generation-67 bounded Rust/lint/binary evidence. Bootstrap linkage, other route roots, application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
 | P2 | Strategy/form coverage and value meaning | Class shorthand/useClass, function-declaration useFactory and useExisting have bounded canonical pair evidence. Other callable forms retain classified compatibility behavior. useValue reference admission is verified; its strategy presentation remains noncanonical. | Reconcile each required form with its actual question and public fact. Only propose richer target/value identity when a demonstrated question requires it; do not assume a general evaluator. Record genuine unsupported forms and resolve required capabilities rather than silently excluding them. |
 | P3 | Injector/application context | Local token/pair identity does not identify the applicable injector or connect its owner to the actual application/configuration hierarchy. | Establish the required owner/application/injector context and visibility proof, with distinct applications/scopes and current dependency paths. This is a prerequisite for effective-provider claims. |
 | P4 | Multi, overrides and precedence | Existing deduplication preserves semantic fact identity; it is not an ordered registration/multi/override model. No winning-provider claim follows from existing edges. | Define and verify the required order/multi/override questions against real registration context, with explicit runtime uncertainty. Architectural changes require the actual bounded owner decision. |

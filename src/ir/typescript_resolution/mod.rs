@@ -9,6 +9,7 @@ mod classic;
 mod compiler_libraries;
 mod constant_strings;
 pub(crate) mod constructor_parameters;
+mod invocation_sites;
 pub(crate) mod member_declarations;
 
 #[cfg(test)]

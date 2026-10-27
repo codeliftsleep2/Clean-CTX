@@ -113,6 +113,10 @@ impl std::hash::Hash for EntityRef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub enum SemanticRelation {
     // ---- Angular ----
+    /// A written native bootstrap call references this Component at argument 0.
+    DeclaresBootstrapRoot,
+    /// A written native bootstrap call references this named config at argument 1.
+    UsesApplicationConfig,
     /// Component injects a Service via constructor/DI.
     Injects,
     /// An Angular declaration registers a provider token in its own scope.

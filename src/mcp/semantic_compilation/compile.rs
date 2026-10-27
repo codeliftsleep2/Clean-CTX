@@ -68,30 +68,42 @@ pub(crate) fn compile_source_artifact(
     compiler.set_config(request.config.clone());
     #[cfg(feature = "typescript")]
     {
-        compiler.typescript_authority =
-            matches!(extension, "ts" | "tsx" | "js" | "jsx" | "mts" | "cts").then(|| {
-                #[cfg(feature = "angular")]
-                if request.config.meta_layers.get("angular").is_none_or(|layer| layer.enabled) {
-                    return crate::ir::typescript_resolution::TypeScriptAuthority::capture_with_declaration_fields(
-                        path, request.source, request.authorized_roots, request.typescript_project,
-                        crate::angular_meta::module_metadata::DECLARATION_FIELDS,
-                    );
-                }
-                if let Some(project) = request.typescript_project {
-                    crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_project(
-                        path,
-                        request.source,
-                        request.authorized_roots,
-                        Some(project),
-                    )
-                } else {
-                    crate::ir::typescript_resolution::TypeScriptAuthority::capture(
-                        path,
-                        request.source,
-                        request.authorized_roots,
-                    )
-                }
-            });
+        compiler.typescript_authority = matches!(
+            extension,
+            "ts" | "tsx" | "js" | "jsx" | "mts" | "cts"
+        )
+        .then(|| {
+            #[cfg(feature = "angular")]
+            if request
+                .config
+                .meta_layers
+                .get("angular")
+                .is_none_or(|layer| layer.enabled)
+            {
+                return crate::ir::typescript_resolution::TypeScriptAuthority::capture_with_demands(
+                    path,
+                    request.source,
+                    request.authorized_roots,
+                    request.typescript_project,
+                    crate::angular_meta::module_metadata::DECLARATION_FIELDS,
+                    crate::angular_meta::bootstrap_references::DEMANDED_APIS,
+                );
+            }
+            if let Some(project) = request.typescript_project {
+                crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_project(
+                    path,
+                    request.source,
+                    request.authorized_roots,
+                    Some(project),
+                )
+            } else {
+                crate::ir::typescript_resolution::TypeScriptAuthority::capture(
+                    path,
+                    request.source,
+                    request.authorized_roots,
+                )
+            }
+        });
     }
     #[cfg(feature = "csharp")]
     if let Some(authority) = request.csharp_authority {

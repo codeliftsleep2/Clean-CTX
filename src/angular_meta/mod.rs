@@ -592,3 +592,6 @@ mod semantic_tests;
 #[cfg(all(test, feature = "angular"))]
 #[path = "../tests/angular_meta/constructor_di_edges.rs"]
 mod constructor_di_edge_tests;
+
+#[cfg(feature = "typescript")]
+pub(crate) mod bootstrap_references;

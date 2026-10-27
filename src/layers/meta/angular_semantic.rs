@@ -258,6 +258,9 @@ pub(super) fn extract_non_testing_edges(
     #[cfg(feature = "typescript")]
     if let Some(authority) = evidence.typescript_authority {
         edges.extend(crate::angular_meta::route_providers::project(authority));
+        edges.extend(crate::angular_meta::bootstrap_references::project(
+            authority,
+        ));
         edges.extend(crate::angular_meta::application_config_providers::project(
             authority,
         ));
@@ -497,6 +500,7 @@ pub(super) fn evaluate_if_applicable(
             crate::angular_meta::class_role_authority::has_class_role(authority)
                 || crate::angular_meta::functional_authority::has_role(authority)
                 || crate::angular_meta::application_config_providers::has_owner(authority)
+                || crate::angular_meta::bootstrap_references::has_call(authority)
         });
     let testing_enabled = meta_config
         .map(|config| config.testing.enabled)

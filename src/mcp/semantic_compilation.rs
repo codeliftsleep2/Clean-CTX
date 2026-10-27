@@ -229,3 +229,15 @@ mod angular_provider_value_admission_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_provider_declaration_lifecycle_issue_162.rs"]
 mod angular_provider_declaration_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_bootstrap_reference_issue_162.rs"]
+mod angular_bootstrap_reference_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_bootstrap_controls_issue_162.rs"]
+mod angular_bootstrap_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_bootstrap_scope_controls_issue_162.rs"]
+mod angular_bootstrap_scope_controls_tests;

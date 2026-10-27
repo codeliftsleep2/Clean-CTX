@@ -6,6 +6,21 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
+            if matches!(
+                edge.relation,
+                crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot
+                    | crate::layers::meta::semantic::SemanticRelation::UsesApplicationConfig
+            ) || edge.subject.entity_type == "ApplicationBootstrap"
+            {
+                #[cfg(feature = "angular")]
+                {
+                    return crate::angular_meta::bootstrap_references::admits(self, edge);
+                }
+                #[cfg(not(feature = "angular"))]
+                {
+                    return false;
+                }
+            }
             #[cfg(feature = "angular")]
             if edge.subject.entity_type == "ApplicationConfig"
                 && edge.relation
@@ -121,7 +136,8 @@ impl TypeScriptAuthority {
 
     fn admits_endpoint(&self, entity: &EntityRef, endpoint: &CanonicalEndpoint) -> bool {
         let declaration = match endpoint {
-            CanonicalEndpoint::RouteOccurrence { .. } => return false,
+            CanonicalEndpoint::RouteOccurrence { .. }
+            | CanonicalEndpoint::InvocationOccurrence { .. } => return false,
             CanonicalEndpoint::Declaration { declaration, .. } => declaration,
             CanonicalEndpoint::StringValue {
                 string_value,
