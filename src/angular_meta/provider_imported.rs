@@ -42,6 +42,27 @@ pub(super) fn project_entries(
     registration: SemanticRelation,
     strict: bool,
 ) -> Vec<SemanticEdge> {
+    project_entries_at(
+        authority,
+        (&owner.source, &owner.source_hash),
+        subject,
+        root,
+        imported_only,
+        registration,
+        strict,
+    )
+}
+
+/// Occurrence owners supply source identity without inventing DeclarationId.
+pub(super) fn project_entries_at(
+    authority: &TypeScriptAuthority,
+    owner: (&std::path::Path, &str),
+    subject: EntityRef,
+    root: &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
+    imported_only: bool,
+    registration: SemanticRelation,
+    strict: bool,
+) -> Vec<SemanticEdge> {
     let mut edges = Vec::new();
     let occurrences = if strict {
         super::provider_composition::proved_entries(authority, root)

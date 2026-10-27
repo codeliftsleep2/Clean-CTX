@@ -84,7 +84,7 @@ pub(super) fn registration_token(
     )?;
     registration_entry(
         authority,
-        owner,
+        (&owner.source, &owner.source_hash),
         super::provider_composition::Entry {
             source: &authority.source,
             hash: &authority.source_hash,
@@ -96,7 +96,7 @@ pub(super) fn registration_token(
 
 pub(super) fn registration_entry(
     authority: &TypeScriptAuthority,
-    owner: &crate::ir::typescript_resolution::DeclarationId,
+    owner: (&std::path::Path, &str),
     occurrence: super::provider_composition::Entry<'_>,
 ) -> Option<EntityRef> {
     use super::provider_pair_authority::{Strategy, canonical_token_in, pair_entry};

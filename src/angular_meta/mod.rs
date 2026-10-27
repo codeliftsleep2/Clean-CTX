@@ -595,3 +595,6 @@ mod constructor_di_edge_tests;
 
 #[cfg(feature = "typescript")]
 pub(crate) mod bootstrap_references;
+
+#[cfg(feature = "typescript")]
+mod bootstrap_inline_providers;

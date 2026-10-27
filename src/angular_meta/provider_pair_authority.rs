@@ -61,7 +61,7 @@ pub(super) fn pair_at(
     )?;
     pair_entry(
         authority,
-        owner,
+        (&owner.source, &owner.source_hash),
         super::provider_composition::Entry {
             source: &authority.source,
             hash: &authority.source_hash,
@@ -74,7 +74,7 @@ pub(super) fn pair_at(
 
 pub(super) fn pair_entry(
     authority: &TypeScriptAuthority,
-    owner: &crate::ir::typescript_resolution::DeclarationId,
+    owner: (&std::path::Path, &str),
     occurrence: super::provider_composition::Entry<'_>,
     strategy: Strategy,
 ) -> Option<(EntityRef, EntityRef)> {
@@ -130,12 +130,12 @@ pub(super) fn pair_entry(
 
 pub(super) fn canonical_token_in(
     authority: &TypeScriptAuthority,
-    owner: &crate::ir::typescript_resolution::DeclarationId,
+    owner: (&std::path::Path, &str),
     occurrence: super::provider_composition::Entry<'_>,
     value: &ExpressionFacet,
 ) -> Option<EntityRef> {
     if occurrence.source == authority.source.as_path() && occurrence.hash == authority.source_hash {
-        return canonical_token(authority, owner, value);
+        return canonical_token_at(authority, owner, value);
     }
     if let Some(units) = authority.demanded_string_value(occurrence.source, occurrence.hash, value)
     {
@@ -153,9 +153,9 @@ pub(super) fn canonical_token_in(
     ))
 }
 
-pub(super) fn canonical_token(
+fn canonical_token_at(
     authority: &TypeScriptAuthority,
-    owner: &crate::ir::typescript_resolution::DeclarationId,
+    owner: (&std::path::Path, &str),
     token: &ExpressionFacet,
 ) -> Option<EntityRef> {
     if let ExpressionValue::Reference(Resolution::Resolved(id)) = &token.value {
@@ -166,7 +166,7 @@ pub(super) fn canonical_token(
         }
     }
     let token = if let Some(units) = authority.string_value(token) {
-        super::string_token_authority::token(owner, token, &units, "ProviderToken")
+        super::string_token_authority::token_at(owner.0, owner.1, token, &units, "ProviderToken")
     } else {
         let ExpressionValue::Reference(Resolution::Resolved(id)) = &token.value else {
             return None;
@@ -212,7 +212,8 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && actual.file == expected.file
             && actual.canonical == expected.canonical
     };
-    super::application_config_providers::admits(authority, edge)
+    super::bootstrap_references::admits(authority, edge)
+        || super::application_config_providers::admits(authority, edge)
         || super::route_providers::admits(authority, edge)
         || super::provider_imported::admits(authority, edge)
         || authority

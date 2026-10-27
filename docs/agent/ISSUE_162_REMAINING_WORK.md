@@ -4,6 +4,84 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-27
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Generation-69 focused tests GREEN; warning cleanup authored
+
+Inspected bootstrap-inline69-focused-20261027-170015: integrated inline controls
+5 passed (76.31s), existing bootstrap controls 8 passed (168.36s), template
+compatibility 1 passed (0.07s), NgRx transition 11 passed (60.48s), zero failures/
+ignored. Together with the preceding unchanged original five passes, the requested
+focused batch has 30 passing executions. The historical invalid-oracle failures
+remain preserved. These logs contain a dead_code warning for canonical_token;
+this checkpoint is test GREEN, not zero-warning GREEN.
+
+The obsolete declaration wrapper canonical_token had no callers after the source/
+hash refactor; it is now removed, retaining the active shared canonical_token_at
+implementation. No semantic behavior changed. Warning removal is UNRUN. The
+next operator batch run-bootstrap-inline69-preservation.ps1 covers affected
+provider/view/string/module/config/route/native-bootstrap/durable preservation,
+then fmt and all-targets/all-features Clippy with warnings denied. No repeated
+focused batch or binary run is requested at this point. Binary/approval exit
+reconciliation and broader repository/field gates remain open.
+
+## Integrated test-oracle correction authored, UNRUN
+
+Inspected bootstrap-inline69-focused-20261027-165339: the integrated batch records
+3 passed, 2 failed, 73.18s. Composition/strategy assertions passed before the public
+helper omitted the independently valid string-token row from its expectation.
+The proof-refusal control stopped at a raw count expecting two instead of the
+fixture's three retained entries (Left, Right, repeated Left); its subsequent
+corruption assertions were not reached.
+
+The helper now explicitly compares declaration-token rows and the composition
+control independently requires the exact named string registration in both public
+directions. The raw control requires three retained occurrences and two unique
+canonical token identities. No production or generation change. Pre-correction
+test/log bytes: target/issue-162/bootstrap-inline69-control-correction/.
+Use -ResumeAfterInlineControlsFailure to rerun the integrated batch and remaining
+bootstrap/compatibility filters without repeating the unchanged original controls.
+Corrected tests remain UNRUN; later preservation/lint/binary are not inferred.
+
+## Inline bootstrap production approved; generation 69 authored, UNRUN
+
+Owner approval now authorizes direct inline object provider membership on the
+existing bootstrap call occurrence. The original five-test file was isolated
+and restored byte-identically. Shared provider producer/admission now consumes
+the proved call/argument/object/providers path; no new public identity or retained
+payload. Five integrated controls and compatibility updates are authored.
+See [approved checkpoint](ISSUE_162_BOOTSTRAP_INLINE_PROVIDER_DECISION.md).
+Next operator gate: run-bootstrap-inline69-focused.ps1. No runtime GREEN or
+binary acceptance is inferred; broader P1/P3/AQ14/W04/#162 remain open.
+
+## Inline bootstrap RED batch inspected
+
+Four native route cases fail at the intended inline-membership boundary after
+all required prerequisites; the refusal/named-config control passes (1 passed,
+4 failed, 106.72s). Exact bytes/hashes are archived. The
+[bounded production request](ISSUE_162_BOOTSTRAP_INLINE_PROVIDER_DECISION.md)
+now records the concrete entry/carrier boundary and integrated exit obligations.
+Production semantic/carrier/compatibility extension remains pending approval.
+
+## Inline bootstrap investigation controls authored, UNRUN
+
+Owner disposition authorizes investigation/test authoring only. Five tracked
+controls now cover four native API routes plus bounded refusal/named-config
+preservation. No production owner meaning, carrier or generation change occurred.
+See [inline decision and carrier audit](ISSUE_162_BOOTSTRAP_INLINE_PROVIDER_DECISION.md).
+Operator handoff: run-bootstrap-inline-provider-red.ps1. Observe valid behavioral
+REDs after prerequisites before production approval. No binary/field run requested.
+
+## Current next question: inline bootstrap provider membership
+
+Generation-68 named bootstrap root/config references and query-bounded refresh
+rediscovery have bounded deterministic/lint/binary acceptance. They establish
+written associations, not active application or effective provider context.
+The next proposed P1/P3 question is direct inline bootstrap providers:
+[bounded owner decision](ISSUE_162_BOOTSTRAP_INLINE_PROVIDER_DECISION.md).
+Static trace identifies the intentional named-reference-only argument boundary.
+No new tests or production edits accompany this investigation. Inline call-owner
+membership requires explicit approval; merge/legacy bootstrap/injector semantics
+remain unresolved. Earlier "next bootstrap" statements below are historical.
+
 ## Generation-68 integrated binary acceptance inspected PASS
 
 Inspected bootstrap68-binary-20261027-152030: bootstrap-references PASS 201 checks,

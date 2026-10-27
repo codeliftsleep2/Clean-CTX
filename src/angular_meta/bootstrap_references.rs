@@ -10,7 +10,7 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 pub(crate) const DEMANDED_APIS: &[(&str, &str)] =
     &[("@angular/platform-browser", "bootstrapApplication")];
 
-fn call<'a>(
+pub(super) fn call<'a>(
     authority: &'a TypeScriptAuthority,
     facet: &'a InvocationFacet,
 ) -> Option<&'a [ExpressionFacet]> {
@@ -192,6 +192,12 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
                 end: expression.end,
             },
         });
+        edges.extend(super::bootstrap_inline_providers::project_call(
+            authority,
+            facet,
+            args,
+            subject.clone(),
+        ));
         for (position, kind, relation) in [
             (0, "Component", SemanticRelation::DeclaresBootstrapRoot),
             (
