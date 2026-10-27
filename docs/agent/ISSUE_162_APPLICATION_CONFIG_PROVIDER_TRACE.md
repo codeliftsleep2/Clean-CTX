@@ -1,7 +1,64 @@
 # Issue #162: source-declared ApplicationConfig providers
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-67 scoped Rust checkpoint GREEN (459 passing executions; historical controls corrected); fmt/Clippy GREEN; approval coverage review and binary acceptance pending.
+Status: owner APPROVED; generation-67 scoped Rust/lint GREEN (460 passing executions); integrated binary PASS (config 304, route 305, imported owners 332); broader repository/field gates open.
+
+## Generation-67 integrated binary checkpoint inspected PASS
+
+Inspected the operator receipts: application-config-providers PASS (304 checks),
+route-providers PASS (305), provider-imported-owners PASS (332). Each has zero
+failed checks/errors, three FINISHED sessions and the existing 500-check ceiling.
+All three bind the same binary SHA-256
+ d699b837b7ff26089a59bbd0b18567ae23a4e58580aca2915316372b3cbef4dc
+(mtime 2026-10-27T14:45:22.544Z) and input hash
+19474282f4d028435cd540fad7e1006199249edd5304c6884b3b0054c8a6756f.
+Receipt/report hashes: target/issue-162/application-config67-binary-receipt.json.
+Full handoff logs: target/issue-162/application-config67-binary-20261027-104245/.
+
+The expanded retained-membership/serde control passed (1 test, 12.68s), verifying
+its seven additional refusal cases; scoped Rust passing executions now total 460.
+Formatting logs are empty and the operator reports GREEN. Clippy and the rebuilt
+all-feature binary record Finished without warnings/errors; syntax preflight
+passed 31 JavaScript files. These categories remain separate: 460 scoped Rust
+executions, three bounded binary suites, and no full repository/Claude field gate.
+
+This supersedes authored-UNRUN statements below for the requested checkpoint.
+The bounded declared ApplicationConfig production membership and affected route/
+class-owner preservation now have local binary evidence. No production/harness
+change accompanies inspection. Final repository/encoding/size and field gates,
+active application selection and broader P1/P3/AQ14/W04/#162 closure remain open.
+
+## Expanded refusal compile correction, UNRUN
+
+The first integrated handoff stopped at compilation: the new crossed-source
+mutation called String::push_str on DeclarationId.source, which is PathBuf.
+It now uses PathBuf::push to forge a distinct source path. This is an agent-authored
+test compile error, not behavioral RED evidence. No production change or assertion
+weakening occurred. Original diagnostic remains in
+application-config67-binary-20261027-102605/config-refusal.log. No lint/build/binary
+suite was reached; the corrected control and subsequent stages remain UNRUN.
+
+## Integrated config binary checkpoint and coverage map authored, UNRUN
+
+The [bounded acceptance map](ISSUE_162_APPLICATION_CONFIG_ACCEPTANCE.md) maps all
+51 owner-approval requirements to tracked controls and public binary questions,
+keeping observed GREEN distinct from authored verification. The retained-membership
+control gains seven refusal cases for duplicate/renamed fields, shifted annotation/
+object spans, duplicate type occurrences and crossed initializer/source proof.
+These additions are UNRUN; the prior 459 passing executions remain historical
+scoped evidence and do not verify them.
+
+A new application-config-providers suite uses the existing three-session stdio
+runner with same-named configs, exact owner/token file multisets, local/imported
+composition, no view membership, restart/stale restore, contributor/token/barrel/
+config/package mutations, sibling survival, retirement and explicit recreated-root
+reacquisition. It retains binary/input hashes and the hard 500-check ceiling.
+
+The logged run-application-config67-checkpoint.ps1 tests the expanded Rust control
+and lint first, then syntax preflight, one all-feature rebuild and the new config
+suite plus route-providers/provider-imported-owners preservation. This is the
+planned major integrated binary checkpoint. All new controls are UNRUN; no agent
+Cargo/build/lint/Node/runtime execution or production semantic edit occurred.
 
 ## Generation-67 scoped preservation and lint GREEN
 

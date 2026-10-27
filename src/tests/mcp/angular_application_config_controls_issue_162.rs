@@ -230,7 +230,7 @@ fn issue_162_application_config_provider_membership_forgery_and_serde_refusal() 
     assert!(crate::angular_meta::application_config_providers::admits(
         &restored, &edges[0]
     ));
-    for mode in 0..10 {
+    for mode in 0..17 {
         let mut bad = authority.clone();
         let index = bad
             .declaration_facets
@@ -253,6 +253,77 @@ fn issue_162_application_config_provider_membership_forgery_and_serde_refusal() 
                 .push('x'),
             7 => bad.references.retain(|(name, _, _)| name != "appConfig"),
             8 => bad.declarations.retain(|id| id.name != "appConfig"),
+            10 => {
+                use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
+                let ExpressionValue::Object(fields) = &mut bad.declaration_facets[index]
+                    .initializer
+                    .as_mut()
+                    .unwrap()
+                    .value
+                else {
+                    panic!()
+                };
+                let duplicate = fields
+                    .iter()
+                    .find(|(key, _)| key == "providers")
+                    .unwrap()
+                    .clone();
+                fields.push(duplicate);
+            }
+            11 => {
+                use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
+                let ExpressionValue::Object(fields) = &mut bad.declaration_facets[index]
+                    .initializer
+                    .as_mut()
+                    .unwrap()
+                    .value
+                else {
+                    panic!()
+                };
+                fields
+                    .iter_mut()
+                    .find(|(key, _)| key == "providers")
+                    .unwrap()
+                    .0 = "unrelated".into();
+            }
+            12 => {
+                bad.declaration_facets[index]
+                    .type_annotation
+                    .as_mut()
+                    .unwrap()
+                    .start += 1
+            }
+            13 => {
+                bad.declaration_facets[index]
+                    .initializer
+                    .as_mut()
+                    .unwrap()
+                    .start += 1
+            }
+            14 => {
+                let annotation = bad.declaration_facets[index]
+                    .type_annotation
+                    .as_ref()
+                    .unwrap();
+                let duplicate = bad
+                    .type_reference_sites
+                    .iter()
+                    .find(|(start, end, _)| *start == annotation.start && *end == annotation.end)
+                    .unwrap()
+                    .clone();
+                bad.type_reference_sites.push(duplicate);
+            }
+            15 => {
+                let annotation = bad.declaration_facets[index]
+                    .type_annotation
+                    .clone()
+                    .unwrap();
+                bad.declaration_facets[index].initializer = Some(annotation);
+            }
+            16 => bad.declaration_facets[index]
+                .declaration
+                .source
+                .push("crossed.ts"),
             _ => {
                 use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
                 let ExpressionValue::Object(fields) = &mut bad.declaration_facets[index]

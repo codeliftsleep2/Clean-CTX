@@ -279,7 +279,11 @@ control. Inspected resumed compression/provider/publication/durable preservation
 fixture/generation/timing failures remain recorded with corrected GREEN controls.
 Final fmt/Clippy are GREEN. Approval coverage review, later major-checkpoint binary
 acceptance and final repository/field gates remain open.
-Actual bootstrap/config selection remains a separate P3/AQ14 integration gap.
+The [51-item acceptance map](ISSUE_162_APPLICATION_CONFIG_ACCEPTANCE.md) now records
+the expanded refusal control GREEN (460 scoped Rust passing executions total) and
+one-build binary PASS: config 304, route 305, imported owners 332 checks, each in
+three FINISHED sessions below 500 checks. Final repository/encoding/size and field
+gates remain open. Actual bootstrap/config selection remains a separate P3/AQ14 integration gap.
 
 ## What counts as closing an implementation package
 
