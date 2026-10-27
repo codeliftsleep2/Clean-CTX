@@ -1,7 +1,113 @@
 # Issue #162: source-declared ApplicationConfig providers
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-67 focused config/route/compatibility receipts GREEN (33 passing executions); broader preservation/lint and binary acceptance pending.
+Status: owner APPROVED; generation-67 scoped Rust checkpoint GREEN (459 passing executions; historical controls corrected); fmt/Clippy GREEN; approval coverage review and binary acceptance pending.
+
+## Generation-67 scoped preservation and lint GREEN
+
+Inspected the final timing controls: post-commit missing source 1 passed (7.65s)
+and pre-commit stale-authority refusal 1 passed (4.63s). Final fmt log is empty
+and the operator reports GREEN. All-targets/all-features Clippy records Finished
+with no warnings/errors for -D warnings.
+
+Across the logged preservation/resume batches, 426 passing executions are retained:
+initial Angular/compression/baseline 386; publication/recovery/hydration 13;
+durable restore 4 plus corrected rerun 1; restore compatibility 9 plus corrected
+reruns 3; delta fidelity 8 plus corrected timing and new refusal controls 2.
+The prior focused config/route/compatibility 33 bring the scoped total to 459.
+These are executions, not unique tests or a full repository run. Historical five
+failed executions and handoff interruptions remain preserved; their corrected
+controls now pass, with no unresolved failure in the requested batch. Count/hash
+receipt: target/issue-162/application-config67-preservation-receipt.json.
+
+No production behavior changes accompany this evidence update. The test-only
+acknowledgement hook does not exist in non-test builds. Broader config approval
+coverage review, bounded binary acceptance, final repository/encoding/size and
+Claude field gates remain open. No binary run or P1.A1/P1/W04/#162 closure is
+inferred from these scoped Rust/lint receipts.
+
+## Delta acknowledgement timing correction, UNRUN
+
+All three corrected generation controls passed. Delta fidelity then recorded
+8 passed, 1 failed: committed_delta_acknowledgement_survives_missing_source.
+The test deletes its source before apply_delta, so pending_transition rejects
+stale native authority before mutation. It never reaches committed acknowledgement
+rendering. This is distinct from source becoming unavailable after commit.
+
+The test now removes its source through a thread-local, cfg(test)-only hook after
+semantic publication and transition consumption, immediately before response
+rendering. Its successful target/version/consumption/skeleton assertions remain.
+A separate tracked control requires deletion before acceptance to reject and keep
+the baseline IR/version and pending transition unchanged. No currentness check is
+weakened; non-test code behavior is unchanged. Original failure/test bytes are
+archived at target/issue-162/application-config67-delta-ack-timing-correction/.
+Both timing controls remain UNRUN. -ResumeAfterAcknowledgementFailure formats
+the affected test/support/hook files and runs these two cases followed by fmt/Clippy;
+the eight passing delta controls and earlier preservation passes are not repeated.
+
+## Restore compatibility generation-control correction, UNRUN
+
+The corrected native durable-delta control passed (1 passed, 5.60s). Restore
+compatibility then recorded 9 passed, 3 failed (34.25s). The three failures use
+obsolete test generation literals: C# semantic projection 4 versus current 5,
+and TypeScript canonical 2 versus current 3. The C# mismatch string replacement
+was a no-op, so restore correctly accepted the unchanged identity; the two
+removal cases failed their old-generation prerequisites before testing restore.
+
+The mismatch now parses stored JSON, verifies the production generation and
+changes that exact field to the next generation. Removal controls verify against
+existing production constants. Incompatible-restore and clean-state assertions
+are unchanged. No production/generation change accompanies this correction.
+Pre-correction bytes/log hashes are archived under
+target/issue-162/application-config67-restore-generation-control-correction/.
+The three corrected controls remain UNRUN. -ResumeAfterCompatibilityFailure
+formats that test file, runs only those three cases and the remaining delta
+fidelity filter, then fmt/Clippy. Earlier passing controls are not repeated.
+
+## Durable-delta native fixture correction, UNRUN
+
+The resumed preservation batch passed publication race 1, recovery 7, retry 1
+and hydration fidelity 4 controls. Durable semantic restore records 4 passed,
+1 failed at the baseline app-old selector assertion, before delta application
+or restore. The fixture supplies an unresolved @angular/core import but no native
+package proof. Nonempty framework/meta edges do not establish its Component role;
+the native class-role projection requires exact public API proof.
+
+The affected test now installs the existing angular_authority_fixture and checks
+its native selector before editing the source. All delta rejection, pending-state,
+application and complete durable restoration assertions remain intact. No production
+or semantic generation change accompanies this fixture correction. Original test/log
+bytes and hashes are preserved under
+target/issue-162/application-config67-durable-native-fixture-correction/.
+The corrected control is UNRUN. The handoff's -ResumeAfterDurableFailure runs only
+that corrected case, the two remaining preservation filters and fmt/Clippy; prior
+passing executions are retained, including the other four durable controls.
+
+## Partial preservation GREEN; handoff filter correction
+
+Inspected application-config67-preserve-20261027-091409: provider 85, view 6,
+string 12, module 14, provider_semantics 6, compress 261 and baseline publication
+2 passed: 386 passing executions, zero test failures. The next filename-derived
+provide_publication_race filter selected zero tests, correctly stopping the script.
+Remaining filters and fmt/Clippy did not run. This was an agent handoff error,
+not production failure. The script now uses actual registered Rust module names
+for publication, hydration, restore compatibility and delta fidelity. Its
+-ResumeAfterBaseline option skips the seven completed filters. Original logs and
+a partial count/hash receipt remain preserved in that timestamped directory.
+No production/test assertion changed; remaining verification stays UNRUN.
+
+## Broader compression/provider preservation handoff, UNRUN
+
+The next operator batch selects existing provider/view/string/module/helper
+controls and shared compression, baseline/publication race/recovery, hydration
+fidelity, durable restore/compatibility and delta-fidelity controls. This scope
+covers the shared compression publication repair beyond the config regression.
+No production or test assertions change. The preceding 33 config/route/compatibility
+passes remain applicable and are not scheduled again. The tracked handoff is
+verification/live-acceptance/issue-162/run-application-config67-preservation.ps1;
+it stops on failure or an empty filter, retains timestamped full logs, and runs
+final fmt/Clippy after preservation. These commands are UNRUN. Config approval
+coverage review and bounded binary acceptance remain open; no Node run is included.
 
 ## Generation-67 focused config/route/compatibility GREEN
 

@@ -299,6 +299,8 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
             // availability must therefore never turn a successful mutation
             // into an error response, and raw source is valid only when it is
             // the exact source snapshot represented by the committed target.
+            #[cfg(all(test, feature = "typescript"))]
+            acknowledgement_test_support::after_commit(state, &durable_file);
             let compact =
                 || super::content::presentation_document(&target_ir, &hierarchy, fidelity, state);
             let (rendered, raw_passthrough) = match state.read_source(&durable_file) {
@@ -355,3 +357,7 @@ pub(crate) fn handle_apply_delta(id: &Value, params: &Value, state: &McpState) {
     }
     });
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_acknowledgement_support.rs"]
+pub(crate) mod acknowledgement_test_support;

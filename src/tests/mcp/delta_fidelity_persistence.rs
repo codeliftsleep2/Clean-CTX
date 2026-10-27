@@ -379,6 +379,35 @@ fn explicit_delta_missing_baseline_preserves_high_fidelity_across_restart_restor
 }
 
 #[test]
+fn uncommitted_delta_missing_source_preserves_pending_state() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().expect("temp workspace");
+    let path = root.path().join("missing-before-acceptance.ts");
+    let state = crate::mcp::McpState::new(config(&root));
+    let (file, delta, from) = pending_tiny_delta(&state, &root, &path);
+    let alias = state.alias_for_path(&file).expect("session alias");
+    let baseline = state.ir_context_read().get_ir(&alias).cloned();
+    let version = state.file_version(&alias);
+    std::fs::remove_file(&path).expect("remove source before acceptance");
+    state.invalidate_source_cache(&file);
+    let rejected = dispatch(
+        &state,
+        25,
+        "apply_delta",
+        json!({ "delta": delta, "currentVersion": from }),
+    );
+    assert!(
+        rejected["error"]["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("pending TypeScript authority is stale")),
+        "{rejected}"
+    );
+    assert_eq!(state.file_version(&alias), version);
+    assert_eq!(state.ir_context_read().get_ir(&alias).cloned(), baseline);
+    assert_eq!(state.pending_transition_count(&alias), 1);
+}
+
+#[test]
 fn committed_delta_acknowledgement_survives_missing_source() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("temp workspace");
@@ -388,8 +417,7 @@ fn committed_delta_acknowledgement_survives_missing_source() {
     let alias = state.alias_for_path(&file).expect("session alias");
     let target_version = delta["to"].as_u64().expect("target version");
 
-    std::fs::remove_file(&path).expect("remove source before acknowledgement");
-    state.invalidate_source_cache(&file);
+    let _removal = crate::mcp::tool_handlers::core::delta_apply::acknowledgement_test_support::remove_source_after_commit(&file);
     let applied = dispatch(
         &state,
         22,
@@ -397,6 +425,7 @@ fn committed_delta_acknowledgement_survives_missing_source() {
         json!({ "delta": delta, "currentVersion": from }),
     );
 
+    assert!(!path.exists(), "post-commit removal hook must run");
     assert!(applied.get("error").is_none(), "{applied}");
     assert_eq!(applied["result"]["_meta"]["content_kind"], "skeleton");
     let text = applied["result"]["content"][0]["text"]

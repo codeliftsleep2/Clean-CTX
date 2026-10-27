@@ -305,10 +305,14 @@ fn restore_rejects_csharp_semantic_projection_generation_mismatch() {
         "semantic_edge_snapshots",
         "semantic_producer_identity",
         |json| {
-            json.replace(
-                "\"c_sharp_semantic_projection\":4",
-                "\"c_sharp_semantic_projection\":99",
-            )
+            let mut identity: Value = serde_json::from_str(&json).expect("semantic identity");
+            let generation = identity["relevant_producers"]
+                .get_mut("c_sharp_semantic_projection")
+                .expect("C# semantic projection generation");
+            let current = crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION;
+            assert_eq!(*generation, json!(current));
+            *generation = json!(current.checked_add(1).expect("next generation"));
+            serde_json::to_string(&identity).expect("rewritten semantic identity")
         },
     );
     drop(producer);
@@ -346,7 +350,12 @@ fn restore_rejects_csharp_snapshot_missing_projection_generation() {
                 .as_object_mut()
                 .expect("producer map")
                 .remove("c_sharp_semantic_projection");
-            assert_eq!(removed, Some(json!(4)));
+            assert_eq!(
+                removed,
+                Some(json!(
+                    crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION
+                ))
+            );
             serde_json::to_string(&identity).expect("rewritten semantic identity")
         },
     );
@@ -414,7 +423,12 @@ fn restore_rejects_current_producer_when_persisted_set_lacks_it() {
                 .as_object_mut()
                 .expect("producer map")
                 .remove("type_script_canonical");
-            assert_eq!(removed, Some(json!(2)));
+            assert_eq!(
+                removed,
+                Some(json!(
+                    crate::ir::layers::typescript::CANONICAL_PRODUCER_GENERATION
+                ))
+            );
             serde_json::to_string(&identity).expect("rewritten canonical identity")
         },
     );

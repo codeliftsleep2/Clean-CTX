@@ -81,6 +81,7 @@ fn replace_first_durable_edge(
 fn generated_delta_persists_and_restores_complete_target_edges() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("temp workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("component.ts");
     let file = path.to_string_lossy().into_owned();
     let baseline = "import { Component } from '@angular/core';\n@Component({ selector: 'app-old', template: '' })\nexport class AppComponent { run(): void { helper(); } }\n";
@@ -96,6 +97,13 @@ fn generated_delta_persists_and_restores_complete_target_edges() {
             .as_array()
             .is_some_and(|edges| !edges.is_empty()),
         "framework/meta edges must exist in the production fixture"
+    );
+
+    assert!(
+        indexed_component_edges(&producer, "AppComponent")
+            .to_string()
+            .contains("app-old"),
+        "native Component selector must be indexed before the source edit"
     );
 
     std::fs::write(&path, target).expect("target source");

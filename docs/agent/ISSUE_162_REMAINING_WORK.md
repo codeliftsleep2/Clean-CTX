@@ -274,8 +274,11 @@ and the initial ten-test integrated checkpoint now pass, reusing the shared
 provider mechanisms and real declaration identity. Inspected focused receipts
 record 33 passing executions: config 10, route 11 and compatibility 12. The
 compression-to-index retained-authority repair passes its before-query lifecycle
-control. Broader affected compression/provider preservation, final lint and later
-major-checkpoint binary acceptance remain open.
+control. Inspected resumed compression/provider/publication/durable preservation records
+426 passing executions; with the focused 33, the scoped total is 459. Historical
+fixture/generation/timing failures remain recorded with corrected GREEN controls.
+Final fmt/Clippy are GREEN. Approval coverage review, later major-checkpoint binary
+acceptance and final repository/field gates remain open.
 Actual bootstrap/config selection remains a separate P3/AQ14 integration gap.
 
 ## What counts as closing an implementation package
