@@ -85,7 +85,7 @@ pub(super) fn capture(
         }) {
             demand.declaration(id);
         }
-        // Directly annotated source-owned callables and demanded array syntax
+        // Directly annotated source-owned callables and demanded array/object syntax
         // retain neutral declaration/type/initializer association. Framework
         // consumers still prove their exact native root; no role comes from shape.
         if let Some(tree) = demand.resolver.source_tree(request) {
@@ -97,7 +97,8 @@ pub(super) fn capture(
                     node.child_by_field_name("type").is_some()
                         && node.child_by_field_name("value").is_some_and(|value| {
                             matches!(value.kind(), "arrow_function" | "function_expression")
-                                || (!fields.is_empty() && value.kind() == "array")
+                                || (!fields.is_empty()
+                                    && matches!(value.kind(), "array" | "object"))
                         })
                 }) {
                     demand.declaration(id);

@@ -24,6 +24,8 @@
 // - (this file)  : Public surface, `MetaBlock` struct, `run_meta_layer`
 
 #[cfg(feature = "typescript")]
+pub(crate) mod application_config_providers;
+#[cfg(feature = "typescript")]
 pub(crate) mod class_role_authority;
 #[cfg(feature = "typescript")]
 pub(crate) mod constructor_authority;
@@ -71,6 +73,8 @@ pub(crate) mod template_occurrences;
 pub(crate) mod template_ordered;
 pub mod template_ownership;
 pub mod testing;
+#[cfg(feature = "typescript")]
+pub(crate) mod typed_provider_root;
 pub mod util;
 
 #[cfg(test)]

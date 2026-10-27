@@ -1,8 +1,8 @@
 //! Exact native Routes-root/object membership feeding shared provider policies.
+use crate::ir::typescript_resolution::TypeScriptAuthority;
 use crate::ir::typescript_resolution::declaration_facets::{
     DeclarationFacet, ExpressionFacet, ExpressionValue,
 };
-use crate::ir::typescript_resolution::{Namespace, Resolution, TypeScriptAuthority};
 use crate::layers::meta::canonical_endpoint::{CanonicalEndpoint, RouteOccurrence};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
@@ -21,53 +21,11 @@ fn unique<'a>(fields: &'a [(String, ExpressionFacet)], name: &str) -> Option<&'a
 }
 
 fn root(authority: &TypeScriptAuthority, facet: &DeclarationFacet) -> bool {
-    let id = &facet.declaration;
-    if id.source != authority.source
-        || id.source_hash != authority.source_hash
-        || id.kind != "variable_declarator"
-        || authority
-            .declaration_facets
-            .iter()
-            .filter(|f| f.declaration == *id)
-            .count()
-            != 1
-        || !authority.declarations.contains(id)
-    {
-        return false;
-    }
-    let (Some(annotation), Some(initializer)) = (&facet.type_annotation, &facet.initializer) else {
-        return false;
-    };
-    if !(id.start <= annotation.start
-        && annotation.start < annotation.end
-        && annotation.end <= initializer.start
-        && initializer.start < initializer.end
-        && initializer.end <= id.end)
-    {
-        return false;
-    }
-    let ExpressionValue::Reference(Resolution::Resolved(target)) = &annotation.value else {
-        return false;
-    };
-    let mut sites = authority
-        .type_reference_sites
-        .iter()
-        .filter(|(s, e, _)| *s == annotation.start && *e == annotation.end);
-    let Some((_, _, Resolution::Resolved(actual))) = sites.next() else {
-        return false;
-    };
-    actual == target
-        && sites.next().is_none()
-        && super::class_role_authority::public_entry_api(
-            authority,
-            target,
-            "@angular/router",
-            "@angular/router",
-            "Routes",
-            Namespace::Type,
-        )
-        && matches!(initializer.value, ExpressionValue::Array(_))
-        && structure(authority, initializer)
+    super::typed_provider_root::admits(authority, facet, "@angular/router", "Routes")
+        && facet
+            .initializer
+            .as_ref()
+            .is_some_and(|value| matches!(value.value, ExpressionValue::Array(_)))
 }
 
 fn objects(
@@ -147,6 +105,7 @@ fn objects(
                 providers,
                 false,
                 SemanticRelation::RegistersProvider,
+                true,
             ));
         }
         if let Some(children) = unique(fields, "children")

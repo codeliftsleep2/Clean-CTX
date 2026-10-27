@@ -7,6 +7,13 @@ impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
             #[cfg(feature = "angular")]
+            if edge.subject.entity_type == "ApplicationConfig"
+                && edge.relation
+                    == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
+            {
+                return crate::angular_meta::application_config_providers::admits(self, edge);
+            }
+            #[cfg(feature = "angular")]
             if edge.subject.entity_type == "Route"
                 && edge.relation
                     == crate::layers::meta::semantic::SemanticRelation::RegistersProvider

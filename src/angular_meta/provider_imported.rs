@@ -28,6 +28,7 @@ pub(super) fn project(
         root,
         true,
         position.relation(),
+        false,
     )
 }
 
@@ -39,12 +40,9 @@ pub(super) fn project_entries(
     root: &crate::ir::typescript_resolution::declaration_facets::ExpressionFacet,
     imported_only: bool,
     registration: SemanticRelation,
+    strict: bool,
 ) -> Vec<SemanticEdge> {
     let mut edges = Vec::new();
-    let strict = matches!(
-        subject.canonical,
-        Some(crate::layers::meta::canonical_endpoint::CanonicalEndpoint::RouteOccurrence { .. })
-    );
     let occurrences = if strict {
         super::provider_composition::proved_entries(authority, root)
     } else {

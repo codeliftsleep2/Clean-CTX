@@ -171,7 +171,7 @@ answer portions; trace them before implementing replacements.
 
 | ID | Remaining obligation | Current evidence boundary | Exit needed for W04 |
 | --- | --- | --- | --- |
-| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component and Directive/Module composition have scoped Rust/lint GREEN and inspected generation-65 binary PASS (332 imported-owner checks, 190 same-source preservation checks); route/application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
+| P1 | Provider owners and composed registrations | Direct Component/Directive/Module registration, Component view position and same-source composition have bounded verified checkpoints. Imported Component and Directive/Module composition have scoped Rust/lint GREEN and inspected generation-65 binary PASS (332 imported-owner checks, 190 same-source preservation checks); Native source-owned Routes objects now have bounded generation-66 declared membership acceptance; other route roots, application/environment/testing contexts remain unreconciled. | Map required owner/container forms to exact production acquisition and canonical registration answers, including composition/retraction and negative owner controls. Coordinate W02, W06 and W10. |
 | P2 | Strategy/form coverage and value meaning | Class shorthand/useClass, function-declaration useFactory and useExisting have bounded canonical pair evidence. Other callable forms retain classified compatibility behavior. useValue reference admission is verified; its strategy presentation remains noncanonical. | Reconcile each required form with its actual question and public fact. Only propose richer target/value identity when a demonstrated question requires it; do not assume a general evaluator. Record genuine unsupported forms and resolve required capabilities rather than silently excluding them. |
 | P3 | Injector/application context | Local token/pair identity does not identify the applicable injector or connect its owner to the actual application/configuration hierarchy. | Establish the required owner/application/injector context and visibility proof, with distinct applications/scopes and current dependency paths. This is a prerequisite for effective-provider claims. |
 | P4 | Multi, overrides and precedence | Existing deduplication preserves semantic fact identity; it is not an ordered registration/multi/override model. No winning-provider claim follows from existing edges. | Define and verify the required order/multi/override questions against real registration context, with explicit runtime uncertainty. Architectural changes require the actual bounded owner decision. |
@@ -261,9 +261,22 @@ zero errors and six FINISHED sessions. Bounded P1.R1 local acceptance is satisfi
 with explicit known-root reacquisition after recreation; automatic rediscovery
 of a removed route identity remains uncertified. Broader P1/W04 and repository/
 field gates remain open.
-Route shape omits providers; native route-root demand and distinct route-object
-identity require tracing/approval before production extension. No injector model
-or route authority change is authorized by the previous class-owner approvals.
+The earlier route acquisition/object-identity omission is repaired under the
+separate route approval. No activation or effective injector model follows.
+
+Next investigation: [P1.A1 native ApplicationConfig declarations](ISSUE_162_APPLICATION_CONFIG_PROVIDER_TRACE.md).
+All four direct/local/imported controls reached their intended omission REDs
+(0 passed, 4 failed, 19.55 seconds), after Component registration and native
+config-type occurrence prerequisites passed. Evidence is byte-preserved and the
+[bounded config-owner decision](ISSUE_162_APPLICATION_CONFIG_PROVIDER_DECISION.md)
+is now owner-approved. Generation-67 typed-object acquisition/owner membership
+and the initial ten-test integrated checkpoint now pass, reusing the shared
+provider mechanisms and real declaration identity. Inspected focused receipts
+record 33 passing executions: config 10, route 11 and compatibility 12. The
+compression-to-index retained-authority repair passes its before-query lifecycle
+control. Broader affected compression/provider preservation, final lint and later
+major-checkpoint binary acceptance remain open.
+Actual bootstrap/config selection remains a separate P3/AQ14 integration gap.
 
 ## What counts as closing an implementation package
 
@@ -293,7 +306,7 @@ remain valid; routine implementation choices do not create another approval gate
 | ID | Gate | Exit criterion / current status |
 | --- | --- | --- |
 | G01 | Final source audit and repository gate | All W01–W12 exit criteria reconciled; obsolete competing authority removed; known frontier/exclusions resolved for the claimed scope; operator runs the single [authoritative Final Verification Gate](verification.md#final-verification-gate). OPEN. Incremental fmt/Clippy receipts do not equal this gate. |
-| G02 | Consolidated production-boundary acceptance | Reusable binary assets cover all applicable migrated families and cross-family/ecological cases, with rebuilt binary/input hashes, real public answers, persistence and lifecycle. OPEN. Current 1660-check driver is strong bounded evidence, not whole-migration coverage. |
+| G02 | Consolidated production-boundary acceptance | Reusable binary assets cover all applicable migrated families and cross-family/ecological cases, with rebuilt binary/input hashes, real public answers, persistence and lifecycle. OPEN. Current split binary assets supply bounded family-specific receipts, not whole-migration coverage. |
 | G03 | Batched final Claude field acceptance | Local questions resolved first; consolidate remaining real-workspace/client-only questions into the fewest practical pilots, record results and any discoveries, then obtain owner acceptance. OPEN; do not request field switching while local implementation gaps remain. |
 
 Do not duplicate or improvise the full repository command list here; verification.md

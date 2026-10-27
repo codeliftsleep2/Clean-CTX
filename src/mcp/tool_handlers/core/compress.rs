@@ -202,8 +202,24 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             state.remember_context_fidelity(&path_alias, effective_fidelity);
             if !canonical_path.to_ascii_lowercase().ends_with(".cs") {
                 let mut idx = state.workspace_index_lock();
-                idx.remove_file(&canonical_path);
-                idx.add_edges(&canonical_path, semantic_edges.clone());
+                match crate::workspace::index::SemanticFidelity::from_compilation(
+                    effective_fidelity,
+                ) {
+                    Some(semantic_fidelity) => idx
+                        .replace_semantic_projection_with_retained_authority(
+                            &canonical_path,
+                            semantic_edges.clone(),
+                            semantic_fidelity,
+                            source_hash.clone(),
+                            semantic_dependencies.clone(),
+                            #[cfg(feature = "typescript")]
+                            authority.typescript_authority.clone(),
+                        )?,
+                    None => {
+                        idx.remove_file(&canonical_path);
+                        idx.add_edges(&canonical_path, semantic_edges.clone());
+                    }
+                }
             }
             state.remember_retained_semantic_projection(
                 &path_alias,

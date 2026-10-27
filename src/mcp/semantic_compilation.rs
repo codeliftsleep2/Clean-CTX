@@ -195,6 +195,14 @@ mod angular_provider_owner_composition_tests;
 mod angular_route_provider_tests;
 
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_application_config_provider_issue_162.rs"]
+mod angular_application_config_provider_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_application_config_controls_issue_162.rs"]
+mod angular_application_config_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_route_provider_controls_issue_162.rs"]
 mod angular_route_provider_controls_tests;
 
