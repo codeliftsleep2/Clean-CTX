@@ -1,5 +1,6 @@
 // Explicit full-run inventory; individual receipts remain bounded.
 export const suites = [
+  "bootstrap-references",
   "modules",
   "inject",
   "constructor",

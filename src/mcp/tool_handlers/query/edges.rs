@@ -67,6 +67,17 @@ fn try_prepare_forward_edges(
     let requirement = edge_hydration_requirement(args);
     let mut hydration =
         context.hydrate(state, "forward_edges", name, workspace_root, requirement)?;
+    #[cfg(feature = "angular")]
+    if identity.exact().is_some_and(|exact| {
+        exact.domain == "angular"
+            && exact.entity_type == "ApplicationBootstrap"
+            && exact.name == "bootstrapApplication"
+    }) {
+        hydration.merge(
+            crate::mcp::tool_handlers::hydration::hydrate_bootstrap_owners(state, workspace_root)
+                .map_err(QueryFailure::internal)?,
+        );
+    }
     if hydration.is_complete()
         && let Some(exact) = identity.exact()
         && exact.domain == "dotnet"

@@ -377,3 +377,152 @@ fn issue_162_bootstrap_controls_independent_argument_call_and_source_retirement(
     call(&state, p, "refresh_workspace", json!({}));
     facts(&state, p, &[("neighbor.ts", 1, 1)]);
 }
+
+#[test]
+fn issue_162_bootstrap_controls_exact_public_targets_and_independent_replacement() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (root, config) = setup(&CALL.repeat(2), true);
+    let p = root.path();
+    std::fs::write(p.join("other-root.ts"), ROOT).unwrap();
+    std::fs::write(p.join("other-config.ts"), CONFIG).unwrap();
+    let state = crate::mcp::McpState::new(config);
+    capture(&state, p, "main.ts");
+    capture(&state, p, "neighbor.ts");
+    let identity = |file: &str| {
+        crate::dictionary::path::canonical_identity_key(&p.join(file).to_string_lossy())
+    };
+    for (body, root_file, config_file) in [
+        (CALL.repeat(2), "root.ts", "config.ts"),
+        ("import {Root as Next} from './other-root'; launch(Next,appConfig); launch(Root,appConfig);".into(), "other-root.ts", "config.ts"),
+        ("import {Root as Next} from './other-root'; import {appConfig as NextConfig} from './other-config'; launch(Next,NextConfig); launch(Root,appConfig);".into(), "other-root.ts", "other-config.ts"),
+    ] {
+        std::fs::write(p.join("main.ts"), format!("{PREFIX}{body}")).unwrap();
+        let mut wanted = Vec::new();
+        for (owner, target_root, target_config) in [
+            ("main.ts", root_file, config_file),
+            ("main.ts", "root.ts", "config.ts"),
+            ("neighbor.ts", "root.ts", "config.ts"),
+        ] {
+            wanted.push((identity(owner), "DeclaresBootstrapRoot".to_owned(), identity(target_root)));
+            wanted.push((identity(owner), "UsesApplicationConfig".to_owned(), identity(target_config)));
+        }
+        wanted.sort();
+        for _ in 0..2 {
+            for reverse in [false, true] {
+                let mut actual = Vec::new();
+                let selectors = if reverse {
+                    vec![("Component", "Root"), ("ApplicationConfig", "appConfig")]
+                } else {
+                    vec![("ApplicationBootstrap", "bootstrapApplication")]
+                };
+                for (kind, name) in selectors {
+                    let answer = call(&state, p, "workspace_query", json!({
+                        "type": if reverse {"reverse_edges"} else {"forward_edges"},
+                        "domain":"angular", "entity_type":kind, "name":name
+                    }));
+                    for edge in answer["edges"].as_array().unwrap() {
+                        let Some(relation @ ("DeclaresBootstrapRoot" | "UsesApplicationConfig")) = edge["relation"].as_str() else { continue };
+                        assert_eq!(edge["subject"]["entity_type"], "ApplicationBootstrap");
+                        assert_eq!(edge["subject"]["name"], "bootstrapApplication");
+                        assert_eq!(edge["object"]["entity_type"], if relation == "DeclaresBootstrapRoot" {"Component"} else {"ApplicationConfig"});
+                        assert!(edge["subject"].get("canonical").is_none());
+                        assert!(edge["object"].get("canonical").is_none());
+                        actual.push((
+                            crate::dictionary::path::canonical_identity_key(edge["subject"]["file"].as_str().unwrap()),
+                            relation.to_owned(),
+                            crate::dictionary::path::canonical_identity_key(edge["object"]["file"].as_str().unwrap()),
+                        ));
+                    }
+                }
+                actual.sort();
+                assert_eq!(actual, wanted, "reverse={reverse}");
+            }
+        }
+    }
+}
+
+#[test]
+fn issue_162_bootstrap_controls_refresh_rediscovers_unchanged_barrel_caller() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (root, config) = setup(CALL, true);
+    let p = root.path();
+    // Match the binary route: the caller itself has no native API spelling.
+    std::fs::write(
+        p.join("api.ts"),
+        "export {bootstrapApplication,bootstrapApplication as start} from '@angular/platform-browser';",
+    ).unwrap();
+    std::fs::write(
+        p.join("neighbor.ts"),
+        format!(
+            "{}{CALL}",
+            PREFIX.replace("bootstrapApplication as launch", "start as launch")
+        ),
+    )
+    .unwrap();
+    let state = crate::mcp::McpState::new(config);
+    for file in ["main.ts", "neighbor.ts"] {
+        let authority = capture(&state, p, file);
+        let edges = crate::angular_meta::bootstrap_references::project(&authority);
+        assert_eq!(edges.len(), 2, "native call prerequisites: {file}");
+        assert!(authority.admits_relation_evidence(&edges));
+    }
+    facts(&state, p, &[("main.ts", 1, 1), ("neighbor.ts", 1, 1)]);
+    let neighbor = std::fs::read(p.join("neighbor.ts")).unwrap();
+    std::fs::remove_file(p.join("main.ts")).unwrap();
+    call(&state, p, "refresh_workspace", json!({}));
+    assert_eq!(std::fs::read(p.join("neighbor.ts")).unwrap(), neighbor);
+    // First public query after refresh must rediscover the proved barrel caller.
+    // No explicit capture or reverse target query may rescue this assertion.
+    facts(&state, p, &[("neighbor.ts", 1, 1)]);
+}
+
+#[test]
+fn issue_162_bootstrap_controls_cold_discovery_routes_and_query_boundary() {
+    let _serial = crate::protocol::handler_response_serial();
+    for (import, callee) in [
+        (
+            "import {bootstrapApplication} from '@angular/platform-browser';",
+            "bootstrapApplication",
+        ),
+        (
+            "import {bootstrapApplication as launch} from '@angular/platform-browser';",
+            "launch",
+        ),
+        ("import {start as launch} from './api';", "launch"),
+        (
+            "import * as platform from '@angular/platform-browser';",
+            "platform.bootstrapApplication",
+        ),
+    ] {
+        let (root, config) = setup(CALL, false);
+        let p = root.path();
+        std::fs::write(p.join("api.ts"), "export {bootstrapApplication,bootstrapApplication as start} from '@angular/platform-browser';").unwrap();
+        std::fs::write(p.join("neighbor.ts"), format!("{import} import {{Root}} from './root'; import {{appConfig}} from './config'; {callee}(Root,appConfig);")).unwrap();
+        let state = crate::mcp::McpState::new(config);
+        call(
+            &state,
+            p,
+            "workspace_query",
+            json!({"type":"forward_edges","domain":"angular","entity_type":"Component","name":"AbsentUnrelatedName"}),
+        );
+        assert!(
+            state
+                .alias_for_path(&p.join("neighbor.ts").to_string_lossy())
+                .is_none(),
+            "generic query must not acquire all TS owners"
+        );
+        // No source capture precedes the first bootstrap answer.
+        facts(&state, p, &[("main.ts", 1, 1), ("neighbor.ts", 1, 1)]);
+        std::fs::remove_file(p.join("main.ts")).unwrap();
+        call(&state, p, "refresh_workspace", json!({}));
+        facts(&state, p, &[("neighbor.ts", 1, 1)]);
+        let answer = call(
+            &state,
+            p,
+            "workspace_query",
+            json!({"type":"forward_edges","domain":"angular","entity_type":"ApplicationBootstrap","name":"bootstrapApplication"}),
+        );
+        assert_eq!(answer["coverage"]["result_semantics"], "lower_bound");
+        assert_eq!(answer["coverage"]["source_complete"], false);
+    }
+}

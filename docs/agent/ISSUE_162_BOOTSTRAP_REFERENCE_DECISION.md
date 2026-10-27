@@ -1,7 +1,220 @@
 # Issue #162: source-declared bootstrap root/config references
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-68 focused scope/bootstrap/compatibility receipts inspected GREEN (30 passing executions); broader preservation/lint and binary acceptance pending.
+Status: owner APPROVED; generation-68 focused and scoped preservation/lint GREEN; exit review and binary acceptance pending.
+
+## Generation-68 integrated binary acceptance inspected PASS
+
+Inspected bootstrap68-binary-20261027-152030: bootstrap-references PASS 201 checks,
+ApplicationConfig preservation PASS 304, imported-owner preservation PASS 332.
+Each receipt has zero failed checks/errors, three FINISHED sessions and fewer
+than 500 checks. All share the same rebuilt binary and recorded input hash.
+The all-feature build Finished without warnings/errors (22.05s); syntax preflight
+passed 33 JavaScript files. Full report paths, hashes and binary identity:
+target/issue-162/bootstrap68-binary-receipt.json.
+
+This supersedes the previous bootstrap binary failure for these selected suites.
+The repaired query-bounded discovery path now passes the refresh/caller-deletion
+stage and the later stale-restore/package/config stages. No production or harness
+edit accompanies evidence inspection. This is bounded binary/stdio acceptance,
+not a full repository gate or Claude field result. AQ14/P3/P1/W04/#162 remain open.
+
+## Query-bounded discovery preservation/lint inspected GREEN
+
+Inspected bootstrap68-exit-20261027-150605: filesystem discovery cache 9 passed
+(8.80s), config provider 10 passed (89.67s), route provider 11 passed (103.76s),
+zero failed/ignored. The corrected native-package fixture now passes its original
+inbound-result and scan-count assertions. Format/fmt logs are empty; Clippy
+Finished in 26.02s without warnings/errors for all targets/features, -D warnings.
+Operator reports GREEN. Prior eight bootstrap controls and completed refresh/
+hydration-cache passes remain valid; the historical invalid-fixture failure is
+preserved. Summary/hash receipt:
+target/issue-162/bootstrap68-discovery-preservation-receipt.json.
+
+No production edit accompanies this inspection. The post-repair deterministic
+checkpoint is GREEN. The existing integrated binary checkpoint may now resume
+with one rebuild, bootstrap-references and its config/imported-owner preservation
+suites. The previous binary failure is not superseded until new receipts pass.
+Final repository/Claude field and broader issue gates remain open.
+
+## Discovery preservation fixture correction, UNRUN
+
+Inspected bootstrap68-exit-20261027-145541: eight integrated bootstrap controls
+passed (162.43s). The filesystem discovery-cache filter records eight passes and
+one failure: external_refresh_expires_zero_result_inbound_discovery expected a
+native Angular constructor edge from a fixture without @angular/core package
+proof. Generic inbound discovery did run again; no bootstrap query was involved.
+The test now installs the existing canonical Angular fixture before state/source
+capture. The original count and two-scan assertions are unchanged. Pre-correction
+test/log bytes are under target/issue-162/bootstrap68-filesystem-control-correction/.
+No production change accompanies this fixture correction; corrected test UNRUN.
+
+The handoff supports -ResumeAfterFilesystemFailure to rerun the corrected filter,
+then config/route preservation and final lint without repeating completed bootstrap,
+refresh and hydration-cache batches. Historical failed receipt remains preserved;
+no later preservation, lint or binary acceptance is inferred.
+
+## Approved query-bounded discovery implementation authored, UNRUN
+
+The supplied owner approval authorizes conservative TypeScript nomination for the
+exact Angular ApplicationBootstrap/bootstrapApplication forward query. The valid
+regression and its registration were isolated as raw bytes under
+target/issue-162/bootstrap68-refresh-approved-isolation/ before production edits,
+then restored byte-identically. HEAD and the normal index were untouched.
+
+A private bootstrap hydration function reuses configured_roots and source_inventory,
+selects TypeScript owners without a spelling predicate, and feeds existing High
+capture/publication. Only the exact forward identity invokes it. Root exclusions
+and source validation remain in existing inventory/publication code; withinPath
+is not passed to acquisition. Generic literal discovery, native proof and retained
+admission remain unchanged. No new cache, scanner, resolver or lifecycle exists.
+Inventory completion does not supply an acquisition satisfaction/completeness proof.
+No retained meaning or durable encoding changed; semantic generation remains 68.
+
+One additional tracked control batches cold and post-refresh direct/alias/barrel/
+namespace routes, independent caller deletion, generic-query non-expansion and
+lower-bound coverage. The original refresh RED is unchanged. Eight integrated
+controls plus refresh/discovery-cache/config/route preservation, fmt and Clippy
+are now selected by run-bootstrap68-exit-controls.ps1. All post-repair commands
+are UNRUN; no agent Cargo, formatter, Node or runtime execution occurred. Binary
+acceptance is deferred until this deterministic checkpoint passes.
+
+## Refresh discovery RED and bounded decision
+
+The corrected regression now fails after native prerequisites, matching the
+binary omission. Evidence is archived under bootstrap68-refresh-discovery-red-evidence.
+See [bounded discovery decision](ISSUE_162_BOOTSTRAP_DISCOVERY_DECISION.md).
+No production repair or binary rerun has occurred. The shared literal discovery
+predicate cannot establish an alias caller after refresh retracts retained owners.
+A bounded candidate policy requires disposition before repair.
+
+## Refresh regression fixture corrected, UNRUN
+
+Inspected bootstrap68-refresh-red-20261027-142557/test.log: one passed in 9.89s.
+This did not reproduce the binary failure. The first tracked fixture still wrote
+bootstrapApplication as launch in its caller import; the binary caller writes
+start as launch. Literal discovery can select the former. The earlier causal
+classification remains a hypothesis until the corrected regression is observed.
+
+The corrected fixture exports bootstrapApplication as start from its barrel and
+imports start as launch in the unchanged sibling, matching the binary route with
+no native API spelling in that caller. Native call/admission prerequisites and
+the first-forward-query assertion are unchanged. Pre-correction test bytes are
+preserved under target/issue-162/bootstrap68-refresh-control-correction/.
+No production repair was made. Corrected regression UNRUN.
+
+## Generation-68 binary refresh discovery failure inspected
+
+The first bootstrap binary receipt records 126 successful checks followed by
+q113/exact-public-multiset failure (127 total checks). Cold/warm checkpoint and
+restart, root/config/barrel mutation/repair and argument/call replacement checks
+passed before failure. After deleting boot-main-0.ts and refresh_workspace, the
+first forward query omits the unchanged barrel caller boot-main-2.ts; callers 1
+and 3 remain. This is not an all-green binary batch. Later stale-restore/package/
+config session and both preservation suites were not reached.
+
+Receipt: target/live-acceptance/issue-162/2026-10-27T18-20-41-970Z-bootstrap-references-summary-11396/.
+Binary SHA-256: be0b8ec13efd999077d84b201c2208c2caa785dabf92d97a48667a5883621e39.
+The located boundary is refresh clearing indexed/retained owners followed by
+name-based forward discovery: the caller imports start as launch from its barrel
+and contains no bootstrapApplication spelling. Existing retained-owner replay
+cannot recover an owner removed by refresh. Native interpretation had admitted
+this exact caller earlier. No production repair has been made.
+
+A seventh tracked integrated control now requires valid native call/admission
+prerequisites, deletes one caller, refreshes, and checks the first public forward
+answer for its unchanged barrel sibling without explicit recapture or a preceding
+reverse query. This regression is UNRUN; isolate a valid behavioral RED before
+repair. Existing six-control GREEN and previous lint are historical evidence.
+No binary rerun is requested until this divergence is handled deterministically.
+
+## Generation-68 integrated binary batch authored, UNRUN
+
+Agent MaxHeadRoom added bootstrap-references to the existing binary/stdio runner
+and explicit suite manifest. Four native API routes, distinct same-named target
+pairs and repeated calls use exact public forward/reverse source/relation/target
+multisets. Three sessions batch cold/warm queries, restart, root/config/barrel
+mutation and repair with unchanged callers, independent argument/call/source
+retirement, stale restore refusal before queries, package/config mutation and
+repair. A foreign API caller must emit no bootstrap associations.
+
+The handoff rebuilds once, pins the binary hash between suites and runs bootstrap-
+references, application-config-providers and provider-imported-owners. Each uses
+the existing hard 500-check ceiling, source/input/binary hashes and complete
+session logs. The bootstrap scenario has fewer than 300 planned checks. Node
+syntax preflight, build and all three live suites are operator-owned and UNRUN.
+No production or Rust test change accompanies this harness authorship. Scoped
+Rust/lint evidence remains valid; final repository/Claude field gates stay open.
+Operator: verification/live-acceptance/issue-162/run-bootstrap68-checkpoint.ps1.
+
+## Generation-68 integrated exit controls inspected GREEN
+
+Inspected bootstrap68-exit-20261027-140450: all six integrated controls passed,
+zero failed/ignored, 95.53s. This includes the strengthened exact public forward/
+reverse source/relation/target multisets and independent root/config replacement.
+Formatting and fmt-check logs are empty; Clippy Finished in 22.60s with no warnings/
+errors for all targets/features and -D warnings. Operator reports GREEN.
+Hash/count receipt: target/issue-162/bootstrap68-exit-receipt.json.
+
+This supersedes the new public-control UNRUN statements below. No production
+change accompanies inspection. The deterministic exit strengthening is GREEN;
+rebuilt-binary acceptance remains open, along with final repository/field and
+broader AQ14/P3/P1/W04/#162 gates. No binary run is inferred.
+
+## Bootstrap exit review and strengthened public control authored, UNRUN
+
+The [47-item exit review](ISSUE_162_BOOTSTRAP_REFERENCE_EXIT_REVIEW.md) maps the
+approval to concrete controls and receipts, with binary acceptance explicitly open.
+Audit found exact bidirectional target-file replacement was weaker than the source/
+relation count controls. A sixth integrated test now compares exact public
+source/relation/target multisets in both directions, repeated queries, and
+independent same-named root/config replacement for one repeated call while its
+sibling and neighboring caller survive. This is a test-only change, UNRUN.
+Operator handoff: verification/live-acceptance/issue-162/run-bootstrap68-exit-controls.ps1.
+The existing 242 preservation passes are retained; this handoff runs the six
+integrated controls and lint, not another broad batch. No agent-run runtime.
+
+## Generation-68 scoped preservation and lint GREEN
+
+Inspected the broader preservation logs under bootstrap68-preserve-20261027-130656:
+242 passing executions, zero failed/ignored across the 22 selected filters.
+The historical Clippy failure is preserved. Following the mechanical type-alias
+and test-helper correction, the operator reports the targeted twelve bootstrap
+controls GREEN; their console output was not archived by the supplied command.
+Do not classify that rerun as an inspected test-log receipt.
+
+Inspected bootstrap68-preserve-20261027-135544: fmt log empty; Clippy Finished in
+40.27s with no warnings/errors for all targets/features and -D warnings. The
+operator reports the conditional follow-up GREEN. Summary/hash receipt:
+target/issue-162/bootstrap68-preservation-receipt.json. No production edit
+accompanies this evidence update. The scoped preservation/lint gate is satisfied;
+the 47-item exit review, rebuilt-binary acceptance and final repository/field
+gates remain open. This is not full-repository or binary acceptance.
+
+## Generation-68 preservation reached lint; mechanical correction UNRUN
+
+The operator batch reached Clippy after the selected preservation filters and
+fmt check. Clippy rejected the invocation capture return tuple complexity and
+the original bootstrap prerequisite helper's nine arguments. A private return
+type alias and a tuple of the same three test expectations address these style
+violations without changing assertions or semantic behavior. Original test bytes
+are preserved under target/issue-162/bootstrap68-clippy-correction/; the historical
+unchanged-RED hash remains evidence of the pre-correction test, not the current
+mechanically refactored file. Formatting, the twelve affected bootstrap controls
+and Clippy must be rerun. No agent-run Cargo, formatter or runtime occurred.
+
+## Generation-68 broader preservation handoff authored, UNRUN
+
+Agent MaxHeadRoom prepared run-bootstrap68-preservation.ps1 for the operator.
+It batches nine existing native lexical/callable/type-occurrence filters, Angular
+provider/view/string/module/config/route and injection controls, durable semantic
+restore, restore compatibility and delta persistence, then fmt and all-targets/
+all-features Clippy with warnings denied. The 30 focused passes are not repeated.
+Timestamped logs use Windows-safe filenames; an explicit StartAt filter supports
+resuming without rewriting earlier evidence. No production edit accompanies this
+handoff. These commands remain UNRUN; binary acceptance and the 47-item exit
+review remain pending. This scoped batch does not replace the final repository
+or Claude field gates. Node remains deferred to the major integrated checkpoint.
 
 ## Generation-68 focused GREEN inspected
 

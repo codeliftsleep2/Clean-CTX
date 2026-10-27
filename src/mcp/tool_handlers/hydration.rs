@@ -16,12 +16,14 @@ use std::path::PathBuf;
 
 mod cache;
 use cache::{discovery_is_complete, discovery_scopes_for_roots, pending_discovery_roots};
-
+#[cfg(feature = "angular")]
+mod bootstrap;
+#[cfg(feature = "angular")]
+pub(super) use bootstrap::hydrate_bootstrap_owners;
 mod candidates;
 #[cfg(all(test, feature = "rust"))]
 use candidates::append_project_paths;
 use candidates::{append_rooted_paths, discovery_status};
-
 mod acquisition;
 #[cfg(feature = "csharp")]
 mod dependencies;

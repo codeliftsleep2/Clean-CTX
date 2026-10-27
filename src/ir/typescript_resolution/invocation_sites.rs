@@ -4,16 +4,18 @@ use super::{Resolution, Resolver};
 use crate::ir::invocation_evidence::SourceSpan;
 use std::path::Path;
 
+type CapturedInvocationSites = (
+    Vec<(usize, usize, Resolution)>,
+    Vec<PackageExportEvidence>,
+    Vec<(usize, usize)>,
+);
+
 pub(super) fn capture(
     resolver: &mut Resolver,
     file: &Path,
     source: &str,
     apis: &[(&str, &str)],
-) -> (
-    Vec<(usize, usize, Resolution)>,
-    Vec<PackageExportEvidence>,
-    Vec<(usize, usize)>,
-) {
+) -> CapturedInvocationSites {
     let mut sites = Vec::new();
     let mut packages = Vec::new();
     let mut selected = Vec::new();

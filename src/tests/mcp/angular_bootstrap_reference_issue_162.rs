@@ -166,10 +166,9 @@ fn prove_calls(
     source: &str,
     expression: &str,
     side: &str,
-    repeats: usize,
-    config: bool,
-    native: bool,
+    expectations: (usize, bool, bool),
 ) {
+    let (repeats, config, native) = expectations;
     let authority = capture(state, p, file);
     let artifact = crate::mcp::tool_helpers::compile_source_ir_candidate(
         &p.join(file).to_string_lossy(),
@@ -280,9 +279,7 @@ fn question(form: &str, root_relation: bool, repeats: usize, config: bool) {
             source,
             &expression,
             side,
-            repeats,
-            config,
-            true,
+            (repeats, config, true),
         );
     }
     // Provisional labels are test hypotheses only; no production enum/schema added.
@@ -414,9 +411,7 @@ fn issue_162_bootstrap_reference_native_api_refusal_controls() {
             source,
             expression,
             "left",
-            1,
-            true,
-            file == "positive-main.ts",
+            (1, true, file == "positive-main.ts"),
         );
     }
 }

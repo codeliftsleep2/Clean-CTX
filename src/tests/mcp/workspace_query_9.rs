@@ -175,6 +175,7 @@ fn external_refresh_expires_zero_result_inbound_discovery() {
     let _serial = serialize();
     reset_test_scan_calls();
     let root = tempfile::TempDir::new().unwrap();
+    crate::tests::angular_authority_fixture::install(root.path());
     let service = root.path().join("ServiceA.ts");
     write_source(
         &service,
