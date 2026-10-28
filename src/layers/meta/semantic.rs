@@ -117,6 +117,8 @@ pub enum SemanticRelation {
     DeclaresBootstrapRoot,
     /// A written native bootstrap call references this named config at argument 1.
     UsesApplicationConfig,
+    /// Written named native config inputs; no evaluated provider union.
+    IncludesApplicationConfig,
     /// Component injects a Service via constructor/DI.
     Injects,
     /// An Angular declaration registers a provider token in its own scope.

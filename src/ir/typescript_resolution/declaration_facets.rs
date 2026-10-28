@@ -107,7 +107,16 @@ pub(super) fn capture(
                         && node.child_by_field_name("value").is_some_and(|value| {
                             matches!(value.kind(), "arrow_function" | "function_expression")
                                 || (!fields.is_empty()
-                                    && matches!(value.kind(), "array" | "object"))
+                                    && (matches!(value.kind(), "array" | "object")
+                                        || (value.kind() == "call_expression"
+                                            && value.child_by_field_name("function").is_some_and(
+                                                |callee| {
+                                                    selected_calls.contains(&(
+                                                        callee.start_byte(),
+                                                        callee.end_byte(),
+                                                    ))
+                                                },
+                                            ))))
                         })
                 }) {
                     demand.declaration(id);

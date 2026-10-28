@@ -6,6 +6,18 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
+            if edge.relation
+                == crate::layers::meta::semantic::SemanticRelation::IncludesApplicationConfig
+            {
+                #[cfg(feature = "angular")]
+                {
+                    return crate::angular_meta::config_composition::admits(self, edge);
+                }
+                #[cfg(not(feature = "angular"))]
+                {
+                    return false;
+                }
+            }
             if matches!(
                 edge.relation,
                 crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot

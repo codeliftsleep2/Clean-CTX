@@ -598,3 +598,6 @@ pub(crate) mod bootstrap_references;
 
 #[cfg(feature = "typescript")]
 mod bootstrap_inline_providers;
+
+#[cfg(feature = "typescript")]
+pub(crate) mod config_composition;

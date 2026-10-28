@@ -7,8 +7,10 @@ use crate::ir::typescript_resolution::{DeclarationId, Namespace, Resolution, Typ
 use crate::layers::meta::canonical_endpoint::{CanonicalEndpoint, InvocationOccurrence};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
-pub(crate) const DEMANDED_APIS: &[(&str, &str)] =
-    &[("@angular/platform-browser", "bootstrapApplication")];
+pub(crate) const DEMANDED_APIS: &[(&str, &str)] = &[
+    ("@angular/platform-browser", "bootstrapApplication"),
+    ("@angular/core", "mergeApplicationConfig"),
+];
 
 pub(super) fn call<'a>(
     authority: &'a TypeScriptAuthority,
@@ -163,10 +165,11 @@ fn config(authority: &TypeScriptAuthority, id: &DeclarationId) -> bool {
         facet,
         "@angular/core",
         "ApplicationConfig",
-    ) && facet
+    ) && (facet
         .initializer
         .as_ref()
         .is_some_and(|i| matches!(i.value, ExpressionValue::Object(_)))
+        || super::config_composition::result_args(authority, facet).is_some())
 }
 /// Applicability shares the exact retained callee/call path with projection.
 pub(crate) fn has_call(authority: &TypeScriptAuthority) -> bool {

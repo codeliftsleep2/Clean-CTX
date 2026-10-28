@@ -253,3 +253,11 @@ mod angular_bootstrap_inline_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_bootstrap_inline_exit_issue_162.rs"]
 mod angular_bootstrap_inline_exit_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_config_composition_issue_162.rs"]
+mod angular_config_composition_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_config_composition_controls_issue_162.rs"]
+mod angular_config_composition_controls_tests;

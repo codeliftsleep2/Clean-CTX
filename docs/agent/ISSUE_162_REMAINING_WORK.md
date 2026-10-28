@@ -4,6 +4,62 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-27
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Generation-70 focused tests inspected GREEN; unused import removed
+
+Inspected config-composition70-focused-20261027-230822: composition 13 passed,
+existing config providers 10, bootstrap controls 8, template compatibility 1,
+NgRx legacy transition 11. Total 43 passing executions, zero failed/ignored.
+All nine original REDs and four integrated controls pass; later no-flattening
+assertions are now reached. Active-file size check passed 17 active files;
+format log is empty. Summary/hash receipt:
+target/issue-162/config-composition70-focused-receipt.json.
+
+The compile/test logs retain one unused SemanticRelation import warning in the
+new integrated test file. That import is removed without behavioral changes;
+43 test passes remain valid. This is test GREEN, not zero-warning GREEN. Only
+Clippy is needed to verify this deletion; do not rerun the focused batch solely
+for the warning. Broader preservation, 63-item exit reconciliation and integrated
+binary acceptance remain pending. No agent runtime execution occurred.
+
+## Named config composition approved; generation 70 authored, UNRUN
+
+Owner approval authorizes the bounded native merge-result role, written input
+pairs and exact bootstrap result reference. Nine unchanged REDs were isolated
+and restored exactly. Existing retained call/type/argument carriers are reused;
+no provider flattening. Four integrated controls and compatibility updates are
+authored. Next operator handoff: run-config-composition70-focused.ps1.
+Compilation/runtime/preservation/lint/binary acceptance remain unverified.
+See [approved checkpoint](ISSUE_162_CONFIG_COMPOSITION_DECISION.md).
+
+## Config-composition behavioral REDs inspected
+
+Nine tests reach their intended composition/bootstrap-reference boundaries after
+native prerequisites (0 passed, 9 failed, 113.78s). Bootstrap-demanded acquisition
+retains the call initializer; the observed loss is interpretation/target admission.
+Exact bytes are archived. The [updated production request](ISSUE_162_CONFIG_COMPOSITION_DECISION.md)
+recommends pair-level public input facts with private argument occurrence retention;
+production and multiplicity disposition remain pending. No repair has been made.
+
+## Named config-composition investigation tests authored, UNRUN
+
+Owner disposition approves investigation/test authoring only. Nine tracked tests
+separate native merge-input association from merged-result bootstrap references,
+with exact native prerequisites and a repeated-input multiplicity probe. No
+production role, relation, capture or compatibility change occurred.
+See [investigation checkpoint](ISSUE_162_CONFIG_COMPOSITION_DECISION.md).
+Next operator handoff: run-config-composition-red.ps1. No binary/field run requested.
+
+## Next W06/AQ14 question: named config composition
+
+The inline-provider generation-69 slice now has bounded deterministic/lint and
+binary acceptance (205 inline, 201 bootstrap, 304 config checks). It does not
+evaluate config merging or establish effective application providers.
+The next static trace identifies typed call-initializer acquisition and object-only
+config admission boundaries. See [named config composition proposal](ISSUE_162_CONFIG_COMPOSITION_DECISION.md).
+It requests investigation/test-authoring disposition for written native config
+inputs and exact bootstrap result references; production remains unapproved.
+No new tests, production edits or runtime commands accompany this trace.
+
 ## Generation-69 integrated binary acceptance inspected PASS
 
 Inspected bootstrap-inline69-binary-20261027-184145: inline bootstrap providers

@@ -72,6 +72,15 @@ impl TypeScriptAuthority {
             return false;
         };
         let actual: Vec<_> = match &value.value {
+            ExpressionValue::Call(callee, args) if kind == "call" => {
+                std::iter::once(("callee".into(), callee.start, callee.end))
+                    .chain(
+                        args.iter()
+                            .enumerate()
+                            .map(|(i, a)| (format!("argument:{i}"), a.start, a.end)),
+                    )
+                    .collect()
+            }
             ExpressionValue::Spread(child) if kind == "spread" => {
                 vec![(String::new(), child.start, child.end)]
             }

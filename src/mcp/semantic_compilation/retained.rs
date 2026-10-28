@@ -21,6 +21,7 @@ impl RetainedAuthority {
                     edge.relation,
                     crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot
                         | crate::layers::meta::semantic::SemanticRelation::UsesApplicationConfig
+                        | crate::layers::meta::semantic::SemanticRelation::IncludesApplicationConfig
                 )
                 && edge.relation
                     != crate::layers::meta::semantic::SemanticRelation::ProviderUsesExisting
