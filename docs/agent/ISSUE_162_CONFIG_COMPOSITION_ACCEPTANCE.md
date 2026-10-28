@@ -175,57 +175,58 @@ All paths are tracked under src/tests/mcp/. E is authored, UNRUN.
 | 16 | exact native `ApplicationConfig` annotation | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 17 | exact initializer association | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 18 | foreign merge API refusal | C foreign API GREEN; E additional local/type-only/ambiguous routes UNRUN |
-| 19 | local/shadowed merge API refusal | E explicit API/type/input/refusal matrix UNRUN |
-| 20 | type-only/ineligible merge API refusal | E explicit API/type/input/refusal matrix UNRUN |
-| 21 | unresolved merge API refusal | E explicit API/type/input/refusal matrix UNRUN |
-| 22 | ambiguous merge API refusal | E explicit API/type/input/refusal matrix UNRUN |
-| 23 | wrong/foreign `ApplicationConfig` type refusal | E explicit API/type/input/refusal matrix UNRUN |
+| 19 | local/shadowed merge API refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 20 | type-only/ineligible merge API refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 21 | unresolved merge API refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 22 | ambiguous merge API refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 23 | wrong/foreign `ApplicationConfig` type refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 24 | mutable/non-const result refusal under this contract | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
-| 25 | missing initializer refusal | E explicit API/type/input/refusal matrix UNRUN |
+| 25 | missing initializer refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 26 | non-call initializer outside established direct-object behavior | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 27 | spread input refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 28 | inline merge input refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 29 | unresolved input refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
-| 30 | ambiguous input refusal | E explicit API/type/input/refusal matrix UNRUN |
-| 31 | non-ApplicationConfig input refusal | E explicit API/type/input/refusal matrix UNRUN |
+| 30 | ambiguous input refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 31 | non-ApplicationConfig input refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 32 | borrowed valid result/input endpoint refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 33 | forged initializer association refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 34 | wrong argument-position refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 35 | shifted/crossed source/hash/span refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
-| 36 | malformed/competing retained proof refusal | C initial proof/serde GREEN; E duplicate/crossed proof and repeated-query expansion UNRUN |
+| 36 | malformed/competing retained proof refusal | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 37 | valid sibling preservation with unsupported sibling | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 38 | repeated-input one-support removal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 39 | repeated-input final-support removal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 40 | exact pair-level public deduplication | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 41 | private retention of both repeated argument occurrences | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 42 | exact forward/reverse result/input file multisets | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
-| 43 | repeated-query stability | C initial proof/serde GREEN; E duplicate/crossed proof and repeated-query expansion UNRUN |
+| 43 | repeated-query stability | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 44 | complete retained payload/endpoints | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 45 | SQLite/index restoration before public queries | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 46 | stale restored composition refusal | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
 | 47 | unchanged-result input mutation/repair | C standalone/refusal/proof/pair-support/SQLite controls GREEN |
-| 48 | unchanged-result API mutation/repair | E API/barrel/package/config stale restore and unchanged-result repair UNRUN |
-| 49 | barrel/package/config mutation/repair | E API/barrel/package/config stale restore and unchanged-result repair UNRUN |
-| 50 | independent input retirement | C support retirement GREEN; E independent input/result/caller retirement UNRUN |
-| 51 | independent result retirement | C support retirement GREEN; E independent input/result/caller retirement UNRUN |
-| 52 | independent bootstrap caller retirement | C support retirement GREEN; E independent input/result/caller retirement UNRUN |
+| 48 | unchanged-result API mutation/repair | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 49 | barrel/package/config mutation/repair | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 50 | independent input retirement | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 51 | independent result retirement | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
+| 52 | independent bootstrap caller retirement | Supplemental controls GREEN; historical subject-oracle correction and targeted recreation rerun preserved in receipts |
 | 53 | direct named config provider preservation | Focused native config provider preservation 10 GREEN |
-| 54 | inline bootstrap provider preservation | Pending preservation script selects existing inline owner family; UNRUN at generation 70 |
+| 54 | inline bootstrap provider preservation | Generation-70 scoped preservation GREEN; see 177-pass preservation/supplemental receipt |
 | 55 | existing `DeclaresBootstrapRoot` preservation | Focused eight bootstrap controls GREEN; original reference preservation queued |
 | 56 | existing named `UsesApplicationConfig` preservation | Focused eight bootstrap controls GREEN; original reference preservation queued |
-| 57 | Component/Directive/NgModule provider preservation | Existing provider/module/route preservation queued, UNRUN at generation 70 |
-| 58 | route-provider preservation | Existing provider/module/route preservation queued, UNRUN at generation 70 |
+| 57 | Component/Directive/NgModule provider preservation | Generation-70 scoped preservation GREEN; see 177-pass preservation/supplemental receipt |
+| 58 | route-provider preservation | Generation-70 scoped preservation GREEN; see 177-pass preservation/supplemental receipt |
 | 59 | no provider flattening from input to result | Post-boundary original no-flattening and C public checks GREEN |
 | 60 | no provider flattening from result to bootstrap | Post-boundary original no-flattening and C public checks GREEN |
 | 61 | semantic/durable compatibility as applicable | Focused template/NgRx generation compatibility and C serde/SQLite GREEN |
-| 62 | warning-free focused preservation | 43 focused passes; Clippy operator-reported GREEN after unused import deletion; new-test lint/preservation pending |
+| 62 | warning-free focused preservation | Focused 43 plus supplemental/preservation 177 passes; additional recreation 1 pass; inspected fmt/Clippy clean |
 | 63 | rebuilt-binary acceptance at the planned integrated checkpoint | PASS: 296 composition checks; 205 inline and 304 config preservation checks; same binary/input hashes |
 
-## Next integrated checkpoint
+## Bounded local acceptance and remaining campaign gates
 
-run-config-composition70-preservation.ps1 batches only four new E controls and
-pending native/provider/bootstrap/route/durable preservation, then formats/lints
-the new test code. It does not rerun the 43 focused checks. Operator owns execution.
-After receipts pass, reconcile every row and author one major rebuilt-binary suite
-plus affected preservation. Full repository/encoding/size and final Claude field
-gates remain separate. AQ14/P3/P1/W04/#162 remain open.
+The generation-70 declared composition slice has scoped deterministic/lint and
+binary/stdio acceptance. The 63-row crosswalk now reflects the inspected focused,
+preservation/supplemental, targeted recreation and binary receipts. Historical
+failures and corrections remain in the decision record. This does not certify
+full repository/encoding/size or final Claude field acceptance. Named nested merge
+inputs, runtime/effective providers and broader AQ14/P3/P1/W04/#162 remain open.
+No additional run is required merely to reconcile this evidence ledger.

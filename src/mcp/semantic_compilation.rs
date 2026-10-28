@@ -265,3 +265,15 @@ mod angular_config_composition_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_config_composition_exit_issue_162.rs"]
 mod angular_config_composition_exit_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_nested_config_input_issue_162.rs"]
+mod angular_nested_config_input_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_nested_config_cycles_issue_162.rs"]
+mod angular_nested_config_cycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_nested_config_controls_issue_162.rs"]
+mod angular_nested_config_controls_tests;

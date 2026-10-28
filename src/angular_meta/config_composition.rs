@@ -88,10 +88,11 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
                 leaf,
                 "@angular/core",
                 "ApplicationConfig",
-            ) || !leaf
+            ) || !(leaf
                 .initializer
                 .as_ref()
                 .is_some_and(|v| matches!(v.value, ExpressionValue::Object(_)))
+                || result_args(authority, leaf).is_some())
             {
                 continue;
             }

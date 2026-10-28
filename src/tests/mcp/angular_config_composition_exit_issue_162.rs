@@ -85,7 +85,9 @@ fn issue_162_config_composition_exit_api_type_and_input_refusals() {
         facts(
             &state,
             p,
-            if matches!(mode, 6 | 7 | 9 | 10) {
+            if mode == 9 {
+                &["base.ts", "result.ts"]
+            } else if matches!(mode, 6 | 7 | 10) {
                 &["base.ts"]
             } else {
                 &[]

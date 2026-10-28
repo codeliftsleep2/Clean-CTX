@@ -4,6 +4,149 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-27
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Generation-71 binary checkpoint inspected PASS
+
+Inspected operator receipts: nested-config-inputs 370/370 checks,
+config-composition preservation 296/296, bootstrap-inline-providers preservation
+205/205. Each records zero failed checks/errors, three FINISHED sessions and a
+500-check maximum. All three share binary SHA-256 f05fd8cc27d50852708391938e2038c237b4a72dca6cbb5b8e5b9c94267631df
+and the same recorded input set/hashes; binary mtime 2026-10-28T18:46:32.049Z.
+Syntax preflight passed 39 JavaScript files; the all-feature final binary build
+finished without warnings/errors. Full logs: target/issue-162/nested-config71-binary-20261028-144511/.
+Summary and report hashes: target/issue-162/nested-config71-binary-receipt.json.
+
+This supersedes authored/UNRUN binary statements below for these three suites.
+The bounded nested-input/written-cycle slice now has scoped Rust/lint evidence
+(228 passing executions) and rebuilt-binary production-boundary acceptance.
+These evidence classes remain separate. No production or harness edit accompanies
+inspection. Full repository, final field and P1/P3/AQ14/W04/#162 closure remain open.
+
+## Generation-71 major binary checkpoint authored, UNRUN
+
+Agent MaxHeadRoom added nested-config-inputs to the existing binary/stdio runner.
+Four same-named independent graphs exercise native direct/alias/barrel/namespace
+routes, imported input barrels, repeated support, standalone cold/warm discovery,
+self and multi-file written cycles, cycle break/repair and exact forward/reverse
+source-pair multisets. No transitive pairs or inherited providers are expected.
+Three sessions batch checkpoint/restart, independent inner/outer retirement,
+stale restore before queries, unchanged-outer role/barrel/API/package/config
+mutation and repair. Existing transport, input/binary hashes and hard 500-check
+ceiling remain unchanged. Static branch counting budgets 370 checks for the new
+suite; runtime count is not yet observed.
+
+run-nested-config71-checkpoint.ps1 performs syntax preflight, one all-feature final
+binary rebuild with unique metadata, then nested-config-inputs, config-composition
+and bootstrap-inline-providers against the same binary hash. Each suite retains
+its own bounded receipt. No production or Rust test change accompanies authorship;
+228 scoped Rust passing executions and lint remain valid. All new binary controls
+are UNRUN. Operator owns execution; repository/field and broader closure stay open.
+
+## Generation-71 preservation/lint inspected GREEN
+
+Inspected nested-config71-preserve-20261028-134523: twelve filters record
+183 passed, zero failed/ignored, including the standalone cold/warm written-cycle
+control. Existing config/bootstrap/inline/provider/route/durable families pass.
+Together with 45 focused executions, scoped evidence totals 228 passing
+executions; these are executions, not unique-test or full-repository counts.
+
+Format/fmt logs are empty and the operator reports GREEN. Clippy records Finished
+with no warnings/errors under all-targets/all-features -D warnings. Active sizes
+pass. Summary and log hashes: target/issue-162/nested-config71-preservation-receipt.json.
+This supersedes the pending preservation/lint statements below. No production
+change or agent-run runtime accompanies inspection. The 63-item acceptance map
+is reconciled through deterministic preservation/lint; rebuilt-binary acceptance
+and broader repository/field gates remain open.
+
+## Approval exit map and cold-cycle control authored, UNRUN
+
+The [63-item acceptance map](ISSUE_162_NESTED_CONFIG_ACCEPTANCE.md) links the focused
+45 passing executions to required direct-pair, role, cycle, public, durable and
+lifecycle questions. Review identified cycle-specific standalone cold/warm
+convergence as not yet isolated; one supplemental control now issues the first
+composition query without capture/restore/bootstrap demand and checks both
+written cycle directions plus cold/warm equality. No production edit occurred.
+
+run-nested-config71-preservation.ps1 runs only that new control and pending
+config/bootstrap/inline/provider/route/durable preservation, then fmt/Clippy.
+The focused 45 checks do not repeat. New control and preservation/lint remain
+UNRUN; no agent Cargo/formatter/build/Node/runtime execution occurred. Binary
+acceptance is deferred until this deterministic batch and exit reconciliation.
+
+## Generation-71 focused checkpoint inspected GREEN
+
+Inspected nested-config71-focused-20261028-133619: corrected reverse-helper test
+1 passed, Angular template compatibility 1, NgRx transition 11; zero failed/ignored.
+Compile/format logs are empty, with no compiler/test warnings or errors. Earlier
+16 nested/cycle/integrated and 16 existing-composition passing executions remain
+valid. Combined requested focused executions: 45. Historical helper failure is
+preserved, not rewritten as an all-green original run. Summary/hash receipt:
+target/issue-162/nested-config71-focused-receipt.json.
+
+Original ten REDs and foreign-producer refusal now pass, including later reverse,
+cold/warm/repeated-query and cycle break/restore assertions. Five new proof/durable/
+currentness/retirement controls pass. No production edit accompanies inspection.
+Broader config/bootstrap/inline/provider/route preservation, approval exit review,
+final fmt/Clippy and major integrated binary acceptance remain open; no binary or
+full repository/field result is inferred. No immediate Node run is requested.
+
+## Focused nested GREEN; prior reverse-helper correction, UNRUN
+
+Inspected nested-config71-focused-20261028-132225: all 16 nested/cycle/integrated
+controls pass (280.45s). Existing config composition records 16 passed, 1 failed,
+303.38s. The failure is the deliberate prior-refusal fixture's mode-9 reverse
+comparison: its newly expected nested target is named nested, while the shared
+helper queries only leafConfig. Forward admission already returns the approved
+pair. This is a test query-selector mismatch, not a production omission.
+
+The helper now also requests the nested reverse bucket when that target is part
+of this fixture expectation, retaining exact appConfig subject/file comparisons.
+Pre-correction helper/log bytes: target/issue-162/nested-config71-reverse-control-correction/.
+No production/generation change. Use -ResumeAfterReverseControlFailure to run only
+the corrected test and pending template/NgRx compatibility filters. Earlier 32
+passing executions remain recorded and need not repeat. Corrected assertions and
+later compatibility/lint/binary remain UNRUN; original frozen tests are unchanged.
+
+## Nested config inputs approved; generation 71 authored, UNRUN
+
+Owner approval authorizes direct native merge-result inputs and independently
+proved written-cycle edges. The original eleven controls were isolated/restored
+byte-identically. The existing input-role guard now reuses existing result_args;
+no recursion, transitive/provider expansion or new carrier. Five integrated
+controls, compatibility update and the deliberate prior-refusal expectation change
+are authored. Next handoff: run-nested-config71-focused.ps1.
+See [approved checkpoint](ISSUE_162_NESTED_CONFIG_INPUT_DECISION.md).
+All post-repair runtime/preservation/lint/binary checks remain unverified.
+
+## Nested-input evidence inspected: seven ordinary and three cycle REDs
+
+Both filters reached the intended boundaries after native prerequisites: ordinary
+0 passed/7 failed (112.77s); cycle 1 passed/3 failed (36.93s), foreign-producer
+refusal GREEN. Exact tests/registration/logs are archived. The
+[bounded production request](ISSUE_162_NESTED_CONFIG_INPUT_DECISION.md) proposes
+existing independent merge-result input proof and direct written-cycle semantics,
+without recursion or flattening. Production admission/cycle policy remains pending.
+No repair made; later post-panic lifecycle/public assertions remain unclassified.
+
+## Nested named config-input investigation controls authored, UNRUN
+
+Owner disposition authorizes bounded test authoring and written-cycle hypotheses,
+not production input-role expansion. Seven acyclic/local/imported/repeated/cold
+controls and four separate cycle probes are registered. Exact native roles and
+argument joins precede candidate assertions. No production change occurred.
+See [nested input checkpoint](ISSUE_162_NESTED_CONFIG_INPUT_DECISION.md).
+Operator handoff: run-nested-config-input-red.ps1. No binary/field run requested.
+
+## Generation-70 acceptance reconciled; next named-input question traced
+
+The 63-item local acceptance crosswalk now reflects the inspected focused,
+supplemental/preservation/recreation and binary receipts. No new run is requested
+for ledger reconciliation. Remaining work includes named merged configs as direct
+inputs to other configs, currently refused by the deliberate Object-only input
+policy. See [bounded investigation proposal](ISSUE_162_NESTED_CONFIG_INPUT_DECISION.md).
+Direct-pair graph semantics and cycle disposition must be settled before test/
+production extension. No production edit or new test accompanies this static trace.
+Final repository/field and broader package gates remain open.
+
 ## Generation-70 integrated binary acceptance inspected PASS
 
 Inspected config-composition70-binary-20261028-114237: config composition PASS

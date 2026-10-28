@@ -28,12 +28,25 @@ pub(super) fn facts(state: &crate::mcp::McpState, p: &std::path::Path, inputs: &
         crate::dictionary::path::canonical_identity_key(&p.join(file).to_string_lossy())
     };
     for reverse in [false, true] {
-        let answer = call(
+        let mut answer = call(
             state,
             p,
             "workspace_query",
             json!({"type":if reverse{"reverse_edges"}else{"forward_edges"},"domain":"angular","entity_type":"ApplicationConfig","name":if reverse{"leafConfig"}else{"appConfig"}}),
         );
+        if reverse && inputs.contains(&"result.ts") {
+            // This fixture's newly admitted merged input is named nested, not leafConfig.
+            let nested = call(
+                state,
+                p,
+                "workspace_query",
+                json!({"type":"reverse_edges","domain":"angular","entity_type":"ApplicationConfig","name":"nested"}),
+            );
+            answer["edges"]
+                .as_array_mut()
+                .unwrap()
+                .extend(nested["edges"].as_array().unwrap().iter().cloned());
+        }
         let mut actual = answer["edges"]
             .as_array()
             .unwrap()
