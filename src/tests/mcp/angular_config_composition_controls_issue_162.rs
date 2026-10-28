@@ -2,8 +2,8 @@
 use super::angular_bootstrap_inline_controls_tests::{call, capture, raw, setup as base_setup};
 use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
 use serde_json::json;
-const NATIVE: &str = "import type {ApplicationConfig} from '@angular/core'; import {mergeApplicationConfig as combine} from '@angular/core'; import {leafConfig as Base} from './base'; import {leafConfig as Feature} from './feature';";
-fn setup(args: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
+pub(super) const NATIVE: &str = "import type {ApplicationConfig} from '@angular/core'; import {mergeApplicationConfig as combine} from '@angular/core'; import {leafConfig as Base} from './base'; import {leafConfig as Feature} from './feature';";
+pub(super) fn setup(args: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
     let (root, config) = base_setup("");
     let p = root.path();
     std::fs::write(p.join("node_modules/@angular/core/index.d.ts"),"export declare function Component(metadata:unknown):any; export interface ApplicationConfig {providers:unknown[];} export declare function mergeApplicationConfig(...configs:ApplicationConfig[]):ApplicationConfig;").unwrap();
@@ -23,7 +23,7 @@ fn setup(args: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
     .unwrap();
     (root, config)
 }
-fn facts(state: &crate::mcp::McpState, p: &std::path::Path, inputs: &[&str]) {
+pub(super) fn facts(state: &crate::mcp::McpState, p: &std::path::Path, inputs: &[&str]) {
     let identity = |file: &str| {
         crate::dictionary::path::canonical_identity_key(&p.join(file).to_string_lossy())
     };
@@ -38,7 +38,9 @@ fn facts(state: &crate::mcp::McpState, p: &std::path::Path, inputs: &[&str]) {
             .as_array()
             .unwrap()
             .iter()
-            .filter(|e| e["relation"] == "IncludesApplicationConfig")
+            .filter(|e| {
+                e["relation"] == "IncludesApplicationConfig" && e["subject"]["name"] == "appConfig"
+            })
             .map(|e| {
                 (
                     crate::dictionary::path::canonical_identity_key(

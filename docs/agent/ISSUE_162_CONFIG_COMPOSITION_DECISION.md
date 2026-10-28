@@ -1,7 +1,150 @@
 # Issue #162: source-declared named config composition
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-70 focused tests inspected GREEN (43 passing executions); warning gate/preservation/exit/binary pending.
+Status: owner APPROVED; scoped Rust/lint GREEN; generation-70 binary acceptance inspected PASS (296 composition, 205 inline, 304 config checks); repository/field gates open.
+
+## Generation-70 integrated binary acceptance inspected PASS
+
+Inspected config-composition70-binary-20261028-114237: config composition PASS
+296 checks, inline-bootstrap preservation PASS 205, native config-provider
+preservation PASS 304. Each has zero failed checks/errors, three FINISHED sessions
+and fewer than 500 checks. All share binary SHA-256
+4db45b11baffbbfae3d0f1cc2af38b7a551bf60bdfc7176b3a160d8bf07db773 and the same
+recorded input hash. Syntax preflight passed 37 JavaScript files; the final binary
+target compilation Finished in 5.11s without warnings/errors. Full report paths,
+counts and hashes: target/issue-162/config-composition70-binary-receipt.json.
+
+This supersedes the failed lifecycle-notification and zero-check freshness runs
+for these selected suites; those historical receipts remain preserved. Pair-level
+input association, standalone cold acquisition, bootstrap result references,
+repeated-support retirement, recreate-and-refresh, stale restore and later API/
+package/config repair stages now have bounded binary/stdio acceptance. No production
+or harness edit accompanies inspection. Earlier 220 scoped test passes and one
+additional recreation pass remain separately recorded; no full repository or
+Claude field result is inferred. AQ14/P3/P1/W04/#162 remain open.
+
+## Binary freshness preflight stopped before runtime; handoff corrected
+
+The 2026-10-28T15-39-45-099Z-config-composition-summary-27616 receipt records zero
+checks and zero sessions. Error: binary predates Rust/build inputs; rebuild.
+Cargo's build log Finished in 1.40s and reused the binary. Static comparison finds
+only angular_config_composition_exit_issue_162.rs newer than the executable; the
+acceptance guard conservatively includes test sources. This is neither behavioral
+FAIL evidence nor a passed binary suite.
+
+The checkpoint now invokes cargo rustc for the all-feature clean-ctx binary with
+a unique metadata marker, forcing final-target recompilation while retaining
+cached dependencies. The guard and source/binary hashes remain unchanged; no file
+mtime is forged, no cargo clean, no production edit and no Rust test repetition.
+Corrected binary checkpoint is UNRUN. Existing failed/preflight receipts remain
+preserved; no later suite or field result is inferred.
+
+## Recreated-result control inspected GREEN
+
+Inspected config-composition70-recreation-20261028-112745: one targeted test passed,
+zero failed/ignored, 15.76s. Recreation with the existing refresh notification
+restores both result/input pairs without explicit recapture. Format log empty;
+Clippy Finished in 24.38s without warnings/errors for all targets/features and
+-D warnings. Hash receipt: target/issue-162/config-composition70-recreation-receipt.json.
+
+The correction changes test/harness lifecycle notification only; production remains
+unchanged. Prior 220 scoped passes remain separately recorded, with this one
+additional lifecycle execution. The corrected integrated binary checkpoint may
+now run; the earlier failed binary receipt is preserved and not superseded yet.
+No broad Rust preservation rerun or field switching is requested.
+
+## Binary recreation notification correction, UNRUN
+
+Inspected 2026-10-28T14-59-22-132Z-config-composition-summary-8564: 182 successful
+checks followed by one failure (183 total). Cold standalone/warm and earlier
+restart/support/input/caller deletion checks pass. The failure follows external
+recreation of deleted merge-result-1.ts without refresh: the first composition
+answer lacks that result's two input pairs, although the later bootstrap query
+reacquires its own result reference. Later stale-restore/API/package/config stages
+and preservation suites were not reached.
+
+Generic discovery's documented external-write contract requires refresh for newly
+created sources; the suite notified deletion but not recreation. It now refreshes
+after recreation before querying. No explicit recapture is added, no expected rows
+are removed, and no production/semantic change occurred. The tracked independent-
+retirement control now recreates the result with the same refresh notification and
+requires both input pairs again. Pre-correction harness/test bytes are preserved
+under target/issue-162/config-composition70-recreation-control-correction/.
+Only that targeted test and new-test lint need execution before the later binary
+checkpoint; no broad preservation rerun is required.
+
+## Generation-70 integrated binary batch authored, UNRUN
+
+Agent MaxHeadRoom added config-composition using the existing binary/stdio runner,
+source/input/binary hashes, three sessions and hard 500-check ceiling. Four API
+routes, same-named result/leaf declarations, repeated-input pair deduplication and
+independent bootstrap references are compared as exact public forward/reverse
+source/relation/target multisets. The first graph has no bootstrap caller, proving
+standalone query-only acquisition at the real production boundary.
+
+Restart batches one/final repeated-input support removal, input type mutation and
+repair with unchanged results, independent caller/result deletion and recreation,
+stale restore refusal before query, API/barrel/package/config mutation/repair.
+Public checks refuse provider flattening. The planned composition suite is below
+400 checks; the existing runner enforces the exact hard ceiling.
+
+Operator handoff run-config-composition70-checkpoint.ps1 runs syntax preflight,
+one all-feature binary rebuild, then config-composition plus inline-provider and
+ApplicationConfig-provider preservation suites, pinning binary identity between
+runs. No focused/preservation Rust checks are repeated. All new Node/build/binary
+commands are UNRUN; no agent runtime execution or production edit accompanied
+harness authorship. Final repository and Claude field gates remain separate/open.
+
+## Generation-70 supplemental/preservation/lint inspected GREEN
+
+Inspected config-composition70-preserve-20261028-095700: corrected supplemental
+refusal test 1, native callable scope 4/type query 5, provider 85/view 6/string 12/
+module 14/semantic helper 6, route 11, original bootstrap references 12, inline
+bootstrap family 13 and durable semantic restore 5. Total 174 passing executions,
+zero failed/ignored. The earlier three supplemental passes remain valid; historical
+subject-oracle failure is preserved. Combined supplemental/preservation: 177 passes;
+with focused 43, 220 requested passing executions, not unique tests.
+
+Format/fmt logs are empty; all-targets/all-features Clippy Finished in 28.07s with
+no warnings/errors for -D warnings. Summary/count/hash receipt:
+target/issue-162/config-composition70-preservation-receipt.json.
+No production edit accompanies evidence inspection. The deterministic checkpoint
+is GREEN; the next gate is one integrated rebuilt-binary checkpoint. Binary,
+full repository/final field and broader AQ14/P3/P1/W04/#162 closure remain open.
+
+## Supplemental subject-oracle correction, UNRUN
+
+Inspected config-composition70-preserve-20261028-094926: three supplemental tests
+passed; api_type_and_input_refusals failed at reverse-row comparison in mode 9
+(3 passed, 1 failed, 112.57s). The separate native typed declaration named nested
+legitimately publishes its own base/feature inputs. The reverse helper selected
+all config subjects but expected appConfig-only rows. The appConfig result still
+correctly refuses nested as an input and preserves Base.
+
+The helper now explicitly filters its intended appConfig subject; mode 9 separately
+checks nested's exact two native input files. No production/generation change.
+Pre-correction bytes/log: target/issue-162/config-composition70-subject-control-correction/.
+Use -ResumeAfterRefusalFailure to rerun only that corrected supplemental test then
+the pending preservation/lint filters; the three passing tests are not repeated.
+Corrected assertions remain UNRUN. No later preservation/binary result is inferred.
+
+## Generation-70 approval map and supplemental batch authored, UNRUN
+
+The [63-item acceptance map](ISSUE_162_CONFIG_COMPOSITION_ACCEPTANCE.md) separates
+43 focused GREEN executions from pending proof/refusal/lifecycle and preservation
+obligations. Standalone Clippy after unused import removal is operator-reported
+GREEN; no archive is invented. Four new supplemental tracked controls batch
+local/type-only/unresolved/ambiguous merge APIs, foreign type/missing initializer,
+ambiguous/non-native/nested/aliased inputs with valid sibling preservation;
+competing/cross-source proof, repeated queries; API/barrel/package/config stale
+restore and unchanged-result repair; independent input/result/caller retirement.
+Existing fixture helpers gained only bounded sibling visibility. No production edit.
+
+run-config-composition70-preservation.ps1 runs the four new controls and pending
+shared/native/provider/route/bootstrap/durable preservation, then fmt/Clippy for
+new tests. It does not repeat the 43 focused checks. All supplemental work remains
+UNRUN. Binary/field acceptance remains deferred until this deterministic batch
+passes. No agent formatter/Cargo/Node/runtime execution occurred.
 
 ## Generation-70 focused tests inspected GREEN; unused import removed
 

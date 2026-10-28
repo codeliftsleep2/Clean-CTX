@@ -261,3 +261,7 @@ mod angular_config_composition_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_config_composition_controls_issue_162.rs"]
 mod angular_config_composition_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_config_composition_exit_issue_162.rs"]
+mod angular_config_composition_exit_tests;
