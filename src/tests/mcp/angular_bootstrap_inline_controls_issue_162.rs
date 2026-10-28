@@ -4,12 +4,12 @@ use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
 use crate::layers::meta::semantic::SemanticRelation;
 use serde_json::{Value, json};
 use std::path::Path;
-const PREFIX: &str = "import {start as launch} from './api'; import {Root} from './root'; import {GROUP} from './group';";
-const CALL: &str = "launch(Root,{providers:[...GROUP]});";
+pub(super) const PREFIX: &str = "import {start as launch} from './api'; import {Root} from './root'; import {GROUP} from './group';";
+pub(super) const CALL: &str = "launch(Root,{providers:[...GROUP]});";
 const ROOT: &str = "import {Component} from '@angular/core'; @Component({}) export class Root {}";
 const GROUP: &str = "import {Token as Left} from './left'; import {Token as Right} from './right'; export const GROUP=[Left,{provide:Right,useValue:1},Left];";
 const API: &str = "export {bootstrapApplication as start} from '@angular/platform-browser';";
-fn setup(body: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
+pub(super) fn setup(body: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
     let root = tempfile::tempdir().unwrap();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
@@ -49,19 +49,19 @@ fn setup(body: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
     config.persistence.db_path = p.join("proof.db").to_string_lossy().into_owned();
     (root, config)
 }
-fn raw(state: &crate::mcp::McpState, p: &Path, tool: &str, mut args: Value) -> Value {
+pub(super) fn raw(state: &crate::mcp::McpState, p: &Path, tool: &str, mut args: Value) -> Value {
     args["workspaceRoot"] = json!(p);
     crate::protocol::captured_responses().clear();
     crate::mcp::tools::dispatch_tools_call(&json!(162), tool, &json!({"arguments":args}), state);
     crate::protocol::captured_responses().pop().unwrap()
 }
-fn call(state: &crate::mcp::McpState, p: &Path, tool: &str, args: Value) -> Value {
+pub(super) fn call(state: &crate::mcp::McpState, p: &Path, tool: &str, args: Value) -> Value {
     let r = raw(state, p, tool, args);
     assert!(r.get("error").is_none(), "{r}");
     assert_ne!(r["result"]["isError"], true, "{r}");
     r["result"]["structuredContent"].clone()
 }
-fn capture(state: &crate::mcp::McpState, p: &Path, file: &str) -> TypeScriptAuthority {
+pub(super) fn capture(state: &crate::mcp::McpState, p: &Path, file: &str) -> TypeScriptAuthority {
     call(
         state,
         p,
@@ -78,7 +78,7 @@ fn capture(state: &crate::mcp::McpState, p: &Path, file: &str) -> TypeScriptAuth
         .typescript_authority
         .unwrap()
 }
-fn facts(state: &crate::mcp::McpState, p: &Path, expected: &[(&str, usize, usize)]) {
+pub(super) fn facts(state: &crate::mcp::McpState, p: &Path, expected: &[(&str, usize, usize)]) {
     let key = |file: &str| {
         crate::dictionary::path::canonical_identity_key(&p.join(file).to_string_lossy())
     };

@@ -1,7 +1,103 @@
 # Issue #162: inline bootstrap provider membership
 
 Agent: Agent MaxHeadRoom
-Status: owner APPROVED; generation-69 inline owner implementation and integrated controls authored, UNRUN.
+Status: owner APPROVED; generation-69 focused/preservation/exit Rust GREEN, lint GREEN; bounded binary acceptance inspected PASS; repository/field gates open.
+
+## Generation-69 integrated binary acceptance inspected PASS
+
+Inspected bootstrap-inline69-binary-20261027-184145: inline bootstrap providers
+PASS 205 checks, bootstrap-reference preservation PASS 201, ApplicationConfig
+provider preservation PASS 304. Each has zero failed checks/errors, three FINISHED
+sessions and fewer than 500 checks. All share rebuilt binary SHA-256
+94a12cca11c9399ea7c7ab2af43405f22764ee4aeca4663c99c8500957bcdbeb and the same
+recorded input hash. The all-feature build Finished without warnings/errors;
+syntax preflight passed 35 JavaScript files. Report paths/count/hash receipt:
+target/issue-162/bootstrap-inline69-binary-receipt.json.
+
+This supersedes the inline binary UNRUN checkpoints below for these three suites.
+The bounded direct-inline provider question has scoped deterministic/lint and
+production binary/stdio acceptance. No production/harness edit accompanies this
+inspection. Full repository and final Claude field gates remain open. No named-
+config effectiveness, runtime application/injector semantics, merge/legacy
+bootstrap support, P1/P3/AQ14/W04 or Issue #162 closure follows.
+
+## Generation-69 integrated binary batch authored, UNRUN
+
+Agent MaxHeadRoom added bootstrap-inline-providers to the existing binary/stdio
+runner and explicit suite manifest. Four API routes, two same-named token pairs,
+repeated calls and independent named-config calls are checked as exact public
+forward/reverse source/relation/target multisets. Three sessions batch cold/warm
+query-only acquisition, save/restart, token/contributor mutation and repair,
+independent call/field/source retirement and rediscovery, stale contributor restore
+refusal before query, and API/barrel/package/config mutation/repair.
+
+The existing runner retains binary/input hashes, RPC/stderr receipts and the hard
+500-check ceiling. Planned inline suite is below 300 checks. The handoff rebuilds
+once, pins its hash, then runs inline membership, bootstrap-reference preservation
+and ApplicationConfig-provider preservation. No focused/preservation Rust tests
+are repeated. Node syntax preflight, build and all suites are operator-owned and
+UNRUN. No production edit accompanies harness authorship. Final repository/field
+and broader issue closure remain open.
+Operator: verification/live-acceptance/issue-162/run-bootstrap-inline69-checkpoint.ps1.
+
+## Generation-69 supplemental exit controls and lint inspected GREEN
+
+Inspected bootstrap-inline69-exit-20261027-183652: three tests passed, zero failed/
+ignored, 20.76s. Explicit inline foreign/ambiguous/malformed refusals, isolated
+object/field/entry proof corruption with independent root preservation and edited-
+caller stale restore/repair now pass. Format/fmt logs are empty; Clippy Finished
+in 31.23s without warnings/errors for all targets/features and -D warnings.
+Hash receipt: target/issue-162/bootstrap-inline69-exit-receipt.json.
+
+This supersedes supplemental UNRUN entries below. Thirty focused, 161 preservation
+and three supplemental passing executions are recorded separately (194 requested
+executions, not unique tests). No production edit accompanies this inspection.
+The bounded deterministic approval gaps are covered; generation-69 rebuilt-binary
+inline membership acceptance remains pending. Full repository and final field
+acceptance, P1/P3/AQ14/W04/#162 closure are not inferred.
+
+## Remaining deterministic exit cases authored, UNRUN
+
+Three supplemental tracked tests in angular_bootstrap_inline_exit_issue_162.rs
+batch explicit foreign/ambiguous API and malformed-entry refusals with an
+independent native sibling; nine isolated missing/duplicate/crossed object,
+providers-array and imported entry proof mutations while root admission survives;
+and edited-caller stale restore refusal before queries, neighbor preservation
+and query-driven repair. Existing tracked fixture helpers now have bounded sibling
+visibility; the frozen original RED/refusal file is untouched. No production edit.
+
+Handoff: run-bootstrap-inline69-exit.ps1 runs only these three new tests, then
+fmt/Clippy for the new code. Earlier 30 focused and 161 preservation executions
+are not repeated. The existing standalone Clippy receipt predates these new tests;
+new-test lint must pass. All supplemental controls UNRUN. Binary acceptance stays
+queued for the next integrated checkpoint after these approval gaps are verified.
+
+## Generation-69 tests-only preservation inspected GREEN
+
+Inspected bootstrap-inline69-preserve-20261027-173748: provider 85, view-provider 6,
+string 12, module 14, provider_semantics 6, config provider 10, route provider 11,
+original bootstrap references 12, durable semantic restore 5. Total 161 passing
+executions, zero failed/ignored; no compiler warnings/errors in these logs.
+Summary/count/hash receipt: target/issue-162/bootstrap-inline69-preservation-receipt.json.
+
+The tests-only batch did not repeat formatting or Clippy. The prior standalone
+Clippy GREEN remains operator-reported, and the earlier 30 focused passes remain
+recorded separately (191 requested passing executions combined, not unique tests).
+No production change accompanies inspection. Complete the remaining explicit
+inline refusal/proof/caller-stale controls from the acceptance map before the
+major binary checkpoint. Binary, full repository and final field gates remain open.
+
+## Focused GREEN retained; approval exit crosswalk authored
+
+The [60-item acceptance map](ISSUE_162_BOOTSTRAP_INLINE_ACCEPTANCE.md) now separates
+focused GREEN from remaining explicit inline refusal/proof/caller-staleness cases,
+broader existing-owner preservation and binary acceptance. Clippy cleanup is
+operator-reported GREEN; its output was not archived by the one-line handoff.
+No focused test repetition is required solely for the removed unused wrapper.
+The existing preservation script now supports -TestsOnly to run only the pending
+preservation filters, without formatter/fmt/Clippy. This is separate preservation
+of the shared terminal-policy changes, not a rerun of the focused 30 tests.
+No runtime command or production edit accompanies this review.
 
 ## Generation-69 focused tests GREEN; warning cleanup authored
 
