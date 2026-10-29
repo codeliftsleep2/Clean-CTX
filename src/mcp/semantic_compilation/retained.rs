@@ -20,6 +20,7 @@ impl RetainedAuthority {
                 && !matches!(
                     edge.relation,
                     crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot
+                    | crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapModule
                         | crate::layers::meta::semantic::SemanticRelation::UsesApplicationConfig
                         | crate::layers::meta::semantic::SemanticRelation::IncludesApplicationConfig
                 )

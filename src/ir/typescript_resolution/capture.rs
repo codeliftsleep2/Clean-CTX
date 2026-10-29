@@ -18,6 +18,8 @@ pub(crate) struct TypeScriptAuthority {
     pub demanded_occurrences: Vec<super::demanded_occurrences::DemandedOccurrence>,
     #[serde(default)]
     pub invocation_facets: Vec<super::declaration_facets::InvocationFacet>,
+    #[serde(default)]
+    pub declared_return_members: Vec<super::declared_return_member::DeclaredReturnMember>,
     pub references: Vec<(String, Namespace, Resolution)>,
     /// Exact value occurrences proven by shared lexical/import mechanics.
     pub reference_sites: Vec<(usize, usize, Resolution)>,
@@ -59,7 +61,11 @@ impl TypeScriptAuthority {
             .reference_sites
             .iter()
             .filter(|(start, end, _)| *start == span.start_byte() && *end == span.end_byte());
-        let (_, _, resolution) = sites.next()?;
+        let Some((_, _, resolution)) = sites.next() else {
+            return self
+                .declared_return_member_at(span)
+                .map(|proof| &proof.method);
+        };
         if sites.next().is_some() {
             return None;
         }
@@ -110,6 +116,7 @@ impl TypeScriptAuthority {
             declaration_facets: Vec::new(),
             demanded_occurrences: Vec::new(),
             invocation_facets: Vec::new(),
+            declared_return_members: Vec::new(),
             references: Vec::new(),
             reference_sites: Vec::new(),
             unbound_value_sites: Vec::new(),
@@ -218,7 +225,7 @@ impl TypeScriptAuthority {
                     &result.type_reference_sites,
                     Namespace::Type,
                 ));
-            let (sites, packages, selected) =
+            let (sites, packages, mut selected) =
                 super::invocation_sites::capture(&mut resolver, file, source, call_apis);
             for (start, end, resolution) in sites {
                 if let Some((_, _, known)) = result
@@ -240,6 +247,25 @@ impl TypeScriptAuthority {
                 .reference_sites
                 .sort_by_key(|(start, end, _)| (*start, *end));
             result.package_exports.extend(packages);
+            let (receiver_proofs, receiver_occurrences) =
+                super::declared_return_member::capture(&mut resolver, file, source, &selected);
+            // Export proof for the already-demanded explicit return reference.
+            for proof in &receiver_proofs {
+                result
+                    .package_exports
+                    .extend(super::package_evidence::capture_in_namespace(
+                        &mut resolver,
+                        &proof.factory.source,
+                        &[(
+                            proof.return_site.0,
+                            proof.return_site.1,
+                            Resolution::Resolved(proof.receiver.clone()),
+                        )],
+                        Namespace::Type,
+                    ));
+            }
+            selected.extend(receiver_proofs.iter().map(|proof| proof.access));
+            result.declared_return_members = receiver_proofs;
             let (facets, packages, occurrences, invocations) = super::declaration_facets::capture(
                 &mut resolver,
                 file,
@@ -250,6 +276,11 @@ impl TypeScriptAuthority {
             );
             result.declaration_facets = facets;
             result.demanded_occurrences = occurrences;
+            for site in receiver_occurrences {
+                if !result.demanded_occurrences.contains(&site) {
+                    result.demanded_occurrences.push(site);
+                }
+            }
             result.invocation_facets = invocations;
             result.package_exports.extend(packages);
             Ok::<_, String>(())

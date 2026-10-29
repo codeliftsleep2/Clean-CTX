@@ -115,6 +115,8 @@ pub enum SemanticRelation {
     // ---- Angular ----
     /// A written native bootstrap call references this Component at argument 0.
     DeclaresBootstrapRoot,
+    /// A written native legacy bootstrap call names this exact NgModule argument.
+    DeclaresBootstrapModule,
     /// A written native bootstrap call references this named config at argument 1.
     UsesApplicationConfig,
     /// Written named native config inputs; no evaluated provider union.

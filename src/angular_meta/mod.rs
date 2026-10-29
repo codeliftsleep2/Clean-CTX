@@ -601,3 +601,5 @@ mod bootstrap_inline_providers;
 
 #[cfg(feature = "typescript")]
 pub(crate) mod config_composition;
+
+pub(crate) mod legacy_bootstrap;

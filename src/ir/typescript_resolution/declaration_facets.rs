@@ -4,14 +4,14 @@ use super::{DeclarationId, Resolution, Resolver};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ExpressionFacet {
     pub start: usize,
     pub end: usize,
     pub value: ExpressionValue,
 }
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) enum ExpressionValue {
     Reference(Resolution),
     Array(Vec<ExpressionFacet>),
@@ -520,6 +520,9 @@ impl Demand<'_> {
                     )
                     .collect(),
             )),
+            ExpressionValue::Member(object, name) => {
+                Some(("member", vec![(name.clone(), object.start, object.end)]))
+            }
             ExpressionValue::Spread(child) => {
                 Some(("spread", vec![(String::new(), child.start, child.end)]))
             }

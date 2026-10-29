@@ -10,6 +10,10 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 pub(crate) const DEMANDED_APIS: &[(&str, &str)] = &[
     ("@angular/platform-browser", "bootstrapApplication"),
     ("@angular/core", "mergeApplicationConfig"),
+    (
+        "@angular/platform-browser-dynamic",
+        "platformBrowserDynamic",
+    ),
 ];
 
 pub(super) fn call<'a>(
@@ -85,7 +89,7 @@ pub(super) fn call<'a>(
     }
     Some(args)
 }
-fn target<'a>(
+pub(super) fn target<'a>(
     authority: &'a TypeScriptAuthority,
     args: &[ExpressionFacet],
     position: usize,
@@ -110,7 +114,11 @@ fn target<'a>(
         crate::ir::invocation_evidence::SourceSpan::new(argument.start, argument.end).ok()?;
     (actual == expected && authority.value_reference_at(span) == Some(actual)).then_some(actual)
 }
-fn component(authority: &TypeScriptAuthority, id: &DeclarationId) -> bool {
+pub(super) fn native_class(
+    authority: &TypeScriptAuthority,
+    id: &DeclarationId,
+    expected: super::decorators::ClassKind,
+) -> bool {
     let mut facets = authority
         .declaration_facets
         .iter()
@@ -140,7 +148,7 @@ fn component(authority: &TypeScriptAuthority, id: &DeclarationId) -> bool {
         return false;
     }
     let role = super::class_role_authority::declaration_role(authority, id);
-    if role != Some(super::decorators::ClassKind::Component) {
+    if role != Some(expected) {
         return false;
     }
     facet.decorators.iter().all(|decorator| {
@@ -173,13 +181,14 @@ fn config(authority: &TypeScriptAuthority, id: &DeclarationId) -> bool {
 }
 /// Applicability shares the exact retained callee/call path with projection.
 pub(crate) fn has_call(authority: &TypeScriptAuthority) -> bool {
-    authority
-        .invocation_facets
-        .iter()
-        .any(|facet| call(authority, facet).is_some())
+    !super::legacy_bootstrap::project(authority).is_empty()
+        || authority
+            .invocation_facets
+            .iter()
+            .any(|facet| call(authority, facet).is_some())
 }
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
-    let mut edges = Vec::new();
+    let mut edges = super::legacy_bootstrap::project(authority);
     for facet in &authority.invocation_facets {
         let Some(args) = call(authority, facet) else {
             continue;
@@ -213,7 +222,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
                 continue;
             };
             if !(if position == 0 {
-                component(authority, id)
+                native_class(authority, id, super::decorators::ClassKind::Component)
             } else {
                 config(authority, id)
             }) {

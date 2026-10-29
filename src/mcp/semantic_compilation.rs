@@ -277,3 +277,19 @@ mod angular_nested_config_cycle_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_nested_config_controls_issue_162.rs"]
 mod angular_nested_config_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_legacy_bootstrap_issue_162.rs"]
+mod angular_legacy_bootstrap_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_declared_return_member_issue_162.rs"]
+mod typescript_declared_return_member_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_legacy_bootstrap_controls_issue_162.rs"]
+mod angular_legacy_bootstrap_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_legacy_bootstrap_exit_issue_162.rs"]
+mod angular_legacy_bootstrap_exit_tests;

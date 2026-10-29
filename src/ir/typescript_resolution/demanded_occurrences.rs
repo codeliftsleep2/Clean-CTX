@@ -81,6 +81,9 @@ impl TypeScriptAuthority {
                     )
                     .collect()
             }
+            ExpressionValue::Member(object, name) if kind == "member" => {
+                vec![(name.clone(), object.start, object.end)]
+            }
             ExpressionValue::Spread(child) if kind == "spread" => {
                 vec![(String::new(), child.start, child.end)]
             }

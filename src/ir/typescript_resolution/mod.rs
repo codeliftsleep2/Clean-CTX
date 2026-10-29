@@ -9,6 +9,7 @@ mod classic;
 mod compiler_libraries;
 mod constant_strings;
 pub(crate) mod constructor_parameters;
+pub(crate) mod declared_return_member;
 mod invocation_sites;
 pub(crate) mod member_declarations;
 

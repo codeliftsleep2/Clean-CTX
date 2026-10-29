@@ -21,6 +21,7 @@ impl TypeScriptAuthority {
             if matches!(
                 edge.relation,
                 crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapRoot
+                    | crate::layers::meta::semantic::SemanticRelation::DeclaresBootstrapModule
                     | crate::layers::meta::semantic::SemanticRelation::UsesApplicationConfig
             ) || edge.subject.entity_type == "ApplicationBootstrap"
             {
