@@ -247,12 +247,23 @@ pub(super) fn extract_non_testing_edges(
             },
         ),
     };
-    if meta_config
+    let routing_enabled = meta_config
         .map(|value| value.routing.enabled)
-        .unwrap_or(true)
-        && let Some(shape) = routing_shape
-    {
-        edges.extend(shape.to_semantic_edges());
+        .unwrap_or(true);
+    if routing_enabled && let Some(shape) = routing_shape {
+        #[cfg(feature = "typescript")]
+        let owned = evidence
+            .typescript_authority
+            .map(crate::angular_meta::route_components::owned_objects)
+            .unwrap_or_default();
+        #[cfg(not(feature = "typescript"))]
+        let owned = Vec::new();
+        edges.extend(shape.to_semantic_edges_selective(&owned));
+    }
+
+    #[cfg(feature = "typescript")]
+    if routing_enabled && let Some(authority) = evidence.typescript_authority {
+        edges.extend(crate::angular_meta::route_components::project(authority));
     }
 
     #[cfg(feature = "typescript")]

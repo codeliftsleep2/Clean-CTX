@@ -293,3 +293,23 @@ mod angular_legacy_bootstrap_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_legacy_bootstrap_exit_issue_162.rs"]
 mod angular_legacy_bootstrap_exit_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_component_membership_issue_162.rs"]
+mod angular_route_component_membership_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_route_component_capture_issue_162.rs"]
+mod typescript_route_component_capture_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_component_controls_issue_162.rs"]
+mod angular_route_component_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_component_support_issue_162.rs"]
+mod angular_route_component_support;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_component_lifecycle_issue_162.rs"]
+mod angular_route_component_lifecycle_tests;

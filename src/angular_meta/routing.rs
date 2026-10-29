@@ -93,6 +93,8 @@ impl PhiMarker for RouteKind {
 /// A single route declaration.
 #[derive(Debug, Clone)]
 pub struct RouteDecl {
+    /// Private parser origin for selective eager migration; never a route identity.
+    pub(crate) eager_object_span: (usize, usize),
     /// The route path (e.g. `"users"`, `""`, `"**"`).
     pub path: String,
     /// The eagerly-loaded component (e.g. `UserListComponent`).
@@ -163,6 +165,13 @@ impl RouteShape {
     /// - Route → `GuardedBy` → Guard (one per guard per route)
     /// - Route → `ResolvedBy` → Resolver (one per resolver per route)
     pub fn to_semantic_edges(&self) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        self.to_semantic_edges_selective(&[])
+    }
+
+    pub(crate) fn to_semantic_edges_selective(
+        &self,
+        owned: &[(usize, usize)],
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges = Vec::new();
@@ -170,7 +179,9 @@ impl RouteShape {
             let route_entity = EntityRef::new("angular", "Route", &route.path);
 
             // Route → RouteMapsTo → Component
-            if let Some(ref comp) = route.component {
+            if let Some(ref comp) = route.component
+                && !owned.contains(&route.eager_object_span)
+            {
                 edges.push(SemanticEdge {
                     relation: SemanticRelation::RouteMapsTo,
                     subject: route_entity.clone(),

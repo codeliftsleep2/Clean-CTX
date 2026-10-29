@@ -1,7 +1,7 @@
 # Issue #162: legacy bootstrap association acceptance map
 
 Agent: Agent MaxHeadRoom
-Status: 236 scoped passing Rust executions and lint GREEN; deterministic map reconciled; binary acceptance pending.
+Status: 236 scoped passing Rust executions and lint GREEN; deterministic map reconciled; ecological binary acceptance inspected PASS; broader repository/field open.
 
 ## Canonical question and actual consumer
 
@@ -89,7 +89,7 @@ All regression controls live under src/tests/mcp; binary receipts remain separat
 | 57 | semantic compatibility advancement | Current semantic generation 72/prior 71 controls GREEN; historical assertions corrected |
 | 58 | durable compatibility only if representation requires it | Existing serde/SQLite representation reused; semantic generation advanced; no durable encoding version change required |
 | 59 | warning-free focused checks | Scoped 236 executions and final supplemental/preservation/fmt/Clippy GREEN |
-| 60 | later rebuilt-binary acceptance. | OPEN: rebuilt-binary acceptance not authored/run |
+| 60 | later rebuilt-binary acceptance. | PASS: legacy 225, modern 201, nested 370 checks; same binary/inputs and nine FINISHED sessions |
 
 ## Generation-72 supplemental/preservation/lint inspected GREEN
 
@@ -115,9 +115,27 @@ was interrupted, then completed through a bounded read of the known log director
 Next is one major rebuilt-binary checkpoint. Full repository/final field and
 broader P1/P3/AQ14/W04/#162 closure remain open.
 
-## Remaining checkpoint
+## Generation-72 ecological binary checkpoint inspected PASS
 
-Author and run one major rebuilt-binary checkpoint with ecological fixtures,
-existing three-session transport, explicit binary/input hashes and the hard
-500-check ceiling per suite. Item 60 remains open. Final repository/Claude field
-and broader P1/P3/AQ14/W04/#162 gates remain open.
+Inspected operator receipts: legacy-bootstrap 225/225 checks, modern bootstrap
+preservation 201/201 and nested config preservation 370/370. Each records zero
+failed checks/errors, three FINISHED sessions and a hard 500-check maximum.
+All three share binary SHA-256 d3b29f5831142cd393265569f16f61f45976483786d7f8515a1424d0b9dba626
+and the same recorded input set/hashes; binary mtime 2026-10-29T13:22:44.815Z.
+Syntax preflight passed 41 JavaScript files. The all-feature final binary build
+finished without warnings/errors. Full logs: target/issue-162/legacy-bootstrap72-binary-20261029-091837/.
+Summary/report hashes: target/issue-162/legacy-bootstrap72-binary-receipt.json.
+
+This supersedes authored/UNRUN statements below for these three binary suites.
+The bounded legacy written-Module association now has 236 scoped Rust passing
+executions, clean lint and inspected ecological binary/stdio acceptance. These
+remain separate evidence classes. No discovery policy expansion was needed.
+No production/harness/test edit accompanies inspection. The 60-item local
+acceptance map is satisfied within the approved envelope; full repository,
+final Claude field and P1/P3/AQ14/W04/#162 closure remain open.
+
+## Remaining campaign gates
+
+The bounded local legacy association map is satisfied by the scoped Rust/lint and
+binary receipts above. Full repository and final Claude field verification,
+and broader P1/P3/AQ14/W04/#162 closure remain open.

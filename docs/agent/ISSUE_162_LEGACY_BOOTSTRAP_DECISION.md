@@ -1,8 +1,51 @@
 # Issue #162: written legacy bootstrap module association
 
 Agent: Agent MaxHeadRoom
-Status: generation-72 scoped Rust/lint inspected GREEN (236 passing executions); deterministic approval map reconciled; rebuilt-binary and broader repository/field gates pending.
+Status: generation-72 scoped Rust/lint GREEN (236 passing executions); ecological binary checkpoint inspected PASS (225 legacy + 201 modern + 370 nested); broader repository/field gates open.
 Legacy discovery expansion remains NOT APPROVED.
+
+## Generation-72 ecological binary checkpoint inspected PASS
+
+Inspected operator receipts: legacy-bootstrap 225/225 checks, modern bootstrap
+preservation 201/201 and nested config preservation 370/370. Each records zero
+failed checks/errors, three FINISHED sessions and a hard 500-check maximum.
+All three share binary SHA-256 d3b29f5831142cd393265569f16f61f45976483786d7f8515a1424d0b9dba626
+and the same recorded input set/hashes; binary mtime 2026-10-29T13:22:44.815Z.
+Syntax preflight passed 41 JavaScript files. The all-feature final binary build
+finished without warnings/errors. Full logs: target/issue-162/legacy-bootstrap72-binary-20261029-091837/.
+Summary/report hashes: target/issue-162/legacy-bootstrap72-binary-receipt.json.
+
+This supersedes authored/UNRUN statements below for these three binary suites.
+The bounded legacy written-Module association now has 236 scoped Rust passing
+executions, clean lint and inspected ecological binary/stdio acceptance. These
+remain separate evidence classes. No discovery policy expansion was needed.
+No production/harness/test edit accompanies inspection. The 60-item local
+acceptance map is satisfied within the approved envelope; full repository,
+final Claude field and P1/P3/AQ14/W04/#162 closure remain open.
+
+## Generation-72 ecological binary checkpoint authored, UNRUN
+
+Agent MaxHeadRoom added legacy-bootstrap using the existing binary/stdio runner,
+source/input/binary hashes, three-session lifecycle and hard 500-check ceiling.
+Four nested application caller files exercise direct/alias/two-hop barrel/namespace
+routes, two same-named native Modules, repeated occurrences and neighboring
+foreign/local/parameter-shadow/optional/computed/extra-argument bootstrap-looking
+syntax. Exact forward/reverse source-target multisets and private proof checks
+exclude noisy lookalikes and provider inheritance; modern sibling facts survive.
+
+The three sessions batch cold/warm and withinPath, checkpoint/restart, repeated
+call retirement, target replacement, independent caller retirement/recreation,
+Module role removal/repair, stale restore before queries, unchanged-caller
+factory return/member/barrel/package/config mutation and repair. Static branch
+counting budgets 225 checks; actual runtime count is unobserved.
+
+run-legacy-bootstrap72-checkpoint.ps1 runs syntax preflight and one all-feature
+final binary rebuild with unique metadata, then legacy-bootstrap,
+bootstrap-references and nested-config-inputs against the same binary hash.
+Each logical suite retains its own below-500 receipt. No Rust production/test
+change accompanies authorship; 236 scoped Rust executions and lint remain valid.
+All new binary controls are UNRUN. Operator owns runtime; final repository/field
+and broader P1/P3/AQ14/W04/#162 closure remain open.
 
 ## Generation-72 supplemental/preservation/lint inspected GREEN
 

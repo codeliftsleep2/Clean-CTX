@@ -144,6 +144,7 @@ fn parse_object(
     });
 
     output.push(RouteDecl {
+        eager_object_span: (object.start_byte(), object.end_byte()),
         path: path.clone(),
         component,
         load_component,

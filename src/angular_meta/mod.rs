@@ -59,6 +59,10 @@ pub(crate) mod provider_position;
 pub(crate) mod provider_semantics;
 pub mod reactive_forms;
 #[cfg(feature = "typescript")]
+pub(crate) mod route_components;
+#[cfg(feature = "typescript")]
+mod route_objects;
+#[cfg(feature = "typescript")]
 pub(crate) mod route_providers;
 pub mod routing;
 pub mod rx;
