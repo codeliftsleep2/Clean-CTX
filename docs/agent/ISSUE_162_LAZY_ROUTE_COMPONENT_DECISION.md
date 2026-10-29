@@ -1,0 +1,461 @@
+# Issue #162: exact source-declared lazy route Component selection
+
+Agent: Agent MaxHeadRoom
+Status: bounded neutral callback/import/export authority APPROVED and authored, UNRUN; unchanged original probes restored.
+Production lazy semantics and legacy replacement remain NOT APPROVED.
+
+## Neutral/preservation tests GREEN; two lint corrections authored, UNRUN
+
+Inspected lazy-arrow-authority-20261029-165535: corrected refusal batch 1, field
+3, eager route 21, routing 26, route provider 11, provider_semantics 6, Module 14,
+modern bootstrap 8, legacy bootstrap 14 and config composition 17 all pass:
+121 executions, zero failed/ignored. Together with four prior preserved neutral
+passes, scoped evidence is 125 passes. Original and semantic investigations have
+not run in this checkpoint because Clippy stopped first.
+
+Clippy reports type_complexity for the expanded declaration-facet capture tuple
+and unnecessary_unwrap in the owner-retirement test. A private CaptureResult alias
+now names the same tuple; if-let replaces the checked unwrap with assertions intact.
+No proof behavior, public semantics, generation or original probe assertion changed.
+These mechanical lint corrections are UNRUN. Use run-lazy-arrow-authority.ps1
+-ResumeAtLint to format/check sizes, rerun Clippy/fmt, then run pending original
+and semantic probes. The 125 passing executions do not repeat. No agent runtime ran.
+Production lazy semantics and legacy replacement remain unapproved.
+
+## Refusal fixture module-boundary correction authored, UNRUN
+
+Inspected lazy-arrow-authority-20261029-164941: neutral batches 4 passed, 1 failed,
+zero ignored, 112.72s. Exact direct/re-export/alias/serde, crossed/borrowed replay,
+SQLite/dependency and owner retirement batches pass. The refusal batch proves its
+first wrong-receiver chain absent, then stops at the eager-sibling count (0 versus
+1), before later refusal cases or ordinary-value role checks. This is not intended
+lazy semantic RED; full preservation/lint/original/semantic probes were not reached.
+
+The private-target fixture was a global script `class Screen {}`, not a module
+with a non-exported native Component. It now imports the native decorator and
+keeps its decorated class unexported, so the test isolates public-export refusal
+without introducing that global script declaration. Eager-sibling failure now
+prints currentness/disposition/facet diagnostics if it persists. Production and
+original investigation bytes are unchanged. Pre-correction tests/log hashes:
+ target/issue-162/lazy-arrow-private-module-control-correction/receipt.json.
+
+Use run-lazy-arrow-authority.ps1 -ResumeAfterRefusalFixtureCorrection: only this
+corrected batch and pending field/preservation/lint/original/semantic investigations
+run. Four prior passing batches do not repeat. Correction and remaining gates
+are UNRUN; no agent formatter/Cargo/runtime ran. No production acceptance follows.
+
+## Approved bounded neutral arrow/import/export slice authored, UNRUN
+
+The supplied owner disposition authorizes only neutral written-selection proof for
+already-demanded loadComponent values. Production lazy RouteMapsTo, eager admission,
+legacy lazy suppression, discovery, semantic generation and durable interpretation
+remain unchanged. Generation stays 73; no public schema/enum was added.
+
+A private additive arrow_selections vector in TypeScriptAuthority links exact
+source/hash-qualified outer arrow/zero parameter list/body, dynamic import/literal,
+then access/call/selector argument, selector parameter/member/receiver/property and
+resolved module/public value export/DeclarationId. Absence defaults empty for old
+payloads and grants no proof. Existing ExpressionValue::Unsupported remains the
+syntax carrier; text never grants authority. Only the separate exact join can admit
+the bounded arrow structure, and clearing the new proof vector still refuses it.
+
+Acquisition is called only for loadComponent fields already selected by the existing
+field-limited Object demand. It uses the existing lexical binding lookup to prove
+the receiver binds to that exact selector ArrowParameter, Resolver::module_request
+with Import mode and Resolver::export_set in Value space with complete uniqueness.
+Target facets and existing demanded occurrence/module request witnesses are reused.
+No alternate resolver, callback evaluator, generic arrow AST or independent cache/
+lifecycle was introduced. Replay checks unique matching source/hash/span joins,
+field containment, module request, exported reference and current dependencies.
+Owner currentness remains governed by the existing caller-supplied current hash.
+
+Original investigation/registration were raw-byte isolated before repair under
+ target/issue-162/lazy-arrow-authority-approved-isolation/, then restored exactly.
+This is not a Git stash; HEAD/index were untouched. New registrations were appended
+after restoration. One historical field-only test now clears separately approved
+selection proof before asserting Unsupported syntax grants no authority; original
+lazy investigation bytes and its assertions are unchanged.
+
+Five new neutral batches cover direct/re-export/alias exact chains, all fourteen
+same-name/repeated/empty/child/provider-bearing/free selections, old-payload absence
+and serde, 24 crossed/borrowed/missing/competing cases, unsupported syntax/export
+refusals and framework-neutral targets, SQLite before consumer, module/export/
+package/config mutation/repair, unrelated changes and owner/member/field retirement.
+Three separate semantic probes require complete neutral selection and native
+Component proof before exact registered public forward/reverse source-target
+multisets; repeated queries are checked only if those assertions are reached.
+These are authored controls, not observed certification. The
+[51-item neutral acceptance map](ISSUE_162_LAZY_ARROW_AUTHORITY_ACCEPTANCE.md)
+keeps required assertions and pending evidence explicit.
+
+Handoff: verification/live-acceptance/issue-162/run-lazy-arrow-authority.ps1.
+Operator formats only unfrozen files, checks sizes, compiles, requires neutral/
+field/eager/routing/provider/Module/modern/legacy/config preservation GREEN, then
+Clippy/fmt. It reruns original four unchanged probes before recording the separate
+three semantic investigations. Any remaining prerequisite must be classified
+before semantic RED. All post-repair checks are UNRUN; no agent formatter/Cargo/
+Node/build/runtime ran. No binary run is requested for this neutral checkpoint.
+Return with actual boundary; production lazy semantics and replacement still
+require a separate disposition. Broader repository/field/#162 gates remain open.
+
+## Observed callback prerequisite boundary; neutral/preservation GREEN
+
+Inspected lazy-route-field-capture-20261029-160634: 119 neutral/preservation
+executions pass, zero failed/ignored. Together with two prior preserved neutral
+passes, scoped field/preservation evidence is 121 passing executions; the final
+investigation separately records 1 passed, 3 failed, zero ignored, 39.15s.
+Clippy records Finished without warnings/errors under all-targets/all-features
+-D warnings. All three neutral field batches are now GREEN, including SQLite
+before-query and corrected current-owner-hash retirement/repair controls.
+
+The unchanged direct/re-export/alias probes now pass exact loadComponent field
+mapping and containment, then stop at line 61, stage=callback-structure-prerequisite.
+Retained value is Unsupported("arrow_function") with actual source spans (direct
+205..247, re-export 205..248, alias 205..260). The earlier field gap is resolved.
+This is NOT intended lazy-membership semantic RED. Later callbacks, import/module,
+then/selector parameter/member/export/native selected-target and fourteen-pair
+public assertions remain unclassified; only independent target roles are proven.
+
+Public answer pattern is unchanged: direct same/child RouteMapsTo counts 2/2,
+reverse Screen 8 including two canonical eager siblings; re-export and alias
+same/child 0/0, reverse 2 eager siblings. No old label certifies lazy proof.
+Tests/log/hash receipt and extracted public answers:
+ target/issue-162/lazy-route-callback-prerequisite-evidence/receipt.json and
+observed-public.json. No production/test edit accompanies inspection; no agent
+runtime ran. Field capture only remains generation 73. No unchanged rerun requested.
+
+## Minimum bounded neutral callback/import/export proposal
+
+Authorize a separate neutral investigation/implementation slice for the exact
+already-demanded field value () => import('./screen').then(m => m.Screen), then
+return with actual lazy association RED before Angular publication or replacement.
+This is a proposed contract, not an implemented or frozen payload layout:
+
+- Question/acquisition: retain only this already-demanded zero-parameter non-async
+  expression-bodied arrow, literal relative import and ordinary noncomputed then
+  call with one non-async expression-bodied selector arrow and one simple parameter.
+  No global arrow scan, inferred return, arbitrary callback/control flow or promise
+  evaluator. Other callbacks remain Unsupported. Root discovery stays unchanged.
+- Missing joins: the retained field currently ends at Unsupported. No returned-body
+  facet connects it to the import/then expression; no import/literal/source-qualified
+  module binding; no selector/parameter/member receiver binding; no selected public
+  export-to-DeclarationId join. Existing Call/Member/Reference alone cannot certify
+  parameter binding or dynamic-import export selection, and old RouteShape stores
+  only target type/name. Independent Component facets cannot supply those joins.
+- Source identity/containment: link exact field arrow, returned expression, import
+  call and literal, then callee/call/argument, selector arrow/body, parameter binding
+  span and selected-member receiver/property spans under the owner source/hash.
+  The binding identity is the exact selector occurrence plus parameter declaration
+  span; the member receiver must resolve to that binding, never spelling alone.
+  Source-qualified occurrence joins reuse existing demanded facets where adequate;
+  a minimum private bounded join record may carry associations absent today.
+- Module/export authority: reuse Resolver::module_request with ModuleRequestKind::Import
+  (not the StaticImport convenience API) so actual project/condition provenance is
+  consumed. Reuse Resolver::export_set in Namespace::Value for the exact selected
+  public name, requiring a complete unique declaration result. Direct, re-export
+  and alias routes use this same existing resolver, not Angular filesystem lookup.
+- Refusal: absent/private/type-only/ambiguous export, wrong module/selector receiver,
+  borrowed source/parameter/member/export, crossed spans/hash, competing records,
+  async/computed/conditional/extra-argument/block-bodied forms remain unproved.
+  Parameter/member spelling is only a syntax nomination, never independent authority.
+- Retention/currentness: carry the bounded joins in existing TypeScriptAuthority,
+  linked to demanded root/object/field/value and consumed module/export declarations.
+  Reuse existing source/config/package/export witnesses and session/currentness/
+  SQLite lifecycle. Replay checks exact unique source-qualified joins; no resolver
+  or filesystem guess during admission. Native Angular Component role remains a
+  separate eventual consumer requirement, not a neutral language role.
+- Transport/durable consequences: no public schema/enum or producer generation
+  change for neutral proof alone. Any new private additive serde field must default
+  empty for old payloads so old snapshots cannot prove the new chain. Review exact
+  representation before implementation; an actual encoding break must return for
+  disposition. No independent registry/cache/lifecycle is proposed.
+- Tests/return: preserve original probes; batch exact/re-export/alias language joins,
+  forged/borrowed/refused chains, serde/SQLite before queries, stale config/package/
+  module/export owner repair and eager/provider/lazy preservation. Then rerun
+  unchanged probes. If another prerequisite fails, report it; if all pass, author
+  exact public semantic controls under investigation approval and preserve genuine
+  association RED before seeking Angular semantics and old/new compatibility policy.
+
+Alternative is a general callback AST/evaluator (unnecessary and outside scope).
+A file/name shortcut loses public-export and parameter authority and is rejected.
+Recommended bounded neutral join reuses the existing resolver and retained lifecycle.
+Production lazy RouteMapsTo, eager/lazy generic endpoint admission, lazy suppression,
+semantic compatibility advance, loadChildren and discovery remain NOT APPROVED.
+
+The field-only owner disposition explicitly requires stopping at this observed
+boundary. AGENTS.md Architectural Approval Gate applies to the new neutral
+semantic-authority joins. Owner disposition is required before implementing this
+proposal. Full repository/final Claude field and broader issue gates remain open.
+
+## Empty-root fixture correction authored, UNRUN
+
+Inspected lazy-route-field-capture-20261029-160329: corrected owner-currentness
+batch records 0 passed, 1 failed, zero ignored, 8.20s. New owner hash inequality
+and old-authority rejection against that current hash both pass. The subsequent
+retained-field helper panics locating a demanded routes facet because the changed
+fixture removed native Routes annotation/import and became an undemanded plain
+const. This is another invalid fixture assumption, not a production currentness
+failure or observed callback boundary.
+
+The owner mutation now preserves native typed const Routes with an empty Array,
+so the same strict retained-field helper can verify zero fields inside the admitted
+envelope. Hash/refusal/restore assertions are unchanged. No production change.
+Pre-correction test/log bytes: target/issue-162/lazy-field-empty-root-control-correction/receipt.json.
+Use the same -ResumeAfterOwnerHashCorrection handoff; two prior passes remain
+valid, corrected and later gates remain UNRUN. No agent runtime ran.
+
+## Owner-hash test control correction authored, UNRUN
+
+Inspected lazy-route-field-capture-20261029-155220: neutral batches 2 pass, 1 fails,
+zero ignored, 27.80s. Field/occurrence/serde/legacy preservation and duplicate/
+non-route neutrality pass. SQLite restoration/field comparison pass before an
+invalid owner-currentness assertion: the test changes the file, then passes the
+old snapshot hash to RetainedAuthority::is_current. That method consumes the
+current owner hash supplied by its caller; it does not reread the owner file.
+
+The control now captures the changed owner in a fresh state, requires a changed
+source hash and zero lazy fields, checks old-authority refusal against the actual
+new hash, then restores bytes and verifies field repair. Production behavior and
+original investigation probes are unchanged. Pre-correction test/log hashes:
+ target/issue-162/lazy-field-owner-hash-control-correction/receipt.json.
+
+Use run-lazy-route-field-capture.ps1 -ResumeAfterOwnerHashCorrection to run only
+the corrected neutral assertion and pending sibling/preservation/lint/investigation.
+The two prior passing batches do not repeat. All corrected/pending checks are
+UNRUN; no agent formatter/Cargo/runtime ran. This was invalid control evidence,
+not observed callback failure or lazy semantic RED.
+
+## Bounded loadComponent field capture approved and authored, UNRUN
+
+The supplied owner disposition authorizes adding loadComponent to the existing
+Angular DECLARATION_FIELDS demand set only. That one field-name addition is the
+entire production change. No callback/import/export carrier, lazy projection,
+legacy suppression, discovery, semantic generation or durable format changed.
+Generation remains 73. Existing Object/value/source/hash/witness transport is reused;
+unsupported callback values grant no lazy-selection authority.
+
+Unchanged investigation tests and registration were raw-byte isolated under
+ target/issue-162/lazy-route-field-approved-isolation/ before the edit and restored
+exactly. This is not a Git stash; HEAD/index were untouched. A new neutral-test
+registration was appended after restoration. Three authored neutral batches cover
+seven distinct lazy fields per root, provider/free/repeated/empty/child objects,
+same-name/re-export fixture independence, serde, duplicate fields and neutral
+non-route metadata, SQLite before queries and owner currentness/repair. Exact
+eager/provider and legacy lazy public controls must remain unchanged.
+
+Handoff: verification/live-acceptance/issue-162/run-lazy-route-field-capture.ps1.
+Operator formats unfrozen files, checks sizes, compiles, requires neutral/sibling/
+eager/integrated/routing/provider/Module/modern/legacy/config preservation GREEN,
+then Clippy before recording the unchanged lazy investigation. All new/post-edit
+checks remain UNRUN. No agent formatter/Cargo/build/Node/runtime ran. Return with
+the actual next prerequisite before any callback/import/export extension; no binary
+run is requested. Final repository/Claude field and broader issue gates remain open.
+
+## Observed lazy field prerequisite boundary: 1 GREEN, 3 failures
+
+Inspected lazy-route-investigation-20261029-154021: 1 passed, 3 failed, zero ignored,
+38.67s. Direct/re-export/alias-export probes stop at line 47,
+stage=loadComponent-field-prerequisite: expected one retained field, received zero.
+Independent native Components, canonical eager sibling, native Routes/root/object
+and route-provider controls pass before the panic. The unsupported-sibling control
+is GREEN. Callback structure/import/module/then/parameter/member/export/target proof
+and later object multiplicity remain unclassified. This is NOT intended lazy
+membership semantic RED. Compile/format logs are empty and active sizes pass.
+
+Exact tests/registration/log bytes and hashes are preserved under
+ target/issue-162/lazy-route-field-prerequisite-evidence/receipt.json;
+observed-public.json retains all three extracted original public answer sets.
+No production/test change accompanies inspection; no agent runtime ran.
+
+| Form | Forward same lazy RouteMapsTo | Forward parent/child lazy RouteMapsTo | Reverse Screen RouteMapsTo |
+| --- | --- | --- | --- |
+| Direct | 2 | 2 | 8, including 2 canonical eager siblings |
+| Re-export | 0 | 0 | 2 canonical eager siblings |
+| Alias export | 0 | 0 | 2 canonical eager siblings |
+
+The fixture writes six same-path lazy associations and four child associations
+across two roots, fourteen lazy pairs overall. The observed direct path cannot
+certify those exact target/source occurrences; re-export forms provide no lazy
+rows in these buckets. These are initial compatibility observations, not a valid
+post-prerequisite relation RED. No replacement policy follows.
+
+## Bounded field capture disposition requested
+
+Approve adding loadComponent to the existing Angular DECLARATION_FIELDS demand
+set, preserving source-qualified ordinary Object field/value containment through
+the existing neutral carrier. No root discovery, callback evaluation, import/
+export resolver, lazy role, relation admission or legacy suppression changes.
+Other already-demanded metadata may retain this named field without obtaining
+routing meaning. No new payload or compatibility advance is proposed for field
+selection alone.
+
+This first acquisition change will not by itself establish callback authority.
+The current ExpressionValue representation has no callback/parameter carrier;
+arrow functions reach unsupported expression handling. Adding the field is expected
+to expose that separate boundary rather than repair lazy membership. That is static
+carrier inspection, not observed callback failure. Do not treat Unsupported text,
+old lazy labels or target presence as retained callback/export proof. A broader
+bounded callback/import/export carrier proposal must specify exact neutral joins,
+resolver reuse, witness/currentness and durable consequences before implementation.
+
+Recommended first disposition is field-only acquisition plus neutral tests and
+unchanged probe rerun to observe the next boundary. Alternative: approve only a
+static design of the full bounded neutral chain before field implementation, to
+review acquisition/carrier consequences together. Both preserve lazy production;
+a spelling/file shortcut and a second resolver remain rejected.
+
+The supplied investigation disposition explicitly requires returning on missing
+field proof before capture. AGENTS.md Architectural Approval Gate applies to the
+acquisition extension. Production lazy semantics, neutral callback/import/export
+extension, replacement and discovery remain NOT APPROVED. No unchanged rerun is
+requested before owner disposition. Final repository/field and broader gates stay open.
+
+## Owner disposition applied: four investigation controls authored, UNRUN
+
+The supplied owner disposition approves bounded investigation and tracked tests
+only. No capture/production semantics, callback/import/export authority, lazy
+replacement, discovery or compatibility change was made; generation remains 73.
+
+Three acquisition probes cover direct named export, re-export and alias-export
+fixtures across two native const Routes roots. Each includes seven lazy objects:
+repeated same-path/same-target, empty paths, child routes and provider-bearing/free
+objects, plus a valid canonical eager sibling. Independently captured same-named
+native Component roles and exact eager/provider root/object controls precede
+registered public observations. Forward same/parent-child and reverse Screen
+responses are printed before field/callback assertions, retaining actual legacy
+contributions without certifying callback/export authority.
+
+The probes then require exact retained loadComponent mapping, containment and
+supported demanded callback structure. Current DECLARATION_FIELDS omits
+loadComponent; missing field is the expected static earliest boundary, not an
+observed result. These are acquisition probes, not complete semantic RED tests.
+Dynamic-import/module/then/parameter/member/export/target joins, full exact public
+multiplicity and repeated-query assertions remain unclassified until complete
+neutral proof is established; they are not inferred from independent target roles.
+
+A fourth control batches wrong-parameter/computed-member/computed-import, missing/
+private/type-only/ambiguous/foreign targets, async/conditional and competing-field
+syntax. It records old public lazy contributions and requires eager/provider
+siblings to survive. It does not assert canonical lazy refusal under current
+legacy semantics. Forged/borrowed retained proof and broader root refusal cases
+remain later investigation work after the observed acquisition boundary.
+
+Handoff: verification/live-acceptance/issue-162/run-lazy-route-investigation.ps1.
+Operator formats only new tests/registration, checks sizes, compiles and records
+all four together. All are UNRUN. No agent formatter/Cargo/Node/build/runtime ran.
+Return with the earliest actual prerequisite boundary and recorded public answers
+before requesting capture or production authority. Generation-73 prior acceptance
+remains unchanged; final repository/field and broader issue gates stay open.
+
+## Canonical question and slice exit
+
+For this exact object in a native typed const Routes root, which exact native
+Component declaration is explicitly selected by its ordinary loadComponent callback?
+Start with () => import('./screen').then(m => m.Screen). Distinguish repeated paths,
+empty paths, child objects and same-named exports in independent target files.
+This is written selection, not loaded code, navigation success, active route,
+rendered instance or runtime callback execution.
+
+Generation-73 eager Component and generation-72 legacy Module checkpoints remain
+accepted within their envelopes. Lazy Component selection is an explicit AQ12/W06
+obligation; eager success did not migrate it. LoadsChildren Module/RouteConfig,
+guard/resolver scope and application context remain distinct questions.
+
+Hypothesis: existing RouteOccurrence subject and RouteMapsTo relation to the exact
+canonical native Component declaration. Path is display, never object identity.
+No new public vocabulary is proposed. This hypothesis is not production approval.
+
+## Located production behavior
+
+routing/structured::lazy_evidence reads the loadComponent value text, finds import(
+and .then(, then extracts a trailing selected identifier. resolve_lazy resolves only
+a direct relative filesystem candidate and checks declaration_kind in its source.
+It records a file dependency, but LazyRouteTarget retains only entity_type/name.
+RouteShape emits lazy RouteMapsTo separately from eager membership with path/name
+EntityRefs. The asserting-file attribution and generic noncanonical compatibility
+path remain available to those old rows. Static inspection does not certify exact
+callback receiver, selected export or field membership from those names.
+
+The generation-73 pipeline suppresses only eager origins owned by the shared
+route_objects walk. It deliberately leaves the lazy branch unchanged. Its canonical
+RouteMapsTo admission currently replays eager route_components proof; canonical lazy
+publication therefore needs an explicit relation-specific proof disposition, not a
+generic endpoint exception. Existing private RouteOccurrence identity can be reused.
+
+The inspected DECLARATION_FIELDS and ExpressionValue capture do not demonstrate
+retained callback/import/then-parameter/selected-export joins for this question.
+Absence of a field name alone is not the complete causal analysis. Investigate
+actual retained authority before adding capture or choosing a carrier. A literal
+module string, imported class and native role independently present elsewhere do
+not establish this callback's selected export.
+
+Inspected: src/angular_meta/routing.rs; routing/structured.rs;
+src/angular_meta/route_objects.rs; src/layers/meta/angular_semantic.rs;
+src/ir/typescript_resolution/relation_evidence.rs; declaration_facets.rs;
+src/angular_meta/module_metadata.rs. No behavioral RED has been observed.
+
+## Recommended bounded investigation
+
+Approve investigation and tracked test authoring only. Use the existing native
+source-owned const Routes Array/Object/children envelope. Start with ordinary,
+non-async zero-parameter callbacks containing the direct literal relative import
+and one .then selector with an exact parameter-to-member join. Require exact
+route root/object/loadComponent field/value spans, dynamic import occurrence,
+module resolution, selected public export, target declaration and native Component
+role. Do not interpret property spelling or source file presence as export proof.
+
+Investigate direct named export first, then resolver-proved re-export/alias forms
+within the same callback shape if existing authority supports them. Batch two
+independent same-name target graphs, repeated objects, empty/child paths,
+provider-free/provider-bearing objects and valid eager/provider/lazy siblings.
+Use registered forward/reverse production queries and retain initial old answers
+before prerequisite assertions, keeping observations distinct from certification.
+
+Refuse shadowed selectors, unrelated receiver/parameter members, competing fields,
+foreign/non-native targets, missing/private/type-only/ambiguous exports and wrong
+source/container spans. Computed imports, conditional/async callbacks, arbitrary
+then/callback evaluation and loadChildren are outside this initial investigation.
+Do not broaden discovery or create a second resolver/cache/route tree.
+
+Missing neutral acquisition/export/native proof is a prerequisite boundary, not
+intended semantic RED. Return its exact missing joins and minimum bounded carrier
+proposal before implementing capture. If prerequisites succeed, preserve unchanged
+valid RED bytes and report actual public identity/multiplicity behavior. Inspect
+existing eager/lazy origin and retained compatibility before requesting production
+replacement; generation-73 eager policy does not authorize lazy retirement.
+
+## Alternatives and tradeoffs
+
+| Option | Consequence |
+| --- | --- |
+| Recommended: investigate exact callback/import/export joins on shared route ownership | Answers a required lazy identity question while exposing prerequisite boundaries before production decisions |
+| Treat extracted member name plus direct file as authority | Does not prove this callback selects that export; reject |
+| Migrate loadComponent/loadChildren/guards/context together | Mixes independent authority questions and increases scope; defer |
+| Defer lazy selection | Preserves compatibility but leaves required AQ12 identity unclassified |
+
+## Evidence and return point
+
+1. Establish nonempty native eager/provider controls and native root/object proof.
+2. Separately establish field, callback/import, selector parameter/member, exact
+   module export, declaration and native role prerequisites.
+3. Record initial public forward/reverse source-target multisets, then assert exact
+   occurrence multiplicity only after all prerequisites pass.
+4. Batch refused forms and sibling preservation. Preserve tests/logs/hashes.
+5. Return earliest observed boundary, precise neutral carrier need and old/new
+   selective compatibility plan. No semantic repair follows automatically.
+6. After later production approval, batch forged/crossed proof, SQLite/index before
+   queries, dependency edits/repair, retirement and cold/warm/refresh/withinPath,
+   then lint and one later binary checkpoint. Operator owns runtime; Claude last.
+
+## Requested owner disposition
+
+Approve bounded investigation and tracked tests for this callback/export question,
+or revise the slice. Production lazy semantics/admission, replacement, neutral
+capture extension and discovery expansion remain unapproved.
+
+AGENTS.md Architectural Approval Gate says: "Do not make any architectural decision
+with global, cross-cutting, repository-wide, or externally observable effects unless
+that decision was explicitly authorized by the task prompt or approved during the
+current work." Exact lazy identity/admission crosses that boundary. Generation-73
+approval explicitly preserved lazy behavior; it does not supply this authorization.
+No full AQ12/AQ13/AQ14/W06/P1/P3/W04/#162 or repository/field closure follows.

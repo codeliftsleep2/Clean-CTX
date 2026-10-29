@@ -1,8 +1,112 @@
 # Issue #162: exact source-declared eager route Component membership
 
 Agent: Agent MaxHeadRoom
-Status: generation-73 scoped Rust/lint inspected GREEN (144 passing executions); supplemental map review and rebuilt-binary/field gates pending.
+Status: generation-73 scoped Rust/lint GREEN (148 passes); binary checkpoint inspected PASS (241 route + 305 provider + 225 legacy); repository/field open.
 Discovery expansion and lazy semantic changes remain NOT APPROVED.
+
+## Generation-73 ecological binary checkpoint inspected PASS
+
+Inspected operator receipts: route-components 241/241 checks, route-provider
+preservation 305/305 and legacy-bootstrap preservation 225/225. Each records
+zero failed checks/errors, three FINISHED sessions and a hard 500-check maximum.
+All three share binary SHA-256 2d95a95d4d667d2a6aa9c99d3fa2afe0455c6e81fd374ff1ae8ba8e7d8bbb45a
+and the same recorded input hash; binary mtime 2026-10-29T18:15:45.329Z.
+Syntax preflight passed 43 JavaScript files; the all-feature final binary build
+finished without warnings/errors. Full logs:
+ target/issue-162/route-component73-binary-20261029-141430/.
+Summary/report/log hashes: target/issue-162/route-component73-binary-receipt.json.
+
+This supersedes authored/UNRUN statements below for these three binary suites.
+The approved eager written-Component slice now has 148 scoped Rust passing
+executions, clean lint and inspected ecological binary/stdio acceptance. These
+remain separate evidence classes. The 57-item local map is satisfied within the
+approved envelope, including the rebuilt-binary ecological checkpoint. No
+production/test/harness edit accompanies inspection and no agent runtime ran.
+Full repository/final Claude field and AQ12/AQ13/AQ14/W06/P1/P3/W04/#162 closure
+remain open; no discovery expansion or runtime route meaning is inferred.
+
+## Generation-73 ecological binary checkpoint authored, UNRUN
+
+Agent MaxHeadRoom added route-components to the existing binary/stdio runner,
+with source/input/binary hashes, three sessions and the existing hard 500-check
+ceiling. Five nested caller files exercise direct/alias/barrel/namespace/local
+references, same-named native Components, repeated/empty/child paths and provider-
+bearing/provider-free objects. Exact public forward/reverse occurrence multisets
+must exclude owned duplicate/invalid target fields and preserve lazy neighbors.
+Each answer must retain truthful lower-bound coverage and private canonical proof.
+
+The sessions batch cold/warm and answers-only withinPath, checkpoint/restart,
+field/provider/repeated-object independence, owner retirement/recreation, stale
+restore before queries, target role removal/repair, barrel refusal/repair, package
+manifest changes and unchanged-owner config-path retarget/repair. The bounded
+scenario has eighteen fact checkpoints, each with twelve explicit checks, plus
+session/schema and withinPath/stale controls; it is budgeted below 300 total checks.
+Actual runtime count is unobserved, and the runner still enforces 500.
+
+run-route-component73-checkpoint.ps1 performs JavaScript syntax preflight and one
+all-feature final binary rebuild with unique metadata. It then runs route-components,
+route-providers and legacy-bootstrap against the same binary hash, preserving
+separate suite receipts. No Rust production/test edit accompanies harness authorship;
+148 scoped Rust executions and clean lint remain valid. All new binary checks are
+UNRUN. Operator owns build/runtime; repository/final Claude field and broader
+AQ12/AQ13/AQ14/W06/P1/P3/W04/#162 closure remain open.
+
+## Generation-73 supplemental exits/lint inspected GREEN
+
+Inspected route-component73-exits-20261029-140143: corrected package/config batch
+passes (1 passed, zero failed/ignored; 17.53s). Together with the three earlier
+supplemental passes, all four exits are GREEN. Scoped generation-73 evidence is
+148 passing executions, not a unique-test or full-repository count. The historical
+invalid config prerequisite remains archived; its corrected run resolves it.
+
+Clippy records Finished without warnings/errors under all-targets/all-features
+-D warnings; compile/format/fmt logs are empty and active sizes pass. Exact log
+hashes: target/issue-162/route-component73-exits-receipt.json. No production/test/
+harness edit accompanies inspection; no agent runtime ran.
+
+This supersedes supplemental UNRUN statements below. Crossed proof, complete
+restored snapshot/index before queries, package/config stale refusal and unchanged-
+owner repair, actual registered eager/lazy coexistence and truthful lower-bound
+coverage now have observed deterministic evidence. The 57-item local map is
+reconciled through deterministic acceptance; rebuilt-binary/ecological checkpoint
+(items 56/57), full repository and final Claude field remain open. Next is the
+consolidated major binary checkpoint; no broader AQ12/AQ13/AQ14/W06/P1/P3/W04/#162
+closure follows.
+
+## Supplemental config fixture prerequisite corrected, UNRUN
+
+Inspected route-component73-exits-20261029-134437: three batches pass; package/
+config batch fails at its initial pre-mutation canonical count (0 versus 1).
+The test's new tsconfig omitted an explicit module-resolution mode; the configured
+resolver cannot prove its required mode. This is fixture prerequisite evidence,
+not a stale-restore or eager association semantic failure. The fixture now supplies
+existing explicit esnext/bundler/noLib/types settings alongside its tested paths.
+No production or expected route-identity assertion changed. Failed bytes/logs/hashes
+are preserved at target/issue-162/route-component73-config-fixture-correction/receipt.json.
+
+147 passing scoped executions remain valid. Resume only the corrected package/
+config batch and pending lint via run-route-component73-exits.ps1
+-ResumeAfterConfigFixtureCorrection. Corrected batch/lint are UNRUN; no agent runtime
+occurred. Binary/repository/field gates remain open.
+
+## Four supplemental deterministic exits authored, UNRUN
+
+The 57-item review identified four batches to close remaining deterministic
+questions before binary acceptance. angular_route_component_exit_issue_162.rs
+adds crossed field/value/container/root/source proof refusal; complete canonical
+snapshot and live index multiplicity immediately after SQLite restore and before
+public queries; unchanged-owner package-manifest/config-path mutation, stale
+restore refusal and repair; and actual registered eager/lazy coexistence with
+explicit lower-bound/source-incomplete/omitted-possible response assertions.
+
+No production change accompanies these tests. Existing original, neutral and
+integrated assertions remain unchanged; 144 earlier passing executions stay valid
+and do not repeat. New tests and their registration are UNRUN. Handoff:
+verification/live-acceptance/issue-162/run-route-component73-exits.ps1 formats only
+new tests/registration, checks sizes, compiles, runs exactly four new batches,
+then Clippy/fmt. No agent formatter/Cargo/build/Node/runtime ran. After results,
+reconcile exact obligations before one major ecological rebuilt-binary checkpoint;
+repository/final Claude field and broader closure remain open.
 
 ## Generation-73 scoped Rust/lint inspected GREEN
 

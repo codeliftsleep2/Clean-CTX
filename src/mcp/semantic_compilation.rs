@@ -313,3 +313,31 @@ mod angular_route_component_support;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_route_component_lifecycle_issue_162.rs"]
 mod angular_route_component_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_component_exit_issue_162.rs"]
+mod angular_route_component_exit_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_lazy_route_component_issue_162.rs"]
+mod angular_lazy_route_component_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_lazy_route_field_issue_162.rs"]
+mod typescript_lazy_route_field_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_lazy_selection_support_issue_162.rs"]
+mod typescript_lazy_selection_support;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_lazy_selection_issue_162.rs"]
+mod typescript_lazy_selection_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_lazy_selection_lifecycle_issue_162.rs"]
+mod typescript_lazy_selection_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_lazy_route_semantic_issue_162.rs"]
+mod angular_lazy_route_semantic_tests;

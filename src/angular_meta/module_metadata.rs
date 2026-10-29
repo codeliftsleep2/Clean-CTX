@@ -20,6 +20,7 @@ pub(crate) const DECLARATION_FIELDS: &[&str] = &[
     "path",
     "children",
     "component",
+    "loadComponent",
     "provide",
     "useClass",
     "useFactory",

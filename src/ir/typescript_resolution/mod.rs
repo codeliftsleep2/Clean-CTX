@@ -1,4 +1,5 @@
 //! Native TypeScript authority: snapshots, project policy and exported declarations.
+pub(crate) mod arrow_selection;
 mod automatic_types;
 
 #[cfg(test)]

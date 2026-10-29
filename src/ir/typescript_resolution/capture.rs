@@ -20,6 +20,8 @@ pub(crate) struct TypeScriptAuthority {
     pub invocation_facets: Vec<super::declaration_facets::InvocationFacet>,
     #[serde(default)]
     pub declared_return_members: Vec<super::declared_return_member::DeclaredReturnMember>,
+    #[serde(default)]
+    pub arrow_selections: Vec<super::arrow_selection::ArrowSelection>,
     pub references: Vec<(String, Namespace, Resolution)>,
     /// Exact value occurrences proven by shared lexical/import mechanics.
     pub reference_sites: Vec<(usize, usize, Resolution)>,
@@ -117,6 +119,7 @@ impl TypeScriptAuthority {
             demanded_occurrences: Vec::new(),
             invocation_facets: Vec::new(),
             declared_return_members: Vec::new(),
+            arrow_selections: Vec::new(),
             references: Vec::new(),
             reference_sites: Vec::new(),
             unbound_value_sites: Vec::new(),
@@ -266,14 +269,16 @@ impl TypeScriptAuthority {
             }
             selected.extend(receiver_proofs.iter().map(|proof| proof.access));
             result.declared_return_members = receiver_proofs;
-            let (facets, packages, occurrences, invocations) = super::declaration_facets::capture(
-                &mut resolver,
-                file,
-                &result.declarations,
-                fields,
-                &result.constructor_parameters,
-                &selected,
-            );
+            let (facets, packages, occurrences, invocations, selections) =
+                super::declaration_facets::capture(
+                    &mut resolver,
+                    file,
+                    &result.declarations,
+                    fields,
+                    &result.constructor_parameters,
+                    &selected,
+                );
+            result.arrow_selections = selections;
             result.declaration_facets = facets;
             result.demanded_occurrences = occurrences;
             for site in receiver_occurrences {

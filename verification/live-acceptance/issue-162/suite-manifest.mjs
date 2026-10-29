@@ -1,5 +1,6 @@
 // Explicit full-run inventory; individual receipts remain bounded.
 export const suites = [
+  "route-components",
   "legacy-bootstrap",
   "nested-config-inputs",
   "config-composition",

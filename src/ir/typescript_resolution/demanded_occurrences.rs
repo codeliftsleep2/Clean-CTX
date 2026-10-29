@@ -66,6 +66,13 @@ impl TypeScriptAuthority {
         value: &super::declaration_facets::ExpressionFacet,
     ) -> bool {
         use super::declaration_facets::ExpressionValue;
+        // Separately retained exact joins, never Unsupported text, grant admission.
+        if source == self.source
+            && hash == self.source_hash
+            && matches!(&value.value, ExpressionValue::Unsupported(kind) if kind == "arrow_function")
+        {
+            return self.arrow_selection_at((value.start, value.end)).is_some();
+        }
         let Some(DemandedValue::Structure { kind, children }) =
             self.demanded_at(source, hash, value.start, value.end)
         else {

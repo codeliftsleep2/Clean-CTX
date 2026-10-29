@@ -57,7 +57,16 @@ struct Demand<'a> {
     occurrences: BTreeMap<(std::path::PathBuf, usize, usize), DemandedOccurrence>,
     invocations: Vec<InvocationFacet>,
     invocation_sites: BTreeSet<(std::path::PathBuf, usize, usize)>,
+    selections: Vec<super::arrow_selection::ArrowSelection>,
 }
+
+type CaptureResult = (
+    Vec<DeclarationFacet>,
+    Vec<super::package_evidence::PackageExportEvidence>,
+    Vec<DemandedOccurrence>,
+    Vec<InvocationFacet>,
+    Vec<super::arrow_selection::ArrowSelection>,
+);
 
 pub(super) fn capture(
     resolver: &mut Resolver,
@@ -66,12 +75,7 @@ pub(super) fn capture(
     fields: &[&str],
     parameters: &[super::constructor_parameters::ConstructorParameter],
     selected_calls: &[(usize, usize)],
-) -> (
-    Vec<DeclarationFacet>,
-    Vec<super::package_evidence::PackageExportEvidence>,
-    Vec<DemandedOccurrence>,
-    Vec<InvocationFacet>,
-) {
+) -> CaptureResult {
     resolver.in_source_project(request, |resolver| {
         let mut demand = Demand {
             resolver,
@@ -81,6 +85,7 @@ pub(super) fn capture(
             source_hashes: BTreeMap::new(),
             packages: Vec::new(),
             invocations: Vec::new(),
+            selections: Vec::new(),
             invocation_sites: BTreeSet::new(),
             fields: fields.iter().map(|field| (*field).to_string()).collect(),
         };
@@ -140,6 +145,7 @@ pub(super) fn capture(
             demand.packages,
             demand.occurrences.into_values().collect(),
             demand.invocations,
+            demand.selections,
         )
     })
 }
@@ -454,7 +460,25 @@ impl Demand<'_> {
                                 raw.into()
                             };
                             if self.fields.contains(&key) {
-                                fields.push((key, self.expression(value, file, source)));
+                                let expression = self.expression(value, file, source);
+                                if key == "loadComponent"
+                                    && let Some((proof, sites)) = super::arrow_selection::capture(
+                                        self.resolver,
+                                        file,
+                                        source,
+                                        value,
+                                    )
+                                {
+                                    self.declaration(&proof.target);
+                                    for site in sites {
+                                        self.occurrences.insert(
+                                            (site.source.clone(), site.start, site.end),
+                                            site,
+                                        );
+                                    }
+                                    self.selections.push(proof);
+                                }
+                                fields.push((key, expression));
                             }
                         }
                     } else if property.kind() == "shorthand_property_identifier" {
