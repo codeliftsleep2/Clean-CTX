@@ -1,12 +1,19 @@
 # Issue #162: bounded neutral arrow/import/export acceptance map
 
 Agent: Agent MaxHeadRoom
-Status: production-neutral implementation and tracked batches authored, entirely UNRUN.
+Status: five neutral batches and preservation GREEN (125 passes); original four probes GREEN; three semantic REDs preserved.
 
 Question: does this exact already-demanded loadComponent value contain the bounded
 arrow/import/then/parameter/member chain selecting an exact public value export?
 No Angular lazy publication or replacement is authorized. Source-qualified field,
 callback/binding and export identity remain separate from native Component role.
+
+Observed checkpoint: all five neutral batches and affected preservation passed;
+original four probes pass. Separate semantic probes reach intended association RED
+only after neutral/native prerequisites. Historical UNRUN labels below are
+superseded for executed assertions; they do not certify unasserted variants.
+See lazy-route-association-red-evidence/receipt.json under target/issue-162.
+Production lazy publication and selective replacement remain unapproved.
 
 Evidence keys:
 

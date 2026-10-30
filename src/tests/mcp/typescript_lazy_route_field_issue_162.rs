@@ -59,7 +59,7 @@ fn retained(a: &TypeScriptAuthority) -> Vec<(usize, usize, usize, usize)> {
         .collect()
 }
 #[test]
-fn issue_162_lazy_field_exact_objects_occurrences_serde_and_legacy_preservation() {
+fn issue_162_lazy_field_exact_objects_occurrences_serde_and_route_preservation() {
     let _serial = crate::protocol::handler_response_serial();
     for reexport in [false, true] {
         let (root, config) = setup("");
@@ -103,7 +103,7 @@ fn issue_162_lazy_field_exact_objects_occurrences_serde_and_legacy_preservation(
                 serde_json::from_value(serde_json::to_value(&a).unwrap()).unwrap();
             assert_eq!(retained(&restored), occurrences);
         }
-        for (name, wanted) in [("same", 2), ("parent/child", 2)] {
+        for (name, wanted) in [("same", 6), ("parent/child", 4)] {
             let answer = call(
                 &state,
                 p,
@@ -118,7 +118,7 @@ fn issue_162_lazy_field_exact_objects_occurrences_serde_and_legacy_preservation(
                     .filter(|e| e["relation"] == "RouteMapsTo")
                     .count(),
                 wanted,
-                "legacy behavior unchanged for {name}"
+                "canonical written lazy membership for {name}"
             );
         }
         let reverse = call(
@@ -127,8 +127,7 @@ fn issue_162_lazy_field_exact_objects_occurrences_serde_and_legacy_preservation(
             "workspace_query",
             json!({"type":"reverse_edges","domain":"angular","entity_type":"Component","name":"Screen"}),
         );
-        // Direct form: six legacy lazy rows plus two eager. Re-export form:
-        // only the direct screen-b callbacks contribute three lazy rows per pair of roots.
+        // Both export forms now retain fourteen exact lazy pairs plus two eager.
         assert_eq!(
             reverse["edges"]
                 .as_array()
@@ -136,7 +135,7 @@ fn issue_162_lazy_field_exact_objects_occurrences_serde_and_legacy_preservation(
                 .iter()
                 .filter(|e| e["relation"] == "RouteMapsTo")
                 .count(),
-            8
+            16
         );
     }
 }

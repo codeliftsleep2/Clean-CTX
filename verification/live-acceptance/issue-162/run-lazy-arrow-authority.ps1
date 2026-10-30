@@ -1,5 +1,5 @@
 # Agent MaxHeadRoom: bounded neutral chain only; semantic RED is recorded last.
-param([switch]$ResumeAfterRefusalFixtureCorrection, [switch]$ResumeAtLint)
+param([switch]$ResumeAfterRefusalFixtureCorrection, [switch]$ResumeAtLint, [switch]$ResumeAtInvestigation)
 $ErrorActionPreference = 'Stop'
 $repoPath = (Resolve-Path (Join-Path $PSScriptRoot '../../..')).Path
 Push-Location $repoPath
@@ -25,7 +25,7 @@ try {
     if ((Get-FileHash -LiteralPath $frozen -Algorithm SHA256).Hash -ne $beforeHash) { throw 'Original investigation bytes changed' }
     & pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-file-sizes.ps1 *> (Join-Path $logDirectory 'sizes.log')
     if ($LASTEXITCODE -ne 0) { throw "Active sizes failed; logs: $logDirectory" }
-    if (-not $ResumeAtLint) {
+    if (-not ($ResumeAtLint -or $ResumeAtInvestigation)) {
     & cargo test --lib --all-features --no-run --quiet *> (Join-Path $logDirectory 'compile.log')
     if ($LASTEXITCODE -ne 0) { throw "Compilation failed; not semantic RED; logs: $logDirectory" }
     $filters = @('issue_162_lazy_selection','issue_162_lazy_field','issue_162_route_component','angular_meta::routing::','issue_162_route_provider','provider_semantics','issue_162_module','issue_162_bootstrap_controls','issue_162_legacy','issue_162_config_composition')
@@ -42,8 +42,10 @@ try {
         if (-not (Select-String -LiteralPath $testLog -Pattern 'test result: ok\. [1-9][0-9]* passed;' -Quiet)) { throw "Empty filter: $filter" }
     }
     }
+    if (-not $ResumeAtInvestigation) {
     & cargo clippy --all-targets --all-features -- -D warnings *> (Join-Path $logDirectory 'clippy.log')
     if ($LASTEXITCODE -ne 0) { throw "Clippy failed; logs: $logDirectory" }
+    }
     & cargo fmt --all -- --check *> (Join-Path $logDirectory 'fmt.log')
     if ($LASTEXITCODE -ne 0) { throw "fmt failed; logs: $logDirectory" }
     & cargo test --lib --all-features --quiet angular_lazy_route_component_tests -- --test-threads=1 *> (Join-Path $logDirectory 'original-investigation.log')

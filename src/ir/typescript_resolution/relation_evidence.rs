@@ -11,7 +11,8 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::route_components::admits(self, edge);
+                    return crate::angular_meta::route_components::admits(self, edge)
+                        || crate::angular_meta::route_lazy_components::admits(self, edge);
                 }
                 #[cfg(not(feature = "angular"))]
                 {

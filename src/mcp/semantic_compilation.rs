@@ -341,3 +341,11 @@ mod typescript_lazy_selection_lifecycle_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_lazy_route_semantic_issue_162.rs"]
 mod angular_lazy_route_semantic_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_lazy_route_controls_issue_162.rs"]
+mod angular_lazy_route_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_lazy_route_lifecycle_issue_162.rs"]
+mod angular_lazy_route_lifecycle_tests;

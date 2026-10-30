@@ -61,6 +61,8 @@ pub mod reactive_forms;
 #[cfg(feature = "typescript")]
 pub(crate) mod route_components;
 #[cfg(feature = "typescript")]
+pub(crate) mod route_lazy_components;
+#[cfg(feature = "typescript")]
 mod route_objects;
 #[cfg(feature = "typescript")]
 pub(crate) mod route_providers;

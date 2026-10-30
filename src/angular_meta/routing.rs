@@ -172,6 +172,14 @@ impl RouteShape {
         &self,
         owned: &[(usize, usize)],
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        self.to_semantic_edges_with_ownership(owned, &[])
+    }
+
+    pub(crate) fn to_semantic_edges_with_ownership(
+        &self,
+        owned: &[(usize, usize)],
+        lazy_owned: &[(usize, usize)],
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges = Vec::new();
@@ -191,7 +199,9 @@ impl RouteShape {
                 });
             }
 
-            if let Some(target) = &route.resolved_load_component {
+            if let Some(target) = &route.resolved_load_component
+                && !lazy_owned.contains(&route.eager_object_span)
+            {
                 edges.push(SemanticEdge {
                     relation: SemanticRelation::RouteMapsTo,
                     subject: route_entity.clone(),

@@ -4,6 +4,164 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-27
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Approved generation-74 lazy production checkpoint authored, UNRUN
+
+The supplied production disposition authorizes exact canonical lazy RouteMapsTo
+and ownership-based replacement of the legacy loadComponent branch, including
+fail-closed retirement of unsupported callbacks inside migrated native ownership.
+No loadChildren, discovery, runtime callback/router meaning, public schema, global
+EntityRef equality, resolver/cache/registry or durable encoding change is introduced.
+Semantic generation advances to 74; compatibility controls use current 74/prior 73.
+
+route_lazy_components consumes the existing shared route_objects ownership,
+unique ordinary loadComponent value containment, complete arrow_selection_at
+replay and separate shared native Component proof. Its projection is reused by
+retained admission alongside the existing eager projection; neither grants generic
+endpoint admission. Production invokes both while honoring routing enablement.
+
+The old parser's existing exact object origin span selects an independent lazy
+ownership list before weak emission. Only its resolved_load_component branch is
+suppressed for shared native-owned objects carrying loadComponent, even when
+canonical proof is refused or competing. Eager suppression is unchanged and
+resolved_load_children/guard/resolver branches remain separate. Historical lazy
+behavior outside shared ownership is retained. No duplicate weak/strong row is
+published for the migrated field. Mixed objects require each field's independent
+proof; when both prove the same exact object/target relation, existing canonical
+index set semantics retain that relation while either support remains valid.
+No distinct route object is merged by this same-pair behavior.
+
+Original semantic REDs, acquisition probes and registration were raw-byte isolated
+under target/issue-162/lazy-route74-approved-isolation/ before repair and restored
+exactly. This is not a Git stash; HEAD/index were untouched. New integrated
+registrations were appended afterwards. A historical neutral field test's old lazy
+public counts now require the approved canonical counts (six same, four child,
+sixteen reverse including two eager controls); field containment/serde assertions
+remain intact. Its previous bytes are archived; genuine semantic REDs are unchanged.
+
+Seven integrated batches cover forged field/arrow/module/target/native proof,
+owned unsupported/duplicate refusal without weak fallback, outside legacy and
+loadChildren preservation, mixed eager/lazy/provider independence, exact SQLite
+snapshot/index before queries, native role repair, cold/warm/refresh/withinPath and
+root/target deletion/recreation, and export/barrel/package/config stale restore/
+unchanged-owner repair. The original three semantic probes retain the exact
+fourteen-pair public oracle. These are authored controls, not observed acceptance.
+The [66-item map](ISSUE_162_LAZY_ROUTE_COMPONENT_ACCEPTANCE.md) records remaining
+review and gates without inferring completion from authorship.
+
+Handoff: verification/live-acceptance/issue-162/run-lazy-route74-focused.ps1.
+Operator formats only unfrozen files, checks sizes, compiles, runs original semantic/
+acquisition and new integrated/neutral/field/eager/routing/generation/provider/
+Module/bootstrap/ApplicationConfig/config preservation, then Clippy/fmt. All
+post-repair checks are UNRUN. No agent formatter/Cargo/Node/build/runtime ran.
+Next: inspect results and reconcile remaining deterministic exit obligations before
+one major rebuilt-binary checkpoint, each suite below 500. Final repository/Claude
+field and AQ12/AQ13/AQ14/W06/P1/P3/W04/#162 closure remain open.
+
+## Intended lazy association RED observed; neutral prerequisites GREEN
+
+Inspected lazy-arrow-authority-20261029-174450: original unchanged investigation
+4 passed, zero failed/ignored, 52.91s. Separate direct/re-export/alias semantic
+probes record 0 passed, 3 failed, zero ignored, 29.17s. All three reach line 71,
+stage=lazy-route-association direction=forward, after exact neutral joins and
+independent native Component role pass for all fourteen selected associations.
+Native root/object/provider and eager sibling controls pass. Combined with 125
+prior neutral/preservation passes, scoped evidence is 129 passing executions
+alongside three intended semantic REDs; not a unique-test/full-repo count.
+
+fmt/format logs are empty and active sizes pass. Corrected Clippy is operator-
+reported clean; the older failed Clippy log is not relabeled PASS. All original
+probe bytes remain identical to approved isolation. Exact semantic/original tests,
+registration/log bytes and hashes are archived at
+ target/issue-162/lazy-route-association-red-evidence/receipt.json;
+observed-public.json retains initial forward/reverse responses for all three forms.
+No production/test edit accompanies inspection and no agent runtime ran.
+
+Direct lazy rows expose two same-path and two child rows, six reverse rows after
+excluding two canonical eager controls. Re-export and alias forms expose no lazy
+rows in either forward bucket or reverse Screen. The required oracle is ten
+nonempty-path forward pairs and fourteen reverse pairs across both roots, with
+actual selected declaration files and independent repeated occurrences. The direct
+legacy rows remain name-based/asserting-file attributed. Later reverse assertions
+and repeated-query checks are unclassified after the first forward panic, although
+initial reverse responses are recorded. This is the intended semantic RED, not
+another missing neutral prerequisite.
+
+## Concrete production lazy disposition requested
+
+Approve RouteMapsTo from the existing exact RouteOccurrence to the canonical
+native Component DeclarationId selected by arrow_selection_at for its unique
+ordinary loadComponent field. Reuse shared native typed const Routes/Object/
+children/path ownership. Join exact demanded field/value, complete neutral replay
+and separate native Component role; a valid route and independently valid target
+must never substitute for selected-export authority. Producer and retained
+admission must recompute one shared lazy projection. Existing eager projection
+remains exact and distinct; no generic endpoint admission or invocation endpoint
+substitution is proposed.
+
+Legacy comparison: the old lazy RouteShape row has path/name/asserting-file
+identity and loses module/export/binding proof and repeated-object multiplicity.
+The canonical candidate uses root/source/hash/object occurrence and exact selected
+value-export declaration. Both use RouteMapsTo; existing source-owned snapshot/
+SQLite/index/currentness/retirement mechanisms are reusable. Neutral proof already
+survives these transport/currentness controls; public lazy integration is not yet
+accepted. No new public relation/field, resolver/cache/registry, EntityRef equality
+or discovery policy is proposed. Advance existing semantic compatibility for the
+changed public identity; durable change only if actual encoding requires it.
+
+Recommended ownership/replacement decision: REPLACE only the loadComponent lazy
+branch for ordinary route objects owned by the exact shared native-root envelope.
+Select by actual object/field provenance before old emission loses origin, never
+by display path/name or a sweep of all RouteMapsTo. Publish canonical membership
+only for the approved callback syntax with complete current proof and native role.
+Do not retain a weaker row for an owned field when export/target/callback evidence
+is refused or competing. This explicitly retires historical lazy rows for
+unsupported callbacks inside that migrated ownership envelope if the old parser
+happened to emit them; this compatibility effect requires owner approval, not an
+inference from generation 73. Duplicate loadComponent fields must not pick one.
+
+PRESERVE AS LEGACY outside shared native ownership, including foreign/mutable/
+untyped roots and unsupported spread containers, without certifying exact lazy
+membership. Alternative: preserve unsupported callback shapes even inside native
+roots by retaining a separately proven syntax boundary before export resolution;
+that requires a more granular neutral shape/provenance distinction. A blanket
+additive canonical path creates duplicate weak/strong facts and is rejected.
+Recommended owned-field replacement is simpler and fails closed, with the stated
+compatibility retirement explicit for review. Preserve eager branch, loadChildren,
+guards/resolvers and marker/display behavior. Mixed eager/lazy same-object cases
+and exact private occurrence/index multiplicity must be exit controls, not an
+excuse to alter global equality or silently merge proof contracts.
+
+After approval: isolate/restore unchanged valid REDs, implement producer and
+retained lazy admission together, keep eager/lazy old origins separate and batch
+exact forward/reverse/multiplicity/empty/child/same-name/re-export/alias cases;
+forged/borrowed/missing native/field/neutral proof; owned weak fallback refusal and
+out-of-envelope/lazy-Module/eager/provider preservation; SQLite/index before
+queries; stale owner/module/export/barrel/package/config repair and independent
+retirement; cold/warm/refresh/withinPath and lower-bound claims. Reconcile the full
+production acceptance map, warning-free checks, then one major rebuilt-binary
+checkpoint with each suite below 500. Operator owns runtime; Claude field last.
+
+The neutral owner disposition explicitly requires returning with this semantic
+RED before production lazy semantics or legacy replacement. AGENTS.md Architectural
+Approval Gate also applies to this public identity/admission and compatibility
+migration. Await owner production disposition; no rerun of unchanged REDs or
+semantic repair is requested now. AQ12/AQ13/AQ14/W06/P1/P3/W04/#162 and full
+repository/final field gates remain open.
+
+## Operator reports corrected Clippy GREEN; public probes still pending
+
+The operator reports Clippy clean after the mechanical lint corrections. The latest
+saved lazy-arrow-authority run remains 20261029-165535 with the historical lint
+failure and no original-investigation/semantic-investigation logs. Clean Clippy is
+operator-reported here, not inferred from those older logs. Scoped 125 passing
+executions remain valid; fmt and both public probe stages remain unobserved.
+
+run-lazy-arrow-authority.ps1 -ResumeAtInvestigation skips completed test batches
+and Clippy, checks formatting and records original unchanged probes followed by
+separate exact semantic investigations. No agent runtime ran and no production
+edit accompanies this handoff. Return with the observed boundary before seeking
+production lazy semantics or legacy replacement.
+
 ## Neutral/preservation tests GREEN; two lint corrections authored, UNRUN
 
 Inspected lazy-arrow-authority-20261029-165535: corrected refusal batch 1, field
