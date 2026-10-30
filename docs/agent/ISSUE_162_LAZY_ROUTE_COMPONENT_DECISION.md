@@ -1,8 +1,85 @@
 # Issue #162: exact source-declared lazy route Component selection
 
 Agent: Agent MaxHeadRoom
-Status: generation-74 scoped Rust/lint inspected GREEN (193 passing executions); acceptance-map reconciliation and rebuilt-binary gates pending.
+Status: generation-74 scoped Rust/lint GREEN (194 passing executions); ecological binary inspected PASS (305 lazy + 241 eager + 305 route-provider); broader repository/field gates open.
 Discovery expansion, loadChildren migration and runtime routing semantics remain NOT APPROVED.
+
+## Generation-74 ecological binary checkpoint inspected PASS
+
+Inspected lazy-route74-binary-20261030-102414: lazy-route-components 305/305,
+eager route-components 241/241 and route-providers 305/305 checks pass. Each
+receipt has zero failed checks/errors, three FINISHED sessions and a 500-check
+ceiling. All share the same recorded input set/hashes and binary SHA-256
+60602b4312793ae843747eb0bdc7bf008f68147e178016722764853a313f7199,
+mtime 2026-10-30T14:25:36.479Z. Syntax preflight passes 45 JavaScript files;
+the all-feature final binary build finishes without warnings/errors. Report/log
+hashes: target/issue-162/lazy-route74-binary-receipt.json.
+
+Actual lazy runtime count is 305, superseding the authored static estimate of 303.
+This supersedes authored/UNRUN statements below for these binary suites. The
+66-item bounded acceptance map is satisfied: 194 scoped Rust passing executions,
+clean lint and inspected ecological binary/stdio acceptance remain distinct
+evidence classes. No production/test/harness edit accompanies inspection and no
+agent runtime ran. Full repository/final Claude field and broader AQ12/AQ13/AQ14/
+W06/P1/P3/W04/#162 closure remain open. Discovery and loadChildren migration remain
+unapproved.
+
+## Generation-74 ecological binary checkpoint authored, UNRUN
+
+Added lazy-route-components using the existing binary/stdio suite runner, input/
+binary hashes, three-session lifecycle and hard 500-check ceiling. Three nested
+caller files exercise direct/re-export/alias-export selection, same-named targets,
+repeated and empty paths, children and provider-bearing/free objects. Exact public
+forward/reverse multisets require actual target files and distinct route objects;
+private canonical proof remains absent from the public response.
+
+Cold/warm/withinPath, checkpoint/restart, repeated-object/field/child/provider
+retirement, independent caller deletion/recreation, stale restore before query,
+Component-role repair, unchanged-caller export removal/retarget, package and config
+mutation/repair are batched. Owned unsupported/duplicate callbacks produce no weak
+fallback; eager, legacy outside-ownership and loadChildren siblings survive.
+Static counting budgets 303 checks (20 fact passes at 14, 21 session checks,
+one scope and one stale-restore check, plus final input check). Actual runtime
+count and behavior remain unobserved.
+
+Handoff: run-lazy-route74-checkpoint.ps1 runs syntax preflight and one all-feature
+final binary rebuild with unique metadata, then lazy-route-components,
+route-components and route-providers against the same binary hash. Each logical
+suite retains its own below-500 receipt. No Rust production/test change accompanies
+authorship; 194 scoped passing executions and clean lint remain valid. No agent
+Node/build/binary/runtime ran. All new binary controls are UNRUN. Full repository,
+final Claude field and broader issue closure remain open.
+
+## Supplemental lifecycle inspected GREEN
+
+Inspected lazy-route74-supplement-20261030-101123: one test passed, zero failed/
+ignored, 23.17 seconds. Individual repeated-object, child, lazy-field and empty-root
+retirement/recreation pass with sibling eager/provider preservation. Together with
+193 preserved executions, scoped evidence totals 194 passing executions; this is
+not a unique-test or full repository count. Clippy finished without warnings/errors;
+format/fmt logs are empty and active sizes pass. Log hashes:
+ target/issue-162/lazy-route74-supplement-receipt.json.
+
+This supersedes the supplemental UNRUN statements below. The 66-item map is
+reconciled through deterministic/static acceptance; item 66 rebuilt-binary remains
+open. No production/test/harness edit accompanies inspection. No agent runtime ran.
+Next is one major ecological binary checkpoint, then broader repository and final
+Claude field gates; no full AQ12/W06/#162 closure follows.
+
+## Acceptance-map review and supplemental lifecycle batch authored, UNRUN
+
+The 66-item map now distinguishes inspected focused coverage, static durable
+compatibility review, supplemental lifecycle transitions and pending binary work.
+One tracked supplemental batch exercises individual repeated-object removal,
+child removal, lazy-field removal, empty native root and full recreation in the
+same state, checking exact public multiplicity and eager/provider preservation.
+Production and original frozen probes are unchanged. The 193 passing executions
+remain valid; this additional batch is UNRUN.
+
+Handoff: run-lazy-route74-supplement.ps1 runs only the new exit test, active sizes,
+formatting and warning-free lint. No agent formatter/Cargo/runtime ran. After its
+result, prepare one consolidated rebuilt-binary checkpoint; final Claude field
+and broader repository/issue gates remain open.
 
 ## Generation-74 focused Rust and preservation inspected GREEN
 

@@ -228,3 +228,58 @@ fn issue_162_lazy_controls_mixed_eager_lazy_provider_independent_retirement() {
         );
     }
 }
+
+#[test]
+fn issue_162_lazy_exit_object_child_field_and_root_retirement() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (root, config) = setup("direct");
+    let p = root.path();
+    let state = crate::mcp::McpState::new(config);
+    let lazy_object = "{path:'exit',loadComponent:()=>import('./screen-a').then(m=>m.Screen)}";
+    let child = "{path:'parent',children:[{path:'child',loadComponent:()=>import('./screen-b').then(m=>m.Screen)}]}";
+    let sibling = "{path:'eager',component:A,providers:[Token]}";
+    for (objects, expected, exit_count, child_count, eager_count) in [
+        (
+            format!("{sibling},{lazy_object},{lazy_object},{child}"),
+            3,
+            2,
+            1,
+            1,
+        ),
+        (format!("{sibling},{lazy_object},{child}"), 2, 1, 1, 1),
+        (format!("{sibling},{lazy_object}"), 1, 1, 0, 1),
+        (format!("{sibling},{{path:'exit'}}"), 0, 0, 0, 1),
+        (String::new(), 0, 0, 0, 0),
+        (
+            format!("{sibling},{lazy_object},{lazy_object},{child}"),
+            3,
+            2,
+            1,
+            1,
+        ),
+    ] {
+        std::fs::write(p.join("one.ts"), format!("import type {{Routes}} from '@angular/router'; import {{Screen as A}} from './screen-a'; import {{Token}} from './left'; export const routes:Routes=[{objects}];")).unwrap();
+        let a = capture(&state, p, "one.ts");
+        let projected = lazy(&a);
+        assert_eq!(projected.len(), expected, "objects={objects}");
+        assert!(a.admits_relation_evidence(&projected));
+        for (name, wanted) in [("exit", exit_count), ("parent/child", child_count)] {
+            assert_eq!(
+                count(&answer(&state, p, name), "RouteMapsTo"),
+                wanted,
+                "{name}: {objects}"
+            );
+        }
+        assert_eq!(
+            crate::angular_meta::route_components::project(&a).len(),
+            eager_count
+        );
+        assert_eq!(
+            crate::angular_meta::route_providers::project(&a)
+                .iter()
+                .filter(|e| e.relation == SemanticRelation::RegistersProvider)
+                .count(),
+            eager_count
+        );
+    }
+}
