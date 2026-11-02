@@ -109,6 +109,8 @@ pub struct RouteDecl {
     pub resolved_load_children: Option<LazyRouteTarget>,
     /// Guard names applied to this route (e.g. `AuthGuard`).
     pub guards: Vec<String>,
+    /// Parser emits canActivate first; this private prefix retains field kind before flattening.
+    pub(crate) can_activate_guard_count: usize,
     /// Resolver names applied to this route (e.g. `UserResolver`).
     pub resolvers: Vec<String>,
 }
@@ -189,6 +191,16 @@ impl RouteShape {
         lazy_owned: &[(usize, usize)],
         children_owned: &[(usize, usize)],
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        self.to_semantic_edges_guard_ownership(owned, lazy_owned, children_owned, &[])
+    }
+
+    pub(crate) fn to_semantic_edges_guard_ownership(
+        &self,
+        owned: &[(usize, usize)],
+        lazy_owned: &[(usize, usize)],
+        children_owned: &[(usize, usize)],
+        guard_owned: &[(usize, usize)],
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges = Vec::new();
@@ -233,7 +245,12 @@ impl RouteShape {
             }
 
             // Route → GuardedBy → Guard
-            for guard in &route.guards {
+            for (index, guard) in route.guards.iter().enumerate() {
+                if index < route.can_activate_guard_count
+                    && guard_owned.contains(&route.eager_object_span)
+                {
+                    continue;
+                }
                 edges.push(SemanticEdge {
                     relation: SemanticRelation::GuardedBy,
                     subject: route_entity.clone(),

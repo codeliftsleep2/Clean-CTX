@@ -118,10 +118,13 @@ fn parse_object(
         .unwrap_or_default();
     let path = join_path(parent_path, &segment);
     let component = pair_value(object, "component", bytes).and_then(|node| identifier(node, bytes));
-    let guards = ["canActivate", "canLoad", "canDeactivate", "canMatch"]
-        .into_iter()
-        .flat_map(|key| array_identifiers(pair_value(object, key, bytes), bytes))
-        .collect();
+    let mut guards = array_identifiers(pair_value(object, "canActivate", bytes), bytes);
+    let can_activate_guard_count = guards.len();
+    guards.extend(
+        ["canLoad", "canDeactivate", "canMatch"]
+            .into_iter()
+            .flat_map(|key| array_identifiers(pair_value(object, key, bytes), bytes)),
+    );
     let resolvers = resolve_identifiers(pair_value(object, "resolve", bytes), bytes);
 
     let load_component_evidence =
@@ -152,6 +155,7 @@ fn parse_object(
         resolved_load_component,
         resolved_load_children,
         guards,
+        can_activate_guard_count,
         resolvers,
     });
 

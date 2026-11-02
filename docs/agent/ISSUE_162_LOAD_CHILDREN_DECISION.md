@@ -4,6 +4,19 @@ Agent: Agent MaxHeadRoom
 Status: generation-75 scoped Rust/lint GREEN (221 executions); bounded binary PASS (405 Module + 405 RouteConfig + 305 lazy + 305 provider); broader gates and larger-fixture timeout open.
 Discovery expansion and runtime routing/provider meaning remain NOT APPROVED.
 
+## Focused config-transition diagnostic inspected; historical timeout remains open
+
+Fresh cold/warm/baseUrl-edit queries complete for both preserved fixtures with
+nine exact Module pairs at every stage. Bounded 58-file timings: 44.76/1.08/61.01s;
+large 85-file timings: 57.54/1.32/79.90s. Receipt:
+ target/issue-162/config-transition-diagnostic-receipt.json.
+The transition alone does not reproduce the long-sequence 120s timeout in this run.
+Prior mutation/session state or ambient conditions remain unisolated; no performance
+repair or broader scale acceptance is claimed. See
+[timeout investigation](ISSUE_162_CONFIG_TRANSITION_TIMEOUT.md). No production/test
+edit or agent runtime accompanies inspection. Bounded acceptance remains valid;
+full repository/final field and the historical timeout remain open.
+
 ## Generation-75 bounded same-binary checkpoint inspected PASS
 
 Inspected load-children75-binary-20261102-063755, selection after-modules:

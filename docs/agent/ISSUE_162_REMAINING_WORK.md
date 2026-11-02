@@ -1,8 +1,133 @@
 # Issue #162: current position and remaining work
 
 Agent: Agent MaxHeadRoom
-Reconciled: 2026-10-30
-Status: planning/evidence reconciliation; no production change or runtime run.
+Reconciled: 2026-11-02
+Status: generation-76 focused/preservation GREEN; rebuilt-binary and final gates pending.
+
+## Generation-76 local GREEN recorded: 245 scoped passing executions
+
+Resumed run 120431 passes 233 executions including the corrected legacy control;
+with twelve preserved semantic/control passes, scoped evidence totals 245 passes.
+Clippy is warning-free; fmt/compile/format logs are empty and active sizes pass.
+Evidence: target/issue-162/route-guard76-focused-green-evidence/receipt.json.
+No new source/test edit or runtime. Next is one consolidated generation-76 rebuilt-
+binary checkpoint, then final repository/Claude field gates; broader context and
+other guard/resolver obligations remain open. Performance stays deferred.
+
+## Generation-76 first focused results: twelve passes, one invalid control expectation
+
+Five semantic probes and seven controls pass. The outside-legacy control expected
+one row from untyped const routes, but old declaration-text discovery produces
+zero; untyped/Foreign expectations are corrected to preserve that existing behavior.
+No production change. Use run-route-guard76-focused.ps1
+-ResumeAfterLegacyControlCorrection for only the corrected control and pending
+gates. Preserved passing groups are skipped. Corrected/pending results are UNRUN.
+
+## Generation-76 canActivate approved and authored; verification UNRUN
+
+Canonical written-use GuardedBy projection/admission and canActivate-only owned
+legacy suppression are authored under explicit production approval. Public support
+multiplicity is one exact route object/target pair; valid slots survive unproved
+siblings. Other guard kinds remain independently legacy. Semantic generation is
+76; durable, marker and pipeline encodings/generations otherwise unchanged.
+Use run-route-guard76-focused.ps1 for focused/affected preservation and lint.
+All post-edit gates are UNRUN. Eight new tracked control/lifecycle batches and the
+updated exact semantic probes are mapped in ISSUE_162_ROUTE_GUARD_ACCEPTANCE.md.
+After GREEN, one consolidated rebuilt-binary checkpoint remains, then final gates.
+Performance remains explicitly deferred. Historical pending dispositions below
+are superseded by the owner's explicit generation-76 approval.
+
+## canActivate association RED preserved; production disposition pending
+
+All five semantic probes reach canActivate-association forward after complete
+reference prerequisites; zero pass, five fail, 73.12 seconds. Exact tests/logs/
+public answers are preserved at route-guard-association-red-evidence under target.
+The guard decision requests explicit written-use target eligibility, support versus
+slot multiplicity, partial-slot policy, relation-specific admission, canActivate-only
+replacement/outside legacy preservation and semantic generation 76. None is
+implemented or approved. No unchanged rerun requested; performance remains deferred.
+
+## canActivate field/reference GREEN; semantic investigation ready
+
+Inspected field capture: 178 scoped passes including six unchanged acquisition
+probes, clean Clippy/fmt and active sizes. Five new semantic investigation probes
+are authored, UNRUN; use run-route-guard-semantic-investigation.ps1. They preserve
+the distinction between sixteen object/target supports and eighteen Array slots,
+without choosing a production multiplicity policy. No GuardedBy production,
+public eligibility, replacement or generation change is authorized. Performance
+remains deferred. The guard decision records evidence and the bounded oracle.
+
+## canActivate field acquisition approved and authored, UNRUN
+
+The owner approves the existing canActivate field-demand addition and neutral
+retention/lifecycle tests only. One production field-name addition and five neutral
+batches are authored; original six probes remain unchanged. Run
+verification/live-acceptance/issue-162/run-route-guard-field-capture.ps1 for neutral,
+affected preservation, lint and unchanged investigation gates. All post-edit gates
+are UNRUN. Generation 75 and guard production semantics remain unchanged; return
+with the earliest observed prerequisite before further authority decisions.
+Performance stays deferred. See the guard decision for exact scope and isolation.
+
+## canActivate field prerequisite observed; bounded acquisition disposition pending
+
+Inspected route-guard-investigation-20261102-094153: one observation control passes;
+five reference-form probes fail only at missing canActivate field mapping after
+native sibling/target/root-object controls. Exact evidence:
+ target/issue-162/route-guard-field-prerequisite-evidence/receipt.json.
+The [guard decision](ISSUE_162_ROUTE_GUARD_MEMBERSHIP_DECISION.md) requests only the
+existing field-demand addition and neutral lifecycle tests. No semantic RED,
+production guard policy, new carrier, discovery or compatibility advance follows.
+No unchanged rerun requested; performance stays explicitly deferred.
+
+## canActivate investigation approved; six controls authored, UNRUN
+
+The owner approves bounded investigation/tracked tests for
+[exact written guard membership](ISSUE_162_ROUTE_GUARD_MEMBERSHIP_DECISION.md).
+Five route-form acquisition probes and one refusal/category observation batch
+are authored without capture/production/generation changes. All checks UNRUN.
+Handoff: run-route-guard-investigation.ps1. Observe actual field/Array/reference
+boundary and public old contribution; no guard semantic repair is pre-authorized.
+Performance remains explicitly deferred; no further performance run is requested.
+Generation-75 bounded acceptance remains valid; broader gates stay open.
+
+## Owner sequencing and next AQ13 identity question
+
+Owner directs deferring hydration performance until the current correctness work
+is finished. The config-transition timeout remains OPEN; duplicate processes/work
+and bad scaling are unconfirmed hypotheses. No further performance runtime is
+requested now. Historical performance-next-step statements below are superseded
+by this sequencing instruction.
+
+Next correctness proposal: [exact canActivate membership](ISSUE_162_ROUTE_GUARD_MEMBERSHIP_DECISION.md),
+a bounded AQ13/W06 prerequisite before parent/config applicability. Static trace
+finds old identifier-label GuardedBy production and no canActivate demand field.
+No failure is inferred and no capture/semantics/test change is made. Request owner
+disposition for investigation/tracked tests only; target eligibility, Array-slot
+support multiplicity, canonical admission and legacy replacement remain separate.
+Generation-75 bounded acceptance stays valid; full repository/Claude field remains
+last and no broader issue closure follows.
+
+## Config-transition diagnostic completed; long-sequence reproducer still open
+
+The focused cold/warm/config-edit diagnostic completes for both 58-file and
+85-file fixtures with exact nine-pair Module answers. After-config times are
+61.01s and 79.90s respectively, under the unchanged deadline. Receipt:
+ target/issue-162/config-transition-diagnostic-receipt.json.
+The historical larger long-sequence timeout remains open; this shorter sequence
+does not reproduce it. Next localization axis: prior dependency mutation/session
+history versus a fresh process, with identical bytes. No production repair or
+policy change is inferred; existing bounded generation-75 acceptance stays valid.
+
+## Next local investigation: preserved config-transition timeout
+
+The bounded generation-75 checkpoint remains accepted. The next blocker under
+investigation is the [larger-fixture config transition](ISSUE_162_CONFIG_TRANSITION_TIMEOUT.md),
+not another semantic extension. An offline comparison confirms larger 85-TS-file
+failure versus bounded 58-TS-file success; file count alone is not causal proof.
+A focused operator diagnostic is authored, UNRUN: cold, warm and post-baseUrl query
+in each preserved fixture, using the same binary and existing request deadline.
+Handoff: run-config-transition-diagnostic.ps1. No production/test/runtime change.
+Full repository/final Claude field and broader issue closure remain open.
 
 ## Generation-75 bounded same-binary acceptance inspected PASS
 

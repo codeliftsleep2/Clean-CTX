@@ -385,3 +385,31 @@ mod angular_load_children_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_load_children_lifecycle_issue_162.rs"]
 mod angular_load_children_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_guard_membership_issue_162.rs"]
+mod angular_route_guard_membership_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_route_guard_field_support_issue_162.rs"]
+mod typescript_route_guard_field_support;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_route_guard_field_issue_162.rs"]
+mod typescript_route_guard_field_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_route_guard_field_lifecycle_issue_162.rs"]
+mod typescript_route_guard_field_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_guard_semantic_issue_162.rs"]
+mod angular_route_guard_semantic_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_guard_controls_issue_162.rs"]
+mod angular_route_guard_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_guard_lifecycle_issue_162.rs"]
+mod angular_route_guard_lifecycle_tests;
