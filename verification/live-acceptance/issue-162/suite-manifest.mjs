@@ -1,5 +1,6 @@
 // Explicit full-run inventory; individual receipts remain bounded.
 export const suites = [
+  "route-guards",
   "load-children-modules",
   "load-children-routes",
   "lazy-route-components",

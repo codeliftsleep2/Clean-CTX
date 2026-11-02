@@ -62,7 +62,7 @@ pub(super) fn setup(form: &str) -> (tempfile::TempDir, crate::config::CleanCtxCo
     }
     (root, config)
 }
-fn walk(a: &TypeScriptAuthority, v: &ExpressionFacet, out: &mut Vec<Field>) {
+fn walk(a: &TypeScriptAuthority, v: &ExpressionFacet, field: &str, out: &mut Vec<Field>) {
     assert!(
         a.admits_demanded_structure(&a.source, &a.source_hash, v),
         "stage=neutral-object-structure"
@@ -70,14 +70,14 @@ fn walk(a: &TypeScriptAuthority, v: &ExpressionFacet, out: &mut Vec<Field>) {
     match &v.value {
         ExpressionValue::Array(values) => {
             for v in values {
-                walk(a, v, out);
+                walk(a, v, field, out);
             }
         }
         ExpressionValue::Object(fields) => {
             for (name, array) in fields {
                 if name == "children" {
-                    walk(a, array, out);
-                } else if name == "canActivate" {
+                    walk(a, array, field, out);
+                } else if name == field {
                     assert!(
                         v.start <= array.start && array.start < array.end && array.end <= v.end
                     );
@@ -138,6 +138,9 @@ fn walk(a: &TypeScriptAuthority, v: &ExpressionFacet, out: &mut Vec<Field>) {
     }
 }
 pub(super) fn retained(a: &TypeScriptAuthority) -> Vec<Field> {
+    retained_field(a, "canActivate")
+}
+pub(super) fn retained_field(a: &TypeScriptAuthority, field: &str) -> Vec<Field> {
     let root = a
         .declaration_facets
         .iter()
@@ -145,6 +148,6 @@ pub(super) fn retained(a: &TypeScriptAuthority) -> Vec<Field> {
         .expect("typed source routes facet");
     assert_eq!(root.declaration.source_hash, a.source_hash);
     let mut out = Vec::new();
-    walk(a, root.initializer.as_ref().unwrap(), &mut out);
+    walk(a, root.initializer.as_ref().unwrap(), field, &mut out);
     out
 }

@@ -1,7 +1,29 @@
 # Issue #162: generation-76 canActivate acceptance and question map
 
 Agent: Agent MaxHeadRoom
-Status: generation-76 focused/preservation GREEN (245 scoped executions); binary/final gates pending.
+Status: generation-76 bounded local/binary acceptance GREEN; full repository/final field pending.
+
+## Observed binary result
+
+route-guard76-binary-20261102-135638 passes 365/365 checks across three FINISHED
+sessions, zero errors. One bounded suite passes, with unchanged matching binary,
+summary and affected source/harness hashes. Checkpoint JSON links complete receipts.
+Binary hash: 7920875f06698622aaa57afc8f8f9dbb3b3bc8f0506b5e6d0406fb58b8e28557.
+This completes the approved slice's bounded binary integration evidence, separate
+from 245 scoped local Rust passes. Historical binary UNRUN labels below are
+superseded by this result. No code or harness edit accompanies inspection.
+Full repository/final Claude field and broader context obligations remain open;
+performance remains owner-deferred.
+
+## Binary handoff authored, UNRUN
+
+verification/live-acceptance/issue-162/route-guards.mjs and its registered suite
+reuse the existing runner/client. Six owners, exact support multisets, reverse empty
+paths, runtime-value/refusal controls, integrated routing/provider siblings and
+three persistence/mutation sessions are authored. Use run-route-guard76-checkpoint.ps1
+for one rebuild and this suite only; it requires fewer than 500 checks, three
+FINISHED sessions, no errors and matching binary/source/harness receipts. No agent
+runtime ran. Local Rust GREEN remains valid; operator binary evidence is pending.
 
 ## Observed local result
 

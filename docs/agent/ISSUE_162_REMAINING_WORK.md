@@ -2,7 +2,74 @@
 
 Agent: Agent MaxHeadRoom
 Reconciled: 2026-11-02
-Status: generation-76 focused/preservation GREEN; rebuilt-binary and final gates pending.
+Status: generation-76 bounded local/binary GREEN; broader correctness and final gates remain open.
+
+## Four-field neutral acquisition GREEN: 33 scoped passes
+
+Inspected field capture 145424: four neutral batches, 25 targeted preservation
+executions and four unchanged acquisition probes pass; clean Clippy/fmt/size gates.
+Each field reaches complete probe field/Array/slot/demanded-reference assertions.
+No remaining prerequisite failure within those probes; no candidate association
+semantic RED is established. Exact receipt and original public observations live
+under target/issue-162/route-guard-kinds-field-green-evidence/.
+Next is tracked association investigation plus the public unqualified-union versus
+field-kind reachability question matrix in the guard-kind decision. No candidate
+projection/admission/replacement or generation advance is approved. No unchanged
+rerun requested; performance stays deferred and final Claude field remains last.
+
+## Four remaining guard demand names approved and authored, UNRUN
+
+Exactly canMatch/canDeactivate/canLoad/canActivateChild were added to the existing
+field demand set. Four neutral batches share fixtures across origins and cover
+reference forms/duplicates/slots, serde/SQLite, owner/dependency/config/package
+currentness and repair. Original four probes/registration were isolated and
+restored exactly. No candidate semantics, suppression, carrier or generation change.
+Use run-route-guard-kinds-field-capture.ps1 for targeted neutral/sibling/lint gates,
+then unchanged four probes. All post-edit gates UNRUN; return each actual next
+prerequisite. Prior broad campaigns/binary suites are not repeated. Performance
+remains deferred; public guard-kind expressibility and broader/final gates stay open.
+
+## Remaining guard fields: four prerequisite failures preserved
+
+All four new probes fail at missing field mapping after accepted/native sibling
+controls, zero passed/four failed in 61.87 seconds. Exact logs/tests/public answers
+are preserved under route-guard-kinds-field-prerequisite-evidence in target/issue-162.
+The guard-kind decision requests only four existing demand names plus neutral
+retention/lifecycle tests. No semantic RED, publication, suppression or generation
+change is inferred. Await bounded acquisition disposition; no unchanged rerun needed.
+Performance remains deferred and generation-76 canActivate acceptance stays bounded.
+
+## Remaining Array guard kinds: four acquisition probes authored, UNRUN
+
+Next bounded investigation batches canMatch/canDeactivate/canLoad/canActivateChild
+without migrating them. Each independently requires exact field/Array/slot/runtime
+reference proof after accepted generation-76 canActivate and route-target/provider
+siblings. No production, capture, carrier or generation change. See
+[guard-kind decision](ISSUE_162_ROUTE_GUARD_KINDS_DECISION.md), including the unresolved
+public distinction between an unqualified GuardedBy fact and proof of a specific
+field. Run run-route-guard-kinds-investigation.ps1; only four new probes plus compile/
+format/size prerequisites, no prior preservation/binary repetition. All new gates
+UNRUN. Performance stays deferred; final Claude field remains last.
+
+## Generation-76 canActivate bounded acceptance GREEN
+
+Local: 245 scoped Rust passing executions with clean Clippy/fmt/size gates.
+Binary: route-guards 365/365 checks, three FINISHED sessions, zero errors; checkpoint
+route-guard76-binary-20261102-135638 under target/issue-162. Hashes match recorded
+source/harness/binary evidence. No source/test/harness edit or agent runtime.
+The bounded canActivate written-membership slice is accepted; other guard kinds,
+resolvers and applicable/inherited context remain separate correctness obligations.
+Full repository/final Claude field remain later, with performance still deferred.
+No acceptance rerun is requested solely for status recording.
+
+## Generation-76 single-suite binary checkpoint ready, UNRUN
+
+run-route-guard76-checkpoint.ps1 rebuilds once and runs route-guards only, using
+three existing-transport sessions for exact written membership, persistence,
+mutations and integrated routing siblings. No Rust/preservation/lint repetition
+or performance diagnostic. New reusable definitions live under verification;
+evidence will be under target. The local 245-pass result is unchanged. Binary
+checkpoint and final repository/Claude field remain pending.
 
 ## Generation-76 local GREEN recorded: 245 scoped passing executions
 

@@ -1,8 +1,62 @@
 # Issue #162: exact source-declared canActivate membership
 
 Agent: Agent MaxHeadRoom
-Status: generation-76 focused/preservation GREEN (245 scoped passes); rebuilt-binary checkpoint pending.
+Status: generation-76 bounded local/binary acceptance GREEN; full repository/final field gates remain open.
 Approved written-use classification only; execution/applicability and other guard-kind migration remain outside scope.
+
+## Generation-76 rebuilt-binary checkpoint GREEN
+
+Inspected route-guard76-binary-20261102-135638: route-guards passes 365/365 checks,
+one of one suites, with three FINISHED sessions and zero recorded errors. This is
+operator binary/stdio evidence, separate from the 245 scoped passing Rust executions
+and clean local Clippy/fmt/size gates. Syntax/build succeeded. Binary and summary
+hashes and affected production/harness input hashes match their recorded receipts.
+
+The three sessions reach cold/warm forward/reverse exact support answers, empty
+paths, scoped answers, SQLite restart/restore, slot/object/field/child/provider/root
+lifecycle and stale target/export/barrel/package/config repair. Broad runtime values,
+partial-slot refusal, duplicate fields, same-target other kinds, outside mutable
+legacy and eager/loadComponent/LoadsChildren/provider siblings pass in this suite.
+No performance conclusion follows from this bounded fixture.
+
+Checkpoint: target/issue-162/route-guard76-binary-20261102-135638/checkpoint.json.
+Binary SHA-256: 7920875f06698622aaa57afc8f8f9dbb3b3bc8f0506b5e6d0406fb58b8e28557.
+Inputs hash: 81224600040d61c448410eb5328786ca1d059d35578553fffa492e4f3d69f7cc.
+The referenced summary owns complete RPC/stderr/mutation/session receipts. No
+production, test or harness edit accompanies inspection and no agent runtime ran.
+
+The approved canActivate slice now has bounded local and rebuilt-binary acceptance.
+This does not close AQ13 context, other guard kinds/resolvers, AQ14/W06/#162 or the
+full repository/final Claude field gates. Performance remains explicitly deferred;
+no rerun/rebuild is requested merely to record this acceptance.
+
+## Consolidated generation-76 binary checkpoint authored, UNRUN
+
+A single route-guards suite reuses the existing suite runner/McpClient, with six
+callers covering direct/alias/barrel/namespace and two independent local scopes.
+Each caller writes seven guard objects/eight exact object-target supports and nine
+slots. The oracle compares actual path/owner/target-file/target-name multisets,
+reverse Gate/RightGate including empty paths, private proof non-disclosure, truthful
+lower bounds and answers-only withinPath. Broad runtime values, refused siblings,
+duplicate fields, same-target other guard kinds and mutable-root legacy are checked
+alongside eager/loadComponent/LoadsChildren/provider preservation in the same suite.
+
+Three sessions cover cold/warm/save, complete restoration before consumers plus
+slot/object/field/child/provider and root deletion/recreation, then stale selected-
+target restore refusal, noncallable runtime replacement, barrel absence/remap,
+package/config mutation and repair with unchanged caller hashes. Existing shared
+runner records schema preflight, source/harness/binary hashes, mutation/RPC/stderr
+receipts and finished session statuses. No transport/lifecycle policy or timeout
+changed. This is operator binary evidence, never a Rust test or final field gate.
+
+Handoff: verification/live-acceptance/issue-162/run-route-guard76-checkpoint.ps1.
+It performs syntax checks, one explicit all-feature binary rebuild, then ONLY the
+new bounded suite (below 500 checks). It does not rerun Rust tests, Clippy or prior
+large binary suites. Failed harness-only corrections may reuse the identical binary
+with -ExpectedExistingBinarySha256; the existing stale-source preflight still
+applies. No agent Node/build/binary/runtime ran; all new harness gates remain UNRUN.
+The 245 local passes remain valid because no production/Rust source changed.
+Performance remains deferred; full repository/final Claude field stay later.
 
 ## Generation-76 focused/preservation GREEN; binary checkpoint pending
 
