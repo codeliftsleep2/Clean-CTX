@@ -1,8 +1,172 @@
 # Issue #162: exact source-declared loadChildren selection
 
 Agent: Agent MaxHeadRoom
-Status: generation-75 scoped Rust/lint inspected GREEN (221 passing executions); acceptance-map reconciliation and rebuilt-binary gates pending.
+Status: generation-75 scoped Rust/lint GREEN (221 executions); bounded binary PASS (405 Module + 405 RouteConfig + 305 lazy + 305 provider); broader gates and larger-fixture timeout open.
 Discovery expansion and runtime routing/provider meaning remain NOT APPROVED.
+
+## Generation-75 bounded same-binary checkpoint inspected PASS
+
+Inspected load-children75-binary-20261102-063755, selection after-modules:
+RouteConfig 405/405, lazy-Component 305/305 and route-provider 305/305 checks pass.
+Each receipt records zero failed checks/errors, three FINISHED sessions and the
+hard 500-check ceiling. Combined with the preserved Module 405/405 receipt, all
+four bounded suites complete: twelve FINISHED sessions, no suite errors.
+
+All four share binary SHA-256
+78b742b520de07a8c5ae1b894cc1fdc8e6bf87b59fe0df10ebb5740953d5255b
+and recorded input hash
+df690d8ae1b032e048079568881ddafacb4eb17d122f6c196da2d3bafc66dcc1.
+Combined receipt/report hashes: target/issue-162/load-children75-binary-receipt.json.
+The Module suite was not repeated by the after-modules selection.
+
+This supersedes corresponding bounded-suite UNRUN/pending statements below.
+Generation-75 has 221 scoped Rust passing executions, clean lint and inspected
+bounded binary/stdio acceptance as distinct evidence classes. The deterministic
+map and bounded binary gate are satisfied within the approved envelope. No
+production/test/harness edit accompanies inspection and no agent runtime ran.
+The preserved larger 85-TypeScript-file config-transition timeout remains OPEN;
+narrowed acceptance does not establish a performance repair or broader scale
+acceptance. Full repository/final Claude field and broader AQ12/AQ13/AQ14/W06/
+P1/P3/W04/#162 closure remain open.
+
+## Bounded Module binary checkpoint inspected PASS
+
+Inspected load-children75-binary-20261101-233051, selection modules-only:
+load-children-modules records 405/405 passing checks, zero errors and all three
+sessions FINISHED. The narrowed scenario completes the previously timed-out config
+mutation/repair with the unchanged 120-second request policy. This establishes
+bounded Module acceptance; it does not resolve the preserved 85-TypeScript-file
+config-transition performance finding or certify broader scale behavior.
+
+Binary SHA-256 remains
+78b742b520de07a8c5ae1b894cc1fdc8e6bf87b59fe0df10ebb5740953d5255b.
+Recorded input hash:
+df690d8ae1b032e048079568881ddafacb4eb17d122f6c196da2d3bafc66dcc1.
+Receipt/report hashes: target/issue-162/load-children75-modules-binary-receipt.json.
+No production/test/harness edit accompanies inspection; no agent runtime ran.
+
+Next run Selection after-modules against this exact binary, preserving the passing
+Module receipt. RouteConfig, lazy-Component and route-provider receipts must share
+its input/binary hashes before combined checkpoint acceptance. Full repository,
+final Claude field, broader issue closure and the larger-fixture timeout stay open.
+
+## Repeated post-config timeout isolated; narrow Module checkpoint authored, UNRUN
+
+Inspected load-children75-binary-20261101-223114 and Module receipt under
+2026-11-02T03-31-19-234Z-load-children-modules-summary-18036: again 364/364 recorded
+checks pass, first two sessions FINISHED, third FAILED. Timeout is request 64,
+the first Route/same query after adding baseUrl to tsconfig. The preceding successful
+same queries were in the previous pre-mutation fact batch; the earlier description
+must not imply that they proved the changed-config query could complete. Duplicate
+query removal reduced calls but did not repair the observed timeout boundary.
+
+The recorded fixture contains 85 TypeScript files: scenario inheritance brought
+unrelated bootstrap/legacy/DI/HTTP/provider files into this role-specific check.
+Narrowed only the scenario's inherited base to its seven declared core/router/
+Component/token dependencies. All Module/RouteConfig target/caller files, native
+and foreign roots, callbacks, guard/resolver/provider/eager/lazy oracles and every
+mutation/repair remain. Shared runner defaults and preservation suites are unchanged;
+no global cap/cache/timeout/retry or production behavior changes. This is a bounded
+fixture-scope correction, not a production performance fix. The larger fixture's
+config-transition timeout remains an open performance finding; no broader scale
+acceptance or full-suite PASS is inferred.
+
+Exact pre-change report/harness/RPC/stderr and hashes:
+ target/issue-162/load-children75-config-transition-timeout/receipt.json.
+The checkpoint now accepts Selection modules-only for the next focused rerun,
+then after-modules for the other three pending suites once Module completes.
+Each selection gets its own explicit receipt; overall four-suite acceptance still
+requires all four complete receipts with matching input/binary hashes. Reuse the
+same hash-verified binary; do not rerun 221 passing Rust tests. New narrower Module
+result is UNRUN; no agent Node/build/binary/runtime ran. Repository/field gates stay
+open, including this preserved larger-fixture timeout.
+
+## Binary timeout after passing assertions; duplicate query removal authored, UNRUN
+
+Inspected load-children75-binary-20261101-212706, Module report under
+2026-11-02T02-27-11-051Z-load-children-modules-summary-7528: 364/364 recorded checks
+pass, first two sessions FINISHED, third FAILED. Overall FAIL is correct: a 120s
+request timeout at stale-role-export-package-config-repair/85/workspace_query
+prevents session completion and final binary/input checks. Remaining suites were
+not reached. Do not report this as binary acceptance or failed semantic assertion.
+
+The RPC trace records the same outgoing Route/same query immediately preceding
+the timeout returning in about 7 seconds three times. The harness repeats that
+query separately for provider/guard/resolver assertions after already obtaining
+the exact fresh response in the current fact batch. Those three preservation
+assertions now consume that same response locally. Every oracle/count, independent
+fact batch, mutation/repair, repeated cold/warm query and session remains intact.
+There is no cross-batch cache, retry, timeout increase or production change. This
+removes redundant harness work; it is not evidence of a production performance
+repair, nor a guarantee that the rerun will complete within the existing timeout.
+
+Prior harness/report/RPC/stderr bytes and hashes:
+ target/issue-162/load-children75-redundant-query-timeout/receipt.json.
+Rerun the four pending suites using the same hash-verified binary. A fresh complete
+Module receipt remains required; the previous two finished sessions are preserved
+as partial evidence, not relabeled whole-suite PASS. No 221-pass Rust rerun or
+rebuild is required for this harness-only change. New binary result is UNRUN;
+no agent Node/build/binary/runtime ran. Repository/final field gates remain open.
+
+## Foreign-root legacy binary fixture correction authored, UNRUN
+
+Inspected load-children75-binary-20261101-212056 and its Module suite receipt:
+18/19 checks pass, then q12/foreign-legacy-preservation expects one row and gets
+zero. The first exact forward/reverse canonical checks, owned refusal and mutable
+legacy checks pass, but no binary suite/session acceptance follows from this
+partial run. RouteConfig/lazy-Component/route-provider suites were not reached.
+Syntax preflight/build completed; runtime receipt records the exact rebuilt binary.
+
+The foreign-root fixture imports Routes only from a local foreign module. The
+unchanged routing::extract_route_shape_at_with_regions gate returns None unless
+source contains @angular/router, independently of Angular class applicability.
+The fixture therefore did not qualify for the old routing contribution it expected.
+This is an invalid compatibility control, not evidence of canonical semantic failure.
+
+Added an unrelated native Route type import to that fixture while retaining its
+foreign Routes root annotation. Expected legacy row/count and all canonical
+assertions are unchanged. No Rust production/test changes. Prior harness, receipt
+and log bytes/hashes: target/issue-162/load-children75-foreign-fixture-correction/receipt.json.
+
+The checkpoint accepts ExpectedExistingBinarySha256 to reuse only the exact prior
+rebuilt binary after this harness-only correction; runner Rust-input freshness,
+binary/input equality, schema and bounded receipts still apply. Rerun all four
+pending suites, starting Module from a fresh workspace/session. Do not repeat the
+221 passing Rust executions or rebuild unchanged Rust. Corrected binary gates
+remain UNRUN; no agent Node/build/binary/runtime ran. Broader gates stay open.
+
+## Generation-75 ecological binary checkpoint authored, UNRUN
+
+Reconciled the 57-item map against passing exact forward/reverse, role/refusal,
+retained/lifecycle and preservation assertions plus unchanged emission/encoding
+review. No additional deterministic edit was needed. The 221 scoped passing
+executions and clean lint remain valid; binary and full repository/field evidence
+are separate.
+
+Added load-children-modules and load-children-routes using the existing binary/
+stdio runner and one shared scenario factory with distinct target roles. Each
+logical suite has three sessions, an existing hard 500-check ceiling and static
+budget of 405 checks; actual counts are unobserved. Fixtures cover nested direct/
+re-export/alias callers, two same-named targets, repeated/empty/child objects,
+provider-bearing/free routes and exact forward/reverse target/source multisets.
+RouteConfig targets are native empty provider-free typed const Routes Arrays.
+
+Cold/warm/withinPath, checkpoint/restart, repeated-object/field/child/provider
+retirement, independent caller deletion/recreation, stale restore before queries,
+selected-role repair, export removal/retarget, package/config mutation and repair
+are batched. Owned unsupported/duplicate callbacks have no weak fallback. Eager,
+loadComponent, route-provider and existing guard/resolver contributions survive.
+Mutable and foreign-root rows are observed only as noncanonical legacy behavior;
+this does not certify guard/resolver applicability or AQ13 context.
+
+Handoff: verification/live-acceptance/issue-162/run-load-children75-checkpoint.ps1.
+Operator runs syntax preflight, one all-feature final binary rebuild with unique
+metadata, then load-children-modules, load-children-routes, lazy-route-components
+and route-providers against that binary. The checkpoint validates shared recorded
+input hashes as well as binary hash and retains summary paths/hashes. Each suite
+keeps its own below-500 receipt. All new binary checks are UNRUN. No Rust production/
+test edit accompanies authorship; no agent Node/build/binary/runtime ran. Full
+repository/final Claude field and broader issue gates remain open.
 
 ## Generation-75 focused Rust/lint inspected GREEN
 

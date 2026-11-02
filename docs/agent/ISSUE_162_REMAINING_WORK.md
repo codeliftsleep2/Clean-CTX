@@ -4,6 +4,30 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-10-30
 Status: planning/evidence reconciliation; no production change or runtime run.
 
+## Generation-75 bounded same-binary acceptance inspected PASS
+
+Scoped Rust/lint remains GREEN (221 passing executions). Bounded binary receipts
+now pass Module 405/405, RouteConfig 405/405, lazy-Component 305/305 and route-provider
+305/305, with matching binary/input hashes, twelve FINISHED sessions and zero
+errors. Combined receipt: target/issue-162/load-children75-binary-receipt.json.
+Module acceptance was preserved while the other three suites ran separately.
+
+The larger 85-TypeScript-file config-transition timeout remains OPEN, preserved at
+ target/issue-162/load-children75-config-transition-timeout/receipt.json.
+Narrowed fixture acceptance is not a performance repair or broad scale acceptance.
+Full repository/final Claude field and broader AQ12/AQ13/AQ14/W06/P1/P3/W04/#162
+closure remain open. Later work must reconcile these independent gates explicitly.
+
+## Generation-75 same-binary checkpoint authored, UNRUN
+
+The deterministic [57-item map](ISSUE_162_LOAD_CHILDREN_ACCEPTANCE.md) is reconciled;
+221 scoped passing executions and clean lint remain valid. Added separate Module
+and RouteConfig binary/stdio suites (three sessions and hard 500-check ceiling each),
+plus same-binary lazy-Component and route-provider preservation. Handoff:
+run-load-children75-checkpoint.ps1. All new binary controls are UNRUN; no agent
+runtime ran. Full repository/final Claude field and broader issue closure remain
+open, alongside unresolved AQ13/context and other unreconciled questions.
+
 ## Generation-75 focused Rust/lint inspected GREEN
 
 LoadsChildren focused evidence totals 221 passing executions; corrected resumed
