@@ -349,3 +349,39 @@ mod angular_lazy_route_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_lazy_route_lifecycle_issue_162.rs"]
 mod angular_lazy_route_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_load_children_issue_162.rs"]
+mod angular_load_children_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_load_children_field_issue_162.rs"]
+mod typescript_load_children_field_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_children_selection_support_issue_162.rs"]
+mod typescript_children_selection_support;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_children_selection_issue_162.rs"]
+mod typescript_children_selection_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_children_selection_lifecycle_issue_162.rs"]
+mod typescript_children_selection_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_shared_selection_roles_issue_162.rs"]
+mod typescript_shared_selection_roles_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_load_children_semantic_issue_162.rs"]
+mod angular_load_children_semantic_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_load_children_controls_issue_162.rs"]
+mod angular_load_children_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_load_children_lifecycle_issue_162.rs"]
+mod angular_load_children_lifecycle_tests;

@@ -6,6 +6,12 @@ use std::path::PathBuf;
 mod acquire;
 pub(super) use acquire::capture;
 pub(crate) type Span = (usize, usize);
+
+// Explicit demand origins only; framework roles are interpreted by consumers.
+pub(super) fn demand_origin(name: &str) -> bool {
+    matches!(name, "loadComponent" | "loadChildren")
+}
+
 type Structure = (Span, &'static str, Vec<(String, usize, usize)>);
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ArrowSelection {
@@ -103,7 +109,10 @@ fn field<'a>(
     match &v.value {
         ExpressionValue::Object(fields) => {
             for (name, value) in fields {
-                if name == "loadComponent" && (value.start, value.end) == span {
+                if demand_origin(name)
+                    && (value.start, value.end) == span
+                    && fields.iter().filter(|(key, _)| key == name).count() == 1
+                {
                     out.push((v, value));
                 }
                 field(value, span, out);

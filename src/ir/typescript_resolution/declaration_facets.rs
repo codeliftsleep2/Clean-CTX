@@ -461,7 +461,7 @@ impl Demand<'_> {
                             };
                             if self.fields.contains(&key) {
                                 let expression = self.expression(value, file, source);
-                                if key == "loadComponent"
+                                if super::arrow_selection::demand_origin(&key)
                                     && let Some((proof, sites)) = super::arrow_selection::capture(
                                         self.resolver,
                                         file,

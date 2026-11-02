@@ -1,8 +1,76 @@
 # Issue #162: current position and remaining work
 
 Agent: Agent MaxHeadRoom
-Reconciled: 2026-10-27
+Reconciled: 2026-10-30
 Status: planning/evidence reconciliation; no production change or runtime run.
+
+## Generation-75 focused Rust/lint inspected GREEN
+
+LoadsChildren focused evidence totals 221 passing executions; corrected resumed
+Clippy/fmt and active sizes are inspected GREEN. Receipt:
+ target/issue-162/load-children75-focused-receipt.json.
+The original exact forward/reverse Module/RouteConfig controls now pass. Next:
+reconcile the [57-item map](ISSUE_162_LOAD_CHILDREN_ACCEPTANCE.md), cover any remaining
+deterministic gaps, then one consolidated rebuilt-binary checkpoint. No binary,
+full repository, final Claude field or broader issue closure is inferred.
+
+## Approved generation-75 LoadsChildren checkpoint authored, UNRUN
+
+The owner approves the [loadChildren production contract](ISSUE_162_LOAD_CHILDREN_DECISION.md):
+exact RouteOccurrence to selected Module or RouteConfig declaration, separate native
+role proofs, shared projection/admission, owned selective legacy replacement,
+outside legacy preservation and generation 75. Implementation and eight integrated
+batches are authored; original REDs/acquisition probes are restored byte-identically.
+See [acceptance map](ISSUE_162_LOAD_CHILDREN_ACCEPTANCE.md) and
+run-load-children75-focused.ps1. All post-repair gates UNRUN; no agent runtime ran.
+Reconcile focused results before a later major binary checkpoint; repository/final
+Claude field and broader issue closure remain open. Discovery is not expanded.
+
+## loadChildren neutral GREEN and intended association RED inspected
+
+Inspected shared-written-selection-20261030-144015: 172 scoped passing executions,
+including six unchanged acquisition probes, clean Clippy/fmt and active sizes.
+All six additional Module/Routes direct/re-export/alias probes reach intended
+forward LoadsChildren association RED after complete neutral selection and
+independent selected role proof. Exact evidence is preserved at
+ target/issue-162/load-children-association-red-evidence/receipt.json.
+
+The [loadChildren decision](ISSUE_162_LOAD_CHILDREN_DECISION.md) now requests explicit
+production disposition for canonical LoadsChildren with separate Module/RouteConfig
+roles, shared exact producer/admission and selective owned replacement versus
+outside-envelope legacy preservation, plus generation 75. No semantic repair is
+authorized by the neutral disposition; no unchanged rerun is requested now. Broader
+repository/final field and issue closure remain open.
+
+## loadChildren shared neutral checkpoint authored, UNRUN
+
+The [loadChildren decision](ISSUE_162_LOAD_CHILDREN_DECISION.md) records field-only
+153 scoped passes and six observed callback prerequisites. Owner approval now
+authorizes shared loadComponent/loadChildren demand acquisition/replay with the
+same carrier/resolver and separate framework target interpretation. Implementation,
+eight neutral batches and six additional complete-selection public probes are
+authored, UNRUN; original six probes are restored unchanged. See the
+[neutral map](ISSUE_162_SHARED_SELECTION_ACCEPTANCE.md) and
+run-shared-written-selection.ps1. Canonical LoadsChildren, Module/RouteConfig public
+policy, legacy retirement, generation advancement and broader closure remain
+unapproved. Return at the next actual prerequisite or genuine association RED.
+
+## Generation-74 bounded lazy Component acceptance inspected PASS
+
+The [lazy Component decision](ISSUE_162_LAZY_ROUTE_COMPONENT_DECISION.md) and
+[66-item map](ISSUE_162_LAZY_ROUTE_COMPONENT_ACCEPTANCE.md) now record 194 scoped
+Rust passing executions, clean lint and same-binary ecological PASS: 305 lazy,
+241 eager and 305 route-provider checks, nine FINISHED sessions, zero errors.
+Receipt: target/issue-162/lazy-route74-binary-receipt.json. This supersedes the
+corresponding authored/UNRUN statements below, not broader repository/field gates.
+
+Next proposed AQ12/W06 question is [exact loadChildren selection](ISSUE_162_LOAD_CHILDREN_DECISION.md)
+for native Module and typed Routes targets, with distinct role controls. Static
+trace finds field omission and loadComponent-specific neutral nomination; no
+behavioral RED is inferred. Investigation/test disposition is requested before
+new capture, semantic publication/admission or legacy replacement. No runtime
+was started. AQ13 context, broader AQ14, full repository and final Claude field
+remain open. No P1/P3/W04/#162 closure follows.
 
 ## Approved generation-74 lazy production checkpoint authored, UNRUN
 
