@@ -1,8 +1,266 @@
 # Issue #162: remaining source-declared Array guard memberships
 
 Agent: Agent MaxHeadRoom
-Status: neutral/targeted preservation GREEN (33 scoped passes); all four acquisition probes GREEN; semantic investigation remains.
-Production edit is exactly four demand names; no candidate semantics or compatibility advance.
+Status: generation-77 focused/targeted preservation GREEN (102 scoped passes); binary checkpoint pending.
+Approved four explicit relations; canonical canActivate GuardedBy preserved without umbrella union.
+
+## Generation-77 focused/targeted preservation GREEN
+
+Inspected route-guard77-focused-20261102-154828: 102 scoped passing executions,
+zero failed/ignored across requested filters. All five adapted semantic/kind controls,
+seven new control/lifecycle batches, four neutral batches, accepted canActivate
+semantic/mixed-kind controls, routing/compatibility and targeted route/provider/
+Module/bootstrap/config siblings pass. The unchanged four acquisition probes pass
+last. This is scoped execution evidence, not unique/full-repository coverage.
+
+Clippy finishes without warnings/errors under all-targets/all-features -D warnings
+(27.49 seconds); compile/format/fmt logs are empty and active sizes pass. Original
+acquisition probe bytes match approved isolation. Exact current source/tests/handoff
+and all logs/hashes are preserved under
+ target/issue-162/route-guard77-focused-green-evidence/receipt.json.
+
+No production/test/harness edit accompanies inspection and no agent runtime ran.
+Generation 77 now has observed bounded local acceptance, including distinct public
+relation names and cross-kind/retained/persistence/currentness controls. One
+consolidated rebuilt-binary checkpoint remains pending; the old generation-76
+binary receipt does not verify generation 77. No local suite rerun is requested
+merely for recording GREEN. Performance stays deferred; full repository/final
+Claude field and broader AQ13/AQ14/W06/#162 remain open.
+
+## Generation-77 production/public approval applied; authored, UNRUN
+
+The owner explicitly approves the four kind-qualified relations and exact per-kind
+support policy, broad written-use targets, partial-slot preservation, field-specific
+retained admission and selective owned replacement. Semantic generation is now 77.
+Historical pending requests below are superseded by that approval. No additional
+approval is required inside this implementation boundary.
+
+Codec/index inspection found the existing named serde JSON edge representation
+and SQLite edges_json transport (sqlite_store/semantic_state.rs), plus relation in
+WorkspaceIndex occurrence identity (workspace/index/edges.rs). The four variants
+are appended at the end of SemanticRelation, preserving all existing positions and
+named values. No edge property, retained carrier, equality change or durable-format
+version is added. Existing query serialization exposes explicit relation names;
+marker generation 6 and pipeline generation 1 remain unchanged. Authored tests
+check named JSON roundtrip, old ordinal anchors and SQLite/index before queries.
+This static inspection is not observed runtime certification.
+
+route_guards now shares parameterized membership mechanics across canActivate and
+the four new fields. Its existing project remains canActivate-only; project_kinds
+walks admitted objects for the four distinct relations. Admission selects the
+corresponding field and replays the same membership mechanics, never another kind.
+The four new relations require exact canonical proof even when a forged edge has
+no canonical endpoints; only old unqualified GuardedBy keeps legacy compatibility.
+No all-kind summary is published.
+
+The legacy parser retains four private counts in one shared fixed field order
+before flattening names. The emitter uses exact object-span/per-kind ownership to
+suppress only each owned branch, independent of eligibility/refusal. This replaces
+the obsolete canActivate-only prefix count without changing old ordering/display.
+canActivateChild has no old branch; no outside-envelope branch was added. Default
+angular_semantic appends both existing canActivate and new kind projections.
+
+Original valid RED/collision probes, registration and historical neutral public
+checks were raw-byte isolated under target/issue-162/route-guard77-approved-isolation/.
+The semantic RED and registration were restored exactly before intentionally
+adapting the approved oracle: each probe now filters its explicit relation and
+requires exactly sixteen object/target supports; repeated slots stay eighteen
+neutral facts. The old collision control now requires distinct public relations
+beside existing canActivate, including canActivateChild. Historical mixed-kind/
+neutral public expectations were updated only for this intentional migration;
+previous bytes remain preserved. Original four acquisition probes are unchanged.
+This is not a Git stash; HEAD and normal index were untouched.
+
+Seven new tracked control/lifecycle batches share all-kind fixtures: named serde/
+ordinal compatibility and isolated cross-kind endpoint/refusal; missing/competing/
+crossed retained occurrence proof while other kinds remain valid; broad/partial/
+computed/spread/non-reference values and duplicate fields with valid siblings;
+same-target five relations and exact outside legacy omissions; complete SQLite
+snapshot/index before queries and cold/warm/refresh/withinPath/deletion/recreation;
+slot/field/kind/object/child/provider/root retirement and repair; unchanged-owner
+selected target/export/barrel/package/config stale refusal and repair. Existing
+neutral five-form tests now verify all four explicit relations across all reference
+forms without duplicating fixture campaigns. These are authored, not observed.
+
+See [generation-77 acceptance map](ISSUE_162_ROUTE_GUARD_KINDS_ACCEPTANCE.md) for
+question, proof, producer/persistence/query reachability and test authority.
+Handoff: verification/live-acceptance/issue-162/run-route-guard77-focused.ps1.
+Operator formats unfrozen active files, checks sizes, compiles, runs focused and
+targeted affected preservation, then warning-free all-target/all-feature Clippy/fmt
+and unchanged four acquisition probes. -ResumeAtLint skips already passing test
+groups for lint-only repair. No broad previous lifecycle campaign is repeated.
+All post-edit runtime gates are UNRUN; no agent formatter/Cargo/Node/build/binary
+or runtime ran. One consolidated binary checkpoint follows local GREEN; none is
+requested now. Prior generation-76 acceptance is historical bounded evidence, not
+verification of generation 77. Performance stays deferred and final Claude field
+remains last; broader AQ13/AQ14/W06/#162 and full repository gates remain open.
+
+## Four intended association REDs observed; public-kind collision control GREEN
+
+Inspected route-guard-kinds-semantic-20261102-151843: one passed, four failed,
+zero ignored, 57.55 seconds. All four isolated-field probes reach line 174,
+stage=guard-kind-association direction=forward after exact retained field/Array/
+slot/demanded reference, matching value_reference_at occurrence, independent selected
+DeclarationId/source-hash and accepted/native sibling prerequisites pass for all
+sixteen object/target supports. This is actual association identity RED, not
+missing capture and not a failure manufactured by a new kind selector.
+
+| Field | Forward same / child GuardedBy | Initial reverse Gate | Candidate requirement |
+| --- | --- | --- | --- |
+| canMatch | 4 / 4 | 8 | 8 same, 4 child, 16 candidate reverse supports (up to 18 slots allowed) |
+| canDeactivate | 4 / 4 | 8 | Same exact source/target support bounds |
+| canLoad | 4 / 4 | 8 | Same exact source/target support bounds |
+| canActivateChild | 0 / 0 | 2 | Same exact source/target support bounds |
+
+Reverse totals include two accepted canActivate controls that the candidate oracle
+excludes. The control bucket independently passes exact selected target file/name
+checks. Direct Right is an imported alias for the second Gate declaration; legacy
+labels/caller-file attribution do not match exact selected target coordinates.
+Distinct repeated objects also collapse. Reverse bounds and repeated-edge checks
+remain unclassified after forward failure, despite initial answers being retained.
+
+The fifth test passes: exact neutral canMatch/canDeactivate/canLoad mappings differ,
+yet the sorted public GuardedBy edge data are identical when each is written beside
+accepted canActivate using the same target. Each case exposes one accepted canonical
+and one weak legacy row. This demonstrates current public-kind indistinguishability;
+it does not choose a new contract or turn canActivate into candidate proof.
+
+Compile/format logs are empty; active sizes pass. Exact formatted tests,
+registration, logs/hashes and all four association plus three collision answers:
+ target/issue-162/route-guard-kinds-association-red-evidence/receipt.json and
+observed-public.json. No production/test/harness edit accompanies inspection and
+no agent runtime ran. Generation remains 76. The 33 scoped acquisition/preservation
+passes remain separate evidence, not candidate semantic acceptance.
+
+## Production and public-contract disposition requested
+
+The observed identity defect needs exact relation-specific membership, and the
+field-specific question additionally needs an expressible kind. Approve a concrete
+public interpretation before implementation. Options:
+
+| Option | Consequence |
+| --- | --- |
+| Unqualified GuardedBy union across five fields | Reuses vocabulary and can represent exact route/target union support, but cannot answer which field is written; that required question remains explicitly open |
+| Recommended: four kind-specific relation variants, keeping existing canonical canActivate GuardedBy | Reuses existing edge, RouteOccurrence, target and query/index representation; relation identity distinguishes field support without a generic edge-metadata carrier or global equality change; expands public vocabulary deliberately |
+| Add a guard-kind property/discriminator to GuardedBy | Directly exposes kind but requires additional edge/transport/index/query contract and possible durable consequences; larger cross-cutting change |
+
+Recommended exact public mapping (names are a proposed contract, not implemented):
+
+| Ordinary field | Canonical relation | Target meaning |
+| --- | --- | --- |
+| canActivate | GuardedBy (existing generation-76 behavior unchanged) | Existing exact runtime declaration as written Guard use |
+| canMatch | GuardedByCanMatch | Same written-use classification, not execution/eligibility |
+| canDeactivate | GuardedByCanDeactivate | Same written-use classification |
+| canLoad | GuardedByCanLoad | Same written-use classification, no runtime/version/deprecation claim |
+| canActivateChild | GuardedByCanActivateChild | Same written-use classification, not inherited applicability |
+
+Under this option, canonical GuardedBy is NOT an additional all-kind summary row:
+retain its accepted canActivate branch only. Each new relation exposes exactly its
+own field. Generic noncanonical GuardedBy outside admitted ownership stays legacy;
+its name does not certify kind. Existing forward/reverse queries return the explicit
+relation names; no new endpoint selector is needed to identify a returned field.
+Review exhaustive relation-name/schema conversions and index/serde handling before
+implementation. If those require broader authority or an encoding change, return
+with that exact requirement rather than silently adding a generic carrier.
+
+Request one public relation per exact RouteOccurrence/kind/resolved runtime
+DeclarationId support. Repeated slots within a field remain independent neutral
+support, not duplicate relations. Different fields naming one target have distinct
+relations; distinct objects remain distinct even with equal path/name/file labels.
+Require the same complete retained root/object/unique ordinary field/Array/slot/
+demanded-and-runtime-reference/source-hash/witness proof in producer and admission.
+Broad resolvable runtime functions/typed values/classes/other values are eligible
+only as written use, independently of actual guard suitability. Preserve proved
+slots when siblings refuse; duplicate mappings and unproved/unsupported slots
+cannot borrow another field's endpoint. These choices require explicit approval
+for the four new kinds; generation-76 alone does not authorize them.
+
+Recommend selective REPLACE of only each migrated field's weak contribution inside
+the shared native typed-const Routes object envelope, even when canonical proof
+refuses. No owned downgrade or old+new duplicate fact. The current parser retains
+only the canActivate prefix; retain minimum private per-kind/object/field origin
+before flattening the other three old branches. canActivateChild currently has no
+old branch to retire. Never suppress by target/path labels or a generic GuardedBy
+sweep. Preserve accepted canActivate and independently valid field/other-route
+siblings. Outside ownership PRESERVE AS LEGACY the exact existing discovery/output,
+including existing omissions, without adding kind-qualified facts there.
+
+Recommend shared parameterized membership mechanics behind the existing/new
+relation-specific consumers, not four copied guard trees or a new resolver.
+Relation-specific admission must replay the exact field for that relation; valid
+canActivate evidence must never admit GuardedByCanMatch or another kind. Existing
+Object/Array/Reference/Declaration and witness lifecycle suffice as demonstrated
+neutral evidence; no new retained payload is currently shown necessary.
+
+Request semantic generation 76 to 77 for the public relation/identity interpretation,
+with marker/pipeline unchanged. No durable-format bump is proposed absent actual
+encoding need; preserve existing enum representations/ordinals when adding variants
+and return if the concrete storage codec requires a new disposition. No global
+EntityRef equality, acquisition/discovery, cache/registry/lifecycle or runtime
+applicability change is proposed.
+
+After approval: isolate/restore all valid RED/collision bytes, then explicitly
+update the approved relation/multiplicity oracle and collision control for the new
+contract. Batch all reference forms, same-target same/different fields, partial/
+duplicate/refused proof and cross-kind borrowing, owned refusal vs outside legacy,
+complete SQLite/index before queries, source/target/field/kind/root retirement and
+unchanged-owner export/barrel/package/config mutation/repair. Reuse accepted sibling
+and focused preservation checks, clean lint, then one consolidated bounded binary
+checkpoint. Keep original observations as evidence of the intentional compatibility
+change. Operator owns execution; performance remains deferred and final Claude
+field remains last. No broad issue closure follows.
+
+The neutral approval explicitly withholds new projection/admission, kind meaning,
+public vocabulary/equality, replacement and generation advance. AGENTS.md's
+Architectural Approval Gate therefore requires this separate production/public
+contract disposition. No unchanged rerun or semantic repair is requested before
+approval. Full AQ13/AQ14/W06/#162 and repository/final field gates remain open.
+
+## Post-acquisition semantic investigation authored, UNRUN
+
+Owner continuation proceeds with tests/investigation only. Four new tracked probes
+isolate one candidate field per fixture across two native typed-const Routes roots.
+Candidate objects carry no other guard fields; accepted canActivate stays on a
+separate controls object. Thus a canActivate fact cannot satisfy a candidate
+membership assertion, and a missing public kind discriminator is not itself RED.
+No production/capture/GuardedBy admission or generation change was made.
+
+Every probe first checks native route-target/provider and canActivate siblings,
+records registered public forward/reverse/control answers, then requires exact
+retained candidate field/Array/slot/demanded-reference proof, the matching runtime
+value_reference_at occurrence and independently recaptured selected DeclarationId.
+Only after all prerequisites pass does stage=guard-kind-association compare actual
+name/file/path coordinates and distinct-object multiplicity through existing
+unqualified GuardedBy queries. This explicitly tests a candidate written-use
+hypothesis, not an approved new target-role or kind contract.
+
+The fixture has sixteen object/target supports and eighteen slots. The oracle
+permits support-level or slot-level counts within each exact coordinate, so it
+does not choose the later public multiplicity policy. It requires distinct route
+objects and exact target identity in nonempty forward buckets and complete reverse
+buckets including empty paths. Accepted control rows are checked independently and
+excluded from candidate reverse comparisons. Initial observations remain available
+if any later prerequisite or semantic assertion panics. Later reverse and repeated
+edge assertions are unclassified until actually reached.
+
+A fifth tracked compatibility control cycles canMatch/canDeactivate/canLoad on the
+same object alongside accepted canActivate using the same target. It requires exact
+neutral candidate retention and accepted canActivate projection, records current
+public answers, and compares sorted edge data across kinds. This is an existing
+public-kind collision observation, not semantic association RED. canActivateChild
+is deliberately excluded from that equality control because the old parser lacks
+its branch; its isolated association probe remains independent. No hypothetical
+new public field/selector or vocabulary was introduced to force a failure.
+
+Tracked tests: src/tests/mcp/angular_route_guard_kinds_semantic_issue_162.rs.
+Handoff: verification/live-acceptance/issue-162/run-route-guard-kinds-semantic.ps1.
+It formats only new tests/registration, checks sizes, compiles and records all five
+new tests. Original acquisition probes are unchanged; prior GREEN suites do not
+repeat. All new runtime gates are UNRUN; no agent formatter/Cargo/Node/build/binary
+or runtime ran. Return actual prerequisite versus identity/multiplicity RED and
+separate public-kind observations before production disposition. No binary or
+performance diagnostic is requested; performance remains deferred and final
+repository/Claude field stays last.
 
 ## All four acquisition probes GREEN; neutral/preservation GREEN
 

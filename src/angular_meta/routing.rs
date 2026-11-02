@@ -90,6 +90,10 @@ impl PhiMarker for RouteKind {
 // Data structures
 // ---------------------------------------------------------------------------
 
+// The fixed parser order is private origin, not route identity or retained payload.
+pub(super) const LEGACY_GUARD_FIELDS: [&str; 4] =
+    ["canActivate", "canLoad", "canDeactivate", "canMatch"];
+
 /// A single route declaration.
 #[derive(Debug, Clone)]
 pub struct RouteDecl {
@@ -109,8 +113,8 @@ pub struct RouteDecl {
     pub resolved_load_children: Option<LazyRouteTarget>,
     /// Guard names applied to this route (e.g. `AuthGuard`).
     pub guards: Vec<String>,
-    /// Parser emits canActivate first; this private prefix retains field kind before flattening.
-    pub(crate) can_activate_guard_count: usize,
+    /// Counts in LEGACY_GUARD_FIELDS order retain each old branch before flattening.
+    pub(crate) guard_counts: [usize; 4],
     /// Resolver names applied to this route (e.g. `UserResolver`).
     pub resolvers: Vec<String>,
 }
@@ -201,6 +205,22 @@ impl RouteShape {
         children_owned: &[(usize, usize)],
         guard_owned: &[(usize, usize)],
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        self.to_semantic_edges_guard_kinds_ownership(
+            owned,
+            lazy_owned,
+            children_owned,
+            guard_owned,
+            &[],
+        )
+    }
+    pub(crate) fn to_semantic_edges_guard_kinds_ownership(
+        &self,
+        owned: &[(usize, usize)],
+        lazy_owned: &[(usize, usize)],
+        children_owned: &[(usize, usize)],
+        guard_owned: &[(usize, usize)],
+        kinds_owned: &[((usize, usize), &'static str)],
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges = Vec::new();
@@ -245,19 +265,24 @@ impl RouteShape {
             }
 
             // Route → GuardedBy → Guard
-            for (index, guard) in route.guards.iter().enumerate() {
-                if index < route.can_activate_guard_count
-                    && guard_owned.contains(&route.eager_object_span)
-                {
-                    continue;
+            let mut offset = 0;
+            for (field, count) in LEGACY_GUARD_FIELDS.into_iter().zip(route.guard_counts) {
+                let suppressed = (field == "canActivate"
+                    && guard_owned.contains(&route.eager_object_span))
+                    || kinds_owned.contains(&(route.eager_object_span, field));
+                for guard in &route.guards[offset..offset + count] {
+                    if suppressed {
+                        continue;
+                    }
+                    edges.push(SemanticEdge {
+                        relation: SemanticRelation::GuardedBy,
+                        subject: route_entity.clone(),
+                        object: EntityRef::new("angular", "Guard", guard),
+                        layer: "angular",
+                        call_evidence: None,
+                    });
                 }
-                edges.push(SemanticEdge {
-                    relation: SemanticRelation::GuardedBy,
-                    subject: route_entity.clone(),
-                    object: EntityRef::new("angular", "Guard", guard),
-                    layer: "angular",
-                    call_evidence: None,
-                });
+                offset += count;
             }
 
             // Route → ResolvedBy → Resolver

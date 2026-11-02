@@ -1,4 +1,4 @@
-//! Four approved neutral demand names; no candidate GuardedBy meaning.
+//! Neutral four-origin retention with approved generation-77 public preservation.
 use super::typescript_guard_kinds_field_support::*;
 use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
 use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
@@ -125,9 +125,26 @@ fn issue_162_guard_kinds_field_exact_forms_independent_origins_slots_serde() {
                     .iter()
                     .filter(|e| e["relation"] == "GuardedBy")
                     .count(),
-                if form == "namespace" { 0 } else { 4 },
-                "field-only acquisition must preserve old merged labels: {form}/{name}"
+                0,
+                "canonical GuardedBy remains canActivate only: {form}/{name}"
             );
+            for relation in [
+                "GuardedByCanMatch",
+                "GuardedByCanDeactivate",
+                "GuardedByCanLoad",
+                "GuardedByCanActivateChild",
+            ] {
+                assert_eq!(
+                    observed["edges"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|e| e["relation"] == relation)
+                        .count(),
+                    if name == "same" { 8 } else { 4 },
+                    "approved kind relation {relation}/{form}/{name}"
+                );
+            }
         }
         let reverse = call(
             &state,
@@ -142,12 +159,24 @@ fn issue_162_guard_kinds_field_exact_forms_independent_origins_slots_serde() {
                 .iter()
                 .filter(|e| e["relation"] == "GuardedBy")
                 .count(),
-            if matches!(form, "direct" | "local") {
-                8
-            } else {
-                2
-            }
+            2
         );
+        for relation in [
+            "GuardedByCanMatch",
+            "GuardedByCanDeactivate",
+            "GuardedByCanLoad",
+            "GuardedByCanActivateChild",
+        ] {
+            assert_eq!(
+                reverse["edges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|e| e["relation"] == relation)
+                    .count(),
+                if form == "local" { 8 } else { 16 }
+            );
+        }
     }
 }
 #[test]

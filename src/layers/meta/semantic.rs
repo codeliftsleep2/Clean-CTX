@@ -157,7 +157,7 @@ pub enum SemanticRelation {
     RouteMapsTo,
     /// A route lazily loads a declaration-proven Module or route configuration.
     LoadsChildren,
-    /// A route is guarded by a guard class.
+    /// Canonical canActivate written use; noncanonical older rows remain legacy.
     GuardedBy,
     /// A route is resolved by a resolver class.
     ResolvedBy,
@@ -225,6 +225,15 @@ pub enum SemanticRelation {
     /// injection or container registration. Its object is an unresolved
     /// `builtin / TypeRef` identity.
     HasConstructorParameterType,
+    // Appended to preserve existing enum variant positions and named JSON values.
+    /// Exact written canMatch use; no runtime applicability or callable certification.
+    GuardedByCanMatch,
+    /// Exact written canDeactivate use.
+    GuardedByCanDeactivate,
+    /// Exact written canLoad use; no runtime/version/deprecation claim.
+    GuardedByCanLoad,
+    /// Exact written canActivateChild use; no inherited applicability claim.
+    GuardedByCanActivateChild,
 }
 
 /// Call-specific evidence carried by a `Calls` semantic edge.

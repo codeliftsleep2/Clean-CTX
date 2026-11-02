@@ -429,3 +429,15 @@ mod typescript_guard_kinds_field_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/typescript_guard_kinds_field_lifecycle_issue_162.rs"]
 mod typescript_guard_kinds_field_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_guard_kinds_semantic_issue_162.rs"]
+mod angular_route_guard_kinds_semantic_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_guard_kinds_controls_issue_162.rs"]
+mod angular_guard_kinds_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_guard_kinds_lifecycle_issue_162.rs"]
+mod angular_guard_kinds_lifecycle_tests;

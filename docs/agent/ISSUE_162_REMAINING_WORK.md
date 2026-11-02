@@ -4,6 +4,51 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-11-02
 Status: generation-76 bounded local/binary GREEN; broader correctness and final gates remain open.
 
+## Generation-77 local GREEN: 102 scoped passing executions
+
+Run 154828 passes every requested focused/targeted preservation filter and original
+four probes, with clean Clippy/fmt/size gates. Exact evidence is preserved under
+route-guard77-focused-green-evidence in target/issue-162. No new code/test/harness
+edit. Next is one consolidated generation-77 rebuilt-binary checkpoint, then later
+full repository/final Claude field gates. Performance stays explicitly deferred;
+broader AQ13/context, resolvers and other issue obligations remain open.
+
+## Generation-77 kind-specific guard contract approved and authored, UNRUN
+
+Four new canonical relations distinguish canMatch/canDeactivate/canLoad/
+canActivateChild. Existing GuardedBy stays canActivate-only; no summary union.
+Shared exact projection/replay, per-kind owned weak-row replacement and seven
+control/lifecycle batches are authored. Semantic generation 77; existing JSON/
+SQLite encoding, marker and pipeline unchanged. REDs were isolated/restored before
+approved oracle adaptation; original acquisition probes unchanged. See guard-kind
+acceptance map. Run run-route-guard77-focused.ps1 for focused/targeted preservation
+and lint, then unchanged probes. All post-edit gates UNRUN; binary checkpoint and
+final gates later. Performance stays deferred; no broad campaign rerun requested.
+
+## Four guard-kind association REDs and public-kind collision preserved
+
+Run 151843: four isolated-field association probes fail forward after complete
+retained/runtime-reference/selected-declaration prerequisites; the public-kind
+collision control passes. One passed/four failed, 57.55 seconds. Evidence is under
+route-guard-kinds-association-red-evidence in target/issue-162.
+The decision requests explicit production and public-contract disposition. It
+recommends four kind-qualified relations retaining existing canActivate GuardedBy,
+exact per-kind support/admission, selective owned replacement/outside legacy and
+semantic generation 77, with no demonstrated new payload. All remain unapproved.
+No unchanged rerun or production change. Performance stays deferred; final gates open.
+
+## Remaining guard-kind association tests authored, UNRUN
+
+Four isolated-field association probes require complete retained/runtime-reference/
+selected-declaration prerequisites, then exact GuardedBy coordinates and distinct
+object support bounds. Separate canActivate controls cannot satisfy them. A fifth
+control records same-target public-kind collisions for the three legacy kinds;
+that control is not intended semantic RED. No production/authority/generation change.
+Run run-route-guard-kinds-semantic.ps1 for only these five new tests plus compile/
+format/size prerequisites. Prior GREEN suites do not repeat. All new gates UNRUN;
+return actual divergence before public-kind, multiplicity or replacement disposition.
+Performance stays deferred and final Claude field remains last.
+
 ## Four-field neutral acquisition GREEN: 33 scoped passes
 
 Inspected field capture 145424: four neutral batches, 25 targeted preservation

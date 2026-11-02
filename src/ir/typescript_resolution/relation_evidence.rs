@@ -6,8 +6,14 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
         edges.iter().all(|edge| {
-            if edge.relation == crate::layers::meta::semantic::SemanticRelation::GuardedBy
-                && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
+            if matches!(
+                edge.relation,
+                crate::layers::meta::semantic::SemanticRelation::GuardedByCanMatch
+                    | crate::layers::meta::semantic::SemanticRelation::GuardedByCanDeactivate
+                    | crate::layers::meta::semantic::SemanticRelation::GuardedByCanLoad
+                    | crate::layers::meta::semantic::SemanticRelation::GuardedByCanActivateChild
+            ) || (edge.relation == crate::layers::meta::semantic::SemanticRelation::GuardedBy
+                && (edge.subject.canonical.is_some() || edge.object.canonical.is_some()))
             {
                 #[cfg(feature = "angular")]
                 {

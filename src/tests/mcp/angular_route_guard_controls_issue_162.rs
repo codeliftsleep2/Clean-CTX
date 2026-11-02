@@ -216,11 +216,26 @@ fn issue_162_guard_controls_other_kinds_same_target_and_outside_legacy() {
         rows.iter()
             .filter(|e| e.subject.canonical.is_none())
             .count(),
-        3,
-        "all three other-kind contributions survive, even equal target labels"
+        0,
+        "owned migrated fields no longer emit weak GuardedBy rows"
     );
     // Index support dedup is independent of producer preservation of other kinds.
-    assert_eq!(count(&answer(&state, p, "mixed")), 4);
+    assert_eq!(count(&answer(&state, p, "mixed")), 2);
+    for relation in [
+        SemanticRelation::GuardedByCanLoad,
+        SemanticRelation::GuardedByCanDeactivate,
+        SemanticRelation::GuardedByCanMatch,
+    ] {
+        assert_eq!(
+            snapshot
+                .edges
+                .iter()
+                .filter(|e| e.relation == relation && e.subject.canonical.is_some())
+                .count(),
+            1,
+            "other kinds preserve their independent exact use"
+        );
+    }
     drop(state);
     // Legacy root discovery tests text in the declaration itself; import text
     // elsewhere does not make an untyped or differently named annotation a root.

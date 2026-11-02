@@ -279,17 +279,26 @@ pub(super) fn extract_non_testing_edges(
             .unwrap_or_default();
         #[cfg(not(feature = "typescript"))]
         let guard_owned = Vec::new();
-        edges.extend(shape.to_semantic_edges_guard_ownership(
+        #[cfg(feature = "typescript")]
+        let kinds_owned = evidence
+            .typescript_authority
+            .map(crate::angular_meta::route_guards::owned_kinds)
+            .unwrap_or_default();
+        #[cfg(not(feature = "typescript"))]
+        let kinds_owned = Vec::new();
+        edges.extend(shape.to_semantic_edges_guard_kinds_ownership(
             &owned,
             &lazy_owned,
             &children_owned,
             &guard_owned,
+            &kinds_owned,
         ));
     }
 
     #[cfg(feature = "typescript")]
     if routing_enabled && let Some(authority) = evidence.typescript_authority {
         edges.extend(crate::angular_meta::route_guards::project(authority));
+        edges.extend(crate::angular_meta::route_guards::project_kinds(authority));
         edges.extend(crate::angular_meta::route_load_children::project(authority));
         edges.extend(crate::angular_meta::route_components::project(authority));
         edges.extend(crate::angular_meta::route_lazy_components::project(
