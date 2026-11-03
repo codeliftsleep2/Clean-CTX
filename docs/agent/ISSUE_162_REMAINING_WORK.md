@@ -2,7 +2,116 @@
 
 Agent: Agent MaxHeadRoom
 Reconciled: 2026-11-02
-Status: generation-76 bounded local/binary GREEN; broader correctness and final gates remain open.
+Status: generation-77 bounded local/binary GREEN (102 scoped Rust passes; 345 binary checks); broader/final gates open.
+
+## Resolver neutral acquisition GREEN: 47 scoped passes
+
+Run route-resolver-mapping-capture-20261103-094832 passes six neutral mapping
+batches, three field tests, targeted siblings and all six unchanged probes, with
+clean Clippy/fmt/size gates. Evidence: route-resolver-mapping-green-evidence.
+No remaining tested acquisition prerequisite. No association RED or public key
+contract certified. Next is tracked exact association and separate key-reachability
+investigation; no unchanged suite rerun. Generation 77 and deferred performance
+unchanged; production semantics and broader/final gates remain open.
+
+## Bounded resolve mapping joins approved and authored, UNRUN
+
+Private source/hash/field/Object/pair/key-token/value joins reuse existing neutral
+reference/witness and JSON/SQLite lifecycle. Old payload mapping evidence defaults
+absent; no public semantics or generation change (77). Six neutral test batches,
+historical field preservation and affected sibling gates precede unchanged six
+probes in run-route-resolver-mapping-capture.ps1. Return actual remaining prerequisite
+before semantic/public-key disposition. Runtime gates UNRUN; performance deferred.
+
+## Resolve field GREEN; six nested-mapping prerequisite failures
+
+Run route-resolver-field-capture-20261103-090922: 35 scoped neutral/preservation
+passes and clean Clippy/fmt/size gates. Unchanged six probes now pass outer field/
+Object proof, then fail at resolver-mapping-prerequisite (empty mappings), 73.94s.
+Evidence: route-resolver-mapping-prerequisite-evidence. No association RED claimed.
+See resolver decision for bounded one-level mapping/key/value join design proposal;
+no acquisition extension before separate disposition. Generation remains 77;
+performance deferred and final gates open. No unchanged rerun requested.
+
+## Resolve-only field acquisition approved and authored, UNRUN
+
+Exactly resolve was added to Angular DECLARATION_FIELDS. Three focused neutral
+batches and targeted preservation/lint handoff precede unchanged six probes:
+run-route-resolver-field-capture.ps1. No nested key demand or semantics changed.
+Return actual post-field prerequisite; generation 77 and deferred performance
+unchanged. All new gates UNRUN; operator owns runtime.
+
+## Resolver field boundary observed: six prerequisite failures
+
+Run route-resolver-20261102-225051: zero passed, six failed, zero ignored, 78.95s.
+All stop at missing resolve field after accepted sibling controls. Evidence and
+public observations are preserved under route-resolver-field-prerequisite-evidence.
+See resolver decision for the minimum resolve-only demand proposal. Nested mapping/
+key/reference authority remains unclassified; no semantics or acquisition repair.
+Await field-only disposition. Generation 77 acceptance and deferred performance
+remain unchanged; no unchanged rerun requested.
+
+## Resolver investigation approved; six tracked probes authored, UNRUN
+
+Five reference-form probes plus duplicate-field/key fixture probe preserve current
+ResolvedBy observations before acquisition assertions. Existing canonical route/
+provider/all-guard-kind siblings remain controls. No field demand or semantics
+changed. Operator handoff: run-route-resolver-investigation.ps1; prior GREEN suites
+are not repeated. Return earliest actual prerequisite before any repair. Separate
+key-token authority and public key expressibility remain unclassified.
+
+## Next bounded question: exact resolve written membership
+
+Static trace and investigation-only disposition are recorded in
+[resolver membership decision](ISSUE_162_ROUTE_RESOLVER_MEMBERSHIP_DECISION.md).
+Current extraction loses keys and exact declaration joins; resolve is absent from
+the field-demand set. These are static boundaries, not observed failures. Separate
+exact declaration identity from key-specific public expressibility. No tests,
+capture, semantics or generation change yet; owner investigation disposition is
+requested. Generation-77 bounded acceptance remains GREEN; performance deferred.
+
+## Generation-77 rebuilt-binary checkpoint GREEN
+
+Inspected route-guard77-binary-20261102-164114: 345/345 operator binary/stdio
+checks pass in one suite, with three FINISHED sessions and zero errors. The
+summary hash and binary identity match checkpoint.json; binary SHA-256 is
+`af80d29057c05684c1a7844410257cb0a60bca430e0ab19aac4177bd422a46fe`.
+Evidence: target/issue-162/route-guard77-binary-20261102-164114/checkpoint.json,
+with the linked full suite report, RPC receipts and mutation records under
+ target/live-acceptance/issue-162/2026-11-02T21-42-10-967Z-route-guard-kinds-summary-29732/.
+
+All five canonical guard relations, exact support multisets, independent kinds,
+partial/duplicate refusal, outside legacy, persistence/restart, retirement and
+mutation/repair controls pass through the rebuilt binary. This is bounded operator
+integration evidence, separate from the 102 prior scoped Rust passes. No agent
+runtime ran and no production/test/harness repair accompanies this inspection.
+
+Generation-77 bounded local/binary acceptance is GREEN. Resolver membership and
+broader AQ13 route context remain separate correctness obligations; full repository
+verification and final Claude field acceptance remain open. Performance remains
+explicitly deferred. No unchanged suite rerun is requested.
+
+## Generation-77 binary checkpoint authored, UNRUN
+
+The next operator command rebuilds the all-feature binary once, then runs only
+`route-guard-kinds` through the existing stdio harness in three sessions. It does
+not repeat the 102 GREEN local Rust executions. All five canonical relations are
+checked together using relation/name/file support multisets, including repeated
+slots, cross-field support, exact reference forms and empty/child objects.
+
+The suite checks partial broad-value slots, duplicate canMatch refusal with other
+kinds preserved, owned no-fallback, unchanged outside-envelope legacy behavior,
+individual canMatch-field removal, slot/object/child/provider retirement, owner
+removal/recreation, SQLite restore before queries, stale restore refusal and target/
+barrel/package/config repair. Eager/loadComponent/LoadsChildren/provider siblings
+remain independent controls. Historical generation-76 harness bytes are unchanged.
+
+Handoff: `verification/live-acceptance/issue-162/run-route-guard77-checkpoint.ps1`.
+The wrapper records binary/input hashes and requires fewer than 500 checks, three
+FINISHED sessions and zero errors. Exact binary-hash reuse is available after a
+harness-only correction. Syntax, build and binary execution remain UNRUN; no agent
+runtime ran. This is operator binary evidence, not Rust/CI or final Claude field
+acceptance. Performance remains deferred and broader/final gates stay open.
 
 ## Generation-77 local GREEN: 102 scoped passing executions
 

@@ -441,3 +441,15 @@ mod angular_guard_kinds_controls_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_guard_kinds_lifecycle_issue_162.rs"]
 mod angular_guard_kinds_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_resolver_issue_162.rs"]
+mod angular_route_resolver_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_resolve_field_issue_162.rs"]
+mod typescript_resolve_field_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/typescript_resolve_mapping_issue_162.rs"]
+mod typescript_resolve_mapping_tests;

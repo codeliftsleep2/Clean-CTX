@@ -27,6 +27,7 @@ pub(crate) const DECLARATION_FIELDS: &[&str] = &[
     "canDeactivate",
     "canLoad",
     "canActivateChild",
+    "resolve",
     "provide",
     "useClass",
     "useFactory",

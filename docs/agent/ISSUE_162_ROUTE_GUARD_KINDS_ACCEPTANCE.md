@@ -1,7 +1,50 @@
 # Issue #162: generation-77 guard-kind acceptance and question matrix
 
 Agent: Agent MaxHeadRoom
-Status: generation-77 focused/targeted preservation GREEN (102 scoped passes); binary/final gates pending.
+Status: generation-77 bounded local/binary GREEN (102 scoped Rust passes; 345 binary checks); broader/final gates open.
+
+## Generation-77 rebuilt-binary checkpoint GREEN
+
+Inspected route-guard77-binary-20261102-164114: 345/345 operator binary/stdio
+checks pass in one suite, with three FINISHED sessions and zero errors. The
+summary hash and binary identity match checkpoint.json; binary SHA-256 is
+`af80d29057c05684c1a7844410257cb0a60bca430e0ab19aac4177bd422a46fe`.
+Evidence: target/issue-162/route-guard77-binary-20261102-164114/checkpoint.json,
+with the linked full suite report, RPC receipts and mutation records under
+ target/live-acceptance/issue-162/2026-11-02T21-42-10-967Z-route-guard-kinds-summary-29732/.
+
+All five canonical guard relations, exact support multisets, independent kinds,
+partial/duplicate refusal, outside legacy, persistence/restart, retirement and
+mutation/repair controls pass through the rebuilt binary. This is bounded operator
+integration evidence, separate from the 102 prior scoped Rust passes. No agent
+runtime ran and no production/test/harness repair accompanies this inspection.
+
+Generation-77 bounded local/binary acceptance is GREEN. Resolver membership and
+broader AQ13 route context remain separate correctness obligations; full repository
+verification and final Claude field acceptance remain open. Performance remains
+explicitly deferred. No unchanged suite rerun is requested.
+
+## Generation-77 binary checkpoint authored, UNRUN
+
+The next operator command rebuilds the all-feature binary once, then runs only
+`route-guard-kinds` through the existing stdio harness in three sessions. It does
+not repeat the 102 GREEN local Rust executions. All five canonical relations are
+checked together using relation/name/file support multisets, including repeated
+slots, cross-field support, exact reference forms and empty/child objects.
+
+The suite checks partial broad-value slots, duplicate canMatch refusal with other
+kinds preserved, owned no-fallback, unchanged outside-envelope legacy behavior,
+individual canMatch-field removal, slot/object/child/provider retirement, owner
+removal/recreation, SQLite restore before queries, stale restore refusal and target/
+barrel/package/config repair. Eager/loadComponent/LoadsChildren/provider siblings
+remain independent controls. Historical generation-76 harness bytes are unchanged.
+
+Handoff: `verification/live-acceptance/issue-162/run-route-guard77-checkpoint.ps1`.
+The wrapper records binary/input hashes and requires fewer than 500 checks, three
+FINISHED sessions and zero errors. Exact binary-hash reuse is available after a
+harness-only correction. Syntax, build and binary execution remain UNRUN; no agent
+runtime ran. This is operator binary evidence, not Rust/CI or final Claude field
+acceptance. Performance remains deferred and broader/final gates stay open.
 
 ## Observed local result
 

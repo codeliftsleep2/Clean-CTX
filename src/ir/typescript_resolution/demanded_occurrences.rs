@@ -122,6 +122,13 @@ impl TypeScriptAuthority {
         start: usize,
         end: usize,
     ) -> Option<&DeclarationId> {
+        for mapping in self
+            .resolve_mappings
+            .iter()
+            .filter(|p| p.source == source && p.value == (start, end))
+        {
+            self.resolve_mapping_at(mapping.pair)?;
+        }
         match self.demanded_at(source, hash, start, end)? {
             DemandedValue::Reference(Resolution::Resolved(id)) => Some(id),
             _ => None,
