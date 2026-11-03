@@ -16,6 +16,7 @@ explicitly authorizes that particular run.
 User-run commands:
 
 ```bash
+pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-semantic-work-fitness.ps1
 cargo fmt --all -- --check
 cargo clippy --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
@@ -145,3 +146,13 @@ The final state must not merely work; it must also be architecturally
 coherent, behaviorally preserved, properly tested, zero-warning, documented
 accurately, free of obsolete implementation paths, and consistent with
 established Clean-CTX architectural principles.
+
+## AF-PERF-001 mandatory bounded-work gate
+
+Run scripts/check-semantic-work-fitness.ps1 before an expensive semantic acceptance
+campaign. It runs tracked AST/work-count/lifecycle tests plus resolver P0, with all
+features. Compilation errors, empty selections, failures and ignored required tests
+fail the gate. CI runs the same command before its full test step. Gate GREEN covers
+only the declared inspected admission families; #173/#174, uninstrumented witness
+scaling and snapshot lock behavior remain separate open risks. Static unresolved
+findings require recorded review; they are not proven absence of amplification.

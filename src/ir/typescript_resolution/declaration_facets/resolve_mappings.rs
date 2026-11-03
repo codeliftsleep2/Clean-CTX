@@ -115,6 +115,21 @@ impl Demand<'_> {
                     value: span(value),
                 });
                 fields.push((name, expression));
+            } else if pair.kind() == "pair"
+                && let Some((key, value)) = nodes
+                && let Some(name) = named_key(key, source)
+            {
+                // Retain the ordinary key's refusal boundary so an unsupported
+                // value cannot hide a competing spelling. Never evaluate contents.
+                self.pair_occurrence(pair, key, value, file, source);
+                fields.push((
+                    name,
+                    ExpressionFacet {
+                        start: value.start_byte(),
+                        end: value.end_byte(),
+                        value: ExpressionValue::Unsupported(value.kind().into()),
+                    },
+                ));
             } else {
                 // Preserve unsupported occurrence, without recursively acquiring its contents.
                 fields.push((
@@ -170,6 +185,8 @@ impl TypeScriptAuthority {
         &self,
         pair: Span,
     ) -> Option<(&ResolveMapping, &DeclarationId)> {
+        #[cfg(all(test, feature = "angular", feature = "typescript"))]
+        crate::angular_meta::route_resolvers::replay_metrics::mapping();
         let mut proofs = self
             .resolve_mappings
             .iter()

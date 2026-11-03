@@ -53,6 +53,8 @@ pub(crate) enum Witness {
 
 impl Witness {
     pub(crate) fn current(&self) -> bool {
+        #[cfg(all(test, feature = "angular"))]
+        crate::angular_meta::admission_work_metrics::witness();
         match self {
             Self::Directory { path, entries } => {
                 directory_entries(path).is_ok_and(|current| current == *entries)

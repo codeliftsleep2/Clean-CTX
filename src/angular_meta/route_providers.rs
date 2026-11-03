@@ -4,6 +4,8 @@ use crate::ir::typescript_resolution::TypeScriptAuthority;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::admission_work_metrics::projection(super::admission_work_metrics::Consumer::Providers);
     super::route_objects::project(authority)
         .into_iter()
         .flat_map(|route| {
@@ -26,7 +28,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
 }
 
 /// Reproduce the exact root/object/field/entry join, including subject identity.
-pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain
             && a.entity_type == b.entity_type
@@ -34,7 +36,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && a.file == b.file
             && a.canonical == b.canonical
     };
-    project(authority).iter().any(|expected| {
+    projected.iter().any(|expected| {
         expected.relation == edge.relation
             && expected.layer == edge.layer
             && same(&expected.subject, &edge.subject)

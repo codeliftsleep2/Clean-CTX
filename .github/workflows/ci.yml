@@ -43,6 +43,9 @@ jobs:
       - name: UTF-8 / mojibake guard
         shell: pwsh
         run: ./scripts/check-utf8.ps1
+      - name: AF-PERF-001 bounded semantic work fitness
+        shell: pwsh
+        run: ./scripts/check-semantic-work-fitness.ps1
       - name: cargo test
         run: cargo test --workspace --all-targets --all-features
       - name: cargo audit

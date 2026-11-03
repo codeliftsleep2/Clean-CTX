@@ -10,6 +10,8 @@ pub(super) fn project(
     name: &str,
     position: Position,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::delegated_work_metrics::position();
     let Some((owner, root)) =
         super::string_token_authority::provider_array_at(authority, name, position)
     else {
@@ -174,7 +176,26 @@ fn edge(relation: SemanticRelation, subject: EntityRef, object: EntityRef) -> Se
     }
 }
 
-pub(super) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+/// Preserve every eligible facet and Ordinary/View position in original order.
+/// No endpoint deduplication, precedence or provider policy is introduced.
+pub(super) fn project_admission(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::delegated_work_metrics::construction(3);
+    let mut edges = Vec::new();
+    for facet in &authority.declaration_facets {
+        if Position::Ordinary
+            .owner_type(authority, &facet.declaration)
+            .is_some()
+        {
+            for position in [Position::Ordinary, Position::View] {
+                edges.extend(project(authority, &facet.declaration.name, position));
+            }
+        }
+    }
+    edges
+}
+
+pub(super) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |actual: &EntityRef, expected: &EntityRef| {
         actual.domain == expected.domain
             && actual.entity_type == expected.entity_type
@@ -182,26 +203,10 @@ pub(super) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && actual.file == expected.file
             && actual.canonical == expected.canonical
     };
-    authority
-        .declaration_facets
-        .iter()
-        .filter(|facet| {
-            Position::Ordinary
-                .owner_type(authority, &facet.declaration)
-                .is_some()
-        })
-        .any(|facet| {
-            [Position::Ordinary, Position::View]
-                .into_iter()
-                .any(|position| {
-                    project(authority, &facet.declaration.name, position)
-                        .iter()
-                        .any(|expected| {
-                            edge.layer == expected.layer
-                                && edge.relation == expected.relation
-                                && same(&edge.subject, &expected.subject)
-                                && same(&edge.object, &expected.object)
-                        })
-                })
-        })
+    projected.iter().any(|expected| {
+        edge.layer == expected.layer
+            && edge.relation == expected.relation
+            && same(&edge.subject, &expected.subject)
+            && same(&edge.object, &expected.object)
+    })
 }

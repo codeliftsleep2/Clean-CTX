@@ -25,6 +25,18 @@ fn memberships(
     authority: &TypeScriptAuthority,
     kinds: &[(&str, SemanticRelation)],
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    for &(field, _) in kinds {
+        use super::admission_work_metrics::{Consumer, projection};
+        projection(match field {
+            "canActivate" => Consumer::Activate,
+            "canMatch" => Consumer::Match,
+            "canDeactivate" => Consumer::Deactivate,
+            "canLoad" => Consumer::Load,
+            "canActivateChild" => Consumer::ActivateChild,
+            _ => unreachable!("fixed explicit guard kinds"),
+        });
+    }
     let mut edges = Vec::new();
     for route in super::route_objects::project(authority) {
         for &(field, relation) in kinds {
@@ -76,7 +88,7 @@ fn memberships(
     edges
 }
 
-pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &crate::layers::meta::semantic::EntityRef,
                 b: &crate::layers::meta::semantic::EntityRef| {
         a.domain == b.domain
@@ -85,25 +97,13 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && a.file == b.file
             && a.canonical == b.canonical
     };
-    let field = if edge.relation == SemanticRelation::GuardedBy {
-        "canActivate"
-    } else if let Some((field, _)) = KINDS
-        .iter()
-        .find(|(_, relation)| *relation == edge.relation)
-    {
-        *field
-    } else {
-        return false;
-    };
-    memberships(authority, &[(field, edge.relation)])
-        .iter()
-        .any(|expected| {
-            expected.relation == edge.relation
-                && expected.layer == edge.layer
-                && same(&expected.subject, &edge.subject)
-                && same(&expected.object, &edge.object)
-                && edge.call_evidence.is_none()
-        })
+    projected.iter().any(|expected| {
+        expected.relation == edge.relation
+            && expected.layer == edge.layer
+            && same(&expected.subject, &edge.subject)
+            && same(&expected.object, &edge.object)
+            && edge.call_evidence.is_none()
+    })
 }
 
 /// Ownership is independent of field uniqueness, container or target proof.
@@ -126,4 +126,19 @@ pub(crate) fn owned_kinds(authority: &TypeScriptAuthority) -> Vec<((usize, usize
         }
     }
     owned
+}
+
+/// Complete membership for exactly the requested explicit guard relation.
+pub(crate) fn project_relation(
+    authority: &TypeScriptAuthority,
+    relation: SemanticRelation,
+) -> Vec<SemanticEdge> {
+    let field = if relation == SemanticRelation::GuardedBy {
+        "canActivate"
+    } else if let Some((field, _)) = KINDS.iter().find(|(_, candidate)| *candidate == relation) {
+        *field
+    } else {
+        return Vec::new();
+    };
+    memberships(authority, &[(field, relation)])
 }

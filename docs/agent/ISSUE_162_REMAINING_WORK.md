@@ -4,6 +4,373 @@ Agent: Agent MaxHeadRoom
 Reconciled: 2026-11-02
 Status: generation-77 bounded local/binary GREEN (102 scoped Rust passes; 345 binary checks); broader/final gates open.
 
+## Phase B verified PASS; bounded generation-78 evidence consolidated
+
+Inspected resolver78-binary-20261103-160437: operator binary/stdio suite passes
+319/319 checks, all 26 required named scenarios and three FINISHED sessions, zero
+suite errors. Both JavaScript syntax logs are empty; build completes successfully.
+Current binary SHA-256, all Rust/build source hashes and every suite-recorded
+harness input hash match. Each session retains rpc.jsonl and stderr.log; process
+completion/shutdown is recorded by the established transport. No scenario is
+skipped or counted from an incomplete session.
+
+Receipt: target/issue-162/resolver78-binary-20261103-160437/receipt.json.
+This is binary/stdio acceptance, distinct from Phase A's eight tracked passes and
+the expanded AF gate's 33 scoped tracked passes/clean lint. Counts are separate
+campaign evidence, not unique full-repository test totals. Earlier intentional
+mutation demonstrates counter+AST regression sensitivity, not binary coverage.
+
+The finite generation-78 written resolver behavior and approved call-local
+admission batching now have bounded local and binary evidence. Remaining risks:
+repeated witness/facet/root work, snapshot validation under its mutex, and separate
+#173/#174 index/refinement concerns. No shared currentness/cache/lock change was
+made or certified. Public resolver-key questions remain OPEN and suspended.
+Full repository Final Verification Gate and final Claude field acceptance remain
+outstanding. Claude stays last; no full #162 closure or generation advance follows.
+No agent test/build/runtime ran while inspecting these operator receipts.
+
+## Expanded delegated fitness/preservation GREEN; bounded final campaign proposed
+
+Verified latest expanded gate: 33 scoped tracked passes, zero failed/ignored,
+clean all-feature/all-target warning-fatal Clippy, fmt/size/encoding. All receipt
+source hashes match. Evidence: delegated-provider-expanded-green-evidence/receipt.json.
+Fourteen-slot lifecycle observation preserves lazy unreachable branches; indexed
+queries do zero admission/projection work. Witness/scanning/lock costs remain open.
+
+See [ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md](ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md)
+for actual timings, remaining static findings, eight residual existing matcher
+preservation tests and one proposed three-session rebuilt-binary/stdio checkpoint.
+Campaign returned for owner approval; no broad rerun or runtime launched. Generation
+78 and public-key suspension remain unchanged. No repository/final Claude closure.
+
+## Delegated direct gate GREEN; expanded fitness/preservation/lint pending
+
+Inspected delegated-provider-replay-after-20261103-153149: six pass, zero failed/
+ignored, 3.19s. All recorded code hashes match the working tree. Each new consumer
+constructs once for 1/2/4/8/16 candidates; imported position projects remain two.
+Mixed direct/delegated fresh invocations both record [1,1,1,1], replacing baseline
+[7,2,1,2]. Unrelated/short-circuit, actual retained-owner stale refusal, independently
+changed authority refusing old endpoints and byte restoration all pass. The
+currentness-boundary test correction is preserved separately; it is not represented
+as unchanged semantic RED. Original growth/count assertions remain authoritative.
+
+Evidence: target/issue-162/delegated-provider-focused-green-evidence/receipt.json.
+Baseline 1.91s stopped early; After 3.19s reaches higher growth/recapture/repair, so
+those totals are not equal-work speed claims. Per-call descriptive timings remain
+in AF_DELEGATED logs; the deterministic counts establish the architectural repair.
+
+Next narrow command:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-af-perf-001-focused.ps1 -DelegatedProviders
+```
+
+It runs the expanded mandatory gate (14 AF + 5 P0 + 6 delegated tracked tests),
+then eight focused existing bootstrap/config/composition/imported-provider controls,
+then all-target/all-feature warning-fatal Clippy, fmt, size and encoding checks.
+The new switch selects affected delegated preservation instead of repeating the
+five prior guard/resolver controls. The original AF regression/lifecycle gate is
+still required because the production delegated call chain changed. No broad
+neutral campaign, full repository suite or binary checkpoint is launched.
+
+All expanded integration/preservation/lint results remain UNRUN; prior 24-test
+fitness evidence and mutation proof remain historical baseline, not certification
+of these changed paths. Generation 78, no new cache/currentness/lock authority.
+No agent Cargo/test/build/formatter/runtime ran.
+
+## Delegated extension approved; six baseline regressions authored, UNRUN
+
+Owner approves bootstrap_references, application_config_providers,
+config_composition and provider_imported batching, including indirect pair/position
+admission. Production dispatch/matchers/traversal are unchanged pending intended RED.
+Test-only counters now observe the three complete project entry points and existing
+imported admission-search entry. Imported per-owner/position project invocations are
+reported separately; they are not confused with the complete eligible-set search.
+
+New tracked delegated_provider_work_af_perf_001.rs directly captures one composite
+native bootstrap/config/merge/Component ordinary+view/route fixture with imported
+provider groups. Six tests cover four growing consumer selections (1/2/4/8/16),
+mixed direct/indirect candidates, fresh-call dependency mutation/repair, unrelated
+zero work and short-circuit refusal. Nonempty fixture proof/exact admission precede
+count assertions. Forged and mixed controls do not certify all later duplicate/
+partial/ambiguity policies; existing semantic controls remain required after repair.
+
+Imported traversal review: current admission filters facets by Ordinary.owner_type,
+then visits each retained facet in order with Ordinary followed by View, projecting
+by the same owner name and applying exact layer/relation/domain/type/name/file/
+canonical comparison. It returns existence of a matching expected edge; expected
+multiplicity is not counted. A call-local Vec preserving this full traversal and
+all repeated expected edges can supply the same matcher without deduplication or
+new target policy. Projection acquisition/retained witness checks remain unchanged;
+no shared currentness proof is inferred. Earlier provider-chain OR branches must
+retain their order. Concrete production representation awaits observed baseline RED.
+
+Operator command, repository root:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-delegated-provider-replay.ps1 -Phase Before
+```
+
+The script formats selected files, checks sizes, snapshots exact code/hashes, and
+runs only the six new tracked tests. Compilation or missing fixture authority is
+not intended RED. After inspection, isolate/restore exact valid regressions and
+implement explicit lazy slots. Extend AST known paths/sinks and mandatory fitness
+selection with this new scope after repair, then focused semantic preservation and
+lint once. Prior 24 scoped passes and mutation proof remain baseline authority
+only, not certification of this extension. No broad campaign or binary checkpoint
+is requested. Generation 78; no agent Cargo/formatter/test/runtime ran.
+
+## AST review returned additional bounded-consumer disposition
+
+See [AF_PERF_001_UNRESOLVED_CALL_REVIEW.md](AF_PERF_001_UNRESOLVED_CALL_REVIEW.md).
+Bootstrap, application-config provider, config composition and imported provider
+admission still reconstruct complete sets per candidate. Route-provider-use
+admission reaches some of these before its batched branch. These lie outside the
+explicit approved consumer set; no additional repair is silently implemented.
+The review proposes exact call-local batching and deterministic coverage, separates
+witness/lock design, and defines the smallest subsequent preservation/binary plan.
+Existing focused GREEN/mutation evidence remains valid within its declared scope;
+whole-path performance acceptance and generation-78 completion remain blocked.
+No expensive campaign or binary command is requested before scope disposition.
+
+## Mutation sensitivity verified; active source preserved
+
+Inspected af-perf-001-mutation-20261103-143345: the isolated real LoadsChildren
+projection-per-edge defect produces the required deterministic counter RED at two
+candidates and AST RED identifying relation_evidence -> route_load_children::project.
+Twelve tests pass, two intended tests fail, zero ignored, 30.40s; gate exits 1 as
+required. This is successful gate sensitivity, not a clean mutated-source GREEN.
+Receipt reports activeSourceUnchanged and isolatedSourceRestored; inspection also
+byte-compares both current files with the preserved pre-mutation source.
+
+Verified evidence: target/issue-162/af-perf-001-mutation-verified-evidence/inspection.json.
+The earlier clean focused gate remains applicable: mutation touched only the
+isolated copy and no production repair accompanies inspection. No repeat clean
+campaign is necessary solely for this operator mutation. No agent runtime ran.
+
+Remaining acceptance sequence: finish explicit review of unresolved AST findings;
+then select only remaining affected eager/lazy/LoadsChildren/provider preservation
+and one consolidated generation-78 binary checkpoint. Reuse the 24 focused passes,
+clean lint and mutation evidence while source hashes remain current. Do not rerun
+the former multi-filter campaign automatically. Full repository/Claude gates remain
+separate, and Claude stays last. Witness sweeps and snapshot lock-held IO remain
+reported costs requiring separate design authority, not hidden cache work.
+Generation 78; public resolver-key design and broader semantic expansion suspended.
+
+## Focused AF gate GREEN; sensitivity and review remain pending
+
+Inspected af-perf-001-focused-20261103-141446 and af-perf-001-20261103-141449:
+14 tracked AF tests pass (20.19s), five resolver P0 tests pass (2.68s), and five
+focused existing adversarial guard/resolver controls pass. Zero failures/ignored.
+These are 24 scoped tracked executions, not full-repository acceptance. All-target/
+all-feature Clippy with -D warnings finishes cleanly (41.01s); fmt/format logs are
+empty, sizes pass, and encoding reports 2004 valid files with zero BOM/mojibake.
+Every file hash in the fitness receipt matches the current working tree.
+
+Production lifecycle observations: publication two admission operations/26115 witness
+checks/3.673152s; SQLite restore three/22960/1.706204s; snapshot currentness one/
+7175/0.492939s. Per-operation projection maxima are exactly one for every consumer.
+Cold/warm restored indexed queries perform zero admission/projection work, 1435
+witness checks each, and take 0.109746s/0.101388s. Cold query scans once, warm query
+zero times. These are small-fixture observations, not enterprise timings or a
+before/after lifecycle comparison. Witness cost remains outside this repair.
+
+Evidence/logs/hashes: target/issue-162/af-perf-001-focused-green-evidence/receipt.json.
+AST review findings remain explicitly unresolved/manual-review obligations; AST
+GREEN proves only absence of known scoped projector-under-iteration chains. It
+is not approval of every unresolved helper or macro. No #173/#174 closure follows.
+
+Next operator command is the isolated real-production mutation sensitivity proof:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-af-perf-001-mutation.ps1
+```
+
+It requires intentional counter and AST RED, preserves evidence, and restores the
+isolated source. It never modifies active source/index. This entails a separate
+isolated build; no agent process is started. After sensitivity/review, return the
+smallest remaining gen78 preservation/binary proposal. No full campaign yet.
+Generation remains 78; resolver-key and broader expansion stay suspended.
+
+## AF-PERF-001 enforcement and narrow lifecycle gate authored, UNRUN
+
+The direct-authority eleven-test GREEN is preserved as historical evidence.
+New test-only observation frames now count each synchronous admission independently,
+including early returns, and record the maximum per-consumer projection count.
+They neither supply proof nor affect production builds. Resolver is a distinct
+slot; Witness::current calls are counted without deduplication or changed IO.
+Query catalog/parse counters, Angular detection parses and discovery scans are
+reported separately, with their existing measurement scopes retained.
+
+New angular_admission_lifecycle_af_perf_001.rs uses a single route object with
+all five guards, eager/lazy Component, LoadsChildren, resolver and providers. It
+exercises real publication, SQLite restore, snapshot currentness and cold/warm
+public queries. It requires actual admission, nonempty resolver replay, witness
+observations and per-invocation maxima <=1. The query verifies one public resolver
+relationship despite two private mapping supports. This is a small regression
+fixture, not enterprise performance evidence. Dependency mutation/repair still
+requires fresh exact admission. All new assertions remain UNRUN.
+
+Tracked semantic_work_static.rs uses the existing Rust AST parser to follow
+unambiguous direct helper calls under loops/iterator closures, failing known
+complete-projector sinks in scoped admission. Lazy Option initialization is a
+recognized reuse boundary, paired with actual work counts. It reports unresolved
+methods, macros, expensive IO/membership calls and recursion as REVIEW_REQUIRED;
+these are not absence proofs. Different impls sharing a method name are unresolved,
+not guessed. Scope excludes macro expansion, trait resolution and whole-program
+analysis. It does not claim to solve #173/#174. Runtime review findings must be
+inspected before architectural acceptance; merely printing them is not approval.
+
+Mandatory scripts/check-semantic-work-fitness.ps1 runs at least fourteen AF tests
+(11 direct, 2 AST, 1 lifecycle) and five resolver P0 tests with all features. It
+rejects compilation/empty/ignored/failing selections. CI invokes it before full
+tests. AGENTS.md and authoritative .clinerules/engineering.md now carry matching
+bounded-work review obligations; architecture/verification docs define the gate.
+No generic runtime registry or shared validation context is introduced.
+
+Operator focused command:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-af-perf-001-focused.ps1
+```
+
+This formats selected active files, checks sizes, runs the mandatory tracked gate,
+five focused existing adversarial guard/resolver controls, then all-feature/
+all-target warning-fatal Clippy, fmt and encoding checks. ResumeAtLint skips passing
+runtime filters only after a lint-only correction. It is not the full generation-78
+campaign or binary checkpoint. Return actual logs before declaring acceptance.
+
+After focused GREEN, operator sensitivity proof is separately available:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162/run-af-perf-001-mutation.ps1
+```
+
+The driver overlays exact reviewed sources into an isolated local clone, reintroduces
+real LoadsChildren projection-per-edge work, runs the same mandatory gate and
+requires both the intended production counter RED and AST RED. It restores isolated
+source bytes and never edits active source/index. Compilation/fixture failures do
+not qualify. This is operator evidence about tracked-test sensitivity, not a new
+regression test category. No sensitivity run is claimed yet. It entails an isolated
+build and is deliberately held until the clean focused gate passes.
+
+Remaining risks include full witness sweeps per mapping/arrow/native proof,
+non-enforced/unresolved relation helper paths, snapshot lock-held IO and independent
+#173/#174 index/reconciliation work. These require their separate authority/design
+boundaries; no currentness/lifecycle/lock change is authored here. Generation stays
+78. No agent formatter/Cargo/test/lint/binary/runtime executed.
+
+## Cross-relation direct-authority GREEN; integration/enforcement pending
+
+Inspected cross-relation-replay-after-20261103-134450: eleven tracked tests pass,
+zero failed/ignored, 8.76s. Every recorded source hash matches the current working
+tree; regression bytes still match the original observed RED exactly. All nine
+consumer/kind projections remain one for 1/2/4/8/16 candidates. Unrelated and
+unreachable branches remain zero; eager success leaves lazy untouched. Both fresh
+mixed invocations record [1,1,1,1,1,1,1,1,1]. Consumed dependency mutation refuses,
+and byte repair restores exact admission. Nothing is reused across calls.
+
+Evidence: target/issue-162/cross-relation-focused-green-evidence/receipt.json.
+Original baseline: ten intended failures, one pass, 9.25s. Intermediate run: nine
+passes/two provider failures, 9.81s; indirect provider helper was then corrected.
+Total test time includes fixture creation and newly reached higher growth/mutation
+assertions, so these elapsed totals are not an equal-work speed comparison. Per-call
+descriptive AF_WORK timings are preserved; deterministic counts establish batching.
+No whole-query/enterprise speedup or shared witness/lock repair is claimed.
+
+This completes only direct-authority work-count acceptance. Next required work:
+focused adversarial semantic preservation; a small real publication/SQLite restore/
+snapshot/query fixture with distinct work categories; AF AST inspection, mandatory
+policy/CI integration and intentional production-regression sensitivity evidence.
+Clippy/full generation-78/binary gates remain pending after production edits.
+No full campaign is requested. Generation remains 78; public-key design suspended.
+No agent Cargo/test/build/lint/runtime ran while inspecting this operator result.
+
+## AF-PERF-001 Phase 1 design returned; minimum blocking gate pending
+
+See [AF_PERF_001_DESIGN.md](AF_PERF_001_DESIGN.md) for the inspected inventory,
+AST-aware inspection design, deterministic production-path work counters and
+mandatory policy/CI rollout. Phase 2 proposes resolver plus independently repaired
+LoadsChildren admission, with intentional production-regression detection. No broad
+fitness machinery or sibling repair is implemented by Phase 1. P0 remains focused
+GREEN; performance blocks acceptance. Await Phase 2 disposition before sibling
+production changes; no expensive campaign, key design or shared currentness/lock
+redesign. Generation remains 78.
+
+## P0 focused GREEN; return cross-relation batching proposal
+
+After run 124029: five passes, zero failures/ignored, 3.24s; current source hashes
+match the operator receipt. Fixed admission 872742us to 113975us, projections 4 to1,
+mapping replays 40 to5; 1/2/4/16 canonical edges retain 1/5 work counts. Empty/
+unrelated/legacy-only admissions do zero resolver projection work. Evidence:
+replay-p0-focused-green-evidence. No full campaign or broad performance claim.
+See ISSUE_162_CROSS_RELATION_REPLAY_PROPOSAL.md for explicit sibling risks, bounded
+per-consumer/kind batching and separate currentness/filesystem/revision/lock design.
+Await sibling disposition before changes or expensive campaign. Generation 78;
+performance blocks acceptance, key/broader expansion suspended, final gates open.
+
+## Blocking P0: historical review complete; bounded correction authored
+
+#173/#174 and older #55/#70/#71/#73/#75 were checked against current code/history.
+Small baseline observes projection-per-edge and duplicate mapping replay REDs;
+4 edges cause 4 projections/40 mapping replays, 872742us admission. Invalid seeded-
+owner stale control corrected to consumed dependency, separately preserved.
+P0 now batches resolver projection call-locally and retains exact proof/runtime/
+crossed-hash refusal without duplicate replay. Run run-resolver-replay-p0.ps1
+-Phase After for only five small tests. No post-fix GREEN/timing claimed, no full
+campaign. Sibling/shared currentness/locks remain a separate design boundary;
+see ISSUE_162_REPLAY_P0_PRIOR_WORK_REVIEW.md. Generation 78; broader/key work paused.
+
+## P0 resolver admission repair approved; small baseline gate authored
+
+Five direct-authority tests enforce zero unrelated projections, one per canonical
+admission operation and one replay per mapping, with fixed four-file timing and
+forged/stale/runtime-reference preservation. Run run-resolver-replay-p0.ps1 -Phase
+Before to preserve deterministic RED before P0 implementation; broad filters remain
+suspended. No new runtime or production repair yet. See performance investigation
+for proof-equivalence review and separate shared currentness/lock decision points.
+Generation stays 78; full acceptance, binary and public-key design remain pending.
+
+## Owner reopens performance: repeated authority replay blocks progress
+
+The latest partial generation-78 run spends 1306.47s in six association tests and
+1632.79s in six control/lifecycle tests; these are execution, not compilation times.
+The campaign was still running at inspection; no full GREEN is claimed.
+[Authority replay investigation](ISSUE_162_AUTHORITY_REPLAY_PERFORMANCE_INVESTIGATION.md)
+traces projection-per-edge, duplicate mapping replay, repeated witness filesystem
+checks and snapshot validation under a shared mutex. No new agent runtime or repair.
+Performance is now active by owner instruction; resolver binary checkpoint and
+public-key design wait. No automatic broad rerun is requested.
+
+## Generation-78 unqualified resolver repair authored, UNRUN
+
+Approved exact object/target ResolvedBy support, written-use eligibility, partial/
+duplicate policy and selective owned replacement are implemented with shared proof
+and relation-specific admission. New control/lifecycle tests and focused handoff:
+run-route-resolver78-focused.ps1. All post-edit gates UNRUN; binary/final later.
+Key-specific public answers remain explicitly OPEN for separate bounded design
+after acceptance. No durable or other generation change; performance deferred.
+
+## Resolver association RED observed; public-key collision GREEN
+
+Run route-resolver-20261103-102245: one passed/five failed, zero ignored, 287.34s.
+All five forms reach forward resolve-association after complete neutral mapping/
+key-token/reference and independent declaration prerequisites. Key-only edits leave
+public ResolvedBy unchanged. Evidence: route-resolver-association-red-evidence.
+See resolver decision for separate exact membership and public-key contract options,
+eligibility/multiplicity/duplicate policy and selective compatibility disposition.
+No production repair; generation 77. Await owner disposition; no unchanged rerun.
+Performance deferred; broader/final gates open.
+
+## Resolver association/key investigation authored, UNRUN
+
+Five exact post-prerequisite association probes plus one separate key-only public
+collision control are registered. Original acquisition probes remain unchanged.
+Run run-route-resolver-semantic-investigation.ps1 for only the six new tests;
+previous GREEN suites do not repeat. No semantic/capture/generation change.
+Return actual association divergence separately from key expressibility and any
+remaining prerequisite. Performance stays deferred; broader/final gates open.
+
 ## Resolver neutral acquisition GREEN: 47 scoped passes
 
 Run route-resolver-mapping-capture-20261103-094832 passes six neutral mapping

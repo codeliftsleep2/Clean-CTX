@@ -35,7 +35,7 @@ pub(crate) mod decorator_scan;
 pub(crate) mod decorators;
 pub(crate) mod detect;
 #[cfg(test)]
-mod detect_metrics;
+pub(crate) mod detect_metrics;
 pub mod formly;
 pub(crate) mod functional_authority;
 #[cfg(feature = "typescript")]
@@ -70,6 +70,8 @@ pub(crate) mod route_load_children;
 mod route_objects;
 #[cfg(feature = "typescript")]
 pub(crate) mod route_providers;
+#[cfg(feature = "typescript")]
+pub(crate) mod route_resolvers;
 pub mod routing;
 pub mod rx;
 pub mod semantic;
@@ -496,25 +498,9 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
         }
     }
 
-    // Tier 5 (Routing): append the Routing meta block if present.
+    // Tier 5 (Routing) owns its existing presentation section.
     if let Some(shape) = route_shape {
-        let route_block = shape.render(fidelity);
-        if !route_block.is_empty() {
-            let mut route_lines: Vec<String> = route_block.lines().map(|l| l.to_string()).collect();
-            let header = if route_lines
-                .first()
-                .map(|l| l.starts_with("// ---"))
-                .unwrap_or(false)
-            {
-                route_lines.remove(0)
-            } else {
-                "// --- Φ Routing Meta ---".to_string()
-            };
-            block.sections.push(MetaSection {
-                header,
-                lines: route_lines,
-            });
-        }
+        shape.append_meta_section(&mut block, fidelity);
     }
 
     // Reactive Forms remains a distinct source-meta section and never emits
@@ -613,3 +599,13 @@ mod bootstrap_inline_providers;
 pub(crate) mod config_composition;
 
 pub(crate) mod legacy_bootstrap;
+
+#[cfg(all(test, feature = "typescript"))]
+pub(crate) mod admission_work_metrics;
+
+#[cfg(all(test, feature = "typescript"))]
+pub(crate) mod delegated_work_metrics;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/architecture/delegated_provider_work_af_perf_001.rs"]
+mod delegated_provider_work_tests;

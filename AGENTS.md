@@ -487,3 +487,21 @@ commits, pushes only that `agent/**` branch, and opens a PR against the default
 branch. The existing `.github/workflows/ci.yml` provides the authoritative
 release-time verification. No push to the default branch ever occurs from the
 runner.
+
+
+### AF-PERF-001 — Bounded semantic work
+
+Any new or modified semantic producer, projector, admission path or reconciler
+must declare its operation scope, expensive complete-set work, expected scaling,
+reuse/invalidation boundary and tracked deterministic work-count coverage. A
+stable bounded operation must not reconstruct or revalidate the same complete
+authority set for each candidate when one exact operation-local result suffices.
+Preserve identity, ambiguity/refusal, source/hash/witness currentness and lifecycle
+semantics. A performance concern does not authorize a cache or authority change.
+
+The mandatory AF-PERF-001 tracked gate is defined in docs/agent/verification.md.
+Semantic correctness alone cannot grant architectural acceptance while the fitness
+gate fails. Review unresolved AST findings explicitly; document an exception only
+with owner approval, exact work unit, justification, measured bound and removal
+condition. No ignored required tests, blanket legacy exception or allow-failure
+CI step may substitute for acceptance. Coverage limits remain explicit.

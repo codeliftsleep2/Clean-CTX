@@ -5,6 +5,8 @@ use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
 use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::admission_work_metrics::projection(super::admission_work_metrics::Consumer::Eager);
     super::route_objects::project(authority)
         .into_iter()
         .filter_map(|route| {
@@ -43,7 +45,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
         .collect()
 }
 
-pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &crate::layers::meta::semantic::EntityRef,
                 b: &crate::layers::meta::semantic::EntityRef| {
         a.domain == b.domain
@@ -52,7 +54,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && a.file == b.file
             && a.canonical == b.canonical
     };
-    project(authority).iter().any(|expected| {
+    projected.iter().any(|expected| {
         expected.relation == edge.relation
             && expected.layer == edge.layer
             && same(&expected.subject, &edge.subject)

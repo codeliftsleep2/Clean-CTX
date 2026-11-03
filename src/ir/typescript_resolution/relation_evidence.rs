@@ -5,7 +5,53 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
+        #[cfg(all(test, feature = "angular"))]
+        let _observation = crate::angular_meta::admission_work_metrics::begin();
+        // One synchronous admission owns this lazy projection. Never retained
+        // across calls, source changes, publication or snapshot lifecycles.
+        #[cfg(feature = "angular")]
+        let mut resolver_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut activate_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut match_guard_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut deactivate_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut load_guard_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut activate_child_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut eager_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut lazy_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut children_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut providers_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut bootstrap_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut config_provider_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut config_composition_projection: Option<Vec<SemanticEdge>> = None;
+        #[cfg(feature = "angular")]
+        let mut imported_provider_projection: Option<Vec<SemanticEdge>> = None;
         edges.iter().all(|edge| {
+            if edge.relation == crate::layers::meta::semantic::SemanticRelation::ResolvedBy
+                && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
+            {
+                #[cfg(feature = "angular")]
+                {
+                    let projected = resolver_projection
+                        .get_or_insert_with(|| crate::angular_meta::route_resolvers::project(self));
+                    return crate::angular_meta::route_resolvers::admits_projected(projected, edge);
+                }
+                #[cfg(not(feature = "angular"))]
+                {
+                    return false;
+                }
+            }
             if matches!(
                 edge.relation,
                 crate::layers::meta::semantic::SemanticRelation::GuardedByCanMatch
@@ -17,7 +63,21 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::route_guards::admits(self, edge);
+                    use crate::layers::meta::semantic::SemanticRelation;
+                    let slot = match edge.relation {
+                        SemanticRelation::GuardedBy => &mut activate_projection,
+                        SemanticRelation::GuardedByCanMatch => &mut match_guard_projection,
+                        SemanticRelation::GuardedByCanDeactivate => &mut deactivate_projection,
+                        SemanticRelation::GuardedByCanLoad => &mut load_guard_projection,
+                        SemanticRelation::GuardedByCanActivateChild => {
+                            &mut activate_child_projection
+                        }
+                        _ => unreachable!("guard-only dispatch"),
+                    };
+                    let projected = slot.get_or_insert_with(|| {
+                        crate::angular_meta::route_guards::project_relation(self, edge.relation)
+                    });
+                    return crate::angular_meta::route_guards::admits_projected(projected, edge);
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -29,7 +89,12 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::route_load_children::admits(self, edge);
+                    let projected = children_projection.get_or_insert_with(|| {
+                        crate::angular_meta::route_load_children::project(self)
+                    });
+                    return crate::angular_meta::route_load_children::admits_projected(
+                        projected, edge,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -41,8 +106,18 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::route_components::admits(self, edge)
-                        || crate::angular_meta::route_lazy_components::admits(self, edge);
+                    let eager = eager_projection.get_or_insert_with(|| {
+                        crate::angular_meta::route_components::project(self)
+                    });
+                    if crate::angular_meta::route_components::admits_projected(eager, edge) {
+                        return true;
+                    }
+                    let lazy = lazy_projection.get_or_insert_with(|| {
+                        crate::angular_meta::route_lazy_components::project(self)
+                    });
+                    return crate::angular_meta::route_lazy_components::admits_projected(
+                        lazy, edge,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -54,7 +129,15 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::config_composition::admits(self, edge);
+                    if edge.call_evidence.is_some() {
+                        return false;
+                    }
+                    let projected = config_composition_projection.get_or_insert_with(|| {
+                        crate::angular_meta::config_composition::project(self)
+                    });
+                    return crate::angular_meta::config_composition::admits_projected(
+                        projected, edge,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -70,7 +153,12 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::bootstrap_references::admits(self, edge);
+                    let projected = bootstrap_projection.get_or_insert_with(|| {
+                        crate::angular_meta::bootstrap_references::project(self)
+                    });
+                    return crate::angular_meta::bootstrap_references::admits_projected(
+                        projected, edge,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -82,14 +170,21 @@ impl TypeScriptAuthority {
                 && edge.relation
                     == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
             {
-                return crate::angular_meta::application_config_providers::admits(self, edge);
+                let projected = config_provider_projection.get_or_insert_with(|| {
+                    crate::angular_meta::application_config_providers::project(self)
+                });
+                return crate::angular_meta::application_config_providers::admits_projected(
+                    projected, edge,
+                );
             }
             #[cfg(feature = "angular")]
             if edge.subject.entity_type == "Route"
                 && edge.relation
                     == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
             {
-                return crate::angular_meta::route_providers::admits(self, edge);
+                let projected = providers_projection
+                    .get_or_insert_with(|| crate::angular_meta::route_providers::project(self));
+                return crate::angular_meta::route_providers::admits_projected(projected, edge);
             }
             #[cfg(feature = "angular")]
             if edge.relation == crate::layers::meta::semantic::SemanticRelation::RegistersProvider
@@ -99,14 +194,22 @@ impl TypeScriptAuthority {
                 )
                 && edge.subject.canonical.is_some()
             {
-                return crate::angular_meta::provider_position::admits_registration(self, edge);
+                return crate::angular_meta::provider_position::admits_registration(
+                    self,
+                    edge,
+                    &mut imported_provider_projection,
+                );
             }
             if edge.relation
                 == crate::layers::meta::semantic::SemanticRelation::RegistersViewProvider
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::provider_position::admits_registration(self, edge);
+                    return crate::angular_meta::provider_position::admits_registration(
+                        self,
+                        edge,
+                        &mut imported_provider_projection,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -123,7 +226,14 @@ impl TypeScriptAuthority {
             {
                 #[cfg(feature = "angular")]
                 {
-                    return crate::angular_meta::provider_pair_authority::admits(self, edge);
+                    return crate::angular_meta::provider_pair_authority::admits(
+                        self,
+                        edge,
+                        &mut providers_projection,
+                        &mut bootstrap_projection,
+                        &mut config_provider_projection,
+                        &mut imported_provider_projection,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {

@@ -194,7 +194,14 @@ fn declaration_entity(
 }
 
 /// Replay the exact retained provider positions, never an endpoint cross-product.
-pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits(
+    authority: &TypeScriptAuthority,
+    edge: &SemanticEdge,
+    route_projection: &mut Option<Vec<SemanticEdge>>,
+    bootstrap_projection: &mut Option<Vec<SemanticEdge>>,
+    config_projection: &mut Option<Vec<SemanticEdge>>,
+    imported_projection: &mut Option<Vec<SemanticEdge>>,
+) -> bool {
     use crate::layers::meta::semantic::SemanticRelation;
     let strategy = match edge.relation {
         SemanticRelation::ProviderUsesClass => Strategy::Class,
@@ -212,50 +219,60 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && actual.file == expected.file
             && actual.canonical == expected.canonical
     };
-    super::bootstrap_references::admits(authority, edge)
-        || super::application_config_providers::admits(authority, edge)
-        || super::route_providers::admits(authority, edge)
-        || super::provider_imported::admits(authority, edge)
-        || authority
-            .declaration_facets
-            .iter()
-            .filter(|facet| {
-                facet.declaration.source == authority.source
-                    && facet.declaration.source_hash == authority.source_hash
-            })
-            .any(|facet| {
-                [
-                    super::provider_position::Position::Ordinary,
-                    super::provider_position::Position::View,
-                ]
-                .into_iter()
-                .any(|position| {
-                    let Some((_, array)) = super::string_token_authority::provider_array_at(
+    super::bootstrap_references::admits_projected(
+        bootstrap_projection.get_or_insert_with(|| super::bootstrap_references::project(authority)),
+        edge,
+    ) || super::application_config_providers::admits_projected(
+        config_projection
+            .get_or_insert_with(|| super::application_config_providers::project(authority)),
+        edge,
+    ) || super::route_providers::admits_projected(
+        route_projection.get_or_insert_with(|| super::route_providers::project(authority)),
+        edge,
+    ) || super::provider_imported::admits_projected(
+        imported_projection
+            .get_or_insert_with(|| super::provider_imported::project_admission(authority)),
+        edge,
+    ) || authority
+        .declaration_facets
+        .iter()
+        .filter(|facet| {
+            facet.declaration.source == authority.source
+                && facet.declaration.source_hash == authority.source_hash
+        })
+        .any(|facet| {
+            [
+                super::provider_position::Position::Ordinary,
+                super::provider_position::Position::View,
+            ]
+            .into_iter()
+            .any(|position| {
+                let Some((_, array)) = super::string_token_authority::provider_array_at(
+                    authority,
+                    &facet.declaration.name,
+                    position,
+                ) else {
+                    return false;
+                };
+                super::provider_composition::entries(
+                    authority,
+                    array,
+                    position.owner_type(authority, &facet.declaration).is_some(),
+                )
+                .iter()
+                .any(|entry| {
+                    pair_at(
                         authority,
                         &facet.declaration.name,
+                        entry.start,
+                        entry.end,
+                        strategy,
                         position,
-                    ) else {
-                        return false;
-                    };
-                    super::provider_composition::entries(
-                        authority,
-                        array,
-                        position.owner_type(authority, &facet.declaration).is_some(),
                     )
-                    .iter()
-                    .any(|entry| {
-                        pair_at(
-                            authority,
-                            &facet.declaration.name,
-                            entry.start,
-                            entry.end,
-                            strategy,
-                            position,
-                        )
-                        .is_some_and(|(token, target)| {
-                            same(&edge.subject, &token) && same(&edge.object, &target)
-                        })
+                    .is_some_and(|(token, target)| {
+                        same(&edge.subject, &token) && same(&edge.object, &target)
                     })
                 })
             })
+        })
 }

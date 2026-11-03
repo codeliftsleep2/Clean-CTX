@@ -16,6 +16,8 @@ pub(crate) fn has_owner(authority: &TypeScriptAuthority) -> bool {
 }
 
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::delegated_work_metrics::construction(1);
     let mut edges = Vec::new();
     for facet in &authority.declaration_facets {
         if !super::typed_provider_root::admits(
@@ -71,7 +73,12 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     edges
 }
 
+#[cfg(test)]
 pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+    admits_projected(&project(authority), edge)
+}
+
+pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain
             && a.entity_type == b.entity_type
@@ -79,7 +86,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && a.file == b.file
             && a.canonical == b.canonical
     };
-    project(authority).iter().any(|expected| {
+    projected.iter().any(|expected| {
         expected.relation == edge.relation
             && expected.layer == edge.layer
             && same(&expected.subject, &edge.subject)

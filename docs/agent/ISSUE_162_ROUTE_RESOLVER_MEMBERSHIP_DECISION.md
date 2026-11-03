@@ -1,8 +1,198 @@
 # Issue #162: exact source-declared resolve membership
 
 Agent: Agent MaxHeadRoom
-Status: neutral/preservation GREEN (47 scoped passes); all six acquisition probes GREEN; semantic/key-expressibility investigation remains.
-Bounded neutral acquisition only; no resolver publication, compatibility or agent runtime execution.
+Status: generation-78 unqualified resolver repair APPROVED and authored, UNRUN; public key question OPEN.
+Approved semantic repair authored; no agent runtime execution.
+
+## Generation-78 unqualified resolver repair approved and authored, UNRUN
+
+The owner explicitly approves canonical ResolvedBy written-use support from exact
+RouteOccurrence to exact runtime DeclarationId. route_resolvers shares existing
+native ownership and neutral mapping replay. One public relation per object/target
+retains all key occurrences privately. Unique fully proved siblings survive named
+mapping refusal; competing outer fields refuse the container; duplicate inner key
+spellings refuse that key without first/last-wins. Public Resolver grants no
+executable/type/framework eligibility. Public key-specific answers remain OPEN.
+
+The existing RouteDecl resolver branch and object span select legacy replacement
+before emission: owned resolve contribution is suppressed even on canonical refusal;
+outside ownership stays exact generic noncanonical compatibility. All route targets,
+providers and five guard kinds remain independent. Canonical admission is relation-
+specific and replays the same projection; no generic endpoint exception or borrowed
+field/key/target fallback. The existing routing presentation section was relocated unchanged from angular_meta/
+mod.rs into RouteShape::append_meta_section to keep the active module declaration
+file below the size ceiling. Routing/marker behavior remains a preservation gate.
+
+Semantic generation advances to 78; other generations,
+public fields, durable schema/codec and discovery remain unchanged.
+
+The existing neutral carrier now retains the ordinary spelling/pair/key evidence
+of unsupported named values while keeping their values Unsupported and unevaluated.
+This is needed to refuse a duplicate even when its competing value is unsupported;
+no recursive capture/evaluator or new record layout is introduced. Unknown-key
+computed/spread/shorthand structure remains unsupported for canonical membership.
+
+Valid RED/control and original probe/registration bytes were raw-byte isolated
+under target/issue-162/resolve78-approved-isolation/. The six original acquisition
+probes were restored unchanged; only the approved semantic oracle is tightened to
+exact sixteen object/target supports. Existing key-only collision remains a valid
+observation of intentionally unqualified output. New registrations follow restore.
+No Git stash, HEAD or index operation was performed.
+
+Six new control/lifecycle batches cover forged/borrowed membership, broad values,
+partial/duplicate keys and outer fields, unsupported duplicate values, owned
+no-fallback/outside legacy, key support retirement and all relation siblings;
+SQLite/index before queries, cold/warm/refresh/withinPath, owner/target deletion/
+recreation, key/field/object/child/provider/root changes and unchanged-owner target/
+barrel/package/config invalidation, stale restore and repair. The
+[acceptance map](ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md) links obligations to tests.
+
+Handoff: verification/live-acceptance/issue-162/run-route-resolver78-focused.ps1.
+Operator formats unfrozen files, checks sizes, compiles, runs focused production/
+neutral/affected preservation, then Clippy/fmt and original six probes. All post-edit
+gates UNRUN; no agent formatter/Cargo/Node/build/runtime ran. Binary checkpoint,
+full repository and final Claude field stay later. Performance remains deferred.
+Return for separate bounded public-key design after this repair is accepted.
+
+## Five association REDs observed; key-only public collision GREEN
+
+Inspected route-resolver-20261103-102245: one passed, five failed, zero ignored,
+287.34s. Five direct/alias/barrel/namespace/local probes pass exact retained root/
+Object/field/nested mapping/key-token/value/demanded/runtime-reference replay and
+independently recaptured selected declarations for all sixteen object/target
+supports (eighteen slots), plus accepted route/provider/all-five-guard siblings.
+All then fail stage=resolve-association direction=forward. Imported and namespace
+forms fail coordinate equality at line 250; local fails support bounds at line 257
+(same-path Gate minimum two, actual one). This is genuine association RED, not
+another acquisition/key-token/declaration prerequisite failure.
+
+| Form | Forward same / child ResolvedBy | Initial reverse Gate / RightGate |
+| --- | --- | --- |
+| direct | 4 / 4 | 6 / 0 |
+| alias | 4 / 4 | 0 / 0 |
+| barrel | 4 / 4 | 0 / 0 |
+| namespace | 0 / 0 | 0 / 0 |
+| local | 4 / 4 | 6 / 6 |
+
+Required nonempty support bounds are eight same-path and four child supports;
+complete reverse support includes four empty-path pairs, sixteen total (eighteen
+slots allowed). Alias spelling/caller-file attribution is not selected declaration
+identity. Local files happen to match owners, but distinct objects collapse.
+Reverse comparisons/repeated-query assertions remain unclassified after forward
+panic; their initial recorded answers are not successful exact comparisons.
+
+The sixth control passes: data0-to-other key-only edits change current neutral
+key evidence while sorted ResolvedBy edge data remain identical in forward/reverse
+buckets. This is observed public key indistinguishability, not a selected public
+contract or a failure manufactured by an invented selector.
+
+Compile/format logs are empty; active sizes pass. Exact tests/registration/handoff,
+logs/hashes and five association plus two key-control answer sets are preserved in
+ target/issue-162/route-resolver-association-red-evidence/receipt.json and
+observed-public.json. No production/test/harness repair accompanies inspection;
+no agent runtime ran. Generation remains 77. Prior 47 scoped neutral passes remain
+separate acquisition/preservation evidence, not semantic acceptance.
+
+## Production identity and public-key disposition required
+
+Two independent decisions are now evidence-grounded:
+
+1. Exact declaration membership: whether ResolvedBy should publish from the actual
+   existing RouteOccurrence to the exact resolved runtime DeclarationId selected
+   by this unique ordinary resolve Object's complete mapping proof.
+2. Key expressibility: whether an intentionally unqualified object/target support
+   relation is the current approved slice, or whether key-specific publication
+   must be designed before any resolver migration. The existing edge coordinate
+   cannot distinguish two keys selecting one target; adding display text alone
+   would not establish mapping identity.
+
+| Option | Effect / tradeoff |
+| --- | --- |
+| Bounded exact unqualified ResolvedBy first | Reuse existing relation/endpoints and fix demonstrated identity; one support per exact object/target, retaining all mapping/key occurrences privately. Explicitly leaves the required key question OPEN. |
+| Key-specific contract before production | Answers which key registers which declaration, but requires explicit public mapping identity/query/schema/index design and codec review. It cannot be inferred from the neutral additive carrier. |
+| Generic edge metadata or dynamic relation names per key | Broadens global contracts or creates unbounded vocabulary; not recommended as a local shortcut. |
+
+Recommended sequencing is exact unqualified membership first only if the owner
+explicitly accepts the key-specific question remaining open, followed by a bounded
+public-key design. If key-specific answers are required in this same slice, stop
+for that design disposition now rather than claiming ordinary ResolvedBy can
+express them. No option is implemented by this report.
+
+For an unqualified membership disposition, separately approve public Resolver as
+written-use classification rather than executable suitability; broad resolved
+runtime-value eligibility versus independently proved callable eligibility;
+one exact object/target support versus mapping multiplicity; partial independently
+proved mappings; duplicate outer-field and duplicate-key policy. The positive
+probes use typed values/functions and do not certify broader eligibility or decide
+those policies. Retaining duplicate neutral evidence supplies no first/last-wins
+meaning. Recommend conservative refusal of competing outer fields and duplicate
+keys while preserving independently proved mappings under an explicit policy.
+
+Any approved producer and retained admission must replay identical native root/
+object/unique field/nested Object/exact mapping/key-token/value/runtime-declaration
+proof under current source/hash/witnesses. No generic endpoint exception, borrowed
+key/target, or source-text/name fallback. Reuse existing source-owned lifecycle.
+
+For compatibility, recommend selective replacement of only the old resolver
+contribution for resolve-bearing objects inside the shared admitted native
+ typed-const Routes envelope, before per-field/mapping origin is lost. Suppress
+owned weak fallback even on canonical refusal; preserve other relation branches
+and independent siblings. Outside ownership preserve exact existing discovery/
+output as noncanonical legacy. No old+new fact for the same migrated support.
+These choices require explicit owner disposition; the earlier neutral approval
+withheld all of them. Private origin representation must be reviewed against the
+actual parser/producer before implementation, not inferred from labels.
+
+An approved external identity/meaning migration would warrant semantic generation
+77 to 78, with marker/pipeline/durable encoding unchanged absent a demonstrated
+encoding requirement. Key-specific public identity might require a different
+reviewed representation; return before changing schema/codec or generic query/
+index/equality contracts. No resolver/cache/registry/discovery expansion proposed.
+
+After production disposition, preserve valid RED/control bytes, adapt only the
+explicitly chosen oracle, and batch exact association/reverse/repeat, mapping/
+field/key/target/root retirement, forged/borrowed/duplicate/partial policy, owned
+no-fallback/outside legacy, SQLite/index-before-query, unchanged-owner dependency/
+package/config mutation/repair and accepted siblings/lint. Then one consolidated
+bounded binary checkpoint; operator owns execution. Performance remains deferred.
+
+AGENTS.md Architectural Approval Gate and the supplied neutral-only disposition
+require approval before these semantic/public-contract changes. No unchanged
+rerun or semantic repair requested now. Full AQ13/AQ14/W06/#162 and final repository/
+Claude field gates remain open.
+
+## Post-prerequisite association/key investigation authored, UNRUN
+
+Owner continuation proceeds with tracked investigation only. Five new probes use
+the five reference forms and original fixture shape with two callers, seven objects/
+nine mapping slots per root, repeated values under distinct keys, same-path/empty/
+child objects and independently sourced same-name targets. Native eager/lazy/
+LoadsChildren/provider and all five guard-kind siblings precede public observations.
+
+Every mapping requires exact resolve_mapping_at pair/key-token/field/Object replay,
+demanded and runtime reference agreement and independently recaptured selected
+DeclarationId, including local functions. Only then does stage=resolve-association
+compare exact public target name/file/path coordinates and distinct-object support
+bounds. Sixteen object/target supports and eighteen slots supply lower/upper bounds;
+this test does not choose eventual support-versus-key multiplicity policy. Forward
+and reverse buckets plus repeated edge comparisons are asserted sequentially;
+later checks stay unclassified if an earlier assertion panics.
+
+A separate sixth control changes only data0 keys to other while preserving values,
+requires current exact neutral mapping replay before/after, records public answers
+and compares sorted existing ResolvedBy edge data. This observes current public
+key expressibility; it neither invents a selector nor manufactures association RED
+from the absence of a hypothetical key contract. Resolver target eligibility and
+public meaning remain undecided. No producer/admission/capture/generation change.
+
+Tracked tests: src/tests/mcp/angular_route_resolver_semantic_issue_162.rs.
+Original six acquisition probes remain byte-identical. Handoff:
+verification/live-acceptance/issue-162/run-route-resolver-semantic-investigation.ps1.
+Operator formats new test/registration, checks sizes, compiles and records only
+these six new tests. Prior GREEN suites do not repeat. All gates UNRUN; no agent
+formatter/Cargo/Node/build/runtime ran. Return earliest prerequisite or actual
+association divergence and independent key-expressibility evidence before any
+production disposition. Generation 77; performance deferred; final gates open.
 
 ## Neutral mapping authority GREEN; all six original probes GREEN
 

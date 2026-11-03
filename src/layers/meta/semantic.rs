@@ -159,7 +159,7 @@ pub enum SemanticRelation {
     LoadsChildren,
     /// Canonical canActivate written use; noncanonical older rows remain legacy.
     GuardedBy,
-    /// A route is resolved by a resolver class.
+    /// Exact resolve written use for canonical routes; no key or execution certification.
     ResolvedBy,
     // ---- NgRx ----
     /// A component/effect dispatches an action.

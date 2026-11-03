@@ -50,3 +50,7 @@ pub mod workspace;
 // Integration tests module
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, feature = "rust", feature = "typescript", feature = "angular"))]
+#[path = "tests/architecture/semantic_work_static.rs"]
+mod semantic_work_static;

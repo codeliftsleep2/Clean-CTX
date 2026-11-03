@@ -227,3 +227,12 @@ When a migration is complete:
 These expectations are part of the migration finalization procedure; see
 `incremental-migration.md` for the workflow and `verification.md` for the
 gate.
+
+## AF-PERF-001 semantic work review
+
+For each changed semantic path, record operation scope, complete-set work and
+scaling, reuse/invalidation boundary, deterministic tracked work-count tests and
+owner-approved exceptions. AST inspection and real production-path counters are
+complementary; neither grants semantic authority. The mandatory verification
+command lives in verification.md. No shared validation context, cross-call cache,
+witness deduplication or lock change follows from this test-only enforcement.

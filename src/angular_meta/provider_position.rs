@@ -171,7 +171,11 @@ pub(super) fn registration_entry(
     canonical_token_in(authority, owner, occurrence, token)
 }
 
-pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits_registration(
+    authority: &TypeScriptAuthority,
+    edge: &SemanticEdge,
+    imported_projection: &mut Option<Vec<SemanticEdge>>,
+) -> bool {
     let position = match edge.relation {
         SemanticRelation::RegistersViewProvider => Position::View,
         SemanticRelation::RegistersProvider => Position::Ordinary,
@@ -199,15 +203,18 @@ pub(crate) fn admits_registration(authority: &TypeScriptAuthority, edge: &Semant
     if !same(&expected, &edge.subject) {
         return false;
     }
-    super::provider_imported::admits(authority, edge)
-        || super::provider_composition::entries(
-            authority,
-            array,
-            position.owner_type(authority, owner).is_some(),
-        )
-        .iter()
-        .any(|entry| {
-            registration_token(authority, &owner.name, entry.start, entry.end, position)
-                .is_some_and(|token| same(&token, &edge.object))
-        })
+    super::provider_imported::admits_projected(
+        imported_projection
+            .get_or_insert_with(|| super::provider_imported::project_admission(authority)),
+        edge,
+    ) || super::provider_composition::entries(
+        authority,
+        array,
+        position.owner_type(authority, owner).is_some(),
+    )
+    .iter()
+    .any(|entry| {
+        registration_token(authority, &owner.name, entry.start, entry.end, position)
+            .is_some_and(|token| same(&token, &edge.object))
+    })
 }

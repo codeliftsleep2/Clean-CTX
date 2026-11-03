@@ -453,3 +453,27 @@ mod typescript_resolve_field_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/typescript_resolve_mapping_issue_162.rs"]
 mod typescript_resolve_mapping_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_route_resolver_semantic_issue_162.rs"]
+mod angular_route_resolver_semantic_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver78_controls_issue_162.rs"]
+mod angular_resolver78_controls_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver78_lifecycle_issue_162.rs"]
+mod angular_resolver78_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_replay_p0_issue_162.rs"]
+mod angular_resolver_replay_p0_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_admission_work_af_perf_001.rs"]
+mod angular_admission_work_af_perf_001;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_admission_lifecycle_af_perf_001.rs"]
+mod angular_admission_lifecycle_af_perf_001;

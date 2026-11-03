@@ -1,5 +1,6 @@
 // Explicit full-run inventory; individual receipts remain bounded.
 export const suites = [
+  "route-resolver78",
   "route-guard-kinds",
   "route-guards",
   "load-children-modules",

@@ -74,7 +74,7 @@ mod outcome;
 mod prepare;
 mod request;
 #[cfg(test)]
-mod work_metrics;
+pub(crate) mod work_metrics;
 
 pub(super) use diagnostics::discovery_field;
 

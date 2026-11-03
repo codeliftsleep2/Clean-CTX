@@ -188,6 +188,8 @@ pub(crate) fn has_call(authority: &TypeScriptAuthority) -> bool {
             .any(|facet| call(authority, facet).is_some())
 }
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    super::delegated_work_metrics::construction(0);
     let mut edges = super::legacy_bootstrap::project(authority);
     for facet in &authority.invocation_facets {
         let Some(args) = call(authority, facet) else {
@@ -239,7 +241,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     }
     edges
 }
-pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
+pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain
             && a.entity_type == b.entity_type
@@ -247,7 +249,7 @@ pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bo
             && a.file == b.file
             && a.canonical == b.canonical
     };
-    project(authority).iter().any(|expected| {
+    projected.iter().any(|expected| {
         expected.relation == edge.relation
             && expected.layer == edge.layer
             && edge.call_evidence.is_none()

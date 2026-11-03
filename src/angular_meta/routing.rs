@@ -221,6 +221,24 @@ impl RouteShape {
         guard_owned: &[(usize, usize)],
         kinds_owned: &[((usize, usize), &'static str)],
     ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
+        self.to_semantic_edges_resolver_ownership(
+            owned,
+            lazy_owned,
+            children_owned,
+            guard_owned,
+            kinds_owned,
+            &[],
+        )
+    }
+    pub(crate) fn to_semantic_edges_resolver_ownership(
+        &self,
+        owned: &[(usize, usize)],
+        lazy_owned: &[(usize, usize)],
+        children_owned: &[(usize, usize)],
+        guard_owned: &[(usize, usize)],
+        kinds_owned: &[((usize, usize), &'static str)],
+        resolver_owned: &[(usize, usize)],
+    ) -> Vec<crate::layers::meta::semantic::SemanticEdge> {
         use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
         let mut edges = Vec::new();
@@ -286,7 +304,11 @@ impl RouteShape {
             }
 
             // Route → ResolvedBy → Resolver
-            for resolver in &route.resolvers {
+            for resolver in route
+                .resolvers
+                .iter()
+                .filter(|_| !resolver_owned.contains(&route.eager_object_span))
+            {
                 edges.push(SemanticEdge {
                     relation: SemanticRelation::ResolvedBy,
                     subject: route_entity.clone(),
@@ -469,3 +491,25 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/angular_meta/routing_issue_139.rs"]
 mod routing_issue_139;
+
+impl RouteShape {
+    pub(super) fn append_meta_section(&self, block: &mut super::MetaBlock, fidelity: Fidelity) {
+        let route_block = self.render(fidelity);
+        if !route_block.is_empty() {
+            let mut route_lines: Vec<String> = route_block.lines().map(|l| l.to_string()).collect();
+            let header = if route_lines
+                .first()
+                .map(|l| l.starts_with("// ---"))
+                .unwrap_or(false)
+            {
+                route_lines.remove(0)
+            } else {
+                "// --- Φ Routing Meta ---".to_string()
+            };
+            block.sections.push(super::MetaSection {
+                header,
+                lines: route_lines,
+            });
+        }
+    }
+}
