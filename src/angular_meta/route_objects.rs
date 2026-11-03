@@ -132,6 +132,8 @@ impl RouteObject<'_> {
 pub(super) fn project(authority: &TypeScriptAuthority) -> Vec<RouteObject<'_>> {
     let mut objects_out = Vec::new();
     for facet in &authority.declaration_facets {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.root_facets += 1);
         if root(authority, facet)
             && let Some(array) = &facet.initializer
         {

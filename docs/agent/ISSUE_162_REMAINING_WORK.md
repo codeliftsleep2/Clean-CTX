@@ -1,8 +1,38 @@
 # Issue #162: current position and remaining work
 
 Agent: Agent MaxHeadRoom
-Reconciled: 2026-11-02
-Status: generation-77 bounded local/binary GREEN (102 scoped Rust passes; 345 binary checks); broader/final gates open.
+Reconciled: 2026-11-03
+Status: generation-78 bounded local/binary accepted; performance-first investigation active; #162 remains open.
+
+## Owner baseline clarification
+
+Generation 78: implemented, targeted verification GREEN, pushed; optional final field/repository certification outstanding.
+AF-PERF-002: active architectural performance hardening.
+
+Pushed status is owner-reported; no remote publication check was performed here.
+Generation-78 semantic contracts and targeted receipts are baseline authority.
+AF-PERF-002 investigation does not reopen that feature acceptance or imply a
+semantic generation advance. Earlier chronological gate language below remains
+historical and must be read under this current disposition.
+
+## AF-PERF-002 system-wide Phase 1 active
+
+[AF_PERF_002_SYSTEM_WIDE_INVESTIGATION.md](AF_PERF_002_SYSTEM_WIDE_INVESTIGATION.md)
+records broader production chains, including root removal multiplying global
+reconciliation and retained-owner revalidation beyond cached discovery. Next is
+small deterministic baseline instrumentation, not another acceptance campaign.
+New validation/index/locking/reconciliation policy still requires concrete design
+approval. Generation 78 and resolver-key suspension continue; #162 remains open.
+
+## Owner prioritizes remaining performance before semantic expansion
+
+See [PERFORMANCE_FIRST_CONTINUATION.md](PERFORMANCE_FIRST_CONTINUATION.md).
+Next work characterizes witness replay, #174 membership comparisons, #173 complete
+reconciliation and snapshot lock scope with deterministic tracked counters. Repair
+shared storage/currentness/publication/locking only after concrete architectural
+disposition. Public resolver-key and broader semantic work remain suspended; full
+repository/Claude acceptance is not substituted for resolving these mechanisms.
+Prior bounded generation-78 evidence remains recorded; #162 is not complete.
 
 ## Phase B verified PASS; bounded generation-78 evidence consolidated
 

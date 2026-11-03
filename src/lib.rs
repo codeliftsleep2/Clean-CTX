@@ -54,3 +54,15 @@ mod tests;
 #[cfg(all(test, feature = "rust", feature = "typescript", feature = "angular"))]
 #[path = "tests/architecture/semantic_work_static.rs"]
 mod semantic_work_static;
+
+#[cfg(test)]
+#[path = "tests/architecture/work_observations_af_perf_002.rs"]
+pub(crate) mod work_observations_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/workspace/index_complexity_af_perf_002.rs"]
+mod index_complexity_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/workspace/index_membership_budget_af_perf_002.rs"]
+mod index_membership_budget_af_perf_002;

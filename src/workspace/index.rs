@@ -180,6 +180,9 @@ fn find_entities_by_name_with_scope<'a>(
 pub struct WorkspaceIndex {
     /// Entity identity → all entity occurrences (with file context).
     entities: HashMap<EntityKey, Vec<EntityRef>>,
+    name_members: HashMap<String, HashSet<EntityKey>>,
+    occurrence_members: HashMap<EntityKey, HashSet<Option<String>>>,
+    publisher_members: HashMap<String, HashSet<EntityKey>>,
     /// Entity identity → source occurrences independently proven as declarations.
     declarations: HashMap<EntityKey, Vec<EntityRef>>,
     /// Entity identity → outgoing edge occurrences (one entry per asserting
@@ -226,6 +229,9 @@ impl WorkspaceIndex {
     pub fn new() -> Self {
         Self {
             entities: HashMap::new(),
+            name_members: HashMap::new(),
+            occurrence_members: HashMap::new(),
+            publisher_members: HashMap::new(),
             declarations: HashMap::new(),
             forward: HashMap::new(),
             reverse: HashMap::new(),
@@ -249,39 +255,6 @@ impl WorkspaceIndex {
     // `add_edges` lives in `index/edges.rs` together with the edge-occurrence
     // identity types it maintains (`EdgeKey`, `StoredEdge`).
 
-    /// Register a single entity occurrence.
-    ///
-    /// Occurrence identity is (domain, entity_type, name, file): registering
-    /// the same occurrence again is a no-op. An entity that participates in
-    /// many edges within one file is registered exactly once for that file;
-    /// the same identity in a different file remains a distinct occurrence
-    /// (cross-file ambiguity preserved).
-    fn register_entity(
-        &mut self,
-        key: &EntityKey,
-        entity: EntityRef,
-        file_entity_keys: &mut Vec<EntityKey>,
-    ) {
-        // Only push unique entity keys into the name index to avoid
-        // repeated lookups for the same (name, identity) pair.
-        let name_entries = self.name_index.entry(entity.name.clone()).or_default();
-        if !name_entries.contains(key) {
-            name_entries.push(key.clone());
-        }
-        // Idempotent occurrence registration: edge participation must not
-        // multiply occurrences. An entity mentioned by N edges in one file
-        // is registered once for that file (occurrence identity:
-        // (domain, entity_type, name, file)).
-        // Track this publisher even when another publisher already registered
-        // the same physical entity occurrence. File queries and replacement use
-        // these keys; occurrence deduplication must not discard their ownership.
-        file_entity_keys.push(key.clone());
-        let occurrences = self.entities.entry(key.clone()).or_default();
-        if occurrences.iter().any(|e| e.file == entity.file) {
-            return;
-        }
-        occurrences.push(entity);
-    }
     // ── Core queries (Phase 4a) ──────────────────────────────────────
 
     /// Get all entity occurrences matching the given identity.
@@ -603,3 +576,5 @@ mod performance_tests;
 #[cfg(test)]
 #[path = "../tests/workspace/index_calls.rs"]
 mod calls_tests;
+
+mod membership;

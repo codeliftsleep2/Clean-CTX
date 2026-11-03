@@ -6,6 +6,7 @@ use serde_json::json;
 use std::time::Instant;
 fn measured<T>(phase: &str, requires_admission: bool, action: impl FnOnce() -> T) -> T {
     metrics::reset_operations();
+    crate::work_observations_af_perf_002::reset();
     work_metrics::reset();
     #[cfg(feature = "rust")]
     crate::mcp::tool_handlers::hydration::reset_test_scan_calls();
@@ -13,6 +14,10 @@ fn measured<T>(phase: &str, requires_admission: bool, action: impl FnOnce() -> T
     let start = Instant::now();
     let result = action();
     let counts = metrics::operations();
+    eprintln!(
+        "AF002_LIFECYCLE phase={phase} observations={:?}",
+        crate::work_observations_af_perf_002::snapshot()
+    );
     let query = work_metrics::snapshot();
     #[cfg(feature = "rust")]
     let discovery_scans = Some(crate::mcp::tool_handlers::hydration::test_scan_calls());
@@ -71,6 +76,18 @@ fn af_perf_001_lifecycle_publication_restore_snapshot_query() {
     std::fs::remove_file(p.join("two.ts")).unwrap();
     let state = crate::mcp::McpState::new(config.clone());
     let authority = measured("publication", true, || capture(&state, p, "one.ts"));
+    let mut expectations = std::collections::BTreeMap::<String, usize>::new();
+    for witness in &authority.witnesses {
+        *expectations
+            .entry(serde_json::to_string(witness).unwrap())
+            .or_default() += 1;
+    }
+    eprintln!(
+        "AF002_CAPTURE_VECTOR total={} distinct={} multiplicities={:?}",
+        authority.witnesses.len(),
+        expectations.len(),
+        expectations.values().copied().collect::<Vec<_>>()
+    );
     let expected = crate::angular_meta::route_resolvers::project(&authority);
     assert_eq!(
         expected.len(),

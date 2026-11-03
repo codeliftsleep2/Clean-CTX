@@ -395,7 +395,11 @@ impl super::McpState {
             "semantic_edge_snapshots"
         )
         .get(alias)
-        .filter(|snapshot| snapshot.is_current())
+        .filter(|snapshot| {
+            #[cfg(test)]
+            let _observation = crate::work_observations_af_perf_002::snapshot_scope();
+            snapshot.is_current()
+        })
         .cloned()
     }
 

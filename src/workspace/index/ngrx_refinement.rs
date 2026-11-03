@@ -1,6 +1,9 @@
 use super::edges::{EdgeKey, StoredEdge};
+#[path = "ngrx_export_evidence.rs"]
+mod export_evidence;
 use super::{WorkspaceIndex, entity_key};
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use export_evidence::{exports_const, exports_function};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -37,6 +40,16 @@ impl WorkspaceIndex {
     }
 
     pub(super) fn rebuild_ngrx_import_refinements(&mut self) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| {
+            s.reconciliation += 1;
+            s.retired += self.ngrx_refined_edges.len();
+            s.candidates += self
+                .ngrx_refinement_candidates
+                .values()
+                .map(Vec::len)
+                .sum::<usize>();
+        });
         for key in std::mem::take(&mut self.ngrx_refined_edges) {
             self.edge_set.remove(&key);
             self.edge_count = self.edge_count.saturating_sub(1);
@@ -365,43 +378,23 @@ impl WorkspaceIndex {
             return;
         };
         let key = entity_key(entity);
-        let exists = self
-            .entities
-            .get(&key)
-            .is_some_and(|items| items.iter().any(|item| item.file.as_ref() == Some(file)));
+        let exists = self.has_physical_occurrence(&key, &entity.file);
         if exists {
             return;
         }
         let mut keys = Vec::new();
         self.register_entity(&key, entity.clone(), &mut keys);
-        let file_keys = self.file_map.entry(file.clone()).or_default();
         for key in keys {
-            if !file_keys.contains(&key) {
-                file_keys.push(key.clone());
-            }
+            self.register_publisher_key(file, key);
         }
         self.ngrx_refined_entities.push((key, file.clone()));
     }
 
     fn drop_ngrx_refined_entities(&mut self) {
         for (key, file) in std::mem::take(&mut self.ngrx_refined_entities) {
-            if let Some(items) = self.entities.get_mut(&key) {
-                items.retain(|item| item.file.as_deref() != Some(&file));
-                if items.is_empty() {
-                    self.entities.remove(&key);
-                }
-            }
-            if let Some(keys) = self.file_map.get_mut(&file) {
-                keys.retain(|item| item != &key);
-            }
-            if !self.entities.contains_key(&key)
-                && let Some(keys) = self.name_index.get_mut(&key.2)
-            {
-                keys.retain(|item| item != &key);
-                if keys.is_empty() {
-                    self.name_index.remove(&key.2);
-                }
-            }
+            self.remove_physical_occurrence(&key, &file);
+            self.remove_publisher_key(&file, &key);
+            self.clean_name_membership(&key.2);
         }
     }
 }
@@ -544,72 +537,4 @@ fn resolve_typescript_module(asserting_file: &str, module: &str) -> Option<Strin
         .canonicalize()
         .ok()
         .map(|path| crate::dictionary::path::canonical_identity_key(&path.to_string_lossy()))
-}
-
-fn exports_const(path: &str, name: &str) -> bool {
-    let Ok(source) = std::fs::read_to_string(path) else {
-        return false;
-    };
-    let Some(language) = crate::compression::language::safe_typescript_language() else {
-        return false;
-    };
-    let mut parser = tree_sitter::Parser::new();
-    if parser.set_language(&language).is_err() {
-        return false;
-    }
-    let Some(tree) = parser.parse(&source, None) else {
-        return false;
-    };
-    let root = tree.root_node();
-    let mut cursor = root.walk();
-    root.named_children(&mut cursor)
-        .filter(|node| node.kind() == "export_statement")
-        .any(|export| exported_const_descendant(export, source.as_bytes(), name))
-}
-
-fn exports_function(path: &str, name: &str) -> bool {
-    let Ok(source) = std::fs::read_to_string(path) else {
-        return false;
-    };
-    let Some(language) = crate::compression::language::safe_typescript_language() else {
-        return false;
-    };
-    let mut parser = tree_sitter::Parser::new();
-    if parser.set_language(&language).is_err() {
-        return false;
-    }
-    let Some(tree) = parser
-        .parse(&source, None)
-        .filter(|tree| !tree.root_node().has_error())
-    else {
-        return false;
-    };
-    let root = tree.root_node();
-    root.named_children(&mut root.walk())
-        .filter(|node| node.kind() == "export_statement")
-        .filter_map(|export| export.named_child(0))
-        .any(|declaration| {
-            declaration.kind() == "function_declaration"
-                && declaration
-                    .child_by_field_name("name")
-                    .and_then(|identifier| identifier.utf8_text(source.as_bytes()).ok())
-                    == Some(name)
-        })
-}
-
-fn exported_const_descendant(node: tree_sitter::Node<'_>, source: &[u8], name: &str) -> bool {
-    if node.kind() == "variable_declarator"
-        && node
-            .child_by_field_name("name")
-            .and_then(|name| name.utf8_text(source).ok())
-            == Some(name)
-        && node
-            .parent()
-            .is_some_and(|parent| parent.kind() == "lexical_declaration")
-    {
-        return true;
-    }
-    let mut cursor = node.walk();
-    node.named_children(&mut cursor)
-        .any(|child| exported_const_descendant(child, source, name))
 }

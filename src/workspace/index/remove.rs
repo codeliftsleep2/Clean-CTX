@@ -66,18 +66,13 @@ impl WorkspaceIndex {
         }
 
         // Phase 2: Remove entity keys tracked to this file.
-        if let Some(keys) = self.file_map.remove(file_path) {
+        if let Some(keys) = self.take_publisher_keys(file_path) {
             let affected_names: HashSet<String> =
                 keys.iter().map(|(_, _, name)| name.clone()).collect();
 
             // Remove entities that only existed in this file.
             for key in &keys {
-                if let Some(occurrences) = self.entities.get_mut(key) {
-                    occurrences.retain(|e| e.file.as_deref() != Some(file_path));
-                    if occurrences.is_empty() {
-                        self.entities.remove(key);
-                    }
-                }
+                self.remove_physical_occurrence(key, file_path);
             }
 
             // Drop adjacency buckets whose identity no longer exists in the
@@ -98,15 +93,7 @@ impl WorkspaceIndex {
                 #[cfg(test)]
                 self.name_cleanup_buckets_examined.push(name.clone());
 
-                let remove_bucket = if let Some(name_keys) = self.name_index.get_mut(&name) {
-                    name_keys.retain(|key| self.entities.contains_key(key));
-                    name_keys.is_empty()
-                } else {
-                    false
-                };
-                if remove_bucket {
-                    self.name_index.remove(&name);
-                }
+                self.clean_name_membership(&name);
             }
         }
         self.rebuild_ngrx_import_refinements();

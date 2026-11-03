@@ -53,27 +53,48 @@ pub(crate) enum Witness {
 
 impl Witness {
     pub(crate) fn current(&self) -> bool {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::witness(self);
         #[cfg(all(test, feature = "angular"))]
         crate::angular_meta::admission_work_metrics::witness();
         match self {
             Self::Directory { path, entries } => {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.enumerations += 1);
                 directory_entries(path).is_ok_and(|current| current == *entries)
             }
             Self::Content { path, hash } => {
-                std::fs::read(path).is_ok_and(|bytes| crate::cache::content_hash(&bytes) == *hash)
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.reads += 1);
+                std::fs::read(path).is_ok_and(|bytes| {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|s| s.hashes += 1);
+                    crate::cache::content_hash(&bytes) == *hash
+                })
             }
-            Self::Missing { path } => std::fs::symlink_metadata(path)
-                .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound),
+            Self::Missing { path } => {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.metadata += 1);
+                std::fs::symlink_metadata(path)
+                    .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+            }
             Self::Kind {
                 path,
                 file,
                 directory,
-            } => std::fs::metadata(path).is_ok_and(|metadata| {
-                metadata.is_file() == *file && metadata.is_dir() == *directory
-            }),
-            Self::Physical { path, target } => path
-                .canonicalize()
-                .is_ok_and(|current| shape(&current) == shape(target)),
+            } => {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.metadata += 1);
+                std::fs::metadata(path).is_ok_and(|metadata| {
+                    metadata.is_file() == *file && metadata.is_dir() == *directory
+                })
+            }
+            Self::Physical { path, target } => {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.canonicalizations += 1);
+                path.canonicalize()
+                    .is_ok_and(|current| shape(&current) == shape(target))
+            }
             Self::Unreadable { .. } | Self::OutsideScope { .. } => false,
         }
     }

@@ -223,6 +223,8 @@ impl WorkspaceIndex {
         let mut file_entity_keys: Vec<EntityKey> = Vec::new();
 
         for mut edge in edges {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.registrations += 1);
             self.total_edges_inserted += 1;
 
             if edge.layer == crate::angular_meta::ngrx::direct_imports::REFINEMENT_LAYER
@@ -304,13 +306,8 @@ impl WorkspaceIndex {
         // rule applied during registration) so `entities_in_file` can never
         // report the same occurrence twice even if a file is ingested twice
         // without an intervening `remove_file`.
-        if !file_entity_keys.is_empty() {
-            let entry = self.file_map.entry(file_path.to_string()).or_default();
-            for key in file_entity_keys.iter() {
-                if !entry.contains(key) {
-                    entry.push(key.clone());
-                }
-            }
+        for key in file_entity_keys {
+            self.register_publisher_key(file_path, key);
         }
         self.rebuild_ngrx_import_refinements();
     }
