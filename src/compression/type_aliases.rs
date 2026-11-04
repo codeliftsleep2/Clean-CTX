@@ -33,16 +33,36 @@ const MIN_ORIGINAL_LEN: usize = 4;
 /// Only aliases that actually appear in the body are emitted in the
 /// footer (avoids dead footer entries).
 pub fn apply_type_aliases(body: &str, aliases: &BTreeMap<String, String>) -> (String, String) {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| {
+        s.alias_calls += 1;
+        s.alias_input_bytes += body.len();
+    });
     // Filter to valid pairs and sort by original length descending so
     // longer type names are matched before shorter ones (`UserService`
     // before `User`).
     let mut pairs: Vec<(&String, &String)> = aliases
         .iter()
-        .filter(|(original, alias)| is_valid_alias(alias) && original.len() >= MIN_ORIGINAL_LEN)
+        .filter(|(original, alias)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.alias_setup_entries += 1);
+            is_valid_alias(alias) && original.len() >= MIN_ORIGINAL_LEN
+        })
         .collect();
-    pairs.sort_by_key(|b| std::cmp::Reverse(b.0.len()));
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| {
+        s.alias_eligible_entries += pairs.len();
+        s.alias_pair_capacity += pairs.capacity();
+    });
+    pairs.sort_by_key(|b| {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.alias_sort_key_calls += 1);
+        std::cmp::Reverse(b.0.len())
+    });
 
     if pairs.is_empty() {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.alias_output_bytes += body.len());
         return (body.to_string(), String::new());
     }
 
@@ -55,17 +75,27 @@ pub fn apply_type_aliases(body: &str, aliases: &BTreeMap<String, String>) -> (St
     let mut seen: HashSet<&str> = HashSet::new();
     let mut i = 0;
     while i < bytes.len() {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.alias_positions += 1);
         // Try to match the longest original at position i.
         let mut matched = false;
         for (original, alias) in &pairs {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.alias_probes += 1);
             let orig_bytes = original.as_bytes();
             if orig_bytes.len() > bytes.len() - i {
                 continue;
             }
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| {
+                s.alias_key_bytes_considered += orig_bytes.len()
+            });
             if &bytes[i..i + orig_bytes.len()] == orig_bytes
                 && is_boundary_before(bytes, i)
                 && is_boundary_after(bytes, i + orig_bytes.len())
             {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.alias_matches += 1);
                 result.push_str(alias);
                 // Only add to `used` on first match — subsequent matches
                 // of the same original would produce duplicate footer entries.
@@ -86,6 +116,10 @@ pub fn apply_type_aliases(body: &str, aliases: &BTreeMap<String, String>) -> (St
     }
 
     let footer = build_footer(&used);
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| {
+        s.alias_output_bytes += result.len() + footer.len()
+    });
     (result, footer)
 }
 
@@ -125,6 +159,8 @@ pub fn substitute_type_token(body: &str, original: &str, alias: &str) -> String 
     let mut result = String::with_capacity(body.len());
     let mut i = 0;
     while i < bytes.len() {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.alias_positions += 1);
         if orig_bytes.len() <= bytes.len() - i
             && &bytes[i..i + orig_bytes.len()] == orig_bytes
             && is_boundary_before(bytes, i)
@@ -187,3 +223,7 @@ fn is_boundary_after(bytes: &[u8], end: usize) -> bool {
 #[cfg(test)]
 #[path = "../tests/compression/type_aliases.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/compression/alias_work_af_perf_002.rs"]
+mod alias_work;

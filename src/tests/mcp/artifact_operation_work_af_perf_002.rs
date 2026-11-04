@@ -165,3 +165,6 @@ mod compression_token_work;
 
 #[path = "c1_public_response_af_perf_002.rs"]
 mod c1_public_response;
+
+#[path = "c2_public_alias_work_af_perf_002.rs"]
+mod c2_public_alias_work;

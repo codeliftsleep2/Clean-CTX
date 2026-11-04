@@ -374,3 +374,49 @@ C2 alias matching stays separate characterization-only. Remaining compression/
 compaction/rendering and source-wide inventory are incomplete. A2 decision remains
 closed; A3 and NgRx collector protected. No automatic broad campaign, binary rebuild
 or Claude field switch is needed to record this bounded result.
+
+
+## C2 alias characterization packet authored
+
+AF_PERF_002_C2_ALIAS_CHARACTERIZATION.md traces active MCP post-compilation operand
+rewrites and distinguishes optional/retired capture callers. Test-only counters
+measure setup/sort/scan/probe/key/match work and actual IR/public totals. Three
+new tests and31 existing alias controls are selected by the new operator packet,
+all UNRUN. No alias algorithm, state/API, generation or cache change. Existing
+protected repairs are not reopened; source accounting remains independent.
+
+
+C2 characterization verified: c2-alias-work-20261104-160845,34 tracked passes,
+clean focused gates and matching source hashes. Public captured parameter/alias
+axes demonstrate repeated operand-local setup; negative matcher axes demonstrate
+text-position times alias probes. C2 remains MONITOR, no optimization authorized.
+See AF_PERF_002_C2_ALIAS_CHARACTERIZATION.md for counts, limits and caller scope.
+Syntax accounting unchanged; broader discovery remains incomplete.
+
+
+Hierarchy owner-placement discovery: active checked projection still linearly scans
+materialized classes for method/field placement. Independent class/member axes and
+ordered identity characterization are authored UNRUN; no production repair. See
+AF_PERF_002_HIERARCHY_DISCOVERY.md. Renderer overload counting has a distinct semantic
+consumer. Whole-subsystem coverage and syntax disposition totals remain unchanged.
+
+
+Hierarchy characterization hierarchy-work-20261104-163440 verified13 passes and
+focused gates with matching source hashes. Method/field placement comparisons equal
+K*C*(C+1), reaching65792 at256 classes. Existing-map lookup substitution proposed
+only, pending owner disposition; public multiplicity and corrected costs unmeasured.
+See AF_PERF_002_HIERARCHY_DISCOVERY.md. Syntax accounting remains unchanged.
+
+
+Hierarchy placement repair:145 focused passes and clean affected gates verified
+(hierarchy-focused-20261104-171027); isolated real one-site scan reintroduction
+fails budget/static and exact restoration passes both (hierarchy-mutation-20261104-171239).
+Approved scope only: two existing-map lookups; composed mandatory gate pending.
+All other hierarchy/discovery gaps and syntax accounting remain explicit.
+
+
+Hierarchy two-site placement scope FIX / CLOSED / PROTECTED: final composed
+af-perf-001-20261104-172427 passes49 tracked executions with212 matching
+source hashes, following focused145 and isolated mutation RED/restored GREEN.
+See AF_PERF_002_HIERARCHY_DISCOVERY.md. Broader hierarchy coverage/discovery remains
+open; original9763 syntax accounting and unresolved scope are unchanged.

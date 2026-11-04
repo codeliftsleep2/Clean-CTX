@@ -9,7 +9,7 @@
 // Child-module access: a private item of an ancestor module is visible in its
 // descendants, so `use super::*` supplies the node types (`HierarchicalIR`,
 // `HierarchicalCall`, `ClassNode`, `MethodNode`, `FieldNode`, `PatternEntry`)
-// and the shared `find_class_by_id` helper.
+// and the shared node definitions.
 
 use super::*;
 use crate::ir::identity::{
@@ -121,7 +121,11 @@ pub fn try_ir_to_hierarchical(
             CoreOp::DefMethod(cid, mid, name) => {
                 let class_id = ClassId::from_serialized(cid);
                 let method_id = MethodId::from_serialized(mid);
-                if let Some(class_idx) = find_class_by_id(&classes, cid) {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|counts| {
+                    counts.hierarchy_placement_map_probes += 1;
+                });
+                if let Some(class_idx) = class_locations.get(&class_id).copied() {
                     let method_idx = push_method(&mut classes[class_idx], &method_id, name.clone());
                     method_locations
                         .insert(method_id, MethodLocation::Class(class_idx, method_idx));
@@ -138,7 +142,11 @@ pub fn try_ir_to_hierarchical(
             CoreOp::DefField(cid, fid, name) => {
                 let class_id = ClassId::from_serialized(cid);
                 let field_id = FieldId::from_serialized(fid);
-                if let Some(class_idx) = find_class_by_id(&classes, cid) {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|counts| {
+                    counts.hierarchy_placement_map_probes += 1;
+                });
+                if let Some(class_idx) = class_locations.get(&class_id).copied() {
                     let field_idx = push_field(&mut classes[class_idx], &field_id, name.clone());
                     field_locations.insert(field_id, FieldLocation::Class(class_idx, field_idx));
                 } else {

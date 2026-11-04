@@ -308,3 +308,6 @@ mod ngrx_binding_static;
 
 #[path = "c1_token_static_af_perf_002.rs"]
 mod c1_token_static;
+
+#[path = "hierarchy_placement_static_af_perf_002.rs"]
+mod hierarchy_placement_static;

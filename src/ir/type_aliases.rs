@@ -45,6 +45,8 @@ pub fn apply_type_aliases_to_ir(
     instructions: &mut Vec<CoreOp>,
     aliases: &BTreeMap<String, String>,
 ) {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.alias_ir_calls += 1);
     if aliases.is_empty() {
         return;
     }
@@ -54,6 +56,8 @@ pub fn apply_type_aliases_to_ir(
     let mut used: BTreeMap<String, String> = BTreeMap::new();
 
     for op in instructions.iter_mut() {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.alias_ir_instruction_visits += 1);
         match op {
             CoreOp::FieldType(_, type_opcode) => {
                 substitute_type_in_op(type_opcode, aliases, &mut used);
@@ -85,6 +89,8 @@ fn substitute_type_in_op(
     aliases: &BTreeMap<String, String>,
     used: &mut BTreeMap<String, String>,
 ) {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.alias_ir_operands += 1);
     let (substituted, footer) = apply_type_aliases(type_opcode, aliases);
     if !substituted.is_empty() && substituted != *type_opcode {
         // Parse the §TA footer to extract alias→original pairs.

@@ -328,11 +328,6 @@ pub fn estimate_savings(ir: &CompiledIR) -> (usize, usize, f64) {
     (pos_chars, hier_chars, savings)
 }
 
-/// Helper: find a class index by its alias ID.
-fn find_class_by_id(classes: &[ClassNode], id: &str) -> Option<usize> {
-    classes.iter().position(|c| c.id == id)
-}
-
 #[cfg(test)]
 #[path = "../tests/ir/hierarchical.rs"]
 mod tests;
@@ -366,3 +361,11 @@ mod pattern_tests;
 #[cfg(test)]
 #[path = "../tests/ir/interface_identity.rs"]
 mod interface_identity_tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchy_work_af_perf_002.rs"]
+mod hierarchy_work_af_perf_002;
+
+#[cfg(test)]
+#[path = "../tests/ir/hierarchy_placement_budget_af_perf_002.rs"]
+mod placement_repair;
