@@ -114,3 +114,9 @@ fn af002_ngrx_empty_call_observes_changed_export() {
         work::snapshot()
     );
 }
+
+#[path = "index_ngrx_reconstruction_af_perf_002.rs"]
+mod reconstruction;
+
+#[path = "index_ngrx_binding_budget_af_perf_002.rs"]
+mod binding_budget;

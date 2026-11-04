@@ -302,3 +302,9 @@ mod index_membership_static;
 
 #[path = "csharp_a3_static_af_perf_002.rs"]
 mod csharp_a3_static;
+
+#[path = "ngrx_binding_static_af_perf_002.rs"]
+mod ngrx_binding_static;
+
+#[path = "c1_token_static_af_perf_002.rs"]
+mod c1_token_static;

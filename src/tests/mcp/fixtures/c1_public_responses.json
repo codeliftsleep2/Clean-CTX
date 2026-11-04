@@ -1,0 +1,586 @@
+{
+  "1": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_23feaa0c5e027de39b57d1008d3ce1fbda25a061e595618104190f1bc216e942",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [
+      "document"
+    ],
+    "content": [
+      {
+        "text": "// ordinary source words \nexport class Workload { run() { return 1; } }",
+        "type": "text"
+      }
+    ],
+    "content_kind": "raw_passthrough",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "2": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_e757e163f4527c0a26a5d8acd2eb7ea085fb8e6d2254577461b8f10b0e3218cb",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [
+      "document"
+    ],
+    "content": [
+      {
+        "text": "// ordinary source words ordinary source words \nexport class Workload { run() { return 1; } }",
+        "type": "text"
+      }
+    ],
+    "content_kind": "raw_passthrough",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "4": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_d098db57800814edbd384b2128131faf4727e45f448c323d35ec7178b2bba879",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [
+      "document"
+    ],
+    "content": [
+      {
+        "text": "// ordinary source words ordinary source words ordinary source words ordinary source words \nexport class Workload { run() { return 1; } }",
+        "type": "text"
+      }
+    ],
+    "content_kind": "raw_passthrough",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "8": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_4db7949574244f7df36a40d9f93247e68e24d7aa60de75b366d685c43efc3aa1",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [
+      "document"
+    ],
+    "content": [
+      {
+        "text": "// ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words \nexport class Workload { run() { return 1; } }",
+        "type": "text"
+      }
+    ],
+    "content_kind": "raw_passthrough",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "16": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_8903fcc8955c8ab4b265554832b35643b48ad7bed73221f46cd5f2a38fdd39f7",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [
+      "document"
+    ],
+    "content": [
+      {
+        "text": "// ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words ordinary source words \nexport class Workload { run() { return 1; } }",
+        "type": "text"
+      }
+    ],
+    "content_kind": "raw_passthrough",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "64": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_1713aaac10a74330db5953a2f5a888b96dff5d06e1c74f187513a46ee3c1a32c",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [],
+    "content": [
+      {
+        "text": "// SCHEMA vNext  @=meta C=class X=extends B?=unresolved-base-type I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\nC Workload\ncmod: EXPORT\nM run → $v ctl:RET\n// α1\n§PATHMAP\n  α1 = <ROOT>\\workload.ts",
+        "type": "text"
+      }
+    ],
+    "content_kind": "skeleton",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  },
+  "256": {
+    "_meta": {
+      "cache_hints": {
+        "breakpoints": [
+          {
+            "breaker": "bl_1713aaac10a74330db5953a2f5a888b96dff5d06e1c74f187513a46ee3c1a32c",
+            "region": "baseline",
+            "ttl": "1h"
+          }
+        ]
+      }
+    },
+    "byte_exact": [],
+    "content": [
+      {
+        "text": "// SCHEMA vNext  @=meta C=class X=extends B?=unresolved-base-type I=implements F=field M=method $=import p:=params →=return mod:=method-modifiers cmod:=class-modifiers ctl:=control-summary pf:=pattern-facts fl:=legacy-flags cl:=class-metadata P=pattern T=type-alias\nC Workload\ncmod: EXPORT\nM run → $v ctl:RET\n// α1\n§PATHMAP\n  α1 = <ROOT>\\workload.ts",
+        "type": "text"
+      }
+    ],
+    "content_kind": "skeleton",
+    "file": "α1",
+    "ir": {
+      "encoding": "hierarchical",
+      "file": "α1",
+      "hs": 9,
+      "ir": {
+        "c": [
+          {
+            "m": [
+              {
+                "n": "M2",
+                "nm": "run",
+                "r": "$v"
+              }
+            ],
+            "mo": [
+              [
+                "EXPORT"
+              ]
+            ],
+            "n": "C1",
+            "nm": "Workload"
+          }
+        ]
+      },
+      "v": 1
+    },
+    "pretty": {
+      "encoding": "named",
+      "file": "α1",
+      "ir": [
+        [
+          "DEF_C",
+          "C1",
+          "Workload"
+        ],
+        [
+          "MOD_C",
+          "C1",
+          "EXPORT"
+        ],
+        [
+          "DEF_M",
+          "C1",
+          "M2",
+          "run"
+        ],
+        [
+          "RET",
+          "M2",
+          "$v"
+        ],
+        [
+          "CTRL_SUM",
+          "M2",
+          "RET"
+        ]
+      ],
+      "v": 1
+    },
+    "v": 1
+  }
+}

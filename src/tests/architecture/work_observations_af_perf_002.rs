@@ -3,10 +3,21 @@ use std::collections::BTreeSet;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Counts {
     pub witnesses: usize,
+    pub token_count_inputs: [std::collections::BTreeMap<String, usize>; 2],
+    pub token_count_bytes: [usize; 2],
     pub identities: BTreeSet<String>,
     pub variants: [usize; 7],
     pub export_reads: usize,
     pub export_parses: usize,
+    pub ngrx_binding_collections: usize,
+    pub ngrx_binding_demand_checks: usize,
+    pub ngrx_binding_edge_visits: usize,
+    pub ngrx_binding_records: usize,
+    pub ngrx_binding_string_bytes: usize,
+    pub ngrx_map_binding_visits: usize,
+    pub ngrx_switch_binding_visits: usize,
+    pub ngrx_reexport_reads: usize,
+    pub ngrx_reexport_parses: usize,
     pub reads: usize,
     pub hashes: usize,
     pub enumerations: usize,
@@ -90,4 +101,12 @@ impl Drop for SnapshotScope {
     fn drop(&mut self) {
         update(|s| s.lock_depth -= 1);
     }
+}
+
+pub(crate) fn token_count_input(boundary: usize, text: &str) {
+    let hash = crate::cache::content_hash(text.as_bytes());
+    update(|s| {
+        *s.token_count_inputs[boundary].entry(hash).or_default() += 1;
+        s.token_count_bytes[boundary] += text.len();
+    });
 }

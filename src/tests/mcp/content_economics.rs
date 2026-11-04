@@ -108,3 +108,63 @@ fn unavailable_local_tokenizer_fails_safe_to_exact_raw() {
     assert_eq!(selected.selected, SelectedRepresentation::RawPassthrough);
     assert_eq!(selected.text.as_bytes(), raw.as_bytes());
 }
+
+#[test]
+fn c1_equivalence_counted_and_recounted_paths() {
+    use crate::mcp::tool_helpers::count_tokens_with_tokenizer;
+    for kind in [
+        TokenizerKind::Cl100k,
+        TokenizerKind::O200k,
+        TokenizerKind::Claude,
+        TokenizerKind::Llama3,
+    ] {
+        let local =
+            crate::tokenizer::create_tokenizer(kind).expect("real local tokenizer prerequisite");
+        for tokenizer in [Some(local.as_ref()), None] {
+            for (raw, candidate) in [
+                ("const λ = 1;\r\n", "A1"),
+                ("same", "same"),
+                ("x", "a larger candidate"),
+                (
+                    "rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+                    "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+                ),
+            ] {
+                let already_counted = count_tokens_with_tokenizer(raw, tokenizer);
+                let old = select_with_local_tokenizer(raw, candidate.into(), kind, tokenizer);
+                let proposed = select_with_local_tokenizer_and_raw_tokens(
+                    raw,
+                    candidate.into(),
+                    kind,
+                    tokenizer,
+                    already_counted,
+                );
+                assert_eq!(
+                    old,
+                    proposed,
+                    "kind={kind:?} availability={} raw={raw:?}",
+                    tokenizer.is_some()
+                );
+                assert_eq!(proposed.raw_tokens, already_counted);
+            }
+        }
+    }
+    // ByteTokenizer makes exact tie and approximation-margin boundaries explicit.
+    for (raw_count, candidate_count) in [(100, 100), (100, 97), (100, 95)] {
+        for kind in [TokenizerKind::Cl100k, TokenizerKind::Claude] {
+            let raw = "r".repeat(raw_count);
+            let candidate = "c".repeat(candidate_count);
+            let count = count_tokens_with_tokenizer(&raw, Some(&ByteTokenizer));
+            assert_eq!(
+                select_with_local_tokenizer(&raw, candidate.clone(), kind, Some(&ByteTokenizer)),
+                select_with_local_tokenizer_and_raw_tokens(
+                    &raw,
+                    candidate,
+                    kind,
+                    Some(&ByteTokenizer),
+                    count
+                )
+            );
+        }
+    }
+}

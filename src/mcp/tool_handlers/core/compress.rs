@@ -161,14 +161,13 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
         let path_alias = state.get_or_create_alias(semantic_owner.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = semantic_owner;
-        let economic = super::content::economical_presentation_document(
-            &ir,
-            &hir,
-            effective_fidelity,
+        let candidate = super::content::presentation_document(&ir, &hir, effective_fidelity, state);
+        let economic = crate::mcp::content_economics::select_with_local_tokenizer_and_raw_tokens(
             source_text,
-            state,
+            candidate,
             tokenizer_kind,
             tokenizer_ref,
+            raw_tokens,
         );
         let llm_text_with_footer = economic.text.clone();
         let compressed_tokens = economic.selected_tokens();

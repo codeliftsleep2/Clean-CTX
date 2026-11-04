@@ -159,3 +159,9 @@ fn af002_artifact_public_query_call_catalog_growth() {
         );
     }
 }
+
+#[path = "compression_token_work_af_perf_002.rs"]
+mod compression_token_work;
+
+#[path = "c1_public_response_af_perf_002.rs"]
+mod c1_public_response;

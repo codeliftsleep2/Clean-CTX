@@ -183,6 +183,8 @@ pub(crate) fn count_tokens_with_tokenizer(
     text: &str,
     tokenizer: Option<&dyn crate::tokenizer::Tokenizer>,
 ) -> usize {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::token_count_input(0, text);
     match tokenizer {
         Some(tok) => tok.count_tokens(text),
         None => estimate_tokens(text),

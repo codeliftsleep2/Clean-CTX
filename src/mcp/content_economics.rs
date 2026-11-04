@@ -58,6 +58,8 @@ pub(crate) fn select_with_local_tokenizer(
     tokenizer_kind: TokenizerKind,
     tokenizer: Option<&dyn Tokenizer>,
 ) -> EconomicContent {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::token_count_input(1, raw);
     let raw_tokens = tokenizer.map_or_else(
         || crate::mcp::tool_helpers::estimate_tokens(raw),
         |tokenizer| tokenizer.count_tokens(raw),

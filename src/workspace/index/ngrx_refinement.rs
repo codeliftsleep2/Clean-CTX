@@ -67,7 +67,18 @@ impl WorkspaceIndex {
             .collect();
         let mut action_authorities = BTreeSet::new();
         let mut reducer_authorities = BTreeSet::new();
-        let value_bindings = self.object_member_value_bindings();
+        // Preserve the original observation position and ordered binding collection.
+        let needs_value_bindings = candidates.iter().any(|(_, edge)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.ngrx_binding_demand_checks += 1);
+            edge.layer == crate::angular_meta::ngrx::object_registration::MAP_LAYER
+                || edge.layer == crate::angular_meta::ngrx::object_actions::SWITCH_VALUE_LAYER
+        });
+        let value_bindings = if needs_value_bindings {
+            self.object_member_value_bindings()
+        } else {
+            Vec::new()
+        };
         let mut map_reducers = BTreeMap::new();
 
         for (asserting_file, edge) in &candidates {
@@ -99,6 +110,8 @@ impl WorkspaceIndex {
             let prefix = format!("{}.", edge.object.name);
             let mut reducers = Vec::new();
             for (member, member_file, value, value_file) in &value_bindings {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.ngrx_map_binding_visits += 1);
                 if member_file != &map_target || !member.starts_with(&prefix) {
                     continue;
                 }
@@ -182,6 +195,10 @@ impl WorkspaceIndex {
                 let actions: Vec<_> = value_bindings
                     .iter()
                     .filter(|(_, member_file, value, value_file)| {
+                        #[cfg(test)]
+                        crate::work_observations_af_perf_002::update(|s| {
+                            s.ngrx_switch_binding_visits += 1
+                        });
                         value == &edge.subject.name
                             && resolve_candidate_target(member_file, Some(value_file)).as_deref()
                                 == Some(value_target.as_str())
@@ -293,14 +310,30 @@ impl WorkspaceIndex {
     }
 
     fn object_member_value_bindings(&self) -> Vec<(String, String, String, String)> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.ngrx_binding_collections += 1);
         self.forward
             .values()
             .flatten()
             .filter(|stored| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| s.ngrx_binding_edge_visits += 1);
                 stored.edge.layer == crate::ir::typescript_object_members::LAYER
                     && stored.edge.relation == SemanticRelation::ReferencesValue
             })
             .filter_map(|stored| {
+                #[cfg(test)]
+                if let (Some(subject), Some(object)) =
+                    (&stored.edge.subject.file, &stored.edge.object.file)
+                {
+                    crate::work_observations_af_perf_002::update(|s| {
+                        s.ngrx_binding_records += 1;
+                        s.ngrx_binding_string_bytes += stored.edge.subject.name.len()
+                            + subject.len()
+                            + stored.edge.object.name.len()
+                            + object.len();
+                    });
+                }
                 Some((
                     stored.edge.subject.name.clone(),
                     stored.edge.subject.file.clone()?,
@@ -409,10 +442,14 @@ fn resolve_candidate_target(asserting_file: &str, module: Option<&str>) -> Optio
 }
 
 fn one_hop_named_reexport(path: &str, name: &str) -> Option<String> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.ngrx_reexport_reads += 1);
     let source = std::fs::read_to_string(path).ok()?;
     let language = crate::compression::language::safe_typescript_language()?;
     let mut parser = tree_sitter::Parser::new();
     parser.set_language(&language).ok()?;
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.ngrx_reexport_parses += 1);
     let tree = parser.parse(&source, None)?;
     if tree.root_node().has_error() {
         return None;

@@ -269,3 +269,93 @@ Source-path coverage advances for these named helpers only. Behavioral dimension
 remain unmeasured here; original9763-record syntax accounting is unchanged.
 Spring/Java, compression, protocol/proxy, graph traversal and other NOT INSPECTED
 rows remain explicit queue items. Final independent adversarial review is outstanding.
+
+
+## NgRx reconstruction measured return
+
+ngrx-reconstruction-20261104-123958 passes four NgRx and nine af174 tests,
+clean focused gates and matching source hashes.56 rows confirm E+B binding
+collection even without consumers and M*B map/switch comparisons. One-hop reexport
+retirement/repair exposes previously uncounted IO. Equal join counts have unequal
+times; no latency attribution or broad join repair follows. See
+AF_PERF_002_NGRX_RECONSTRUCTION_RESULTS.md for a proposed demand-local collector
+slice and its required observation-position proof. No optimization is implemented;
+owner approval and genuine pre-repair RED remain necessary. Broader discovery open.
+
+
+## Latest baseline reconciliation and #173 proof gap
+
+AF_PERF_002_NGRX_OBSERVATION_REVIEW.md records current source/receipt matching:
+completed C# borrowed-bucket repair is A3 PROTECTED; A2 no-repair decision is closed
+for its accepted scope, without fabricating an A2 optimization receipt. No repeat
+A2 work is queued. #173 fact-multiset equivalence does not establish exact collector
+order after earlier forward HashMap insertions. The directive's original-position
+demand-prepass fallback is returned for owner review with explicit costs and a
+narrower zero-no-family invariant. No production repair or runtime was performed.
+
+
+## Collector slice final composed GREEN
+
+Agent MaxHeadRoom inspected af-perf-001-20261104-144311:42 tracked passes,
+zero failures/ignored across14 admission/AST/lifecycle,5 resolver P0,6 delegated,
+4 A3,9 af174 and4 NgRx collector controls. All recorded source hashes match;
+inspection.json records exact hash count and group results. No production/test
+source changed after verification; this update is evidence prose only.
+
+Approved no-family collector repair disposition: FIX / CLOSED / PROTECTED.
+Original-position prepass removes proven unused collection while preserving demanding
+construction, binding order/multiplicity, matching, export validation and immediate
+reconciliation. Genuine original budget RED, unchanged GREEN, positive/negative/
+duplicate/currentness controls, finite static enforcement, real isolated eager
+mutation RED/restored GREEN and final composed fitness GREEN are all recorded.
+No enterprise latency, allocator-byte or whole-system certification claim follows.
+
+This closes only the approved collector slice. #173 M*B joins and reconstruction
+scheduling remain unresolved; no deferral/index/cache change is authorized. A2's
+no-repair decision remains closed and A3 protected. Source-wide discovery, A1/A4,
+declaration membership and remaining inventory gaps are independent. No automatic
+repeat campaign, binary rebuild or Claude field switch is needed for this result.
+
+
+## Compression/compaction scoped discovery begins
+
+AF_PERF_002_COMPRESSION_DISCOVERY.md traces the normal public IR compression path
+separately from legacy capture/compaction exports. A same-operation raw-token recount
+candidate is source grounded; a public characterization packet is authored UNRUN.
+Configured alias matching is a separate T*A structural risk, including delegated
+IR type formatting. No repair applied; full compression/compaction coverage remains
+incomplete and syntax accounting unchanged. Protected A2/A3/collector work is not
+reopened. CBM degraded; bounded known-source inspection used.
+
+
+## Compression C1 measured duplicate-count candidate
+
+compression-work-20261104-145210 passes one public-path growth test and six existing
+economics controls, with clean focused gates and matching source hashes. Each raw
+source has one handler count request and one economics recount:2*S observed bytes.
+This is not measured tokenizer CPU or attributable total latency. Proposed local
+successful-handler wiring reuses its existing raw_tokens via the already-counted
+selector; no new API/cache/context. Owner disposition required before repair and
+genuine regression RED. C2 alias matching and full compaction coverage remain open.
+
+
+## C1 final composed GREEN and bounded closure
+
+Agent MaxHeadRoom inspected af-perf-001-20261104-153416:46 tracked passes,
+zero failed/ignored. Groups:14 admission/AST/lifecycle,5 resolver P0,6 delegated,
+4 A3,9 af174,4 NgRx collector and4 C1. All recorded source hashes match;
+inspection.json retains exact count and outcome. No production/test edits follow
+this verification; this update records evidence only.
+
+C1: FIX / CLOSED / PROTECTED for successful public IR-branch raw-count reuse.
+Original production-path RED, equivalence/semantic GREEN, exact public result/
+fail-safe controls, before/after work counts, focused zero-warning/format/size/
+encoding gates, static enforcement, isolated real recount mutation RED/restored
+GREEN and composed architectural gate are established. No new helper/cache/state/
+API/authority/lifecycle contract. Other compression branches/callers unchanged.
+No universal latency or allocator-byte improvement claim follows.
+
+C2 alias matching stays separate characterization-only. Remaining compression/
+compaction/rendering and source-wide inventory are incomplete. A2 decision remains
+closed; A3 and NgRx collector protected. No automatic broad campaign, binary rebuild
+or Claude field switch is needed to record this bounded result.

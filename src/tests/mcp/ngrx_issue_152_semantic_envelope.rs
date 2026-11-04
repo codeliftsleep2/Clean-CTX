@@ -311,3 +311,6 @@ StoreModule.forRoot(reducers);
         "ReducerA"
     ));
 }
+
+#[path = "ngrx173_binding_semantics.rs"]
+mod binding_semantics;
