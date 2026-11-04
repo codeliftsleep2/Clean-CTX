@@ -225,3 +225,9 @@ fn compilation_identity_mstest_class_attributes_survive_generic_members() {
         edge.relation == SemanticRelation::Defines && edge.subject.entity_type == "TestClass"
     }));
 }
+
+#[path = "a2_owner_semantics_af_perf_002.rs"]
+mod a2_owner_semantics;
+
+#[path = "a2_density_af_perf_002.rs"]
+mod a2_density;

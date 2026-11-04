@@ -328,3 +328,53 @@ characterization and fitness design, not invasive rewrites or implicit currentne
 concurrency or index-policy changes. Generation-78 semantics remain baseline.
 The exhaustive coverage map and adversarial pass remain outstanding; this addendum
 records the directive and does not claim their completion.
+
+## Coverage-map continuation
+
+See [AF_PERF_002_COVERAGE_MAP.md](AF_PERF_002_COVERAGE_MAP.md) for the explicit
+first-pass subsystem dispositions, insertion/persistence dependency traces and
+living finding dispositions. New enclosing declaration/no-op counters and two
+tracked tests are authored, UNRUN. Operator command is run-af-perf-002-enclosing.ps1.
+No agent formatter/test/build/runtime ran. Broader discovery and adversarial
+second pass remain incomplete; no production optimization is introduced.
+
+## Verified enclosing return and architectural recurrence
+
+Enclosing packet GREEN and independent declaration membership recurrence are
+recorded in AF_PERF_002_ENCLOSING_RESULTS_AND_DECLARATION_DESIGN.md. A targeted
+source-wide pattern census and initial classifications extend discovery without
+a general index rewrite. Declaration companion design awaits separate approval;
+NgRx/currentness/locking policies remain unchanged. Agent Popper's independent
+adversarial pass is required after first-pass enumeration, not yet performed.
+
+## Source-wide antipattern directive execution
+
+The new membership-family inventory documents expanded collection/manual-loop
+discovery and distinguishes inspected work units from unresolved census output.
+Tracked AST enumeration and an operator packet are authored, not executed. This
+focused family search does not replace the broader IO, persistence, witness,
+concurrency, lifecycle and memory investigation. No new production optimization
+is authorized or applied. See AF_PERF_002_MEMBERSHIP_SOURCE_INVENTORY.md.
+
+
+## Governing owner principle: exhaustive discovery is not exhaustive optimization
+
+Owner adopts the four-criterion decision rule now recorded in authoritative
+engineering policy, AGENTS.md and architecture.md: demonstrated problem, significant
+construction-inclusive benefit, semantic preservation and proportional complexity.
+FIX/MONITOR/ACCEPT are legitimate final decisions for the investigated scope;
+DESIGN REVIEW is temporary. No change after rigorous investigation is a successful
+outcome when evidence supports it. Controlled demonstrated scaling failure can
+justify prevention despite weak small-fixture timing gains; speculation cannot.
+
+Examples remain distinct: AF-PERF-001 has measured expensive-path reduction and
+observed improvement; A3 has measured multiplicative irrelevant-candidate work and
+a bounded protected correction, without universal latency improvement; A2 supplies
+evidence against implementing its proposed correction. A2 remains MONITOR with
+characterization complete for that decision and broader coverage open. A2b requires
+separate approval. None of these dispositions certify the uninspected system.
+
+Continue source-wide discovery and the next non-C# consequential characterization.
+Do not optimize to improve operation counts at the expense of necessary semantics,
+construction/maintenance overhead or avoidable architecture. Existing AF-PERF-001
+invariants and required owner approval remain fully in force.

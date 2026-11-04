@@ -32,40 +32,28 @@ const ASPNET_HTTP_ATTRIBUTES: &[&str] = &[
 const MSTEST_TEST_CLASS_ATTRIBUTE: &str =
     "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute";
 
-pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
-{
-    vec![
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(EF_CORE_DB_CONTEXT),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(AUTOMAPPER_PROFILE),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(SIGNALR_HUB),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external_with_arity(SIGNALR_HUB, 1),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_CONTROLLER_BASE),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
-            ASPNET_API_CONTROLLER_ATTRIBUTE,
-        ),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
-            ASPNET_CONTROLLER_ATTRIBUTE,
-        ),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(ASPNET_ROUTE_ATTRIBUTE),
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(
-            MSTEST_TEST_CLASS_ATTRIBUTE,
-        ),
-    ]
-    .into_iter()
-    .chain(ASPNET_HTTP_ATTRIBUTES.iter().map(|identity| {
-        crate::ir::csharp_resolution::CSharpTypeIdentity::known_external(*identity)
-    }))
-    .collect()
-}
+mod known_types;
+pub(crate) use known_types::known_csharp_type_identities;
 
 pub(crate) fn project_resolved_mstest_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[4] += 1);
     classes
         .iter()
-        .filter(|class| class.files.first().is_some_and(|owner| owner == file))
+        .filter(|class| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[4] += 1);
+            class.files.first().is_some_and(|owner| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_class_file_visits[4] += 1
+                });
+                owner == file
+            })
+        })
         .filter(|class| is_resolved_mstest_test_class(class))
         .map(|class| {
             let mut entity = EntityRef::new("dotnet", "TestClass", &class.owner);
@@ -114,9 +102,20 @@ pub(crate) fn project_resolved_dbcontext_edges(
     file: &str,
     fidelity: Fidelity,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[0] += 1);
     let mut edges = Vec::new();
     for class in classes.iter().filter(|class| {
-        is_resolved_dbcontext(class) && class.files.iter().any(|owner| owner == file)
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[0] += 1);
+        is_resolved_dbcontext(class)
+            && class.files.iter().any(|owner| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_class_file_visits[0] += 1
+                });
+                owner == file
+            })
     }) {
         let mut role = EntityRef::new("dotnet", "DbContext", &class.owner);
         role.file = Some(file.to_string());
@@ -127,7 +126,11 @@ pub(crate) fn project_resolved_dbcontext_edges(
             layer: crate::layers::meta::semantic::SEMANTIC_ROLE_REGISTRATION_LAYER,
             call_evidence: None,
         });
-        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_raw_part_visits[0] += 1);
+            owner == file
+        }) {
             if let Some(analysis) =
                 crate::dotnet_meta::efcore::analyze_authorized_efcore(raw_class, fidelity)
             {
@@ -204,9 +207,20 @@ pub(crate) fn project_resolved_aspnet_edges(
     file: &str,
     fidelity: Fidelity,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[3] += 1);
     let mut edges = Vec::new();
     for class in classes.iter().filter(|class| {
-        is_resolved_aspnet_controller(class) && class.files.iter().any(|owner| owner == file)
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[3] += 1);
+        is_resolved_aspnet_controller(class)
+            && class.files.iter().any(|owner| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_class_file_visits[3] += 1
+                });
+                owner == file
+            })
     }) {
         let Some(symbol_owner) = class.files.first() else {
             continue;
@@ -244,7 +258,13 @@ pub(crate) fn project_resolved_aspnet_edges(
             });
         }
         if fidelity != Fidelity::Low {
-            for method in class.methods.iter().filter(|method| method.file == file) {
+            for method in class.methods.iter().filter(|method| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_aspnet_method_visits += 1
+                });
+                method.file == file
+            }) {
                 if !method.attributes.iter().any(|attribute| {
                     ASPNET_HTTP_ATTRIBUTES
                         .iter()
@@ -277,13 +297,28 @@ pub(crate) fn project_resolved_automapper_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[1] += 1);
     let mut edges = Vec::new();
     for class in classes.iter().filter(|class| {
-        is_resolved_automapper_profile(class) && class.files.iter().any(|owner| owner == file)
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[1] += 1);
+        is_resolved_automapper_profile(class)
+            && class.files.iter().any(|owner| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_class_file_visits[1] += 1
+                });
+                owner == file
+            })
     }) {
         let mut profile = EntityRef::new("dotnet", "MapperProfile", &class.owner);
         profile.file = Some(file.to_string());
-        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_raw_part_visits[1] += 1);
+            owner == file
+        }) {
             for (source, destination) in extract_create_map_mappings(raw_class) {
                 let mut source_entity = EntityRef::new("dotnet", "Entity", source);
                 source_entity.file = Some(file.to_string());
@@ -314,18 +349,32 @@ pub(crate) fn project_resolved_signalr_edges(
     file: &str,
     fidelity: Fidelity,
 ) -> Vec<SemanticEdge> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[2] += 1);
     if fidelity == Fidelity::Low {
         return Vec::new();
     }
     let mut edges = Vec::new();
-    for class in classes
-        .iter()
-        .filter(|class| is_resolved_signalr_hub(class) && class.files.iter().any(|f| f == file))
-    {
+    for class in classes.iter().filter(|class| {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[2] += 1);
+        is_resolved_signalr_hub(class)
+            && class.files.iter().any(|f| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|s| {
+                    s.csharp_class_file_visits[2] += 1
+                });
+                f == file
+            })
+    }) {
         let mut hub = EntityRef::new("dotnet", "Hub", &class.owner);
         hub.file = Some(file.to_string());
         let mut projected_methods = std::collections::BTreeSet::new();
-        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| owner == file) {
+        for (_, raw_class) in class.raw_parts.iter().filter(|(owner, _)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_raw_part_visits[2] += 1);
+            owner == file
+        }) {
             for method_name in extract_hub_methods(raw_class) {
                 if !projected_methods.insert(method_name.clone()) {
                     continue;
@@ -349,13 +398,25 @@ pub(crate) fn project_resolved_signalr_execution_contexts(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
 ) -> Vec<crate::ir::opcodes::CoreOp> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_role_entries[5] += 1);
     classes
         .iter()
-        .filter(|class| is_resolved_signalr_hub(class))
+        .filter(|class| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_role_class_visits[5] += 1);
+            is_resolved_signalr_hub(class)
+        })
         .flat_map(|class| &class.method_ids)
-        .filter(|(owner, _)| owner == file)
+        .filter(|(owner, _)| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_method_owner_visits += 1);
+            owner == file
+        })
         .flat_map(|(_, methods)| methods)
         .map(|method| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.csharp_context_method_visits += 1);
             crate::ir::opcodes::CoreOp::ExecutionContext(
                 method.clone(),
                 crate::ir::opcodes::ExecutionContextKind::Realtime,

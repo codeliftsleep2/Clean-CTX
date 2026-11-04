@@ -66,3 +66,19 @@ mod index_complexity_af_perf_002;
 #[cfg(test)]
 #[path = "tests/workspace/index_membership_budget_af_perf_002.rs"]
 mod index_membership_budget_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/workspace/index_enclosing_af_perf_002.rs"]
+mod index_enclosing_af_perf_002;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "tests/architecture/membership_census_af_perf_002.rs"]
+mod membership_census_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/workspace/index_ngrx_noop_af_perf_002.rs"]
+mod index_ngrx_noop_af_perf_002;
+
+#[cfg(all(test, feature = "csharp"))]
+#[path = "tests/mcp/artifact_operation_work_af_perf_002.rs"]
+mod artifact_operation_work_af_perf_002;

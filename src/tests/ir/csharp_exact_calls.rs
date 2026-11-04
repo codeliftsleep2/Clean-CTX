@@ -109,3 +109,124 @@ class Use {
         "property-generated callable must retain its declaring owner"
     );
 }
+
+#[test]
+fn a3_direct_precedence_and_extension_ambiguity_remain_exact() {
+    let direct = exact_calls(
+        r#"
+class Target { public void Save() {} }
+static class Extensions { public static void Save(Target target) {} }
+class Use { void Run(Target target) { target.Save(); } }
+"#,
+    );
+    assert_eq!(direct.len(), 1);
+    assert_eq!(direct[0].object.name, "Target::Save()->void");
+    let extension = exact_calls(
+        r#"
+class Target {}
+static class Extensions { public static void Save(Target target) {} }
+class Use { void Run(Target target) { target.Save(); } }
+"#,
+    );
+    assert_eq!(extension.len(), 1);
+    assert_eq!(extension[0].object.name, "Extensions::Save(Target)->void");
+    let ambiguous = exact_calls(
+        r#"
+class Target {}
+static class A { public static void Save(Target target) {} }
+static class B { public static void Save(Target target) {} }
+class Use { void Run(Target target) { target.Save(); } }
+"#,
+    );
+    assert!(ambiguous.is_empty());
+}
+
+#[test]
+fn a3_direct_competitors_never_fall_back_to_extension() {
+    let calls = exact_calls(
+        r#"
+class Target { public void Save(string x) {} public void Save(int x) {} }
+static class Extensions { public static void Save(Target target, object value) {} }
+class Use { void Run(Target target) { target.Save(default); } }
+"#,
+    );
+    assert!(calls.is_empty());
+}
+
+#[test]
+fn a3_borrowed_buckets_preserve_duplicates_order_and_fresh_authority() {
+    use super::{Declaration, DeclarationLookup};
+    let declaration = Declaration {
+        id: "m".into(),
+        owner: "Target".into(),
+        name: "Save".into(),
+        parameters: vec![],
+        return_type: "void".into(),
+        is_static: false,
+    };
+    let authority = vec![declaration.clone(), declaration];
+    let first = DeclarationLookup::new(&authority);
+    let bucket = &first.direct[&("Target", "Save", 0)];
+    assert_eq!(bucket.len(), 2);
+    assert!(std::ptr::eq(bucket[0], &authority[0]));
+    assert!(std::ptr::eq(bucket[1], &authority[1]));
+    let changed = vec![Declaration {
+        name: "Other".into(),
+        ..authority[0].clone()
+    }];
+    let second = DeclarationLookup::new(&changed);
+    assert!(!second.direct.contains_key(&("Target", "Save", 0)));
+    assert_eq!(second.direct[&("Target", "Other", 0)].len(), 1);
+}
+
+#[test]
+fn a3_gap_dense_extensions_preserve_competing_authority() {
+    use crate::work_observations_af_perf_002 as work;
+    for n in [1, 2, 4, 8, 16, 64, 256] {
+        let mut source =
+            "class Target {} class Use { void Run(Target target) { target.Save(); } }".to_owned();
+        for index in 0..n {
+            source.push_str(&format!(
+                "static class E{index} {{ public static void Save(Target target) {{}} }}"
+            ));
+        }
+        work::reset();
+        let start = std::time::Instant::now();
+        let calls = exact_calls(&source);
+        let counts = work::snapshot();
+        assert_eq!(calls.len(), usize::from(n == 1));
+        if n == 1 {
+            assert_eq!(calls[0].object.name, "E0::Save(Target)->void");
+        }
+        assert_eq!(counts.csharp_lookup_builds, 1);
+        assert_eq!(counts.csharp_lookup_build_visits, n + 1);
+        assert_eq!(counts.csharp_declaration_probes[1], n);
+        eprintln!(
+            "A3_GAP_DENSE n={n} builds={} build_visits={} build_probes={} lookups={} candidate_visits={:?} payload_bytes={} us={} boundary=production-compilation-not-public-query",
+            counts.csharp_lookup_builds,
+            counts.csharp_lookup_build_visits,
+            counts.csharp_lookup_build_probes,
+            counts.csharp_lookup_probes,
+            counts.csharp_declaration_probes,
+            counts.csharp_lookup_payload_bytes,
+            start.elapsed().as_micros()
+        );
+    }
+}
+
+#[test]
+fn a3_gap_extension_static_arity_and_receiver_refusals() {
+    for declaration in [
+        "class E { public void Save(Target target) {} }",
+        "static class E { public static void Save(Target target, int extra) {} }",
+        "static class E { public static void Save(Other target) {} }",
+    ] {
+        let source = format!(
+            "class Target {{}} class Other {{}} {declaration} class Use {{ void Run(Target target) {{ target.Save(); }} }}"
+        );
+        assert!(
+            exact_calls(&source).is_empty(),
+            "unsupported extension must refuse: {declaration}"
+        );
+    }
+}

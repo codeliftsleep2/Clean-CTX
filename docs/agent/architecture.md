@@ -236,3 +236,22 @@ owner-approved exceptions. AST inspection and real production-path counters are
 complementary; neither grants semantic authority. The mandatory verification
 command lives in verification.md. No shared validation context, cross-call cache,
 witness deduplication or lock change follows from this test-only enforcement.
+
+
+## AF-PERF-002 optimization decision review
+
+Apply the four evidence criteria in the authoritative engineering policy and its
+AGENTS.md projection: demonstrated problem, significant construction-inclusive
+benefit, semantic preservation and proportional complexity. Investigation does
+not create an obligation to change production code. Controlled scaling-failure
+prevention is valid benefit evidence even without a small-fixture latency gain;
+an asymptotic label without measured growth is insufficient.
+
+Each candidate return records FIX, MONITOR or ACCEPT with exact scope and evidence;
+use DESIGN REVIEW temporarily when a decision cannot yet be supported. Include the
+unchanged baseline as an alternative, costs relocated into construction/maintenance,
+input dimensions and supported/refused/lifecycle preservation. Explain uncertainty
+and what evidence would reopen the decision. Necessary output growth is not proof
+of waste. Source accounting, behavioral coverage and existing fitness enforcement
+remain independently reported. No additional runtime framework or generic decision
+registry is required; use the existing investigation report and pathology register.

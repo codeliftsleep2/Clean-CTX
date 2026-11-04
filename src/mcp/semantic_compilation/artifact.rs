@@ -212,6 +212,12 @@ impl SemanticCompilationArtifact {
     pub(crate) fn published_semantics(
         &self,
     ) -> (Vec<SemanticEdge>, Vec<SemanticDependency>, String) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| {
+            s.artifact_publication_clones[0] += 1;
+            s.artifact_publication_clones[1] += self.semantic_edges.len();
+            s.artifact_publication_clones[2] += self.semantic_dependencies.len();
+        });
         (
             self.semantic_edges.clone(),
             self.semantic_dependencies.clone(),
@@ -293,6 +299,8 @@ impl SemanticCompilationArtifact {
         resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
         fidelity: crate::compression::Fidelity,
     ) -> Result<Vec<SemanticEdge>, String> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.artifact_projection_owners += 1);
         let mut edges = self.project_exact_csharp_calls(authority)?;
         edges.retain(|edge| {
             if edge.subject.domain != "dotnet" {
@@ -363,6 +371,10 @@ impl SemanticCompilationArtifact {
         &self,
         resolved_classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     ) -> CompiledIR {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| {
+            s.artifact_ir_instruction_clones += self.compiled.instructions.len();
+        });
         let mut compiled = self.compiled.clone();
         compiled.instructions.retain(|instruction| {
             !matches!(

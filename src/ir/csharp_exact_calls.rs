@@ -62,6 +62,7 @@ pub(crate) fn project_with_authority(
         .iter()
         .map(|declaration| (declaration.id.as_str(), declaration))
         .collect();
+    let mut lookup = None;
     let mut occurrence_index = 0;
 
     for op in instructions {
@@ -86,6 +87,7 @@ pub(crate) fn project_with_authority(
             occurrence,
             caller,
             authority,
+            &mut lookup,
             *argument_count,
             *has_spread,
         ) else {
@@ -108,6 +110,7 @@ pub(crate) fn project_with_authority(
             occurrence,
             &caller,
             authority,
+            &mut lookup,
             occurrence.arguments().len(),
             false,
         ) else {
@@ -280,9 +283,15 @@ fn resolve<'a>(
     occurrence: &InvocationOccurrence,
     caller: &Declaration,
     declarations: &'a [Declaration],
+    lookup: &mut Option<DeclarationLookup<'a>>,
     argument_count: usize,
     has_spread: bool,
 ) -> Option<&'a Declaration> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| {
+        s.csharp_resolution_calls += 1;
+        s.csharp_catalog_population_max = s.csharp_catalog_population_max.max(declarations.len());
+    });
     if has_spread {
         return None;
     }
@@ -296,36 +305,97 @@ fn resolve<'a>(
         WrittenCallee::Unsupported { .. } => return None,
     };
 
-    let direct: Vec<_> = declarations
-        .iter()
-        .filter(|candidate| {
-            candidate.owner == receiver_type
-                && candidate.name == written
-                && candidate.parameters.len() == argument_count
-        })
-        .collect();
-    if direct.len() == 1 {
-        return direct.into_iter().next();
+    let lookup = lookup.get_or_insert_with(|| DeclarationLookup::new(declarations));
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_lookup_probes += 1);
+    let direct = lookup
+        .direct
+        .get(&(receiver_type.as_str(), written, argument_count));
+    if let Some(direct) = direct {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| {
+            s.csharp_declaration_probes[0] += direct.len()
+        });
+        // Every duplicate remains competing authority; never choose first among competitors.
+        return (direct.len() == 1).then(|| direct[0]);
     }
-    if !direct.is_empty() {
-        return None;
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|s| s.csharp_lookup_probes += 1);
+    let extensions = lookup.extensions.get(&(written, argument_count + 1))?;
+    let mut selected = None;
+    let mut count = 0;
+    for candidate in extensions {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_declaration_probes[1] += 1);
+        if candidate
+            .parameters
+            .first()
+            .is_some_and(|first| normalize_type(first) == normalize_type(&receiver_type))
+        {
+            selected = Some(*candidate);
+            count += 1;
+        }
     }
+    (count == 1).then_some(selected).flatten()
+}
 
-    let extensions: Vec<_> = declarations
-        .iter()
-        .filter(|candidate| {
-            candidate.is_static
-                && candidate.name == written
-                && candidate.parameters.len() == argument_count + 1
-                && candidate
-                    .parameters
-                    .first()
-                    .is_some_and(|first| normalize_type(first) == normalize_type(&receiver_type))
-        })
-        .collect();
-    (extensions.len() == 1)
-        .then(|| extensions.into_iter().next())
-        .flatten()
+// Borrowed, duplicate-preserving selection accelerators for exactly one projection.
+// The declaration slice remains authority; neither map grants freshness or identity.
+struct DeclarationLookup<'a> {
+    direct: HashMap<(&'a str, &'a str, usize), Vec<&'a Declaration>>,
+    extensions: HashMap<(&'a str, usize), Vec<&'a Declaration>>,
+}
+
+impl<'a> DeclarationLookup<'a> {
+    fn new(declarations: &'a [Declaration]) -> Self {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| s.csharp_lookup_builds += 1);
+        let mut result = Self {
+            direct: HashMap::new(),
+            extensions: HashMap::new(),
+        };
+        for declaration in declarations {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| {
+                s.csharp_lookup_build_visits += 1;
+                s.csharp_lookup_build_probes += 1 + usize::from(declaration.is_static);
+            });
+            result
+                .direct
+                .entry((
+                    declaration.owner.as_str(),
+                    declaration.name.as_str(),
+                    declaration.parameters.len(),
+                ))
+                .or_default()
+                .push(declaration);
+            if declaration.is_static {
+                result
+                    .extensions
+                    .entry((declaration.name.as_str(), declaration.parameters.len()))
+                    .or_default()
+                    .push(declaration);
+            }
+        }
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|s| {
+            let direct_refs: usize = result.direct.values().map(Vec::capacity).sum();
+            let extension_refs: usize = result.extensions.values().map(Vec::capacity).sum();
+            s.csharp_lookup_capacities = [
+                result.direct.capacity(),
+                result.extensions.capacity(),
+                direct_refs,
+                extension_refs,
+            ];
+            // Logical capacity payload only: excludes hash control bytes and allocator overhead.
+            s.csharp_lookup_payload_bytes += result.direct.capacity()
+                * std::mem::size_of::<((&str, &str, usize), Vec<&Declaration>)>()
+                + result.extensions.capacity()
+                    * std::mem::size_of::<((&str, usize), Vec<&Declaration>)>()
+                + (direct_refs + extension_refs) * std::mem::size_of::<&Declaration>();
+        });
+        result
+    }
 }
 
 fn receiver_owner(

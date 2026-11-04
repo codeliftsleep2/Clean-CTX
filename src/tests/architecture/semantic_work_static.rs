@@ -299,3 +299,6 @@ fn af_perf_001_ast_retained_admission_has_no_known_per_candidate_projection() {
 
 #[path = "index_membership_static_af_perf_002.rs"]
 mod index_membership_static;
+
+#[path = "csharp_a3_static_af_perf_002.rs"]
+mod csharp_a3_static;

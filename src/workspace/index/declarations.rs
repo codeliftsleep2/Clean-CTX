@@ -10,17 +10,22 @@ impl WorkspaceIndex {
         entity: EntityRef,
     ) {
         let occurrences = self.declarations.entry(key.clone()).or_default();
-        if !occurrences
-            .iter()
-            .any(|occurrence| occurrence.file == entity.file)
-        {
+        if !occurrences.iter().any(|occurrence| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.declaration_comparisons[0] += 1);
+            occurrence.file == entity.file
+        }) {
             occurrences.push(entity);
         }
         let keys = self
             .file_declarations
             .entry(file_path.to_string())
             .or_default();
-        if !keys.contains(key) {
+        if !keys.iter().any(|existing| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|s| s.declaration_comparisons[1] += 1);
+            existing == key
+        }) {
             keys.push(key.clone());
         }
     }

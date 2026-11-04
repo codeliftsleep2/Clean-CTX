@@ -505,3 +505,39 @@ gate fails. Review unresolved AST findings explicitly; document an exception onl
 with owner approval, exact work unit, justification, measured bound and removal
 condition. No ignored required tests, blanket legacy exception or allow-failure
 CI step may substitute for acceptance. Coverage limits remain explicit.
+
+
+### AF-PERF-002 — Exhaustive discovery, selective remediation
+
+Investigate every meaningful architectural performance risk; do not optimize every
+investigated path. Before approving a production optimization, record evidence for:
+
+1. Demonstrated problem: measured unnecessary work, meaningful latency or memory
+   pressure, or a credible scaling failure supported by controlled growth evidence.
+2. Significant benefit: material improvement for the relevant workload, including
+   construction, allocation, maintenance, invalidation and enclosing-operation costs.
+3. Semantic preservation: correctness, ordering, exact identity, currentness,
+   provenance, ownership and lifecycle behavior remain intact.
+4. Proportional complexity: benefit justifies added code, state, abstractions and
+   long-term maintenance compared with leaving the behavior unchanged.
+
+Preventing demonstrated scaling failure may justify a repair even when small-fixture
+wall times improve little; asymptotic speculation alone does not establish benefit.
+Fewer counted operations alone do not establish better overall system behavior.
+
+Every investigated candidate has one evidence-backed decision:
+
+- FIX: significant, provable benefit justifies the correction.
+- MONITOR: a real risk exists, but intervention is not justified yet.
+- ACCEPT: work is necessary, bounded, or cheaper than the complexity of eliminating it.
+
+DESIGN REVIEW is temporary while evidence is insufficient to choose. Record scope,
+evidence, uncertainty and reassessment triggers; ACCEPT does not certify uninspected
+paths, and MONITOR does not waive a failing established invariant. Doing nothing
+after rigorous investigation is a successful engineering outcome when supported
+by evidence. Discovery completeness and production-operation coverage remain separate.
+
+This decision rule does not weaken AF-PERF-001 gates or authorize production changes,
+caches, authority/lifecycle changes or architectural exceptions. Obtain the required
+owner disposition for each repair. The objective is the best overall system behavior
+at an acceptable complexity and correctness cost, not the smallest operation count.
