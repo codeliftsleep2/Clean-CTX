@@ -78,12 +78,22 @@ impl WorkspaceIndex {
 
     /// Build a deterministic node index from all registered entity identities.
     fn build_node_index(&self) -> (Vec<EntityKey>, HashMap<EntityKey, usize>) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.traversal_node_builds += 1;
+            counts.traversal_source_keys +=
+                self.entities.len() + self.forward.len() + self.reverse.len();
+        });
         let mut all_keys: HashSet<EntityKey> = HashSet::new();
         all_keys.extend(self.entities.keys().cloned());
         all_keys.extend(self.forward.keys().cloned());
         all_keys.extend(self.reverse.keys().cloned());
         let mut keys: Vec<EntityKey> = all_keys.into_iter().collect();
         keys.sort();
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.traversal_unique_nodes += keys.len()
+        });
         let map: HashMap<EntityKey, usize> = keys
             .iter()
             .enumerate()
@@ -400,6 +410,12 @@ impl WorkspaceIndex {
                 .map(|edges| {
                     edges
                         .iter()
+                        .inspect(|_| {
+                            #[cfg(test)]
+                            crate::work_observations_af_perf_002::update(|counts| {
+                                counts.traversal_adjacency_edges += 1
+                            });
+                        })
                         .filter(|e| Self::DEPENDENCY_RELATIONS.contains(&e.edge.relation))
                         // Occurrence provenance, never semantic identity.
                         .filter(|e| scope.is_none_or(|scope| scope.admits(&e.asserting_file)))

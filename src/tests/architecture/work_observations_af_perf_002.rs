@@ -3,6 +3,10 @@ use std::collections::BTreeSet;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Counts {
     pub witnesses: usize,
+    pub traversal_node_builds: usize,
+    pub traversal_source_keys: usize,
+    pub traversal_unique_nodes: usize,
+    pub traversal_adjacency_edges: usize,
     pub hierarchy_class_comparisons: usize,
     pub hierarchy_placement_map_probes: usize,
     pub token_count_inputs: [std::collections::BTreeMap<String, usize>; 2],

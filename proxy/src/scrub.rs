@@ -154,9 +154,9 @@ pub fn scrub_secrets(content: &str) -> ScrubResult {
     for rule in scrub_rules() {
         let re = (rule.re)();
         let new_result = re.replace_all(&result, rule.replacement);
-        // Detect changes by comparing lengths (avoids a full string comparison
-        // and eliminates the separate is_match / find_iter passes).
-        if new_result.len() != result.len() {
+        // Compare with this rule's unchanged input before committing ownership:
+        // a valid substitution can preserve byte length.
+        if new_result.as_ref() != result.as_str() {
             let count = re.captures_iter(&result).count();
             for _ in 0..count {
                 hits.push(ScrubHit {

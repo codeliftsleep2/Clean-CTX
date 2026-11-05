@@ -133,6 +133,14 @@ pub(crate) const KEYWORD_ROOTS: &[&str] = &[
     "client_secret",
     "credential",
     "bearer",
+    "pwd",
+    "apikey",
+    "api-key",
+    "accesskey",
+    "access-key",
+    "privatekey",
+    "private-key",
+    "authorization",
 ];
 
 #[cfg(test)]

@@ -26,3 +26,11 @@ mod config_tool_filter {
     // ToolFilterConfig is public API — dead_code warning is intentional.
     // It's implemented for future .clean-ctx.json integration.
 }
+
+#[cfg(test)]
+#[path = "../../src/tests/proxy/scrub_equal_length_af_perf_002.rs"]
+mod scrub_equal_length_af_perf_002;
+
+#[cfg(test)]
+#[path = "../../src/tests/proxy/scrub_prefilter_af_perf_002.rs"]
+mod scrub_prefilter_af_perf_002;

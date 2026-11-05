@@ -578,3 +578,7 @@ mod performance_tests;
 mod calls_tests;
 
 mod membership;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_traversal_work_af_perf_002.rs"]
+mod traversal_work_af_perf_002;

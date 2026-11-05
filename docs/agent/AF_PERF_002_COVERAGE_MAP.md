@@ -397,3 +397,97 @@ af-perf-001-20261104-172427 passes49 tracked executions with212 matching
 source hashes, following focused145 and isolated mutation RED/restored GREEN.
 See AF_PERF_002_HIERARCHY_DISCOVERY.md. Broader hierarchy coverage/discovery remains
 open; original9763 syntax accounting and unresolved scope are unchanged.
+
+
+Graph traversal slice: public dependency query preparation and answer traversal
+straddle hydration; narrow reachability builds a complete sorted node table.
+Independent unrelated/invocation and negative/depth controls authored UNRUN, no
+repair. See AF_PERF_002_GRAPH_TRAVERSAL_DISCOVERY.md. Cycle witness determinism
+remains a distinct complete-graph obligation; inventory totals unchanged.
+
+
+Traversal-work-20261104-174619 verified38 tracked passes, focused gates and matching
+source hashes. Fixed reachable output still pays1031 input keys/515 unique nodes
+with256 unrelated edges; absent/sink starts do zero setup. Local direct-key BFS
+candidate requires separate design approval and dense/scoped semantic comparison.
+See AF_PERF_002_GRAPH_TRAVERSAL_DISCOVERY.md; no optimization implemented.
+Syntax accounting and broader discovery incompleteness remain unchanged.
+
+
+Traversal-density-20261104-175647 verified39 passes, clean affected gates and
+matching hashes.42 shape/depth rows plus scoped removal/restoration controls pass.
+Dense256/unlimited expands65280 edges for255 results while setup remains768 keys;
+depth1 expands255 with the same setup. Direct-key replacement remains DESIGN REVIEW
+for construction-inclusive hashing/memory tradeoffs; no repair/prototype implemented.
+No new syntax dispositions or exhaustive graph/public coverage are claimed.
+
+
+Proxy default request pipeline traced (server -> Pipeline -> transform -> scrub).
+Length-only replacement acceptance is a source-grounded correctness risk: equal-
+length redaction can be discarded. Two synthetic tracked regressions authored
+UNRUN, no production correction. See AF_PERF_002_PROXY_SCRUB_DISCOVERY.md.
+Transport/logging/other proxy paths and syntax classification remain open.
+
+
+Proxy equal-length scrub defect confirmed:proxy-equal-length-before-20261104-180252
+executes two intended direct/pipeline correctness failures, no real credentials.
+Exact content change detection proposed; production unchanged pending disposition.
+See AF_PERF_002_PROXY_SCRUB_DISCOVERY.md. This correctness finding does not close
+proxy performance/transport/logging coverage or advance syntax accounting.
+
+
+Proxy scrub exact-content comparison owner-approved and implemented at the one
+change-detection predicate; rules/accounting/pipeline unchanged. Original two RED
+cases retained; four additional byte/order/idempotence controls and focused52-test/
+isolated predicate mutation packets authored UNRUN. No protected acceptance yet.
+See AF_PERF_002_PROXY_SCRUB_DISCOVERY.md; other audit work remains independent.
+
+
+Proxy scrub correction focused52 GREEN verified181341; isolated old-predicate
+mutation181501 gives original two-case RED and exact restored six-case GREEN.
+Source identities match; composed mandatory gate pending. Exact comparator only;
+other proxy rules, scope and pipeline contracts unchanged. No audit completeness
+or further syntax disposition is inferred.
+
+
+Proxy scrub exact-content correction FIX / PROTECTED: final composed
+af-perf-001-20261104-193130 passes55 tracked executions, zero failures/ignored,
+219 source hashes match. Original two-case RED, focused52 and isolated
+old-predicate RED/exact restored six-case GREEN retained. Scope is one predicate
+and comment; no rule/policy expansion. See AF_PERF_002_PROXY_SCRUB_DISCOVERY.md.
+Broader proxy/audit coverage and original syntax accounting remain incomplete.
+
+
+Adjacent proxy prefilter obligation: existing optional-separator/pwd assignment/
+flag and non-Bearer Authorization rules may be excluded by the cheap gate.
+96-case finite regex-prerequisite table and exact pipeline regression authored
+UNRUN; no production correction. Protected comparator remains unchanged. See
+AF_PERF_002_PROXY_PREFILTER_DISCOVERY.md; syntax totals unchanged.
+
+
+Prefilter195317 verifies two correctness REDs:31/96 actual existing-rule cases
+blocked, exact pipeline propagation fails; source hashes match. Eight roots-only
+additions proposed pending separate approval. No matching policy/comparator change.
+Unicode/full-rule-language coverage stays open; inventory accounting unchanged.
+
+
+Approved prefilter eight-root correction implemented, post-repair UNRUN. Frozen
+source comparison confirms roots-only diff and unchanged protected comparator.
+Original96 cases retained; exact standalone/pipeline96 and16 nonmatching-keyword
+controls plus focused66/eight-root isolated mutation packets authored. Unicode
+gap remains separate; no new rule or normalization. See proxy prefilter report.
+
+
+Prefilter focused200149 verifies66 passes, all96 admissions/exact standalone-
+pipeline outputs and16 negatives; clean focused gates. Mutation200235 removes each
+of eight approved roots independently: eight intended REDs, exact restored four
+GREEN; source hashes match. Final composed gate pending. Unicode scope remains
+explicitly unresolved and syntax accounting unchanged.
+
+
+Eight-root prefilter scope FIX / PROTECTED: final composed
+af-perf-001-20261104-201445 passes59 tracked executions with220 matching
+source hashes; original31-case RED, focused66 GREEN and eight independent root
+mutation REDs/exact restored GREEN retained. Comparator/rules unchanged. Unicode
+equivalence stays separately unresolved; broader discovery and syntax accounting
+remain incomplete. See AF_PERF_002_PROXY_PREFILTER_DISCOVERY.md.
