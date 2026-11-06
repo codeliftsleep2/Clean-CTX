@@ -146,6 +146,13 @@ impl McpState {
         {
             let mut index = self.workspace_index_lock();
             for projection in &projections {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::publication_copy(
+                    "reconciliation-index",
+                    &projection.edges,
+                    &projection.dependencies,
+                    &projection.source_hash,
+                );
                 index.replace_semantic_projection_with_dependencies(
                     &projection.file,
                     projection.edges.clone(),

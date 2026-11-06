@@ -147,3 +147,7 @@ pub(crate) fn run_meta_layer_for_applicable_source(
 #[cfg(all(test, feature = "spring_boot"))]
 #[path = "../tests/spring_meta/mod.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "spring_boot"))]
+#[path = "../tests/spring_meta/work_af_perf_002.rs"]
+mod work_af_perf_002;

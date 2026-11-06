@@ -168,3 +168,18 @@ mod c1_public_response;
 
 #[path = "c2_public_alias_work_af_perf_002.rs"]
 mod c2_public_alias_work;
+
+#[path = "publication_copy_af_perf_002.rs"]
+mod publication_copy;
+
+#[path = "a1_clone_budget_af_perf_002.rs"]
+mod a1_clone_budget;
+
+#[path = "a1_clone_frozen_af_perf_002.rs"]
+mod a1_clone_frozen;
+
+#[path = "a1_clone_static_af_perf_002.rs"]
+mod a1_clone_static;
+
+#[path = "dependency_footprint_af_perf_002.rs"]
+mod dependency_footprint;

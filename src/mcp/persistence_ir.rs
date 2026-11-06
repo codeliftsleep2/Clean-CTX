@@ -4,6 +4,8 @@ use crate::ir::compiler::CompiledIR;
 use crate::ir::delta::{IRDelta, SequenceDelta};
 
 pub(crate) fn baseline(ir: &CompiledIR, file_path: &str) -> CompiledIR {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::publication_ir_copy("persistence-normalization", ir);
     let mut durable = ir.clone();
     durable.file_id = file_path.to_string();
     durable

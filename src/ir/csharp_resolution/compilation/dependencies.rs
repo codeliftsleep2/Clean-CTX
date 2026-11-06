@@ -3,6 +3,10 @@ use super::*;
 use crate::ir::csharp_symbols::CSharpSymbolComposition;
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
+#[path = "dependency_inputs.rs"]
+mod dependency_inputs;
+use dependency_inputs::OriginalInputs;
+
 #[derive(Default)]
 pub(crate) struct AncestryObligations {
     pub(crate) discovery_terms: BTreeSet<String>,
@@ -46,12 +50,19 @@ pub(crate) fn ancestry_obligations(
     seed: &str,
     known_external: &[CSharpTypeIdentity],
 ) -> AncestryObligations {
-    let index = CSharpSourceSymbolIndex::build(
-        units
-            .iter()
-            .flat_map(|unit| unit.classes.iter().map(|input| input.part.clone())),
-    );
-    collect_obligations(units, seed, known_external, &index)
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.symbol_builds[0] += 1);
+    let mut inputs = OriginalInputs::default();
+    let index =
+        CSharpSourceSymbolIndex::build(units.iter().flat_map(|unit| &unit.classes).map(|input| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.a4.symbol_part_visits[0] += 1);
+            inputs.insert(input);
+            input.part.clone()
+        }));
+    #[cfg(test)]
+    inputs.observe_storage();
+    collect_obligations(&inputs, seed, known_external, &index)
 }
 
 pub(crate) fn ancestry_obligations_for_files(
@@ -59,56 +70,66 @@ pub(crate) fn ancestry_obligations_for_files(
     files: &[&str],
     external: &[CSharpTypeIdentity],
 ) -> BTreeMap<String, AncestryObligations> {
-    let index = CSharpSourceSymbolIndex::build(
-        units
-            .iter()
-            .flat_map(|unit| unit.classes.iter().map(|input| input.part.clone())),
-    );
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.symbol_builds[1] += 1);
+    let mut inputs = OriginalInputs::default();
+    let index =
+        CSharpSourceSymbolIndex::build(units.iter().flat_map(|unit| &unit.classes).map(|input| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.a4.symbol_part_visits[1] += 1);
+            inputs.insert(input);
+            input.part.clone()
+        }));
+    #[cfg(test)]
+    inputs.observe_storage();
     files
         .iter()
         .map(|file| {
             (
                 (*file).to_string(),
-                collect_obligations(units, file, external, &index),
+                collect_obligations(&inputs, file, external, &index),
             )
         })
         .collect()
 }
 
 fn collect_obligations(
-    units: &[CSharpCompilationUnit],
+    inputs: &OriginalInputs<'_>,
     seed: &str,
     known_external: &[CSharpTypeIdentity],
     index: &CSharpSourceSymbolIndex,
 ) -> AncestryObligations {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.collect_calls += 1);
     let mut result = AncestryObligations::default();
-    let seeds: BTreeSet<_> = units
-        .iter()
-        .flat_map(|unit| &unit.classes)
-        .filter(|input| input.part.file == seed)
-        .map(|input| input.part.key.clone())
-        .collect();
-    for key in seeds {
+    for key in inputs.seeds(seed) {
         visit(
-            &key,
-            units,
+            key,
+            inputs,
             index,
             known_external,
             &mut HashSet::new(),
             &mut result,
         );
     }
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| {
+        c.a4.returned_terms += result.discovery_terms.len();
+        c.a4.returned_requirements += result.requirements.len();
+    });
     result
 }
 
 fn visit(
     key: &CSharpSymbolKey,
-    units: &[CSharpCompilationUnit],
+    inputs: &OriginalInputs<'_>,
     index: &CSharpSourceSymbolIndex,
     external: &[CSharpTypeIdentity],
     active: &mut HashSet<CSharpSymbolKey>,
     result: &mut AncestryObligations,
 ) {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.ancestry_visits += 1);
     if !active.insert(key.clone()) {
         result.reasons.insert("dependency_cycle");
         return;
@@ -124,11 +145,9 @@ fn visit(
     for part in &symbol.parts {
         result.owners.insert(part.file.clone());
     }
-    for input in units
-        .iter()
-        .flat_map(|unit| &unit.classes)
-        .filter(|input| input.part.key == *key)
-    {
+    for input in inputs.family(key) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.a4.matching_family_visits += 1);
         for attribute in input
             .attributes
             .iter()
@@ -174,10 +193,13 @@ fn visit(
         }
     }
     if let Some(written) = &symbol.base_reference {
-        let input = units
-            .iter()
-            .flat_map(|unit| &unit.classes)
-            .find(|input| input.part.key == *key && input.part.base_references.contains(written));
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.a4.lookup_calls[2] += 1);
+        let input = inputs.family(key).iter().copied().find(|input| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.a4.base_family_prefix_visits += 1);
+            input.part.base_references.contains(written)
+        });
         if let Some(input) = input {
             // These are conservative discovery hints, never resolution evidence.
             hint(written, &mut result.discovery_terms);
@@ -204,7 +226,7 @@ fn visit(
                         name: identity.terminal_name,
                         generic_arity: identity.generic_arity,
                     };
-                    visit(&next, units, index, external, active, result);
+                    visit(&next, inputs, index, external, active, result);
                 }
                 CSharpResolution::Resolved { .. } => {}
                 CSharpResolution::Ambiguous(_) => {
@@ -235,3 +257,11 @@ fn hint(written: &str, terms: &mut BTreeSet<String>) {
         terms.insert(terminal.to_string());
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/ir/a4_lookup_budget_af_perf_002.rs"]
+mod a4_lookup_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/ir/a4_lookup_acceptance_af_perf_002.rs"]
+mod a4_lookup_acceptance;

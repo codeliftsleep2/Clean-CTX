@@ -115,27 +115,41 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
             }
         }
     } else {
-        let mut text = crate::mcp::session_stats::render_dashboard_text(&merged);
+        let mut text = String::new();
+        if format != "json" {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|counts| {
+                counts.stats_initial_text_renders += 1;
+                counts.stats_initial_text_input_files += merged.all_file_stats().len();
+            });
+            text = crate::mcp::session_stats::render_dashboard_text(&merged);
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|counts| {
+                counts.stats_initial_text_bytes += text.len()
+            });
 
-        let active_tokenizer = state.config.tokenizer.to_string();
-        text.push_str(&format!(
-            "── Tokenizer ──\n  Active: {} (config: {})\n",
-            active_tokenizer, active_tokenizer
-        ));
-
-        if let Some(ref db_summary) = db_stats.as_ref().map(|db| db.summary()) {
+            let active_tokenizer = state.config.tokenizer.to_string();
             text.push_str(&format!(
-                "── Persistence (SQLite) ──\n  Status: enabled\n  DB Files: {}\n  DB Compressions: {}\n  DB Deltas: {}\n",
-                db_summary.total_files,
-                db_summary.full_compress_count,
-                db_summary.delta_count,
+                "── Tokenizer ──\n  Active: {} (config: {})\n",
+                active_tokenizer, active_tokenizer
             ));
-        } else {
-            text.push_str("── Persistence (SQLite) ──\n  Status: disabled\n");
+
+            if let Some(ref db_summary) = db_stats.as_ref().map(|db| db.summary()) {
+                text.push_str(&format!(
+                    "── Persistence (SQLite) ──\n  Status: enabled\n  DB Files: {}\n  DB Compressions: {}\n  DB Deltas: {}\n",
+                    db_summary.total_files,
+                    db_summary.full_compress_count,
+                    db_summary.delta_count,
+                ));
+            } else {
+                text.push_str("── Persistence (SQLite) ──\n  Status: disabled\n");
+            }
         }
 
         let metrics = state.cache_metrics_lock();
-        if let Some(cache_text) = render_cache_text(&metrics, state.config.cache.enabled) {
+        if format != "json"
+            && let Some(cache_text) = render_cache_text(&metrics, state.config.cache.enabled)
+        {
             text.push_str(&cache_text);
         }
 
@@ -188,3 +202,15 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/context_stats_read_only.rs"]
 mod read_only_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/stats_work_af_perf_002.rs"]
+mod work_af_perf_002;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/stats_format_budget_af_perf_002.rs"]
+mod format_budget_af_perf_002;
+
+#[cfg(test)]
+#[path = "../../../tests/mcp/stats_format_static_af_perf_002.rs"]
+mod format_static_af_perf_002;

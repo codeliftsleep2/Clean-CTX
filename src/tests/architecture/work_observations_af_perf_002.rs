@@ -2,7 +2,34 @@
 use std::collections::BTreeSet;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Counts {
+    pub publication_copies: std::collections::BTreeMap<&'static str, PublicationCopy>,
+    pub publication_sinks: std::collections::BTreeMap<&'static str, [usize; 3]>,
+    pub a4: DependencyWork,
     pub witnesses: usize,
+    pub stats_initial_text_renders: usize,
+    pub stats_initial_text_input_files: usize,
+    pub stats_initial_text_bytes: usize,
+    pub replay_sequence_calls: usize,
+    pub replay_candidate_clones: usize,
+    pub replay_candidate_tuples: usize,
+    pub replay_candidate_string_bytes: usize,
+    pub replay_full_validation_passes: usize,
+    pub replay_full_validation_tuple_visits: usize,
+    pub replay_tuple_validation_calls: usize,
+    pub replay_index_rebuilds: usize,
+    pub replay_index_tuple_visits: usize,
+    pub replay_occurrence_prefix_visits: usize,
+    pub replay_sequence_commits: usize,
+    pub sqlite_baseline_queries: usize,
+    pub sqlite_owner_queries: usize,
+    pub sqlite_decode_bytes: usize,
+    pub sqlite_delta_rows: usize,
+    pub sqlite_delta_payload_bytes: usize,
+    pub sqlite_output_tuple_clones: usize,
+    pub spring_detection_parses: usize,
+    pub spring_detection_parse_bytes: usize,
+    pub spring_method_scan_calls: usize,
+    pub spring_method_scan_bytes: usize,
     pub traversal_node_builds: usize,
     pub traversal_source_keys: usize,
     pub traversal_unique_nodes: usize,
@@ -75,8 +102,22 @@ pub(crate) struct Counts {
     pub lock_witnesses: usize,
 }
 thread_local! { static COUNTS: std::cell::RefCell<Counts> = std::cell::RefCell::new(Counts::default()); }
+thread_local! { static ENABLED: std::cell::Cell<bool> = const { std::cell::Cell::new(true) }; }
+/// Paired helper timing excludes observation bookkeeping, never production work.
+pub(crate) fn unobserved<T>(f: impl FnOnce() -> T) -> T {
+    struct Restore(bool);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            ENABLED.set(self.0);
+        }
+    }
+    let _restore = Restore(ENABLED.replace(false));
+    f()
+}
 pub(crate) fn update(f: impl FnOnce(&mut Counts)) {
-    COUNTS.with(|s| f(&mut s.borrow_mut()));
+    if ENABLED.get() {
+        COUNTS.with(|s| f(&mut s.borrow_mut()));
+    }
 }
 pub(crate) fn reset() {
     update(|s| {
@@ -129,4 +170,95 @@ pub(crate) fn token_count_input(boundary: usize, text: &str) {
         *s.token_count_inputs[boundary].entry(hash).or_default() += 1;
         s.token_count_bytes[boundary] += text.len();
     });
+}
+
+/// Logical payload at actual clone sites; not allocator events or total heap bytes.
+#[derive(Clone, Debug, Default, serde::Serialize)]
+pub(crate) struct PublicationCopy {
+    pub calls: usize,
+    pub edges: usize,
+    pub dependencies: usize,
+    pub endpoint_string_bytes: usize,
+    pub canonical_endpoints: usize,
+    pub dependency_string_bytes: usize,
+    pub hash_string_bytes: usize,
+    pub ir_instructions: usize,
+    pub ir_file_id_bytes: usize,
+}
+pub(crate) fn publication_copy(
+    site: &'static str,
+    edges: &[crate::layers::meta::semantic::SemanticEdge],
+    dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+    hash: &str,
+) {
+    update(|counts| {
+        let c = counts.publication_copies.entry(site).or_default();
+        c.calls += 1;
+        c.edges += edges.len();
+        c.dependencies += dependencies.len();
+        c.hash_string_bytes += hash.len();
+        for edge in edges {
+            for endpoint in [&edge.subject, &edge.object] {
+                c.endpoint_string_bytes +=
+                    endpoint.name.len() + endpoint.file.as_ref().map_or(0, String::len);
+                c.canonical_endpoints += usize::from(endpoint.canonical.is_some());
+            }
+        }
+        c.dependency_string_bytes += dependencies
+            .iter()
+            .map(|d| d.file_path.len() + d.source_hash.as_ref().map_or(0, String::len))
+            .sum::<usize>();
+    });
+}
+pub(crate) fn publication_ir_copy(site: &'static str, ir: &crate::ir::compiler::CompiledIR) {
+    update(|counts| {
+        let c = counts.publication_copies.entry(site).or_default();
+        c.calls += 1;
+        c.ir_instructions += ir.instructions.len();
+        c.ir_file_id_bytes += ir.file_id.len();
+    });
+}
+
+pub(crate) fn publication_sink(site: &'static str, edges: usize, dependencies: usize) {
+    update(|counts| {
+        let c = counts.publication_sinks.entry(site).or_default();
+        c[0] += 1;
+        c[1] += edges;
+        c[2] += dependencies;
+    });
+}
+
+/// A4 source-backed dependency work. Arrays: [single-owner, partition-batch].
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct DependencyWork {
+    pub lookup_input_visits: usize,
+    pub lookup_insert_attempts: [usize; 3],
+    pub lookup_calls: [usize; 3],
+    pub lookup_key_comparisons: [usize; 3],
+    pub matching_family_visits: usize,
+    pub base_family_prefix_visits: usize,
+    pub retained_input_references: usize,
+    pub retained_seed_references: usize,
+    pub retained_family_vectors: usize,
+    pub retained_file_sets: usize,
+    pub family_reference_capacity: usize,
+    pub footprint_calls: [usize; 2],
+    pub partition_tests: [usize; 2],
+    pub unit_clones: [usize; 2],
+    pub peer_visits: [usize; 2],
+    pub owner_probes: [usize; 2],
+    pub term_probes: [usize; 2],
+    pub source_bytes_offered: [usize; 2],
+    pub term_bytes_offered: [usize; 2],
+    pub emitted_dependencies: [usize; 2],
+    pub dependency_string_bytes: [usize; 2],
+    pub symbol_builds: [usize; 2],
+    pub symbol_part_visits: [usize; 2],
+    pub collect_calls: usize,
+    pub seed_class_visits: usize,
+    pub ancestry_visits: usize,
+    pub family_class_visits: usize,
+    pub base_find_visits: usize,
+    pub returned_terms: usize,
+    pub returned_requirements: usize,
 }

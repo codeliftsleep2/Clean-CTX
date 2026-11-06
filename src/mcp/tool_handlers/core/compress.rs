@@ -157,7 +157,6 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
             None => return,
         };
         let raw_tokens = count_tokens_with_tokenizer(source_text, tokenizer_ref);
-        let durable_candidate = ir.clone();
         let path_alias = state.get_or_create_alias(semantic_owner.clone());
         ir.file_id.clone_from(&path_alias);
         let canonical_path = semantic_owner;
@@ -186,7 +185,7 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 state,
                 &durable_owner,
                 effective_fidelity,
-                &durable_candidate,
+                &ir,
                 &semantic_edges,
                 &semantic_dependencies,
                 &authority,
@@ -195,12 +194,31 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                 raw_tokens,
                 compressed_tokens,
             )?;
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::publication_ir_copy("handler-live-ir", &ir);
             state
                 .ir_context_lock()
                 .load_ir(ir.clone(), Some(source_hash.clone()));
             state.remember_context_fidelity(&path_alias, effective_fidelity);
             if !canonical_path.to_ascii_lowercase().ends_with(".cs") {
                 let mut idx = state.workspace_index_lock();
+                #[cfg(test)]
+                {
+                    let semantic = crate::workspace::index::SemanticFidelity::from_compilation(
+                        effective_fidelity,
+                    )
+                    .is_some();
+                    crate::work_observations_af_perf_002::publication_copy(
+                        "handler-index",
+                        &semantic_edges,
+                        if semantic {
+                            &semantic_dependencies
+                        } else {
+                            &[]
+                        },
+                        if semantic { &source_hash } else { "" },
+                    );
+                }
                 match crate::workspace::index::SemanticFidelity::from_compilation(
                     effective_fidelity,
                 ) {
@@ -220,6 +238,13 @@ pub(crate) fn handle_compress_code_context(id: &Value, params: &Value, state: &M
                     }
                 }
             }
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::publication_copy(
+                "handler-snapshot",
+                &semantic_edges,
+                &semantic_dependencies,
+                &source_hash,
+            );
             state.remember_retained_semantic_projection(
                 &path_alias,
                 crate::mcp::state::durable_semantics::SemanticSnapshot {

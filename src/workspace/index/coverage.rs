@@ -248,6 +248,12 @@ impl WorkspaceIndex {
         source_hash: String,
         dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     ) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_sink(
+            "workspace-index",
+            edges.len(),
+            dependencies.len(),
+        );
         self.remove_file(file_path);
         self.add_edges(file_path, edges);
         self.semantic_coverage.insert(

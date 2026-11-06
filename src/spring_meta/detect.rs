@@ -142,6 +142,11 @@ fn ast_based_spring_detect_with_status(source: &str) -> AstResult {
         return AstResult::ParseFailed;
     }
 
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|counts| {
+        counts.spring_detection_parses += 1;
+        counts.spring_detection_parse_bytes += source.len();
+    });
     let tree = match parser.parse(source, None) {
         Some(tree) => tree,
         None => return AstResult::ParseFailed,

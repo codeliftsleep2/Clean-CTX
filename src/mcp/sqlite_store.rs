@@ -594,3 +594,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../tests/mcp/durable_compatibility_persistence.rs"]
 mod compatibility_persistence_tests;
+
+#[cfg(test)]
+#[path = "../tests/mcp/sqlite_work_af_perf_002.rs"]
+mod work_af_perf_002;

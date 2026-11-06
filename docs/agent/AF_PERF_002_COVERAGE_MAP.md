@@ -22,17 +22,17 @@ No clean test or repaired helper establishes whole-system completeness.
 | Retained admission: ir/typescript_resolution/relation_evidence.rs | PROTECTED, fourteen complete-set slots | Per-consumer construction bounded; structural inner joins and witness sweeps remain REVIEW REQUIRED. |
 | Angular acquisition/extraction: angular_meta, layers/meta | INSPECTED, prior finite evidence | Route/provider/guard identity covered; exhaustive default pipeline and all other Angular consumers NOT INSPECTED in this audit. |
 | Durable lifecycle: mcp/durable_semantics.rs | CHARACTERIZED, small fixture | Publication/restore/snapshot/query counters measured. Lock-held validation remains DESIGN REVIEW. Other failure/race workloads unresolved. |
-| SQLite: mcp/sqlite_store/semantic_state.rs, replay.rs | INSPECTED, named save/load paths only | Save checks authority before begin transaction, clones snapshot authority, serializes/persists then commits/rolls back. Durable load calls metadata/context-ID/replay/snapshot queries; replay looks up context ID again and decodes/reconstructs IR. Counts/bytes not yet measured. Other SQLite entry points NOT INSPECTED. |
+| SQLite: mcp/sqlite_store/semantic_state.rs, replay.rs | CHARACTERIZED, finite canonical/durable replay slice; CLOSED / NO REPAIR | Bounded measured lookups ACCEPT. Instruction/delta work and seven refusal controls retained; full validation/prefix questions deferred MONITOR. Physical IO, other entry points and full publication coverage remain open. |
 | Query/hydration: mcp/tool_handlers/query/prepare.rs, hydration | INSPECTED, prior finite census | Catalog/discovery reuse differs from retained owner currentness. Need per-entry-point graph and negative/unchanged/adversarial workloads. |
 | CBM: cbm/bridge/indexing.rs | INSPECTED, project indexing invocation only | Project-level external indexing and caller multiplicity need characterization. External provider contract unchanged. |
-| Canonical IR: ir/compiler, pipeline, hierarchical, replay, binary_wire | NOT INSPECTED system-wide | Module roots identified; enumerate real compilation/edit/restore callers, graph/clone/encode growth. SQLite replay observation alone is insufficient. |
-| Provenance/graphs: ir/program_graph, workspace/index/traversal.rs | NOT INSPECTED system-wide | Cycles, repeated closure, sparse/wide/deep graph queries, attribution and output-sensitive work. |
-| C#/EF: dotnet_meta, ir/csharp_resolution | NOT INSPECTED in current systematic pass | Historical correctness/performance evidence is not current exhaustive path coverage. |
-| Spring/Java: spring_meta, layers/language | NOT INSPECTED | Default/delegated extraction, parsing, config and dependency multiplicity. |
-| Compression/compaction: compression/pipeline.rs, compaction | NOT INSPECTED | Entry module exports located; per-candidate extraction, rendering, allocation and reduction remain untraced. |
-| MCP/protocol/proxy: mcp, protocol, proxy_spawner | NOT INSPECTED system-wide | Transport filtering, envelopes, copies, cancellation, task queues, secret scrubbing and errors. |
+| Canonical IR: ir/compiler, pipeline, hierarchical, replay, binary_wire | PARTIALLY CHARACTERIZED; hierarchy placement repair PROTECTED | Two hierarchy placement sinks protected; sequence replay packet closed without repair. Other compilation/edit/restore, encoding and ownership dimensions remain uninspected; no subsystem-wide acceptance. |
+| Provenance/graphs: ir/program_graph, workspace/index/traversal.rs | PARTIALLY CHARACTERIZED, index traversal only | Unrelated/invocation and reachable-density/scoped lifecycle packets measured; direct-key alternative remains DESIGN REVIEW. Program graph and complete public-query amplification remain open. |
+| C#/EF: dotnet_meta, ir/csharp_resolution; publication/reconciliation | PARTIALLY CHARACTERIZED, named A1/A2/A3 boundaries | A1 cold/dirty/warm copy/sink sites measured; A2 no-repair decision closed; A3 protected. Distinct owner copies ACCEPT/MONITOR, handler-only redundant durable IR clone FIX / PROTECTED (65-test final gate). EF and broader dependency/proof/concurrency coverage remains open. |
+| Spring/Java: spring_meta, layers/language | PARTIALLY CHARACTERIZED, default Spring compile slice | Class/method axes and exact endpoint facts measured; inner scanning MONITOR. Other roles/properties, failure/fallback and Java consumers remain open. |
+| Compression/compaction: compression/pipeline.rs, compaction | PARTIALLY CHARACTERIZED | Successful-IR C1 recount repair PROTECTED; C2 alias work MONITOR. Remaining compaction/capture/rendering consumers and independent dimensions remain open. |
+| MCP/protocol/proxy: mcp, protocol, proxy_spawner | PARTIALLY INSPECTED; two bounded proxy scrub repairs PROTECTED | Exact change detector and eight ASCII prefilter roots protected. Unicode equivalence, transport/queue/cancellation, logging and other proxy/MCP paths remain open. |
 | Other edit/diff/cache/analytics/intelligence/dictionary/gitdiff paths | NOT INSPECTED | Enumerate external/default callers before classifying work. No blanket historical exemption. |
-| Observability: observability/metrics, tracing, startup | NOT INSPECTED | Logging serialization/allocation, repeated diagnostics and startup/error amplification. |
+| Observability: context_stats; observability/metrics, tracing, startup | PARTIALLY CHARACTERIZED; session-wide stats JSON format guard PROTECTED | Thirty complete response oracles, work budget/static and real mutation protection. Other logging serialization/allocation, diagnostics, startup/error and transport/concurrency paths remain open. |
 
 ## First-pass work-dependency graphs
 
@@ -491,3 +491,101 @@ source hashes; original31-case RED, focused66 GREEN and eight independent root
 mutation REDs/exact restored GREEN retained. Comparator/rules unchanged. Unicode
 equivalence stays separately unresolved; broader discovery and syntax accounting
 remain incomplete. See AF_PERF_002_PROXY_PREFILTER_DISCOVERY.md.
+
+
+Java/Spring default compile path traced: existing once-detection/combined evaluation
+protection preserved. Inner method-annotation calls/bytes and detection AST attempts
+authored for independent class/method axes with exact Spring output/provenance and
+public publication control. UNRUN, no optimization; see AF_PERF_002_SPRING_DISCOVERY.md.
+Properties/other Java consumers and source-wide syntax classification remain open.
+
+
+Spring-work-20261105-171440 verified13 tracked passes, clean affected gates and
+matching source hashes. Positive High helper calls2*C, Low0; method growth increases
+body bytes/output, not number of helper passes. Detection/evaluation remain once per
+compilation; plain Java avoids detector parsing/evaluation. Inner scans MONITOR, no
+measured multiplicative selection defect or repair proposal. Full Spring coverage
+and9750 pending syntax records remain open; see AF_PERF_002_SPRING_DISCOVERY.md.
+
+
+SQLite canonical/durable replay traced through metadata/owner/binary/delta/snapshot
+loading and historical adoption. Independent instruction/delta axes and exact
+version/IR controls authored UNRUN; helper query/decode/payload/tuple counters only.
+Duplicate owner reads and possible presentation recount remain source leads with
+consistency/observation obligations, no repair. See AF_PERF_002_SQLITE_REPLAY_DISCOVERY.md.
+
+
+SQLite-work-20261105-172853 verifies27 passes, clean affected gates and matching
+source hashes. Named canonical queries stay1 baseline/1 owner; durable baseline
+1 baseline/2 owner. Delta rows/payload grow with history, output tuples with IR.
+Per-delta candidate clones/validation/index rebuilds are outside output-copy counter
+and remain separate measured-work obligations; whole replay MONITOR, no repair.
+See AF_PERF_002_SQLITE_REPLAY_DISCOVERY.md; no syntax completeness advance.
+
+
+Owner accepts bounded replay/durable lookups; no optimization queued. Independent
+intermediate clone/validation/index/occurrence work and late-failure atomicity
+packet authored UNRUN. SQLite temporary owner and public delta_apply outer candidate/
+persistence/publication boundaries traced separately; no reuse or mutation-in-place.
+See AF_PERF_002_REPLAY_INTERMEDIATE_DISCOVERY.md; final-output clones kept separate.
+
+
+Replay-intermediate-work-20261105-174640 verified63 tracked passes, clean focused
+gates and source identities. Intermediate cloning/full validation/index visits each
+D*N, prefix checks2*D*P. Seven late/early refusal controls preserve exact owner/index/
+version/hash state. Candidate isolation and index-maintenance obligations ACCEPT
+with current representation; whole revalidation/prefix work MONITOR, no redundant
+small fix proved. Final-output clone explicitly distinct; lookup acceptance unchanged.
+
+
+## Replay owner closure and scheduling boundary
+
+The executed intermediate replay packet is CLOSED / NO REPAIR. D*N evidence and
+seven refusal controls remain retained, not a mandate to remove all complete-set
+work. Future unchanged-region validation and identical occurrence-prefix questions
+are deferred MONITOR obligations. Any stateful/incremental/copy-on-write/transactional
+alternative needs separate architectural approval; no implementation queued.
+
+Current discovery priority returns to other unexamined production paths. Top-level
+rows now distinguish the named measured/protected slices from still-uninspected
+subsystem scope; historical append-only evidence remains below its original dates.
+Syntax accounting is unchanged and whole-system discovery remains incomplete.
+
+
+Observability source trace separates tracing/startup/optional exporter from actual
+context_stats SessionStats path. Public JSON appears to build unused full text
+dashboard before format selection; file/invocation axes and read-only controls
+authored UNRUN, no repair. See AF_PERF_002_OBSERVABILITY_DISCOVERY.md. Replay stays
+closed; export/transport/concurrency and source-wide syntax accounting remain open.
+
+
+Stats-work-20261105-201544 verified six passes, clean focused gates and matching
+source hashes. Public session-wide JSON constructs one unused initial full text
+dashboard per invocation (F256:20611 base bytes); Q growth multiplies it. Format-
+guarded construction proposed only, preserving text lock placement and all JSON/
+DB/proxy/cache observations. No repair approval inferred; other audit scope open.
+
+
+A1 default publication characterization verified six passes / 63 operation rows,
+1313 source hashes matched at inspection; real save/acquisition failure controls
+pass. Copied item/string payload is measured at named clone sites, not allocator
+traffic or whole graph memory. Current ownership-copy costs are ACCEPT/MONITOR;
+handler durable_candidate elimination is separately proposed for owner review.
+No repair implementation or syntax disposition follows from these observations.
+
+
+A1 handler-only redundant durable-candidate clone is now FIX / PROTECTED after
+original RED, exact durable/public GREEN, finite AST and real mutation RED/restored
+GREEN, focused gates and final65-pass/230-hash composed verification. This closes
+only that correction; distinct publication-owner copies retain ACCEPT/MONITOR and
+uncounted proof/operand bytes, concurrency, A4 and broader source inventory stay open.
+
+A4 original-input lookup correction CLOSED / FIX / PROTECTED: single-operation
+borrowed seed/family retrieval replaces three full-input search sites, preserving
+ordered duplicates, exact base predicate and path-sensitive ancestry. Original RED,
+complete frozen/public semantics and work GREEN, finite static,3independent real
+production mutations RED/exact restored GREEN, focused9plus checks and final
+70pass/236hash composed receipt af-perf-001-20261106-152751 verified. Construction
+comparisons/reference capacities measured; no public latency/allocator claim.
+Peer matching, broader A4 paths/concurrency and source census remain separate.
+No additional frozen syntax disposition follows from57operation rows or this fix.

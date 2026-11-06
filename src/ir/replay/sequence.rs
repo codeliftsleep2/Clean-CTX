@@ -6,6 +6,8 @@ use crate::ir::delta::{SEQUENCE_DELTA_VERSION, SequenceDelta, SequenceEdit, occu
 impl ContextState {
     /// Apply the corrected positional protocol transactionally.
     pub fn apply_sequence(&mut self, delta: SequenceDelta) -> Result<u64, DeltaError> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| counts.replay_sequence_calls += 1);
         if delta.delta_version != SEQUENCE_DELTA_VERSION {
             return Err(DeltaError::UnsupportedDeltaVersion(delta.delta_version));
         }
@@ -26,6 +28,17 @@ impl ContextState {
             });
         }
 
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.replay_candidate_clones += 1;
+            counts.replay_candidate_tuples += file.instructions.len();
+            counts.replay_candidate_string_bytes += file
+                .instructions
+                .iter()
+                .flatten()
+                .map(String::len)
+                .sum::<usize>();
+        });
         let mut instructions = file.instructions.clone();
         for edit in &delta.edits {
             match edit {
@@ -72,6 +85,8 @@ impl ContextState {
         file.version = delta.to;
         file.rebuild_indexes();
         self.version = self.version.max(delta.to);
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| counts.replay_sequence_commits += 1);
         Ok(delta.to)
     }
 }

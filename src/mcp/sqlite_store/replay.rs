@@ -44,6 +44,8 @@ impl SqliteStore {
         &self,
         file_path: &str,
     ) -> Result<Option<String>, Box<dyn std::error::Error>> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| counts.sqlite_owner_queries += 1);
         Ok(self
             .conn
             .query_row(
@@ -72,6 +74,8 @@ impl SqliteStore {
         &self,
         file_path: &str,
     ) -> Result<Option<Vec<u8>>, Box<dyn std::error::Error>> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| counts.sqlite_baseline_queries += 1);
         Ok(self
             .conn
             .query_row(
@@ -90,6 +94,10 @@ impl SqliteStore {
         let Some(blob) = self.baseline_binary(file_path)? else {
             return Ok(None);
         };
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.sqlite_decode_bytes += blob.len()
+        });
         let ir = crate::ir::binary_wire::decode(&blob)?;
         if ir.file_id != file_path {
             return Err(format!(
@@ -114,12 +122,24 @@ impl SqliteStore {
         let mut state = crate::ir::replay::ContextState::new();
         state.load_ir(ir, None);
         for row in rows {
+            #[cfg(test)]
+            if let Ok(payload) = &row {
+                crate::work_observations_af_perf_002::update(|counts| {
+                    counts.sqlite_delta_rows += 1;
+                    counts.sqlite_delta_payload_bytes += payload.len();
+                });
+            }
             match PersistedDelta::from_json(&row?)? {
                 PersistedDelta::Sequence(delta) => state.apply_sequence(delta)?,
                 PersistedDelta::Legacy(delta) => state.apply(delta)?,
             };
         }
 
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.sqlite_output_tuple_clones +=
+                state.get_ir(file_path).map_or(0, |tuples| tuples.len());
+        });
         let instructions = state.get_ir(file_path).cloned().unwrap_or_default();
         let version = state.file_version(file_path).unwrap_or(1);
         let instructions = instructions

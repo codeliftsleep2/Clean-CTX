@@ -70,7 +70,14 @@ fn failed_compress_baseline_commit_publishes_no_candidate_live_state() {
     .unwrap();
     state.invalidate_source_cache(&file);
     crate::mcp::sqlite_store::fail_next_semantic_save(&file);
+    crate::work_observations_af_perf_002::reset();
     let failed = dispatch(&state, 3, "compress_code_context", args(&file, &root));
+    let copy_observation = crate::work_observations_af_perf_002::snapshot();
+    eprintln!(
+        "AF002_A1_FAILURE {}",
+        json!({"sites":copy_observation.publication_copies,
+        "sinks":copy_observation.publication_sinks})
+    );
     assert!(
         failed["error"]["message"]
             .as_str()

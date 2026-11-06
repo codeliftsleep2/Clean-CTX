@@ -151,7 +151,13 @@ pub(crate) fn occurrence_key_at(
     let identity = DeltaIdentity::from_tuple(instructions.get(position)?)?;
     let occurrence = instructions[..position]
         .iter()
-        .filter(|tuple| DeltaIdentity::from_tuple(tuple).as_ref() == Some(&identity))
+        .filter(|tuple| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|counts| {
+                counts.replay_occurrence_prefix_visits += 1
+            });
+            DeltaIdentity::from_tuple(tuple).as_ref() == Some(&identity)
+        })
         .count();
     Some(OccurrenceKey {
         identity,

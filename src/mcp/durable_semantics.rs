@@ -319,6 +319,12 @@ impl super::McpState {
         edges: Vec<SemanticEdge>,
         dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     ) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_sink(
+            "generation-snapshot",
+            edges.len(),
+            dependencies.len(),
+        );
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),
             "semantic_edge_snapshots"
@@ -338,6 +344,12 @@ impl super::McpState {
         alias: &str,
         snapshot: SemanticSnapshot,
     ) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_sink(
+            "retained-snapshot",
+            snapshot.edges.len(),
+            snapshot.dependencies.len(),
+        );
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),
             "semantic_edge_snapshots"

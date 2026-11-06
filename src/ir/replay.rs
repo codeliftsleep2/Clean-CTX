@@ -153,9 +153,15 @@ impl FileState {
     }
 
     fn rebuild_indexes(&mut self) {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| counts.replay_index_rebuilds += 1);
         self.index.clear();
         self.occurrence_index.clear();
         for (position, tuple) in self.instructions.iter().enumerate() {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|counts| {
+                counts.replay_index_tuple_visits += 1
+            });
             self.index.insert(primary_key_from_tuple(tuple), position);
             if let Some(identity) = DeltaIdentity::from_tuple(tuple) {
                 self.occurrence_index
@@ -289,6 +295,10 @@ impl FileState {
 }
 
 fn validate_tuple(tuple: &[String], position: usize) -> Result<(), DeltaError> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|counts| {
+        counts.replay_tuple_validation_calls += 1
+    });
     tuple_to_op(tuple)
         .map(|_| ())
         .ok_or_else(|| DeltaError::InvalidCanonicalTuple {
@@ -298,7 +308,15 @@ fn validate_tuple(tuple: &[String], position: usize) -> Result<(), DeltaError> {
 }
 
 fn validate_tuples(tuples: &[Vec<String>]) -> Result<(), DeltaError> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|counts| {
+        counts.replay_full_validation_passes += 1
+    });
     for (position, tuple) in tuples.iter().enumerate() {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|counts| {
+            counts.replay_full_validation_tuple_visits += 1
+        });
         validate_tuple(tuple, position)?;
     }
     Ok(())
@@ -538,3 +556,7 @@ impl Default for ContextState {
 #[cfg(test)]
 #[path = "../tests/ir/replay.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/ir/replay_work_af_perf_002.rs"]
+mod work_af_perf_002;

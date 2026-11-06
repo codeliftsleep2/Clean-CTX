@@ -218,6 +218,13 @@ impl SemanticCompilationArtifact {
             s.artifact_publication_clones[1] += self.semantic_edges.len();
             s.artifact_publication_clones[2] += self.semantic_dependencies.len();
         });
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_copy(
+            "artifact-accessor",
+            &self.semantic_edges,
+            &self.semantic_dependencies,
+            &self.identity.source_hash,
+        );
         (
             self.semantic_edges.clone(),
             self.semantic_dependencies.clone(),
@@ -227,6 +234,13 @@ impl SemanticCompilationArtifact {
 
     #[cfg(feature = "csharp")]
     pub(crate) fn semantic_dependencies_owned(&self) -> Vec<SemanticDependency> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_copy(
+            "artifact-dependencies",
+            &[],
+            &self.semantic_dependencies,
+            "",
+        );
         self.semantic_dependencies.clone()
     }
 
@@ -269,6 +283,13 @@ impl SemanticCompilationArtifact {
             .filter(|edge| edge.layer != "csharp-exact-call")
             .cloned()
             .collect();
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_copy(
+            "artifact-base-edges",
+            &edges,
+            &[],
+            "",
+        );
         edges.extend(crate::ir::csharp_exact_calls::project_with_authority(
             self.source_snapshot.as_str(),
             &self.compiled.instructions,
@@ -375,6 +396,11 @@ impl SemanticCompilationArtifact {
         crate::work_observations_af_perf_002::update(|s| {
             s.artifact_ir_instruction_clones += self.compiled.instructions.len();
         });
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::publication_ir_copy(
+            "artifact-generation-ir",
+            &self.compiled,
+        );
         let mut compiled = self.compiled.clone();
         compiled.instructions.retain(|instruction| {
             !matches!(

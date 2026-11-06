@@ -397,6 +397,11 @@ pub(crate) fn parse_mapping_paths(arg: &str) -> Vec<String> {
 }
 
 pub(crate) fn collect_method_annotations(body: &str) -> Vec<(String, AnnotationKind, String)> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|counts| {
+        counts.spring_method_scan_calls += 1;
+        counts.spring_method_scan_bytes += body.len();
+    });
     let mut out: Vec<(String, AnnotationKind, String)> = Vec::new();
     let bytes = body.as_bytes();
     let len = bytes.len();

@@ -40,10 +40,14 @@ pub(crate) fn footprint(
     owner: &str,
     artifacts: &[Arc<SemanticCompilationArtifact>],
 ) -> Vec<SemanticDependency> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.footprint_calls[0] += 1);
     let partition = csharp_resolution_partition(state, owner);
     let peers: Vec<_> = artifacts
         .iter()
         .filter(|artifact| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.a4.partition_tests[0] += 1);
             csharp_resolution_partition(state, artifact.canonical_owner()) == partition
         })
         .collect();
@@ -51,21 +55,41 @@ pub(crate) fn footprint(
         .iter()
         .filter_map(|artifact| artifact.csharp_resolution_unit().cloned())
         .collect();
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.unit_clones[0] += units.len());
     let external = crate::dotnet_meta::semantic::known_csharp_type_identities();
     let obligations = ancestry_obligations(&units, owner, &external);
     peers
         .into_iter()
         .filter(|artifact| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.a4.peer_visits[0] += 1);
             artifact.canonical_owner() != owner
-                && (obligations.owners.contains(artifact.canonical_owner())
-                    || obligations
-                        .discovery_terms
-                        .iter()
-                        .any(|term| artifact.source_snapshot().contains(term)))
+                && ({
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|c| c.a4.owner_probes[0] += 1);
+                    obligations.owners.contains(artifact.canonical_owner())
+                } || obligations.discovery_terms.iter().any(|term| {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|c| {
+                        c.a4.term_probes[0] += 1;
+                        c.a4.source_bytes_offered[0] += artifact.source_snapshot().len();
+                        c.a4.term_bytes_offered[0] += term.len();
+                    });
+                    artifact.source_snapshot().contains(term)
+                }))
         })
-        .map(|artifact| SemanticDependency {
-            file_path: artifact.canonical_owner().to_string(),
-            source_hash: Some(artifact.source_hash().to_string()),
+        .map(|artifact| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| {
+                c.a4.emitted_dependencies[0] += 1;
+                c.a4.dependency_string_bytes[0] +=
+                    artifact.canonical_owner().len() + artifact.source_hash().len();
+            });
+            SemanticDependency {
+                file_path: artifact.canonical_owner().to_string(),
+                source_hash: Some(artifact.source_hash().to_string()),
+            }
         })
         .collect()
 }
@@ -74,8 +98,12 @@ pub(crate) fn footprints(
     state: &McpState,
     artifacts: &[Arc<SemanticCompilationArtifact>],
 ) -> BTreeMap<String, Vec<SemanticDependency>> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.a4.footprint_calls[1] += 1);
     let mut partitions = BTreeMap::<String, Vec<_>>::new();
     for artifact in artifacts {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.a4.partition_tests[1] += 1);
         partitions
             .entry(csharp_resolution_partition(
                 state,
@@ -91,21 +119,43 @@ pub(crate) fn footprints(
             .iter()
             .filter_map(|peer| peer.csharp_resolution_unit().cloned())
             .collect();
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.a4.unit_clones[1] += units.len());
         let files: Vec<_> = peers.iter().map(|peer| peer.canonical_owner()).collect();
         for (owner, obligations) in ancestry_obligations_for_files(&units, &files, &external) {
             let dependencies = peers
                 .iter()
                 .filter(|peer| {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|c| c.a4.peer_visits[1] += 1);
                     peer.canonical_owner() != owner
-                        && (obligations.owners.contains(peer.canonical_owner())
-                            || obligations
-                                .discovery_terms
-                                .iter()
-                                .any(|term| peer.source_snapshot().contains(term)))
+                        && ({
+                            #[cfg(test)]
+                            crate::work_observations_af_perf_002::update(|c| {
+                                c.a4.owner_probes[1] += 1
+                            });
+                            obligations.owners.contains(peer.canonical_owner())
+                        } || obligations.discovery_terms.iter().any(|term| {
+                            #[cfg(test)]
+                            crate::work_observations_af_perf_002::update(|c| {
+                                c.a4.term_probes[1] += 1;
+                                c.a4.source_bytes_offered[1] += peer.source_snapshot().len();
+                                c.a4.term_bytes_offered[1] += term.len();
+                            });
+                            peer.source_snapshot().contains(term)
+                        }))
                 })
-                .map(|peer| SemanticDependency {
-                    file_path: peer.canonical_owner().to_string(),
-                    source_hash: Some(peer.source_hash().to_string()),
+                .map(|peer| {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|c| {
+                        c.a4.emitted_dependencies[1] += 1;
+                        c.a4.dependency_string_bytes[1] +=
+                            peer.canonical_owner().len() + peer.source_hash().len();
+                    });
+                    SemanticDependency {
+                        file_path: peer.canonical_owner().to_string(),
+                        source_hash: Some(peer.source_hash().to_string()),
+                    }
                 })
                 .collect();
             result.insert(owner, dependencies);

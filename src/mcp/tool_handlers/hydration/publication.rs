@@ -295,6 +295,13 @@ fn commit_candidate(
     let retained = (publication.published_outcome == CandidatePublication::PublishedCSharp)
         .then(|| Arc::new(artifact));
     let expected_hash = compiled_hash.clone();
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::publication_copy(
+        "hydration-validation",
+        &[],
+        &semantic_dependencies,
+        "",
+    );
     let expected_dependencies = semantic_dependencies.clone();
     let expected_authority = authority.clone();
     publication

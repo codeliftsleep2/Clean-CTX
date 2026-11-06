@@ -1,15 +1,16 @@
 # AF-PERF-002: independent progress indicators and artifact operation trace
 
 Agent: Agent MaxHeadRoom
-Status: parser boundary accepted; authorized artifact public-query packet GREEN; A3 repair design proposed only.
-No new production optimization authorized. Generation 78 remains semantic baseline.
+Status: discovery INCOMPLETE; approved repair scopes protected and measured no-repair
+packets retained. Replay characterization CLOSED / NO REPAIR; monitored questions deferred.
+Generation 78 remains semantic baseline; no additional production repair authorized.
 
 ## Two indicators, separate conclusions
 
 | Indicator | Current evidence | What it proves and does not prove |
 | --- | --- | --- |
 | Syntax accounting completeness | 9763/9763 original records retained with accountable states; 13 scoped syntax outcomes linked to seven reviewed operations; 9750 still macro/review-required | No original row disappears. This is not completed classification or behavioral coverage. Nested iterator links are not independent defects or extra human inspections. |
-| Production operation coverage | 24 prior inspected operation records plus four artifact/caller work units traced below; prior measured index/admission/lifecycle packets retained; new artifact work measurements UNRUN | Named production entry points and delegated work are traced. Significant-operation denominator is not yet closed; no percentage or whole-system acceptance is justified. |
+| Production operation coverage | Historical operation records retained below; executed artifact, NgRx, compression, hierarchy, proxy, graph, Spring and replay packets are recorded chronologically; replay packet closed without repair | Named production entry points and delegated work are traced. Significant-operation denominator is not yet closed; no percentage or whole-system acceptance is justified. |
 
 The two denominators differ. Reducing syntax review counts cannot certify a public
 operation, and discovering one measured public-operation defect cannot account for
@@ -514,3 +515,307 @@ source hashes; original31-case RED, focused66 GREEN and eight independent root
 mutation REDs/exact restored GREEN retained. Comparator/rules unchanged. Unicode
 equivalence stays separately unresolved; broader discovery and syntax accounting
 remain incomplete. See AF_PERF_002_PROXY_PREFILTER_DISCOVERY.md.
+
+
+Java/Spring default compile path traced: existing once-detection/combined evaluation
+protection preserved. Inner method-annotation calls/bytes and detection AST attempts
+authored for independent class/method axes with exact Spring output/provenance and
+public publication control. UNRUN, no optimization; see AF_PERF_002_SPRING_DISCOVERY.md.
+Properties/other Java consumers and source-wide syntax classification remain open.
+
+
+Spring-work-20261105-171440 verified13 tracked passes, clean affected gates and
+matching source hashes. Positive High helper calls2*C, Low0; method growth increases
+body bytes/output, not number of helper passes. Detection/evaluation remain once per
+compilation; plain Java avoids detector parsing/evaluation. Inner scans MONITOR, no
+measured multiplicative selection defect or repair proposal. Full Spring coverage
+and9750 pending syntax records remain open; see AF_PERF_002_SPRING_DISCOVERY.md.
+
+
+SQLite canonical/durable replay traced through metadata/owner/binary/delta/snapshot
+loading and historical adoption. Independent instruction/delta axes and exact
+version/IR controls authored UNRUN; helper query/decode/payload/tuple counters only.
+Duplicate owner reads and possible presentation recount remain source leads with
+consistency/observation obligations, no repair. See AF_PERF_002_SQLITE_REPLAY_DISCOVERY.md.
+
+
+SQLite-work-20261105-172853 verifies27 passes, clean affected gates and matching
+source hashes. Named canonical queries stay1 baseline/1 owner; durable baseline
+1 baseline/2 owner. Delta rows/payload grow with history, output tuples with IR.
+Per-delta candidate clones/validation/index rebuilds are outside output-copy counter
+and remain separate measured-work obligations; whole replay MONITOR, no repair.
+See AF_PERF_002_SQLITE_REPLAY_DISCOVERY.md; no syntax completeness advance.
+
+
+Owner accepts bounded replay/durable lookups; no optimization queued. Independent
+intermediate clone/validation/index/occurrence work and late-failure atomicity
+packet authored UNRUN. SQLite temporary owner and public delta_apply outer candidate/
+persistence/publication boundaries traced separately; no reuse or mutation-in-place.
+See AF_PERF_002_REPLAY_INTERMEDIATE_DISCOVERY.md; final-output clones kept separate.
+
+
+Replay-intermediate-work-20261105-174640 verified63 tracked passes, clean focused
+gates and source identities. Intermediate cloning/full validation/index visits each
+D*N, prefix checks2*D*P. Seven late/early refusal controls preserve exact owner/index/
+version/hash state. Candidate isolation and index-maintenance obligations ACCEPT
+with current representation; whole revalidation/prefix work MONITOR, no redundant
+small fix proved. Final-output clone explicitly distinct; lookup acceptance unchanged.
+
+
+## Current owner disposition: replay packet closed; return to discovery breadth
+
+Replay intermediate characterization is CLOSED / NO REPAIR. Retain63 executed
+passes,28 direct work rows, enclosing counters and seven refusal controls. Candidate
+isolation/current index maintenance remain accepted under the existing representation;
+full revalidation and occurrence-prefix questions remain deferred MONITOR items.
+No blanket D*N-elimination budget, incremental state, copy-on-write or transaction
+redesign is authorized. Exact future redundancy-proof obligations are recorded in
+AF_PERF_002_REPLAY_INTERMEDIATE_DISCOVERY.md.
+
+Replay is not the active implementation queue. Continue other unexamined production
+entry points/delegates and retain separate syntax and behavioral denominators. Original
+9763 records/13 scoped outcomes/9750 pending plus96 callback supplements are unchanged.
+No runtime was run or requested to record this owner decision.
+
+
+Observability source trace separates tracing/startup/optional exporter from actual
+context_stats SessionStats path. Public JSON appears to build unused full text
+dashboard before format selection; file/invocation axes and read-only controls
+authored UNRUN, no repair. See AF_PERF_002_OBSERVABILITY_DISCOVERY.md. Replay stays
+closed; export/transport/concurrency and source-wide syntax accounting remain open.
+
+
+Stats-work-20261105-201544 verified six passes, clean focused gates and matching
+source hashes. Public session-wide JSON constructs one unused initial full text
+dashboard per invocation (F256:20611 base bytes); Q growth multiplies it. Format-
+guarded construction proposed only, preserving text lock placement and all JSON/
+DB/proxy/cache observations. No repair approval inferred; other audit scope open.
+
+
+Stats format repair: original unused-render RED verified; guard authored and public
+budget GREEN with thirty normalized response matches. Focused eight tests/Clippy
+passed but encoding failed, so acceptance remains pending. Exact Unicode recovery
+from Git and thirty corrected frozen expectations are authored; fresh focused and
+isolated mutation evidence required. See AF_PERF_002_OBSERVABILITY_DISCOVERY.md.
+No final GREEN, protected disposition or syntax-accounting progress is claimed.
+
+
+Stats format correction: fresh focused eight tests and warning-fatal Clippy/format/
+size/encoding GREEN verified (stats-focused-20261106-000051; 1312 matching hashes).
+Isolated production unconditional-render mutation gives intended budget/static RED,
+restored three-test GREEN; active/restored production byte-identical (stats-format-
+mutation-20261106-000243; 2134 inventory hashes matched before this doc update).
+Thirty corrected complete normalized response oracles pass. Final mandatory composed
+fitness gate remains user-owned pending; no additional production or test edits.
+
+
+Format-gated stats rendering FIX / PROTECTED: final mandatory composed receipt
+af-perf-001-20261106-001356 verifies 61 passes / 15 groups, zero failed/ignored,
+224 matching source hashes. Original work RED, thirty corrected complete response
+oracles, eight focused passes/clean gates and real isolated mutation RED/restored
+GREEN are retained separately. No production/test edits follow final verification.
+Scope closes unused session-wide JSON text construction only; overall discovery,
+syntax reconciliation and other subsystem risks remain open. See observability
+report for source hash, encoding recovery history and evidence limits.
+
+
+Owner closes format-gated stats FIX / PROTECTED; no further work queued there.
+Broader source-only follow-up separates opt-in metrics snapshot/export, startup
+trace acquisition, production transport from test capture, and library Low-fidelity
+symbol encoding from default IR compilation. One eager fallback-clone candidate is
+source-traced but unmeasured/caller-limited, not approved for repair. Metrics default
+bucket work is finite; no demonstrated consequential exporter defect. No runtime,
+production edit, commit or syntax disposition in this follow-up. See
+AF_PERF_002_OBSERVABILITY_AND_SYMBOL_FOLLOWUP.md. A1/A4 and other default paths stay
+independent priorities; uncommitted verified work remains a separate Git step.
+
+
+Owner accepts exporter/transport/symbol trace without repair and directs A1 default
+publication-copy characterization. New A1 packet authored UNRUN: actual accessor,
+generation IR/base edges, staged index copies, handler durable/live/snapshot copies,
+persistence normalization and dependent index/snapshot sinks observed separately.
+Cold/dirty/warm owner/payload/name/request dimensions and existing real publication
+failure controls included. Test-only instrumentation preserves clone/move/order;
+logical object/string payload counts explicitly exclude allocator bytes and deeper
+uncounted payload. No production optimization or new fitness budget. See
+AF_PERF_002_A1_PUBLICATION_COPY_CHARACTERIZATION.md for user-owned command, ownership
+proof, complete measurement limits and remaining failure/allocator gaps. Syntax
+accounting unchanged; all earlier protected/closed dispositions preserved.
+
+
+A1 publication-work-20261106-074024 verified: six tracked passes, clean warning-fatal
+all-target/all-feature lint/format/size/encoding; 1313 source hashes match. Parsed
+63 operation rows plus one real failed-save interval. Zero accessor counts coexist
+with real generation/index/handler copies. At M256, persistence off copies 1029 IR
+instructions at each of two handler sites; on adds a third normalization copy.
+Two independent edge owners each copy 515 edges/75586 endpoint-string bytes. C#
+cold/accessor, dirty staged/index/snapshot and warm controls remain separate.
+
+Distinct publication-owner copies ACCEPT/MONITOR under current representation;
+small handler durable_candidate clone elimination is FIX PROPOSED only: remove
+that clone and pass existing &ir to the same persistence call, whose existing
+normalizer overwrites file_id before encoding. No production correction, new RED
+budget or follow-on runtime started. Exact proposal/proof/tables/failure results
+and byte-accounting limits in AF_PERF_002_A1_PUBLICATION_COPY_CHARACTERIZATION.md.
+A1 broader allocator/proof/dependency/concurrency gaps and A4 stay open. Syntax
+accounting and all protected/closed dispositions unchanged.
+
+
+Owner approves A1 handler-only durable_candidate clone elimination. Before editing,
+authored a new public-operation zero-redundant-clone budget plus exact normalization
+identity control, both UNRUN. Eleven public cases freeze full responses and verified
+durable IR/binary/physical owner/version across persistence/auto-save/High/Edit and
+payload/request axes. Original handler clone and persistence helper unchanged.
+User-owned Before command in AF_PERF_002_A1_HANDLER_CLONE_REPAIR.md. No new repair,
+executed RED or protected disposition claimed yet; all other scopes preserved.
+
+
+A1 handler clone original RED verified: a1-handler-clone-before-20261106-093043,
+identity control passes and all eleven semantic rows complete before final intended
+clone-budget failure; 1314 hashes match. Applied only redundant clone/observation
+removal plus &ir at unchanged unconditional persistence call. Budget and normalizer
+bytes unchanged. After exact semantic/budget command is user-owned pending; no
+protected disposition yet. See A1_HANDLER_CLONE_REPAIR report for preserved failed
+attempts, genuine RED, minimal diff and remaining acceptance.
+
+
+A1 handler clone After verified: a1-handler-clone-after-20261106-093922, two tracked
+passes and all eleven exact semantic rows match frozen Before; 1314 source hashes
+match. M256 measured IR copies off 2058->1029, on 3087->2058; normalization clone
+unchanged, no universal latency benefit claim. Permanent finite clone-site/frozen
+semantic and isolated real restored-clone mutation assets authored UNRUN. Focused
+sixteen-test and mutation commands in A1_HANDLER_CLONE_REPAIR; final composed now
+includes four A1 protections (expected total65). No new production or budget edits
+since After GREEN; acceptance remains pending, no protected disposition yet.
+
+
+A1 focused and isolated mutation verified: focused-20261106-095253 sixteen passes,
+clean lint/format/size/encoding and 1317 matching hashes. Real restored handler clone
+causes intended budget/static RED while frozen semantics pass; exact restoration
+four passes (mutation-20261106-095605, 2146 inventory hashes match). Active/restored
+handler byte-identical; budget and normalization original bytes unchanged. Final
+mandatory composed gate user-owned pending, expected at least65 passes. No new
+production/test edit or protected disposition in this documentation return.
+
+
+A1 handler-only durable candidate clone CLOSED / FIX / PROTECTED. Final mandatory
+receipt af-perf-001-20261106-102529 verifies 65 passes in17 groups, zero failed/
+ignored and230 matching source hashes. Exact minimal handler diff verified against
+original RED; budget and normalization source bytes unchanged. Focused16, isolated
+real mutation2 intended RED/restored4 GREEN and all11 exact durable/public cases
+retained separately. No production/test edits after final verification; docs only.
+Other A1 ACCEPT/MONITOR copies, A4/broader discovery and9750 syntax records remain
+open independently. No commit/stage/push performed.
+
+
+A4 next default-path packet authored UNRUN, no optimization. Reconciliation batch
+already builds one obligation source-symbol index per partition; single-owner
+compression builds independently. New test-only counters separate owner seed/
+family/base scans, owner-membership vs short-circuit peer terms/bytes and emitted
+path/hash dependencies. Nineteen public fixtures cover F/C, match density, source
+length and ancestry depth; exact dependency ownership/hash and C# call oracles,
+unchanged warm and existing retirement/ambiguity/failure controls included. See
+AF_PERF_002_A4_DEPENDENCY_CHARACTERIZATION.md for the user-owned five-test packet.
+A4 remains MONITOR until executed evidence; no completed/protected scope reopened,
+no new source syntax dispositions or performance-fitness claims.
+
+
+A4 first packet a4-dependency-work-20261106-105146 failed the new test after
+74.43s: its sorted dependency oracle incorrectly required single-owner artifact
+traversal to match batch path ordering. Observed paths/hashes agree; only order
+differs. Comparison now sorts owned test copies while preserving exact records,
+multiplicity and hashes; production is unchanged. Failed evidence retained, no
+GREEN receipt or optimization RED claimed. Remaining tests/lint/encoding did not
+execute. Same user-owned wrapper rerun required; no agent runtime started.
+
+A4 bounded characterization GREEN: a4-dependency-work-20261106-131054, five
+tracked passes,57 operation rows, all1318 source hashes match; warning-fatal
+Clippy/format/size/encoding pass. Batch family scans show C*C on no-ancestry
+fixtures; F2/C256 records65536 family predicate visits. Existing once-built
+partition index and zero selected warm work accepted for measured paths; repeated
+family/seed/base and conservative peer-text scaling MONITOR. No repair proposed,
+no production optimization or source census disposition added. Exact dependency
+record/hash, C# call, reuse/removal/ambiguity/failure controls remain GREEN. See A4
+report for independent dimensions, ownership/currentness limits and frozen failed
+ordering-oracle history. Protected and closed scopes remain unchanged.
+A4 revised owner directive supersedes passive MONITOR for repeated original-input
+retrieval. Source-symbol index retains sorted declaration parts but omits original
+Scope/attribute/method inputs; direct getter reuse cannot preserve the old scan.
+FIX PROPOSED: private call-local borrowed exact-key family vectors and file seed
+sets populated alongside the existing one-time index build. Filter-subsequence
+proof preserves occurrence order, duplicates, first exact base match and refusal;
+recursion/currentness/peer matching unchanged. Construction/reference/container
+costs and required original RED, semantic differential, static/mutation/focused/
+composed gates detailed in AF_PERF_002_A4_SCAN_CORRECTION_PROPOSAL.md. Await owner
+authorization of concrete correction; no production edit or runtime started.
+A4 implementation approved. Original retrieval remains unchanged pending genuine
+RED. Authored frozen original-algorithm oracle,13 semantic families and10 complete
+construction-budget cases plus actual19-fixture public budget. Before wrapper
+requires one semantic pass and two intended budget failures with all10/57 rows;
+compile/oracle failures invalid RED. Setup/comparison/retained-reference counters
+reserved separately. Family Vec duplicates/order and path-sensitive recursion
+explicitly protected. User command: run-a4-lookup-budget.ps1 -Phase Before.
+Assets UNRUN; no agent test/build/lint/runtime. No protected scope reopened.
+A4 Before attempt a4-lookup-before-20261106-134716 invalid RED: compilation
+E0433 from the frozen test algorithm's relocated relative enum path. Corrected
+only the test's CSharpTypeIdentityOrigin qualification to the absolute crate path;
+production retrieval and all assertions unchanged. No semantic or budget execution
+occurred. Frozen failed evidence retained; same Before command rerun required.
+A4 genuine RED verified: a4-lookup-before-20261106-135919, frozen equivalence1pass,
+construction/public2 intended failures only after all10/57 rows;1320 hashes match
+before edit. Approved private borrowed lookup now implemented alongside existing
+index-build traversal, preserving family Vec duplicates/order and exact base
+contains predicate; seed retrieval direct, recursion/cycle and authority unchanged.
+Actual BTree comparisons/setup/reference/container observations included. Budget,
+frozen oracle and public test bytes unchanged. After driver UNRUN; user command
+run-a4-lookup-budget.ps1 -Phase After. Static/mutation/focused/composed acceptance
+still pending. No agent runtime, other production scope or protected repair changed.
+A4 After attempt a4-lookup-after-20261106-141549 stops at compile: private seeds
+opaque iterator capture and family slice lifetimes were underspecified. Corrected
+only signatures to express shorter receiver/query reborrows; storage, ordering,
+exact predicates, ownership and assertions unchanged. No semantic or budget test
+executed; not GREEN or semantic failure evidence. Same After command rerun needed.
+A4 After verified: a4-lookup-after-20261106-142530, three tracked passes,
+1321 source hashes match, all10 construction/57 public rows complete. C256 distinct
+family/seed65536/4096 ->0/0, but setup256,8006 key comparisons and256 matching
+visits explicitly measured. C64 slower single sample retained honestly; paired
+observer-disabled cost test authored for acceptance. New finite static and three
+independent isolated production scan-restoration variants authored UNRUN. Focused
+expects9passes+lint/format/size/encoding; mutation6intended RED/3semantic GREEN/
+restored5GREEN. Mandatory composition adds5A4 controls (at least70total). Run
+run-a4-lookup-focused.ps1 then run-a4-lookup-mutation.ps1 sequentially. No agent
+runtime or further production algorithm change. FIX / PROTECTED still pending.
+A4 focused-20261106-143527: unit/public GREEN and paired cost GREEN, static test
+failed on unclassified existing iterator-chain call nodes. Classified only exact
+iter/copied/find chain and added reverse-order self-mutation rejection; production
+unchanged. Eight paired medians favor repair, including C64 distinct1.1252ms vs
+0.9625ms, but no public speedup claim. Remaining lifecycle/lint/encoding not reached;
+no successful focused receipt. Isolated143850 incomplete at inspection, old static
+snapshot not acceptance. Corrected focused runs static first; rerun it, then mutation
+only after focused GREEN. No agent runtime or original budget/oracle edits.
+A4 focused144408 passes9tracked tests but Clippy rejects duplicate oracle-module
+loading. Acceptance now imports the one frozen oracle; budget file changes only
+mod original -> pub(super) mod original, verified exactly; all assertions/fixtures
+and oracle bytes unchanged. No lint suppression. Mutation145105 clean static passes
+but isolated seed fails private-field initialization compile, invalid RED; constructor
+moved inside isolated helper impl only. Production unchanged. Rerun focused then
+mutation; focused now Clippy-first. No complete receipts/final acceptance yet.
+A4 focused150155 verified9tracked passes; Clippy38.43s, format/size54/encoding2150
+GREEN,1324 receipt hashes match. Paired construction cost medians favor repair in
+all8bounded fixtures; no public latency/allocator claim. Mutation150830 independently
+restores3real scans:6intended budget/static RED,3frozen semantic GREEN; exact
+restored5GREEN. All2157inventory hashes match and both active/restored production
+files byte-identical. No code/test changes after acceptance. Final mandatory
+check-semantic-work-fitness.ps1 now user-owned pending, expected at least70passes.
+Final bounded FIX / PROTECTED awaits composed/source verification; prior protected
+scopes and syntax census unchanged. No agent runtime or commit/push performed.
+A4 three original-input retrievals CLOSED / FIX / PROTECTED. Final mandatory
+receipt af-perf-001-20261106-152751 verifies70passes/20groups/zero failed or ignored,
+236 matching hashes. Both production hashes match focused/restored-mutation bytes.
+Original2budget RED, frozen semantic/work GREEN, focused9plus all checks and real
+3independent mutation6RED/3semantic GREEN/restored5GREEN retained separately.
+C256 distinct removes4096seed/65536family full-input predicates while measuring
+256setup/768insertion attempts/8006key comparisons/256matching visits. No public
+latency/allocator-total claim. Peer/recursion/currentness and all other protected
+scopes unchanged. No code/test changes after acceptance, no stage/commit/push.
+Census13/9763 scoped,9750unresolved plus96supplements remains unchanged.
