@@ -77,6 +77,11 @@ pub fn build_snapshot(
     source: &str,
     _fidelity: Fidelity,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| {
+        c.diff.snapshot_builds += 1;
+        c.diff.snapshot_source_bytes += source.len();
+    });
     // G2-1/G2-4: always extract at Medium so the snapshot is
     // fidelity-stable regardless of the caller's requested level.
     // Medium is the only level where `extract_field` calls
@@ -198,6 +203,8 @@ fn try_build_with(
     fidelity: Fidelity,
     parser_label: &str,
 ) -> Result<CapturedStructure, Box<dyn std::error::Error>> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.diff.parser_attempts += 1);
     // Run the SHARED capture pipeline. The closure maps each
     // (capture_name, raw_text) pair to the normalised text the diff
     // path wants stored in the resulting CapEntry. F-08: pass the

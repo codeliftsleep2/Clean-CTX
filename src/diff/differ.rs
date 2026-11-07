@@ -14,6 +14,8 @@ pub fn diff_snapshots(
     baseline: &CapturedStructure,
     current: &CapturedStructure,
 ) -> Vec<DiffAction> {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.diff.comparisons += 1);
     let mut actions: Vec<DiffAction> = Vec::new();
 
     // ---- Imports ---------------------------------------------------------
@@ -186,6 +188,11 @@ fn diff_orphan_fields(baseline: &[String], current: &[String], actions: &mut Vec
 /// G2-2 audit: extracted from `diff_class` so top-level functions reuse
 /// the same grouping logic.
 fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut Vec<DiffAction>) {
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| {
+        c.diff.group_records[0] += base.len();
+        c.diff.group_records[1] += cur.len();
+    });
     let bg = group_by_key(base, |m| method_key(&m.sig));
     let cg = group_by_key(cur, |m| method_key(&m.sig));
     let mut keys: BTreeSet<String> = bg.keys().cloned().collect();
@@ -210,10 +217,17 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                 // First preserve exact declarations regardless of overload
                 // insertion or ordering. Name-group index is not identity.
                 for (base_idx, base_method) in g1.iter().enumerate() {
-                    if let Some((cur_idx, current_method)) = g2
-                        .iter()
-                        .enumerate()
-                        .find(|(idx, method)| !cur_used[*idx] && *method == base_method)
+                    if let Some((cur_idx, current_method)) =
+                        g2.iter().enumerate().find(|(idx, method)| {
+                            #[cfg(test)]
+                            crate::work_observations_af_perf_002::update(|c| {
+                                c.diff.exact_candidate_visits += 1;
+                                if !cur_used[*idx] {
+                                    c.diff.exact_equalities += 1;
+                                }
+                            });
+                            !cur_used[*idx] && *method == base_method
+                        })
                     {
                         base_used[base_idx] = true;
                         cur_used[cur_idx] = true;
@@ -233,10 +247,17 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                     if base_used[base_idx] {
                         continue;
                     }
-                    if let Some((cur_idx, current_method)) = g2
-                        .iter()
-                        .enumerate()
-                        .find(|(idx, method)| !cur_used[*idx] && method.sig == base_method.sig)
+                    if let Some((cur_idx, current_method)) =
+                        g2.iter().enumerate().find(|(idx, method)| {
+                            #[cfg(test)]
+                            crate::work_observations_af_perf_002::update(|c| {
+                                c.diff.signature_candidate_visits += 1;
+                                if !cur_used[*idx] {
+                                    c.diff.signature_equalities += 1;
+                                }
+                            });
+                            !cur_used[*idx] && method.sig == base_method.sig
+                        })
                     {
                         base_used[base_idx] = true;
                         cur_used[cur_idx] = true;

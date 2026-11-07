@@ -6,6 +6,7 @@ pub(crate) struct Counts {
     pub publication_sinks: std::collections::BTreeMap<&'static str, [usize; 3]>,
     pub a4: DependencyWork,
     pub edit: EditWork,
+    pub diff: DiffWork,
     pub witnesses: usize,
     pub stats_initial_text_renders: usize,
     pub stats_initial_text_input_files: usize,
@@ -289,4 +290,68 @@ pub(crate) struct EditWork {
     pub resolution_calls: usize,
     pub bare_unit_predicates: usize,
     pub uneditable_predicates: usize,
+}
+
+/// Snapshot-copy sites: [byte-identical shortcut, changed-source comparison].
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct DiffWork {
+    pub snapshot_builds: usize,
+    pub snapshot_source_bytes: usize,
+    pub parser_attempts: usize,
+    pub comparisons: usize,
+    pub group_records: [usize; 2],
+    pub exact_candidate_visits: usize,
+    pub exact_equalities: usize,
+    pub signature_candidate_visits: usize,
+    pub signature_equalities: usize,
+    pub snapshot_clones: [usize; 2],
+    pub cloned_records: [[usize; 4]; 2],
+    pub cloned_string_bytes: [usize; 2],
+}
+pub(crate) fn diff_snapshot_copy(site: usize, snapshot: &crate::diff::CapturedStructure) {
+    let mut objects = [
+        snapshot.classes.len(),
+        snapshot.orphan_methods.len(),
+        snapshot.orphan_fields.len(),
+        snapshot.imports.len(),
+    ];
+    let mut bytes = snapshot
+        .imports
+        .iter()
+        .chain(&snapshot.orphan_fields)
+        .map(String::len)
+        .sum::<usize>();
+    for class in &snapshot.classes {
+        objects[1] += class.methods.len();
+        objects[2] += class.fields.len();
+        bytes += class.name.len()
+            + class.class_meta.len()
+            + class.fields.iter().map(String::len).sum::<usize>();
+    }
+    for method in snapshot
+        .classes
+        .iter()
+        .flat_map(|c| &c.methods)
+        .chain(&snapshot.orphan_methods)
+    {
+        bytes += method.sig.len()
+            + method.markers.iter().map(String::len).sum::<usize>()
+            + method.body.as_ref().map_or(0, String::len);
+        if let Some(declaration) = &method.declaration {
+            bytes += declaration.return_type.len()
+                + declaration
+                    .attributes
+                    .iter()
+                    .chain(&declaration.modifiers)
+                    .map(String::len)
+                    .sum::<usize>();
+        }
+    }
+    update(|c| {
+        c.diff.snapshot_clones[site] += 1;
+        for (i, count) in objects.into_iter().enumerate() {
+            c.diff.cloned_records[site][i] += count;
+        }
+        c.diff.cloned_string_bytes[site] += bytes;
+    });
 }

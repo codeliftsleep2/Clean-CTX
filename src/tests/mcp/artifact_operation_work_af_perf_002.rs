@@ -186,3 +186,6 @@ mod dependency_footprint;
 
 #[path = "edit_relocation_work_af_perf_002.rs"]
 mod edit_relocation_work;
+
+#[path = "diff_work_af_perf_002.rs"]
+mod diff_work;

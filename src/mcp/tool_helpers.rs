@@ -424,7 +424,7 @@ pub(crate) fn diff_code_context_handler(
     let source_hash = cache.compute_hash(source.as_bytes());
     if let Some(stored_hash) = cache.get_baseline_hash(&cache_key)
         && stored_hash == source_hash
-        && let Some(baseline_snap) = cache.get_baseline(&cache_key).cloned()
+        && let Some(baseline_snap) = cache.get_baseline(&cache_key)
     {
         // Content is byte-identical to the stored baseline — no
         // structural changes possible.
@@ -437,7 +437,13 @@ pub(crate) fn diff_code_context_handler(
     }
     let current = build_snapshot(source, fidelity)?;
 
-    let baseline = cache.get_baseline(&cache_key).cloned();
+    let baseline = cache
+        .get_baseline(&cache_key)
+        .inspect(|_snapshot| {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::diff_snapshot_copy(1, _snapshot);
+        })
+        .cloned();
     let body = match baseline {
         None => {
             let class_count = current.classes.len();
