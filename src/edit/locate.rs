@@ -15,6 +15,18 @@ use tree_sitter::{Language, Parser, Query, QueryCursor};
 
 use crate::ir::opcodes::CoreOp;
 
+#[path = "locate/end_join.rs"]
+mod end_join;
+use end_join::EndJoin;
+
+#[cfg(test)]
+#[path = "../tests/edit/exact_end_budget_af_perf_002.rs"]
+mod exact_end_tests;
+
+#[cfg(test)]
+#[path = "../tests/edit/exact_end_acceptance_af_perf_002.rs"]
+mod exact_end_acceptance;
+
 /// One splice-addressable structural unit derived from compiled IR.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnitRecord {
@@ -122,6 +134,8 @@ impl UnitTable {
     /// bodies (legacy wire state) are skipped by design so the write path
     /// can never splice against unknown offsets.
     pub fn from_instructions(instructions: &[CoreOp]) -> Self {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.edit.table_builds += 1);
         let mut classes: HashMap<String, String> = HashMap::new();
         let mut order: Vec<PendingMeta> = Vec::new();
         let mut index_of_mid: HashMap<String, usize> = HashMap::new();
@@ -135,6 +149,8 @@ impl UnitTable {
         // Pass 1: collect structure in instruction order (preserves the
         // compiler's emission ordering).
         for op in instructions {
+            #[cfg(test)]
+            crate::work_observations_af_perf_002::update(|c| c.edit.instruction_visits += 1);
             match op {
                 CoreOp::DefClass(id, name) => {
                     classes.entry(id.clone()).or_insert_with(|| name.clone());
@@ -258,6 +274,11 @@ impl UnitTable {
         query: &str,
     ) -> Result<Self, Box<dyn std::error::Error>> {
         let mut table = Self::from_instructions(instructions);
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| {
+            c.edit.declaration_parses += 1;
+            c.edit.source_bytes += source.len();
+        });
         let mut parser = Parser::new();
         parser.set_language(&language)?;
         let tree = parser.parse(source, None).ok_or("AST generation failed")?;
@@ -308,13 +329,16 @@ impl UnitTable {
         collect_test_callbacks(tree.root_node(), source, &mut syntax_declarations);
         syntax_declarations.sort();
         syntax_declarations.dedup();
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| {
+            c.edit.editable_units += table.units.len();
+            c.edit.declaration_captures += declarations.len();
+            c.edit.syntax_declarations += syntax_declarations.len();
+        });
 
+        let end_join = EndJoin::new(declarations, &table.units);
         for unit in &mut table.units {
-            let declaration = declarations
-                .iter()
-                .copied()
-                .filter(|(start, end, _)| *start <= unit.start_byte && *end == unit.end_byte)
-                .min_by_key(|(start, end, _)| end - start);
+            let declaration = end_join.declaration(unit);
             unit.declaration_span = declaration
                 .and_then(|(start, end, insertion_start)| insertion_start.map(|_| (start, end)));
             unit.insert_before_byte = declaration.and_then(|(_, _, start)| start);
@@ -331,10 +355,7 @@ impl UnitTable {
             // when a whole-declaration operation lacks comment ownership.
             // Resolution selects the unit; the requested operation then
             // reports its specific missing boundary as uneditable.
-            let editable = table
-                .units
-                .iter()
-                .any(|unit| unit.end_byte == end && unit.start_byte >= start);
+            let editable = end_join.editable(start, end);
             if !editable {
                 table.uneditable.push(UneditableRecord {
                     selector,
@@ -366,6 +387,8 @@ impl UnitTable {
     /// 3. Qualified name (`"UserService.processOrder"`) when unique
     /// 4. Bare name (`"processOrder"`) when unique.
     pub fn resolve(&self, target: &str) -> Result<&UnitRecord, LocateError> {
+        #[cfg(test)]
+        crate::work_observations_af_perf_002::update(|c| c.edit.resolution_calls += 1);
         if let Some(&idx) = self.by_method_id.get(target) {
             return Ok(&self.units[idx]);
         }
@@ -377,6 +400,10 @@ impl UnitTable {
                 .iter()
                 .enumerate()
                 .filter_map(|(index, unit)| {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::update(|c| {
+                        c.edit.bare_unit_predicates += 1
+                    });
                     (unit.name == target || method_base_name(&unit.name) == target).then_some(index)
                 })
                 .collect()
@@ -384,7 +411,11 @@ impl UnitTable {
         let uneditable: Vec<&UneditableRecord> = self
             .uneditable
             .iter()
-            .filter(|record| record.selector == target || record.name == target)
+            .filter(|record| {
+                #[cfg(test)]
+                crate::work_observations_af_perf_002::update(|c| c.edit.uneditable_predicates += 1);
+                record.selector == target || record.name == target
+            })
             .collect();
         match (editable.as_slice(), uneditable.as_slice()) {
             ([index], []) => Ok(&self.units[*index]),

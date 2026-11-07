@@ -187,6 +187,8 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         .extension()
         .and_then(|e| e.to_str())
         .unwrap_or("");
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.edit.candidate_compile_attempts[0] += 1);
     let pre_compiled = match compile_source_ir_candidate(
         &resolved_path,
         source,
@@ -230,6 +232,8 @@ pub(crate) fn handle_apply_edit(id: &Value, params: &Value, state: &McpState) {
         return err_response(id, -32602, e.to_string(), Some(e.structured()));
     }
 
+    #[cfg(test)]
+    crate::work_observations_af_perf_002::update(|c| c.edit.candidate_compile_attempts[1] += 1);
     let ((mut target_ir, semantic_edges, semantic_dependencies, new_hash), authority) =
         match compile_source_ir_candidate(
             &resolved_path,

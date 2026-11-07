@@ -5,6 +5,7 @@ pub(crate) struct Counts {
     pub publication_copies: std::collections::BTreeMap<&'static str, PublicationCopy>,
     pub publication_sinks: std::collections::BTreeMap<&'static str, [usize; 3]>,
     pub a4: DependencyWork,
+    pub edit: EditWork,
     pub witnesses: usize,
     pub stats_initial_text_renders: usize,
     pub stats_initial_text_input_files: usize,
@@ -261,4 +262,31 @@ pub(crate) struct DependencyWork {
     pub base_find_visits: usize,
     pub returned_terms: usize,
     pub returned_requirements: usize,
+}
+
+/// Actual apply_edit relocation work; logical predicates, not allocator/CPU bytes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct EditWork {
+    pub end_setup_declarations: usize,
+    pub end_setup_units: usize,
+    pub end_key_comparisons: usize,
+    pub end_attachment_lookups: usize,
+    pub end_editability_lookups: usize,
+    pub end_same_end_candidates: usize,
+    pub end_buckets: usize,
+    pub end_retained_declarations: usize,
+    pub end_declaration_capacity: usize,
+    pub candidate_compile_attempts: [usize; 2],
+    pub instruction_visits: usize,
+    pub table_builds: usize,
+    pub declaration_parses: usize,
+    pub source_bytes: usize,
+    pub editable_units: usize,
+    pub declaration_captures: usize,
+    pub syntax_declarations: usize,
+    pub attachment_predicates: usize,
+    pub editable_predicates: usize,
+    pub resolution_calls: usize,
+    pub bare_unit_predicates: usize,
+    pub uneditable_predicates: usize,
 }

@@ -589,3 +589,27 @@ production mutations RED/exact restored GREEN, focused9plus checks and final
 comparisons/reference capacities measured; no public latency/allocator claim.
 Peer matching, broader A4 paths/concurrency and source census remain separate.
 No additional frozen syntax disposition follows from57operation rows or this fix.
+Default structural edit relocation now source-traced, characterization authored
+UNRUN: registered apply_edit uses UnitTable declaration attachment and syntax-to-
+editable joins before staged durable commit. Actual U/D/S/Q work and ownership/
+currentness observations scoped in AF_PERF_002_EDIT_RELOCATION_DISCOVERY.md.
+No optimization or syntax disposition yet; A4 original retrieval remains closed.
+Edit relocation characterization GREEN: edit-relocation-work-20261106-154640,
+16tracked tests,15public rows,1323matching source hashes; all focused checks pass.
+U256 single edit performs65536attachment and33152editability predicates. Field
+population independently grows failed membership scans; Q changes resolution not
+table count. Exact byte/span/durable/live and refusal/failure controls GREEN.
+FIX PROPOSED: one call-local exact-end bucket map preserving ordered duplicate
+captures plus maximum body start for exact existential editability. Construction,
+small/same-end density costs and original RED/frozen oracle remain required before
+production edit. No optimization applied or latency/allocator benefit claimed.
+A4 stays closed; no reconfirmation runtime, source syntax disposition or commit.
+Structural edit exact-end joins CLOSED / FIX / PROTECTED. Final composed receipt
+af-perf-001-20261106-170706:75tracked passes/22groups/zero failed or ignored,
+242recorded hashes match; both production identities unchanged from focused and
+restored mutation. Original RED, exact frozen/public semantic/work GREEN, focused29,
+real independent mutation4RED/2semantic passes/restored5GREEN, corrected paired-cost
+review all retained separately. U256 eliminates65536/33152old predicates with full
+setup/comparison/capacity accounting. No public latency/allocator claim. No code/test
+change after acceptance, no new execution to reconfirm, no agent stage/commit/push.
+Other edit paths and syntax census13/9763 scoped,9750unresolved remain independent.

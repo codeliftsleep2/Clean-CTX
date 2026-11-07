@@ -819,3 +819,74 @@ C256 distinct removes4096seed/65536family full-input predicates while measuring
 latency/allocator-total claim. Peer/recursion/currentness and all other protected
 scopes unchanged. No code/test changes after acceptance, no stage/commit/push.
 Census13/9763 scoped,9750unresolved plus96supplements remains unchanged.
+Next consequential default path: public apply_edit relocation. Source trace finds
+U*D whole declaration attachment and up-to-S*U editability search; identity/shortest
+capture/duplicates/comment ownership and ambiguity must survive any correction.
+No optimization applied. Test-only actual-boundary observations and new public
+12success/3refusal fixture packet authored UNRUN, including real durable/live byte/
+version/span checks and existing stale/candidate/durable failure controls. User
+command run-af-perf-002-edit-relocation-work.ps1. A4 stays closed/protected, no
+reconfirmation tests. Replay/no-repair and all prior scopes preserved. Census unchanged.
+Edit relocation characterization GREEN: edit-relocation-work-20261106-154640,
+16tracked tests,15public rows,1323matching source hashes; all focused checks pass.
+U256 single edit performs65536attachment and33152editability predicates. Field
+population independently grows failed membership scans; Q changes resolution not
+table count. Exact byte/span/durable/live and refusal/failure controls GREEN.
+FIX PROPOSED: one call-local exact-end bucket map preserving ordered duplicate
+captures plus maximum body start for exact existential editability. Construction,
+small/same-end density costs and original RED/frozen oracle remain required before
+production edit. No optimization applied or latency/allocator benefit claimed.
+A4 stays closed; no reconfirmation runtime, source syntax disposition or commit.
+Owner approves exact-end edit joins only. Original joins remain unchanged. Frozen
+complete locate algorithm, tracked real-source/table/refusal differential control,
+and independent public budget across all12growth rows authored UNRUN. Replacement
+setup/comparison/lookup/capacity fields reserved separately. Current characterization
+shape assertion removed before RED; all semantic checks retained and frozen original
+evidence preserved. User command run-edit-end-budget.ps1 -Phase Before expects
+1semantic PASS/1intended budget FAIL, complete12rows. Compile/oracle failures invalid.
+No production repair before genuine RED; no agent runtime. See EDIT_EXACT_END_REPAIR.
+Edit exact-end genuine original RED verified: edit-end-before-20261106-160342,
+full-table frozen equivalence PASS8.87s; all12public semantic rows complete then
+intended132264join-predicate budget FAIL53.74s,1325hashes match before editing.
+Approved local EndJoin implemented, consuming ordered duplicate capture tuples and
+summarizing maximum body start per exact end. Original start/end/min selection,
+parse/source/transaction boundaries unchanged. Setup/comparison/capacity observations
+included. All3baseline test/oracle files unchanged. User-owned After UNRUN:
+run-edit-end-budget.ps1 -Phase After expects2passes; permanent/raw dense-end/static/
+mutation/focused/composed acceptance remains pending. No agent runtime or commit.
+Edit exact-end After160829 verified2tracked passes, all12public rows,1326matching
+hashes. Oldpredicates0; U256 setup256/256,11776comparisons,256/257lookups,256same-end
+candidates,256buckets/1024tuple capacity. Slower public samples retained; no latency
+benefit claimed. Raw tie/metadata/empty/order/dense-end, paired complete local-kernel
+cost, finite static and2independent real join-restoration drivers authored UNRUN.
+Focused29plus all checks, then mutation4intended RED/2semantic passes/restored5GREEN.
+Mandatory composition adds5edit controls (at least75total), final execution later.
+Original3budget/oracle sources unchanged; production algorithm unchanged afterAfter,
+test registration/docs/assets only. No agent runtime or commit/push; A4 closed.
+Edit exact-end focused162628 verified29passes and all checks,1329hashes match at
+inspection. Mutation163103 four intended actual-join budget/static RED,2frozen
+semantic GREEN, exact restored5GREEN;2168hashes match and both production files
+active/restored identical. Dense-end timing review found test asymmetry: repaired
+candidate probes still check disabled observer flag while copied original omitted
+original production probes. Corrected only acceptance-reference diagnostic sites,
+not predicates/production/budgets. Narrow run-edit-end-cost-review.ps1 now UNRUN,
+1cost/semantic test8rows plus checks. No repeat29tests/mutations needed for diagnostic
+change. Final tradeoff disposition/composed gate pending comparable costs; no FIX /
+PROTECTED claim. No adaptive path, production change, runtime or commit/push.
+Edit exact-end cost-review165841 verified1tracked test8dimensions plus all checks,
+1328hashes match. Matched observer-site debug medians old/new ns: D0 300/500,
+D1 1500/4500,D8 5300/12900,D64 224600/129400,D256 3424300/633300;
+dense64 327400/312600,dense256 5690300/5209600. Tiny0.2-7.6us overhead accepted
+within owner scope; no consequential construction regression shown. No public/
+allocator speedup claim. Production unchanged, prior29focused/mutation evidence
+retained; no redundant reruns. Final user-owned check-semantic-work-fitness.ps1
+pending, expected at least75passes. FIX / PROTECTED only after composed/hash GREEN.
+Structural edit exact-end joins CLOSED / FIX / PROTECTED. Final composed receipt
+af-perf-001-20261106-170706:75tracked passes/22groups/zero failed or ignored,
+242recorded hashes match; both production identities unchanged from focused and
+restored mutation. Original RED, exact frozen/public semantic/work GREEN, focused29,
+real independent mutation4RED/2semantic passes/restored5GREEN, corrected paired-cost
+review all retained separately. U256 eliminates65536/33152old predicates with full
+setup/comparison/capacity accounting. No public latency/allocator claim. No code/test
+change after acceptance, no new execution to reconfirm, no agent stage/commit/push.
+Other edit paths and syntax census13/9763 scoped,9750unresolved remain independent.
