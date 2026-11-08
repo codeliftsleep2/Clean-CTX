@@ -23,6 +23,7 @@ mod csharp_evidence;
 pub(crate) mod differ;
 pub(crate) mod formatter;
 pub(crate) mod keys;
+mod overload_lookup;
 pub(crate) mod snapshot;
 
 pub use action::{DiffAction, DiffKind, DiffTarget};

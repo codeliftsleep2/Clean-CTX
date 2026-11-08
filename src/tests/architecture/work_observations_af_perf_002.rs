@@ -7,6 +7,7 @@ pub(crate) struct Counts {
     pub a4: DependencyWork,
     pub edit: EditWork,
     pub diff: DiffWork,
+    pub overload: OverloadWork,
     pub witnesses: usize,
     pub stats_initial_text_renders: usize,
     pub stats_initial_text_input_files: usize,
@@ -307,6 +308,40 @@ pub(crate) struct DiffWork {
     pub snapshot_clones: [usize; 2],
     pub cloned_records: [[usize; 4]; 2],
     pub cloned_string_bytes: [usize; 2],
+}
+
+/// Operation-local matcher accounting, separate from original scan predicates.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+pub(crate) struct OverloadWork {
+    pub pairs: Vec<(String, usize, usize, usize)>,
+    pub projections: usize,
+    pub entries: [usize; 2],
+    pub lookups: [usize; 2],
+    pub key_comparisons: [usize; 2],
+    pub string_comparisons: usize,
+    pub sequence_comparisons: usize,
+    pub string_bytes_offered: usize,
+    pub discrimination_comparisons: usize,
+    pub payload_comparisons: usize,
+    pub full_equalities: usize,
+    pub payload_bytes_offered: usize,
+    pub discrimination_bytes_offered: usize,
+    pub hash_input_bytes: usize,
+    pub selection_visits: usize,
+    pub hash_table_capacity: usize,
+    pub pushes: [usize; 2],
+    pub pops: [usize; 2],
+    pub used_flag_visits: usize,
+    pub retained_keys: [usize; 2],
+    pub retained_queues: [usize; 2],
+    pub queue_capacity: [usize; 2],
+}
+pub(crate) fn overload_pair(key: &str, phase: usize, baseline: usize, current: usize) {
+    update(|c| {
+        c.overload
+            .pairs
+            .push((key.to_string(), phase, baseline, current))
+    });
 }
 pub(crate) fn diff_snapshot_copy(site: usize, snapshot: &crate::diff::CapturedStructure) {
     let mut objects = [

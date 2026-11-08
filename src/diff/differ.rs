@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::action::{DiffAction, DiffKind, DiffTarget};
 use super::keys::{field_key, group_by_key, group_strings_by_key, method_key, summarize_class};
+use super::overload_lookup::MethodLookup;
 use super::snapshot::{CapturedClass, CapturedMethod, CapturedStructure};
 
 /// Compute the AST-level diff between two snapshots.
@@ -214,21 +215,17 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                 let mut base_used = vec![false; g1.len()];
                 let mut cur_used = vec![false; g2.len()];
 
+                let mut lookup = MethodLookup::new(g2);
+
                 // First preserve exact declarations regardless of overload
                 // insertion or ordering. Name-group index is not identity.
                 for (base_idx, base_method) in g1.iter().enumerate() {
-                    if let Some((cur_idx, current_method)) =
-                        g2.iter().enumerate().find(|(idx, method)| {
-                            #[cfg(test)]
-                            crate::work_observations_af_perf_002::update(|c| {
-                                c.diff.exact_candidate_visits += 1;
-                                if !cur_used[*idx] {
-                                    c.diff.exact_equalities += 1;
-                                }
-                            });
-                            !cur_used[*idx] && *method == base_method
-                        })
-                    {
+                    if let Some(cur_idx) = lookup.exact(base_method, &cur_used) {
+                        let current_method = g2[cur_idx];
+                        #[cfg(test)]
+                        crate::work_observations_af_perf_002::overload_pair(
+                            &key, 0, base_idx, cur_idx,
+                        );
                         base_used[base_idx] = true;
                         cur_used[cur_idx] = true;
                         actions.push(method_action(
@@ -241,29 +238,27 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                     }
                 }
 
+                // Complete global exact phase before any signature consumption.
+
                 // A stable visible signature independently proves continuity
                 // for body, marker, and producer-evidence changes.
                 for (base_idx, base_method) in g1.iter().enumerate() {
                     if base_used[base_idx] {
                         continue;
                     }
-                    if let Some((cur_idx, current_method)) =
-                        g2.iter().enumerate().find(|(idx, method)| {
-                            #[cfg(test)]
-                            crate::work_observations_af_perf_002::update(|c| {
-                                c.diff.signature_candidate_visits += 1;
-                                if !cur_used[*idx] {
-                                    c.diff.signature_equalities += 1;
-                                }
-                            });
-                            !cur_used[*idx] && method.sig == base_method.sig
-                        })
-                    {
+                    if let Some(cur_idx) = lookup.signature(&base_method.sig, &cur_used) {
+                        let current_method = g2[cur_idx];
+                        #[cfg(test)]
+                        crate::work_observations_af_perf_002::overload_pair(
+                            &key, 1, base_idx, cur_idx,
+                        );
                         base_used[base_idx] = true;
                         cur_used[cur_idx] = true;
                         push_method_comparison(actions, &key, base_method, current_method);
                     }
                 }
+
+                drop(lookup);
 
                 let remaining_base: Vec<usize> = base_used
                     .iter()
@@ -282,6 +277,10 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                 if let ([base_idx], [cur_idx]) =
                     (remaining_base.as_slice(), remaining_cur.as_slice())
                 {
+                    #[cfg(test)]
+                    crate::work_observations_af_perf_002::overload_pair(
+                        &key, 2, *base_idx, *cur_idx,
+                    );
                     base_used[*base_idx] = true;
                     cur_used[*cur_idx] = true;
                     push_method_comparison(actions, &key, g1[*base_idx], g2[*cur_idx]);
@@ -434,3 +433,15 @@ fn diff_class(baseline: &CapturedClass, current: &CapturedClass) -> Vec<DiffActi
 #[cfg(test)]
 #[path = "../tests/diff/differ.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/diff/overload_equivalence_af_perf_002.rs"]
+pub(crate) mod overload_equivalence;
+
+#[cfg(test)]
+#[path = "../tests/diff/overload_cost_static_af_perf_002.rs"]
+mod overload_acceptance;
+
+#[cfg(test)]
+#[path = "../tests/diff/overload_alternatives_af_perf_002.rs"]
+pub(crate) mod overload_alternatives;

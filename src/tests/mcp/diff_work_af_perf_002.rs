@@ -11,6 +11,9 @@ mod shortcut_budget;
 #[path = "diff_shortcut_protection_af_perf_002.rs"]
 mod shortcut_protection;
 
+#[path = "overload_budget_af_perf_002.rs"]
+mod overload_budget;
+
 fn dispatch(state: &McpState, file: &str, root: &tempfile::TempDir) -> Value {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(
