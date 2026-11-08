@@ -890,3 +890,68 @@ review all retained separately. U256 eliminates65536/33152old predicates with fu
 setup/comparison/capacity accounting. No public latency/allocator claim. No code/test
 change after acceptance, no new execution to reconfirm, no agent stage/commit/push.
 Other edit paths and syntax census13/9763 scoped,9750unresolved remain independent.
+
+## Broad default-operation discovery resumed after overload closure
+
+Owner accepts bounded overload retrieval CLOSED / FIX / PROTECTED; final evidence
+is in AF_PERF_002_OVERLOAD_REPAIR.md (84 composed passes/29 groups, 285 matching
+hashes). Dense same-signature equality is explicitly deferred. No closed repair
+is reopened, tuned or revalidated by this return.
+
+AF_PERF_002_DEFAULT_OPERATION_DISCOVERY.md traces persisted compression/checkpoint
+encoding and file-scoped context_history. Source candidates: redundant unique-string
+vector clone, rebuilt reverse-string lookup, and unused owned pretty_text retrieval
+in metadata reads. Two public characterization tests plus three existing controls
+are authored UNRUN; 46 expected operation intervals distinguish real compiled
+checkpoint paths from directly seeded committed metadata rows. No measured ranking,
+optimization RED, implementation acceptance, allocation or latency benefit claimed.
+One provisional next slice is encoder vector borrowing only, subject to measured
+return and owner review. No composed gate or runtime started by the agent.
+
+Broad discovery receipt default-operation-discovery-20261108-005910 verified five
+tracked passes/46 operation rows, Clippy/format/size/encoding GREEN and 1361 matching
+source hashes. Encoder clones 394116 logical string bytes per long-body encode;
+metadata history discards394544 bytes in that compiled fixture. Ranked engineering
+priorities: encoder vector clone, redundant reverse map, unused metadata text.
+Only vector borrowing returned FIX PROPOSED for owner authorization; no repair,
+CPU/allocator ranking, optimization RED or composed execution claimed. Detailed
+limits and work tables: AF_PERF_002_DEFAULT_OPERATION_DISCOVERY.md. Dense equality
+deferred, protected identities unchanged; no stage/commit/push.
+## Binary encoder vector clone CLOSED / FIX / PROTECTED
+
+AF_PERF_002_BINARY_CLONE_REPAIR.md records genuine original clone-budget RED,
+exact binary42/public40 GREEN, focused37 passes and checks, isolated real clone
+restoration2 intended RED/2 binary-public GREEN/restored4 GREEN. Final composed
+ af-perf-001-20261108-141819 completes88 passes/33 groups and299 matching hashes
+with explicit preserved-group/source validation after the bounded-output resume.
+Production encoder SHA-256413316666b5bc7fafa455c194ec83fddcaa086fed973c82bc2a338dd7313d4a8
+matches focused/restored acceptance. No source/test edits after acceptance. Logical
+copy elimination is not allocation/latency proof. Next candidate is encoder reverse-map
+reconstruction under separate design; SQLite text and deferred dense equality stay
+independent. All prior repairs protected; no stage/commit/push. Census unchanged.
+## Encoder reverse-map investigation measured; production design proposed
+
+binary-reverse-design-20261108-154747 inspected:2 tracked tests/12 paired cost
+rows, clean Clippy/format/size/encoding and1373 matching source hashes. Both test
+modes preserve actual production bytes,39 public-derived binary payloads and
+first-position/missing-key semantics. Distinct-key cases favor existing-index reuse;
+long duplicates are essentially flat (+0.11% median) with overlapping samples.
+Complete common construction/query/write/drop included; no allocator or production
+latency claim. Recommend only read-only internal StringTable index_of plus local
+encoder reuse, requiring owner approval and independent original reconstruction RED.
+No production implementation or composed rerun. Full evidence/proof/tradeoffs:
+AF_PERF_002_BINARY_REVERSE_DESIGN.md. Vector clone and all earlier repairs protected;
+SQLite unused text separate and next; dense equality deferred. No stage/commit/push.
+## Encoder reverse-map reuse CLOSED / FIX / PROTECTED
+
+Agent MaxHeadRoom inspected final composed af-perf-001-20261108-164840: 92 tracked
+passes/37 groups, 309 matching source hashes. Genuine original reverse-map RED,
+current-byte After, 63 focused passes/12 integrated cost rows and warning-fatal
+checks precede isolated real restoration: two intended budget/static RED, three
+preserved binary/public GREEN and five byte-exact restored GREEN, 2250 matching
+inventory hashes. Final production identities and full evidence/limits are recorded
+in AF_PERF_002_BINARY_REVERSE_REPAIR.md. Existing index reuse removes only redundant
+map setup; necessary common work and vector borrowing stay protected. No allocator,
+release/public latency or universal speedup claim. SQLite unused text remains the
+next independent candidate, not an approved implementation; dense equality deferred.
+No source/test changes after acceptance, no staging/commit/push. Census unchanged.

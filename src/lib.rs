@@ -60,6 +60,30 @@ mod semantic_work_static;
 pub(crate) mod work_observations_af_perf_002;
 
 #[cfg(test)]
+#[path = "tests/architecture/default_operation_observations_af_perf_002.rs"]
+pub(crate) mod default_operation_observations_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/ir/binary_clone_equivalence_af_perf_002.rs"]
+pub(crate) mod binary_clone_equivalence_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/ir/binary_clone_protection_af_perf_002.rs"]
+mod binary_clone_protection_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/ir/binary_reverse_design_af_perf_002.rs"]
+mod binary_reverse_design_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/ir/binary_reverse_equivalence_af_perf_002.rs"]
+mod binary_reverse_equivalence_af_perf_002;
+
+#[cfg(test)]
+#[path = "tests/ir/binary_reverse_integrated_af_perf_002.rs"]
+mod binary_reverse_integrated_af_perf_002;
+
+#[cfg(test)]
 #[path = "tests/workspace/index_complexity_af_perf_002.rs"]
 mod index_complexity_af_perf_002;
 

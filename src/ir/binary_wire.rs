@@ -242,7 +242,7 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
     let mut table = StringTable::from_instructions(&ir.instructions);
     table.intern(&ir.file_id);
     // Map each string to its string-table index for fast lookup
-    let strings: Vec<String> = table.strings().to_vec();
+    let strings = table.strings();
 
     let mut buf = Vec::new();
 
@@ -255,22 +255,17 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
 
     // 3. String table
     write_varint(&mut buf, strings.len() as u64);
-    for s in &strings {
+    for s in strings {
         write_string(&mut buf, s);
-    }
-
-    // Build a lookup: string → table index
-    use std::collections::HashMap;
-    let mut str_to_idx: HashMap<&str, u64> = HashMap::new();
-    for (i, s) in strings.iter().enumerate() {
-        str_to_idx.insert(s.as_str(), i as u64);
     }
 
     // Helper to encode an operand string as its table index varint
     let encode_operand = |buf: &mut Vec<u8>, s: &str| {
-        let idx = str_to_idx
-            .get(s)
-            .copied()
+        #[cfg(test)]
+        crate::default_operation_observations_af_perf_002::binary_lookup(s);
+        let idx = table
+            .index_of(s)
+            .map(|i| i as u64)
             .expect("canonical binary operand missing from string table");
         write_varint(buf, idx);
     };
@@ -471,6 +466,8 @@ pub fn encode(ir: &CompiledIR) -> Vec<u8> {
         }
     }
 
+    #[cfg(test)]
+    crate::default_operation_observations_af_perf_002::binary_output(buf.len(), 0);
     buf
 }
 

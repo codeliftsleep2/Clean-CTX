@@ -60,9 +60,13 @@ impl StringTable {
     /// Iterates all instructions, extracts every string operand, and
     /// builds a deduplicated table ordered by first appearance.
     pub fn from_instructions(instructions: &[CoreOp]) -> Self {
+        #[cfg(test)]
+        crate::default_operation_observations_af_perf_002::table_build();
         let mut table = Self::new();
         for op in instructions {
             let tuple = op_to_tuple(op);
+            #[cfg(test)]
+            crate::default_operation_observations_af_perf_002::tuple(&tuple);
             for s in &tuple {
                 table.intern(s);
             }
@@ -72,12 +76,20 @@ impl StringTable {
 
     /// Intern a string — returns its index, adding it if not present.
     pub fn intern(&mut self, s: &str) -> usize {
+        #[cfg(test)]
+        crate::default_operation_observations_af_perf_002::intern(s);
         if let Some(&idx) = self.indices.get(s) {
             return idx;
         }
         let idx = self.strings.len();
         self.strings.push(s.to_string());
         self.indices.insert(s.to_string(), idx);
+        #[cfg(test)]
+        crate::default_operation_observations_af_perf_002::table_insert(
+            s,
+            self.strings.capacity(),
+            self.indices.capacity(),
+        );
         idx
     }
 
@@ -85,6 +97,11 @@ impl StringTable {
     /// Returns None if the index is out of bounds.
     pub fn lookup(&self, idx: usize) -> Option<&str> {
         self.strings.get(idx).map(|s| s.as_str())
+    }
+
+    /// Read an existing first-appearance index without interning or changing order.
+    pub(crate) fn index_of(&self, s: &str) -> Option<usize> {
+        self.indices.get(s).copied()
     }
 
     /// Get the number of unique strings in the table.

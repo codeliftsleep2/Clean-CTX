@@ -455,6 +455,8 @@ impl ContextStore for SqliteStore {
         &self,
         file_path: &str,
     ) -> Result<Option<StoredContextMeta>, Box<dyn std::error::Error>> {
+        #[cfg(test)]
+        crate::default_operation_observations_af_perf_002::metadata_query();
         let mut stmt = self.conn.prepare(
             "SELECT c.id, c.file_path, COALESCE(NULLIF(c.source_hash, ''), c.content_hash), c.fidelity, c.pretty_text, c.created_at,
                     COALESCE(c.raw_tokens, 0) as raw_tokens,
@@ -470,6 +472,8 @@ impl ContextStore for SqliteStore {
             let hash: String = row.get(2)?;
             let fid: i32 = row.get(3)?;
             let _pretty: Option<String> = row.get(4)?;
+            #[cfg(test)]
+            crate::default_operation_observations_af_perf_002::metadata_text(_pretty.as_deref());
             let created_at_str: String = row.get(5)?;
             let raw_tokens: i64 = row.get(6)?;
             let compressed_tokens: i64 = row.get(7)?;
