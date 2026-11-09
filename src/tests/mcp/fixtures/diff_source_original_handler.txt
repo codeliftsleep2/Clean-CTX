@@ -1,0 +1,74 @@
+pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpState) {
+    let file_path_str = crate::mcp::tool_helpers::arg_str_or_empty(params, "filePath");
+    let workspace_root = crate::mcp::tool_helpers::arg_str(params, "workspaceRoot");
+    let resolved_path = match resolve_file_path_checked(
+        file_path_str,
+        workspace_root,
+        &state.config.additional_roots,
+    ) {
+        Ok(p) => p,
+        Err(msg) => {
+            send_response(&crate::mcp::tool_helpers::jsonrpc_error(
+                id.clone(),
+                -32602,
+                msg,
+                None,
+            ));
+            return;
+        }
+    };
+    let fidelity = match parse_fidelity_arg(id, params, &state.config) {
+        Ok(f) => f,
+        Err(()) => return,
+    };
+    // A-08: Use source_cache via state.read_source() instead of direct disk read
+    #[cfg(all(test, feature = "typescript"))]
+    ownership_design::read_attempt();
+    let source = match state.read_source(&resolved_path) {
+        Ok(s) => {
+            #[cfg(all(test, feature = "typescript"))]
+            {
+                if ownership_design::alternative() {
+                    ownership_design::acquire(s)
+                } else {
+                    let source = s.as_str().to_string();
+                    ownership_design::repair::owned_copy(&source);
+                    ownership_design::owned(source)
+                }
+            }
+            #[cfg(not(all(test, feature = "typescript")))]
+            {
+                s.as_str().to_string()
+            }
+        }
+        Err(e) => {
+            send_response(
+                &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } }),
+            );
+            return;
+        }
+    };
+    #[cfg(all(test, feature = "typescript"))]
+    ownership_design::before_helper(state, &resolved_path, &source);
+    match diff_code_context_handler(
+        PathBuf::from(&resolved_path),
+        &source,
+        &mut state.cache_write(),
+        fidelity,
+    ) {
+        Ok(body) => {
+            let mut response = serde_json::json!({
+                "jsonrpc": "2.0", "id": id,
+                "result": { "content": [{ "type": "text", "text": body }] }
+            });
+            // Diff output is rolling dynamic content — mark as tail (ephemeral).
+            inject_tail_breakpoint(&mut response, state);
+            send_response(&response);
+        }
+        Err(e) => send_response(&serde_json::json!({
+            "jsonrpc": "2.0", "id": id,
+            "error": { "code": -32603, "message": e.to_string() }
+        })),
+    }
+}
+

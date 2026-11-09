@@ -1044,3 +1044,15 @@ Only explicit ordinary demand omits unused manifests; proof/unknown demand and
 combined acquisition retain authority and retry contracts. No universal speedup,
 public latency or allocator-saving claim. Prior scopes protected; startup projection
 deferred/count removal rejected, dense equality deferred. No stage/commit/push.
+
+## Registered diff source ownership CLOSED / FIX / PROTECTED
+
+Agent MaxHeadRoom inspected af-perf-001-20261109-112919: 106 tracked passes across
+51 groups, 350 matching source hashes. Genuine original copy RED, all 225 frozen
+public/error/cache/lifetime identities, current-byte zero-copy budget, integrated
+costs/focused checks, real original-conversion restoration RED and byte-exact restored
+GREEN complete. Final identities/evidence: AF_PERF_002_DIFF_SOURCE_REPAIR.md.
+The acquired Arc replaces only redundant source String ownership; protected helper,
+hash shortcut, source-cache and baseline policy remain unchanged. No demonstrated
+universal speedup, public latency or allocator benefit. Other candidates/dispositions
+remain separate; no automatic next investigation. No stage/commit/push.

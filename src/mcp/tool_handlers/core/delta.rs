@@ -43,8 +43,19 @@ pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpSt
         Err(()) => return,
     };
     // A-08: Use source_cache via state.read_source() instead of direct disk read
+    #[cfg(all(test, feature = "typescript"))]
+    ownership_design::read_attempt();
     let source = match state.read_source(&resolved_path) {
-        Ok(s) => s.as_str().to_string(),
+        Ok(s) => {
+            #[cfg(all(test, feature = "typescript"))]
+            {
+                ownership_design::current(s)
+            }
+            #[cfg(not(all(test, feature = "typescript")))]
+            {
+                s
+            }
+        }
         Err(e) => {
             send_response(
                 &serde_json::json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32603, "message": format!("Cannot read file: {}", e) } }),
@@ -52,6 +63,8 @@ pub(crate) fn handle_diff_code_context(id: &Value, params: &Value, state: &McpSt
             return;
         }
     };
+    #[cfg(all(test, feature = "typescript"))]
+    ownership_design::before_helper(state, &resolved_path, &source);
     match diff_code_context_handler(
         PathBuf::from(&resolved_path),
         &source,
@@ -132,13 +145,15 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     let ir_ctx = state.ir_context_lock();
     let prev_version = ir_ctx.file_version(&path_alias).unwrap_or(0);
     let previous_authority = (prev_version > 0 && ir_ctx.has_file(&path_alias)).then(|| {
-        (
-            ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default(),
-            ir_ctx.get_source_hash(&path_alias).cloned(),
-        )
+        let tuples = ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default();
+        #[cfg(all(test, feature = "typescript"))]
+        discovery_work::previous_copy(&tuples);
+        (tuples, ir_ctx.get_source_hash(&path_alias).cloned())
     });
     if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         if let Ok(source_arc) = state.read_source(&resolved_path) {
+            #[cfg(all(test, feature = "typescript"))]
+            discovery_work::second_read(source_arc.len());
             let source_hash = {
                 let cache = state.cache_read();
                 cache.compute_hash(source_arc.as_bytes())
@@ -148,6 +163,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 // Source unchanged - return cached IR without recompiling
                 // P0-4: Lock still held, ensuring consistent state
                 let cached_ir = ir_ctx.get_ir(&path_alias).unwrap().clone();
+                #[cfg(all(test, feature = "typescript"))]
+                discovery_work::cached_return(&cached_ir, previous_authority.is_some());
                 let instruction_count = cached_ir.len();
                 drop(ir_ctx);
                 let compiled =
@@ -525,6 +542,14 @@ mod fidelity_persistence_tests;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/delta_compatibility_epoch.rs"]
 mod compatibility_epoch_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/rolling_read_discovery_af_perf_002.rs"]
+mod discovery_work;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/diff_ownership_design_af_perf_002.rs"]
+mod ownership_design;
 
 // Presentation boundary: the delta is code-side only. Its model-visible
 // `content` is a minimal summary (adds/mods/dels counts), never a full
