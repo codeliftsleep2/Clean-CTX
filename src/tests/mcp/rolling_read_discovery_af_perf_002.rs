@@ -30,6 +30,10 @@ pub(super) fn source_copy(source: &String) {
     });
 }
 pub(super) fn previous_copy(tuples: &Vec<Vec<String>>) {
+    super::delta_design::previous(tuples);
+    if !super::delta_design::observing() {
+        return;
+    }
     WORK.with(|w| {
         let mut w = w.borrow_mut();
         w.previous_copies += 1;
@@ -46,6 +50,10 @@ pub(super) fn previous_copy(tuples: &Vec<Vec<String>>) {
     });
 }
 pub(super) fn second_read(bytes: usize) {
+    super::delta_design::second(bytes);
+    if !super::delta_design::observing() {
+        return;
+    }
     WORK.with(|w| {
         let mut w = w.borrow_mut();
         w.second_reads += 1;
@@ -53,6 +61,10 @@ pub(super) fn second_read(bytes: usize) {
     });
 }
 pub(super) fn cached_return(tuples: &[Vec<String>], previous: bool) {
+    super::delta_design::cached(tuples, previous);
+    if !super::delta_design::observing() {
+        return;
+    }
     WORK.with(|w| {
         let mut w = w.borrow_mut();
         w.cached_returns += 1;

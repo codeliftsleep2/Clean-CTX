@@ -130,6 +130,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
         }
     };
     let tokenizer_kind = parse_tokenizer_arg(params, &state.config);
+    #[cfg(all(test, feature = "typescript"))]
+    delta_design::after_source(state, &resolved_path, &source);
     let tokenizer_box = crate::tokenizer::create_tokenizer(tokenizer_kind).ok();
     let tokenizer_ref = tokenizer_box.as_deref();
     let fidelity_name = format!("{:?}", fidelity).to_lowercase();
@@ -144,12 +146,15 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
     // P0-4: Hold lock during entire check to prevent TOCTOU race
     let ir_ctx = state.ir_context_lock();
     let prev_version = ir_ctx.file_version(&path_alias).unwrap_or(0);
-    let previous_authority = (prev_version > 0 && ir_ctx.has_file(&path_alias)).then(|| {
-        let tuples = ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default();
-        #[cfg(all(test, feature = "typescript"))]
-        discovery_work::previous_copy(&tuples);
-        (tuples, ir_ctx.get_source_hash(&path_alias).cloned())
-    });
+    #[cfg(all(test, feature = "typescript"))]
+    let previous_authority =
+        (delta_design::historical_early() && prev_version > 0 && ir_ctx.has_file(&path_alias))
+            .then(|| {
+                let tuples = ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default();
+                #[cfg(all(test, feature = "typescript"))]
+                discovery_work::previous_copy(&tuples);
+                (tuples, ir_ctx.get_source_hash(&path_alias).cloned())
+            });
     if prev_version > 0 && ir_ctx.has_file(&path_alias) {
         if let Ok(source_arc) = state.read_source(&resolved_path) {
             #[cfg(all(test, feature = "typescript"))]
@@ -165,6 +170,12 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                 let cached_ir = ir_ctx.get_ir(&path_alias).unwrap().clone();
                 #[cfg(all(test, feature = "typescript"))]
                 discovery_work::cached_return(&cached_ir, previous_authority.is_some());
+                #[cfg(all(test, feature = "typescript"))]
+                delta_design::repair::cached(
+                    previous_authority.as_ref(),
+                    &cached_ir,
+                    ir_ctx.get_ir(&path_alias).unwrap(),
+                );
                 let instruction_count = cached_ir.len();
                 drop(ir_ctx);
                 let compiled =
@@ -234,6 +245,20 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
             }
         }
     }
+    let capture_previous = || {
+        (prev_version > 0 && ir_ctx.has_file(&path_alias)).then(|| {
+            let tuples = ir_ctx.get_ir(&path_alias).cloned().unwrap_or_default();
+            #[cfg(all(test, feature = "typescript"))]
+            discovery_work::previous_copy(&tuples);
+            (tuples, ir_ctx.get_source_hash(&path_alias).cloned())
+        })
+    };
+    #[cfg(all(test, feature = "typescript"))]
+    let previous_authority = previous_authority.or_else(capture_previous);
+    #[cfg(not(all(test, feature = "typescript")))]
+    let previous_authority = capture_previous();
+    #[cfg(all(test, feature = "typescript"))]
+    delta_design::changed(previous_authority.as_ref());
     drop(ir_ctx); // Release lock before expensive compile
 
     // Source changed or no baseline - compile
@@ -252,6 +277,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
 
     #[cfg(test)]
     super::provide::publication_race_test_support::pause_after_compile(&resolved_path);
+    #[cfg(all(test, feature = "typescript"))]
+    delta_design::before_publish(state, &resolved_path);
 
     let canonical_path = semantic_owner;
     let expected_source_hash = source_hash.clone();
@@ -276,6 +303,8 @@ pub(crate) fn handle_delta_code_context(id: &Value, params: &Value, state: &McpS
                     .alias_for_path(&resolved_path)
                     .is_none_or(|alias| !ir_ctx.has_file(&alias)),
             };
+            #[cfg(all(test, feature = "typescript"))]
+            delta_design::publication(authority_is_current);
             if !authority_is_current {
                 return Ok((false, None));
             }
@@ -550,6 +579,10 @@ mod discovery_work;
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../../../tests/mcp/diff_ownership_design_af_perf_002.rs"]
 mod ownership_design;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/delta_previous_design_af_perf_002.rs"]
+mod delta_design;
 
 // Presentation boundary: the delta is code-side only. Its model-visible
 // `content` is a minimal summary (adds/mods/dels counts), never a full
