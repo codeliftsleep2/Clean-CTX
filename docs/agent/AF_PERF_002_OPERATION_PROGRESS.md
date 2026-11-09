@@ -955,3 +955,92 @@ map setup; necessary common work and vector borrowing stay protected. No allocat
 release/public latency or universal speedup claim. SQLite unused text remains the
 next independent candidate, not an approved implementation; dense equality deferred.
 No source/test changes after acceptance, no staging/commit/push. Census unchanged.
+## SQLite discarded-text design measured; local validation proposed
+
+Agent MaxHeadRoom inspected sqlite-text-design-20261108-170937: five tracked passes,
+twelve paired query-cost rows, warning-fatal checks and1381 matching hashes.
+Test-only same-column UTF-8 validation preserves measured metadata/error ordering
+while omitting the owned String.393216-byte cases favor the candidate by descriptive
+12.6%/13.4% medians; smaller cases mostly close. No production/public latency or
+allocator benefit claimed. AF_PERF_002_SQLITE_TEXT_DESIGN.md records full costs,
+malformed-row controls and missing future coverage. Return one FIX PROPOSED for
+owner approval, not implementation/optimization RED. Both encoder corrections and
+all previous repairs stay closed; dense equality deferred. No stage/commit/push.
+## SQLite discarded pretty-text ownership CLOSED / FIX / PROTECTED
+
+Agent MaxHeadRoom inspected final composed af-perf-001-20261108-212233:97 tracked
+passes/42 groups,324 matching hashes. Genuine original materialization RED18 owned
+strings/786504 logical bytes precedes exact public/durable/error After GREEN,
+57 focused passes/twelve integrated cost rows and warning-fatal checks. Isolated
+real original-method restoration gives two intended RED, two preserved semantic/
+public GREEN and five byte-exact restored GREEN with2265 inventory matches.
+AF_PERF_002_SQLITE_TEXT_REPAIR.md retains exact source identities and full evidence.
+Only discarded ownership is removed; SQL and conversion validation remain. No
+allocator/public latency/universal speedup claim. Previous repairs protected, dense
+equality deferred. Reassess remaining default-operation candidates before choosing
+another slice. No stage/commit/push; census unchanged.
+## Broad startup/listing discovery measured; no production correction
+
+Agent MaxHeadRoom inspected broad-startup-discovery-20261108-214510: three tracked
+passes, twelve populations/twenty-four source-exact SQLite query observations,
+warning-fatal checks and1389 matching hashes. Startup consumes only file_path from
+full summaries; indexed COUNT/sort/projection work grows with contexts/deltas.
+128-context source-exact query rises4235 to53386 VM steps from0 to128 deltas per
+context; these are SQLite VM operations, not CPU/public latency. Malformed fidelity
+fails the reader and startup source skips all registration, constraining any
+narrower path. Recommend one bounded startup-enumeration DESIGN investigation,
+not implementation. Listing output counts remain necessary; per-root manifest
+filtering/cloning remains unmeasured. Full limits/source identities and ranked
+shortlist: AF_PERF_002_BROAD_STARTUP_DISCOVERY.md. Prior repairs protected, dense
+equality deferred, no stage/commit/push; census unchanged.
+## Startup projection design executed: DEFER; count removal REJECT
+
+Agent MaxHeadRoom inspected startup-projection-design-20261108-215733: four tracked
+passes/twelve paired populations, warning-fatal checks and1391 matching hashes.
+Preserving projection retains SQL/count/error/order and passes actual hardlink
+startup/all-or-nothing malformed-row controls. It removes summary/timestamp/fidelity
+ownership, typically saving45..88us at128..256 zero-delta contexts in debug copies;
+count-heavy ranges overlap and SQLite VM steps are unchanged. No consequential
+actual startup benefit established, so DEFER rather than add a separate protected
+reader. Count-removal scratch queries succeed where real missing/malformed-deltas
+reads fail, changing registration: REJECT under current semantics. No production
+correction recommended. Full evidence/limits: AF_PERF_002_STARTUP_PROJECTION_DESIGN.md.
+Next discovery priority is per-root inventories, not implementation or dense equality.
+Prior repairs remain protected; no stage/commit/push, census unchanged.
+## Per-root inventory discovery measured; no-proof consumer design candidate
+
+Agent MaxHeadRoom inspected root-inventory-discovery-20261108-221307: three tracked
+passes/36 public rows, warning-fatal checks and1392 matching hashes. Actual ordinary
+find_entities builds per-root manifests without a proof target/consumer; all grouping
+counters zero, confirmed by execution.rs conditional use trace.8 overlapping roots/
+32 entries make256 predicates/144 entry clones/22560 metadata bytes, sharing source
+bodies through Arc. Successful identical warm requests skip all named work; missing
+roots retry, preserving failure/currentness. Recommend one bounded demand-driven
+manifest DESIGN comparison, with proof-backed positive controls before any correction.
+No replacement timing, CPU attribution or allocator/public benefit claimed. Details:
+AF_PERF_002_ROOT_INVENTORY_DISCOVERY.md. Startup deferred/count removal rejected,
+prior repairs protected, dense equality deferred; no stage/commit/push, census unchanged.
+## Proof-aware manifest design GREEN; minimal demand boundary FIX PROPOSED
+
+Agent MaxHeadRoom inspected proof-manifest-design-20261108-222948: five tracked
+passes,60 paired public rows/24 cost rows/one durable proof control, warning-fatal
+checks and1392 matching hashes. Ordinary no-proof-target work vanishes in test-only
+variant; required manifests/proofs/provenance/public/live/durable identities remain
+exact, including reconstruction after ordinary discovery and incomplete retries.
+Eight-overlap ordinary local median51.034 ->47.321ms with separated central ranges;
+unchanged-work proof controls vary, so no public/release or exact causal claim.
+Recommend one private explicit-demand slice for owner approval and genuine original
+RED, not implementation under design authority. Full limits/source identities and
+acceptance prerequisites: AF_PERF_002_PROOF_MANIFEST_DESIGN.md. Prior scopes protected,
+startup deferred/count removal rejected/dense equality deferred. No stage/commit/push.
+
+## Explicit-demand manifests CLOSED / FIX / PROTECTED
+
+Agent MaxHeadRoom inspected af-perf-001-20261109-090100: 103 tracked passes across
+48 groups, 343 matching source hashes. Original RED, 70 exact frozen identities,
+integrated costs/static checks, focused warning-fatal acceptance and real restoration
+mutation RED/restored GREEN complete. Full evidence: AF_PERF_002_MANIFEST_DEMAND_REPAIR.md.
+Only explicit ordinary demand omits unused manifests; proof/unknown demand and
+combined acquisition retain authority and retry contracts. No universal speedup,
+public latency or allocator-saving claim. Prior scopes protected; startup projection
+deferred/count removal rejected, dense equality deferred. No stage/commit/push.

@@ -37,12 +37,14 @@ pub(super) use execution::hydrate_workspace_index;
 pub(super) use execution::{hydrate_workspace_index_for, hydrate_workspace_index_for_acquisition};
 
 mod filesystem;
+mod filesystem_discovery;
 #[cfg(feature = "csharp")]
 pub(crate) use filesystem::configured_roots as dependency_roots;
 #[cfg(any(feature = "csharp", all(test, feature = "rust")))]
 pub(crate) use filesystem::source_inventory;
-use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key, scan};
+use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key};
 pub(crate) use filesystem::{effective_refresh_roots, source_candidates_containing};
+use filesystem_discovery::filesystem_only_discovery;
 
 mod invalidation;
 #[cfg(all(test, feature = "rust"))]
@@ -222,8 +224,8 @@ fn discover_candidate_paths(
 ) -> DiscoveryOutcome {
     #[cfg(all(test, feature = "rust"))]
     {
-        if !has_test_project_search() {
-            if let Some(paths) = test_hydration_candidates() {
+        if !test_manifest_search(authority.proof_target().is_some()) {
+            if let Some(paths) = test_manifest_candidates(authority.proof_target().is_some()) {
                 return DiscoveryOutcome {
                     candidates: paths,
                     project_coverage: Vec::new(),
@@ -250,6 +252,7 @@ fn discover_candidate_paths(
             query_name,
             "cbm_unavailable",
             requirement,
+            authority.proof_target().is_some(),
         );
     };
     let projects = bridge.configured_projects();
@@ -512,7 +515,12 @@ fn discover_candidate_paths(
         };
     }
 
-    let scan = scan(state, &pending_roots, query_name);
+    let scan = filesystem::scan_with_manifest_demand(
+        state,
+        &pending_roots,
+        query_name,
+        authority.proof_target().is_some(),
+    );
     let root_completions = if scan.completed {
         discovery_scopes_for_roots(&pending_roots)
     } else {
@@ -540,72 +548,6 @@ fn discover_candidate_paths(
         provider_completions,
         root_completions,
         inventories,
-    }
-}
-
-fn filesystem_only_discovery(
-    state: &McpState,
-    discovery: DiscoveryMode,
-    roots: Vec<PathBuf>,
-    query_name: &str,
-    fallback_reason: &'static str,
-    requirement: HydrationRequirement,
-) -> DiscoveryOutcome {
-    let (pending_roots, cached_roots) =
-        pending_discovery_roots(state, discovery, query_name, roots, requirement);
-    if pending_roots.is_empty() {
-        if cached_roots == 0 {
-            // No root was configured (or every root was already unusable):
-            // identical to scanning nothing.
-            return DiscoveryOutcome {
-                candidates: Vec::new(),
-                project_coverage: Vec::new(),
-                provider: "none",
-                status: "failed",
-                attempted: false,
-                fallback_reason: Some("filesystem_unavailable"),
-                provider_completions: Vec::new(),
-                root_completions: Vec::new(),
-                inventories: Vec::new(),
-            };
-        }
-        // Nothing left to scan: every configured root's fallback discovery
-        // already completed for this generation (and its candidates were
-        // compiled then), so the full-repo walk is skipped entirely.
-        return DiscoveryOutcome {
-            candidates: Vec::new(),
-            project_coverage: Vec::new(),
-            provider: "filesystem",
-            status: "completed",
-            attempted: true,
-            fallback_reason: Some(fallback_reason),
-            provider_completions: Vec::new(),
-            root_completions: Vec::new(),
-            inventories: Vec::new(),
-        };
-    }
-    let scan = scan(state, &pending_roots, query_name);
-    let root_completions = if scan.completed {
-        discovery_scopes_for_roots(&pending_roots)
-    } else {
-        Vec::new()
-    };
-    let covered = scan.attempted || cached_roots > 0;
-    let provider = if covered { "filesystem" } else { "none" };
-    DiscoveryOutcome {
-        candidates: scan.candidates,
-        project_coverage: Vec::new(),
-        provider,
-        status: discovery_status(covered, scan.completed, false),
-        attempted: covered,
-        fallback_reason: Some(if covered {
-            fallback_reason
-        } else {
-            "filesystem_unavailable"
-        }),
-        provider_completions: Vec::new(),
-        root_completions,
-        inventories: scan.inventories,
     }
 }
 

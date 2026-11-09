@@ -16,6 +16,9 @@ pub(crate) struct Work {
     pub metadata_queries: usize,
     pub metadata_rows: usize,
     pub discarded_pretty_bytes: usize,
+    pub discarded_pretty_strings: usize,
+    pub metadata_conversion_attempts: usize,
+    pub validated_pretty_bytes: usize,
     pub string_table_builds: usize,
     pub tuple_visits: usize,
     pub tuple_strings: usize,
@@ -104,11 +107,22 @@ pub(crate) fn binary_output(bytes: usize, capacity: usize) {
 pub(crate) fn metadata_query() {
     update(|work| work.metadata_queries += 1);
 }
+pub(crate) fn metadata_conversion() {
+    update(|work| work.metadata_conversion_attempts += 1);
+}
 pub(crate) fn metadata_text(text: Option<&str>) {
     update(|work| {
         work.metadata_rows += 1;
+        work.discarded_pretty_strings += usize::from(text.is_some());
         work.discarded_pretty_bytes += text.map_or(0, str::len);
+        work.validated_pretty_bytes += text.map_or(0, str::len);
     });
+}
+pub(crate) fn metadata_validated_bytes(bytes: usize) {
+    update(|work| work.validated_pretty_bytes += bytes);
+}
+pub(crate) fn metadata_validated() {
+    update(|work| work.metadata_rows += 1);
 }
 
 #[cfg(feature = "typescript")]

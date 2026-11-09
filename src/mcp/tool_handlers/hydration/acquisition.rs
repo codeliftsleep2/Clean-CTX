@@ -176,6 +176,13 @@ pub(super) fn prepare_clean_acquisition(
             }
         }
     }
+    #[cfg(all(test, feature = "rust"))]
+    if super::filesystem::inventory_work::comparison::observing() {
+        super::filesystem::inventory_work::comparison::proof_receipt(serde_json::json!({
+            "requirement":format!("{requirement:?}"),"proofs":format!("{proofs:?}"),
+            "barriers":format!("{barriers:?}"),"owners":owners,"snapshots":source_snapshots
+        }));
+    }
     Some(ProvisionalAcquisition {
         requirement,
         proofs,
@@ -226,6 +233,8 @@ fn manifests_by_source_kind(
 ) -> Vec<(CoverageUnit, InventoryManifest)> {
     let mut grouped = BTreeMap::<SourceKind, Vec<_>>::new();
     for entry in &root.manifest.entries {
+        #[cfg(all(test, feature = "rust"))]
+        super::filesystem::inventory_work::group_clone(entry);
         grouped
             .entry(entry.source_kind)
             .or_default()
@@ -239,6 +248,8 @@ fn manifests_by_source_kind(
                     != ProducerCapabilityDisposition::Incapable
         })
         .map(|(source_kind, entries)| {
+            #[cfg(all(test, feature = "rust"))]
+            super::filesystem::inventory_work::group_capacity(entries.len(), entries.capacity());
             let generation = capability_generation(source_kind, catalog, capability);
             (
                 match capability {

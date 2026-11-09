@@ -25,6 +25,7 @@ use std::path::Path;
 mod compatibility_schema;
 mod deletion;
 mod edit_intent;
+mod metadata_text;
 mod replay;
 mod semantic_state;
 
@@ -471,9 +472,11 @@ impl ContextStore for SqliteStore {
             let fp: String = row.get(1)?;
             let hash: String = row.get(2)?;
             let fid: i32 = row.get(3)?;
-            let _pretty: Option<String> = row.get(4)?;
             #[cfg(test)]
-            crate::default_operation_observations_af_perf_002::metadata_text(_pretty.as_deref());
+            crate::default_operation_observations_af_perf_002::metadata_conversion();
+            let _pretty: Option<metadata_text::ValidatedText> = row.get(4)?;
+            #[cfg(test)]
+            crate::default_operation_observations_af_perf_002::metadata_validated();
             let created_at_str: String = row.get(5)?;
             let raw_tokens: i64 = row.get(6)?;
             let compressed_tokens: i64 = row.get(7)?;

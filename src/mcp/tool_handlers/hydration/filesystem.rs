@@ -152,6 +152,16 @@ pub(crate) fn effective_refresh_roots(state: &McpState, workspace_root: &str) ->
 }
 
 pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> FilesystemScan {
+    // Callers without explicit proof demand retain the original manifest work.
+    scan_with_manifest_demand(state, roots, query_name, true)
+}
+
+pub(super) fn scan_with_manifest_demand(
+    state: &McpState,
+    roots: &[PathBuf],
+    query_name: &str,
+    manifests_required: bool,
+) -> FilesystemScan {
     #[cfg(all(test, feature = "rust"))]
     {
         TEST_SCAN_CALLS.set(TEST_SCAN_CALLS.get() + 1);
@@ -178,11 +188,17 @@ pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> Fil
     let read_match_started = std::time::Instant::now();
     let manifest = build_inventory(state, source_paths, attempted, traversal_completed);
     #[cfg(all(test, feature = "rust"))]
+    inventory_work::combined(&manifest);
+    #[cfg(all(test, feature = "rust"))]
     {
         stats.read_match_elapsed = read_match_started.elapsed();
     }
     let candidates = type_ref_candidate_owners(&manifest, query_name);
-    let inventories = root_inventories(roots, &manifest);
+    let inventories = if manifests_required {
+        root_inventories(roots, &manifest)
+    } else {
+        Vec::new()
+    };
     #[cfg(all(test, feature = "rust"))]
     {
         stats.total_elapsed = total_started.elapsed();
@@ -197,6 +213,10 @@ pub(super) fn scan(state: &McpState, roots: &[PathBuf], query_name: &str) -> Fil
 }
 
 fn root_inventories(roots: &[PathBuf], combined: &InventoryManifest) -> Vec<RootInventoryManifest> {
+    #[cfg(all(test, feature = "rust"))]
+    if inventory_work::begin(roots.len(), combined.entries.len()) {
+        return Vec::new();
+    }
     roots
         .iter()
         .map(|root| {
@@ -204,13 +224,18 @@ fn root_inventories(roots: &[PathBuf], combined: &InventoryManifest) -> Vec<Root
             let entries = combined
                 .entries
                 .iter()
-                .filter(|entry| Path::new(&entry.owner).starts_with(Path::new(&root)))
+                .filter(|entry| {
+                    let selected = Path::new(&entry.owner).starts_with(Path::new(&root));
+                    #[cfg(all(test, feature = "rust"))]
+                    inventory_work::predicate(entry, selected);
+                    selected
+                })
                 .cloned()
                 .collect();
-            RootInventoryManifest {
-                root,
-                manifest: InventoryManifest::new(entries, combined.attempted, combined.complete),
-            }
+            let manifest = InventoryManifest::new(entries, combined.attempted, combined.complete);
+            #[cfg(all(test, feature = "rust"))]
+            inventory_work::manifest(&root, &manifest);
+            RootInventoryManifest { root, manifest }
         })
         .collect()
 }
@@ -332,3 +357,7 @@ fn is_supported_source(path: &Path) -> bool {
 #[cfg(all(test, feature = "rust"))]
 #[path = "../../../tests/mcp/hydration_filesystem.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "rust"))]
+#[path = "../../../tests/mcp/root_inventory_discovery_af_perf_002.rs"]
+pub(super) mod inventory_work;

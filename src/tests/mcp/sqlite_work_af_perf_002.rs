@@ -156,3 +156,18 @@ fn af002_sqlite_enclosing_durable_baseline() {
         );
     }
 }
+
+#[path = "sqlite_text_design_af_perf_002.rs"]
+mod text_design;
+
+#[path = "sqlite_text_repair_af_perf_002.rs"]
+mod text_repair;
+
+#[path = "sqlite_text_integrated_af_perf_002.rs"]
+mod text_integrated;
+
+#[path = "startup_listing_discovery_af_perf_002.rs"]
+mod startup_listing_discovery;
+
+#[path = "startup_projection_design_af_perf_002.rs"]
+mod startup_projection_design;

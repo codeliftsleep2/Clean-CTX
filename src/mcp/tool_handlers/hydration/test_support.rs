@@ -16,6 +16,16 @@ use crate::mcp::discovery_cache::DiscoveryMode;
 use std::collections::HashMap;
 use std::sync::{LazyLock, Mutex};
 
+pub(crate) fn test_manifest_candidates(proof_required: bool) -> Option<Vec<String>> {
+    super::filesystem::inventory_work::comparison::capture(proof_required);
+    test_hydration_candidates()
+}
+
+pub(crate) fn test_manifest_search(proof_required: bool) -> bool {
+    super::filesystem::inventory_work::comparison::capture(proof_required);
+    has_test_project_search()
+}
+
 /// Candidate paths injected per test thread in place of real CBM discovery.
 static TEST_HYDRATION_CANDIDATES: LazyLock<Mutex<HashMap<std::thread::ThreadId, Vec<String>>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
