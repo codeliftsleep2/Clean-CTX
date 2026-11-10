@@ -155,6 +155,8 @@ pub fn collect_changed_files(
             .map(|c| c.current_path().to_string())
             .collect();
 
+        #[cfg(all(test, feature = "typescript"))]
+        super::engine::discovery::dedup(&existing_paths, ls_output.len());
         for line in ls_output.lines() {
             let path = line.trim_end();
             if path.is_empty() || existing_paths.contains(path) {

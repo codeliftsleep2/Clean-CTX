@@ -65,6 +65,8 @@ pub fn gitdiff_workspace(
 ) -> Result<GitDiffSummary, crate::error::CleanCtxError> {
     let mut changes = collect_changed_files(root, from, to)?;
     let file_count = changes.len();
+    #[cfg(all(test, feature = "typescript"))]
+    discovery::changed(file_count);
 
     // Resource limit: cap the number of changed files processed.
     // Files beyond the cap are counted as skipped (fail-closed, never
@@ -287,6 +289,8 @@ fn diff_renamed_file(
 /// Admit source text without lossy decoding. NUL-bearing or non-UTF-8 blobs
 /// are binary for this semantic comparison boundary, regardless of extension.
 fn source_text(bytes: &[u8]) -> Option<&str> {
+    #[cfg(all(test, feature = "typescript"))]
+    discovery::admit(bytes.len());
     if bytes.contains(&0) {
         return None;
     }
@@ -307,15 +311,28 @@ fn diff_two_contents(
     fidelity: Fidelity,
 ) -> (String, Option<String>) {
     if is_compressible(path) {
-        match build_snapshot(from_content, fidelity) {
-            Ok(base_snap) => match build_snapshot(to_content, fidelity) {
-                Ok(cur_snap) => {
-                    let actions = diff_snapshots(&base_snap, &cur_snap);
-                    let body = format_diff(&actions, fidelity).trim_end().to_string();
-                    (body, None)
+        #[cfg(all(test, feature = "typescript"))]
+        discovery::snapshot(from_content);
+        let base_result = build_snapshot(from_content, fidelity);
+        match base_result {
+            Ok(base_snap) => {
+                #[cfg(all(test, feature = "typescript"))]
+                discovery::snapshot(to_content);
+                let current_result = build_snapshot(to_content, fidelity);
+                match current_result {
+                    Ok(cur_snap) => {
+                        let actions = diff_snapshots(&base_snap, &cur_snap);
+                        let body = {
+                            let formatted = format_diff(&actions, fidelity);
+                            #[cfg(all(test, feature = "typescript"))]
+                            discovery::body_copy(&formatted, formatted.trim_end());
+                            formatted.trim_end().to_string()
+                        };
+                        (body, None)
+                    }
+                    Err(e) => (String::new(), Some(e.to_string())),
                 }
-                Err(e) => (String::new(), Some(e.to_string())),
-            },
+            }
             Err(e) => (String::new(), Some(e.to_string())),
         }
     } else if is_angular_template(path) {
@@ -370,6 +387,8 @@ fn compress_added_file(content: &str, path: &str, fidelity: Fidelity) -> String 
         return format_line_delta(0, content.lines().count());
     }
     // Best-effort: build a snapshot and render as a compact skeleton.
+    #[cfg(all(test, feature = "typescript"))]
+    discovery::snapshot(content);
     match build_snapshot(content, fidelity) {
         Ok(snap) => {
             // Render imports + class names as a compact skeleton.
@@ -512,3 +531,7 @@ mod type_change_tests;
 #[cfg(test)]
 #[path = "../tests/gitdiff/issue_137.rs"]
 mod issue_137_tests;
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../tests/gitdiff/default_work_discovery_af_perf_002.rs"]
+pub(crate) mod discovery;

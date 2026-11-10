@@ -106,6 +106,8 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         tokenizer_kind,
         tokenizer_box.as_deref(),
     );
+    #[cfg(all(test, feature = "typescript"))]
+    observation_tests::after_economics(state, file_path, &path_alias, &economic);
     let selected_raw = matches!(
         economic.selected,
         crate::mcp::content_economics::SelectedRepresentation::RawPassthrough
@@ -167,3 +169,7 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         }
     }));
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../../tests/mcp/replay_footer_observation_af_perf_002.rs"]
+mod observation_tests;

@@ -47,6 +47,8 @@ pub fn run_git(root: &str, args: &[&str]) -> Result<String, CleanCtxError> {
 /// lossily and then presented as source text. Text-oriented callers continue
 /// through [`run_git`].
 pub fn run_git_bytes(root: &str, args: &[&str]) -> Result<Vec<u8>, CleanCtxError> {
+    #[cfg(all(test, feature = "typescript"))]
+    super::engine::discovery::command(args);
     let mut cmd = Command::new("git");
     cmd.arg("--no-pager");
     // `-C <root>` changes directory; root is always resolved via
@@ -62,6 +64,12 @@ pub fn run_git_bytes(root: &str, args: &[&str]) -> Result<Vec<u8>, CleanCtxError
         ))
     })?;
 
+    #[cfg(all(test, feature = "typescript"))]
+    super::engine::discovery::output(
+        output.stdout.len(),
+        output.stderr.len(),
+        output.status.success(),
+    );
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
     if !output.status.success() {
