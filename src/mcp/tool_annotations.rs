@@ -53,7 +53,7 @@ fn effects(name: &str) -> ToolEffects {
 
         // Repeating the same explicit save has the same durable semantic
         // effect and does not delete source or historical state.
-        "save_context" => ToolEffects {
+        "save_context" | "pcg_documents_v1" => ToolEffects {
             read_only: false,
             destructive: false,
             idempotent: true,

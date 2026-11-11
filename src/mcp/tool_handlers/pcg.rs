@@ -86,12 +86,23 @@ fn parse(params: &Value) -> Result<(query::Request, String, u64), Error> {
 
 fn invoke(params: &Value, state: &McpState) -> Result<projection::Response, Error> {
     let (request, tokenizer, budget) = parse(params)?;
-    state
+    let guard = state
+        .pcg
+        .documents
+        .as_ref()
+        .map(|documents| documents.guard(&request.workspace_root))
+        .transpose()?
+        .flatten();
+    let response = state
         .pcg
         .session
         .as_ref()
         .ok_or(Error("pcg_disabled"))?
-        .project(&request, &tokenizer, budget)
+        .project(&request, &tokenizer, budget)?;
+    if let Some(guard) = guard {
+        guard.complete()?;
+    }
+    Ok(response)
 }
 
 pub(crate) fn handle(id: &Value, params: &Value, state: &McpState) {

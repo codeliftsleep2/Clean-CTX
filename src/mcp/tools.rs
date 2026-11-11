@@ -540,6 +540,11 @@ pub(crate) fn tool_list_for_state(state: &super::McpState) -> Vec<Value> {
             super::tool_handlers::pcg::descriptor(),
         ]));
     }
+    if state.pcg.documents.is_some() {
+        tools.extend(super::tool_annotations::inject(vec![
+            super::tool_handlers::pcg_documents::descriptor(),
+        ]));
+    }
     tools
 }
 
