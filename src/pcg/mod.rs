@@ -1,5 +1,6 @@
 //! Owner-enrolled projection and explicit read-only acquisition. No runtime approval API.
 pub mod cli;
+pub mod documents;
 mod closure;
 mod enrollment;
 mod git;
@@ -57,6 +58,9 @@ mod support;
 #[cfg(test)]
 #[path = "../tests/pcg/mcp_fixture.rs"]
 pub(crate) mod mcp_fixture;
+#[cfg(test)]
+#[path = "../tests/pcg/document_fixture.rs"]
+pub(crate) mod document_fixture;
 
 #[cfg(test)]
 #[path = "../tests/pcg/query.rs"]

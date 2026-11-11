@@ -80,6 +80,10 @@ fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
 
 static PCG_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
     std::sync::OnceLock::new();
+static DOCUMENT_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
+static COMBINED_PCG_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
 
 #[cfg(test)]
 pub fn setup_handler_registry_for_tests() {
@@ -140,7 +144,15 @@ pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, s
         _ => {}
     }
 
-    let registry = if state.pcg.enabled() {
+    let registry = if state.pcg.documents.is_some() {
+        if state.pcg.enabled() {
+            COMBINED_PCG_REGISTRY
+                .get_or_init(|| tool_handlers::registry::create_document_registry(true))
+        } else {
+            DOCUMENT_REGISTRY
+                .get_or_init(|| tool_handlers::registry::create_document_registry(false))
+        }
+    } else if state.pcg.enabled() {
         PCG_REGISTRY.get_or_init(tool_handlers::registry::create_pcg_registry)
     } else {
         get_registry()

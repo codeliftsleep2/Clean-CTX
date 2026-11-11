@@ -221,3 +221,13 @@ pub(crate) fn create_pcg_registry() -> HandlerRegistry {
     registry.register("pcg_query_v1", Box::new(super::pcg::handle));
     registry
 }
+
+pub(crate) fn create_document_registry(with_v1: bool) -> HandlerRegistry {
+    let mut registry = if with_v1 {
+        create_pcg_registry()
+    } else {
+        create_default_registry()
+    };
+    registry.register("pcg_documents_v1", Box::new(super::pcg_documents::handle));
+    registry
+}

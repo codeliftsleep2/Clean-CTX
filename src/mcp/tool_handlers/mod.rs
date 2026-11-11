@@ -18,6 +18,7 @@ pub mod edit;
 pub mod gitdiff;
 pub(crate) mod hydration;
 pub(crate) mod pcg;
+pub(crate) mod pcg_documents;
 pub mod persistence;
 pub mod query;
 pub mod refresh;
