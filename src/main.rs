@@ -14,6 +14,11 @@ use clap::Parser;
     about = "Token Waste Reducer & Context Compiler",
 )]
 enum Cli {
+    /// Explicit owner-enrolled PCG projection maintenance (no retrieval API).
+    Pcg {
+        #[command(subcommand)]
+        command: clean_ctx::pcg::cli::Command,
+    },
     /// Create default .clean-ctx.json config and .clean-ctx/ directory
     Init,
     /// Check CBM availability and optionally generate config
@@ -46,6 +51,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // automatically dispatched above — no parallel manual whitelist to keep
     // in sync.
     match Cli::try_parse() {
+        Ok(Cli::Pcg { command }) => clean_ctx::pcg::cli::run(command),
         Ok(Cli::Init) => cmd_init(),
         Ok(Cli::Setup { force }) => cmd_setup_cbm(force),
         Ok(Cli::ConfigDump) => cmd_config_dump(),
@@ -54,7 +60,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Intercept it to default to running the MCP server (stdio JSON-RPC loop).
         // Any future Cli variant is automatically dispatched above — no parallel
         // manual whitelist to keep in sync.
-        Err(e) if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand => {
+        Err(e)
+            if e.kind() == clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
+                && std::env::args_os().len() == 1 =>
+        {
             clean_ctx::mcp::run()
         }
         Err(e) => e.exit(),

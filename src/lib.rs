@@ -42,6 +42,7 @@ pub mod ir;
 pub mod layers;
 pub mod meta_util;
 pub mod observability;
+pub mod pcg;
 pub mod proxy_spawner;
 pub mod spring_meta;
 pub mod tokenizer;
