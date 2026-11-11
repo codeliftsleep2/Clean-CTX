@@ -214,3 +214,10 @@ pub fn create_default_registry() -> HandlerRegistry {
 
     reg
 }
+
+/// The enabled catalog and dispatch use this same conditional extension.
+pub(crate) fn create_pcg_registry() -> HandlerRegistry {
+    let mut registry = create_default_registry();
+    registry.register("pcg_query_v1", Box::new(super::pcg::handle));
+    registry
+}

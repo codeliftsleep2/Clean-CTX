@@ -60,6 +60,60 @@ pub fn send_response(val: &serde_json::Value) {
     let _ = send_response_checked(val);
 }
 
+/// Emit the M3-metered tool result verbatim; only JSON-RPC framing is added.
+/// Ordinary responses retain their existing serialization path below.
+pub(crate) fn send_pcg_result(
+    id: &serde_json::Value,
+    result: &crate::pcg::projection::Response,
+) -> bool {
+    let Ok(id) = serde_json::to_string(id) else {
+        return false;
+    };
+    let payload = format!(
+        "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{}}}",
+        result.serialized_result
+    );
+    #[cfg(test)]
+    {
+        capture_wire(&payload);
+        if let Ok(value) = serde_json::from_str(&payload) {
+            captured_responses().push(value);
+        }
+        println!("{payload}");
+        true
+    }
+    #[cfg(not(test))]
+    {
+        use std::io::{self, Write};
+        let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
+        let mut stdout = io::stdout().lock();
+        writeln!(stdout, "{payload}")
+            .and_then(|_| stdout.flush())
+            .is_ok()
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static CAPTURED_WIRE: std::cell::RefCell<Option<Vec<String>>> = const { std::cell::RefCell::new(None) };
+}
+#[cfg(test)]
+fn capture_wire(payload: &str) {
+    CAPTURED_WIRE.with(|sink| {
+        if let Some(values) = sink.borrow_mut().as_mut() {
+            values.push(payload.to_owned());
+        }
+    });
+}
+#[cfg(test)]
+pub(crate) fn begin_wire_capture() {
+    CAPTURED_WIRE.with(|sink| *sink.borrow_mut() = Some(Vec::new()));
+}
+#[cfg(test)]
+pub(crate) fn take_captured_wire() -> Vec<String> {
+    CAPTURED_WIRE.with(|sink| sink.borrow_mut().take().unwrap_or_default())
+}
+
 /// Send a response and report whether serialization, write, and flush succeeded.
 pub(crate) fn send_response_checked(val: &serde_json::Value) -> bool {
     #[cfg(test)]
@@ -68,6 +122,7 @@ pub(crate) fn send_response_checked(val: &serde_json::Value) -> bool {
             q.push(val.clone());
         }
         if let Ok(payload) = serde_json::to_string(val) {
+            capture_wire(&payload);
             // Route diagnostics through libtest capture: successful tests stay
             // quiet, while failures retain the complete model-facing response.
             println!("{payload}");

@@ -78,6 +78,9 @@ fn get_registry() -> &'static tool_handlers::registry::HandlerRegistry {
     HANDLER_REGISTRY.get_or_init(tool_handlers::registry::create_default_registry)
 }
 
+static PCG_REGISTRY: std::sync::OnceLock<tool_handlers::registry::HandlerRegistry> =
+    std::sync::OnceLock::new();
+
 #[cfg(test)]
 pub fn setup_handler_registry_for_tests() {
     let _ = get_registry();
@@ -137,7 +140,12 @@ pub(crate) fn dispatch_tools_call(id: &Value, tool_name: &str, params: &Value, s
         _ => {}
     }
 
-    if let Some(entry) = get_registry().get(tool_name) {
+    let registry = if state.pcg.enabled() {
+        PCG_REGISTRY.get_or_init(tool_handlers::registry::create_pcg_registry)
+    } else {
+        get_registry()
+    };
+    if let Some(entry) = registry.get(tool_name) {
         (entry.handler)(id, params, state);
         return;
     }

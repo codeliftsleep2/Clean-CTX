@@ -33,7 +33,7 @@ pub(crate) fn handle_tools_list(id: &Value, state: &McpState) {
         "jsonrpc": "2.0",
         "id": id,
         "result": {
-            "tools": tools::tool_list()
+            "tools": tools::tool_list_for_state(state)
         }
     });
 

@@ -232,7 +232,9 @@ fn read(
     packing: &mut Packing<'_>,
 ) -> Result<()> {
     trusted.recheck()?;
-    let connection = store::reader(trusted, &q.corpus)?;
+    // Failure to open the projection is not failure of an enrolled source witness.
+    let connection =
+        store::reader(trusted, &q.corpus).map_err(|_| Error("projection_unavailable"))?;
     require(
         store::head(&connection, trusted, &q.corpus)? == Some(q.generation.clone()),
         "generation_mismatch",

@@ -1,0 +1,21 @@
+{
+ "$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","additionalProperties":false,
+ "required":["workspaceRoot","corpus","generation","mode","subject","tokenizer","limits","includeHistory"],
+ "properties":{
+  "workspaceRoot":{"type":"string","minLength":1},"corpus":{"$ref":"#/$defs/id"},"generation":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+  "mode":{"enum":["constraints","closure","impact","provenance"]},
+  "subject":{"type":"object","additionalProperties":false,"required":["workspace","at"],"properties":{
+   "workspace":{"$ref":"#/$defs/id"},"file":{"type":"string","minLength":1},"operation":{"$ref":"#/$defs/id"},"task":{"$ref":"#/$defs/id"},"at":{"type":"string","pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"},
+   "entity":{"type":"object","additionalProperties":false,"required":["kind","file","source_sha256","start","end","name","declaration_kind"],"properties":{
+    "kind":{"const":"declaration"},"file":{"type":"string","minLength":1},"source_sha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},"start":{"type":"integer","minimum":0},"end":{"type":"integer","minimum":1},"name":{"type":"string","minLength":1},"declaration_kind":{"type":"string","minLength":1}
+   }}
+  }},
+  "records":{"type":"array","minItems":1,"uniqueItems":true,"items":{"$ref":"#/$defs/id"}},
+  "tokenizer":{"enum":["cl100k","o200k"]},"includeHistory":{"type":"boolean"},
+  "limits":{"type":"object","additionalProperties":false,"required":["records","edges","evidence_bytes","token_budget"],"properties":{
+   "records":{"type":"integer","minimum":1},"edges":{"type":"integer","minimum":1},"evidence_bytes":{"type":"integer","minimum":1},"token_budget":{"type":"integer","minimum":1}
+  }}
+ },
+ "oneOf":[{"properties":{"mode":{"const":"constraints"}},"not":{"required":["records"]}},{"properties":{"mode":{"enum":["closure","impact","provenance"]}},"required":["records"]}],
+ "$defs":{"id":{"type":"string","pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"}}
+}

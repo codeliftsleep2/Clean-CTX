@@ -81,6 +81,24 @@ canonical file is rejected; combine selectors for that file into one
 Edit or Verbatim content. If every item fails, the sole text block directs the
 caller to the authoritative structured item errors.
 
+#### Explicit persistent evidence query
+
+`pcg_query_v1` is advertised only when the server starts with an owner-selected
+absolute `CLEAN_CTX_PCG_PROFILE` path. Its closed request requires `workspaceRoot`,
+`corpus`, exact `generation`, `mode`, `subject`, exact `tokenizer`, `limits` and
+`includeHistory`; closure/impact/provenance additionally require record IDs.
+Scope bindings remain owner-enrolled, not caller-editable. No entity identity is
+invented when source-owned proof is unavailable. The tool reads the existing
+projection without importing, hydrating source or injecting context automatically.
+
+The schema owner is `src/mcp/tool_handlers/pcg/schema.json`. Its single text result
+contains the PCG v1 payload; there is no `structuredContent` or `outputSchema`.
+The complete MCP result is token-metered by M3 and emitted verbatim, with only
+JSON-RPC framing added. Inspect `result_state`, coverage, omissions and source
+attribution before using evidence. A complete enrolled-scope result is not edit
+authorization, authenticated approval or a claim of continuous/atomic freshness.
+See [M4a integration evidence](PCG_175_M4A_IMPLEMENTATION.md).
+
 ### 1.3 Diff/Delta Tools (Read-Only Comparisons)
 
 | Tool | Required | Optional | Semantics |

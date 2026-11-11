@@ -533,6 +533,16 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
     super::tool_annotations::inject(inject_supported_languages(tools))
 }
 
+pub(crate) fn tool_list_for_state(state: &super::McpState) -> Vec<Value> {
+    let mut tools = tool_list();
+    if state.pcg.enabled() {
+        tools.extend(super::tool_annotations::inject(vec![
+            super::tool_handlers::pcg::descriptor(),
+        ]));
+    }
+    tools
+}
+
 #[cfg(test)]
 #[path = "../tests/mcp/tools.rs"]
 mod tests;

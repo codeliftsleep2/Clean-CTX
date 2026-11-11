@@ -124,6 +124,8 @@ pub struct CbmFilterState {
 /// let ir = state.ir_context_lock();  // Another thread holds ir_context, waiting for cache
 /// ```
 pub struct McpState {
+    /// Session-pinned PCG profile; disabled unless explicitly configured.
+    pub(crate) pcg: crate::mcp::pcg_state::PcgState,
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
     /// `compress_code_context` and `compress_workspace`.
     pub dict: Mutex<PathDictionary>,
@@ -283,6 +285,7 @@ impl McpState {
         let proxy_port = config.proxy.port;
 
         Self {
+            pcg: crate::mcp::pcg_state::PcgState::from_environment(),
             dict: Mutex::new(PathDictionary::new()),
             physical_identities: Mutex::new(physical_identities),
             cache: RwLock::new(LocalStateCache::new()),

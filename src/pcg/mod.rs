@@ -15,6 +15,7 @@ mod query_rows;
 mod query_witnesses;
 mod security;
 mod selectors;
+pub(crate) mod session;
 mod store;
 mod validation;
 mod wire;
@@ -52,6 +53,10 @@ mod security_tests;
 #[cfg(test)]
 #[path = "../tests/pcg/support.rs"]
 mod support;
+
+#[cfg(test)]
+#[path = "../tests/pcg/mcp_fixture.rs"]
+pub(crate) mod mcp_fixture;
 
 #[cfg(test)]
 #[path = "../tests/pcg/query.rs"]
