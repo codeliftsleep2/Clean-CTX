@@ -354,3 +354,17 @@ pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue142Accepta
 
 Then run the complete gate exactly from `docs/agent/verification.md`; it is not
 duplicated here.
+
+```architecture-graph
+node: DOC-434
+kind: RESEARCH
+status: INVESTIGATING
+title: Issue142 historical bounded acceptance and lower-bound completeness
+track: REPOSITORY
+artifact: docs/plans/ISSUE_142_FINAL_CROSS_CUTTING_ACCEPTANCE.md
+uses_evidence:
+  - DOC-452
+consumes_authority:
+  - AUTH.SEMANTIC_MODEL
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

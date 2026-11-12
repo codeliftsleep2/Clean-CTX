@@ -413,3 +413,13 @@ repository suite may run locally. Broader implementation remains paused.
 
 Primary verdict: **MORE EVIDENCE REQUIRED**.
 Paused limited-resolution work: **DISCOVERY MUST BE SOLVED FIRST**.
+
+```architecture-graph
+node: DOC-452
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical query-history investigation preceding approved Issue142 decisions
+track: REPOSITORY
+artifact: docs/plans/QUERY_HISTORY_INDEPENDENCE_AND_DISCOVERY_COMPLETENESS_INVESTIGATION.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

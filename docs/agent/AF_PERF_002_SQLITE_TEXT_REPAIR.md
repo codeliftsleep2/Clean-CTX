@@ -334,3 +334,14 @@ repairs remain CLOSED / FIX / PROTECTED. Dense same-signature equality stays def
 Next campaign step is reassessment of remaining default-operation candidates, not
 automatic dense-equality tuning or an implicitly approved implementation. Census
 remains13/9763 scoped,9750 unresolved plus96 supplements.
+```architecture-graph
+node: DOC-195
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical validated borrowing of discarded SQLite pretty text
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_SQLITE_TEXT_REPAIR.md
+preserves:
+  - AUTH.PERSISTENCE_RECOVERY
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

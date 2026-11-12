@@ -507,3 +507,13 @@ obsolete-path matrix audit resumed. Phase 9 is not certified.
 
 The audit continues in
 [`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION_2.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION_2.md).
+
+```architecture-graph
+node: DOC-309
+kind: RESEARCH
+status: INVESTIGATING
+title: Phase9 historical lifecycle audit continuation P9-17 through P9-24
+track: REPOSITORY
+artifact: docs/architecture/IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

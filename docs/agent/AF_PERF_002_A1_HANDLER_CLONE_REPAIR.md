@@ -372,3 +372,15 @@ A4 remain independent gaps. Syntax accounting remains 13 scoped dispositions out
 of 9763 original records, with 9750 unresolved plus 96 callback supplements.
 No additional runtime or field/binary switch is required merely to close this
 bounded internal correction. No commit, stage or push was performed.
+
+```architecture-graph
+node: DOC-137
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical handler-only redundant candidate clone correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_A1_HANDLER_CLONE_REPAIR.md
+preserves:
+  - PERSIST-001
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

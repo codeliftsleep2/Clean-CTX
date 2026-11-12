@@ -580,3 +580,15 @@ Repository evidence supports this future invariant with an exception:
 > Do not discard structured source evidence required by multiple semantic authorities when those authorities would otherwise reconstruct it heuristically from text—unless retention imposes disproportionate lifecycle, storage, or compatibility cost, in which case keep reconstruction local and document the boundary.
 
 **Final decision: DECISION C. MATERIAL RECONSIDERATION WARRANTED for evidence sequencing; generalized synthesis remains rejected.**
+
+```architecture-graph
+node: DOC-319
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical retained invocation evidence decision before resolver extraction
+track: REPOSITORY
+artifact: docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INVESTIGATION.md
+uses_evidence:
+  - DOC-320
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

@@ -108,3 +108,30 @@ operation matrix, binary contract, living architecture overview, and tooling
 guide are the current authorities. A future rewrite of the contributor guide
 must decompose it under the active-file ceiling rather than patching isolated
 claims into an internally inconsistent document.
+
+## B6 historical acceptance scope
+
+Agent MaxHeadRoom, 2026-11-12. This source retains its exact 2026-09-21 Phase 9
+and 0.8.0-rc acceptance statements. B6 attributes them to the original user-reported
+gate and operator results; it does not independently inspect or rerun those gates,
+recertify later revisions, establish field acceptance, or make this historical
+record a competing current normative owner. Current canonical, binary, persistence
+and verification contracts retain their B1–B5 owners. Historical "current" wording
+describes the recorded revision and must not be applied to today's executable.
+
+```architecture-graph
+node: DOC-306
+kind: RESEARCH
+status: INVESTIGATING
+title: Attributed Phase9 acceptance for the historical 0.8.0-rc lifecycle
+track: REPOSITORY
+artifact: docs/architecture/IR_ARCHITECTURE_CERTIFICATION.md
+uses_evidence:
+  - DOC-308
+  - DOC-309
+  - DOC-310
+consumes_authority:
+  - AUTH.CORE_OPS
+  - AUTH.BINARY_V04
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

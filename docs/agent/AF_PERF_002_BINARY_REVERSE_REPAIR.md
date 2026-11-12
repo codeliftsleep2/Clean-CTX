@@ -325,3 +325,14 @@ and closure only. No agent runtime, stage, commit or push. Publication remains
 separately unauthorized. SQLite unused pretty_text materialization is the next
 independent candidate, without implementation approval. Dense same-signature equality
 remains deferred. All earlier protected corrections stay closed; census unchanged.
+```architecture-graph
+node: DOC-148
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical encoder reverse-map reuse correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_BINARY_REVERSE_REPAIR.md
+preserves:
+  - AUTH.BINARY_V04
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

@@ -606,3 +606,13 @@ Primary verdict: **PIPE TRANSPORT REQUIRES REVISION**.
 Old cache-root decision: **USE CBM ACCOUNT CANONICAL CACHE ROOT**.
 
 Current pipe-level interception mechanism: **PRESERVE WITH TRANSPORT CHANGES**.
+
+```architecture-graph
+node: DOC-379
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical frontend-session versus provider-owned daemon reconciliation
+track: REPOSITORY
+artifact: docs/plans/CBM_SUBPROCESS_SESSION_DAEMON_RECONCILIATION_INVESTIGATION.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

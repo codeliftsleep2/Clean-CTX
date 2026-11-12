@@ -284,3 +284,15 @@ Intermediate evidence-only builds produced unused-field/method warnings before c
 The original frozen implementation slices remain behaviorally preserved by the executed controls. No public schema, constructor extraction, Pipe admission, generic invocation contract, CBM, discovery/hydration policy, templates, NgRx, edit, diff or .NET implementation was changed. Producer-generation fixture alignment and the Pipe comment are explicit bookkeeping, not reopened repairs.
 
 Stop after #138b. Do not close #138 or begin another production slice without owner authorization. Publication/push was not requested; the completed work is committed locally for review.
+
+```architecture-graph
+node: DOC-421
+kind: RESEARCH
+status: INVESTIGATING
+title: Resumed structured inject prerequisite and bounded token repair
+track: REPOSITORY
+artifact: docs/plans/ISSUE_138B_STRUCTURED_INJECT_REPAIR.md
+uses_evidence:
+  - DOC-420
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

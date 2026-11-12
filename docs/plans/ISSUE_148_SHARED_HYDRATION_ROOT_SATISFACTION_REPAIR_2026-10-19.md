@@ -227,3 +227,17 @@ COMMANDS-AWAITING-OPERATOR-AUTHORIZATION:
 6. `cargo test --all-features red_h`
 7. `cargo clippy --all-targets --all-features -- -D warnings`
 8. `pwsh -NoProfile -File ./verification/issue-reconciliation/Invoke-Issue148Acceptance.ps1 -BinaryPath ./target/debug/clean-ctx.exe -ProviderPath "$env:LOCALAPPDATA\Programs\codebase-memory-mcp\codebase-memory-mcp.exe"`
+
+```architecture-graph
+node: DOC-447
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical shared hydration root-satisfaction repair and focused return
+track: REPOSITORY
+artifact: docs/plans/ISSUE_148_SHARED_HYDRATION_ROOT_SATISFACTION_REPAIR_2026-10-19.md
+uses_evidence:
+  - DOC-446
+preserves:
+  - WSC-019
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

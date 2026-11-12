@@ -511,3 +511,13 @@ THE SHARED ROOT-SATISFACTION DECISION IN HYDRATION: READY PROVIDER SUCCESS MAY A
 6. **R0–R6 changes:** no architecture change required; preserve them.
 7. **R6 reverification:** required because shared source acquisition/publication feeds its durable and request-local semantics.
 8. **R7 status:** blocked until repair and R6 reverification are GREEN.
+
+```architecture-graph
+node: DOC-446
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical provider-success root-satisfaction causal divergence
+track: REPOSITORY
+artifact: docs/plans/ISSUE_148_PROVIDER_STATE_REVERSE_EDGES_DIVERGENCE_INVESTIGATION_2026-10-19.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

@@ -613,3 +613,13 @@ production operation/lifecycle, semantic-family, and obsolete-path matrix audit
 resumed in
 [`IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md`](IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md).
 Phase 9 is not certified.
+
+```architecture-graph
+node: DOC-308
+kind: RESEARCH
+status: INVESTIGATING
+title: Phase9 historical production lifecycle audit findings P9-01 through P9-16
+track: REPOSITORY
+artifact: docs/architecture/IR_PRODUCTION_INTEGRATION_AUDIT.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

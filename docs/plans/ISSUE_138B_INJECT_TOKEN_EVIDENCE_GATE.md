@@ -117,3 +117,13 @@ No production changes or downstream improvements occurred. No preservation filte
 Live evidence: `target/angular-inject-token/20261012-145418-89830ad9/`, including primary context/entities/edges, actual targets, source oracle, provenance, JSON-RPC frames, stderr and verdicts. The Cargo RED log is copied into that directory as `registered-red.log`.
 
 No candidate binary, GREEN, live provider, full suite, CI gate, model-host trial, commit or push was run. Work remains an uncommitted blocked draft. Resume only after owner review of the structured evidence boundary; retain the exact primary regression unchanged for its eventual RED→GREEN procedure.
+
+```architecture-graph
+node: DOC-420
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical blocked inject token identity run
+track: REPOSITORY
+artifact: docs/plans/ISSUE_138B_INJECT_TOKEN_EVIDENCE_GATE.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

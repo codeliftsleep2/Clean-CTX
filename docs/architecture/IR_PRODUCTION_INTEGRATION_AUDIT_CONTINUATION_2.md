@@ -276,3 +276,13 @@ exhaustive matrix is complete, no unresolved high-severity integration gap or
 registered obsolete bypass remains, and all bounded repairs are user-verified.
 Phase 10 was then explicitly started for `0.8.0-rc`. Final `0.8.0` remains
 withheld until live field testing is complete.
+
+```architecture-graph
+node: DOC-310
+kind: RESEARCH
+status: INVESTIGATING
+title: Phase9 historical file-scoped transaction and fallback quarantine findings
+track: REPOSITORY
+artifact: docs/architecture/IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION_2.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

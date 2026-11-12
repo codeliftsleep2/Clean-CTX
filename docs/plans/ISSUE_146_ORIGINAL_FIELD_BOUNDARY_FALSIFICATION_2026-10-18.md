@@ -391,3 +391,15 @@ Production repair authorized: NO
 ```text
 Merge with Issue #144: NOT PROVEN
 ```
+
+```architecture-graph
+node: DOC-444
+kind: RESEARCH
+status: INVESTIGATING
+title: Original cross-root field cause remains evidence-insufficient
+track: REPOSITORY
+artifact: docs/plans/ISSUE_146_ORIGINAL_FIELD_BOUNDARY_FALSIFICATION_2026-10-18.md
+uses_evidence:
+  - EXP-004-CROSSROOT
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

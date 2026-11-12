@@ -282,3 +282,13 @@ second delta source read, startup projection and dense equality remain deferred,
 startup delta-count removal rejected, cached-return IR construction required.
 All earlier protected repairs stay closed. No further investigation is initiated
 automatically. No agent runtime, staging, commit or push; publication separate.
+
+```architecture-graph
+node: DOC-161
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical registered diff source-ownership correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_DIFF_SOURCE_REPAIR.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

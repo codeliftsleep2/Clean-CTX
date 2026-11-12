@@ -397,3 +397,15 @@ pretty_text remains separate. Dense same-signature equality remains deferred. Al
 previous protected repairs stay closed. No stage, commit or push performed;
 repository publication remains a separate decision. Census unchanged13/9763 scoped,
 9750 unresolved plus96 callback supplements; operation rows are not syntax dispositions.
+
+```architecture-graph
+node: DOC-146
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical encoder ordered-vector borrowing correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_BINARY_CLONE_REPAIR.md
+preserves:
+  - AUTH.BINARY_V04
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

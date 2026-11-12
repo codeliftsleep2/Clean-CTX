@@ -169,3 +169,13 @@ was verified zero-hit across the clean tree (501 tracked files) before
 being enforced, and the same intentional-documentation allowlist governs
 both signature families. Pure-ASCII files are scanned for this class — the
 mojibake-only ASCII fast-path skip does not apply to it.
+
+```architecture-graph
+node: AUTH.SOURCE_ENCODING
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Tracked encoding-policy projection subordinate to governing local rule
+track: REPOSITORY
+artifact: docs/ENCODING_POLICY.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

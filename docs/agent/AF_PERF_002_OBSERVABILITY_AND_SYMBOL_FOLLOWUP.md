@@ -127,3 +127,13 @@ Syntax accounting is unchanged: 9763 original records, 13 scoped dispositions,
 9750 unresolved plus 96 callback supplements. None of the source observations in
 this document classify a frozen syntax record, establish a new performance
 invariant or substitute for exhaustive source-wide reconciliation.
+
+```architecture-graph
+node: DOC-175
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical exporter transport and symbol no-repair decision
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OBSERVABILITY_AND_SYMBOL_FOLLOWUP.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

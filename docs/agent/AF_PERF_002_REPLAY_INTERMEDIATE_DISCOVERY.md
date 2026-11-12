@@ -232,3 +232,13 @@ observability/startup diagnostics, edit/diff tooling, binary serialization, rema
 compaction paths and untraced delegated consumers. Prioritize consequential production
 work over more replay variations or incidental syntax volume. No new runtime gate
 is necessary for this documentation-only closure; source evidence stays frozen.
+
+```architecture-graph
+node: DOC-187
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical intermediate replay atomicity and no-repair decision
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_REPLAY_INTERMEDIATE_DISCOVERY.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

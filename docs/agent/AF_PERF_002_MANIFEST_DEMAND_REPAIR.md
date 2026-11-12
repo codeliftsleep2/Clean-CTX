@@ -394,3 +394,15 @@ events or peak memory. Prior repairs stay protected; startup projection deferred
 count removal rejected and dense equality deferred. No new investigation follows
 automatically. No production/test edits follow acceptance; documentation only.
 No agent runtime, staging, commit or push. Publication separate; census unchanged.
+
+```architecture-graph
+node: DOC-170
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Historical explicit-demand per-root manifest construction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_MANIFEST_DEMAND_REPAIR.md
+preserves:
+  - WSC-014
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

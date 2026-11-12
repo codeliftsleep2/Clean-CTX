@@ -196,3 +196,15 @@ live mutation uncertainty and incompatible cohort behavior remain limitations.
 **PHASE B REQUIRES SEPARATE AUTHORIZATION**
 
 **PHASE A ACCEPTED WITH DECLARED LIVE LIMITATIONS**
+
+```architecture-graph
+node: DOC-369
+kind: RESEARCH
+status: INVESTIGATING
+title: A5 later Linux pinned-provider acceptance with explicit live limits
+track: REPOSITORY
+artifact: docs/plans/CBM_A5_ENVIRONMENT_RECOVERY_AND_ACCEPTANCE.md
+uses_evidence:
+  - DOC-371
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

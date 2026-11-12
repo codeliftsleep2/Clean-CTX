@@ -463,3 +463,13 @@ Proceed with a limited private extraction of request-scoped evidence requirement
 The first extraction target is duplicated C#/Angular query orchestration. The first falsifying migration target is one narrowly defined NgRx neutral-to-typed resolution after NgRx obtains structured occurrence and identity evidence.
 
 > **Mission:** Establish the smallest preservation-first resolution boundary that reuses scope, hydration, completeness, and provenance mechanics while leaving every semantic conclusion with the language or domain authority that can actually prove it.
+
+```architecture-graph
+node: DOC-320
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical limited extraction verdict rejecting generic semantic synthesis
+track: REPOSITORY
+artifact: docs/architecture/SEMANTIC_INTELLIGENCE_ARCHITECTURE_HARDENING_INVESTIGATION.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```

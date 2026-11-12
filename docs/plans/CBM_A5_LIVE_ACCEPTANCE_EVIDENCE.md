@@ -164,3 +164,13 @@ rewrite provider configuration or repeat the matrix without resolving that
 environment prerequisite. No Clean-CTX repair is proposed by this evidence.
 
 **A5 BLOCKED — ACCEPTANCE ENVIRONMENT FAILURE**
+
+```architecture-graph
+node: DOC-371
+kind: RESEARCH
+status: INVESTIGATING
+title: A5 read-only account-cache prerequisite failure
+track: REPOSITORY
+artifact: docs/plans/CBM_A5_LIVE_ACCEPTANCE_EVIDENCE.md
+note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+```
