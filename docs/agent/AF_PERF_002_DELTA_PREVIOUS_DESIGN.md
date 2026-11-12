@@ -281,3 +281,13 @@ baseline, independent actual cached-return discarded-snapshot budget and subsequ
 acceptance sequence are tracked in AF_PERF_002_DELTA_PREVIOUS_REPAIR.md. Historical
 design results above remain unchanged. No release behavior change precedes valid
 original RED; no publication is authorized.
+
+```architecture-graph
+node: DOC-156
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical delayed-capture design and conditional approval
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_DELTA_PREVIOUS_DESIGN.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

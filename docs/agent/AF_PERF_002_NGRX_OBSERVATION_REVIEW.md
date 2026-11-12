@@ -309,3 +309,15 @@ scheduling remain unresolved; no deferral/index/cache change is authorized. A2's
 no-repair decision remains closed and A3 protected. Source-wide discovery, A1/A4,
 declaration membership and remaining inventory gaps are independent. No automatic
 repeat campaign, binary rebuild or Claude field switch is needed for this result.
+
+```architecture-graph
+node: DOC-172
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Accepted no-family collector prepass without reconciliation deferral
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_NGRX_OBSERVATION_REVIEW.md
+uses_evidence:
+  - DOC-174
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

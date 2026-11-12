@@ -236,3 +236,26 @@ cloning, still unmeasured and not authorized for production correction. Public
 listing scaling stays monitored; dense same-signature equality remains deferred.
 No further timing requested solely to obtain favorable samples. All completed
 repairs stay CLOSED / FIX / PROTECTED. No stage, commit or push; census unchanged.
+```architecture-graph
+node: DOC-196
+kind: RESEARCH
+status: INVESTIGATING
+title: Executed startup projection comparison and count-error controls
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```
+
+```architecture-graph
+node: PERF-002-STARTUP
+kind: MISSION
+status: INVESTIGATING
+title: Preserving startup projection deferred and count-removal rejected
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md
+uses_evidence:
+  - DOC-196
+preserves:
+  - AUTH.PERSISTENCE_RECOVERY
+note: Source-attributed returned investigation disposition; no owner freeze inferred. DEFER and REJECT remain distinct prose decisions, not new GLS statuses.
+```

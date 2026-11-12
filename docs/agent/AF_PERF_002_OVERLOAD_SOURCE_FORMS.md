@@ -262,3 +262,13 @@ control. The identity test therefore uses exact tracked pre-substitution helper/
 comparator text fixtures to preserve the historical experiment baseline. Current
 production static/public/mutation/composed acceptance is recorded in
 [repair](AF_PERF_002_OVERLOAD_REPAIR.md) and cannot be inferred from this report.
+
+```architecture-graph
+node: DOC-182
+kind: RESEARCH
+status: INVESTIGATING
+title: Owner-approved bounded overload source-form tradeoff
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OVERLOAD_SOURCE_FORMS.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

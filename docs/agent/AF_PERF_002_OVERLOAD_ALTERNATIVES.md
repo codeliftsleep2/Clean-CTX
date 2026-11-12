@@ -245,3 +245,13 @@ If a revised candidate resolves the measured regressions, return its exact bound
 production proposal and original-budget/semantic/static/mutation/composed plan for
 owner authorization. No further execution is requested merely to reconfirm these
 results. All previously protected scopes remain closed.
+
+```architecture-graph
+node: DOC-178
+kind: RESEARCH
+status: INVESTIGATING
+title: Historical overload alternatives and unaccepted tradeoff comparison
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OVERLOAD_ALTERNATIVES.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

@@ -88,3 +88,13 @@ of this first repair unless separately approved.
 No broad historical campaign, generation advance or resolver-key expansion. No
 agent Cargo/test/build/server ran. These four passes characterize existing work;
 focused lint/preservation remains required for accepting instrumentation changes.
+
+```architecture-graph
+node: DOC-145
+kind: RESEARCH
+status: INVESTIGATING
+title: Populated reconciliation characterization and membership proposal
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_BASELINE_002_RESULTS.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

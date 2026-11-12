@@ -652,3 +652,21 @@ No stage, commit or push performed. Repository publication remains separate.
 All prior protected repairs stay closed. Census remains 13 scoped of 9763 original
 records, 9750 unresolved plus 96 supplements; operation rows are not new syntax
 dispositions.
+
+```architecture-graph
+node: PERF-003-OVERLOAD
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Accepted signature-array overload retrieval with residual equality bound
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OVERLOAD_REPAIR.md
+supersedes:
+  - PERF-006-FIFO
+uses_evidence:
+  - DOC-178
+  - DOC-179
+  - DOC-182
+consumes_authority:
+  - PERF-004-DOCTRINE
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

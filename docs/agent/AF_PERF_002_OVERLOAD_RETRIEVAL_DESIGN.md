@@ -205,3 +205,13 @@ not measured for an unimplemented replacement. Acceptance must decide whether
 those costs are minor or require tradeoff review. No production code/test edits,
 runtime, stage/commit/push performed for this design return. Census remains
 13/9763 scoped, 9750 unresolved plus 96 callback supplements.
+
+```architecture-graph
+node: PERF-006-FIFO
+kind: MISSION
+status: SUPERSEDED
+title: Historical initial same-name FIFO retrieval proposal
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OVERLOAD_RETRIEVAL_DESIGN.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

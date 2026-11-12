@@ -1,0 +1,2 @@
+subject,path,original,correction,basis,runtime_change
+C06,docs/agent/AF_PERF_002_DELTA_PREVIOUS_REPAIR.md,No production behavior correction has been applied.,Retain exact opening; appended chronology annotation points to later final composed correction,Final composed acceptance: CLOSED / FIX / PROTECTED; dated original/after/focused/mutation/composed receipts remain separate,none

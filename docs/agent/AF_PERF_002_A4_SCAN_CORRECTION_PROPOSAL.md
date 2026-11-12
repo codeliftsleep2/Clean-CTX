@@ -530,3 +530,15 @@ closed. Census remains13/9763 scoped,9750 unresolved plus96 callback supplements
 No code/test changes after acceptance; this closure updates documentation only.
 No agent runtime, stage, commit or push performed. Repository publication remains
 separate from completed verification.
+
+```architecture-graph
+node: DOC-142
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Accepted bounded CSharp original-input retrieval correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_A4_SCAN_CORRECTION_PROPOSAL.md
+preserves:
+  - SEMDEP-001
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

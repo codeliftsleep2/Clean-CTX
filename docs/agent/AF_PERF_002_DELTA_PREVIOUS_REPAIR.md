@@ -393,3 +393,34 @@ Second delta read, startup projection and dense equality remain deferred; startu
 count removal remains rejected; required cached IR construction remains necessary.
 No new investigation follows automatically. No production/test changes follow
 acceptance; documentation only. No agent runtime, staging, commit or push.
+
+## B5 chronology qualification: C06
+
+Agent MaxHeadRoom, 2026-11-12. The opening sentence "No production behavior
+correction has been applied" is retained verbatim as the pre-substitution
+checkpoint. It is not current implementation standing: the final composed
+acceptance section records the later completed delayed-capture correction.
+This is an explicit descriptive correction to chronology, not a new execution,
+semantic change, universal speedup or replacement of the historical measurements.
+The earlier sixteen High/Edit design rows and later High-only integrated timing
+rows describe different implementations and instrumentation boundaries. Neither
+is substituted for the other; all-five-fidelity equivalence comes from the separate
+380-row frozen controls. The mixed integrated medians, overlapping ranges and
+resource-exhaustion exclusion remain intact. Current document retrieval does not
+reverify the historical handler hash or certify today's executable performance.
+
+```architecture-graph
+node: DOC-157
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Delayed previous-authority capture bounded historical correction
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_DELTA_PREVIOUS_REPAIR.md
+uses_evidence:
+  - DOC-156
+preserves:
+  - AUTH.DELTA_SEQUENCE
+consumes_authority:
+  - PERF-004-DOCTRINE
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

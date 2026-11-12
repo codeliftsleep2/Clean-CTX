@@ -109,3 +109,13 @@ and concurrency designs after this missing characterization. No production
 optimization is authorized or implemented by this measured return. Accepted gen78
 semantics remain baseline; instrumentation edits require their own focused lint/
 preservation before hardening acceptance, not reopening feature contracts.
+
+```architecture-graph
+node: DOC-144
+kind: RESEARCH
+status: INVESTIGATING
+title: First typed witness and index characterization packet
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_BASELINE_001_RESULTS.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

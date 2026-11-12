@@ -353,3 +353,17 @@ cost, not claimed eliminated by retained-memory measurements. No interning added
 reconciliation costs need separate characterization/disposition. Broader audit
 coverage map, adversarial second pass, blocking coverage drift beyond the finite
 known writer scope, and witness/currentness/lock designs remain outstanding.
+
+```architecture-graph
+node: DOC-168
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Finite ordered-index membership repair and outstanding broader audit
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_INDEX_MEMBERSHIP_DESIGN.md
+preserves:
+  - PERF-005-BOUNDED
+uses_evidence:
+  - DOC-145
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

@@ -72,3 +72,15 @@ preserves:
   - INV.C22
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 ```
+
+```architecture-graph
+node: META-002
+kind: INVARIANT
+status: IMPLEMENTED
+title: META-002 compilation-scoped single evaluation
+track: REPOSITORY
+artifact: docs/invariants/meta-evidence.md
+preserves:
+  - INV.C22
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

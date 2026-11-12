@@ -272,3 +272,15 @@ No preservation or binary command is launched or requested before this scope
 boundary is resolved, avoiding another superseded campaign. No production edit
 accompanies this review. Architectural Approval Gate applies because the owner
 explicitly approved a finite consumer set and withheld broader changes.
+
+```architecture-graph
+node: DOC-136
+kind: RESEARCH
+status: INVESTIGATING
+title: Unresolved admission amplification and separate witness lock design
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_001_UNRESOLVED_CALL_REVIEW.md
+uses_evidence:
+  - DOC-135
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

@@ -212,3 +212,15 @@ No further A2 packet is queued merely to improve local completeness. The512-cont
 output fixture has fixed class/ownership work; elapsed growth is not attributed
 to owner selection. A3 protection continues independently; A1/A4 and non-C# audit
 work remain separate. No A2 production selection repair is applied.
+
+```architecture-graph
+node: DOC-139
+kind: RESEARCH
+status: INVESTIGATING
+title: Owner MONITOR decision against proposed A2a selection repair
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_A2_OWNERSHIP_RESULTS.md
+consumes_authority:
+  - PERF-004-DOCTRINE
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

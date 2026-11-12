@@ -1,0 +1,28 @@
+id,kind,status,current_owner,artifact,scope
+PERF-005-BOUNDED,INVARIANT,IMPLEMENTED,docs/architecture/contracts/performance-doctrine.md,AGENTS.md,AF-PERF-001 bounded semantic operation work
+PERF-004-DOCTRINE,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/performance-doctrine.md,AGENTS.md,AF-PERF-002 exhaustive discovery and selective remediation
+AUTH.FINAL_VERIFICATION,AUTHORITY,IMPLEMENTED,docs/agent/verification.md,docs/agent/verification.md,Repository final verification and bounded-work gate
+META-002,INVARIANT,IMPLEMENTED,docs/invariants/meta-evidence.md,docs/invariants/meta-evidence.md,META-002 compilation-scoped single evaluation
+DOC-135,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_001_DESIGN.md,docs/agent/AF_PERF_001_DESIGN.md,Bounded semantic fitness design and scoped generation78 evidence
+DOC-136,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_001_UNRESOLVED_CALL_REVIEW.md,docs/agent/AF_PERF_001_UNRESOLVED_CALL_REVIEW.md,Unresolved admission amplification and separate witness lock design
+DOC-144,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_BASELINE_001_RESULTS.md,docs/agent/AF_PERF_002_BASELINE_001_RESULTS.md,First typed witness and index characterization packet
+DOC-145,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_BASELINE_002_RESULTS.md,docs/agent/AF_PERF_002_BASELINE_002_RESULTS.md,Populated reconciliation characterization and membership proposal
+DOC-197,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_SYSTEM_WIDE_INVESTIGATION.md,docs/agent/AF_PERF_002_SYSTEM_WIDE_INVESTIGATION.md,System-wide performance risk inventory with incomplete coverage
+DOC-156,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_DELTA_PREVIOUS_DESIGN.md,docs/agent/AF_PERF_002_DELTA_PREVIOUS_DESIGN.md,Historical delayed-capture design and conditional approval
+DOC-157,IMPLEMENTATION,IMPLEMENTED,docs/agent/AF_PERF_002_DELTA_PREVIOUS_REPAIR.md,docs/agent/AF_PERF_002_DELTA_PREVIOUS_REPAIR.md,Delayed previous-authority capture bounded historical correction
+EXP-003-REPLAY,EXPERIMENT,FALSIFIED,docs/architecture/contracts/replay-reuse-hypothesis.md,docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md,Earlier Candidate equals later replay under alias deletion
+DOC-188,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md,docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md,Executed replay reuse design and registered-delete counterexample
+DOC-165,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md,docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md,Replay retirement and measured deferred Gitdiff ownership candidates
+PERF-001-REPLAY,MISSION,FROZEN,docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md,docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md,Owner no-repair decision for earlier Candidate replay reuse
+DOC-196,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md,docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md,Executed startup projection comparison and count-error controls
+PERF-002-STARTUP,MISSION,INVESTIGATING,docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md,docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md,Preserving startup projection deferred and count-removal rejected
+PERF-006-FIFO,MISSION,SUPERSEDED,docs/agent/AF_PERF_002_OVERLOAD_RETRIEVAL_DESIGN.md,docs/agent/AF_PERF_002_OVERLOAD_RETRIEVAL_DESIGN.md,Historical initial same-name FIFO retrieval proposal
+DOC-178,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_OVERLOAD_ALTERNATIVES.md,docs/agent/AF_PERF_002_OVERLOAD_ALTERNATIVES.md,Historical overload alternatives and unaccepted tradeoff comparison
+DOC-179,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_OVERLOAD_REFINEMENT.md,docs/agent/AF_PERF_002_OVERLOAD_REFINEMENT.md,Signature-partition refinement design and disclosed residual work
+DOC-182,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_OVERLOAD_SOURCE_FORMS.md,docs/agent/AF_PERF_002_OVERLOAD_SOURCE_FORMS.md,Owner-approved bounded overload source-form tradeoff
+PERF-003-OVERLOAD,IMPLEMENTATION,IMPLEMENTED,docs/agent/AF_PERF_002_OVERLOAD_REPAIR.md,docs/agent/AF_PERF_002_OVERLOAD_REPAIR.md,Accepted signature-array overload retrieval with residual equality bound
+DOC-168,IMPLEMENTATION,IMPLEMENTED,docs/agent/AF_PERF_002_INDEX_MEMBERSHIP_DESIGN.md,docs/agent/AF_PERF_002_INDEX_MEMBERSHIP_DESIGN.md,Finite ordered-index membership repair and outstanding broader audit
+DOC-174,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_NGRX_RECONSTRUCTION_RESULTS.md,docs/agent/AF_PERF_002_NGRX_RECONSTRUCTION_RESULTS.md,Measured NgRx M times B joins with production repair proposed only
+DOC-172,IMPLEMENTATION,IMPLEMENTED,docs/agent/AF_PERF_002_NGRX_OBSERVATION_REVIEW.md,docs/agent/AF_PERF_002_NGRX_OBSERVATION_REVIEW.md,Accepted no-family collector prepass without reconciliation deferral
+DOC-139,RESEARCH,INVESTIGATING,docs/agent/AF_PERF_002_A2_OWNERSHIP_RESULTS.md,docs/agent/AF_PERF_002_A2_OWNERSHIP_RESULTS.md,Owner MONITOR decision against proposed A2a selection repair
+DOC-142,IMPLEMENTATION,IMPLEMENTED,docs/agent/AF_PERF_002_A4_SCAN_CORRECTION_PROPOSAL.md,docs/agent/AF_PERF_002_A4_SCAN_CORRECTION_PROPOSAL.md,Accepted bounded CSharp original-input retrieval correction

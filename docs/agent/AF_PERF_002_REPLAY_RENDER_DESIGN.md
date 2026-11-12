@@ -325,3 +325,15 @@ hypothesis stays REJECTED; diff_commits stays UNMEASURED. Prior protected correc
 and all deferred/rejected dispositions remain unchanged. No new investigation follows
 automatically. No optimization RED, restoration mutation, composed closure, staging,
 commit or push. Agent inspected user-run evidence and edited documentation only.
+
+```architecture-graph
+node: DOC-188
+kind: RESEARCH
+status: INVESTIGATING
+title: Executed replay reuse design and registered-delete counterexample
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md
+falsifies:
+  - EXP-003-REPLAY
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

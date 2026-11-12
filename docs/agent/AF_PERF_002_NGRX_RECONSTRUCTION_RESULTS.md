@@ -115,3 +115,15 @@ No new runtime command is needed simply to record this return. A2 remains MONITO
 A3 protection remains separate, and broader subsystem discovery continues. Original
 syntax accounting9763 preserved/13 scoped/9750 pending plus96 callback supplements
 is unchanged;56 observed operation rows do not imply additional census dispositions.
+
+```architecture-graph
+node: DOC-174
+kind: RESEARCH
+status: INVESTIGATING
+title: Measured NgRx M times B joins with production repair proposed only
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_NGRX_RECONSTRUCTION_RESULTS.md
+consumes_authority:
+  - PERF-004-DOCTRINE
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

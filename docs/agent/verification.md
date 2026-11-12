@@ -156,3 +156,13 @@ fail the gate. CI runs the same command before its full test step. Gate GREEN co
 only the declared inspected admission families; #173/#174, uninstrumented witness
 scaling and snapshot lock behavior remain separate open risks. Static unresolved
 findings require recorded review; they are not proven absence of amplification.
+
+```architecture-graph
+node: AUTH.FINAL_VERIFICATION
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Repository final verification and bounded-work gate
+track: REPOSITORY
+artifact: docs/agent/verification.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

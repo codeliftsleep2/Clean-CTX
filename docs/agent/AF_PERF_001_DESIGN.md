@@ -296,3 +296,15 @@ No reuse across later calls, mutation or publication without explicit revalidati
 ## Return point
 
 Phase 1 is complete. Request Phase 2 disposition for the minimal AST/counter/policy/CI gate plus the bounded LoadsChildren batching repair described above. No new GitHub issue, shared validation context, cache, mutex restructuring, durable change or semantic generation advance is proposed. Do not resume expensive generation-78 acceptance or key design yet. No agent test/build/lint/runtime was executed for this design.
+
+```architecture-graph
+node: DOC-135
+kind: RESEARCH
+status: INVESTIGATING
+title: Bounded semantic fitness design and scoped generation78 evidence
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_001_DESIGN.md
+preserves:
+  - PERF-005-BOUNDED
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

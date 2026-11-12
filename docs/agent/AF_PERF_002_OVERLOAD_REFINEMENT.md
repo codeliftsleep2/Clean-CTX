@@ -230,3 +230,13 @@ Return disposition: FIX PROPOSED with disclosed bounded cost tradeoffs, ready fo
 owner production decision. No production replacement, staging, commit, push or
 additional runtime requested here. Prior protected repairs and source census stay
 unchanged. Dense same-signature discrimination remains a separate unresolved unit.
+
+```architecture-graph
+node: DOC-179
+kind: RESEARCH
+status: INVESTIGATING
+title: Signature-partition refinement design and disclosed residual work
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_OVERLOAD_REFINEMENT.md
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```

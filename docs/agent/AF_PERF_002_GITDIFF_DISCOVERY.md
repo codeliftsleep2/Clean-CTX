@@ -233,3 +233,29 @@ Replay reuse remains REJECTED; previous protected repairs and deferred/rejected
 boundaries remain unchanged. No new investigation follows automatically. Agent
 only inspected user-run receipts and edited documentation; no agent-run runtime,
 repository staging, commit or push.
+
+```architecture-graph
+node: DOC-165
+kind: RESEARCH
+status: INVESTIGATING
+title: Replay retirement and measured deferred Gitdiff ownership candidates
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md
+uses_evidence:
+  - DOC-188
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```
+
+```architecture-graph
+node: PERF-001-REPLAY
+kind: MISSION
+status: FROZEN
+title: Owner no-repair decision for earlier Candidate replay reuse
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md
+uses_evidence:
+  - DOC-188
+preserves:
+  - AUTH.TOKEN_ECONOMICS
+note: FROZEN imports explicit owner no-repair disposition only; not a universal replay prohibition or new execution authority.
+```

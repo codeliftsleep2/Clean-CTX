@@ -378,3 +378,18 @@ Continue source-wide discovery and the next non-C# consequential characterizatio
 Do not optimize to improve operation counts at the expense of necessary semantics,
 construction/maintenance overhead or avoidable architecture. Existing AF-PERF-001
 invariants and required owner approval remain fully in force.
+
+```architecture-graph
+node: DOC-197
+kind: RESEARCH
+status: INVESTIGATING
+title: System-wide performance risk inventory with incomplete coverage
+track: REPOSITORY
+artifact: docs/agent/AF_PERF_002_SYSTEM_WIDE_INVESTIGATION.md
+consumes_authority:
+  - PERF-004-DOCTRINE
+uses_evidence:
+  - DOC-144
+  - DOC-145
+note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+```
