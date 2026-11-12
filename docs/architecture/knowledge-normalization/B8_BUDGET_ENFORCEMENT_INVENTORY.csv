@@ -1,0 +1,8 @@
+boundary,source,old_policy,disposition
+document request cap,src/pcg/documents/mod.rs::Session::query,q.token_budget>0 and <=trusted.profile.token_budget,Removed;legacy optional u64ignored;no larger cap substituted
+document output cap,src/pcg/documents/mod.rs::Session::query,Exact count>request clears payload;too-small control refuses,Removed;full serialized result returned after normal completion checks
+document profile,src/pcg/documents/profile.rs::Trusted::load,Positive token_budget required,Retired optional metadata;other positive resources remain
+MCPcontract,src/mcp/tool_handlers/pcg_documents.rs::descriptor,Required positive tokenBudget,"Optional deprecated compatibility hint,min0;unknown/null/invalidtyped input still rejects"
+diagnostic count,src/pcg/documents/mod.rs,projection::Response.used_tokens exact shared diagnostic return field,Accurate diagnostic count retained;no count-based admission/publication branch
+enrolled evidence,src/pcg/projection.rs;profile.rs,Required evidence token fit/overflow refusal,UNCHANGED
+codecontext/workspace/proxy,Existing unrelated budgeting paths,Existing independent semantics,UNCHANGED;production diffs confined to document module/profile/tool

@@ -18,8 +18,7 @@ Set `CLEAN_CTX_PCG_DOCUMENT_PROFILE` to an absolute owner-controlled JSON file:
   "max_files": 2048,
   "max_nodes": 2048,
   "max_edges": 8192,
-  "max_bytes": 33554432,
-  "token_budget": 32768
+  "max_bytes": 33554432
 }
 ```
 
@@ -43,8 +42,7 @@ Call `pcg_documents_v1` with:
   "id": "DOC-081",
   "maxNodes": 64,
   "maxEdges": 256,
-  "tokenizer": "o200k",
-  "tokenBudget": 32768
+  "tokenizer": "o200k"
 }
 ```
 
@@ -52,7 +50,23 @@ Modes: search (optional exact track and SQLite FTS5 text expression), get (ID),
 related (one-hop incoming/outgoing), context (transitive pre-authoring context),
 history (ID). No vector service is needed; vectors cannot establish status/edges.
 ID is mandatory outside search. Track/text apply only to search; maxNodes/maxEdges
-apply only to context. Profile ceilings bound requests. All schemas are closed.
+apply only to context. Profile node/edge ceilings bound requests. All schemas are closed.
+
+Document responses are not token-budget limited. The legacy request `tokenBudget`
+and profile `token_budget` fields are optional, accepted compatibility hints with
+no enforcement effect. Exact tokenizer accounting remains diagnostic. Response
+`budget.limit` is null and `budget.enforced` is false. This document-only change
+does not change the separate enrolled-evidence `pcg_query_v1` budget contract.
+Token count is not a document admission, completeness, retrieval or publication
+criterion. Consumer-side model context management is separate from acquiring
+architectural knowledge. Legitimate source, scope, security, database and structural
+resource failures remain explicit; completeness and currentness still control
+whether returned knowledge can be used as a complete current context.
+
+Owner policy disposition (B8, 2026-11-12): this source-owned contract replaces the
+earlier document-specific token-refusal policy. B2–B7 reports retain their exact
+historical budget outcomes. No historical measurement or refusal is rewritten,
+and no new graph edge, lifecycle, or competing normative owner is introduced.
 
 Context follows every outgoing typed relation and incoming SUPERSEDES, FALSIFIES,
 VALIDATES, RECLOSES and BANKS, using a deterministic visited traversal. It returns
@@ -102,10 +116,11 @@ unchanged. Consumers must first inspect `result_state`, `catalog_current`, and
 `context.complete`; source references do not turn an incomplete result into
 complete knowledge.
 
-The entire final serialized MCP **result** is metered after projection, including
-reference metadata and JSON escaping. On budget overflow, documents, source
-pool, relationships and witness paths are cleared together; no partial
-authoritative bundle is returned. History remains the separate, unchanged
+The entire final serialized MCP **result** is counted after projection, including
+reference metadata and JSON escaping. Token counts do not refuse or clear document
+results. Finite source/file/byte and context node/edge limits remain enforced;
+an incomplete context still returns no partial authoritative bundle.
+History remains the separate, unchanged
 version-1 `historical_documents` interface. This format does not change source
 scanning, reconciliation, SQLite schema, traversal, freshness observations,
 authorization or configured limits. Reference overhead can exceed savings for
@@ -182,9 +197,9 @@ current document declarations and checks them again before returning its origina
 metered bytes. Other source-code tools do not consume this document catalog.
 
 The entire MCP result is exactly token-counted with cl100k/o200k and sent through
-the existing exact-byte protocol seam. Required overflow returns a bounded blocked
-control result with no partial source documents; too-small control budgets are
-protocol errors. SQLite busy fails without retry. Current catalog reconciliation
+the existing exact-byte protocol seam. Document token-budget refusal is removed;
+other resource, source, and candidate failures retain their explicit diagnostics.
+SQLite busy fails without retry. Current catalog reconciliation
 is a write effect: its MCP annotation is not read-only, despite source documents
 never being edited. FTS5 must be supported by SQLite; absence refuses initialization.
 

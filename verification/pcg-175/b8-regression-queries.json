@@ -1,0 +1,146 @@
+[
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "replay candidate"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "\"639/644\""
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "resolver runtime"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "generation78"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "provider completeness"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "startup count"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "canonical occurrence"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "approval ledger"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "\"calls_in_file\""
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "PassPipeline"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "DOC-157",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "DOC-157",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-003-OVERLOAD",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-003-OVERLOAD",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-004-DOCTRINE",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-004-DOCTRINE",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "get",
+    "id": "DOC-157"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "get",
+    "id": "PERF-003-OVERLOAD"
+  }
+]

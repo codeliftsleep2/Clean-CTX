@@ -17,6 +17,8 @@ pub struct Profile {
     pub max_nodes: usize,
     pub max_edges: usize,
     pub max_bytes: u64,
+    /// Legacy profile metadata; retained without limiting architectural knowledge.
+    #[serde(default)]
     pub token_budget: u64,
 }
 pub struct Trusted {
@@ -42,7 +44,6 @@ impl Trusted {
                 && profile.max_nodes > 0
                 && profile.max_edges > 0
                 && profile.max_bytes > 0
-                && profile.token_budget > 0
                 && !profile.document_roots.is_empty(),
             "document_profile_schema",
         )?;

@@ -47,6 +47,13 @@ fn registered_document_lifecycle_exact_wire_and_legacy_parity() {
     assert_eq!(d["name"], "pcg_documents_v1");
     assert_eq!(d["annotations"]["readOnlyHint"], false);
     assert_eq!(d["inputSchema"]["additionalProperties"], false);
+    assert!(
+        !d["inputSchema"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "tokenBudget")
+    );
     let q = f.request("search", None);
     let args = serde_json::to_value(&q).unwrap();
     assert_eq!(call(&disabled, args.clone()).0["error"]["code"], -32601);
@@ -76,6 +83,12 @@ fn registered_document_lifecycle_exact_wire_and_legacy_parity() {
         direct.used_tokens,
         tokenizer.count_tokens(&direct.serialized_result)
     );
+    let mut without_budget = args.clone();
+    without_budget
+        .as_object_mut()
+        .unwrap()
+        .remove("tokenBudget");
+    assert_eq!(call(&enabled, without_budget).1, wire);
     declaration["status"] = "FROZEN".into();
     f.write("a.md", &declaration);
     let restarted = state(Some(&f));

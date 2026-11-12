@@ -1,0 +1,57 @@
+[
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "PassPipeline"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "replay candidate"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "search",
+    "text": "generation78"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "get",
+    "id": "PERF-001-REPLAY"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "related",
+    "id": "IRPAT-001"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-001-REPLAY",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "DOC-157",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  }
+]

@@ -1,0 +1,19 @@
+category,command,outcome,actual_boundary
+tracked Rust tests,cargo test --lib --all-features pcg::documents::tests -- --nocapture,PASS,15 passed;0 failed;0 ignored;all-feature library compiled;7m07 build plus9.02s tests
+tracked Rust tests,& target/debug/deps/clean_ctx-459afc2dbfa48d18.exe pcg_documents::tests --nocapture,PASS,6 passed;0 failed;0 ignored;registered MCP/wire/currentness/reference reconstruction;3.35s
+tracked Rust tests,& target/debug/deps/clean_ctx-459afc2dbfa48d18.exe pcg::projection::tests,PASS,8 passed;0 failed;0 ignored;separate enrolled budget/overflow and exact serialized accounting;13.28s
+scoped Clippy,cargo clippy -p clean-ctx --all-targets --all-features -- -D warnings,PASS,Root package all targets/features;zero warnings;5m09s;not full workspace gate
+production build,cargo build --bin clean-ctx --all-features,PASS,6m02s;production executable identity recorded separately
+changed Rust formatting,rustfmt --edition 2024 --config skip_children=true --check src/pcg/documents/mod.rs src/pcg/documents/profile.rs src/mcp/tool_handlers/pcg_documents.rs src/tests/pcg/documents.rs src/tests/mcp/pcg_documents.rs src/tests/mcp/pcg_document_sources.rs,PASS,All six changed Rust files
+repository formatting,cargo fmt --all -- --check,FAIL_PREEXISTING,Only untouched B7 files src/pcg/mod.rs;src/pcg/security.rs;src/tests/pcg/persistence.rs;raw target/pcg-b8/full-fmt-check.log
+baseline production,Existing invoke-workspace-documents.ps1 with exact target/pcg-b8/regression-queries.json and accepted B7 executable/profile,REPRODUCED,10 exact searches:3 ready/7 token refusals;6 exact contexts:1 ready/5 blocked;raw target/pcg-b8/before
+production operator verification,pwsh -NoProfile -File verification/pcg-175/run-b8-document-regression.ps1,PASS,33 ready/current responses;10 exact B7 discovery requests;6 mandatory complete contexts;4 complete format pairs;7 architecture traces;not Rust tests or CI
+independent capture analysis,python verification/pcg-175/summarize-b8-document-capture.py,PASS,Independent selected sets;closure and typed edge sets;connected witnesses;source/evidence bytes;218 original revisions retained;216 current revisions exact;2 authorized advances
+exact transport reconstruction,python verification/pcg-175/compare-document-context-formats.py target/pcg-b8/after/context-pairs target/pcg-b8/after/reconstruction.csv,PASS,"Executed by driver;4 exact inline/source_refs pairs,including all3 mandatory subjects;entire reconstructed payload equal"
+B7 evaluation preservation,SHA256 each file against verification/architectural-intelligence-b7/FROZEN_IDENTITIES.json,PASS,36 frozen files unchanged;all16 independent A/B runs UNRUN
+PowerShell driver syntax,Management.Automation.Language.Parser::ParseFile verification/pcg-175/run-b8-document-regression.ps1,PASS,No parse errors
+full repository gate,docs/agent/verification.md::Final Verification Gate,UNRUN,No claim of full workspace tests/CI/full gate;formatting debt remains;draft delivery
+independent agent evaluation,Frozen sixteen B7 A/B runs,UNRUN,Repository-specific memory contamination;do not execute contaminated scenarios
+UTF-8/no BOM,pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-utf8.ps1,PASS,2673 text files valid strict UTF-8;0 BOMs;0 unexplained mojibake/signatures
+active file size,pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-file-sizes.ps1,PASS,31 active text files;12 untouched legacy oversized files reported;PASS;600 target/615 ceiling
+whitespace,git diff --check,PASS,PASS for tracked change set;staged guard rerun at delivery

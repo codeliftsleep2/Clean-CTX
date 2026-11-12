@@ -1,0 +1,82 @@
+[
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-001-REPLAY",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-001-REPLAY",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "DOC-157",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "DOC-157",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-003-OVERLOAD",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-003-OVERLOAD",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-004-DOCTRINE",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "inline_v1"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "tokenizer": "o200k",
+    "tokenBudget": 65536,
+    "mode": "context",
+    "id": "PERF-004-DOCTRINE",
+    "maxNodes": 128,
+    "maxEdges": 512,
+    "responseFormat": "source_refs_v1"
+  }
+]

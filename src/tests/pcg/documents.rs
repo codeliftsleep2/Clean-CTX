@@ -116,7 +116,7 @@ fn exact_taxonomy_and_relationship_compatibility() {
 }
 
 #[test]
-fn deterministic_search_tags_fts_and_required_budget() {
+fn deterministic_search_tags_fts_ignore_legacy_token_budget() {
     let f = Fixture::new();
     f.write("a.md", &Fixture::declaration("DOC-001", "FROZEN"));
     let s = Session::new(f.profile.clone());
@@ -135,13 +135,82 @@ fn deterministic_search_tags_fts_and_required_budget() {
     q.track = None;
     let path = f.root.join("docs/a.md");
     let old = std::fs::read_to_string(&path).unwrap();
-    std::fs::write(path, format!("{}\n{old}", "contract ".repeat(5000))).unwrap();
+    std::fs::write(path, format!("{}\n{old}", "x ".repeat(70_000))).unwrap();
     q.token_budget = 1024;
-    let p = Fixture::decode(&s.query(&q).unwrap().serialized_result);
-    assert_eq!(p["result_state"], "blocked");
-    assert_eq!(p["documents"], json!([]));
-    q.token_budget = 1;
-    assert_eq!(s.query(&q).unwrap_err().0, "token_budget_too_small");
+    let response = s.query(&q).unwrap();
+    let p = Fixture::decode(&response.serialized_result);
+    assert_eq!(p["result_state"], "ready");
+    assert_eq!(p["documents"].as_array().unwrap().len(), 1);
+    assert!(response.used_tokens > 65_536);
+    for hint in [0, 1, u64::MAX] {
+        q.token_budget = hint;
+        assert_eq!(
+            s.query(&q).unwrap().serialized_result,
+            response.serialized_result
+        );
+    }
+    assert_eq!(p["budget"]["enforced"], false);
+    assert!(p["budget"]["limit"].is_null());
+}
+
+#[test]
+fn document_profile_and_request_need_no_token_budget_but_keep_context_limits() {
+    let f = Fixture::new();
+    let mut a = Fixture::declaration("DOC-001", "FROZEN");
+    a["relationships"] = json!([{"kind":"DEPENDS_ON","target":"DOC-002"}]);
+    f.write("a.md", &a);
+    f.write("b.md", &Fixture::declaration("DOC-002", "FROZEN"));
+    let mut profile: Value = serde_json::from_slice(&std::fs::read(&f.profile).unwrap()).unwrap();
+    profile.as_object_mut().unwrap().remove("token_budget");
+    std::fs::write(&f.profile, serde_json::to_vec(&profile).unwrap()).unwrap();
+    let mut request = serde_json::to_value(f.request("context", Some("DOC-001"))).unwrap();
+    request.as_object_mut().unwrap().remove("tokenBudget");
+    let mut request: Request = serde_json::from_value(request).unwrap();
+    let session = Session::new(f.profile.clone());
+    let complete = Fixture::decode(&session.query(&request).unwrap().serialized_result);
+    assert_eq!(complete["context"]["complete"], true);
+    assert_eq!(complete["documents"].as_array().unwrap().len(), 2);
+    request.max_nodes = Some(1);
+    let limited = Fixture::decode(&session.query(&request).unwrap().serialized_result);
+    assert_eq!(limited["context"]["complete"], false);
+    assert_eq!(limited["documents"], json!([]));
+    assert_eq!(limited["diagnostics"][0]["code"], "E_CONTEXT_LIMIT");
+}
+
+#[test]
+fn complete_transitive_context_exceeds_former_ceiling_in_both_formats() {
+    let f = Fixture::new();
+    let mut a = Fixture::declaration("DOC-001", "FROZEN");
+    a["relationships"] = json!([{"kind":"DEPENDS_ON","target":"DOC-002"}]);
+    f.write("a.md", &a);
+    f.write("b.md", &Fixture::declaration("DOC-002", "FROZEN"));
+    for name in ["a.md", "b.md"] {
+        let path = f.root.join("docs").join(name);
+        let source = std::fs::read_to_string(&path).unwrap();
+        std::fs::write(path, format!("{}\n{source}", "x ".repeat(36_000))).unwrap();
+    }
+    let session = Session::new(f.profile.clone());
+    let mut request = f.request("context", Some("DOC-001"));
+    request.token_budget = 1;
+    for format in ["inline_v1", "source_refs_v1"] {
+        request.response_format = Some(format.into());
+        let response = session.query(&request).unwrap();
+        assert!(response.used_tokens > 65_536);
+        let payload = Fixture::decode(&response.serialized_result);
+        assert_eq!(payload["result_state"], "ready");
+        assert_eq!(payload["catalog_current"], true);
+        assert_eq!(payload["context"]["complete"], true);
+        assert_eq!(payload["documents"].as_array().unwrap().len(), 2);
+        assert_eq!(
+            payload["context"]["relationships"]
+                .as_array()
+                .unwrap()
+                .len(),
+            1
+        );
+        assert_eq!(payload["context"]["paths"].as_array().unwrap().len(), 2);
+        assert_eq!(payload["diagnostics"], json!([]));
+    }
 }
 
 #[test]

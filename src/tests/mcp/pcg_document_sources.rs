@@ -84,15 +84,12 @@ fn negotiated_sources_reconstruct_legacy() {
     let exact_result = session.query(&exact).unwrap();
     let exact_payload = Fixture::decode(&exact_result.serialized_result);
     assert_eq!(exact_payload["result_state"], "ready");
-    assert!(exact_result.used_tokens as u64 <= exact.token_budget);
+    assert_eq!(exact_result.serialized_result, result.serialized_result);
     exact.token_budget = 1000;
-    let blocked = Fixture::decode(&session.query(&exact).unwrap().serialized_result);
-    assert_eq!(blocked["result_state"], "blocked");
-    assert_eq!(blocked["documents"], json!([]));
-    assert_eq!(blocked["sources"], json!([]));
-    assert_eq!(blocked["context"]["complete"], false);
-    assert_eq!(blocked["context"]["relationships"], json!([]));
-    assert_eq!(blocked["historical_documents"], json!([]));
+    let complete = session.query(&exact).unwrap();
+    assert!(complete.used_tokens > 1000);
+    assert_eq!(complete.serialized_result, result.serialized_result);
+    assert_eq!(expand(Fixture::decode(&complete.serialized_result)), legacy);
     assert!(
         packed["sources"]
             .as_array()

@@ -6,13 +6,13 @@ pub(crate) fn descriptor() -> Value {
     json!({"name":"pcg_documents_v1",
         "description":"Discover author-declared architectural documents. Automatically validates/reconciles configured Markdown roots into SQLite before search/get/history/related/context. Exact IDs, source-declared tracks and SQLite FTS5; metadata/status/verification remain source-attributed, never authenticated approval. Does not rewrite source or import a corpus manifest.",
         "inputSchema":{"type":"object","additionalProperties":false,
-            "required":["workspaceRoot","mode","tokenizer","tokenBudget"],
+            "required":["workspaceRoot","mode","tokenizer"],
             "properties":{"workspaceRoot":{"type":"string","minLength":1},
                 "mode":{"enum":["search","get","history","related","context"]},
                 "responseFormat":{"enum":["inline_v1","source_refs_v1"],"description":"Default inline_v1 preserves version 1 bytes. Explicit source_refs_v1 is context-only and returns version 2 with exact shared sources and per-node references."},
                 "id":{"type":"string","minLength":1},"track":{"type":"string","minLength":1},
                 "text":{"type":"string","minLength":1,"description":"SQLite FTS5 expression, bound as data"},
-                "tokenizer":{"enum":["cl100k","o200k"]},"tokenBudget":{"type":"integer","minimum":1},"maxNodes":{"type":"integer","minimum":1},"maxEdges":{"type":"integer","minimum":1}},
+                "tokenizer":{"enum":["cl100k","o200k"]},"tokenBudget":{"type":"integer","minimum":0,"description":"Deprecated compatibility hint; document results are not token-budget limited."},"maxNodes":{"type":"integer","minimum":1},"maxEdges":{"type":"integer","minimum":1}},
             "allOf":[{"if":{"required":["responseFormat"],"properties":{"responseFormat":{"const":"source_refs_v1"}}},"then":{"properties":{"mode":{"const":"context"}}}}],
             "oneOf":[{"properties":{"mode":{"const":"search"}},"not":{"required":["id"]}},
                 {"properties":{"mode":{"enum":["get","history","related","context"]}},"required":["id"],
@@ -55,8 +55,7 @@ pub(crate) fn handle(id: &Value, params: &Value, state: &McpState) {
                 | "invalid_id"
                 | "scope_refused"
                 | "request_limits"
-                | "unsupported_tokenizer"
-                | "token_budget_too_small" => -32602,
+                | "unsupported_tokenizer" => -32602,
                 _ => -32603,
             };
             protocol::send_response(&json!({"jsonrpc":"2.0","id":id,"error":{"code":code,
