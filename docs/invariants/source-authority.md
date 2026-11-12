@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: source-authority
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:IRFACT-001:begin -->
 ### IRFACT-001 Derived Facts Use Declaration-Local Evidence
 
 | Property | Value |
@@ -29,8 +32,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRFACT-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IRFACT-001:end -->
+<!-- pcg:IRFACT-002:begin -->
 ### IRFACT-002 Observable and Promise Classifications Are Semantically Disjoint
 
 | Property | Value |
@@ -56,8 +65,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRFACT-002
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IRFACT-002:end -->
+<!-- pcg:WSC-001:begin -->
 ### WSC-001 Authoritative Facts Do Not Imply Authoritative Coverage
 
 | Property | Value |
@@ -82,8 +97,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:WSC-001:end -->
+<!-- pcg:WSC-019:begin -->
 ### WSC-019 Provider Health and Provider Authority Are Independent
 
 | Property | Value |
@@ -99,6 +120,8 @@ note: Source enforcement attributes are retained in prose; admission does not ex
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 558-570, original section `WSC-019`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `b41b1600cc442358339133329ba3e59c194edbd1143927e5362a9ce99a776292`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-019:end -->
+<!-- pcg:AUTH-001:begin -->
 ### AUTH-001 Refinement Joins Authority; It Never Manufactures It
 
 **Status:** ENFORCED
@@ -121,8 +144,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#AUTH-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:AUTH-001:end -->
+<!-- pcg:WSC-014:begin -->
 ### WSC-014 Completeness Is Earned from Evidence, Not Population
 
 **Status:** ENFORCED
@@ -165,8 +194,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-014
+  - qualification self#family-standing
 ```
 
+<!-- pcg:WSC-014:end -->
+<!-- pcg:SEMDEP-001:begin -->
 ### SEMDEP-001 Semantic Validity Follows Dependencies
 
 **Status:** ENFORCED
@@ -190,8 +225,14 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#SEMDEP-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:SEMDEP-001:end -->
+<!-- pcg:REFINE-001:begin -->
 ### REFINE-001 Reconciliation Ownership Is Domain-Local
 
 **Status:** ENFORCED
@@ -214,6 +255,10 @@ track: FOUNDATION
 artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#REFINE-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -224,4 +269,9 @@ title: WSC-019 Provider Health and Provider Authority Are Independent
 track: REPOSITORY
 artifact: docs/invariants/source-authority.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-019
+  - qualification self#family-standing
 ```
+<!-- pcg:REFINE-001:end -->

@@ -84,7 +84,7 @@ caller to the authoritative structured item errors.
 #### Explicit persistent evidence query
 
 For source-owned architectural document discovery and pre-authoring constraint
-chains, use `pcg_documents_v1` and follow [the authoring preflight](pcg-authoring.md).
+chains, use `pcg_knowledge_v1` and follow [the authoring preflight](pcg-authoring.md).
 Its configured document lifecycle is separate from the manifest-enrolled evidence
 corpus interface below. See [the document contract](../architecture/PCG_DOCUMENT_AUTHORING.md)
 for exact search/context requests, GLS declarations and reconciliation semantics.
@@ -824,4 +824,7 @@ preserves:
   - WSC-004
   - INV.CBM_OPTIONAL_001
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

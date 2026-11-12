@@ -428,4 +428,7 @@ preserves:
   - WSC-012
   - INV.MECHANISM_REUSE_001
 note: The foundation status imports its explicit source-frozen design; retained transport is scoped to implemented facets. Neither establishes complete consumer support, new approval or certification.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

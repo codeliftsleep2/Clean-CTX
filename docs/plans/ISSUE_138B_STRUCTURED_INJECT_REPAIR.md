@@ -295,4 +295,7 @@ artifact: docs/plans/ISSUE_138B_STRUCTURED_INJECT_REPAIR.md
 uses_evidence:
   - DOC-420
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

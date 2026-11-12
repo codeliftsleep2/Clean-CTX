@@ -4,8 +4,10 @@ Agent: Agent MaxHeadRoom
 Status: cleanup and discovery executed GREEN; measured Git candidates DEFER.
 No production optimization or repository publication authorized.
 
+<!-- pcg:REPLAY-retirement:begin -->
 ## Rejected replay apparatus retirement
 
+<!-- pcg:REPLAY-outcome:begin -->
 Owner accepted REJECT for earlier-Candidate reuse and authorized retaining a focused
 regression while retiring candidate comparison/timing machinery. The production
 replay selection is now a single original expression in both release and tests;
@@ -13,6 +15,8 @@ there is no Candidate reuse switch or alternate implementation. Discovery counte
 comparison modes, timing tests and their two operator drivers have been removed.
 Only one cfg(test,typescript) one-shot hook remains immediately after economics.
 
+<!-- pcg:REPLAY-outcome:end -->
+<!-- pcg:REPLAY-obligation:begin -->
 The replacement tracked test is replay_footer_observation_af_perf_002.rs, registered
 from replay.rs. It runs actual registered compression/replay and three controlled
 mutations: unrelated alias insertion, exact alias removal and registered deletion.
@@ -24,6 +28,7 @@ Unrelated insertion must leave the complete response unchanged. A RAII reset cle
 the hook on unwind. The test protects the later rendering observation and does not
 create a new lifecycle guarantee for successful replay after deletion.
 
+<!-- pcg:REPLAY-obligation:end -->
 Both investigation reports and original executed receipts remain. Seven retired
 source artifacts were copied before removal into the existing design receipt's
 retired-source-evidence directory, with exact hashes and matched-execution flags in
@@ -32,6 +37,7 @@ portable CI coverage or newly executed results. Existing historical report comma
 are retired; do not rerun them. The replacement tracked test is the active contract.
 No rejected source was silently converted into production behavior.
 
+<!-- pcg:REPLAY-retirement:end -->
 ## Next registered production trace
 
 create_default_registry binds diff_commits to tool_handlers/gitdiff.rs. The handler
@@ -244,6 +250,9 @@ artifact: docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md
 uses_evidence:
   - DOC-188
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```
 
 ```architecture-graph
@@ -258,4 +267,16 @@ uses_evidence:
 preserves:
   - AUTH.TOKEN_ECONOMICS
 note: FROZEN imports explicit owner no-repair disposition only; not a universal replay prohibition or new execution authority.
+knowledge_scope: decision
+knowledge_content:
+  - statement self#REPLAY-retirement
+  - outcome:REJECT self#REPLAY-outcome
+  - subject:earlier_candidate_reuse self#REPLAY-outcome
+  - verification_obligation:later_footer self#REPLAY-obligation
+  - rationale docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-executed-reason
+  - counterexample:registered_delete docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-counterexample
+  - rejected_alternative:earlier_candidate docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-disposition
+  - scope:bounded_substitution docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-disposition
+  - constraint:later_observation docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-executed-reason
+  - qualification:bounded_decision docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md#REPLAY-disposition
 ```

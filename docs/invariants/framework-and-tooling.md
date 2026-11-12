@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: framework-and-tooling
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:EDIT-001:begin -->
 ### EDIT-001 apply_edit Unit Verification & EOL Preservation
 
 | Property | Value |
@@ -18,6 +21,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 317-328, original section `EDIT-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `f74f0baac8a95b393f94c249993dd7a0630bb8aa7ef6240ce41ad782a0d8c4d5`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:EDIT-001:end -->
+<!-- pcg:MCP-001:begin -->
 ### MCP-001 MCP Result Envelope Conformance
 
 | Property | Value |
@@ -33,6 +38,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 329-341, original section `MCP-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `d9bbd21c900fbeed15d97633e406c4ae057ee3420b4f2da72116d743f5b59ccf`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:MCP-001:end -->
+<!-- pcg:MCP-002:begin -->
 ### MCP-002 Focused Context Requests Have One Explicit Fidelity Meaning
 
 | Property | Value |
@@ -48,6 +55,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 342-354, original section `MCP-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `dbc90a831a26827753658dbd664a624ac8c8f9703ea9ca1b77229f393f90c1db`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:MCP-002:end -->
+<!-- pcg:MCP-003:begin -->
 ### MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
 
 | Property | Value |
@@ -63,6 +72,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 355-366, original section `MCP-003`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `5802127c59ec78c7daee05fcaf70a7315ce007448776b023f9cb993a9ffc3ade`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:MCP-003:end -->
+<!-- pcg:SEL-001:begin -->
 ### SEL-001 Selector-Value Invariant
 
 | Property | Value |
@@ -78,6 +89,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 471-483, original section `SEL-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `2c33090e29e539f48127f9345cb48648561ff6b0a280a321f5d2097866d0a9e2`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:SEL-001:end -->
+<!-- pcg:INV.ANG_DI_001:begin -->
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
 | Property | Value |
@@ -93,6 +106,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 4
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 649-661, original section `ANG-DI-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `6b5edbd5d3ef9c797e534ce2caa43193b70984efa371bb4f8fedde012b7dc170`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.ANG_DI_001:end -->
+<!-- pcg:INV.ANG_TPL_001:begin -->
 ### ANG-TPL-001 Angular Template Ownership and Identity
 
 | Property | Value |
@@ -108,6 +123,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 947-959, original section `ANG-TPL-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `07957de884fcd33c512058219b4bcecbe48d2d1b3ac0ddc6472e8aac6059aa46`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.ANG_TPL_001:end -->
+<!-- pcg:INV.ANG_TPL_002:begin -->
 ### ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
 
 | Property | Value |
@@ -123,6 +140,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 960-972, original section `ANG-TPL-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `dbd2741b377818a49e081a1d110e8119223c17c644f3bd761992cfb9aac11067`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.ANG_TPL_002:end -->
+<!-- pcg:INV.CSHARP_RESOLUTION_001:begin -->
 ### CSHARP-RESOLUTION-001 Structured C# Resolution Owns Framework Authority
 
 | Property | Value |
@@ -144,6 +163,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1024-1042, original section `CSHARP-RESOLUTION-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `e025d90f9edff23f2302dc6b788fb3bfb102f86e0af48bb569dba544b2f8c529`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CSHARP_RESOLUTION_001:end -->
+<!-- pcg:DOTNET-001:begin -->
 ### DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
 
 | Property | Value |
@@ -168,6 +189,10 @@ title: EDIT-001 apply_edit Unit Verification & EOL Preservation
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#EDIT-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -178,6 +203,10 @@ title: MCP-001 MCP Result Envelope Conformance
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#MCP-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -188,6 +217,10 @@ title: MCP-002 Focused Context Requests Have One Explicit Fidelity Meaning
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#MCP-002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -198,6 +231,10 @@ title: MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#MCP-003
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -208,6 +245,10 @@ title: SEL-001 Selector-Value Invariant
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#SEL-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -222,6 +263,10 @@ preserves:
   - WSC-012
   - SEMDEP-001
 note: Current source-described contract; no witness execution or independent certification is inferred.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CSHARP_RESOLUTION_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -236,6 +281,10 @@ depends_on:
 preserves:
   - WSC-011
 note: Current source-described contract; no witness execution or independent certification is inferred.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#DOTNET-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -248,6 +297,10 @@ artifact: docs/invariants/framework-and-tooling.md
 preserves:
   - WSC-012
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.ANG_DI_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -261,6 +314,10 @@ preserves:
   - SEMDEP-001
   - WSC-012
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.ANG_TPL_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -275,4 +332,9 @@ depends_on:
 preserves:
   - REFINE-001
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.ANG_TPL_002
+  - qualification self#family-standing
 ```
+<!-- pcg:DOTNET-001:end -->

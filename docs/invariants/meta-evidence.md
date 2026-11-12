@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: meta-evidence
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:INV.C22:begin -->
 ### C-22 — Meta-Layer Source Context from Canonical Capture Identity
 
 | Property | Value |
@@ -28,8 +31,14 @@ track: FOUNDATION
 artifact: docs/invariants/meta-evidence.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.C22
+  - qualification self#family-standing
 ```
 
+<!-- pcg:INV.C22:end -->
+<!-- pcg:META-001:begin -->
 ### META-001 Framework Annotations Retain Declaration-Local Ownership and Intelligible Values
 
 | Property | Value |
@@ -46,6 +55,8 @@ note: Source enforcement attributes are retained in prose; admission does not ex
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 173-186, original section `META-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `7543e6a4e1427eb0328c0720775e572daf754d5093e5bf76ceadab9e95a75bde`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:META-001:end -->
+<!-- pcg:META-002:begin -->
 ### META-002 Compilation-Scoped Single Evaluation
 
 | Property | Value |
@@ -71,6 +82,10 @@ artifact: docs/invariants/meta-evidence.md
 preserves:
   - INV.C22
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#META-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -83,4 +98,9 @@ artifact: docs/invariants/meta-evidence.md
 preserves:
   - INV.C22
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#META-002
+  - qualification self#family-standing
 ```
+<!-- pcg:META-002:end -->

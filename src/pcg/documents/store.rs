@@ -8,11 +8,10 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, time::Duration};
 
-const SCHEMA: &str = include_str!("schema.sql");
 pub(super) fn sql<T>(r: rusqlite::Result<T>) -> Result<T> {
     r.map_err(|_| Error("document_database"))
 }
-fn metadata(c: &Connection) -> Result<Vec<(String, String)>> {
+pub(super) fn metadata(c: &Connection) -> Result<Vec<(String, String)>> {
     let mut s =
         sql(c.prepare("SELECT name,sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name"))?;
     let rows = sql(s.query_map([], |r| Ok((r.get(0)?, r.get(1)?))))?;
@@ -24,38 +23,14 @@ pub fn open(trusted: &Trusted) -> Result<Connection> {
     security::no_links(p, true)?;
     let c = sql(Connection::open(p))?;
     sql(c.busy_timeout(Duration::ZERO))?;
-    let actual = metadata(&c)?;
-    let reference = sql(Connection::open_in_memory())?;
-    sql(reference.execute_batch(SCHEMA))?;
-    require(
-        actual.is_empty() || actual == metadata(&reference)?,
-        "document_schema",
-    )?;
-    if !actual.is_empty() {
-        let version: (i64, String) = sql(c.query_row(
-            "SELECT version,profile FROM document_schema",
-            [],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        ))?;
-        require(
-            version == (1, trusted.scope_fingerprint.clone()),
-            "document_profile_changed",
-        )?;
-    }
+    super::schema::check(&c, trusted)?;
     sql(c.execute_batch(
         "PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;",
     ))?;
     Ok(c)
 }
 pub fn initialize(tx: &Connection, trusted: &Trusted) -> Result<()> {
-    if metadata(tx)?.is_empty() {
-        sql(tx.execute_batch(SCHEMA))?;
-        sql(tx.execute(
-            "INSERT INTO document_schema VALUES(1,?)",
-            [&trusted.scope_fingerprint],
-        ))?;
-    }
-    Ok(())
+    super::schema::initialize(tx, trusted)
 }
 pub fn head(c: &Connection) -> Result<Option<String>> {
     sql(c
@@ -83,33 +58,55 @@ pub fn publish(
     trusted: &Trusted,
     nodes: &BTreeMap<String, Candidate>,
 ) -> Result<String> {
+    reconcile(tx, trusted, nodes, true)
+}
+pub(super) fn publish_knowledge(
+    tx: &Connection,
+    trusted: &Trusted,
+    nodes: &BTreeMap<String, Candidate>,
+) -> Result<String> {
+    reconcile(tx, trusted, nodes, false)
+}
+fn reconcile(
+    tx: &Connection,
+    trusted: &Trusted,
+    nodes: &BTreeMap<String, Candidate>,
+    legacy_search: bool,
+) -> Result<String> {
     let generation = identity::hash(
         &json!({"profile":trusted.fingerprint,"revisions":nodes.values().map(|n|&n.revision).collect::<Vec<_>>()}),
     );
     let old_head = head(tx)?;
     if old_head.as_ref() == Some(&generation) {
-        verify(tx, &generation, nodes, true)?;
+        verify(tx, &generation, nodes, legacy_search)?;
+        super::knowledge_store::publish(tx, &generation, nodes, false)?;
         return Ok(generation);
     }
     sql(tx.execute(
         "INSERT OR IGNORE INTO document_generation VALUES(?)",
         [&generation],
     ))?;
+    let mut source_keys = std::collections::BTreeSet::new();
     for (id, n) in nodes {
         let previous: Option<String> = sql(tx.query_row("SELECT revision FROM document_member WHERE g=(SELECT g FROM document_head WHERE slot=1) AND id=?", [id], |r|r.get(0)).optional())?;
         let declaration =
             serde_json::to_string(&n.declaration).map_err(|_| Error("document_encoding"))?;
         let evidence =
             serde_json::to_string(&n.evidence).map_err(|_| Error("document_encoding"))?;
+        if source_keys.insert((&n.path, &n.source_sha)) {
+            sql(tx.execute(
+                "INSERT OR IGNORE INTO document_source VALUES(?,?,?)",
+                params![n.path, n.source_sha, n.bytes.as_slice()],
+            ))?;
+        }
         sql(tx.execute(
-            "INSERT OR IGNORE INTO document_revision VALUES(?,?,?,?,?,?,?,?)",
+            "INSERT OR IGNORE INTO document_revision VALUES(?,?,?,?,?,?,?)",
             params![
                 n.revision,
                 id,
                 n.path,
                 n.source_sha,
                 declaration,
-                n.bytes,
                 evidence,
                 previous
             ],
@@ -143,6 +140,7 @@ pub fn publish(
         ))?;
     }
     verify(tx, &generation, nodes, true)?;
+    super::knowledge_store::publish(tx, &generation, nodes, true)?;
     sql(tx.execute(
         "INSERT INTO document_head VALUES(1,?) ON CONFLICT(slot) DO UPDATE SET g=excluded.g",
         [&generation],
@@ -174,8 +172,35 @@ fn verify(
         .map(|(id, n)| (id.clone(), n.revision.clone()))
         .collect();
     require(actual == expected, "document_corruption")?;
-    for n in nodes.values() {
-        revision(c, &n.revision)?;
+    // Validate exact rows without constructing legacy full-source response Values.
+    // A declaring source is checked once for this complete operation.
+    let mut checked_sources = std::collections::BTreeSet::new();
+    for (id, n) in nodes {
+        let row: (String,String,String,String,String)=sql(c.query_row(
+            "SELECT id,path,source_sha,declaration,evidence FROM document_revision WHERE revision=?",[&n.revision],
+            |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))))?;
+        let declaration: Value =
+            serde_json::from_str(&row.3).map_err(|_| Error("document_corruption"))?;
+        let evidence: Value =
+            serde_json::from_str(&row.4).map_err(|_| Error("document_corruption"))?;
+        require(
+            row.0 == *id
+                && row.1 == n.path
+                && row.2 == n.source_sha
+                && declaration
+                    == serde_json::to_value(&n.declaration)
+                        .map_err(|_| Error("document_encoding"))?
+                && evidence == json!(n.evidence),
+            "document_corruption",
+        )?;
+        if checked_sources.insert((&n.path, &n.source_sha)) {
+            let body: Vec<u8> = sql(c.query_row(
+                "SELECT body FROM document_source WHERE path=? AND sha=?",
+                params![n.path, n.source_sha],
+                |r| r.get(0),
+            ))?;
+            require(body.as_slice() == n.bytes.as_slice(), "document_corruption")?;
+        }
     }
     let mut statement = sql(c.prepare("SELECT source,kind,target,evidence FROM document_edge WHERE g=? ORDER BY source,kind,target"))?;
     let rows = sql(statement.query_map([g], |r| {
@@ -224,7 +249,9 @@ fn verify(
                 Ok((
                     id.clone(),
                     n.declaration.title.clone(),
-                    String::from_utf8(n.bytes.clone()).map_err(|_| Error("invalid_utf8"))?,
+                    std::str::from_utf8(&n.bytes)
+                        .map_err(|_| Error("invalid_utf8"))?
+                        .to_owned(),
                     n.declaration.track.clone(),
                 ))
             })
@@ -235,7 +262,7 @@ fn verify(
 }
 pub(super) fn revision(c: &Connection, rev: &str) -> Result<Value> {
     let row: (String,String,String,Vec<u8>,String,Option<String>) = sql(c.query_row(
-        "SELECT path,source_sha,declaration,body,evidence,previous FROM document_revision WHERE revision=?", [rev],
+        "SELECT r.path,r.source_sha,r.declaration,s.body,r.evidence,r.previous FROM document_revision r JOIN document_source s ON s.path=r.path AND s.sha=r.source_sha WHERE revision=?", [rev],
         |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?))))?;
     require(identity::sha(&row.3) == row.1, "document_corruption")?;
     let d: Value = serde_json::from_str(&row.2).map_err(|_| Error("document_corruption"))?;

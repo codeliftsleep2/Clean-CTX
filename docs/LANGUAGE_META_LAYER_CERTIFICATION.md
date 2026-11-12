@@ -752,4 +752,7 @@ depends_on:
 preserves:
   - INV.MECHANISM_REUSE_001
   - INV.META_LAYER_COMPLETENESS_001
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

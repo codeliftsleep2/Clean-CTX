@@ -591,4 +591,7 @@ artifact: docs/architecture/SEMANTIC_EVIDENCE_SUFFICIENCY_AND_RECOVERABILITY_INV
 uses_evidence:
   - DOC-320
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

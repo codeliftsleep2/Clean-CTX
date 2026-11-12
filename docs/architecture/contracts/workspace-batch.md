@@ -54,4 +54,7 @@ preserves:
   - WSC-009
   - WSC-013
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

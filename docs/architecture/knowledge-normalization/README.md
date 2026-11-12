@@ -298,4 +298,7 @@ title: Repository architectural knowledge assessment and migration design
 track: REPOSITORY
 artifact: docs/architecture/knowledge-normalization/README.md
 note: Planning evidence only; proposed identities and relationships are not admitted authority.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

@@ -100,4 +100,7 @@ artifact: docs/architecture/contracts/pcg-projection-v1.md
 depends_on:
   - AUTH.PCG_ACQUISITION_V1
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

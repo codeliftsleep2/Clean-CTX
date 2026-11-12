@@ -179,4 +179,7 @@ artifact: docs/architecture/contracts/angular-guard-kinds.md
 deepens:
   - AUTH.ANGULAR_CAN_ACTIVATE
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

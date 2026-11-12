@@ -1,6 +1,8 @@
 # Issue #156: static implementation and focused GREEN handoff
 
+<!-- pcg:EF-standing:begin -->
 B4a source disposition: The focused EF dependency contract owns the relocated frontier/identity/lifecycle clauses. The later coverage-schema RED and awaiting-GREEN section qualifies earlier GREEN evidence; post-repair live acceptance remains unrun after the prior 639/644 live failure. No new defect was reproduced or repair authorized by B4a.
+<!-- pcg:EF-standing:end -->
 
 Agent: Agent MaxHeadRoom
 
@@ -25,6 +27,7 @@ the repository-gate status only. Live acceptance remains outstanding. This is
 not issue closure. The agent ran no Cargo test,
 check, build, Clippy, Clean-CTX binary, MCP/provider operation, or live harness.
 
+<!-- pcg:EF-earlier-green:begin -->
 ## Completed focused GREEN receipt
 
 `target/issue-156/green-2.log` contains 1377886 bytes at inspection. Its summary
@@ -47,6 +50,7 @@ Its command list remains solely in verification.md. Earlier NOT RUN statements
 below are historical initial-handoff statements, superseded only for this focused
 18-test run. No commit or push has been made.
 
+<!-- pcg:EF-earlier-green:end -->
 ## First GREEN attempt and static follow-up
 
 Receipt: `target/issue-156/green.log`, 1316671 bytes at inspection; final summary
@@ -175,12 +179,15 @@ complete repository gate remain operator-owned; use the authoritative
 
 ## Live coverage-schema defect: focused RED captured, repair awaiting GREEN
 
+<!-- pcg:EF-valid-red:begin -->
 The operator subsequently ran the focused regression. Inspection of
 `target/issue-156/coverage-red.log` confirms the intended assertion at test
 line 21: `unresolved EF evidence inserted an absent optional field`.
 Result: **0 passed; 1 failed; 4116 filtered out; 0.87s**. This establishes
 tracked behavioral RED independently of the live harness.
 
+<!-- pcg:EF-valid-red:end -->
+<!-- pcg:EF-reported-repair:begin -->
 The regression and its three-line registration were preserved in a narrow
 stash named `issue-156 coverage frozen RED regression only`; its parent diff
 contains only those two paths. With the regression absent, EF `Evidence::apply`
@@ -191,12 +198,14 @@ No schema, live oracle, or earlier frozen test changed. Focused GREEN and live
 acceptance are NOT RUN after this repair. The earlier authoring notes below
 describe the sequence before operator RED.
 
+<!-- pcg:EF-reported-repair:end -->
 ```powershell
 cargo test --quiet --all-features issue_156_unresolved_coverage_preserves_optional_requirements -- --test-threads=1 *> target/issue-156/coverage-green.log
 $LASTEXITCODE
 Get-Content target/issue-156/coverage-green.log -Tail 24
 ```
 
+<!-- pcg:EF-live-failure:begin -->
 Agent MaxHeadRoom inspected the operator receipt
 `target/live-acceptance/issue-156/2026-10-21T01-48-18-599Z-10208/report.json`:
 **639/644 live checks passed; five failed**. The failures are coverage-schema
@@ -206,6 +215,7 @@ entity, missing entity, and changed assembly marker. Each response contains
 when this optional field is present. These are operator/live results, not Rust
 test results. Live acceptance remains FAIL.
 
+<!-- pcg:EF-live-failure:end -->
 The source cause is `Evidence::apply` in EF `obligations.rs`: mutable JSON
 indexing of the absent optional field inserts null before `as_array_mut` fails.
 The intended local correction is a non-inserting `get_mut` lookup; neither the
@@ -269,4 +279,13 @@ artifact: docs/agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md
 implements:
   - AUTH.EF_MODEL_DEPENDENCIES
 note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
+  - observation:earlier_focused_green self#EF-earlier-green
+  - observation:live_639_644 self#EF-live-failure
+  - observation:valid_tracked_red self#EF-valid-red
+  - observation:reported_local_repair self#EF-reported-repair
+  - verification_obligation:post_repair_green_and_live self#EF-reported-repair
+  - qualification:historical_chronology self#EF-standing
 ```

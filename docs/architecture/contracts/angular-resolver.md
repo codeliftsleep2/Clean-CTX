@@ -10,8 +10,11 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:RESOLVER-standing:begin -->
 C04/C05: generation78 is unqualified written RouteOccurrence/DeclarationId membership only. Public resolver-key and executable eligibility questions remain open. The 319-check/three-session receipt is historical; B4b found 68 of 1,224 listed inputs differ today and a different current binary. Current-producer revalidation, final repository/Claude gates and #162 closure are not established here.
 
+<!-- pcg:RESOLVER-standing:end -->
+<!-- pcg:RESOLVER-written:begin -->
 ## Generation-78 unqualified resolver repair approved and authored, UNRUN
 
 The owner explicitly approves canonical ResolvedBy written-use support from exact
@@ -63,8 +66,10 @@ full repository and final Claude field stay later. Performance remains deferred.
 Return for separate bounded public-key design after this repair is accepted.
 
 
+<!-- pcg:RESOLVER-written:end -->
 Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_MEMBERSHIP_DECISION.md](../../agent/ISSUE_162_ROUTE_RESOLVER_MEMBERSHIP_DECISION.md), baseline `ec7067fd`, original section SHA-256 `ca6ef02057503f13f206ffad91a058ffff2f04fd289544e10131a32f0d1ea157`.
 
+<!-- pcg:RESOLVER-questions:begin -->
 ## Approved question and limit
 
 Which exact runtime declarations are written under ordinary named resolve mappings
@@ -75,8 +80,10 @@ Which exact public key registers each declaration remains explicitly OPEN and mu
 return as a separate bounded public design after this repair is accepted.
 
 
+<!-- pcg:RESOLVER-questions:end -->
 Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md](../../agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md), baseline `ec7067fd`, original section SHA-256 `40111762876a985c81d9c6da796f992dc6faa6bbee04e2e668ee98e70bf080bf`.
 
+<!-- pcg:RESOLVER-lifecycle:begin -->
 ## Production authority and lifecycle
 
 route_resolvers::project reuses route_objects native ownership, unique outer field,
@@ -107,6 +114,7 @@ Semantic generation advances 77 to 78; marker/pipeline,
 enum representation, JSON schema/codec and durable generation do not advance.
 
 
+<!-- pcg:RESOLVER-lifecycle:end -->
 Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md](../../agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md), baseline `ec7067fd`, original section SHA-256 `f07caeaf7e229ac56bf66b1cedd9a18194aebeb5463b15e4367924e8fceb929d`.
 
 
@@ -124,4 +132,11 @@ preserves:
 uses_evidence:
   - DOC-228
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
+  - scope:written_membership self#RESOLVER-written
+  - constraint:native_declaration_identity self#RESOLVER-lifecycle
+  - qualification:historical_input_drift self#RESOLVER-standing
+  - verification_obligation:public_keys_and_current_producer self#RESOLVER-questions
 ```

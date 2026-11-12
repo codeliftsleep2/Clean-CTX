@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: projection-fidelity
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:ARCH-003:begin -->
 ### ARCH-003 Canonical IR and LLM Projection Are Separate Contracts
 
 | Property | Value |
@@ -30,8 +33,14 @@ track: FOUNDATION
 artifact: docs/invariants/projection-fidelity.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#ARCH-003
+  - qualification self#family-standing
 ```
 
+<!-- pcg:ARCH-003:end -->
+<!-- pcg:CONTENT-001:begin -->
 ### CONTENT-001 Visible Content Metadata Describes Only the Visible Text
 
 | Property | Value |
@@ -56,8 +65,14 @@ track: FOUNDATION
 artifact: docs/invariants/projection-fidelity.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#CONTENT-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:CONTENT-001:end -->
+<!-- pcg:WSC-006:begin -->
 ### WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware
 
 | Property | Value |
@@ -73,6 +88,8 @@ note: Source enforcement attributes are retained in prose; admission does not ex
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 597-609, original section `WSC-006`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `287c9784fe15de90f1b57ed6dae995324cfe39f1ab751a3a782bf92cc89682fb`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-006:end -->
+<!-- pcg:CTX-001:begin -->
 ### CTX-001 Canonical Semantics and Representation Authorities Stay Distinct
 
 | Property | Value |
@@ -97,8 +114,14 @@ track: FOUNDATION
 artifact: docs/invariants/projection-fidelity.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#CTX-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:CTX-001:end -->
+<!-- pcg:PROJ-001:begin -->
 ### PROJ-001 Acquisition Strength Does Not Upgrade Publication Fidelity
 
 **Status:** ENFORCED
@@ -121,6 +144,10 @@ track: FOUNDATION
 artifact: docs/invariants/projection-fidelity.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#PROJ-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -131,4 +158,9 @@ title: WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware
 track: REPOSITORY
 artifact: docs/invariants/projection-fidelity.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-006
+  - qualification self#family-standing
 ```
+<!-- pcg:PROJ-001:end -->

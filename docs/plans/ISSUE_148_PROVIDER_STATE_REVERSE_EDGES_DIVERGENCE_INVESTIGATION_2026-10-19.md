@@ -520,4 +520,7 @@ title: Historical provider-success root-satisfaction causal divergence
 track: REPOSITORY
 artifact: docs/plans/ISSUE_148_PROVIDER_STATE_REVERSE_EDGES_DIVERGENCE_INVESTIGATION_2026-10-19.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

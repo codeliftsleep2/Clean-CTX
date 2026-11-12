@@ -420,4 +420,7 @@ artifact: docs/architecture/CORE_OP_CONTRACT_MATRIX.md
 commit: 655f0a75
 preserves:
   - IRPAT-001
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

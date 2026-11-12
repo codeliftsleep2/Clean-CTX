@@ -541,4 +541,7 @@ artifact: docs/agent/AF_PERF_002_A4_SCAN_CORRECTION_PROPOSAL.md
 preserves:
   - SEMDEP-001
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

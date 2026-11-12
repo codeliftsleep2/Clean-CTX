@@ -165,4 +165,7 @@ title: Repository final verification and bounded-work gate
 track: REPOSITORY
 artifact: docs/agent/verification.md
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

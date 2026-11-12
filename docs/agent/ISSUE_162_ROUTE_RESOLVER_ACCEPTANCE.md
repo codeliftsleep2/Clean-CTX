@@ -53,4 +53,7 @@ artifact: docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md
 implements:
   - AUTH.ANGULAR_RESOLVER
 note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

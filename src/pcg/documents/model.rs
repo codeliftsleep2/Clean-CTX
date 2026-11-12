@@ -53,6 +53,9 @@ pub struct Declaration {
     pub commit: Option<String>,
     pub note: Option<String>,
     pub relationships: Vec<Relationship>,
+    /// Source extension is projected separately; legacy metadata/hashes keep their shape.
+    #[serde(skip)]
+    pub knowledge: Option<super::content::Spec>,
 }
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -80,8 +83,9 @@ impl Diagnostic {
 pub struct Candidate {
     pub path: String,
     pub source_sha: String,
-    pub bytes: Vec<u8>,
+    pub bytes: std::sync::Arc<Vec<u8>>,
     pub declaration: Declaration,
     pub revision: String,
     pub evidence: Vec<serde_json::Value>,
+    pub knowledge: Option<super::content::Knowledge>,
 }

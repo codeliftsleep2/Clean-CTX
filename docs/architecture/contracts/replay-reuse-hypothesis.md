@@ -24,4 +24,7 @@ title: Earlier Candidate equals later replay under alias deletion
 track: REPOSITORY
 artifact: docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: proposition
+knowledge_content:
+  - statement self#whole
 ```

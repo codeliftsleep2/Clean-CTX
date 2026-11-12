@@ -252,4 +252,7 @@ preserves:
   - AUTH.PCG_DOCUMENTS
   - AUTH.PCG_ENROLLED_V1
 note: Source normalization and bounded production retrieval; no self-certification, authenticated approval, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

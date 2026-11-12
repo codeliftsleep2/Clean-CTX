@@ -229,5 +229,9 @@ pub(crate) fn create_document_registry(with_v1: bool) -> HandlerRegistry {
         create_default_registry()
     };
     registry.register("pcg_documents_v1", Box::new(super::pcg_documents::handle));
+    registry.register(
+        "pcg_knowledge_v1",
+        Box::new(super::pcg_documents::handle_knowledge),
+    );
     registry
 }

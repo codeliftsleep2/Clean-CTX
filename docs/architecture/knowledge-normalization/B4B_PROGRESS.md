@@ -256,4 +256,7 @@ preserves:
   - AUTH.ANGULAR_FOUNDATION
   - AUTH.ANGULAR_RESOLVER
 note: Source normalization and bounded document retrieval; historical evidence remains scoped, without current producer certification or campaign closure.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

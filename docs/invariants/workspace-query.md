@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: workspace-query
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:WSC-002:begin -->
 ### WSC-002 CBM Discovers Candidates; Clean-CTX Alone Determines WorkspaceIndex Semantics
 
 | Property | Value |
@@ -19,6 +22,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 523-535, original section `WSC-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `82aa57950c13f861af5f0abf6f8d29a90a4067cf4a38137916c66d311cfd871e`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-002:end -->
+<!-- pcg:WSC-003:begin -->
 ### WSC-003 Hydration Discovery Is Session-State Work
 
 | Property | Value |
@@ -43,6 +48,8 @@ generation, producer, or exhaustiveness proof.
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 536-557, original section `WSC-003`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `34f440a75292392fa60b0a22e9b337de9ba6e721fdcf89a7667455241f64018b`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-003:end -->
+<!-- pcg:WSC-004:begin -->
 ### WSC-004 Workspace Queries Respect Declared Workspace Scope
 
 | Property | Value |
@@ -58,6 +65,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 5
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 571-583, original section `WSC-004`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `f7f140495f4592b17483463c477c948fe951473e1268e7a7f34d4f996f5a7e45`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-004:end -->
+<!-- pcg:WSC-005:begin -->
 ### WSC-005 File-Local Call Inspection Retains Canonical Owner and Occurrence Evidence
 
 | Property | Value |
@@ -73,6 +82,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 5
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 584-596, original section `WSC-005`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `1124bb375847d31a3972c7c411880fb1d8c0a0fcad849f21bc87e1dd9ce1f88c`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-005:end -->
+<!-- pcg:WSC-007:begin -->
 ### WSC-007 Dependency-Cycle Results Are Witnessed, Scoped Index Evidence
 
 | Property | Value |
@@ -88,6 +99,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 5
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 610-622, original section `WSC-007`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `9b160c06f8b804bc6a4ae44d33561e383460369a83e61da0af1a6d228283ba2b`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-007:end -->
+<!-- pcg:WSC-008:begin -->
 ### WSC-008 Incomplete Query Identity Resolves Once Without Guessing
 
 | Property | Value |
@@ -103,6 +116,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 623-635, original section `WSC-008`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `88d2f52c1ce09dad1c3f1bc43f30066c6603682ff9093d225830d83b7c0b326e`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-008:end -->
+<!-- pcg:WSC-009:begin -->
 ### WSC-009 Workspace Query Batches Isolate Outcomes and Share Final Evidence
 
 | Property | Value |
@@ -118,6 +133,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 636-648, original section `WSC-009`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `e7d3a4c45a906556542ee7ed3785399f9007e37a41a43abc501bd274125c5f0b`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-009:end -->
+<!-- pcg:WSC-013:begin -->
 ### WSC-013 Authoritative Query Truth Is History-Independent
 
 **Status:** ENFORCED FOR CERTIFIED DOMAINS; LOWER-BOUND FAMILIES EXPLICIT
@@ -135,6 +152,8 @@ pins exact/partial and cold/warm equivalence.
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 776-790, original section `WSC-013`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `d79499d20b749ecdb03d29e70d93cb2bfd33bf929788eefcf3474db80274f33c`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-013:end -->
+<!-- pcg:WSC-018:begin -->
 ### WSC-018 Coverage Detail Cannot Strengthen Completeness
 
 **Status:** ENFORCED
@@ -166,6 +185,8 @@ output schema; `workspace_query_coverage.rs`,
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 822-850, original section `WSC-018`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `0971bb7bb4ea302098e9e35f5eaef6544ebd011bafe2f4de19b5fbf6de62b33f`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-018:end -->
+<!-- pcg:WSC-010:begin -->
 ### WSC-010 Authoritative Refresh Retracts Absent Semantic Owners
 
 | Property | Value |
@@ -181,6 +202,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 8
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 934-946, original section `WSC-010`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `ce29e2255798f8958a255f8771fa568d2043f0fd8d211958859d23a1c94c5d7d`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:WSC-010:end -->
+<!-- pcg:WSC-011:begin -->
 ### WSC-011 Direct Declaration Authority Is Independent of Derived Relationships
 
 | Property | Value |
@@ -205,6 +228,10 @@ title: WSC-002 CBM Discovers Candidates; Clean-CTX Alone Determines WorkspaceInd
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -215,6 +242,10 @@ title: WSC-003 Hydration Discovery Is Session-State Work
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-003
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -225,6 +256,10 @@ title: WSC-004 Workspace Queries Respect Declared Workspace Scope
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-004
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -235,6 +270,10 @@ title: WSC-005 File-Local Call Inspection Retains Canonical Owner and Occurrence
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-005
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -245,6 +284,10 @@ title: WSC-007 Dependency-Cycle Results Are Witnessed, Scoped Index Evidence
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-007
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -255,6 +298,10 @@ title: WSC-008 Incomplete Query Identity Resolves Once Without Guessing
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-008
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -265,6 +312,10 @@ title: WSC-009 Workspace Query Batches Isolate Outcomes and Share Final Evidence
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-009
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -275,6 +326,10 @@ title: WSC-013 Authoritative Query Truth Is History-Independent
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-013
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -285,6 +340,10 @@ title: WSC-018 Coverage Detail Cannot Strengthen Completeness
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-018
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -295,6 +354,10 @@ title: WSC-010 Authoritative Refresh Retracts Absent Semantic Owners
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-010
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -305,4 +368,9 @@ title: WSC-011 Direct Declaration Authority Is Independent of Derived Relationsh
 track: REPOSITORY
 artifact: docs/invariants/workspace-query.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-011
+  - qualification self#family-standing
 ```
+<!-- pcg:WSC-011:end -->

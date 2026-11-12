@@ -516,4 +516,7 @@ title: Phase9 historical lifecycle audit continuation P9-17 through P9-24
 track: REPOSITORY
 artifact: docs/architecture/IR_PRODUCTION_INTEGRATION_AUDIT_CONTINUATION.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

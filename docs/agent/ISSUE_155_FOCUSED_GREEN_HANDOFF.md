@@ -162,4 +162,7 @@ artifact: docs/agent/ISSUE_155_FOCUSED_GREEN_HANDOFF.md
 implements:
   - AUTH.CSHARP_DEPENDENCY_CLOSURE
 note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

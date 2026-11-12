@@ -4,6 +4,9 @@ use crate::{config::CleanCtxConfig, pcg::document_fixture::Fixture};
 #[path = "pcg_document_sources.rs"]
 mod source_payloads;
 
+#[path = "pcg_knowledge.rs"]
+mod knowledge_payloads;
+
 fn state(f: Option<&Fixture>) -> McpState {
     let mut config = CleanCtxConfig::default();
     config.cbm.enabled = false;

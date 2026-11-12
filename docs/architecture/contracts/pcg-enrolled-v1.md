@@ -335,4 +335,7 @@ title: Owner-enrolled immutable evidence authority
 track: REPOSITORY
 artifact: docs/architecture/contracts/pcg-enrolled-v1.md
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

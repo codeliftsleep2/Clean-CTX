@@ -11,7 +11,13 @@ pub struct Context {
     pub relationships: Vec<Value>,
     pub paths: Vec<Value>,
 }
-fn meaning(kind: &str) -> &'static str {
+pub struct Membership {
+    pub complete: bool,
+    pub revisions: Vec<(String, String)>,
+    pub relationships: Vec<Value>,
+    pub paths: Vec<Value>,
+}
+pub(super) fn meaning(kind: &str) -> &'static str {
     match kind {
         "DEPENDS_ON" => "necessary_premise",
         "BLOCKED_BY" => "blocker_satisfied_only_by_reclosed_or_banked",
@@ -36,6 +42,28 @@ pub fn collect(
     max_nodes: usize,
     max_edges: usize,
 ) -> Result<Context> {
+    let membership = collect_membership(c, g, seed, max_nodes, max_edges)?;
+    let mut documents = Vec::new();
+    for (_, revision) in membership.revisions {
+        let mut value = store::revision(c, &revision)?;
+        value["freshness"] = "current_observed_boundaries".into();
+        documents.push(value);
+    }
+    Ok(Context {
+        complete: membership.complete,
+        documents,
+        relationships: membership.relationships,
+        paths: membership.paths,
+    })
+}
+
+pub fn collect_membership(
+    c: &Connection,
+    g: &str,
+    seed: &str,
+    max_nodes: usize,
+    max_edges: usize,
+) -> Result<Membership> {
     let mut frontier = VecDeque::from([seed.to_string()]);
     let mut paths = BTreeMap::<String, Vec<Value>>::from([(seed.into(), Vec::new())]);
     let mut seen = BTreeSet::new();
@@ -61,9 +89,7 @@ pub fn collect(
         let Some(rev) = rev else {
             return Err(Error("document_not_found"));
         };
-        let mut value = store::revision(c, &rev)?;
-        value["freshness"] = "current_observed_boundaries".into();
-        documents.push(value);
+        documents.push((id.clone(), rev));
         let mut s=store::sql(c.prepare("SELECT source,kind,target,evidence FROM document_edge WHERE g=?1 AND (source=?2 OR (target=?2 AND kind IN ('SUPERSEDES','FALSIFIES','VALIDATES','RECLOSES','BANKS'))) ORDER BY kind,source,target"))?;
         let rows = store::sql(s.query_map(params![g, id], |r| {
             Ok((
@@ -101,21 +127,17 @@ pub fn collect(
         }
     }
     if !complete {
-        return Ok(Context {
+        return Ok(Membership {
             complete: false,
-            documents: Vec::new(),
+            revisions: Vec::new(),
             relationships: Vec::new(),
             paths: Vec::new(),
         });
     }
-    documents.sort_by(|a, b| {
-        a["declaration"]["node"]
-            .as_str()
-            .cmp(&b["declaration"]["node"].as_str())
-    });
-    Ok(Context {
+    documents.sort();
+    Ok(Membership {
         complete,
-        documents,
+        revisions: documents,
         relationships: edges.into_values().collect(),
         paths: paths
             .into_iter()

@@ -402,4 +402,7 @@ artifact: docs/plans/ISSUE_146_ORIGINAL_FIELD_BOUNDARY_FALSIFICATION_2026-10-18.
 uses_evidence:
   - EXP-004-CROSSROOT
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

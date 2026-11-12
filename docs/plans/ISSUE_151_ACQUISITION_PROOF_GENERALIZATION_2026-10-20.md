@@ -82,4 +82,7 @@ artifact: docs/plans/ISSUE_151_ACQUISITION_PROOF_GENERALIZATION_2026-10-20.md
 implements:
   - AUTH.DECLARATION_ACQUISITION
 note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

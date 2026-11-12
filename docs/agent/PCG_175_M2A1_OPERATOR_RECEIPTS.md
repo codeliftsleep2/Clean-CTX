@@ -238,4 +238,7 @@ title: M2a-1 bounded operator and owner-reported evidence reconciliation
 track: REPOSITORY
 artifact: docs/agent/PCG_175_M2A1_OPERATOR_RECEIPTS.md
 note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

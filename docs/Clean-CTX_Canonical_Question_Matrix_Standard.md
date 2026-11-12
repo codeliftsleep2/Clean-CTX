@@ -639,4 +639,7 @@ artifact: docs/Clean-CTX_Canonical_Question_Matrix_Standard.md
 commit: 655f0a75
 preserves:
   - ARCH-004
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: cbm
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:INV.CBM_ID_001:begin -->
 ### CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
 
 | Property | Value |
@@ -17,6 +20,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 200-210, original section `CBM-ID-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `a1a1fc48550583c9e8390b9ae542919abbbd1addb08bbfe09f8f6b379a30fde9`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_ID_001:end -->
+<!-- pcg:INV.CBM_LIFE_001:begin -->
 ### CBM-LIFE-001 Optional Provider Never Gates Core MCP Readiness
 
 | Property | Value |
@@ -30,6 +35,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 211-221, original section `CBM-LIFE-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `0fa68dcdc2f6b439a2847fbdefc7854bed58896778587dd521b54f3219c41383`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_LIFE_001:end -->
+<!-- pcg:INV.CBM_CACHE_001:begin -->
 ### CBM-CACHE-001 Canonical Project-Owned Graph Cache
 
 | Property | Value |
@@ -43,6 +50,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 222-232, original section `CBM-CACHE-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `68c0bbdbb80c553562e6ef6d77dd5f57e716efc693bab6288486e00ed19491c6`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_CACHE_001:end -->
+<!-- pcg:INV.CBM_E_001:begin -->
 ### CBM-E-001 Explicit CBM Error Propagation
 
 | Property | Value |
@@ -56,6 +65,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 233-243, original section `CBM-E-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `be36aca3ae7f249aea82db1d3669f83ecf6854e72118742eea7383817fba2e2d`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_E_001:end -->
+<!-- pcg:INV.CBM_IDENTITY_001:begin -->
 ### CBM-IDENTITY-001 Trace Source Resolution Never Guesses
 
 | Field | Contract |
@@ -67,6 +78,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 244-252, original section `CBM-IDENTITY-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `dc93df59ca10e63df78729b799a86693eeebcdbd6b943419e5b1ba9b3111c6d1`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_IDENTITY_001:end -->
+<!-- pcg:INV.CBM_WIRE_001:begin -->
 ### CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 
 | Property | Value |
@@ -80,6 +93,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 253-263, original section `CBM-WIRE-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `88b8ee6ecba90ae0067938e81a7bae44f242187de51d71358b986b021e60b5c4`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_WIRE_001:end -->
+<!-- pcg:INV.CBM_WIRE_002:begin -->
 ### CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Column-Shape-Driven Edge Extraction
 
 | Property | Value |
@@ -95,6 +110,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 264-276, original section `CBM-WIRE-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `195a5f4a98912a3f9130a04fcf51ef6c98e74fbfb4173d923dd8a02df9a4f90f`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_WIRE_002:end -->
+<!-- pcg:INV.CBM_VERIFY_001:begin -->
 ### CBM-VERIFY-001 Per-Result Caller Verification for `search_graph`
 
 | Property | Value |
@@ -110,6 +127,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 277-289, original section `CBM-VERIFY-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `5199b1dc818cc1eecbdbda42caa63cbc2d6538109473e840e715514476c79a93`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_VERIFY_001:end -->
+<!-- pcg:INV.CBM_VERIFY_002:begin -->
 ### CBM-VERIFY-002 Verified Caller Identity Is Retained and Candidate Discovery Reuses the Project-Scoped Graph Cache
 
 | Property | Value |
@@ -125,6 +144,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 290-303, original section `CBM-VERIFY-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `549c7a95248e3c6489b9e7e578d97e3b8551316f91d7c3348988bc4e6b5fc04f`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.CBM_VERIFY_002:end -->
+<!-- pcg:INV.CBM_OPTIONAL_001:begin -->
 ### CBM-OPTIONAL-001 Optional Providers Change Cost, Not Core Truth
 
 **Status:** ENFORCED
@@ -169,6 +190,10 @@ title: CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_ID_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -181,6 +206,10 @@ artifact: docs/invariants/cbm.md
 preserves:
   - INV.CBM_OPTIONAL_001
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_LIFE_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -193,6 +222,10 @@ artifact: docs/invariants/cbm.md
 preserves:
   - INV.CBM_ID_001
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_CACHE_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -203,6 +236,10 @@ title: CBM-E-001 Explicit CBM Error Propagation
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_E_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -213,6 +250,10 @@ title: CBM-IDENTITY-001 Trace Source Resolution Never Guesses
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_IDENTITY_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -223,6 +264,10 @@ title: CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_WIRE_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -233,6 +278,10 @@ title: CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Column-Shape-Driv
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_WIRE_002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -243,6 +292,10 @@ title: CBM-VERIFY-001 Per-Result Caller Verification for `search_graph`
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_VERIFY_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -253,6 +306,10 @@ title: CBM-VERIFY-002 Verified Caller Identity Is Retained and Candidate Discove
 track: REPOSITORY
 artifact: docs/invariants/cbm.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_VERIFY_002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -265,4 +322,9 @@ artifact: docs/invariants/cbm.md
 preserves:
   - WSC-014
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.CBM_OPTIONAL_001
+  - qualification self#family-standing
 ```
+<!-- pcg:INV.CBM_OPTIONAL_001:end -->

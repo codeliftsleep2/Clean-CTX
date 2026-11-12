@@ -126,4 +126,7 @@ artifact: docs/agent/AF_PERF_002_NGRX_RECONSTRUCTION_RESULTS.md
 consumes_authority:
   - PERF-004-DOCTRINE
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

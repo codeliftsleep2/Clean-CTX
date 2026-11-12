@@ -1,3 +1,4 @@
+<!-- pcg:performance-standing:begin -->
 # Performance doctrine source authority
 
 Agent: **Agent MaxHeadRoom**. B5, 2026-11-12.
@@ -28,6 +29,7 @@ No new optimization, cache, authority, resource ceiling or approval system follo
 from these declarations. Historical owner dispositions remain attributed in their
 own records. Policy compliance is not current performance certification.
 
+<!-- pcg:performance-standing:end -->
 ```architecture-graph
 node: PERF-005-BOUNDED
 kind: INVARIANT
@@ -42,6 +44,10 @@ preserves:
 consumes_authority:
   - AUTH.FINAL_VERIFICATION
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: invariant
+knowledge_content:
+  - statement AGENTS.md#AF-PERF-001
+  - qualification self#performance-standing
 ```
 
 ```architecture-graph
@@ -57,4 +63,8 @@ preserves:
 consumes_authority:
   - AUTH.TOKEN_ECONOMICS
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: authority
+knowledge_content:
+  - statement AGENTS.md#AF-PERF-002
+  - qualification self#performance-standing
 ```

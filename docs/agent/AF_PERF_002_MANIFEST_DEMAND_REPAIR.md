@@ -405,4 +405,7 @@ artifact: docs/agent/AF_PERF_002_MANIFEST_DEMAND_REPAIR.md
 preserves:
   - WSC-014
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

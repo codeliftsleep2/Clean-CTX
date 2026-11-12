@@ -1,5 +1,14 @@
 # Source-owned PCG document authoring
 
+**Normal architectural knowledge workflow:** use `pcg_knowledge_v1` as defined
+below. `pcg_documents_v1` remains the explicit legacy whole-document interface.
+
+For example, pass `@{workspaceRoot=(Get-Location).Path; mode='get'; id='PIPELINE-001'}`
+as the knowledge tool's arguments from this repository root. Use `search` for
+identity discovery, `related` for typed relationships, `context` for the complete
+declared authority bundle, and `source` for original evidence. See
+[the agent workflow](../agent/pcg-authoring.md) for the normal authoring path.
+
 Graph declarations belong to their source documents. PCG parses and validates
 them; SQLite owns admitted graph revisions/history. No document metadata is
 inferred or silently repaired. This interface is distinct from the unchanged
@@ -31,7 +40,7 @@ fresh session. Changing the physical catalog scope requires a new DB; adjusting
 operational ceilings across sessions does not discard history. Profiles are not
 per-document enrollment manifests. There is no watcher or background ingestion.
 
-## Query before writing
+## Legacy whole-document retrieval
 
 Call `pcg_documents_v1` with:
 
@@ -203,6 +212,7 @@ SQLite busy fails without retry. Current catalog reconciliation
 is a write effect: its MCP annotation is not read-only, despite source documents
 never being edited. FTS5 must be supported by SQLite; absence refuses initialization.
 
+<!-- pcg:GLS-grammar-and-bootstrap:begin -->
 ## Inspected reference and exact taxonomy
 
 Actual GLS repository: `C:/Users/MNasty/Desktop/GoalLine Stand 2026`, HEAD
@@ -267,6 +277,7 @@ The separate enrolled `pcg_query_v1` surface consumes an explicitly owner-enroll
 
 Runtime actors, approval transitions, authorization, retention/erasure and a ledger require a separately reviewed M4b design. Source-attributed status, owner labels, graph admission and successful queries supply none of those contracts. See the preserved [M4b reconciliation](../agent/PCG_175_M4B_SCOPE_RECONCILIATION.md). No blanket supersession joins the two interfaces.
 
+<!-- pcg:GLS-grammar-and-bootstrap:end -->
 ```architecture-graph
 node: AUTH.PCG_GLS
 kind: AUTHORITY
@@ -275,6 +286,9 @@ title: Exact imported GLS grammar and candidate-state lifecycle
 track: REPOSITORY
 artifact: docs/architecture/PCG_DOCUMENT_AUTHORING.md
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#GLS-grammar-and-bootstrap
 ```
 
 ```architecture-graph
@@ -289,4 +303,109 @@ depends_on:
 preserves:
   - ARCH-003
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```
+
+## Independently retrievable knowledge (B9)
+
+Owner-authorized B9 corrects retrieval granularity without replacing Markdown
+authority, identities, typed relationships, historical evidence or B8's removal
+of document token budgets. A source artifact can own several knowledge units.
+Rust extracts explicitly owned content; SQLite indexes and selects it. An agent
+reasons about that knowledge rather than locating each proposition in a document.
+
+Extend the same flat declaration with `knowledge_scope` and `knowledge_content`.
+Both must be present together. Scope is `proposition`, `decision`, `invariant`,
+`constraint`, `finding`, `authority`, `evidence`, or `multi_section`. This is content
+scope, not a new graph kind or lifecycle state. A complete contract/report may
+legitimately use `whole`; a proposition sharing a source requires its own selector.
+No implicit whole-source fallback certifies unrepresented knowledge.
+
+Each ordered content entry is `role[:label] path#selector`. `self` means the
+declaring source; other paths must be safe repository-relative artifacts. `whole`
+selects the complete observed artifact. Other selectors name exact paired marker
+lines, outside fenced examples. The selected UTF-8 bytes begin after the begin
+line and end before the end line. Marker names are unique per source. Proper
+nesting is allowed; missing, duplicate, malformed, unclosed or empty boundaries
+refuse admission. Headings, proximity and filenames are not extraction authority.
+
+```markdown
+<!-- pcg:EXACT-SUBJECT:begin -->
+Exact original proposition, including its necessary conditions and rationale.
+<!-- pcg:EXACT-SUBJECT:end -->
+```
+
+Source-owned component roles are `statement`, `subject`, `scope`, `outcome`,
+`rationale`, `alternative`, `rejected_alternative`, `rejection_reason`, `consequence`,
+`constraint`, `verification_obligation`, `observation`, `counterexample`,
+`qualification`, `historical_applicability`, and `evidence`. A statement is required.
+Labels and selectors use ASCII letters/digits/dot/underscore/hyphen; labels are
+explicit semantic annotations, not inferred facts. Multiple intervals can preserve
+shared definitions and qualifications. Do not fabricate missing components or
+duplicate normative prose. Historical reports and uncertainty remain attributed.
+
+`pcg_knowledge_v1` requires explicit `workspaceRoot` and `mode`:
+
+- `search`: optional FTS `text`, exact `track`, `kind`, `status`, `role`, and `label`.
+  Returns identity/title/status/scope/revision, match origins and ready acquisition
+  references. It does not materialize source bodies or claim authority closure.
+  FTS indexes each admitted component and the composed knowledge content. Identity/
+  title matches are distinct. If only a multi-component expression matches,
+  `composed_knowledge` does not falsely attribute it to one component.
+  Composed matching uses the source-declared component order and may span component
+  boundaries; it does not assert a contiguous quotation in one original artifact.
+  Role/label
+  predicates select the explicitly typed components. Order is deterministic ID,
+  not a semantic relevance rank. Shared source ownership creates no sibling match.
+- `get`: exact `id`, optionally a declared `role`/`label` selection. Returns exact
+  content, ordered components, source/interval/content hashes, evidence references
+  and outgoing typed relationships. Full units retain all declared qualifications.
+  Filtered acquisition retains all explicitly associated `qualification` components
+  whenever the requested predicate matches; `selected_by_predicate` distinguishes
+  requested components from those required for interpretation. Filtered acquisition
+  explicitly reports `unit_complete:false`; `complete` then
+  refers to the requested component predicate, not the complete unit.
+- `related`: exact `id`, optional `edgeKind` and `direction` (`incoming`, `outgoing`,
+  `both`). Returns actual typed edges, provenance, meanings and endpoint identities.
+  No endpoint source bodies are acquired merely for relationship discovery.
+- `context`: exact `id`, optional existing `maxNodes`/`maxEdges`. Rust computes the
+  unchanged typed transitive closure and deterministic witnesses, then acquires
+  each selected knowledge unit's exact components. No relationship reconstruction
+  is delegated to the LLM. A structural overflow returns no partial authority bundle.
+- `source`: exact `id`, optional associated `path`. Returns a complete current
+  original artifact, UTF-8 text or lossless byte-array data for binary evidence.
+  Source access is restricted to that identity's declared/associated artifacts.
+  Returned references pin `sourceSha256`; a changed artifact returns explicit
+  `source_revision_changed`, never different bytes under the old reference.
+  Existing material-denial checks also apply to a binary detection view without
+  changing the returned original bytes. Legitimate security failures remain explicit.
+
+References include workspace, identity and associated path so consumers need no
+database knowledge or arbitrary SQL. Required original evidence is exposed by
+complete, exact, current artifact references and explicit source retrieval; there
+are no optional evidence tiers. Component text is not a summary. No token count
+controls selection, admission, completeness or publication. Whole-source legacy
+search remains explicitly document discovery, not proposition discovery.
+
+Read `result_state`, `catalog_current`, `complete`, diagnostics and catalog coverage.
+Discovery over unrepresented identities is incomplete; selected missing knowledge
+also returns incomplete without an authoritative partial bundle. Complete means
+complete against this declared operation/traversal, not all inferred applicability.
+Lifecycle labels and parsed obligations do not establish execution or authorization.
+
+Catalog schema v2 deduplicates complete `(path,hash)` source storage and adds
+revision-bound unit/component projections and attributed FTS. Exact v1 catalogs
+migrate transactionally, retaining every revision, predecessor, generation,
+publication, identity, edge, evidence association and original body. Source-bound
+revision hashing remains unchanged. Explicit external content associations enter
+the same evidence/currentness identity. Failed migration/reconciliation rolls back.
+Stable knowledge reads verify current members, exact source/revision metadata,
+declared edges and the knowledge index, without materializing or certifying the
+unconsumed legacy FTS view. Explicit legacy reads retain their existing legacy
+index check. Every newly published generation builds and verifies both projections
+in the same transaction.
+Unsupported/corrupt schemas refuse. Old binaries refuse v2; there is no destructive
+downgrade. Legacy response formats and full original history remain supported by
+the new executable. The separate enrolled interface and unrelated budgets are unchanged.

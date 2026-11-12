@@ -51,4 +51,7 @@ title: Network and data-handling boundaries
 track: REPOSITORY
 artifact: docs/architecture/contracts/network-effects.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

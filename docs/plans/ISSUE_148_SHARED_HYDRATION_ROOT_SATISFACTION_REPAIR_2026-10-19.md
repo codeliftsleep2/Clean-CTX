@@ -240,4 +240,7 @@ uses_evidence:
 preserves:
   - WSC-019
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

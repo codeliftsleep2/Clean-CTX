@@ -276,4 +276,7 @@ title: Historical corrected design review with later scoped v1 acceptance
 track: REPOSITORY
 artifact: docs/agent/PCG_175_DESIGN_FREEZE.md
 note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

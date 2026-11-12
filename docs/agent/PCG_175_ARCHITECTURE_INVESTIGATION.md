@@ -471,4 +471,7 @@ title: PCG architecture investigation and bounded read-only proposal
 track: REPOSITORY
 artifact: docs/agent/PCG_175_ARCHITECTURE_INVESTIGATION.md
 note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

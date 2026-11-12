@@ -271,4 +271,7 @@ title: Owner-approved bounded overload source-form tradeoff
 track: REPOSITORY
 artifact: docs/agent/AF_PERF_002_OVERLOAD_SOURCE_FORMS.md
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

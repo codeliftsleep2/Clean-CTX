@@ -22,4 +22,7 @@ title: General symmetric cross-root DbContext failure hypothesis
 track: REPOSITORY
 artifact: docs/plans/ISSUE_146_CROSS_ROOT_DBCONTEXT_CLASSIFICATION_INVESTIGATION_2026-10-18.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: proposition
+knowledge_content:
+  - statement self#whole
 ```

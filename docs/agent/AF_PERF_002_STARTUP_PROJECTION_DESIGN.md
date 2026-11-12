@@ -129,6 +129,7 @@ composed acceptance required before closure. Do not implement it from this desig
 approval. Per-root inventories remain unmeasured, listing scaling monitored and
 dense equality deferred. Census unchanged13/9763 scoped,9750 unresolved plus96
 supplements. No stage, commit or push.
+<!-- pcg:STARTUP-results:begin -->
 ## Executed comparison: DEFER projection, REJECT count removal
 
 Agent MaxHeadRoom inspected startup-projection-design-20261108-215733: four tracked
@@ -220,6 +221,7 @@ implementation delegates to them. Historical discovery samples remain distinct.
 
 ### Returned disposition
 
+<!-- pcg:STARTUP-defer:begin -->
 **DEFER the preserving projection.** It demonstrates avoidable owned summary work
 with bounded semantic equivalence, but typical measured savings are tens of
 microseconds and count-heavy retained work limits benefit. Real startup frequency/
@@ -228,6 +230,8 @@ a separate reader and its conversion/order/authority protections is not currentl
 justified by this evidence. This is an engineering-priority judgment, not a new
 global optimization threshold or claim that45us can never matter.
 
+<!-- pcg:STARTUP-defer:end -->
+<!-- pcg:STARTUP-reject:begin -->
 No implementation slice is recommended now. Keep this measured candidate for
 reconsideration only with stronger exposure evidence. Count-elimination is rejected
 under existing semantics; do not pursue more speculative SQL/preflight variants.
@@ -236,6 +240,8 @@ cloning, still unmeasured and not authorized for production correction. Public
 listing scaling stays monitored; dense same-signature equality remains deferred.
 No further timing requested solely to obtain favorable samples. All completed
 repairs stay CLOSED / FIX / PROTECTED. No stage, commit or push; census unchanged.
+<!-- pcg:STARTUP-reject:end -->
+<!-- pcg:STARTUP-results:end -->
 ```architecture-graph
 node: DOC-196
 kind: RESEARCH
@@ -244,6 +250,9 @@ title: Executed startup projection comparison and count-error controls
 track: REPOSITORY
 artifact: docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```
 
 ```architecture-graph
@@ -258,4 +267,9 @@ uses_evidence:
 preserves:
   - AUTH.PERSISTENCE_RECOVERY
 note: Source-attributed returned investigation disposition; no owner freeze inferred. DEFER and REJECT remain distinct prose decisions, not new GLS statuses.
+knowledge_scope: decision
+knowledge_content:
+  - statement self#STARTUP-results
+  - outcome:DEFER self#STARTUP-defer
+  - outcome:REJECT self#STARTUP-reject
 ```

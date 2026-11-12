@@ -222,4 +222,7 @@ preserves:
   - AUTH.DECLARATION_ACQUISITION
   - INV.CSHARP_RESOLUTION_001
 note: Source migration and bounded document retrieval only; historical verification stays attributed, without language certification or closure.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

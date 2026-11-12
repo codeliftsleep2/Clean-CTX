@@ -119,4 +119,7 @@ preserves:
   - WSC-013
   - WSC-019
 note: Current source-described contract; no witness execution or independent certification is inferred.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

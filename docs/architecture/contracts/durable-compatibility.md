@@ -31,4 +31,7 @@ artifact: docs/architecture/contracts/durable-compatibility.md
 preserves:
   - PERSIST-002
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

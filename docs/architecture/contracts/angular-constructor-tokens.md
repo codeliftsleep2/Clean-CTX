@@ -104,4 +104,7 @@ artifact: docs/architecture/contracts/angular-constructor-tokens.md
 depends_on:
   - AUTH.TS_RETAINED_EVIDENCE
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

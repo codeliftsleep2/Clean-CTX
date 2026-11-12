@@ -142,4 +142,7 @@ artifact: docs/architecture/contracts/pcg-mcp-v1.md
 depends_on:
   - AUTH.PCG_PROJECTION_V1
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

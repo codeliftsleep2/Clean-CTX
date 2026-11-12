@@ -164,4 +164,7 @@ artifact: docs/agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md
 implements:
   - AUTH.PCG_DOCUMENTS
 note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

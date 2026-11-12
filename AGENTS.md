@@ -33,7 +33,7 @@ depend on `.clinerules/` being present.
 ### Architectural authoring preflight
 
 Before significant architectural decisions or document authoring, follow
-`docs/agent/pcg-authoring.md`: query `pcg_documents_v1` for related nodes and their
+`docs/agent/pcg-authoring.md`: query `pcg_knowledge_v1` for related nodes and their
 typed transitive constraint chains before proposing changes, then reconcile the
 source declaration after writing. Record unavailable coverage honestly; graph
 status is not execution authorization. This projects the local engineering rule,
@@ -498,6 +498,7 @@ release-time verification. No push to the default branch ever occurs from the
 runner.
 
 
+<!-- pcg:AF-PERF-001:begin -->
 ### AF-PERF-001 — Bounded semantic work
 
 Any new or modified semantic producer, projector, admission path or reconciler
@@ -516,6 +517,8 @@ condition. No ignored required tests, blanket legacy exception or allow-failure
 CI step may substitute for acceptance. Coverage limits remain explicit.
 
 
+<!-- pcg:AF-PERF-001:end -->
+<!-- pcg:AF-PERF-002:begin -->
 ### AF-PERF-002 — Exhaustive discovery, selective remediation
 
 Investigate every meaningful architectural performance risk; do not optimize every
@@ -550,3 +553,4 @@ This decision rule does not weaken AF-PERF-001 gates or authorize production cha
 caches, authority/lifecycle changes or architectural exceptions. Obtain the required
 owner disposition for each repair. The objective is the best overall system behavior
 at an acceptable complexity and correctness cost, not the smallest operation count.
+<!-- pcg:AF-PERF-002:end -->

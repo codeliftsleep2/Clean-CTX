@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: persistence-publication
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:PERSIST-001:begin -->
 ### PERSIST-001 Automatic Checkpoints Are Policy; Accepted Mutations Are Durable Authority
 
 | Property | Value |
@@ -19,6 +22,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 675-687, original section `PERSIST-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `461e1a6757a02318e8fd0708a32a64a4858a54faa4fa945a45a572fd795a717c`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:PERSIST-001:end -->
+<!-- pcg:PERSIST-002:begin -->
 ### PERSIST-002 Durable Authority Requires Scoped Compatibility Evidence
 
 | Property | Value |
@@ -37,6 +42,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 688-703, original section `PERSIST-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `cbfc877d512d21df475ba3d4142579ca8caf8bde89f5068450c9a1ca8854cacd`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:PERSIST-002:end -->
+<!-- pcg:PUB-001:begin -->
 ### PUB-001 Same-Owner Semantic Publication Is Source-Ordered
 
 | Property | Value |
@@ -60,6 +67,10 @@ title: PERSIST-001 Automatic Checkpoints Are Policy; Accepted Mutations Are Dura
 track: REPOSITORY
 artifact: docs/invariants/persistence-publication.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#PERSIST-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -70,6 +81,10 @@ title: PERSIST-002 Durable Authority Requires Scoped Compatibility Evidence
 track: REPOSITORY
 artifact: docs/invariants/persistence-publication.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#PERSIST-002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -80,4 +95,9 @@ title: PUB-001 Same-Owner Semantic Publication Is Source-Ordered
 track: REPOSITORY
 artifact: docs/invariants/persistence-publication.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#PUB-001
+  - qualification self#family-standing
 ```
+<!-- pcg:PUB-001:end -->

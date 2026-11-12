@@ -307,4 +307,7 @@ artifact: docs/agent/AF_PERF_001_DESIGN.md
 preserves:
   - PERF-005-BOUNDED
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

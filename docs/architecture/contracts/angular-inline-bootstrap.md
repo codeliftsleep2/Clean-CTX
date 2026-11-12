@@ -58,4 +58,7 @@ depends_on:
   - AUTH.ANGULAR_BOOTSTRAP_REFERENCE
   - AUTH.ANGULAR_IMPORTED_ARRAY
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

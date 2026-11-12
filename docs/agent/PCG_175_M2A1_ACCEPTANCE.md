@@ -234,4 +234,7 @@ artifact: docs/agent/PCG_175_M2A1_ACCEPTANCE.md
 uses_evidence:
   - PCG-175-M2A1-OPERATOR-RECEIPTS
 note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

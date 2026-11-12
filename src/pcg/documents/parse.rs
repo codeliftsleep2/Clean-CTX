@@ -44,7 +44,7 @@ fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
         }
         let value = tail.trim();
         let relation = key.to_ascii_uppercase();
-        if RELATIONS.contains(&relation.as_str()) {
+        if RELATIONS.contains(&relation.as_str()) || key == "knowledge_content" {
             let mut values = Vec::new();
             if !value.is_empty() {
                 if value.starts_with('[') || value.ends_with(',') {
@@ -60,7 +60,16 @@ fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
             };
         } else {
             if ![
-                "node", "kind", "status", "title", "track", "artifact", "verdict", "commit", "note",
+                "node",
+                "kind",
+                "status",
+                "title",
+                "track",
+                "artifact",
+                "verdict",
+                "commit",
+                "note",
+                "knowledge_scope",
             ]
             .contains(&key)
             {
@@ -78,6 +87,20 @@ fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
             return Err(error(&format!("Missing required field: {required}")));
         }
     }
+    let knowledge = match (
+        scalars.remove("knowledge_scope"),
+        edges.remove("knowledge_content"),
+    ) {
+        (None, None) => None,
+        (Some(scope), Some(entries)) => {
+            Some(super::content::spec(scope, entries).map_err(|e| error(e.0))?)
+        }
+        _ => {
+            return Err(error(
+                "knowledge_scope and knowledge_content must be declared together",
+            ));
+        }
+    };
     Ok(Declaration {
         id: scalars.remove("node").expect("required"),
         kind: scalars.remove("kind").expect("required"),
@@ -88,6 +111,7 @@ fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
         verdict: scalars.remove("verdict"),
         commit: scalars.remove("commit"),
         note: scalars.remove("note"),
+        knowledge,
         relationships: edges
             .into_iter()
             .flat_map(|(kind, targets)| {

@@ -146,4 +146,7 @@ implements:
   - AUTH.PCG_PREAUTHORING
 uses_evidence:
   - PCG-175-DOCUMENTS
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

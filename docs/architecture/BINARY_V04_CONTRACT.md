@@ -263,4 +263,7 @@ depends_on:
   - AUTH.CORE_OPS
 preserves:
   - IRWIRE-001
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

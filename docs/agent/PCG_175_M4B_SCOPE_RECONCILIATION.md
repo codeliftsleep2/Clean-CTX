@@ -95,4 +95,7 @@ title: Unfrozen runtime-ledger scope and unresolved prerequisite decisions
 track: REPOSITORY
 artifact: docs/agent/PCG_175_M4B_SCOPE_RECONCILIATION.md
 note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

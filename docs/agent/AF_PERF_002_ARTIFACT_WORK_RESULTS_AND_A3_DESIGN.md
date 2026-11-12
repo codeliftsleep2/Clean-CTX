@@ -450,4 +450,7 @@ title: Historical A3 lazy candidate buckets with construction tradeoffs
 track: REPOSITORY
 artifact: docs/agent/AF_PERF_002_ARTIFACT_WORK_RESULTS_AND_A3_DESIGN.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

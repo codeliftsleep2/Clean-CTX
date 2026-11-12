@@ -226,4 +226,7 @@ preserves:
   - AUTH.PCG_DOCUMENTS
   - AUTH.SEMANTIC_MODEL
 note: Bounded normalization delivery and source-attributed history; knowledge availability holds and unexecuted integration/repository/field gates remain explicit.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

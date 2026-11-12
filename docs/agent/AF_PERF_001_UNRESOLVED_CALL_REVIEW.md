@@ -283,4 +283,7 @@ artifact: docs/agent/AF_PERF_001_UNRESOLVED_CALL_REVIEW.md
 uses_evidence:
   - DOC-135
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

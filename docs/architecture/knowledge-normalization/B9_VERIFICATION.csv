@@ -1,0 +1,21 @@
+category,command,outcome,scope_and_evidence
+tracked corrected RED,cargo test --lib --all-features explicit_knowledge_boundaries_reconcile_without_changing_legacy_shape -- --nocapture,EXPECTED FAIL,0passed/1failed;unknown GLS field against unchanged B8;corrected fixture;target/pcg-b9/boundary-red-corrected.log
+tracked document/migration tests,cargo test --lib --all-features pcg::documents::,PASS,33passed/0failed/0ignored;target/pcg-b9/final-document-tests-2.log
+tracked registered MCP tests,target/debug/deps/clean_ctx-459afc2dbfa48d18.exe pcg_documents::tests,PASS,8passed;new conditional registered interface/source references plus existing legacy parity/reconstruction
+tracked enrolled isolation,target/debug/deps/clean_ctx-459afc2dbfa48d18.exe pcg::projection::tests,PASS,8passed;retained separate token limits/refusal;target/pcg-b9/enrolled-isolation.log
+tracked code-context isolation,target/debug/deps/clean_ctx-459afc2dbfa48d18.exe compression_token_work::c1_budget_public_raw_count_once,PASS,1passed;target/pcg-b9/code-context-isolation.log
+scoped warning-fatal Clippy,cargo clippy -p clean-ctx --all-targets --all-features -- -D warnings,PASS,Zero warnings;target/pcg-b9/final-clippy-2.log;earlier two auto-deref findings corrected
+production build,cargo build --bin clean-ctx --all-features,PASS,target/pcg-b9/production-build.log;exact binary hash in production evidence
+production knowledge,invoke-workspace-knowledge.ps1 with b9-knowledge-queries.json,PASS,270 actual-root requests;218 exact get witnesses;10original FTS queries;11contexts;typed relations;historical components;original evidence
+independent capture checker,python verification/pcg-175/verify-b9-knowledge.py target/pcg-b9/production,PASS,Every component current source bytes/hash;all baseline identities/edges/history;exact declared context closure and valid witnesses;mandatory historical phrase oracles
+source preservation,python target/pcg-b9/preserve.py,PASS WITH RECORDED DISPOSITION,149 sources original prose recovered byte-exact;4authorized governing/workflow amendments;1local line-ending difference with unchanged prose characters;all original bytes retained in history
+changed Rust formatting,rustfmt --edition 2024 --config skip_children=true --check [20 changed Rust files],PASS,All changed Rust files;exact list in change set
+repository formatting,cargo fmt --all -- --check,FAIL PREEXISTING,Same untouched src/pcg/mod.rs;src/pcg/security.rs;src/tests/pcg/persistence.rs as B8;target/pcg-b9/repository-fmt.log
+full repository gate,docs/agent/verification.md::Final Verification Gate,UNRUN,No full workspace/CI claim;no unrelated historical producer or performance campaign run
+independent A/B evaluation,Frozen B7 sixteen runs,UNRUN,Memory contamination remains;all36 frozen files hash-identical
+legacy production compatibility,invoke-workspace-documents.ps1 with original18requests plus3history requests,PASS,21ready/current;6completecontexts;3exact format-pair reconstructions;3originalB8history bodies and evidence exact
+returned references,invoke-workspace-knowledge.ps1 with4actual returned hash-pinned source requests,PASS,All returned references execute verbatim and retrieve exact source bytes
+frozen evaluation preservation,SHA256 against FROZEN_IDENTITIES.json,PASS,36frozen files unchanged;16independent runs remainUNRUN
+source encoding,pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-utf8.ps1,PASS,StrictUTF8/noBOM guard;final normalcommitguard reruns current scope
+active file size,pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/check-file-sizes.ps1,PASS,Active file guard;12untouched legacy oversized files;request set one record per line
+whitespace,git diff --check,PASS,No whitespace errors;staged check at delivery

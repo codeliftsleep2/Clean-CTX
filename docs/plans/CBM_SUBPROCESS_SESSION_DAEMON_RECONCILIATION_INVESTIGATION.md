@@ -615,4 +615,7 @@ title: Historical frontend-session versus provider-owned daemon reconciliation
 track: REPOSITORY
 artifact: docs/plans/CBM_SUBPROCESS_SESSION_DAEMON_RECONCILIATION_INVESTIGATION.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

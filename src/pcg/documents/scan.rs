@@ -13,8 +13,20 @@ pub struct Capture {
     witnesses: BTreeMap<String, (String, Vec<u8>)>,
     contents: BTreeMap<String, std::sync::Arc<Vec<u8>>>,
     bytes: u64,
+    #[cfg(test)]
+    boundary_work: (usize, usize, usize, usize, usize),
 }
 impl Capture {
+    pub(super) fn source(&self, path: &str) -> Result<&[u8]> {
+        self.contents
+            .get(path)
+            .map(|s| s.as_slice())
+            .ok_or(Error("document_source_unavailable"))
+    }
+    #[cfg(test)]
+    pub fn boundary_work(&self) -> (usize, usize, usize, usize, usize) {
+        self.boundary_work
+    }
     #[cfg(test)]
     pub fn read_work(&self) -> (u64, usize) {
         (self.bytes, self.witnesses.len())
@@ -80,6 +92,8 @@ pub fn scan(trusted: &Trusted) -> Result<Capture> {
         witnesses: BTreeMap::new(),
         contents: BTreeMap::new(),
         bytes: 0,
+        #[cfg(test)]
+        boundary_work: (0, 0, 0, 0, 0),
     };
     let root = &trusted.profile.workspace_root;
     let mut stack: Vec<_> = trusted
@@ -182,10 +196,11 @@ pub fn scan(trusted: &Trusted) -> Result<Capture> {
                 entry.insert(Candidate {
                     path: path.clone(),
                     source_sha,
-                    bytes: bytes.as_ref().clone(),
+                    bytes: bytes.clone(),
                     declaration,
                     revision,
                     evidence,
+                    knowledge: None,
                 });
             } else {
                 result.diagnostics.push(Diagnostic::new(
@@ -196,6 +211,42 @@ pub fn scan(trusted: &Trusted) -> Result<Capture> {
                 ));
             }
         }
+    }
+    let mut resolver = super::content::Resolver::default();
+    for (id, mut node) in std::mem::take(&mut result.nodes) {
+        if let Some(spec) = &node.declaration.knowledge {
+            match resolver.resolve(spec, &node.path, |path| result.read(trusted, path)) {
+                Ok(knowledge) => {
+                    for component in &knowledge.components {
+                        if !node
+                            .evidence
+                            .iter()
+                            .any(|e| e["path"].as_str() == Some(&component.binding.path))
+                        {
+                            let text = std::str::from_utf8(&component.source)
+                                .map_err(|_| Error("invalid_utf8"))?;
+                            node.evidence
+                                .push(json!({"kind":"artifact","path":component.binding.path,
+                                "sha256":component.source_sha,"text":text}));
+                        }
+                    }
+                    node.revision = identity::hash(
+                        &json!({"path":node.path,"source_sha256":node.source_sha,
+                        "declaration":serde_json::to_value(&node.declaration).map_err(|_| Error("document_metadata"))?,
+                        "evidence":node.evidence}),
+                    );
+                    node.knowledge = Some(knowledge);
+                }
+                Err(error) => result
+                    .diagnostics
+                    .push(super::content::diagnostic(&node.path, &id, error)),
+            }
+        }
+        result.nodes.insert(id, node);
+    }
+    #[cfg(test)]
+    {
+        result.boundary_work = resolver.work();
     }
     require(
         result

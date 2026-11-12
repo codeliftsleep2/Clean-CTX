@@ -216,4 +216,7 @@ preserves:
   - AUTH.CORE_OPS
   - AUTH.BINARY_V04
 note: Source normalization and actual stdio reconciliation; no new runtime test or independent certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

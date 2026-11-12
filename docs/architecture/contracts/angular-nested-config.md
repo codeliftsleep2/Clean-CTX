@@ -101,4 +101,7 @@ artifact: docs/architecture/contracts/angular-nested-config.md
 deepens:
   - AUTH.ANGULAR_CONFIG_COMPOSITION
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

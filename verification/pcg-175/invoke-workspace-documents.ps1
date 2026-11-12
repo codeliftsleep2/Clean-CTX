@@ -5,7 +5,9 @@ param(
     [Parameter(Mandatory)][string]$Requests,
     [Parameter(Mandatory)][string]$OutputRoot,
     [Parameter(Mandatory)][string]$LaunchDirectory,
-    [string]$TokenCounter
+    [string]$TokenCounter,
+    [ValidateSet('pcg_documents_v1', 'pcg_knowledge_v1')]
+    [string]$ToolName = 'pcg_documents_v1'
 )
 # Explicit production document queries, not a fixture/corpus importer or a test.
 # Uses the same bounded JSON-RPC/stdio lifecycle as run-documents.ps1.
@@ -67,9 +69,15 @@ function Rpc([int]$Id, [string]$Method, $Params) {
     if ($response.id -ne $Id) { throw 'Unexpected RPC response ID' }
     if ($response.ContainsKey('error')) { throw ($response.error | ConvertTo-Json -Compress) }
     if ($Method -eq 'tools/call') {
-        $prefix = '{"jsonrpc":"2.0","id":' + $Id + ',"result":'
-        if (-not $line.StartsWith($prefix) -or -not $line.EndsWith('}')) { throw 'Unexpected exact-byte PCG framing' }
-        $rawResult = $line.Substring($prefix.Length, $line.Length - $prefix.Length - 1)
+        if ($ToolName -eq 'pcg_documents_v1') {
+            $prefix = '{"jsonrpc":"2.0","id":' + $Id + ',"result":'
+            if (-not $line.StartsWith($prefix) -or -not $line.EndsWith('}')) { throw 'Unexpected exact-byte PCG framing' }
+            $rawResult = $line.Substring($prefix.Length, $line.Length - $prefix.Length - 1)
+        } else {
+            $document = [Text.Json.JsonDocument]::Parse($line)
+            try { $rawResult = $document.RootElement.GetProperty('result').GetRawText() }
+            finally { $document.Dispose() }
+        }
         [IO.File]::WriteAllText((Join-Path $outputPath "$Id.serialized-result.json"), $rawResult, $utf8)
     }
     return $response
@@ -80,10 +88,10 @@ try {
     $null = Rpc 0 'initialize' @{protocolVersion='2025-11-25'; capabilities=@{}; clientInfo=@{name='maxheadroom-production-authoring'; version='1'}}
     $process.StandardInput.WriteLine('{"jsonrpc":"2.0","method":"notifications/initialized"}')
     $catalog = Rpc 1 'tools/list' @{}
-    if (@($catalog.result.tools | Where-Object {$_.name -ceq 'pcg_documents_v1'}).Count -ne 1) { throw 'Document tool unavailable in production stdio' }
+    if (@($catalog.result.tools | Where-Object {$_.name -ceq $ToolName}).Count -ne 1) { throw 'Requested knowledge/document tool unavailable in production stdio' }
     $id = 2
     foreach ($query in $queries) {
-        $response = Rpc $id 'tools/call' @{name='pcg_documents_v1'; arguments=$query}
+        $response = Rpc $id 'tools/call' @{name=$ToolName; arguments=$query}
         $payload = $response.result.content[0].text | ConvertFrom-Json -AsHashtable
         Write-Json "$id.payload.json" $payload
         $tokens = $null
@@ -91,7 +99,11 @@ try {
             $tokens = [int](& $counterPath count $query.tokenizer (Join-Path $outputPath "$id.serialized-result.json"))
             if ($LASTEXITCODE -ne 0) { throw 'Existing Rust tokenizer helper failed' }
         }
-        $results.Add(@{request=$id; mode=$query.mode; node=$query.id; result_state=$payload.result_state; catalog_current=$payload.catalog_current; generation=$payload.generation; documents=@($payload.documents).Count; context=$payload.context; serialized_tokens=$tokens; budget=$payload.budget; diagnostics=$payload.diagnostics})
+        if ($ToolName -eq 'pcg_knowledge_v1') {
+            $results.Add(@{request=$id; mode=$query.mode; node=$query.id; result_state=$payload.result_state; catalog_current=$payload.catalog_current; complete=$payload.complete; generation=$payload.generation; units=@($payload.units).Count; relationships=@($payload.relationships).Count; paths=@($payload.paths).Count; diagnostics=$payload.diagnostics; catalog_coverage=$payload.catalog_coverage})
+        } else {
+            $results.Add(@{request=$id; mode=$query.mode; node=$query.id; result_state=$payload.result_state; catalog_current=$payload.catalog_current; generation=$payload.generation; documents=@($payload.documents).Count; context=$payload.context; serialized_tokens=$tokens; budget=$payload.budget; diagnostics=$payload.diagnostics})
+        }
         $id++
     }
 } catch {
@@ -105,7 +117,7 @@ try {
         $exitCode = $process.ExitCode
         [IO.File]::WriteAllText((Join-Path $outputPath 'stderr.txt'), $stderr.GetAwaiter().GetResult(), $utf8)
     }
-    Write-Json 'receipt.json' @{workflow='actual-workspace pcg_documents_v1 production stdio'; workspace=$workspace; profile=$profilePath; binary=$binaryPath; binary_sha256=$binaryHash; profile_sha256=$profileHash; token_counter=$counterPath; token_counter_sha256=$counterHash; process_exit_code=$exitCode; error=$failure; queries=$results.ToArray()}
+    Write-Json 'receipt.json' @{workflow="actual-workspace $ToolName production stdio"; workspace=$workspace; profile=$profilePath; binary=$binaryPath; binary_sha256=$binaryHash; profile_sha256=$profileHash; token_counter=$counterPath; token_counter_sha256=$counterHash; process_exit_code=$exitCode; error=$failure; queries=$results.ToArray()}
     $process.Dispose()
 }
 if ($failure -or $exitCode -ne 0) { throw "Production stdio failed: $failure / exit $exitCode" }

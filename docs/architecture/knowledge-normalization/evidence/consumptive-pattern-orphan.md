@@ -59,4 +59,7 @@ artifact: docs/architecture/knowledge-normalization/evidence/consumptive-pattern
 preserves:
   - IRPAT-001
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: finding
+knowledge_content:
+  - statement self#whole
 ```

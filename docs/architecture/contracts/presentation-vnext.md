@@ -164,4 +164,7 @@ preserves:
   - CONTENT-001
   - CTX-001
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

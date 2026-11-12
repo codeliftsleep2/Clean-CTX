@@ -213,4 +213,7 @@ preserves:
   - PROJ-001
   - WSC-019
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

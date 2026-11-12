@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: invocation
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:INV.INVOCATION_001:begin -->
 ### INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
 
 | Property | Value |
@@ -16,6 +19,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 973-982, original section `INVOCATION-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `3c7116fc92556fa7ba3766d3df7578e7c09d46579e7e0e6e858ad0785a4efbf7`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.INVOCATION_001:end -->
+<!-- pcg:INV.INVOCATION_002:begin -->
 ### INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
 
 | Property | Value |
@@ -28,6 +33,8 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 983-992, original section `INVOCATION-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `bbe6ed63ad11e6ecc36d9cbe2e2427b16b26559032a04f6502943f622d9c6eb9`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:INV.INVOCATION_002:end -->
+<!-- pcg:INV.INVOCATION_003:begin -->
 ### INVOCATION-003 Exact C# Calls Use Capability-Gated Artifact Authority
 
 | Property | Value |
@@ -57,6 +64,10 @@ artifact: docs/invariants/invocation.md
 preserves:
   - CTX-001
 note: Current source-described contract; no witness execution or independent certification is inferred.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.INVOCATION_001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -72,6 +83,10 @@ preserves:
   - WSC-012
   - PROJ-001
 note: Current source-described contract; no witness execution or independent certification is inferred.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.INVOCATION_003
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -84,4 +99,9 @@ artifact: docs/invariants/invocation.md
 depends_on:
   - INV.INVOCATION_001
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.INVOCATION_002
+  - qualification self#family-standing
 ```
+<!-- pcg:INV.INVOCATION_003:end -->

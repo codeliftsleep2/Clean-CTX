@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: delta-lifecycle
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:DELTA-001:begin -->
 ### DELTA-001 Delta Correctness
 
 | Property | Value |
@@ -19,6 +22,8 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 62-74, original section `DELTA-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `732b74dc91122b6d2e865633cf8e2f4813aafa37b96af658d8cc659df61632bb`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:DELTA-001:end -->
+<!-- pcg:IRDELTA-001:begin -->
 ### IRDELTA-001 Exact Occurrence-Preserving Delta Replay
 
 | Property | Value |
@@ -43,8 +48,14 @@ track: FOUNDATION
 artifact: docs/invariants/delta-lifecycle.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRDELTA-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IRDELTA-001:end -->
+<!-- pcg:IRDELTA-002:begin -->
 ### IRDELTA-002 Explicit Code-Side Delta Acknowledgement
 
 | Property | Value |
@@ -60,6 +71,8 @@ note: Source enforcement attributes are retained in prose; admission does not ex
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 391-402, original section `IRDELTA-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `27d1bf8277509ae778143e894334c69aaff2cdc93c8d4f50306309b022019e0d`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+<!-- pcg:IRDELTA-002:end -->
+<!-- pcg:IRDELTA-003:begin -->
 ### IRDELTA-003 Delta Statistics Mirror the Successful Response Lifecycle
 
 | Property | Value |
@@ -84,6 +97,10 @@ title: DELTA-001 Delta Correctness
 track: REPOSITORY
 artifact: docs/invariants/delta-lifecycle.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#DELTA-001
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -94,6 +111,10 @@ title: IRDELTA-002 Explicit Code-Side Delta Acknowledgement
 track: REPOSITORY
 artifact: docs/invariants/delta-lifecycle.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRDELTA-002
+  - qualification self#family-standing
 ```
 
 ```architecture-graph
@@ -104,4 +125,9 @@ title: IRDELTA-003 Delta Statistics Mirror the Successful Response Lifecycle
 track: REPOSITORY
 artifact: docs/invariants/delta-lifecycle.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRDELTA-003
+  - qualification self#family-standing
 ```
+<!-- pcg:IRDELTA-003:end -->

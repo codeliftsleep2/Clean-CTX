@@ -58,4 +58,7 @@ preserves:
   - PIPELINE-001
   - AUTH-001
   - ARCH-003
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

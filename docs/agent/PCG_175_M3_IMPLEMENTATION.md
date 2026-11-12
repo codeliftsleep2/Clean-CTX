@@ -335,4 +335,7 @@ artifact: docs/agent/PCG_175_M3_IMPLEMENTATION.md
 implements:
   - AUTH.PCG_PROJECTION_V1
 note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

@@ -122,4 +122,7 @@ artifact: docs/agent/ISSUE_162_MODULE_DECLARATION_EVIDENCE_DECISION.md
 implements:
   - AUTH.TS_RETAINED_EVIDENCE
 note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

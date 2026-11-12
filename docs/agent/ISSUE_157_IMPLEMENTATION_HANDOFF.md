@@ -250,4 +250,7 @@ artifact: docs/agent/ISSUE_157_IMPLEMENTATION_HANDOFF.md
 preserves:
   - SEMDEP-001
 note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

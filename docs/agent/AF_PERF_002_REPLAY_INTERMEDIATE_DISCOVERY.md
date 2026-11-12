@@ -241,4 +241,7 @@ title: Historical intermediate replay atomicity and no-repair decision
 track: REPOSITORY
 artifact: docs/agent/AF_PERF_002_REPLAY_INTERMEDIATE_DISCOVERY.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

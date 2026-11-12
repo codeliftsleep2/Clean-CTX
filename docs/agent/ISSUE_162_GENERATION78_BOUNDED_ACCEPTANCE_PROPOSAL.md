@@ -1,11 +1,14 @@
 # Generation 78: bounded remaining preservation and binary proposal
 
+<!-- pcg:GEN78-standing:begin -->
 B4b evidence scope: historical banners and later outcomes remain stage-specific. Generation78 local/binary acceptance is distinct from public resolver keys, current-executable validation and full #162/field certification. Existing receipt input drift is recorded in B4B_HISTORICAL_RECEIPTS.csv; no campaign was rerun.
+<!-- pcg:GEN78-standing:end -->
 
 Agent: Agent MaxHeadRoom
 Status: owner approved; Phase A and three-session binary assets authored, UNRUN.
 Generation 78. Public resolver-key expansion remains suspended.
 
+<!-- pcg:GEN78-binary:begin -->
 ## Phase B verified PASS; bounded generation-78 evidence consolidated
 
 Inspected resolver78-binary-20261103-160437: operator binary/stdio suite passes
@@ -31,6 +34,8 @@ Full repository Final Verification Gate and final Claude field acceptance remain
 outstanding. Claude stays last; no full #162 closure or generation advance follows.
 No agent test/build/runtime ran while inspecting these operator receipts.
 
+<!-- pcg:GEN78-binary:end -->
+<!-- pcg:GEN78-tracked:begin -->
 ## Phase A verified GREEN; Phase B pending
 
 Inspected resolver78-residual-20261103-160125: all eight exact approved tracked tests pass,
@@ -49,6 +54,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./verification/live-acceptance/issue-162
 This builds one all-feature binary and runs only the approved three-session suite.
 No agent build/test/binary ran. Generation 78; repository/Claude/key gates unchanged.
 
+<!-- pcg:GEN78-tracked:end -->
 ## Approved campaign assets authored; Phase A/B UNRUN
 
 Owner approves the eight exact residual tracked tests and one generation-78 binary
@@ -199,4 +205,10 @@ title: Generation78 bounded local and binary evidence consolidation
 track: REPOSITORY
 artifact: docs/agent/ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md
 note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
+  - observation:historical_binary_acceptance self#GEN78-binary
+  - observation:historical_tracked_green self#GEN78-tracked
+  - qualification:historical_acceptance self#GEN78-standing
 ```

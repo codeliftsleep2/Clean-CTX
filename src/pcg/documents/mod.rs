@@ -1,9 +1,14 @@
 //! Source-owned document admission. SQLite owns admitted graph snapshots/history.
+mod content;
+pub mod knowledge;
+mod knowledge_query;
+mod knowledge_store;
 mod model;
 mod parse;
 mod profile;
 mod response;
 mod scan;
+mod schema;
 mod store;
 mod traversal;
 mod validate;
@@ -228,3 +233,15 @@ impl Session {
 #[cfg(test)]
 #[path = "../../tests/pcg/documents.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/knowledge.rs"]
+mod knowledge_tests;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/knowledge_cases.rs"]
+mod knowledge_cases;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/knowledge_migration.rs"]
+mod knowledge_migration;

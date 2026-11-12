@@ -178,4 +178,7 @@ title: Tracked encoding-policy projection subordinate to governing local rule
 track: REPOSITORY
 artifact: docs/ENCODING_POLICY.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

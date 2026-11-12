@@ -335,4 +335,7 @@ artifact: docs/agent/AF_PERF_002_BINARY_REVERSE_REPAIR.md
 preserves:
   - AUTH.BINARY_V04
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

@@ -472,4 +472,7 @@ title: Historical limited extraction verdict rejecting generic semantic synthesi
 track: REPOSITORY
 artifact: docs/architecture/SEMANTIC_INTELLIGENCE_ARCHITECTURE_HARDENING_INVESTIGATION.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

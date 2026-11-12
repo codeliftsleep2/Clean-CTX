@@ -259,4 +259,7 @@ preserves:
   - INV.CSHARP_RESOLUTION_001
   - WSC-012
 note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

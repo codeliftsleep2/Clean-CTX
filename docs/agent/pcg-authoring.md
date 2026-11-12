@@ -10,25 +10,35 @@ than querying before every edit.
 
 ## Retrieve first
 
-1. Use `pcg_documents_v1` with the explicit workspaceRoot. If the task names a
+1. Use `pcg_knowledge_v1` with the explicit workspaceRoot. If the task names a
    node, request `mode:"context"` for that exact ID. Otherwise use `mode:"search"`
    with source-declared track and/or a deterministic FTS text expression, then
    request context for relevant returned IDs. Never invent document IDs.
-2. Inspect result_state, catalog_current, diagnostics and context.complete.
+2. Inspect result_state, catalog_current, diagnostics, complete and catalog coverage.
    Retain the returned generation and relevant node revisions as the preflight
    identity. A successful RPC or nonempty search is not complete context.
-3. Follow the returned typed paths: controlling contracts/invariants, DEPENDS_ON
+3. Read the exact returned statement, rationale, qualification and other declared
+   content components. Use `get` with `role`/`label` for an independently queryable
+   decision component; inspect `unit_complete` when selecting only some components.
+   Use `related` for typed edge/endpoint discovery and `source` for the exact
+   complete original artifact. Returned references include ready request fields.
+   The explicit legacy `pcg_documents_v1` interface retains whole-document search,
+   acquisition, history and lossless reference transport; it is not the normal
+   proposition discovery workflow.
+4. Follow the returned typed paths: controlling contracts/invariants, DEPENDS_ON
    prerequisites, BLOCKED_BY obligations, incoming SUPERSEDES successors and
    FALSIFIES counterevidence. Inspect cited source text and artifact witnesses.
    USES_EVIDENCE, PRESERVES and IMPLEMENTS do not establish prerequisite truth;
    VALIDATES is neither independent reclosure nor banking.
-4. Carry the relevant constraints and unresolved obligations into the work.
+5. Carry the relevant constraints and unresolved obligations into the work.
    For example, DOC-081 IMPLEMENTS DOC-068 DEPENDS_ON DOC-042 means the author
    must inspect DOC-068 and DOC-042 before proposing a contradictory change.
    Traversal returns structural relationships, not an inferred applicability or
    conflict verdict. The author assesses the actual proposition and conditions.
 
-Use only profile-permitted token/node/edge budgets. If context is incomplete or
+Use only the existing profile-permitted node/edge limits. Architectural knowledge
+has no token-budget admission, retrieval, completeness or publication criterion.
+If context is incomplete or
 blocked, do not claim the missing chain was checked. Refine an unrelated broad
 search or inspect explicit returned references; never drop an applicable
 prerequisite merely to obtain a smaller response. An empty catalog/search proves
@@ -37,13 +47,18 @@ architectural constraint exists elsewhere in the repository.
 
 ## Author and reconcile
 
-Prepare the report and its GLS `architecture-graph` declaration together. Stable
+Prepare the report and its GLS `architecture-graph` declaration together. Declare
+its source-owned knowledge scope and exact content selectors; retain shared
+definitions, rationale and caveats as explicit components. A whole contract or
+evidence report can legitimately select its complete source. Do not infer a
+proposition boundary from heading proximity or create duplicate normative prose.
+Stable
 node identity, kind, status, track, artifact and typed relationships belong to
 the author. Do not infer independent approval from graph status or rewrite a
 historical failure to pass validation. Use the source grammar in
 [PCG document authoring](../architecture/PCG_DOCUMENT_AUTHORING.md).
 
-After writing or modifying a declaration, issue a get/context query for the node.
+After writing or modifying a declaration, issue a knowledge get/context query for the node.
 This automatically validates and reconciles the candidate graph. Correct actual
 source declaration defects using the actionable diagnostics; do not silently
 repair metadata in a separate manifest or edit SQLite by hand. Invalid source
@@ -87,15 +102,17 @@ what actions may proceed; a graph query does not grant that authorization.
 For this repository's configured production workspace, the
 [B0/B1 authoring route](../architecture/knowledge-normalization/B0_B1_PROGRESS.md#using-this-production-authoring-route)
 documents the existing ignored owner profile and a bounded production stdio
-query client. It is an actual-workspace route when the host cannot advertise
+query client retains the legacy operation. B9's tracked
+`verification/pcg-175/invoke-workspace-knowledge.ps1` uses the same isolated
+profile/stdio route for `pcg_knowledge_v1`. It is an actual-workspace route when the host cannot advertise
 the conditional document tool directly. Use the existing profile and explicit
 workspace; do not substitute a prior controlled corpus. Starting that client
 remains subject to the existing runtime-execution rule and current owner
 authorization. Direct host exposure requires a host session launched with the
 profile; it is not established by writing configuration or by a stdio receipt.
 
-If pcg_documents_v1 is not advertised, the current host/session cannot expose the
-document capability. State that limitation and consult the known authoritative repository
+If pcg_knowledge_v1 is not advertised, the current host/session cannot expose the
+knowledge capability. State that limitation and consult the known authoritative repository
 documents through the normal tooling policy; do not pretend a PCG preflight ran.
 Do not create profiles, start servers or enroll production data without task
 authority. If a concrete controlling prerequisite cannot be established, report
@@ -115,4 +132,7 @@ artifact: docs/agent/pcg-authoring.md
 consumes_authority:
   - AUTH.PCG_DOCUMENTS
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
+knowledge_scope: authority
+knowledge_content:
+  - statement self#whole
 ```

@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: completion-governance
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:ARCH-004:begin -->
 ### ARCH-004 Production Integration Is the Completion Boundary
 
 | Property | Value |
@@ -28,8 +31,14 @@ track: FOUNDATION
 artifact: docs/invariants/completion-governance.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#ARCH-004
+  - qualification self#family-standing
 ```
 
+<!-- pcg:ARCH-004:end -->
+<!-- pcg:INV.MECHANISM_REUSE_001:begin -->
 ### MECHANISM-REUSE-001 Equivalent Mechanics Are Shared; Semantics Keep Their Owners
 
 **Status:** DOCUMENTED (architectural and certification review; not a new executable gate)
@@ -90,8 +99,14 @@ track: FOUNDATION
 artifact: docs/invariants/completion-governance.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.MECHANISM_REUSE_001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:INV.MECHANISM_REUSE_001:end -->
+<!-- pcg:INV.META_LAYER_COMPLETENESS_001:begin -->
 ### META-LAYER-COMPLETENESS-001 Supported Framework Semantics Are Complete
 
 | Property | Value |
@@ -116,4 +131,9 @@ track: FOUNDATION
 artifact: docs/invariants/completion-governance.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#INV.META_LAYER_COMPLETENESS_001
+  - qualification self#family-standing
 ```
+<!-- pcg:INV.META_LAYER_COMPLETENESS_001:end -->

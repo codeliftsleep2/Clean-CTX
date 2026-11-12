@@ -207,6 +207,7 @@ documentation-only update. Protected implementations remain exact. inspection.js
 preserves checked totals, all cost rows and disposition. The earlier failed packet
 remains distinct; no completed cost samples were repeated to seek favorable results.
 
+<!-- pcg:REPLAY-executed-reason:begin -->
 ### Ordinary equality does not cover the executed currentness difference
 
 All 336 ordinary original/candidate complete responses and canonical/owner/alias/
@@ -227,6 +228,7 @@ older-restore publication protections remain GREEN.
 | Registered compression only between renders | Equal; original historical adoption succeeds |
 | Newer registered replay after compression | Equal rejection of older replay; newer ticket commits |
 
+<!-- pcg:REPLAY-counterexample:begin -->
 The registered-deletion case is decisive. Both original and candidate outer replays
 succeed under the EXISTING implementation. The deletion removes the requested alias
 before original compact rendering. Original reads the newer dictionary state and
@@ -237,6 +239,7 @@ canonical/provenance and durable state. The direct dictionary-API mutation produ
 the same footer/cache difference, but rejection does not rely only on that stronger
 fault: the actual registered delete reproduces it.
 
+<!-- pcg:REPLAY-counterexample:end -->
 No field is normalized or removed, no divergent footer is declared equivalent, and
 no synchronization or ticket change is added to hide the result. The tests pass
 because they capture the counterexample explicitly. The observed successful replay
@@ -244,6 +247,7 @@ after deletion is original lifecycle behavior, not newly authorized policy; chan
 it would be separate work and is not undertaken here. Compression-only adoption
 and true newer-ticket supersession likewise remain distinct original contracts.
 
+<!-- pcg:REPLAY-executed-reason:end -->
 ### Actual work retained versus omitted in sequential controls
 
 There are 288 observed replay calls plus 48 restore calls in the 336 paired phase
@@ -309,6 +313,7 @@ These observations establish no consistent/public/release latency improvement or
 causal allocator/CPU benefit. No further samples or alternative tuning is justified.
 Regardless of timing, a semantic counterexample prevents FIX under this authorization.
 
+<!-- pcg:REPLAY-disposition:begin -->
 ### Owner return and boundary
 
 **Recommendation: REJECT this bounded earlier-Candidate reuse substitution.**
@@ -326,6 +331,7 @@ and all deferred/rejected dispositions remain unchanged. No new investigation fo
 automatically. No optimization RED, restoration mutation, composed closure, staging,
 commit or push. Agent inspected user-run evidence and edited documentation only.
 
+<!-- pcg:REPLAY-disposition:end -->
 ```architecture-graph
 node: DOC-188
 kind: RESEARCH
@@ -336,4 +342,9 @@ artifact: docs/agent/AF_PERF_002_REPLAY_RENDER_DESIGN.md
 falsifies:
   - EXP-003-REPLAY
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
+  - counterexample:registered_delete self#REPLAY-counterexample
+  - rejection_reason self#REPLAY-disposition
 ```

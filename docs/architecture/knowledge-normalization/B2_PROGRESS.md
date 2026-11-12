@@ -233,4 +233,7 @@ preserves:
   - AUTH.CANONICAL_IR
   - AUTH.BINARY_V04
 note: Source migration and scoped deterministic and production stdio evidence; no independent certification or global final-gate claim.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```

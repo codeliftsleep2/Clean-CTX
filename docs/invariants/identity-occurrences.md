@@ -1,9 +1,12 @@
+<!-- pcg:family-standing:begin -->
 # Invariant family: identity-occurrences
 
 Current normative sections relocated from [the invariant catalog](../ARCHITECTURAL_INVARIANTS.md). Source attributes such as ENFORCED, STRUCTURAL, DOCUMENTED, RESOLVED and qualified enforcement retain their original meanings; GLS status is separate. Original section identities and witnesses remain unchanged except the explicitly documented C13 descriptive correction.
 
 Graph status IMPLEMENTED records the source-described existing mechanism or operative governance contract, not a new successful witness execution. The DOCUMENTED mechanism-reuse rule remains INVESTIGATING in GLS: documentary convention is not promoted to proven machine enforcement. Sections without declarations remain current source contracts awaiting their assigned later migration batch.
 
+<!-- pcg:family-standing:end -->
+<!-- pcg:IDENT-001:begin -->
 ### IDENT-001 One Physical File, One Stable Alias
 
 | Property | Value |
@@ -28,8 +31,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IDENT-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IDENT-001:end -->
+<!-- pcg:IRWIRE-001:begin -->
 ### IRWIRE-001 Semantic Binary Round Trip
 
 | Property | Value |
@@ -54,8 +63,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRWIRE-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IRWIRE-001:end -->
+<!-- pcg:IRPAT-001:begin -->
 ### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
 
 | Property | Value |
@@ -80,8 +95,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IRPAT-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IRPAT-001:end -->
+<!-- pcg:PATID-001:begin -->
 ### PATID-001 Method Identity Survives Pattern Recognition (F2)
 
 | Property | Value |
@@ -107,8 +128,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#PATID-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:PATID-001:end -->
+<!-- pcg:IDX-001:begin -->
 ### IDX-001 Index-Encoding Invariant
 
 | Property | Value |
@@ -133,8 +160,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IDX-001
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IDX-001:end -->
+<!-- pcg:IDX-002:begin -->
 ### IDX-002 Edge Occurrence Identity Is Source-Occurrence Aware
 
 | Property | Value |
@@ -159,8 +192,14 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#IDX-002
+  - qualification self#family-standing
 ```
 
+<!-- pcg:IDX-002:end -->
+<!-- pcg:WSC-012:begin -->
 ### WSC-012 Workspace Tuple Identity Is Not Exact Declaration Identity
 
 **Status:** ENFORCED
@@ -184,4 +223,9 @@ track: FOUNDATION
 artifact: docs/invariants/identity-occurrences.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
+knowledge_scope: invariant
+knowledge_content:
+  - statement self#WSC-012
+  - qualification self#family-standing
 ```
+<!-- pcg:WSC-012:end -->

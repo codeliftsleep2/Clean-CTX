@@ -271,4 +271,7 @@ preserves:
   - PERF-004-DOCTRINE
   - META-002
 note: Source normalization and bounded production document retrieval; no current performance certification, new optimization, global closure or banking.
+knowledge_scope: evidence
+knowledge_content:
+  - statement self#whole
 ```
