@@ -279,3 +279,15 @@ This is static witness inspection, not a Rust test or an executed PCG query/impo
 The static inspection above preceded the focused execution recorded in §7.
 Those scoped results support M2a-2 owner acceptance; no operator or broad gate
 result is inferred and the completed M2a-1 campaign is not reopened.
+
+```architecture-graph
+node: PCG-175-M2A2
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Deterministic evidence acquisition implementation
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M2A2_IMPLEMENTATION.md
+implements:
+  - AUTH.PCG_ACQUISITION_V1
+note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+```

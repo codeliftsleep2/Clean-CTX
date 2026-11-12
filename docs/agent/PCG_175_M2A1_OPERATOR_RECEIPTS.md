@@ -229,3 +229,13 @@ The owner subsequently directed M2a-1 closure on November 11 with disposition
 ACCEPTANCE READY, without another execution. That gate is now closed.
 No tests, driver changes, operator campaign, broad checks or M2a-2 are requested
 or started. Separate M2a-2 authorization remains necessary.
+
+```architecture-graph
+node: PCG-175-M2A1-OPERATOR-RECEIPTS
+kind: RESEARCH
+status: IMPLEMENTED
+title: M2a-1 bounded operator and owner-reported evidence reconciliation
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M2A1_OPERATOR_RECEIPTS.md
+note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+```

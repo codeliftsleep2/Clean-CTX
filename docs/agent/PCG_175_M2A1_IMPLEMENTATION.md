@@ -238,3 +238,15 @@ the PCG module, without a final result or detailed panic summaries. This does no
 establish their causes or their relationship to this campaign. No full-suite
 completion is needed for continuing M2a-1 review, and no unrelated repair or later
 stage is initiated from these markers. The owner controls all execution decisions.
+
+```architecture-graph
+node: PCG-175-M2A1
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Owner-enrolled evidence import and derived persistence
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M2A1_IMPLEMENTATION.md
+implements:
+  - AUTH.PCG_ENROLLED_V1
+note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+```

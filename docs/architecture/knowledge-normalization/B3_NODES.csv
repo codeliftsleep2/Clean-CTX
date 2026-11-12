@@ -1,0 +1,18 @@
+id,kind,status,current_owner,scope
+AUTH.PCG_ACQUISITION_V1,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/pcg-acquisition-v1.md,Deterministic enrolled-evidence acquisition
+AUTH.PCG_PROJECTION_V1,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/pcg-projection-v1.md,Required evidence and exact token projection
+AUTH.PCG_ENROLLED_V1,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/pcg-enrolled-v1.md,Owner-enrolled immutable evidence authority
+AUTH.PCG_MCP_V1,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/pcg-mcp-v1.md,Conditional exact enrolled-evidence MCP transport
+AUTH.PCG_GLS,AUTHORITY,IMPLEMENTED,docs/architecture/PCG_DOCUMENT_AUTHORING.md,Exact imported GLS grammar and candidate-state lifecycle
+AUTH.PCG_DOCUMENTS,AUTHORITY,IMPLEMENTED,docs/architecture/PCG_DOCUMENT_AUTHORING.md,Source-owned document reconciliation and retrieval
+AUTH.PCG_PREAUTHORING,AUTHORITY,IMPLEMENTED,docs/agent/pcg-authoring.md,Retrieve constraints before authoring and reconcile source changes
+PCG-175-M2A1,IMPLEMENTATION,IMPLEMENTED,docs/agent/PCG_175_M2A1_IMPLEMENTATION.md,Owner-enrolled evidence import and derived persistence
+PCG-175-M2A2,IMPLEMENTATION,IMPLEMENTED,docs/agent/PCG_175_M2A2_IMPLEMENTATION.md,Deterministic evidence acquisition implementation
+PCG-175-M3,IMPLEMENTATION,IMPLEMENTED,docs/agent/PCG_175_M3_IMPLEMENTATION.md,Token-bounded required evidence projection implementation
+PCG-175-M4A,IMPLEMENTATION,IMPLEMENTED,docs/agent/PCG_175_M4A_IMPLEMENTATION.md,Conditional read-only evidence MCP implementation
+PCG-175-DOCUMENTS,IMPLEMENTATION,IMPLEMENTED,docs/agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md,Source-owned document graph implementation and scoped evidence
+PCG-175-DISCOVERY,RESEARCH,INVESTIGATING,docs/agent/PCG_175_ARCHITECTURE_INVESTIGATION.md,PCG architecture investigation and bounded read-only proposal
+PCG-175-DESIGN-FREEZE,RESEARCH,INVESTIGATING,docs/agent/PCG_175_DESIGN_FREEZE.md,Historical corrected design review with later scoped v1 acceptance
+PCG-175-M4B,MISSION,PROPOSED,docs/agent/PCG_175_M4B_SCOPE_RECONCILIATION.md,Unfrozen runtime-ledger scope and unresolved prerequisite decisions
+PCG-175-M2A1-ACCEPTANCE,RESEARCH,IMPLEMENTED,docs/agent/PCG_175_M2A1_ACCEPTANCE.md,M2a-1 owner-attributed acceptance reconciliation
+PCG-175-M2A1-OPERATOR-RECEIPTS,RESEARCH,IMPLEMENTED,docs/agent/PCG_175_M2A1_OPERATOR_RECEIPTS.md,M2a-1 bounded operator and owner-reported evidence reconciliation

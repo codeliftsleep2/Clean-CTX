@@ -139,7 +139,7 @@ preserves:
 ````
 
 Use the exact GLS seven kinds, twelve statuses and thirteen directional relations
-listed in [the reconciliation](../agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md).
+listed in [the GLS taxonomy below](#inspected-reference-and-exact-taxonomy).
 `node`, `kind`, `status`, `title`, `track` are required. Additional supported scalar
 fields are `artifact`, `verdict`, `commit`, `note`. Relationships use established
 lower_snake_case keys and two-space `- target` block items. Scalars are literal
@@ -187,3 +187,91 @@ control result with no partial source documents; too-small control budgets are
 protocol errors. SQLite busy fails without retry. Current catalog reconciliation
 is a write effect: its MCP annotation is not read-only, despite source documents
 never being edited. FTS5 must be supported by SQLite; absence refuses initialization.
+
+## Inspected reference and exact taxonomy
+
+Actual GLS repository: `C:/Users/MNasty/Desktop/GoalLine Stand 2026`, HEAD
+`491988992586f08984c523034a27f87e1140fec8`. Its worktree contains unrelated
+changes. The governing doctrine, validator and publication contract were read;
+no GLS file was modified. This supersedes neither the older PCG discovery pin
+nor any domain finding there. Reference files:
+`docs/ARCHITECTURE_EVIDENCE_GRAPH.md`, `scripts/architecture_graph.py`,
+`docs/DOCUMENT_GRAPH_PUBLICATION_CONTRACT.md`, and P677PR's actual reclosure
+declaration (RECLOSES P677P; preserves authorities/invariants; no banking claim).
+
+Seven kinds, exactly: `MISSION`, `IMPLEMENTATION`, `EXPERIMENT`, `RESEARCH`,
+`AUTHORITY`, `INVARIANT`, `DEBT`.
+
+Twelve statuses, exactly: `PROPOSED`, `INVESTIGATING`, `FROZEN`,
+`IMPLEMENTATION_READY`, `IMPLEMENTED`, `VALIDATED`, `RECLOSED`, `BANKED`,
+`BLOCKED`, `FALSIFIED`, `SUPERSEDED`, `DEBT`.
+
+| Relation | Source -> target meaning |
+| --- | --- |
+| DEPENDS_ON | proposition -> necessary premise |
+| USES_EVIDENCE | proposition -> informative evidence, not premise |
+| PRESERVES | later -> earlier truth respected |
+| IMPLEMENTS | implementation -> realized contract |
+| VALIDATES | evidence -> supported proposition |
+| RECLOSES | independent reclosure -> closable artifact |
+| BANKS | banking decision -> banked target |
+| BLOCKED_BY | blocked proposition -> unresolved gate |
+| SUPERSEDES | controlling interpretation -> historical proposition |
+| FALSIFIES | frozen counterevidence -> refuted proposition |
+| DEEPENS | extending proposition -> authority extended without replacement |
+| PRODUCES_AUTHORITY | establishing evidence -> AUTHORITY |
+| CONSUMES_AUTHORITY | consumer -> AUTHORITY |
+
+GLS has **no pairwise status-transition matrix**. Candidate rules: IDs unique,
+valid kinds/statuses, existing required artifacts/endpoints, no self-edge;
+DEPENDS_ON cannot target FALSIFIED/SUPERSEDED; IMPLEMENTS targets MISSION,
+IMPLEMENTATION or AUTHORITY; RECLOSES targets MISSION/IMPLEMENTATION and a
+RECLOSED source requires a RECLOSED/BANKED target; SUPERSEDES targets SUPERSEDED;
+authority relations target AUTHORITY. SUPERSEDED requires exactly one incoming
+SUPERSEDES. BLOCKED needs at least one unresolved blocker; only RECLOSED/BANKED
+satisfy a blocker. IMPLEMENTATION_READY/VALIDATED/RECLOSED/BANKED require all
+declared blockers satisfied. No status automatically authenticates approval,
+independence, executable success or banking. General dependency cycles are not
+prohibited by this GLS validator.
+
+History doctrine retains failed results, superseded propositions and resolved
+blocker relationships. It does not supply an executable permission system.
+Candidate-state validity and revision authorization remain different questions.
+The initial PCG implementation adds no speculative pairwise restrictions.
+
+
+Source: [docs/agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md](../agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md), commit `187d0096`, original section SHA-256 `6f77a7908d5dd9c979973ad5c82972f1e6db10556823679a716e0a7021d7dc09`. Original tense and proposed-era labels are retained; acceptance is scoped below, not inferred from that wording.
+
+## Identity grammar and bootstrap boundary
+
+The existing `src/pcg/documents/validate.rs::node_id` is the implementation of the imported GLS ID grammar. It accepts `AUTH.`, `INV.` or `DEBT.` followed by an uppercase ASCII letter then uppercase letters/digits/underscores; GLS `P` missions with three or four digits, an uppercase alphanumeric suffix and optional uppercase alphanumeric hyphen components; or a three-to-eight-letter uppercase infrastructure prefix, a three-digit number with optional uppercase suffix, and optional uppercase alphanumeric hyphen components. IDs are case-sensitive. This documents the existing parser, not a new naming system or allocation registry.
+
+The document catalog describes governing source propositions; it does not supply the authority to implement or execute its own interpreter. Production code determines actual behavior. Controlling source contracts, repository instructions, tracked tests, operator receipts and independent certification retain their distinct roles. A successful scan/query establishes only the stated candidate, provenance, completeness and observed-freshness result. It does not prove the interpreter correct, authenticate a revision or approver, execute witnesses, or independently certify reconciliation. `AUTH.PCG_GLS` and `AUTH.PCG_DOCUMENTS` are separate logical propositions sharing this cohesive authoring source; the catalog depends on the imported grammar, not the reverse. Neither status nor a dependency cycle bootstraps execution permission.
+
+The separate enrolled `pcg_query_v1` surface consumes an explicitly owner-enrolled immutable evidence generation. Its four roles, lifecycle, applicability, closure, approval-attribution and integrity assumptions are governed by [enrolled v1](contracts/pcg-enrolled-v1.md), [acquisition](contracts/pcg-acquisition-v1.md), [projection](contracts/pcg-projection-v1.md) and [evidence MCP](contracts/pcg-mcp-v1.md). They are not the catalog's seven kinds/twelve statuses/GLS cycle rules. Catalog reconciliation writes only its isolated derived document state; it does not import, approve or mutate enrolled corpora. The existing same-root document guard on the evidence handler is a refusal/currentness guard, not authority transfer or replacement of metered v1 bytes.
+
+Runtime actors, approval transitions, authorization, retention/erasure and a ledger require a separately reviewed M4b design. Source-attributed status, owner labels, graph admission and successful queries supply none of those contracts. See the preserved [M4b reconciliation](../agent/PCG_175_M4B_SCOPE_RECONCILIATION.md). No blanket supersession joins the two interfaces.
+
+```architecture-graph
+node: AUTH.PCG_GLS
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Exact imported GLS grammar and candidate-state lifecycle
+track: REPOSITORY
+artifact: docs/architecture/PCG_DOCUMENT_AUTHORING.md
+note: Operative source-described contract; status does not authenticate approval or certify implementation.
+```
+
+```architecture-graph
+node: AUTH.PCG_DOCUMENTS
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Source-owned document reconciliation and retrieval
+track: REPOSITORY
+artifact: docs/architecture/PCG_DOCUMENT_AUTHORING.md
+depends_on:
+  - AUTH.PCG_GLS
+preserves:
+  - ARCH-003
+note: Operative source-described contract; status does not authenticate approval or certify implementation.
+```

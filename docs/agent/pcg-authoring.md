@@ -104,3 +104,15 @@ that specific unresolved condition rather than infer permission from tool absenc
 This instruction makes use of the graph explicit and reviewable. It is not
 runtime enforcement that every agent obeys it; real authoring sessions must
 supply the query/reconciliation evidence before adoption can be called observed.
+
+```architecture-graph
+node: AUTH.PCG_PREAUTHORING
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Retrieve constraints before authoring and reconcile source changes
+track: REPOSITORY
+artifact: docs/agent/pcg-authoring.md
+consumes_authority:
+  - AUTH.PCG_DOCUMENTS
+note: Operative source-described contract; status does not authenticate approval or certify implementation.
+```

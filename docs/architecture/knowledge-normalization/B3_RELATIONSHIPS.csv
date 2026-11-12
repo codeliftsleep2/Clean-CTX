@@ -1,0 +1,15 @@
+source,kind,target,source_owner,evidence
+AUTH.PCG_ACQUISITION_V1,DEPENDS_ON,AUTH.PCG_ENROLLED_V1,docs/architecture/contracts/pcg-acquisition-v1.md,M2a-2 Scope and call path consumes the existing immutable admitted projection; design §7 requires the scope/identity/integrity owner.
+AUTH.PCG_PROJECTION_V1,DEPENDS_ON,AUTH.PCG_ACQUISITION_V1,docs/architecture/contracts/pcg-projection-v1.md,Design §8.1 consumes ME-01 mandatory closure before packing; M3 §1 keeps packing inside acquisition COMPLETION.
+AUTH.PCG_MCP_V1,DEPENDS_ON,AUTH.PCG_PROJECTION_V1,docs/architecture/contracts/pcg-mcp-v1.md,"M4a production path invokes the existing M3 projection and sends its exact metered bytes, without result reserialization."
+AUTH.PCG_DOCUMENTS,DEPENDS_ON,AUTH.PCG_GLS,docs/architecture/PCG_DOCUMENT_AUTHORING.md,Authoring declaration grammar and candidate-state consistency import the exact GLS vocabulary.
+AUTH.PCG_DOCUMENTS,PRESERVES,ARCH-003,docs/architecture/PCG_DOCUMENT_AUTHORING.md,Document implementation contract isolates document knowledge and its SQLite owner from canonical source IR and code projections.
+AUTH.PCG_PREAUTHORING,CONSUMES_AUTHORITY,AUTH.PCG_DOCUMENTS,docs/agent/pcg-authoring.md,Retrieve first and Author and reconcile use the actual document API and source-backed typed constraints; no permission is inferred.
+PCG-175-M2A1,IMPLEMENTS,AUTH.PCG_ENROLLED_V1,docs/agent/PCG_175_M2A1_IMPLEMENTATION.md,The report traces its named implementation boundary and actual producer/owner/consumer path.
+PCG-175-M2A2,IMPLEMENTS,AUTH.PCG_ACQUISITION_V1,docs/agent/PCG_175_M2A2_IMPLEMENTATION.md,The report traces its named implementation boundary and actual producer/owner/consumer path.
+PCG-175-M3,IMPLEMENTS,AUTH.PCG_PROJECTION_V1,docs/agent/PCG_175_M3_IMPLEMENTATION.md,The report traces its named implementation boundary and actual producer/owner/consumer path.
+PCG-175-M4A,IMPLEMENTS,AUTH.PCG_MCP_V1,docs/agent/PCG_175_M4A_IMPLEMENTATION.md,The report traces its named implementation boundary and actual producer/owner/consumer path.
+PCG-175-DOCUMENTS,IMPLEMENTS,AUTH.PCG_DOCUMENTS,docs/agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md,The report traces its named implementation boundary and actual producer/owner/consumer path.
+PCG-175-M2A1-ACCEPTANCE,USES_EVIDENCE,PCG-175-M2A1-OPERATOR-RECEIPTS,docs/agent/PCG_175_M2A1_ACCEPTANCE.md,Acceptance opening names the operator receipt corroboration and separates artifact-backed from owner-reported evidence.
+PCG-175-ADOPTION,IMPLEMENTS,AUTH.PCG_PREAUTHORING,docs/agent/PCG_175_AUTHORING_ADOPTION.md,Entry points identifies pcg-authoring as procedural source and traces the controlled real-agent sequence.
+PCG-175-ADOPTION,USES_EVIDENCE,PCG-175-DOCUMENTS,docs/agent/PCG_175_AUTHORING_ADOPTION.md,Actual authoring sequence uses the accepted source-document production tool and its retained implementation/report evidence.

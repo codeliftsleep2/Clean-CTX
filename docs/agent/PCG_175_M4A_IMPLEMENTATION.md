@@ -1,5 +1,7 @@
 # PCG-175-M4A: explicit read-only MCP integration
 
+B3 source disposition: Current normative request and transport clauses are owned by [evidence MCP](../architecture/contracts/pcg-mcp-v1.md). The remaining sections retain M4a implementation/verification chronology. Subsequent scoped acceptance is attributed in [M4b reconciliation](PCG_175_M4B_SCOPE_RECONCILIATION.md); this is not authorization for runtime ledger work.
+
 Agent: **Agent MaxHeadRoom**
 
 Date: 2026-11-11 (America/New_York).
@@ -37,42 +39,7 @@ uncommitted; no second commit or publication was made.
 
 ## 2. Production lifecycle and exact-byte boundary
 
-```text
-owner configures CLEAN_CTX_PCG_PROFILE before server startup
-  -> McpState -> PcgState -> pinned Trusted profile witness
-  -> initialize / tools/list advertises pcg_query_v1 when configured
-  -> stdin JsonRpcRequest -> Dispatcher -> router::dispatch
-  -> tools::dispatch_tools_call -> enabled handler registry -> pcg::handle
-  -> closed typed arguments -> Session::project -> existing M3 projection
-  -> existing acquisition/store/closure/packing/COMPLETION observations
-  -> protocol::send_pcg_result adds JSON-RPC framing only
-  -> existing shared stdout mutex -> UTF-8 line + flush -> MCP client
-```
-
-The environment variable is read once for the session. An omitted variable
-disables PCG: the legacy catalog and registry remain unchanged and direct PCG
-invocation returns the existing tool-not-found error. A configured profile adds
-exactly one descriptor and handler. The enabled registry is the existing default
-registry plus that handler; all original handlers remain the same functions.
-The profile path cannot be selected or replaced by a tool argument.
-
-The session retains the existing `Trusted` byte/permission witness and rechecks
-it around projection. Replacing/revoking it does not silently establish a new
-principal: the request fails closed and restart is needed. Startup reads the
-profile only; projection DB open/header checks remain lazy and read-only on an
-explicit query. No import, migration, repair, source hydration, graph extraction,
-source publication, pending persistence flush or context injection is added.
-
-Ordinary `send_response` still serializes its existing `Value` responses normally.
-The PCG-only sender copies `Response.serialized_result` directly into JSON-RPC's
-`result` field. It serializes the request ID, never the metered result. It adds
-no cache hints, metadata, whitespace, `structuredContent`, duplicate text block
-or result re-escaping. Both paths use the same stdout lock in the production
-binary. JSON-RPC framing and its newline are outside the design's result budget.
-
-Test capture of serialized lines is thread-local and opt-in, then drained and
-disabled after each call. Ordinary test suites do not accumulate a second raw
-response history. Existing parsed-response capture semantics remain intact.
+Current normative owner: [AUTH.PCG_MCP_V1](../architecture/contracts/pcg-mcp-v1.md). The original section remains available at commit `187d0096`; this location preserves navigation and historical attribution.
 
 ## 3. Exact changed-file inventory
 
@@ -107,48 +74,7 @@ M1/M2/M3 regression definitions and their operator drivers are untouched.
 
 ## 4. MCP request and response contract
 
-Tool: **`pcg_query_v1`**, explicit read only, single request (no new batch mode).
-Its `inputSchema` is Draft 2020-12, closed at every object. No `outputSchema` is
-advertised because the approved response has one text block, not structuredContent.
-
-Required arguments: `workspaceRoot`, `corpus`, exact 64-hex `generation`, `mode`,
-`subject`, `tokenizer`, `limits`, `includeHistory`. Modes are `constraints`,
-`closure`, `impact`, `provenance`. Constraints rejects `records`; the other modes
-require a nonempty unique record-ID array. Subject requires workspace and explicit
-UTC effective time, with optional exact file/entity/operation/task selectors.
-Scope bindings remain enrolled source assertions; callers cannot submit bindings,
-partitions, principals, profile paths or approval flags. Entity-shaped requests
-without source-owned proof retain `incomplete/identity_unavailable`; there is no
-invented identity or hydration fallback.
-
-Limits are positive `records`, `edges`, `evidence_bytes` and `token_budget`, bounded
-by the trusted profile. Only `cl100k` and `o200k` are supported. Typed decoding
-rejects unknown/missing members, inappropriate nulls, unsupported modes, fractions
-and invalid argument shapes; existing acquisition validation enforces identities,
-calendar time, paths, exact scope, selectors and policy. There is no fidelity,
-tokenizer default or raw-text fallback borrowed from source-facing tools.
-
-Success is the exact M3 result:
-
-```json
-{"content":[{"type":"text","text":"<canonical PCG v1 payload JSON>"}],"isError":false}
-```
-
-The JSON-RPC result payload retains M3 states `complete_within_registered_scope`,
-`incomplete`, `blocked` and `unavailable`. Internal acquisition Ready corresponds
-to a complete result only after M3 packing/fit and COMPLETION checks. No incomplete,
-blocked or unavailable response gains partial actionable required authority.
-Required overflow remains blocked with an empty authority bundle; a result whose
-minimal control cannot fit becomes `-32602/token_budget_too_small` instead.
-
-Fixed errors: unsupported tokenizer -> `-32602/unsupported_tokenizer`; malformed,
-unauthorized scope/policy or invalid request -> `-32602/pcg_invalid_request`;
-tokenizer/control/trusted-profile initialization or session-pin failure ->
-`-32603/pcg_control_unavailable`. These protocol errors contain no evidence result
-or source detail and are outside the evidence-result budget. A configured,
-valid-profile but unavailable DB keeps the tool discoverable and returns a
-metered unavailable result. An unreadable/invalid or changed trusted profile
-cannot establish scope and returns the fixed control error instead of evidence.
+Current normative owner: [AUTH.PCG_MCP_V1](../architecture/contracts/pcg-mcp-v1.md). The original section remains available at commit `187d0096`; this location preserves navigation and historical attribution.
 
 ## 5. Demonstrated corrections and negative controls
 
@@ -333,3 +259,15 @@ benchmarks remain unrun in this mission, not failed or silently green.
 **Recommend M4A ACCEPTANCE READY.** No remaining demonstrated integration blocker.
 Leave M4a changes uncommitted for owner review. Stop before M4b, automatic
 injection, production enrollment, further commit, push or publication.
+
+```architecture-graph
+node: PCG-175-M4A
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Conditional read-only evidence MCP implementation
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M4A_IMPLEMENTATION.md
+implements:
+  - AUTH.PCG_MCP_V1
+note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+```

@@ -462,3 +462,13 @@ All GLS links below resolve against [the pinned GLS snapshot](https://github.com
 | C20 | Clean-CTX [`docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md`](https://github.com/codeliftsleep2/Clean-CTX/blob/8ce0a6865ff8a2b55866895c6a239f6bcc3245a3/docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md): cleanup, failed first packet, final reported discovery and two DEFER decisions; receipt `gitdiff-discovery-20261109-190157`, not rerun. |
 
 Inspection limitations: no full GLS validator/fitness execution, no new original test receipt verification, no live MCP/Claude run, no production DB reads/migrations, no enterprise identity/ACL integration test, no private enterprise corpus, no whole-repository absence proof for every possible memory feature, no live GitHub protection/CI verification. Separate feature branches and later commits are outside this pinned design basis. Source-level tests show intended assertions, not their current execution result. A future design freeze must record any changed source baseline before implementation.
+
+```architecture-graph
+node: PCG-175-DISCOVERY
+kind: RESEARCH
+status: INVESTIGATING
+title: PCG architecture investigation and bounded read-only proposal
+track: REPOSITORY
+artifact: docs/agent/PCG_175_ARCHITECTURE_INVESTIGATION.md
+note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+```

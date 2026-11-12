@@ -1,57 +1,12 @@
 # PCG source-owned document graph
 
+B3 source disposition: The exact GLS taxonomy now has one current owner in [document authoring](../architecture/PCG_DOCUMENT_AUTHORING.md#inspected-reference-and-exact-taxonomy). The remaining implementation-contract prose is the historical production implementation explanation; the current query/declaration/transport contract is owned by that authoring document, including B2 negotiation. This report retains its original scoped execution evidence, not independent certification.
+
 Agent: **Agent MaxHeadRoom**. Implementation mission, 2026-11-11.
 
 ## Inspected reference and exact taxonomy
 
-Actual GLS repository: `C:/Users/MNasty/Desktop/GoalLine Stand 2026`, HEAD
-`491988992586f08984c523034a27f87e1140fec8`. Its worktree contains unrelated
-changes. The governing doctrine, validator and publication contract were read;
-no GLS file was modified. This supersedes neither the older PCG discovery pin
-nor any domain finding there. Reference files:
-`docs/ARCHITECTURE_EVIDENCE_GRAPH.md`, `scripts/architecture_graph.py`,
-`docs/DOCUMENT_GRAPH_PUBLICATION_CONTRACT.md`, and P677PR's actual reclosure
-declaration (RECLOSES P677P; preserves authorities/invariants; no banking claim).
-
-Seven kinds, exactly: `MISSION`, `IMPLEMENTATION`, `EXPERIMENT`, `RESEARCH`,
-`AUTHORITY`, `INVARIANT`, `DEBT`.
-
-Twelve statuses, exactly: `PROPOSED`, `INVESTIGATING`, `FROZEN`,
-`IMPLEMENTATION_READY`, `IMPLEMENTED`, `VALIDATED`, `RECLOSED`, `BANKED`,
-`BLOCKED`, `FALSIFIED`, `SUPERSEDED`, `DEBT`.
-
-| Relation | Source -> target meaning |
-| --- | --- |
-| DEPENDS_ON | proposition -> necessary premise |
-| USES_EVIDENCE | proposition -> informative evidence, not premise |
-| PRESERVES | later -> earlier truth respected |
-| IMPLEMENTS | implementation -> realized contract |
-| VALIDATES | evidence -> supported proposition |
-| RECLOSES | independent reclosure -> closable artifact |
-| BANKS | banking decision -> banked target |
-| BLOCKED_BY | blocked proposition -> unresolved gate |
-| SUPERSEDES | controlling interpretation -> historical proposition |
-| FALSIFIES | frozen counterevidence -> refuted proposition |
-| DEEPENS | extending proposition -> authority extended without replacement |
-| PRODUCES_AUTHORITY | establishing evidence -> AUTHORITY |
-| CONSUMES_AUTHORITY | consumer -> AUTHORITY |
-
-GLS has **no pairwise status-transition matrix**. Candidate rules: IDs unique,
-valid kinds/statuses, existing required artifacts/endpoints, no self-edge;
-DEPENDS_ON cannot target FALSIFIED/SUPERSEDED; IMPLEMENTS targets MISSION,
-IMPLEMENTATION or AUTHORITY; RECLOSES targets MISSION/IMPLEMENTATION and a
-RECLOSED source requires a RECLOSED/BANKED target; SUPERSEDES targets SUPERSEDED;
-authority relations target AUTHORITY. SUPERSEDED requires exactly one incoming
-SUPERSEDES. BLOCKED needs at least one unresolved blocker; only RECLOSED/BANKED
-satisfy a blocker. IMPLEMENTATION_READY/VALIDATED/RECLOSED/BANKED require all
-declared blockers satisfied. No status automatically authenticates approval,
-independence, executable success or banking. General dependency cycles are not
-prohibited by this GLS validator.
-
-History doctrine retains failed results, superseded propositions and resolved
-blocker relationships. It does not supply an executable permission system.
-Candidate-state validity and revision authorization remain different questions.
-The initial PCG implementation adds no speculative pairwise restrictions.
+Current normative owner: [AUTH.PCG_GLS](../architecture/PCG_DOCUMENT_AUTHORING.md). The original section remains available at commit `187d0096`; this location preserves navigation and historical attribution.
 
 ## Gap matrix and reconciliation
 
@@ -198,3 +153,15 @@ conditional registry/catalog/annotations/dispatch, legacy PCG guard and new
 document handler; `src/tests/pcg/{document_fixture,documents}.rs`,
 `src/tests/mcp/pcg_documents.rs`; tracked stdio driver; authoring contract and this
 reconciliation. Prior corpus reports/data are excluded from this commit.
+
+```architecture-graph
+node: PCG-175-DOCUMENTS
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Source-owned document graph implementation and scoped evidence
+track: REPOSITORY
+artifact: docs/agent/PCG_175_SOURCE_DOCUMENT_GRAPH.md
+implements:
+  - AUTH.PCG_DOCUMENTS
+note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+```

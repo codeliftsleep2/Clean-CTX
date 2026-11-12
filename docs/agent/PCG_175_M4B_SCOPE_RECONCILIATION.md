@@ -1,5 +1,7 @@
 # PCG-175-M4B: frozen-scope reconciliation
 
+B3 source disposition: C03: the later source-document catalog is a distinct implemented scope, not this proposed runtime ledger. Its source-attributed statuses do not authenticate actors, approvals or transitions. The unresolved decisions below remain operative holds on ledger implementation; no blocker endpoint or frozen ledger design is invented. The catalog may describe this mission without satisfying it.
+
 Agent: **Agent MaxHeadRoom**
 
 Date: 2026-11-11 (America/New_York).
@@ -84,3 +86,13 @@ Accept this scope reconciliation; **do not claim M4b implemented or acceptance
 ready**. The frozen read-only MCP boundary is already satisfied by accepted M4a.
 A distinct M4b requires a concrete design amendment resolving the decisions above.
 Preserve prior acceptance and verification closure while that scope is defined.
+
+```architecture-graph
+node: PCG-175-M4B
+kind: MISSION
+status: PROPOSED
+title: Unfrozen runtime-ledger scope and unresolved prerequisite decisions
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M4B_SCOPE_RECONCILIATION.md
+note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+```

@@ -1,0 +1,4 @@
+node,generation,inline_tokens,source_refs_tokens,saved_tokens,saved_percent,nodes,unique_sources,edges,paths,reconstruction,revisions,metadata,completeness,tokenizer
+AUTH.PCG_DOCUMENTS,4bb1213261d0b7fb039a05d2ff189f68ea3ecdb8794ab5b0f6d14ab573a01470,13039,9400,3639,27.909,3,2,2,3,exact,exact,exact,current and complete,o200k
+AUTH.PCG_PREAUTHORING,4bb1213261d0b7fb039a05d2ff189f68ea3ecdb8794ab5b0f6d14ab573a01470,15102,11598,3504,23.202,4,3,3,4,exact,exact,exact,current and complete,o200k
+AUTH.PCG_ENROLLED_V1,4bb1213261d0b7fb039a05d2ff189f68ea3ecdb8794ab5b0f6d14ab573a01470,12322,12464,-142,-1.152,1,1,0,1,exact,exact,exact,current and complete,o200k

@@ -142,4 +142,8 @@ track: REPOSITORY
 artifact: docs/agent/PCG_175_AUTHORING_ADOPTION.md
 verdict: Instructions integrated; one controlled agent workflow observed
 note: No automatic conflict detection, global agent compliance or independent banking claimed.
+implements:
+  - AUTH.PCG_PREAUTHORING
+uses_evidence:
+  - PCG-175-DOCUMENTS
 ```

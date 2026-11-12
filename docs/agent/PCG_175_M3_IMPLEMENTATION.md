@@ -325,3 +325,14 @@ Claude run, production corpus enrollment, broad suite, all-target Clippy, new
 benchmark or prior-stage campaign was launched. Those unrun activities are not
 failures and are not claimed green. No staging, commit, ref change or publication
 occurred. **Recommend M3 ACCEPTANCE READY; stop before M4.**
+```architecture-graph
+node: PCG-175-M3
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Token-bounded required evidence projection implementation
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M3_IMPLEMENTATION.md
+implements:
+  - AUTH.PCG_PROJECTION_V1
+note: Historical implementation and scoped reported verification; B3 does not rerun or independently certify these witnesses.
+```

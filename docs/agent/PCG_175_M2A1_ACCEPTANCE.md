@@ -223,3 +223,15 @@ fe1f7e6836692cccce2dc884b27f23d74ccea9b53f8cda21bdf389cc126a3672  src/tests/pcg/
 9cb958b9877c139b4ed4736fefe11ac8f36730607761d8b7771535bf370827bd  verification/pcg-175/README.md
 1277596c2df471f32e5e24d203abf522a6fc9038db73e16ed25a2da87e8fef58  verification/pcg-175/run-cli.ps1
 ```
+
+```architecture-graph
+node: PCG-175-M2A1-ACCEPTANCE
+kind: RESEARCH
+status: IMPLEMENTED
+title: M2a-1 owner-attributed acceptance reconciliation
+track: REPOSITORY
+artifact: docs/agent/PCG_175_M2A1_ACCEPTANCE.md
+uses_evidence:
+  - PCG-175-M2A1-OPERATOR-RECEIPTS
+note: Source record and its attributed disposition only; no new execution, authenticated approval, independent certification, reclosure or banking.
+```
