@@ -6,6 +6,11 @@ always-loaded; consult it when ending a multi-step architectural task.
 
 ## Authoritative reference
 
+Before significant architectural decisions or authoring, perform the
+[PCG context preflight](pcg-authoring.md). It retrieves existing controlling
+constraints and preserves typed dependency/blocker/supersession distinctions;
+it does not replace the source evidence or owner authorization.
+
 The [Canonical Question Matrix Standard](../Clean-CTX_Canonical_Question_Matrix_Standard.md)
 is a **hard architectural and completion requirement for every layer, feature
 and upgrade**, including existing capabilities being modified. Every material

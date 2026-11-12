@@ -30,6 +30,15 @@ depend on `.clinerules/` being present.
 
 ## Core policy (derived from `.clinerules/engineering.md`)
 
+### Architectural authoring preflight
+
+Before significant architectural decisions or document authoring, follow
+`docs/agent/pcg-authoring.md`: query `pcg_documents_v1` for related nodes and their
+typed transitive constraint chains before proposing changes, then reconcile the
+source declaration after writing. Record unavailable coverage honestly; graph
+status is not execution authorization. This projects the local engineering rule,
+not a separate metadata or approval system.
+
 ### Rule 2 — Minimize tool calls
 
 Use the fewest tool calls reasonably necessary to complete the request correctly.

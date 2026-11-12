@@ -83,6 +83,12 @@ caller to the authoritative structured item errors.
 
 #### Explicit persistent evidence query
 
+For source-owned architectural document discovery and pre-authoring constraint
+chains, use `pcg_documents_v1` and follow [the authoring preflight](pcg-authoring.md).
+Its configured document lifecycle is separate from the manifest-enrolled evidence
+corpus interface below. See [the document contract](../architecture/PCG_DOCUMENT_AUTHORING.md)
+for exact search/context requests, GLS declarations and reconciliation semantics.
+
 `pcg_query_v1` is advertised only when the server starts with an owner-selected
 absolute `CLEAN_CTX_PCG_PROFILE` path. Its closed request requires `workspaceRoot`,
 `corpus`, exact `generation`, `mode`, `subject`, exact `tokenizer`, `limits` and

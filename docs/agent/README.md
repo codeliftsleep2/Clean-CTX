@@ -40,6 +40,7 @@ the product architecture overview.
 |-----------|------------------------------------------------------|------------------------------|
 | `verification.md` | Single authoritative final verification gate | declaring any task complete |
 | `architecture.md` | RED/GREEN regression procedure, architectural audit checklist, invariant hierarchy, test-file convention | fixing a reproducible bug or ending a multi-step architectural task |
+| `pcg-authoring.md` | Source-backed pre-authoring search/context, relevant revision comparison and post-authoring reconciliation | significant architectural decisions, investigations, plans or reports; not ordinary coding edits |
 | `incremental-migration.md` | Incremental architectural migration procedure | performing a designated migration |
 | `releases.md` | Gated release, changelog & versioning accounting | a behavior-affecting build ships |
 | `tooling.md` | Comprehensive MCP/code-context tool selection, workflow, and antipatterns guide | choosing how to read, understand, edit, or verify code |
