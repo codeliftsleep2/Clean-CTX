@@ -1,5 +1,7 @@
 # Issue #155: four-blocker implementation handoff
 
+B4a source disposition: The focused C# dependency contract owns the relocated production-boundary clauses. The latest receipt is scoped operator/inspected-receipt evidence, not original-workspace Claude acceptance or a new certification.
+
 Agent: Agent MaxHeadRoom
 
 Latest acceptance (2026-10-20): operator reports all handed-off focused tests,
@@ -36,50 +38,7 @@ focused GREEN; neither frozen regression file was changed.
 
 ## Production components changed
 
-1. Canonical C# dependency obligations in
-   `src/ir/csharp_resolution/compilation/dependencies.rs` now include class and
-   method attribute references, exact written and suffix discovery hints, aliases,
-   original declaration/scope/span and resolver disposition. Existing canonical
-   attribute resolution decides identity; discovery names never grant framework
-   authority. Known producer attribute authority that remains ambiguous/unsupported
-   stays unproven. Unmodeled unrelated custom attributes do not become new framework
-   capabilities. All attribute discovery uses the existing SourceDependencyClosure
-   frontier, not query-specific prewarming.
-2. `src/mcp/semantic_compilation/dependencies.rs` is the common retained/context
-   boundary used by workspace queries and non-query C# context consumers. It
-   acquires through the accepted shared capability and projects requested rendering
-   fidelity through canonical generation functions. C# generation reconciliation
-   now attaches exact captured source hashes for consulted base/partial/shadow
-   evidence to remembered semantic snapshots. A partition's dependency index is
-   reused across owners during footprint construction.
-3. `core/provide/evaluate.rs`, `core/provide/batch.rs`, `core/provide/outcome.rs`
-   and `core/compress.rs` use that boundary before returning/persisting C# semantics.
-   Rendering fidelity remains requested by the caller; the canonical semantic
-   index retains its acquired High evidence instead of being overwritten by a
-   lower-fidelity rendering. Existing durable persistence receives the consulted
-   footprint; existing compatibility validation rejects stale dependency hashes.
-   C# semantic producer generation advances from 4 to 5 so older snapshots lacking
-   the new lifecycle evidence do not remain compatible. Canonical and unrelated
-   language producer generations are unchanged.
-4. Typed PublicationStamp validation is shared by dependency evidence, workspace
-   prepared evaluators, and provided contexts. Workspace batches reprepare stale
-   items until all required stamps match the final guarded index. Context batches
-   reevaluate earlier successful C# items when later preparation supersedes their
-   publication. Item order is preserved. A single-item supersession fails closed;
-   synchronization does not grant authority. No global retry count or timeout was
-   introduced.
-5. `src/mcp/tools.rs` deliberately registers
-   `semantic_dependencies_unresolved`. Reasons preserve legacy object entries and
-   explicitly allow the bounded dependency string codes already used by the frozen
-   supplemental tests. `dependency_proof` is registered as complete with a string
-   generation, or unproven. Implementation and schema use those same forms.
-
-Cache reuse checks the current target projection's recorded dependencies as well
-as owner/source, partition, producer, root and publication compatibility. Inventory
-acquisition stabilizes its source generation if reading newly changed sources
-invalidates a previous root observation. A source-current retained artifact can be
-reconciled after a base mutation without recompiling that unchanged owner merely
-because its derived dependency footprint became stale.
+Current normative owner: [AUTH.CSHARP_DEPENDENCY_CLOSURE](../architecture/contracts/csharp-dependency-closure.md). Original section bytes, chronology and enforcement attribution remain available at commit `0d8437cc`.
 
 ## Frozen regression receipts
 
@@ -192,3 +151,15 @@ Focused GREEN is now reported. Run the authoritative Final Verification Gate in
 `docs/agent/verification.md`; its full workspace test run includes preservation
 coverage. The agent has not run it. Binary/stdio and relevant field acceptance
 remain separate pending evidence, with Claude reserved for the last field gate.
+
+```architecture-graph
+node: DOC-202
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: CSharp dependency closure implementation and scoped operator evidence
+track: REPOSITORY
+artifact: docs/agent/ISSUE_155_FOCUSED_GREEN_HANDOFF.md
+implements:
+  - AUTH.CSHARP_DEPENDENCY_CLOSURE
+note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+```

@@ -1,0 +1,5 @@
+node,generation,inline_tokens,source_refs_tokens,saved_tokens,saved_percent,nodes,unique_sources,edges,paths,reconstruction,revisions,metadata,completeness,tokenizer
+AUTH.DECLARATION_ACQUISITION,0a7bd575f261324db5933cbdc6948850d6f0122faab98b37197dcde5e017cdf2,25944,17286,8658,33.372,4,3,3,4,exact,exact,exact,current and complete,o200k
+INV.CSHARP_RESOLUTION_001,0a7bd575f261324db5933cbdc6948850d6f0122faab98b37197dcde5e017cdf2,23197,19016,4181,18.024,4,3,3,4,exact,exact,exact,current and complete,o200k
+INV.INVOCATION_003,0a7bd575f261324db5933cbdc6948850d6f0122faab98b37197dcde5e017cdf2,19039,13744,5295,27.811,5,3,4,5,exact,exact,exact,current and complete,o200k
+WSC-012,0a7bd575f261324db5933cbdc6948850d6f0122faab98b37197dcde5e017cdf2,5498,5644,-146,-2.656,1,1,0,1,exact,exact,exact,current and complete,o200k

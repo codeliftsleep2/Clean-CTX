@@ -1,5 +1,7 @@
 # C# Semantic Resolution R13 Finalization
 
+B4a source disposition: This finalization report is the dated R13 retirement/migrated-consumer audit and attributed operator-gate result. CSHARP-RESOLUTION-001 and DOTNET-001 remain the current normative owners. Campaign GREEN is not a dual-signoff certification under LANGUAGE_META_LAYER_CERTIFICATION.md.
+
 **Agent:** Agent MaxHeadRoom  
 **Date:** 2026-10-19  
 **Repository:** Clean-CTX  
@@ -103,3 +105,16 @@ TEXTUAL SEMANTIC AUTHORITY: RETIRED FOR EVERY KNOWN MIGRATED CONSUMER
 STRUCTURED APPLICABILITY: SOLE SEMANTIC ADMISSION PATH
 
 R13: GREEN — FINAL REPOSITORY GATE PASSED
+
+```architecture-graph
+node: DOC-389
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: CSharp R13 retirement audit and operator-reported finalization
+track: REPOSITORY
+artifact: docs/plans/CSHARP_SEMANTIC_RESOLUTION_R13_FINALIZATION_2026-10-19.md
+preserves:
+  - INV.CSHARP_RESOLUTION_001
+  - DOTNET-001
+note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+```

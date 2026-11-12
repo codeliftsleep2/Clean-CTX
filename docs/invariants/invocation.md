@@ -38,7 +38,7 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 | **Fidelity preservation** | Exact-call projection may strengthen exact-call evidence, but it preserves each artifact publication's semantic fidelity. Preparing Calls authority never upgrades a Low or Medium projection to High. A later explicit higher-fidelity request remains the only authority for that upgrade. Dirty Calls authority does not make independently current TypeRef evidence inadequate. |
 | **Boundary** | Retained invocation evidence remains source-bound under INVOCATION-001 and is owned only by the in-session artifact store; artifacts are not durable persistence. Exact-call currentness is capability-scoped through `CSharpAuthorityFingerprint`, not modeled as per-edge all-authority-file dependencies. Provider availability and query target identity do not participate in semantic truth or the fingerprint. |
 | **Enforcement** | `SemanticCompilationArtifact` is the compiler return boundary. `CSharpCallAuthorityState` owns artifacts and dirty/current generation state; query preparation is the sole exact-call capability gate; `WorkspaceIndex` separately owns capability coverage. Structural work counters pin K-only compilation, zero eager TypeRef projection, artifact-backed projection, one manifest per generation, and O(1) warm currentness. Lifecycle, artifact-reconciliation, fingerprint, ambiguity, deletion/restore, and fidelity regressions enforce fail-closed behavior. |
-| **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 4. |
+| **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 5. |
 | **Authority** | `src/ir/csharp_exact_calls.rs`; `src/mcp/semantic_compilation/`; `src/mcp/csharp_calls/`; `src/workspace/index/capability_coverage.rs`; `src/tests/mcp/issue_144_performance_work_counts.rs`; `src/tests/mcp/csharp_call_authority_lifecycle.rs`; `src/tests/mcp/csharp_call_artifact_reconciliation.rs`; `src/tests/mcp/csharp_call_authority_fingerprint.rs` |
 | **Type** | ENFORCED |
 | **Gate** | Focused Issue #144 artifact, parallelism, lifecycle, reconciliation, fingerprint, and work-count regressions; then the authoritative Final Verification Gate. |
@@ -46,3 +46,30 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 993-1009, original section `INVOCATION-003`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `9e00ada0bb79964e4b4cb9ef953176ea3334f2d9872e1befb362e7ec72a24d31`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: INV.INVOCATION_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
+track: REPOSITORY
+artifact: docs/invariants/invocation.md
+preserves:
+  - CTX-001
+note: Current source-described contract; no witness execution or independent certification is inferred.
+```
+
+```architecture-graph
+node: INV.INVOCATION_003
+kind: INVARIANT
+status: IMPLEMENTED
+title: INVOCATION-003 Exact C# Calls Use Capability-Gated Artifact Authority
+track: REPOSITORY
+artifact: docs/invariants/invocation.md
+depends_on:
+  - INV.INVOCATION_001
+preserves:
+  - WSC-012
+  - PROJ-001
+note: Current source-described contract; no witness execution or independent certification is inferred.
+```

@@ -1,5 +1,7 @@
 # Issue #156: static implementation and focused GREEN handoff
 
+B4a source disposition: The focused EF dependency contract owns the relocated frontier/identity/lifecycle clauses. The later coverage-schema RED and awaiting-GREEN section qualifies earlier GREEN evidence; post-repair live acceptance remains unrun after the prior 639/644 live failure. No new defect was reproduced or repair authorized by B4a.
+
 Agent: Agent MaxHeadRoom
 
 Date: 2026-10-20
@@ -115,100 +117,15 @@ In the last eight rows, `query/` abbreviates `mcp/tool_handlers/query/`.
 
 ## Generalized repair architecture
 
-```text
-forward DbContext / reverse Entity semantic query
-  -> existing target and C# ancestry preparation
-  -> EF-owned scoped structured obligations
-  -> shared authoritative source inventory
-  -> conservative candidate hints, never identity proof
-  -> shared batched publication + canonical compilation
-  -> repeat the structured frontier until stable
-  -> canonical EF identity/membership resolution
-  -> generation reconciliation and surviving-source inventory check
-  -> filtered query-local EF catalog
-  -> final publication/project validation
-  -> existing lower-bound response
-```
-
-Obligation kinds are `ModelEntity`, `ExplicitConfiguration`,
-`ConfigurationContract`, `ConfigurationEntity`, and `AssemblyMarker`. Each
-retains the context/declaration key, written type shape, namespace/nesting,
-imports/aliases, effective WorkspaceScope, and canonical resolver disposition.
-Explicit registration and its interface/entity requirements form a connected
-frontier. The interface requirement must resolve specifically to the known EF
-contract; resolving a source lookalike cannot satisfy membership.
-
-The producer remains beside the existing EF semantic catalog. Shared machinery
-owns inventory, source admission, compilation, single-flight and reconciliation.
-No new universal capability was added; SourceDependencyClosure still means the
-existing C# ancestry/attribute acquisition contract. The EF flight uses a distinct
-`ef-model-v1` synchronization key with no ancestry capability target. Followers
-rerun their own attempt; a completed flight supplies no semantic proof.
+Current normative owner: [AUTH.EF_MODEL_DEPENDENCIES](../architecture/contracts/ef-model-dependencies.md). Original section bytes, chronology and enforcement attribution remain available at commit `0d8437cc`.
 
 ## Identity, scope, and assembly-universe authority
 
-Reference resolution uses the existing neutral explicit/import/alias resolvers
-and CSharpSourceSymbolIndex. Class declaration parts come from retained canonical
-compilation units, preserving partial metadata and declaration spans. The existing
-neutral interface syntax captures remain source-shadow evidence. Partial class
-families compose; duplicate non-partial or import-ambiguous targets fail closed.
-One stable canonical physical part represents a composed entity in the response.
-
-EF's existing authorized query-scope catalog remains its reference universe.
-The adapter does not impose ancestry-shaped project partitions on EF references
-or infer project-reference legality. #155 continues to own its existing ancestry
-partition rule. Candidate discovery is restricted to authorized scope, and names
-only choose candidates for canonical resolution. The root-order fixture uses
-distinct namespaces with the same terminal entity name; it does not introduce a
-new rule for legal cross-project references.
-
-For the supported local assembly form, marker identity must resolve and share
-the context's unique nearest `.csproj`. A complete shared source inventory is
-filtered to that existing project convention and the existing source-bearing
-IEntityTypeConfiguration contract spelling, including supported alias targets.
-All candidate configurations are admitted and validated; their entity references
-and declaration families extend the same structured frontier. Enumerating only
-previously admitted configurations never closes the universe.
-
-Closure requires complete inventory, successful publication, resolved obligations,
-the framework contract, and stable final inventory/publication/project evidence.
-Unknown assembly expressions gain no capability. Incomplete inventory, ambiguous
-membership, missing references or unprovable project evidence leave proof
-unproven and ordinary relationship results lower-bound. No new runtime assembly,
-NuGet, project-file Compile-item, reflection, or overload semantics were added.
+Current normative owner: [AUTH.EF_MODEL_DEPENDENCIES](../architecture/contracts/ef-model-dependencies.md). Original section is retained in the baseline revision.
 
 ## Lifecycle, publication, proof and schema
 
-Each attempt observes current source bytes through the shared inventory. The
-dependency catalog accepts only admitted snapshots whose cached source and
-canonical artifact hashes match that observation. Selected changed files use
-the existing publication path. Deleted/changed snapshots cannot contribute EF
-model/configuration edges merely because they remain in a session's older index.
-EF source eligibility reaches the projection catalog explicitly.
-
-An unchanged context can therefore acquire newly appearing entities/configurations,
-retract old configuration ownership, observe entity retargeting, exclude deleted
-dependencies and restore relationships. Project witnesses also invalidate reuse
-when configurations enter/leave the supported nearest-project universe or marker
-project evidence changes. Source-local DbSet written facts retain their separate
-existing authority; deleting an entity declaration does not erase source syntax.
-
-Evidence binds the publication observed during obligation derivation, rather than
-capturing a newer stamp after unrelated work. A second inventory observation and
-project checks reject superseded attempts. Ancestry proofs are reacquired if EF
-publication supersedes them. Changed EF source eligibility triggers repreparation
-even without publication. The existing PreparedQuery validation boundary also
-checks EF project/publication evidence; batch coordination can reprepare rather
-than publish a stale prepared answer. Non-EF validators remain trivially true.
-
-Public response fields and registered schemas are unchanged. Existing dependency
-proof/status/reason forms express unresolved evidence. Successful internal EF
-closure does not promote ordinary edge source_complete or exactness. The missing
-entity regression checks emitted status/reasons against the registered schema.
-
-Model/configuration edges remain request-local. They were not made durable index
-facts, no persistence ownership model was introduced, and no durable EF model-edge
-integration is claimed. #155's retained ancestry footprints remain separate.
+Current normative owner: [AUTH.EF_MODEL_DEPENDENCIES](../architecture/contracts/ef-model-dependencies.md). Original section is retained in the baseline revision.
 
 ## Supplemental tracked regressions
 
@@ -341,3 +258,15 @@ three observed RED assertions remain unchanged; the fifteen supplemental tests
 are unexecuted. Compile errors or fixture failures must be classified separately
 from behavioral GREEN. No runtime authorization is inferred from this handoff.
 Claude field testing remains the last-resort gate after local evidence is batched.
+
+```architecture-graph
+node: DOC-206
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: EF dependency implementation with qualified historical verification
+track: REPOSITORY
+artifact: docs/agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md
+implements:
+  - AUTH.EF_MODEL_DEPENDENCIES
+note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+```

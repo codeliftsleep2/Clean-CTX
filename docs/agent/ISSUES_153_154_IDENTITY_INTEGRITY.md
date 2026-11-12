@@ -247,3 +247,16 @@ no further verification will be started by the agent without a new explicit
 per-run instruction. The final repository gate remains solely defined in
 `docs/agent/verification.md`; its command list is not duplicated here.
 No standalone binary, provider, or live MCP process was started.
+
+```architecture-graph
+node: DOC-200
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: CSharp exact declaration input repair and attributed verification
+track: REPOSITORY
+artifact: docs/agent/ISSUES_153_154_IDENTITY_INTEGRITY.md
+preserves:
+  - INV.CSHARP_RESOLUTION_001
+  - WSC-012
+note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+```

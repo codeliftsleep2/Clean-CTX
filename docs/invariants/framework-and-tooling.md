@@ -150,7 +150,7 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1
 |----------|-------|
 | **Intent** | Clean-CTX durably expresses a proven framework role independently of whether that role currently has relationship payload. |
 | **Invariant** | A resolved framework role may register a file-provenanced semantic occurrence independently of `HasEntity`, mappings, hub targets, routes/actions, or tests. Role registration never becomes source declaration authority or graph adjacency; `builtin/Class` remains the C# declaration. A role alone cannot fabricate relationship payload. DbContext and Controller publish explicit role occurrences; relationship-bearing Profile/Hub projections retain their resolved-role authorization even when their current payload is empty. |
-| **Lifecycle** | Role and relationship projections use the same admitted-source resolution generation described by CSHARP-RESOLUTION-001. Publication, replacement, refresh, deletion, rename, warm reuse, partial composition, alias/ancestry changes, producer compatibility, and same-name owner identity use `WorkspaceIndex` owner lifecycle and generation reconciliation. .NET semantic producer generation 6 owns the current projection. |
+| **Lifecycle** | Role and relationship projections use the same admitted-source resolution generation described by CSHARP-RESOLUTION-001. Publication, replacement, refresh, deletion, rename, warm reuse, partial composition, alias/ancestry changes, producer compatibility, and same-name owner identity use `WorkspaceIndex` owner lifecycle and generation reconciliation. .NET semantic producer generation 7 owns the current projection. |
 | **Enforcement** | `src/dotnet_meta/semantic.rs` owns framework interpretation; `src/mcp/semantic_compilation/artifact.rs` retires and rebuilds generation-owned facts; `src/workspace/index/edges.rs` normalizes role registrations into non-declaration occurrences. R6-R12 tracked suites pin role/payload independence, fail-closed resolution, lifecycle, cross-consumer isolation, and history/provider convergence. |
 | **Authority** | CSHARP-RESOLUTION-001; `src/dotnet_meta/semantic.rs`; `src/mcp/semantic_compilation/artifact.rs`; `src/workspace/index/edges.rs` |
 | **Type** | STRUCTURAL and ENFORCED (test) |
@@ -208,4 +208,32 @@ title: SEL-001 Selector-Value Invariant
 track: REPOSITORY
 artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CSHARP_RESOLUTION_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CSHARP-RESOLUTION-001 Structured C# Resolution Owns Framework Authority
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+preserves:
+  - AUTH-001
+  - WSC-012
+  - SEMDEP-001
+note: Current source-described contract; no witness execution or independent certification is inferred.
+```
+
+```architecture-graph
+node: DOTNET-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+depends_on:
+  - INV.CSHARP_RESOLUTION_001
+preserves:
+  - WSC-011
+note: Current source-described contract; no witness execution or independent certification is inferred.
 ```

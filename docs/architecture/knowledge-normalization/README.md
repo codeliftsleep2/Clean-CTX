@@ -280,7 +280,8 @@ documentation assessment. This PR remains reviewable without fabricating that ga
 
 This assessment is the historical baseline. Completed migration evidence is
 recorded in [B0/B1 progress](B0_B1_PROGRESS.md), [B2 subsystem progress](B2_PROGRESS.md)
-and [B3 PCG authority progress](B3_PROGRESS.md).
+and [B3 PCG authority progress](B3_PROGRESS.md). The next bounded split is
+[B4a neutral/C# authority progress](B4A_PROGRESS.md); Angular remains B4b.
 The candidate tables above are not a competing current authority: admitted
 source declarations and the focused owners linked by those progress records
 determine current graph standing. C15 and later-batch holds remain explicit.

@@ -1,5 +1,7 @@
 # Issue #151: acquisition proof generalization
 
+B4a source disposition: The focused acquisition contract owns relocated 151-A/B and lifecycle clauses. The remaining original NOT RUN, GREEN and operator-definition statements retain their chronological subjects; no current field acceptance or full final gate is inferred.
+
 Agent: MaxHeadRoom
 Status: focused Rust suites user-reported GREEN; full gate and live verification pending.
 
@@ -18,61 +20,15 @@ producer obligation and reports a lower bound.
 
 ## 151-A scope contract
 
-PROVEN BY SOURCE: `PreparationContext::scope` validates the authorized root set
-and optional `withinPath`; occurrence lookup applies this scope. Hydration
-receives the workspace root and configured additional roots independently of
-the answer narrowing. The schema now describes answer projection by asserting
-file. Acquisition behavior is unchanged by `withinPath`.
-
-The tracked Issue #151 scope regression checks the returned primary-root
-declaration while separately checking index-owned declarations acquired from
-both authorized roots. It proves projection using facts, rather than telemetry.
+Current normative owner: [AUTH.DECLARATION_ACQUISITION](../architecture/contracts/declaration-acquisition.md). Original section bytes, chronology and enforcement attribution remain available at commit `0d8437cc`.
 
 ## 151-B public meaning and authority
 
-Ordinary mode returns matching authoritative indexed entity occurrences after
-registered hydration. These may include declarations, relationship endpoints,
-and framework roles. Its coverage remains a lower bound.
-
-Declaration mode returns matching source-proven declaration occurrences. An
-explicit workspace root enables the shared `SourceDeclarations` acquisition
-capability. Exactness describes supported declaration producers within the
-authorized source admission policy. Domain/type and `withinPath` filters
-project that acquired declaration universe.
-
-Source completeness requires complete inventory of every authorized root,
-coverage of every admitted language/producer unit, compatible generations,
-validated exhaustive claims, and current High semantic publication of every
-selected owner. No selective declaration-name predicate is certified, so the
-capability processes the entire admitted unit. This may cost more than ordinary
-name discovery; no new performance budget or truncation policy is introduced.
-
-Declaration fact authority alone does not prove exhaustive search. Providers
-remain advisory. Discovery counts, provider status, cache presence, and query
-order never authorize exactness. Missing roots, processing/publication failures,
-or missing producer generations prevent certification.
+Current normative owner: [AUTH.DECLARATION_ACQUISITION](../architecture/contracts/declaration-acquisition.md). Original section is retained in the baseline revision.
 
 ## Shared production lifecycle
 
-`workspace_query` dispatch -> `prepare_find_entities` -> request-local keyed
-hydration -> typed `AcquisitionTarget` -> existing hydration flight -> existing
-acquisition completion cache -> Clean inventory -> capability coverage units ->
-shared full-unit proof claim -> shared proof validator -> candidate compilation
-and publication -> inventory/source/projection currentness check ->
-`AcquisitionSatisfaction` -> shared completion cache -> capability-checked
-`CompletenessCertificate` -> structured coverage and the existing content
-envelope.
-
-Ordinary cached discovery does not satisfy the proof obligation. When no
-compatible satisfaction exists and inventories are absent or cover fewer roots,
-the acquisition path obtains the required root inventories. Warm requests reuse
-the same proof cache; refresh/edit/root invalidation retains the existing cache
-lifecycle. There is no declaration-only cache or parallel satisfaction model.
-
-The declaration capability binds generation identity to native canonical and
-semantic generations plus the active producer catalog, including framework
-declaration producers. Typed capability identity prevents declaration and
-incoming-TypeRef requirements or certificates from being interchanged.
+Current normative owner: [AUTH.DECLARATION_ACQUISITION](../architecture/contracts/declaration-acquisition.md). Original section is retained in the baseline revision.
 
 ## Regression evidence and preservation
 
@@ -115,3 +71,15 @@ root recovery, and unreadable-source recovery. It reuses `PhaseBSession.ps1`.
 PowerShell parsing passed without executing the harness. Live results remain
 NOT RUN. The invocation and evidence rules are documented in the verification
 directory README; #144/#148 preservation harnesses use the same binary.
+
+```architecture-graph
+node: DOC-448
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Declaration acquisition proof generalization and attributed evidence
+track: REPOSITORY
+artifact: docs/plans/ISSUE_151_ACQUISITION_PROOF_GENERALIZATION_2026-10-20.md
+implements:
+  - AUTH.DECLARATION_ACQUISITION
+note: Historical implementation and source-attributed evidence only; no new execution, independent language certification, reclosure or banking.
+```

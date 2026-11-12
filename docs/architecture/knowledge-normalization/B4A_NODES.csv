@@ -1,0 +1,13 @@
+id,kind,status,current_owner,scope
+AUTH.DECLARATION_ACQUISITION,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/declaration-acquisition.md,Source declaration acquisition and public query meaning
+AUTH.CSHARP_DEPENDENCY_CLOSURE,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/csharp-dependency-closure.md,CSharp ancestry and attribute dependency closure
+AUTH.EF_MODEL_DEPENDENCIES,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/ef-model-dependencies.md,EF owned model and configuration dependency obligations
+INV.INVOCATION_001,INVARIANT,IMPLEMENTED,docs/invariants/invocation.md,INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
+INV.INVOCATION_003,INVARIANT,IMPLEMENTED,docs/invariants/invocation.md,INVOCATION-003 Exact C# Calls Use Capability-Gated Artifact Authority
+INV.CSHARP_RESOLUTION_001,INVARIANT,IMPLEMENTED,docs/invariants/framework-and-tooling.md,CSHARP-RESOLUTION-001 Structured C# Resolution Owns Framework Authority
+DOTNET-001,INVARIANT,IMPLEMENTED,docs/invariants/framework-and-tooling.md,DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
+DOC-200,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUES_153_154_IDENTITY_INTEGRITY.md,CSharp exact declaration input repair and attributed verification
+DOC-448,IMPLEMENTATION,IMPLEMENTED,docs/plans/ISSUE_151_ACQUISITION_PROOF_GENERALIZATION_2026-10-20.md,Declaration acquisition proof generalization and attributed evidence
+DOC-202,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUE_155_FOCUSED_GREEN_HANDOFF.md,CSharp dependency closure implementation and scoped operator evidence
+DOC-206,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md,EF dependency implementation with qualified historical verification
+DOC-389,IMPLEMENTATION,IMPLEMENTED,docs/plans/CSHARP_SEMANTIC_RESOLUTION_R13_FINALIZATION_2026-10-19.md,CSharp R13 retirement audit and operator-reported finalization
