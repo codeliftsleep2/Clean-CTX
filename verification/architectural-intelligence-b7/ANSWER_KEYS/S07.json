@@ -1,0 +1,78 @@
+{
+  "scenario": "S07",
+  "subject": "Startup work removal",
+  "baseline": "1789bf56b209e3d6950f7d37903ce86a1ae51fe5",
+  "generation": "8b91c92e82c9edf31fb4c111e5ba8b7c38ee02ca5942d3f69910f8d1d0582529",
+  "engineering_problem": "Startup materializes full persisted-context summaries although its immediate loop uses only paths. A teammate proposes replacing that query with a path-only reader and dropping the correlated delta count and unused conversions. Decide what is safe, what prior investigation establishes, and what should happen next. Do not implement, retime, or reopen a campaign.",
+  "controlling_identities": [
+    "PERF-004-DOCTRINE",
+    "PERF-005-BOUNDED",
+    "PERF-002-STARTUP",
+    "DOC-196",
+    "AUTH.PERSISTENCE_RECOVERY",
+    "META-002"
+  ],
+  "source_references": [
+    {
+      "identity": "PERF-004-DOCTRINE",
+      "path": "docs/architecture/contracts/performance-doctrine.md",
+      "revision": "3497ec2a14163ca63b0b290e9645cfe59e7fe392114a1866add31b5e05f3e59c",
+      "source_sha256": "6fe2c9ced23c0271a502527c83911ecb8be277368b6fc2dc9d0696294debedc1"
+    },
+    {
+      "identity": "PERF-005-BOUNDED",
+      "path": "docs/architecture/contracts/performance-doctrine.md",
+      "revision": "da33c19c166673fe17576601749cc927f33e655e4644308cf760cc1bd357d1a5",
+      "source_sha256": "6fe2c9ced23c0271a502527c83911ecb8be277368b6fc2dc9d0696294debedc1"
+    },
+    {
+      "identity": "PERF-002-STARTUP",
+      "path": "docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md",
+      "revision": "721a9caf9e4193b4652acd9061d2ee4803c741cbfa7c55c647cf4470ab2610b0",
+      "source_sha256": "21077db29b5c30c01b73e69ff1c54d64ce358f5e265da1c8a8051c9fc34dd21e"
+    },
+    {
+      "identity": "DOC-196",
+      "path": "docs/agent/AF_PERF_002_STARTUP_PROJECTION_DESIGN.md",
+      "revision": "a09b430093b2df1ca50e924f7cf7250e93ac8c0622ee9f78ac59a6977817a674",
+      "source_sha256": "21077db29b5c30c01b73e69ff1c54d64ce358f5e265da1c8a8051c9fc34dd21e"
+    },
+    {
+      "identity": "AUTH.PERSISTENCE_RECOVERY",
+      "path": "docs/architecture/contracts/persistence-recovery.md",
+      "revision": "df4076a17eb9254c9e50305a4b2f2d370d2a2747b649980a846188f7b56981a1",
+      "source_sha256": "7fc594039ae859e5d2b6256224d833c3d563e60e721ae3bc1f408e012e89ce26"
+    },
+    {
+      "identity": "META-002",
+      "path": "docs/invariants/meta-evidence.md",
+      "revision": "91f4b223b7b6062b779f3b737ff1346fa6394715bf3b1f2f0ffb676675b12a5e",
+      "source_sha256": "c74b8e6b5e70490ba15abd2d3dcd6d8e3dc0a3160c8728eda0f907f3307fe1c6"
+    }
+  ],
+  "required_reasoning": [
+    "Apply demonstrated problem,construction-inclusive significant benefit,semantic preservation and proportional complexity;bounded work gate remains.",
+    "Discover preserving projection DEFER and delta-count-removal REJECT as distinct decisions.",
+    "Dropping count/conversions changes SQLite error behavior and all-or-nothing durable physical-owner registration,including malformed later rows.",
+    "Typical tens-of-microseconds bounded projection savings are not whole-startup/public/release speedup.",
+    "Do not treat deferral as implementation approval or invent a global threshold.",
+    "META-002 governs compilation-scoped single evaluation,not blanket removal of startup validation;retain ordering,conversion/error and source/ownership controls before any separately authorized design."
+  ],
+  "critical_failures": [
+    "Approves count/error validation omission as unused work under current contract",
+    "Treats deferred preserving projection as approved implementation",
+    "Claims universal/end-to-end benefit from focused timings"
+  ],
+  "acceptable_alternatives": [
+    "Reject the unsafe mechanism while preserving the legitimate objective",
+    "Hold the affected decision with exact missing evidence and a bounded authorized investigation",
+    "Propose a source-supported representation/ownership change that proves full correctness;no unique implementation mandated"
+  ],
+  "verification_obligations": "Tracked regression for actual changed behavior,appropriate production-boundary evidence,source/binary identity and user-owned authoritative gates;no campaign executed by this assessment",
+  "hold_conditions": "Missing or unavailable applicable proof;unestablished post-repair/current verification;scope requires separate architectural authorization",
+  "claims_not_to_make": [
+    "Approves count/error validation omission as unused work under current contract",
+    "Treats deferred preserving projection as approved implementation",
+    "Claims universal/end-to-end benefit from focused timings"
+  ]
+}

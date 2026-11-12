@@ -1,0 +1,12 @@
+category,command,outcome,limit
+baseline/preflight,Established invoke-workspace-documents.ps1 with target/pcg-b7/preflight-queries.json and unchanged actual-root profile,17complete contexts;2inheritedrefusals;51identities/32sources verified,No complete held closure claim
+independent evaluation,Fresh fork_turns=none isolation probe only,0scored scenarios;16A/Bconditions UNRUN;repository memory inherited,"No comparative benefit,critical-failure rates or independent reasoning result"
+operator discovery/availability,Established invoke-workspace-documents.ps1 -Requests target/pcg-b7/assessment-queries.json -OutputRoot target/pcg-b7/assessment,10FTSsearches:3ready/7blocked;two held context pairs;doctrine inline blocked/reference ready;two source gets ready,"Designer-selected feasibility,not independent evaluation;blocked control costs not whole unavailable payload costs"
+freeze/isolation,python temp evaluator freeze.py;frozen hash comparison in target/pcg-b7/finish.py,"8scenarios/16prompts,8keys and rubric frozen before feasibility outputs;all36frozenfiles exact",Keys absent evaluated repo during captures;committed afterward and must be excluded future agent views
+production changes,git diff --name-only -- src proxy .clean-ctx,NONE;baseline nodes/edges/declarations/revisions checked read-only,Assessment docs may advance scanner generation;reported separately
+unexecuted full gate,Use exact authoritative commands in docs/agent/verification.md,"UNRUN:Cargo/test/Clippy/full gate,historical/producer/Claudecampaigns","No independent certification,global closure or banking"
+encoding,pwsh -NoProfile -File scripts/check-utf8.ps1,PASS2640textfiles;zeroBOM/unexplained signatures;normal hook repeats,No suppression
+sizes,pwsh -NoProfile -File scripts/check-file-sizes.ps1,PASS38activefiles;12untouchedlegacyreported,No policy exception
+whitespace,git -c core.safecrlf=false diff --check,PASS,Repeat staged check before delivery
+final graph,Actual production get plus read-only database member/edge comparison,218/221;allbaseline tuples/revisions exact;generation unchanged,No assessment graph nodes
+delivery guards,git commit with .githooks/pre-commit enabled,Enforced at delivery;successful commit output reports actual result,No --no-verify

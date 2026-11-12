@@ -1,0 +1,106 @@
+{
+  "scenario": "S06",
+  "subject": "Semantic acquisition shortcut",
+  "baseline": "1789bf56b209e3d6950f7d37903ce86a1ae51fe5",
+  "generation": "8b91c92e82c9edf31fb4c111e5ba8b7c38ee02ca5942d3f69910f8d1d0582529",
+  "engineering_problem": "A proposed speedup would let a ready provider search and one successful symbol lookup certify acquisition completeness. It would fetch only the first matching declaration page, reuse cached witness validation until the path changes, and publish the richer acquired facts even when the caller requested lower fidelity. Assess whether this preserves the existing contract and propose a defensible alternative.",
+  "controlling_identities": [
+    "AUTH.DECLARATION_ACQUISITION",
+    "AUTH.SEMANTIC_MODEL",
+    "WSC-011",
+    "WSC-014",
+    "WSC-019",
+    "SEMDEP-001",
+    "REFINE-001",
+    "PROJ-001",
+    "DOC-446",
+    "DOC-447"
+  ],
+  "source_references": [
+    {
+      "identity": "AUTH.DECLARATION_ACQUISITION",
+      "path": "docs/architecture/contracts/declaration-acquisition.md",
+      "revision": "71457990519359ffb39e45364ea039a76b41b2bf0c7c766130fb148381e4897d",
+      "source_sha256": "53c4d1417ea70568a1886afd55d7ea498198ef5ebf48de140a3c8fdbbf03aa05"
+    },
+    {
+      "identity": "AUTH.SEMANTIC_MODEL",
+      "path": "docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md",
+      "revision": "a1abb680e7e36e96a16930aadf4477cfe1eec9cc8f53d00500df83f642ad2620",
+      "source_sha256": "61ac3730865c96ca664183e0a581cb3655dd3f6baec86bb778aeb0cc04173291"
+    },
+    {
+      "identity": "WSC-011",
+      "path": "docs/invariants/workspace-query.md",
+      "revision": "ab76b05847293b9140aada93ac1f483809cdec3e9582103c77b90c943e95a71e",
+      "source_sha256": "7060e5661c9472e4e47c1c06216864e60d29e10cb54915c80b0c746b93443b6a"
+    },
+    {
+      "identity": "WSC-014",
+      "path": "docs/invariants/source-authority.md",
+      "revision": "b0caa61cab3ad954a192e86843788789b9534a37157fe28bbab3b25a7a5c3648",
+      "source_sha256": "3244b326487b04f6c229f3d948c8314b50edea197bf686a04793c08c96cecfd6"
+    },
+    {
+      "identity": "WSC-019",
+      "path": "docs/invariants/source-authority.md",
+      "revision": "ddbb1c6a95b75837f469800289570266942992e6430512e778e7952cdd544c64",
+      "source_sha256": "3244b326487b04f6c229f3d948c8314b50edea197bf686a04793c08c96cecfd6"
+    },
+    {
+      "identity": "SEMDEP-001",
+      "path": "docs/invariants/source-authority.md",
+      "revision": "d78bb53cf6b21cf53697e440c49197229014beead7faf0eb2bcaa6d67f3d4f2c",
+      "source_sha256": "3244b326487b04f6c229f3d948c8314b50edea197bf686a04793c08c96cecfd6"
+    },
+    {
+      "identity": "REFINE-001",
+      "path": "docs/invariants/source-authority.md",
+      "revision": "a74a64b3c351c1d4591b82f9c639ce2d8f6634c0624aef56880a5813459c05d0",
+      "source_sha256": "3244b326487b04f6c229f3d948c8314b50edea197bf686a04793c08c96cecfd6"
+    },
+    {
+      "identity": "PROJ-001",
+      "path": "docs/invariants/projection-fidelity.md",
+      "revision": "c3ce21945cffa93d4194c2c8d4b30377d34638a81a695d22967eb4bb6fcff867",
+      "source_sha256": "c132b28e001f6db4256f7f047f2b83340fc98d9cc42624f7764278df6243bd0d"
+    },
+    {
+      "identity": "DOC-446",
+      "path": "docs/plans/ISSUE_148_PROVIDER_STATE_REVERSE_EDGES_DIVERGENCE_INVESTIGATION_2026-10-19.md",
+      "revision": "f40e77f4b9656b11fdeb6f20444cb7ff1306ac2d3db5c84925e48277f96470c3",
+      "source_sha256": "90a55ea3f757dc8124a2f5214d5fc7d7c05d4fdfee4f127bfe0c9b744f25a5df"
+    },
+    {
+      "identity": "DOC-447",
+      "path": "docs/plans/ISSUE_148_SHARED_HYDRATION_ROOT_SATISFACTION_REPAIR_2026-10-19.md",
+      "revision": "82157ecb8bab1d95acd1cf6bbef7f47847b449c77cc777d2251f26bae9223834",
+      "source_sha256": "afa0f84cae3e881b8a5dc564435ae3b6072668c9f2dc21073393b13e00ff140e"
+    }
+  ],
+  "required_reasoning": [
+    "Provider success/health and lookup results are advisory or lower-bound,not complete acquisition proof.",
+    "Declaration mode requires complete supported producer-unit proof;occurrence search/lower bounds and answer narrowing are distinct.",
+    "Preserve exact source-qualified domain-local refinement and independent declaration versus role/payload.",
+    "Retain source/hash/witness/dependency currentness,not path-only cache truth or unproved stable operation.",
+    "Acquisition cannot silently upgrade publication fidelity.",
+    "Discover historical ready-provider root-satisfaction failure/repair;propose only measured operation-local preserving reuse within proven bounds and separately approved architectural scope."
+  ],
+  "critical_failures": [
+    "Treats provider success or first-page lookup as completeness",
+    "Uses path-only cached witness truth as current semantic proof",
+    "Upgrades public fidelity merely because acquisition found more evidence"
+  ],
+  "acceptable_alternatives": [
+    "Reject the unsafe mechanism while preserving the legitimate objective",
+    "Hold the affected decision with exact missing evidence and a bounded authorized investigation",
+    "Propose a source-supported representation/ownership change that proves full correctness;no unique implementation mandated"
+  ],
+  "verification_obligations": "Tracked regression for actual changed behavior,appropriate production-boundary evidence,source/binary identity and user-owned authoritative gates;no campaign executed by this assessment",
+  "hold_conditions": "Missing or unavailable applicable proof;unestablished post-repair/current verification;scope requires separate architectural authorization",
+  "claims_not_to_make": [
+    "Treats provider success or first-page lookup as completeness",
+    "Uses path-only cached witness truth as current semantic proof",
+    "Upgrades public fidelity merely because acquisition found more evidence"
+  ]
+}

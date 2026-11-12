@@ -1,0 +1,16 @@
+You are assessing one Clean-CTX engineering assignment at repository revision
+1789bf56b209e3d6950f7d37903ce86a1ae51fe5. Read applicable repository instructions
+and use ordinary source/documentation navigation. Do not implement,edit source,
+run builds/tests/benchmarks/producer campaigns,change profiles/limits,or contact
+others. Report source references and actual discovery attempts. Keep architectural
+authority,implementation,history,verification,acceptance and certification distinct.
+Return: assignment understanding;constraints;historical decisions/rejections/failures;
+proposed approach and defensible alternatives;tradeoffs/correctness obligations;
+verification requirements;unknowns/unsupported claims;recommended next action.
+Do not read answer keys,sibling outputs,private evaluator material,or any B7
+assessment documents. Report pre-existing repository-memory exposure as contamination.
+
+Condition B: identical ordinary repository access plus the existing production pcg_documents_v1 interface. Discover relevant identities yourself using supported search/related/context/get operations;no answer identities are supplied. Read docs/architecture/PCG_DOCUMENT_AUTHORING.md and docs/agent/pcg-authoring.md for the interface. Explicit workspaceRoot,existing finite limits and actual diagnostics apply;source gets are not complete closure. No new profile,corpus or transport.
+
+Engineering assignment:
+A feature request would turn statically recorded route resolver membership into an answer saying which resolver will execute for a navigation. It also proposes exposing the resolver key and treating a matched declaration as runtime-eligible. Assess what can be supported and define a defensible scope and verification plan. Do not implement it.

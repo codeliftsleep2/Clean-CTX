@@ -1,0 +1,9 @@
+scenario,title,prompt_file,condition_a,condition_b,answer_key,baseline,designed,independent_executed,operator_demonstration
+S01,Canonical simplification,SCENARIOS/S01.md,SCENARIOS/S01_A_PROMPT.txt,SCENARIOS/S01_B_PROMPT.txt,ANSWER_KEYS/S01.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S02,Earlier replay result reuse,SCENARIOS/S02.md,SCENARIOS/S02_A_PROMPT.txt,SCENARIOS/S02_B_PROMPT.txt,ANSWER_KEYS/S02.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S03,CSharp repair standing,SCENARIOS/S03.md,SCENARIOS/S03_A_PROMPT.txt,SCENARIOS/S03_B_PROMPT.txt,ANSWER_KEYS/S03.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S04,Angular resolver interpretation,SCENARIOS/S04.md,SCENARIOS/S04_A_PROMPT.txt,SCENARIOS/S04_B_PROMPT.txt,ANSWER_KEYS/S04.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S05,Historical Angular acceptance,SCENARIOS/S05.md,SCENARIOS/S05_A_PROMPT.txt,SCENARIOS/S05_B_PROMPT.txt,ANSWER_KEYS/S05.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S06,Semantic acquisition shortcut,SCENARIOS/S06.md,SCENARIOS/S06_A_PROMPT.txt,SCENARIOS/S06_B_PROMPT.txt,ANSWER_KEYS/S06.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S07,Startup work removal,SCENARIOS/S07.md,SCENARIOS/S07_A_PROMPT.txt,SCENARIOS/S07_B_PROMPT.txt,ANSWER_KEYS/S07.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only
+S08,Document graph evolution,SCENARIOS/S08.md,SCENARIOS/S08_A_PROMPT.txt,SCENARIOS/S08_B_PROMPT.txt,ANSWER_KEYS/S08.json,1789bf56b209e3d6950f7d37903ce86a1ae51fe5,YES,NO,Separate feasibility only

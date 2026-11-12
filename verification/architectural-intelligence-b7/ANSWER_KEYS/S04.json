@@ -1,0 +1,92 @@
+{
+  "scenario": "S04",
+  "subject": "Angular resolver interpretation",
+  "baseline": "1789bf56b209e3d6950f7d37903ce86a1ae51fe5",
+  "generation": "8b91c92e82c9edf31fb4c111e5ba8b7c38ee02ca5942d3f69910f8d1d0582529",
+  "engineering_problem": "A feature request would turn statically recorded route resolver membership into an answer saying which resolver will execute for a navigation. It also proposes exposing the resolver key and treating a matched declaration as runtime-eligible. Assess what can be supported and define a defensible scope and verification plan. Do not implement it.",
+  "controlling_identities": [
+    "AUTH.ANGULAR_RESOLVER",
+    "AUTH.ANGULAR_FOUNDATION",
+    "AUTH.TS_RETAINED_EVIDENCE",
+    "AUTH.ANGULAR_PUBLIC_ENTRY",
+    "DOC-270",
+    "DOC-228",
+    "SEMDEP-001",
+    "PROJ-001"
+  ],
+  "source_references": [
+    {
+      "identity": "AUTH.ANGULAR_RESOLVER",
+      "path": "docs/architecture/contracts/angular-resolver.md",
+      "revision": "61127c59b654b01a43092648678cfbbd52580cdf098851e210bea57672e574ec",
+      "source_sha256": "e5a9ae5a04c760c2c8c97f6c949e376784037733b95c8bfd8c4dc8a2d529df81"
+    },
+    {
+      "identity": "AUTH.ANGULAR_FOUNDATION",
+      "path": "docs/agent/ISSUE_162_FOUNDATION_DESIGN_FREEZE.md",
+      "revision": "ad2989b2fcd23b0e35bcb52efbcd6b68a55e863b26915188670d708cd89df892",
+      "source_sha256": "eba077601bb0d62f44731aae48bcdbf898ba336038ced9c52d4f50888a781807"
+    },
+    {
+      "identity": "AUTH.TS_RETAINED_EVIDENCE",
+      "path": "docs/agent/ISSUE_162_RETAINED_AUTHORITY_CONTRACT.md",
+      "revision": "7aee1372551bae5d1abaa13422ef294d8babd823d572fd6859a60b729fad7931",
+      "source_sha256": "0dff9926c82d4e08b4f20436dfb6fa5bcb65e594cf0bb567245d40734ae8c6d0"
+    },
+    {
+      "identity": "AUTH.ANGULAR_PUBLIC_ENTRY",
+      "path": "docs/architecture/contracts/angular-public-entry.md",
+      "revision": "d9c115a68195272901fc4a8c2b3f25eb6207ac916d941e307792d3decb6a0a58",
+      "source_sha256": "edd4fad76293fcc86de1f8f19aefa57f75c626fd21e4abf0b431c5a2a02e0a48"
+    },
+    {
+      "identity": "DOC-270",
+      "path": "docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md",
+      "revision": "6de94c5bf6857186eae060184e93466d8bff3ff2f0320e6adf1c4ea1de730ab4",
+      "source_sha256": "371b880da4d3592f00f0bf644a3c582eba8b203f9cc56238c9aac69d684f504e"
+    },
+    {
+      "identity": "DOC-228",
+      "path": "docs/agent/ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md",
+      "revision": "de53ade3260781e8b1ef743ac65130c98694022e6f3a96c5ee27da6ef5fad377",
+      "source_sha256": "f7a88b363d03ee7c0fc8c9a09aae2e2e8451c55f3bb06c22c486b3869c5ac69a"
+    },
+    {
+      "identity": "SEMDEP-001",
+      "path": "docs/invariants/source-authority.md",
+      "revision": "d78bb53cf6b21cf53697e440c49197229014beead7faf0eb2bcaa6d67f3d4f2c",
+      "source_sha256": "3244b326487b04f6c229f3d948c8314b50edea197bf686a04793c08c96cecfd6"
+    },
+    {
+      "identity": "PROJ-001",
+      "path": "docs/invariants/projection-fidelity.md",
+      "revision": "c3ce21945cffa93d4194c2c8d4b30377d34638a81a695d22967eb4bb6fcff867",
+      "source_sha256": "c132b28e001f6db4256f7f047f2b83340fc98d9cc42624f7764278df6243bd0d"
+    }
+  ],
+  "required_reasoning": [
+    "Current subject is unqualified written ResolvedBy membership,not runtime execution/navigation.",
+    "Require exact native Angular/package/public-entry,retained TS declaration and runtime-reference evidence.",
+    "Declaration existence and exact association are not executable eligibility.",
+    "Public resolver-key registration and effective runtime/injector/navigation remain open;no full#162closure.",
+    "Keep C04 bounded acceptance distinct from C05 generation78historical receipt.",
+    "Preserve dependency/currentness/publication fidelity and identify producer/public-question/field obligations for separately approved extension."
+  ],
+  "critical_failures": [
+    "Infers runtime navigation or eligibility from written membership",
+    "Claims public resolver-key capability already implemented",
+    "Claims full Angular/#162certification or closure"
+  ],
+  "acceptable_alternatives": [
+    "Reject the unsafe mechanism while preserving the legitimate objective",
+    "Hold the affected decision with exact missing evidence and a bounded authorized investigation",
+    "Propose a source-supported representation/ownership change that proves full correctness;no unique implementation mandated"
+  ],
+  "verification_obligations": "Tracked regression for actual changed behavior,appropriate production-boundary evidence,source/binary identity and user-owned authoritative gates;no campaign executed by this assessment",
+  "hold_conditions": "Missing or unavailable applicable proof;unestablished post-repair/current verification;scope requires separate architectural authorization",
+  "claims_not_to_make": [
+    "Infers runtime navigation or eligibility from written membership",
+    "Claims public resolver-key capability already implemented",
+    "Claims full Angular/#162certification or closure"
+  ]
+}

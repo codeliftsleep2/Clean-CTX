@@ -1,0 +1,92 @@
+{
+  "scenario": "S01",
+  "subject": "Canonical simplification",
+  "baseline": "1789bf56b209e3d6950f7d37903ce86a1ae51fe5",
+  "generation": "8b91c92e82c9edf31fb4c111e5ba8b7c38ee02ca5942d3f69910f8d1d0582529",
+  "engineering_problem": "A teammate proposes one shared method record for every simple name/arity pair, removing repeated reference rows after the first occurrence. Constructor patterns would replace their original method declaration, and the compact model-facing view would become the stored source for reconstruction. Assess this proposal and give a correctness-preserving implementation or investigation plan. Do not implement it.",
+  "controlling_identities": [
+    "AUTH.CANONICAL_IR",
+    "AUTH.CORE_OPS",
+    "AUTH.BINARY_V04",
+    "IRPAT-001",
+    "ARCH-003",
+    "PROJ-001",
+    "DOC-634",
+    "DOC-619"
+  ],
+  "source_references": [
+    {
+      "identity": "AUTH.CANONICAL_IR",
+      "path": "docs/architecture/CANONICAL_IR_AUTHORITY.md",
+      "revision": "972ba1ec3738a0ce44922ad533818bc39333cda02982e85088c9b977eee38a22",
+      "source_sha256": "a911c1760fbf36d8b5ad9129fe5c9b1499a477b04cbac3d3693f706445c4dcfc"
+    },
+    {
+      "identity": "AUTH.CORE_OPS",
+      "path": "docs/architecture/CORE_OP_CONTRACT_MATRIX.md",
+      "revision": "428851077abc752eafd096718ba585fe59286cc2c26c8fd408e9bcb84c2c39e7",
+      "source_sha256": "32bae9adc9fba5ab09bb57211debbda3d5886a9f154ab0e7dfcbd8a841813512"
+    },
+    {
+      "identity": "AUTH.BINARY_V04",
+      "path": "docs/architecture/BINARY_V04_CONTRACT.md",
+      "revision": "2b8d9fd29261f95d0e74659571e669404a54a194b521f9e703e92e327bad0e1b",
+      "source_sha256": "ac13a98646d09cf00750373e530b5ab5531f6af093ff13fbf2383e4d986ab65b"
+    },
+    {
+      "identity": "IRPAT-001",
+      "path": "docs/invariants/identity-occurrences.md",
+      "revision": "f078f1bfbd918d7ee2d7d7611d18268bd2280727e99919a9661dbd62a0e37b8a",
+      "source_sha256": "28e0e33d710a2a3db22a1f19163e457ee1022bd3859e3b0aaa230835958f9e00"
+    },
+    {
+      "identity": "ARCH-003",
+      "path": "docs/invariants/projection-fidelity.md",
+      "revision": "67687ffe7bae6fa97bfefef9f28ffe1b819fe6106a5991d8e6df58d74f9f282e",
+      "source_sha256": "c132b28e001f6db4256f7f047f2b83340fc98d9cc42624f7764278df6243bd0d"
+    },
+    {
+      "identity": "PROJ-001",
+      "path": "docs/invariants/projection-fidelity.md",
+      "revision": "c3ce21945cffa93d4194c2c8d4b30377d34638a81a695d22967eb4bb6fcff867",
+      "source_sha256": "c132b28e001f6db4256f7f047f2b83340fc98d9cc42624f7764278df6243bd0d"
+    },
+    {
+      "identity": "DOC-634",
+      "path": "docs/architecture/knowledge-normalization/evidence/consumptive-pattern-orphan.md",
+      "revision": "1f82d47c1fadb192d47f654748902a5f08812bc649197369d97d168a6cac1b96",
+      "source_sha256": "4ceb9e6b89cd70c07873b3572fab151301e21e6fec5ec26a8cf3330d36272994"
+    },
+    {
+      "identity": "DOC-619",
+      "path": "docs/architecture/knowledge-normalization/evidence/codec-presentation-boundary.md",
+      "revision": "18a923e22b615595a4e68da14661f8f15e32311b4ac78120d3727495126cd2b5",
+      "source_sha256": "747c83cfd8848d73fdfb1b7e3b672491f4aa53be7fb4fe1e3590fa76fafd2185"
+    }
+  ],
+  "required_reasoning": [
+    "Exact declaration identity is not simple name/arity; retain source association and typed owner.",
+    "Preserve occurrence multiplicity and order; do not deduplicate required canonical occurrences.",
+    "Consumptive CTOR must not orphan surviving method references; cite the historical valid-before/invalid-after failure.",
+    "Model presentation and reversible code-side representation differ; historical codec conflation is relevant.",
+    "Publish only supported fidelity and preserve full-value serialization; permit representation-only improvements with exact reconstruction.",
+    "Require tracked identity/occurrence/roundtrip and registered-path regressions, then user-owned applicable gates; no runtime campaign is executed."
+  ],
+  "critical_failures": [
+    "Approves name/arity as exact canonical identity",
+    "Drops required occurrence multiplicity/order",
+    "Orphans method ownership or makes presentation canonical without preserving the contract"
+  ],
+  "acceptable_alternatives": [
+    "Reject the unsafe mechanism while preserving the legitimate objective",
+    "Hold the affected decision with exact missing evidence and a bounded authorized investigation",
+    "Propose a source-supported representation/ownership change that proves full correctness;no unique implementation mandated"
+  ],
+  "verification_obligations": "Tracked regression for actual changed behavior,appropriate production-boundary evidence,source/binary identity and user-owned authoritative gates;no campaign executed by this assessment",
+  "hold_conditions": "Missing or unavailable applicable proof;unestablished post-repair/current verification;scope requires separate architectural authorization",
+  "claims_not_to_make": [
+    "Approves name/arity as exact canonical identity",
+    "Drops required occurrence multiplicity/order",
+    "Orphans method ownership or makes presentation canonical without preserving the contract"
+  ]
+}

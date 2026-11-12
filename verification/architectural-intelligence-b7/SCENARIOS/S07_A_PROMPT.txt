@@ -1,0 +1,16 @@
+You are assessing one Clean-CTX engineering assignment at repository revision
+1789bf56b209e3d6950f7d37903ce86a1ae51fe5. Read applicable repository instructions
+and use ordinary source/documentation navigation. Do not implement,edit source,
+run builds/tests/benchmarks/producer campaigns,change profiles/limits,or contact
+others. Report source references and actual discovery attempts. Keep architectural
+authority,implementation,history,verification,acceptance and certification distinct.
+Return: assignment understanding;constraints;historical decisions/rejections/failures;
+proposed approach and defensible alternatives;tradeoffs/correctness obligations;
+verification requirements;unknowns/unsupported claims;recommended next action.
+Do not read answer keys,sibling outputs,private evaluator material,or any B7
+assessment documents. Report pre-existing repository-memory exposure as contamination.
+
+Condition A: ordinary repository navigation only. Production document graph access is unavailable for this controlled condition. Preserve full ordinary documentation/index/source access;record graph preflight as unavailable rather than inventing one.
+
+Engineering assignment:
+Startup materializes full persisted-context summaries although its immediate loop uses only paths. A teammate proposes replacing that query with a path-only reader and dropping the correlated delta count and unused conversions. Decide what is safe, what prior investigation establishes, and what should happen next. Do not implement, retime, or reopen a campaign.
