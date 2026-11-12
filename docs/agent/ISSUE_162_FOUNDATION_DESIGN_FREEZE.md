@@ -1,5 +1,7 @@
 # Issue #162 foundation design freeze
 
+B4b standing: original design/authoring banners retain their historical subjects. Native foundation and retained transport/facets govern only their approved scope. Later module-facet and canonical-relation records describe bounded implementation; neither payload retention nor a design freeze establishes every consumer/question, current executable verification or language certification.
+
 Agent: Agent MaxHeadRoom
 
 Date: 2026-10-21
@@ -393,3 +395,37 @@ for this design phase. Full native conformance and lifecycle integration remain
 implementation/verification obligations, not assumptions.
 
 FOUNDATION DESIGN: READY TO FREEZE
+
+## Subsequent accepted scope interpretation
+
+### Owner decision — 2026-10-22
+
+**[RE] The owner accepted Verdict B and the question-driven scope interpretation.**
+The governing rule is now:
+
+> No new TypeScript semantic frontier enters implementation merely because it differs from `tsc`. It must have a demonstrated canonical-question → required-fact → authority/dependency → consumer chain. Existing established requirements remain frozen, and publication, persistence, consumer migration, production queryability, completeness, and live verification remain mandatory.
+
+**[ND] Publication and consumption now receive increasing execution priority.**
+Correct internal facts alone do not satisfy #162. This acceptance changes the
+scheduling rule; it does not certify implementation, remove requirements or
+approve a separate global identity/public-contract redesign. Historical pending
+decision language below describes the investigation before this acceptance.
+
+
+Source: [docs/agent/ISSUE_162_SEMANTIC_BOUNDARY_REASSESSMENT.md](ISSUE_162_SEMANTIC_BOUNDARY_REASSESSMENT.md), baseline `ec7067fd`, original section SHA-256 `a819e3afcd8cf060e494653ea1a2f9e6b68edf0e3d0ead87263bb4df5c276ed1`.
+
+
+```architecture-graph
+node: AUTH.ANGULAR_FOUNDATION
+kind: AUTHORITY
+status: FROZEN
+title: ANGULAR FOUNDATION
+track: REPOSITORY
+artifact: docs/agent/ISSUE_162_FOUNDATION_DESIGN_FREEZE.md
+preserves:
+  - AUTH-001
+  - REFINE-001
+  - WSC-012
+  - INV.MECHANISM_REUSE_001
+note: The foundation status imports its explicit source-frozen design; retained transport is scoped to implemented facets. Neither establishes complete consumer support, new approval or certification.
+```

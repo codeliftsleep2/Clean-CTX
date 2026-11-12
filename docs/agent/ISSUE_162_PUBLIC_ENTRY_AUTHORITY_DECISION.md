@@ -1,5 +1,7 @@
 # Issue #162: owning package and public entry authority
 
+B4b owner navigation: [AUTH.ANGULAR_PUBLIC_ENTRY](../architecture/contracts/angular-public-entry.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-50 focused/native/lint and expanded binary acceptance GREEN; final campaign acceptance remains open.
 
@@ -226,48 +228,8 @@ claimed; the unchanged HTTP regression remains expected RED.
 
 ## Located architectural decision
 
-PackageExportEvidence currently retains the nearest owning manifest name and
-compares the declaration with an export resolved from that package root.
-public_api uses that same name as the requested API entry. These contracts
-cannot express an owning package @angular/common and its distinct public
-entry @angular/common/http. Merely changing the Angular comparison to accept
-the root package would not prove the HTTP public export.
-
-Authorize neutral retained evidence that distinguishes the exact owning
-package/manifest from the demanded public module entry and its namespace/export
-comparison. Acquire the route through actual consumed import/re-export evidence
-and the existing resolver/Host. Do not infer a public entry from a declaration
-file path, enumerate arbitrary package APIs or create framework-specific native
-rules. Missing, competing, redirected or unavailable proof remains non-success.
-
-Angular then requires the intended HTTP entry and exact role export, alongside
-the owning package/version/witness proof. Preserve the meaning of existing root
-package proofs for decorators, DI and module consumers. Do not promote a package
-name, matching export name or barrel spelling into public-entry authority.
+Current normative owner: [AUTH.ANGULAR_PUBLIC_ENTRY](../architecture/contracts/angular-public-entry.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Scope and lifecycle
 
-Reuse PackageExportEvidence or a bounded companion within the same retained
-TypeScriptAuthority payload and all existing artifact, semantic generation,
-durable snapshot, dependency currentness, publication and retirement machinery.
-No registry, cache, parallel acquisition owner or publication path. Advance
-existing compatibility for changed payload meaning. Public JSON and EntityRef
-equality remain unchanged. This is required by the existing HTTP functional DI
-consumer, not authorization for new framework APIs or general package closure.
-
-Shared package evidence, Angular API admission and durable retained payload are
-affected. AGENTS.md's Architectural Approval Gate therefore applies before
-implementation; the member-identity approval did not decide this boundary.
-
-Recommended: distinguish package ownership from demanded public-entry proof.
-Cost: bounded native acquisition/transport and Angular admission migration with
-root-proof preservation and subpath mutation/forgery controls.
-
-Rejected: relabel the owning package as the subpath, trust a module string, or
-accept any same-named export under the package. Each loses the required exact
-public-entry join. Deferral leaves HTTP explicitly RED and incomplete.
-
-After approval require the unchanged public HTTP test, root API preservation,
-foreign/same-package namesakes, barrel/config/export-map mutation, complete
-retained proof round-trip, stale restore refusal and real public answers.
-Operator owns Cargo/runtime execution; final Claude testing remains last.
+Current normative owner: [AUTH.ANGULAR_PUBLIC_ENTRY](../architecture/contracts/angular-public-entry.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.

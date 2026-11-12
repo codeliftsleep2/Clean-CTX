@@ -1,5 +1,7 @@
 # Issue #162: native reference admission for value providers
 
+B4b owner navigation: [AUTH.ANGULAR_PROVIDER_VALUE](../architecture/contracts/angular-provider-value.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: bounded W04 V1–V4 reference-admission slice verified; generation-59 deterministic GREEN and corrected binary PASS; W04 remains open.
 
@@ -104,42 +106,11 @@ even where native authority already resolves their exact runtime declarations.
 
 ## Recommended bounded decision
 
-Authorize useValue registration admission for exact supported reference-valued
-positions through existing retained provider-field evidence and native reference
-resolution. Require exact Angular owner/API, providers container, unique provide/
-useValue fields, source/hash/spans and resolved runtime reference occurrence.
-Do not recover missing/type-only/ambiguous/unproved reference evidence from its
-name or spelling. Preserve duplicate/competing-field refusal.
-
-Use the provided token's existing canonical identity for RegistersProvider.
-For the already-established noncanonical ProviderUsesValue strategy projection,
-use the proved declaration name as its label where that reference form is
-admitted. Do not turn that label into canonical strategy identity.
-
-Reuse shared retained provider-position selection, exact native reference
-accessor, resolver/Host, witnesses, source-owned artifacts, semantic generations,
-compatibility, durable session/SQLite transport, publication and retirement.
-No new registry, cache, acquisition owner, resolver or lifecycle. Advance existing
-compatibility for changed producer/consumer meaning. Keep public schema, enum
-values and global EntityRef equality unchanged. Preserve literal and existing
-nonmigrated compatibility behavior within their recorded contracts.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_VALUE](../architecture/contracts/angular-provider-value.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Deliberate limits
 
-This decision repairs demonstrated registration admission only. It does not
-authorize canonical runtime-value equality or a canonical ProviderUsesValue pair.
-A referenced declaration identifies a reference endpoint; it does not by itself
-prove the runtime value of an arbitrary initializer or alias chain.
-
-No primitive-value identity policy, object/array literal identity, expression
-evaluation, function invocation, class construction, arbitrary initializer
-evaluation, provider satisfaction, multi, scope/precedence or injector closure
-is proposed. Existing exact string-token proof remains its own admitted token
-contract and does not become a general value evaluator.
-
-Canonical value-strategy identity must be demonstrated separately through an
-actual consumer/test before selecting its semantic carrier or value policy.
-Class/factory/alias strategy approvals do not pre-authorize that decision.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_VALUE](../architecture/contracts/angular-provider-value.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and approval boundary
 

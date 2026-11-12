@@ -1,5 +1,7 @@
 # Issue #162: declaration identity for provider factory relations
 
+B4b owner navigation: [AUTH.ANGULAR_PROVIDER_FACTORY](../architecture/contracts/angular-provider-factory.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-57 focused/pair/durable/currentness controls GREEN; rebuilt factory binary acceptance PASS; broader certification remains open.
 
@@ -127,45 +129,11 @@ owner approval explicitly excludes factory identity and callable forms.
 
 ## Proposed bounded decision
 
-Authorize canonical ProviderUsesFactory token/target pairs for the demonstrated
-resolved function-declaration target form. The target denotes the actual factory
-function declaration, not the function result or an inferred service class.
-Preserve the existing declaration/string token distinction and name rendering.
-
-Require the exact source-owned Angular provider occurrence, owner/API role,
-providers container, unique provide/useFactory expressions, canonical token
-proof and exact native function-reference span/ID. Independently valid endpoints
-do not establish that this occurrence relates them. Refuse mismatched pairings,
-missing/competing fields, unresolved/ambiguous/type-only targets, malformed or
-shifted occurrence spans, incompatible owner proof and stale evidence.
-
-Share proved-equivalent provider-position selection, native exact-reference
-lookup, span validation and pair comparison with the class-strategy interpreter.
-Keep the target-kind and strategy-field policies explicit and Angular-owned.
-Do not create a second resolver, generic callable evaluator or provider registry.
-
-Reuse existing canonical endpoint variants, retained TypeScript authority,
-source-owned artifacts, witnesses/currentness, semantic generations,
-compatibility, session/durable SQLite transport, publication, index deduplication,
-replacement and retirement. The asserting provider file owns the relation even
-when token and function declarations are external or the token is a string.
-Repeated registrations do not manufacture new endpoint identities; same-named
-distinct functions must remain distinct. Advance existing semantic compatibility
-for changed projection/admission meaning. Keep public JSON and global EntityRef
-equality unchanged, and preserve migrated class/registration/DI/member/module/
-package contracts.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_FACTORY](../architecture/contracts/angular-provider-factory.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Explicit limits
 
-This decision concerns function declarations used as useFactory targets only.
-Arrow/function-expression variables, methods, callable aliases, bound functions,
-arbitrary calls, overload families and richer callable forms require their own
-demonstrated contracts. Existing nonmigrated compatibility behavior must be
-classified and preserved where applicable rather than silently removed.
-
-No factory invocation, result/return-type identity, dependency-list interpretation,
-execution context, scope/precedence, multi behavior, provider satisfaction or
-injector closure follows. No useValue/useExisting expansion is authorized.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_FACTORY](../architecture/contracts/angular-provider-factory.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and approval boundary
 

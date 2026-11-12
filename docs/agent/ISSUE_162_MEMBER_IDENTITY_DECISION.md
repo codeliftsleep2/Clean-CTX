@@ -1,5 +1,7 @@
 # Issue #162: declaration identity for Angular member projections
 
+B4b owner navigation: [AUTH.ANGULAR_MEMBER_IDENTITY](../architecture/contracts/angular-member-identity.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-44 focused, endpoint lifecycle, Clippy and binary acceptance GREEN; remaining acceptance obligations open.
 
@@ -65,31 +67,7 @@ Generation-44 Clippy, expanded lifecycle and binary acceptance remain pending.
 
 ## Approval and implementation checkpoint
 
-Owner approval in the attached Declaration Identity for Angular Member Projections
-decision authorizes the bounded native pair/initializer evidence and existing
-lifecycle reuse. It excludes aliases, generated names, inheritance, overrides,
-template joins and broader closure/certification.
-
-The unchanged RED was frozen through the isolated-index workflow in stash
-302a5a1ecf12f81564bf81edada65d405718dc40 and restored byte-identically:
-SHA-256 ce18bb04e10340f260e1c4ab4fbb9a4c2f614215d928fadbd13ac5c5e93d1d93.
-Normal index and HEAD were untouched.
-
-Native source capture now retains direct call-initializer field declarations,
-their owning class and initializer spans. Duplicate named class members retain
-refusal evidence. This does not change unqualified lexical lookup or capture
-dependency-wide members. Angular joins exact occurrences before projecting the
-existing names with Declaration endpoints. Dedicated member-pair admission
-checks exact owner/member/initializer evidence without broadening general
-declaration admission. The payload follows existing serde/artifact/snapshot
-transport. Semantic generation advances to 44.
-
-Two additional tracked controls exercise forged owner pairing, wrong occurrence,
-duplicate/missing retained evidence and duplicate class fields. The original RED
-and these controls are UNRUN after repair. Complete endpoint restart, selection,
-mutation/retirement and preservation acceptance must be established before this
-bounded identity slice is complete; neither existing carrier reuse nor source
-inspection certifies those gates. No runtime execution was performed here.
+Current normative owner: [AUTH.ANGULAR_MEMBER_IDENTITY](../architecture/contracts/angular-member-identity.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Observed failure
 
@@ -118,25 +96,7 @@ make this test pass.
 
 ## Proposed bounded decision
 
-Authorize demanded native source-owned class-member declaration evidence for
-the established direct initializer consumer, including exact owning class ID,
-member ID, source/hash/spans and initializer occurrence. TypeScript owns these
-language identities independently of Angular role. Preserve refusal of duplicate
-or competing member declarations; do not treat a matching written name as unique
-identity. Do not alter unqualified lexical lookup or inventory every dependency
-class member.
-
-Angular must join that exact retained owner/member pair to its existing proved
-API/owner/initializer occurrence before emitting canonical declaration endpoints.
-Reuse the existing Declaration endpoint variant and source-owned artifact,
-durable snapshot, currentness, index selection and retirement lifecycle. Neutral
-admission validates the specific retained pair and occurrence, rather than
-accepting all declarations indiscriminately. Advance existing semantic payload
-compatibility when meaning changes. No new identity variant, registry or cache.
-
-Keep global EntityRef equality and public JSON schema unchanged. Keep current
-HasInput/HasOutput name values. Binding aliases, generated Change names,
-inheritance, template joins and closure remain separate decisions/questions.
+Current normative owner: [AUTH.ANGULAR_MEMBER_IDENTITY](../architecture/contracts/angular-member-identity.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Affected systems and alternatives
 

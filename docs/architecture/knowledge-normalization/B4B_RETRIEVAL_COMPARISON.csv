@@ -1,0 +1,8 @@
+node,generation,inline_tokens,source_refs_tokens,saved_tokens,saved_percent,nodes,unique_sources,edges,paths,reconstruction,revisions,metadata,completeness,tokenizer
+AUTH.ANGULAR_PUBLIC_ENTRY,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,34584,26219,8365,24.187,8,6,7,8,exact,exact,exact,current and complete,o200k
+AUTH.ANGULAR_OWNER_COMPOSITION,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,37726,29633,8093,21.452,10,8,9,10,exact,exact,exact,current and complete,o200k
+INV.ANG_TPL_002,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,31376,19966,11410,36.365,5,3,4,5,exact,exact,exact,current and complete,o200k
+AUTH.ANGULAR_RESOLVER,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,45836,37917,7919,17.277,11,9,11,11,exact,exact,exact,current and complete,o200k
+AUTH.ANGULAR_LOAD_CHILDREN,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,42612,34525,8087,18.978,10,8,11,10,exact,exact,exact,current and complete,o200k
+DOC-228,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,3882,4053,-171,-4.405,1,1,0,1,exact,exact,exact,current and complete,o200k
+WSC-012,480f9ff69396a1239337ded6ed256e0b0cf9b8ea0eac933c523993d5983d80c8,5500,5646,-146,-2.655,1,1,0,1,exact,exact,exact,current and complete,o200k

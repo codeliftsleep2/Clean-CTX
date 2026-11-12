@@ -1,5 +1,7 @@
 # Issue #162: route-declared provider membership decision
 
+B4b owner navigation: [AUTH.ANGULAR_ROUTE_PROVIDERS](../architecture/contracts/angular-route-providers.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: bounded P1.R1 local acceptance GREEN; generation-66 scoped Rust/lint/guards and route binary PASS (305 + 332 preservation checks); broader repository/field gates open.
 
@@ -242,50 +244,7 @@ contributor resolver is justified.
 
 ## Recommended bounded contract
 
-Start with source-owned const declarations explicitly annotated by the exact
-native @angular/router Routes type, including proved type-import aliases. A
-type-only Routes import may establish a type anchor; it must not authorize a
-runtime token. Require exact package/export/type-reference evidence, source/hash,
-unique initializer association and route-object membership in the admitted root.
-Do not infer authority from a variable named routes, source text containing Routes,
-a matching path or an arbitrary object containing providers.
-
-Admit explicit route-object arrays and nested children arrays under that root.
-Each object's ordinary providers field may reuse the approved direct/local/imported
-const-array/alias/spread provider composition and existing token/strategy limits.
-Imported provider contributors do not become asserting owners. Keep the owner file
-and exact route object as the source of each RegistersProvider fact. Route-array
-root imports, arbitrary route-object spreads, RouterModule/provideRouter calls,
-bootstrap/config merges and activation are separate boundaries unless demonstrated
-and approved; record them as open, not silently supported.
-
-Require a typed private route-occurrence identity anchored to the exact native
-configuration declaration plus actual route-object source/hash/span. Prefer a
-bounded explicit route proof carrier over pretending the object is a class or
-fabricating a DeclarationId for a non-declaration. Reuse existing retained authority
-and endpoint-key transport; audit whether an existing carrier can represent this
-meaning exactly before adding a private variant. Any private addition must have
-unambiguous serde and compatibility handling, complete restore and stale refusal.
-Do not change global EntityRef equality or reinterpret existing class/string keys.
-
-The existing public Route name/path and asserting-file presentation may remain for
-this lower-bound membership slice, provided distinct proved objects are retained
-as separate edge occurrences through indexing and serialization. Require exact
-same-path multiplicity/retirement tests. This does not make the current name-only
-query an exact selector for one route object or provide a complete public scope
-explanation. If the existing external contract cannot preserve those occurrences,
-report the concrete public carrier decision before implementing an API change.
-No new public fields/relation or query-selector design is preapproved here.
-
-Producer and retained admission must replay the same root/object/field/terminal
-path. Missing/forged/crossed/ambiguous proof cannot fall back to generic endpoint
-admission or textual routing nomination. Existing token equality does not associate
-a route registration with a position-specific strategy or effective injector.
-
-Reuse the existing resolver/Host capture, source witnesses, source-owned artifact,
-session/SQLite lifecycle, publication and retirement. Advance semantic/durable
-compatibility as required by the actual retained change. No global traversal cap,
-cache, registry, resolver or independent lifecycle is authorized.
+Current normative owner: [AUTH.ANGULAR_ROUTE_PROVIDERS](../architecture/contracts/angular-route-providers.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and tradeoffs
 

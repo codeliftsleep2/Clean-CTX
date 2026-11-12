@@ -1,5 +1,7 @@
 # Generation 78: bounded remaining preservation and binary proposal
 
+B4b evidence scope: historical banners and later outcomes remain stage-specific. Generation78 local/binary acceptance is distinct from public resolver keys, current-executable validation and full #162/field certification. Existing receipt input drift is recorded in B4B_HISTORICAL_RECEIPTS.csv; no campaign was rerun.
+
 Agent: Agent MaxHeadRoom
 Status: owner approved; Phase A and three-session binary assets authored, UNRUN.
 Generation 78. Public resolver-key expansion remains suspended.
@@ -188,3 +190,13 @@ campaign. Operator owns runtime execution. No binaries/tests/builds are started 
 this proposal. Do not request a Claude environment switch now; broader repository
 verification and final Claude field remain later gates, with Claude last. No broad
 #162 closure or semantic expansion follows from bounded performance acceptance.
+
+```architecture-graph
+node: DOC-228
+kind: RESEARCH
+status: IMPLEMENTED
+title: Generation78 bounded local and binary evidence consolidation
+track: REPOSITORY
+artifact: docs/agent/ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md
+note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+```

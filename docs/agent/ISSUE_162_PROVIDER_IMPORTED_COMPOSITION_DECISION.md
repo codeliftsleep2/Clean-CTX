@@ -1,5 +1,7 @@
 # Issue #162: imported source-declared provider membership
 
+B4b owner navigation: [AUTH.ANGULAR_IMPORTED_ARRAY](../architecture/contracts/angular-imported-array.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; scoped Rust/lint GREEN; generation-65 combined C2/C3 binary acceptance inspected PASS (332 imported-owner + 190 preservation checks); broader repository/field gates open.
 
@@ -173,43 +175,7 @@ durable restoration and publication before those relations may be emitted.
 
 ## Recommended bounded contract
 
-Authorize exact imported const-array and const-alias structural routes for the
-existing Component providers/viewProviders positions. Reuse the native resolver's
-proved alias/barrel/namespace references. Require a source-qualified route at every
-hop: actual occurrence source/hash/span, resolved declaration identity, unique
-retained initializer association and exact terminal provider entry/field proof.
-
-Carry the containing source identity while traversing original retained facets.
-Where independent occurrence evidence is required, retain only demanded neutral
-source-qualified reference proof in the existing TypeScript authority payload and
-its durable lifecycle. Do not reinterpret the owner-only reference_sites vector,
-weaken its existing callers, flatten foreign entries into a synthetic owner array,
-or reread dependencies outside the existing authorized resolver/Host acquisition.
-The precise private representation is an implementation choice within this
-source-qualified proof requirement, not approval for a new general evidence system.
-
-The producer and retained admission must consume the same source-qualified path.
-Use the actual contributor syntax/evidence when syntax is needed; its offsets
-must never address the owner's tree. Preserve existing approved strategy/token
-policies and their refusal rules. No textual lookup, terminal-name recovery,
-arbitrary expression evaluation or new canonical value semantics is authorized.
-
-Keep app.ts/its Component as the asserting owner even when entries and both token
-declarations are external. Reuse RegistersProvider and RegistersViewProvider,
-canonical endpoint identity and established deduplication. Contributor ownership
-is dependency proof, not a replacement subject or an independent registration.
-
-Detect cycles by exact active declaration identity; preserve independently proved
-siblings under the established lower-bound answer contract. Missing, ambiguous,
-type-only, mutable, forged, crossed, stale or unsupported paths cannot gain
-authority from a valid token elsewhere. No new global cap/budget is proposed.
-
-Reuse shared retained authority, source witnesses/currentness, artifact ownership,
-session/SQLite transport, publication/index identity, replacement and retirement.
-Advance existing semantic compatibility and durable compatibility as required by
-changed proof meaning. No public enum/object fields, EntityRef equality change,
-new resolver, registry, cache or independent lifecycle is proposed. A bounded
-private retained-proof extension is part of this explicit approval request.
+Current normative owner: [AUTH.ANGULAR_IMPORTED_ARRAY](../architecture/contracts/angular-imported-array.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and tradeoffs
 

@@ -1,5 +1,7 @@
 # Issue #162: provider strategy relation identity
 
+B4b owner navigation: [AUTH.ANGULAR_PROVIDER_STRATEGY](../architecture/contracts/angular-provider-strategy.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-56 focused controls GREEN and rebuilt binary acceptance PASS; broader certification remains open.
 
@@ -249,35 +251,7 @@ source-owner requirement globally is not an acceptable repair.
 
 ## Proposed bounded decision
 
-Authorize canonical identity for the established ProviderUsesClass relation,
-using the existing declaration/string token variants and exact resolved class
-target. Retain the source-owned provider occurrence and its exact owner,
-providers array, provide expression and useClass expression as the authority
-for the pair. Neither endpoint alone proves the registration relationship.
-
-Validate this specific relation through retained provider-position evidence,
-including exact occurrence, source/hash, Angular owner admission, token proof
-and strategy target proof. Do not admit arbitrary endpoint combinations merely
-because both declarations exist somewhere in retained evidence. Preserve
-duplicate/competing-field and unresolved/type-only refusal.
-
-Reuse the existing source-owned artifact/session/durable/index lifecycle and
-the existing canonical endpoint variants. Source ownership remains with the
-asserting provider file even when token and implementation declarations are
-external. Keep occurrence authority distinct from endpoint value equality so
-repeated registrations do not manufacture distinct token/target identities.
-No new registry, cache, independent acquisition or publication lifecycle.
-
-Keep public JSON and global EntityRef equality unchanged. Declaration labels
-remain declaration names; exact target provenance must follow the proved
-declaration. Advance semantic compatibility for changed retained meaning.
-Preserve constructor, field, module, member and registration admission contracts.
-
-This first decision is bounded to useClass and its already-supported class
-shorthand equivalent. Factory callable identity and admissible forms, useValue
-identity, useExisting, multi, scope/precedence and injector satisfaction remain
-explicit follow-up contracts. No arbitrary evaluator or runtime construction
-claim is authorized. Do not silently generalize this approval to all strategies.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_STRATEGY](../architecture/contracts/angular-provider-strategy.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and affected contracts
 

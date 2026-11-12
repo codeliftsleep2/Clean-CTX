@@ -60,3 +60,15 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 187-199, original section `META-002`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `9a3f6affb9441b3889003488ff7d2003f87c41797504d89762a6044472723082`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: META-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: META-001 Framework Annotations Retain Declaration-Local Ownership and Intelligible Values
+track: REPOSITORY
+artifact: docs/invariants/meta-evidence.md
+preserves:
+  - INV.C22
+note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+```

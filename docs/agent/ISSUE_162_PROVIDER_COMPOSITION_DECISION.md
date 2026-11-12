@@ -1,5 +1,7 @@
 # Issue #162: source-declared provider-array composition
 
+B4b owner navigation: [AUTH.ANGULAR_ARRAY_COMPOSITION](../architecture/contracts/angular-array-composition.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED with structural-authority boundary; generation-63 focused/durable/currentness and lint controls operator-reported GREEN; composition and position binary receipts inspected PASS.
 
@@ -142,42 +144,7 @@ copy the older textual Contributors module lookup into provider resolution.
 
 ## Recommended bounded contract for approval
 
-Authorize source-declared membership through explicit nested Array, Spread and
-resolved same-source const-array initializer routes in the existing admitted
-provider positions. Preserve the exact asserting owner and position all the way
-to the exact terminal provider entry. Start with the demonstrated Component
-forms in both positions; preserve existing ordinary Directive/Module behavior
-without claiming new composed-owner acceptance for untested forms.
-
-This fact records what the supported declaration structure contains. A const
-binding is not a claim that its runtime array can never change. No actual runtime
-provider list, execution-order completeness or immutable runtime-value identity
-is established. Mutable bindings, initializer calls, property evaluation,
-unresolved/ambiguous/type-only routes and unsupported composition must not gain
-authority through names. Known competing/malformed evidence must refuse the
-affected path. Do not silently promote a partial structural answer into complete
-provider or injector closure.
-
-Use existing demanded native DeclarationId/facet/source/hash/reference authority
-for each reference hop. Follow only an exact retained const initializer; detect
-cycles through the active path, preserving independently proved siblings under
-the existing lower-bound answer contract. Do not introduce a global traversal
-cap, budget, registry, cache, resolver or independent lifecycle. Repeated aliases
-or composition occurrences do not create new token identities.
-
-Containment is per source-owned syntax step, not a fabricated geometric claim
-that a const initializer lies inside a decorator's span. Retain/replay the route
-from metadata position to initializer and terminal entry; a valid token elsewhere
-does not prove membership. Do not flatten entries into an unauditable synthetic
-array or globally relax direct-entry span checks. Producer and retained admission
-must consume the same proved path and preserve separately approved strategy limits.
-
-Reuse RegistersProvider and RegistersViewProvider without new relation values or
-schema fields. Do not alter canonical owner/token identity, EntityRef equality,
-source ownership, publication or deduplication meaning. Existing authority can
-carry demanded initializer structure; determine whether any bounded companion
-evidence is necessary during implementation and keep it in the same retained
-payload/lifecycle. Advance semantic compatibility for changed admission meaning.
+Current normative owner: [AUTH.ANGULAR_ARRAY_COMPOSITION](../architecture/contracts/angular-array-composition.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and tradeoffs
 

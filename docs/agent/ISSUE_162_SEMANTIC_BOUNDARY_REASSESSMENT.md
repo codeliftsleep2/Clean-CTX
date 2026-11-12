@@ -6,16 +6,7 @@ Status: investigation and recommended scope; no certification or implementation 
 
 ### Owner decision — 2026-10-22
 
-**[RE] The owner accepted Verdict B and the question-driven scope interpretation.**
-The governing rule is now:
-
-> No new TypeScript semantic frontier enters implementation merely because it differs from `tsc`. It must have a demonstrated canonical-question → required-fact → authority/dependency → consumer chain. Existing established requirements remain frozen, and publication, persistence, consumer migration, production queryability, completeness, and live verification remain mandatory.
-
-**[ND] Publication and consumption now receive increasing execution priority.**
-Correct internal facts alone do not satisfy #162. This acceptance changes the
-scheduling rule; it does not certify implementation, remove requirements or
-approve a separate global identity/public-contract redesign. Historical pending
-decision language below describes the investigation before this acceptance.
+Current normative owner: [AUTH.ANGULAR_FOUNDATION](ISSUE_162_FOUNDATION_DESIGN_FREEZE.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 Evidence labels used throughout:
 

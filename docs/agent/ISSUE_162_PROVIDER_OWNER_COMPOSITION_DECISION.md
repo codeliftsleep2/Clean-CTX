@@ -1,5 +1,7 @@
 # Issue #162: Directive/NgModule declared provider composition
 
+B4b owner navigation: [AUTH.ANGULAR_OWNER_COMPOSITION](../architecture/contracts/angular-owner-composition.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; scoped Rust/lint GREEN; generation-65 combined C2/C3 binary acceptance inspected PASS (332 imported-owner + 190 preservation checks); broader repository/field gates open.
 
@@ -192,46 +194,7 @@ can be reused. No new proof payload or carrier is demonstrated as necessary.
 
 ## Recommended bounded contract for approval
 
-Authorize source-declared composition through the demonstrated nested Array,
-Spread, same-source const-array/const-alias and exact imported const-array/alias
-routes for native/API-proved Directive and NgModule ordinary providers only.
-This extends owner admission for the existing mechanism; it does not introduce
-a different provider interpreter, contributor resolver or initializer evaluator.
-
-Use an explicit shared owner/position policy throughout producer, traversal,
-token/strategy selection, relation admission and subject construction:
-
-| Position | Admitted native owners | Registration subject |
-| --- | --- | --- |
-| providers | Component, Directive, Module | Actual canonical Component, Directive or Module |
-| viewProviders | Component only | Actual canonical Component |
-
-Preserve exact native/API/package evidence, unique owner/metadata container,
-source/hash and per-step containment. Imported occurrences keep their actual
-source-qualified spans and exact native joins at every hop. Reuse the approved
-cycle/sibling/lower-bound contracts and all separately approved token/strategy
-limits. No names, labels or independently valid endpoints may repair missing
-composition/entry authority. Source ownership remains the asserting Angular file.
-
-Reuse RegistersProvider for ordinary entries and preserve RegistersViewProvider's
-existing Component-only meaning. Preserve canonical owner/token identities,
-EntityRef equality, relation enum/schema fields, deduplication and retained
-occurrence multiplicity. Do not render Directive or Module as Component.
-
-Require canonical ordinary registration admission for the three admitted owners
-to replay exact retained owner/position/entry membership, including when composed
-proof has been removed or rejected. This deliberate fail-closed rule prevents
-newly admitted facts from downgrading to generic canonical-endpoint acceptance.
-Preserve established noncanonical direct compatibility behavior within its recorded
-limits; do not allow legacy textual fallback to rescue a composed registration.
-Existing valid direct canonical registrations must remain GREEN.
-
-Reuse existing authority, witnesses/currentness, source-owned artifacts, session/
-SQLite transport, index/publication, replacement and retirement. Advance existing
-semantic compatibility for changed owner/admission meaning. No global limit,
-cache, registry, resolver, new acquisition owner or independent lifecycle is
-authorized by this proposal. Routine private implementation choices inside this
-bounded owner/position policy would not require another approval.
+Current normative owner: [AUTH.ANGULAR_OWNER_COMPOSITION](../architecture/contracts/angular-owner-composition.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and tradeoffs
 

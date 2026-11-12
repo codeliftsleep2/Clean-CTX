@@ -1,0 +1,5 @@
+constant,value,owner,line,source_sha256,registration,disposition
+ANGULAR_MARKER_PRODUCER_GENERATION,6,src/layers/meta/mod.rs,36,d7a20e99c110a06a1be3a28e013714dc3bbb06c0a835d9cb68b0d60301978ea4,src/mcp/compatibility/producer.rs,Owning constant and registration inspected; unchanged; not executable certification
+ANGULAR_SEMANTIC_PRODUCER_GENERATION,78,src/layers/meta/mod.rs,37,d7a20e99c110a06a1be3a28e013714dc3bbb06c0a835d9cb68b0d60301978ea4,src/mcp/compatibility/producer.rs,Owning constant and registration inspected; unchanged; not executable certification
+CANONICAL_PRODUCER_GENERATION,3,src/ir/layers/typescript.rs,29,52afddd27ee5ebcbabdfa60dab314834986a4d4af54553e13f37437ed423b5e5,src/mcp/compatibility/producer.rs,Owning constant and registration inspected; unchanged; not executable certification
+SEMANTIC_INPUT_GENERATION,3,src/ir/layers/typescript.rs,31,52afddd27ee5ebcbabdfa60dab314834986a4d4af54553e13f37437ed423b5e5,src/mcp/compatibility/producer.rs,Owning constant and registration inspected; unchanged; not executable certification

@@ -1,5 +1,7 @@
 # Issue #162: canonical relation publication identity
 
+B4b owner navigation: [AUTH.ANGULAR_CANONICAL_RELATIONS](../architecture/contracts/angular-canonical-relations.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; focused and consolidated regressions GREEN; three-session binary/stdio PASS; final field/completeness verification pending.
 
@@ -16,41 +18,7 @@ remain unverified for the latest changes.
 
 ## Owner approval and implementation checkpoint
 
-The owner explicitly approved this bounded carrier and lifecycle extension.
-Global EntityRef equality, legacy edge-key meaning, public JSON and query
-selectors remain frozen. The proposal below is historical decision context.
-
-Implementation uses optional internal CanonicalEndpoint annotations beside
-EntityRef presentation. Each annotation retains all native declaration identity
-fields losslessly; the subject also retains the asserting decorator site. The
-neutral carrier imports no IR module. EntityRef equality/hash remain unchanged,
-and annotations are skipped by public Serialize. DurableEntityRef explicitly
-stores the annotations with default absence for legacy records. No endpoint
-identity is recovered from a projected filename or name.
-
-Native module projection constructs the annotations from demanded DeclarationId
-values. Artifact/projection/session propagation retains the existing cloned
-SemanticEdge values. Durable snapshot conversion stores/restores annotations;
-compatibility, session currentness, pending transition and index admission
-validate them against the retained native facets/package declarations. Angular
-semantic generation advances from 31 to 32. Legacy facts with no annotations
-keep their existing key behavior and cannot supply canonical proof.
-
-EdgeKey includes the optional annotations in construction and exact matching.
-The existing forward/reverse adjacency retains whole edges; selected_occurrences
-returns each admitted occurrence without a second name-based deduplication.
-remove_file uses the same EdgeKey matching for both adjacency directions, and
-source-generation replacement republishes surviving facts under the same owner.
-No second relation index, ownership mechanism or lock order was introduced.
-
-The regression with corrected Windows presentation assertions was frozen in
-isolated stash `bdde4dae6a773edec14182c1054b858a6e80fbc4` and restored byte-exactly.
-The original observed test/log bytes remain in the earlier RED receipt directory.
-Supplemental tracked coverage now checks two pre-publication facts, duplicate
-publication, source retirement/replacement, real SQLite endpoint round-trip,
-public JSON shape, restart, role mutation and endpoint deletion. These new
-assertions are authored and UNRUN. Neither passing behavior nor completeness is
-claimed. No Cargo/runtime command was started by the agent.
+Current normative owner: [AUTH.ANGULAR_CANONICAL_RELATIONS](../architecture/contracts/angular-canonical-relations.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Demonstrated requirement and RED
 
@@ -86,24 +54,7 @@ that no earlier projection loss also exists.
 
 ## Decision requested
 
-Authorize a bounded extension for migrated canonical TypeScript/Angular relation
-facts: retain typed asserting declaration/site and canonical endpoint identities
-through the existing semantic result, compatibility, durable snapshot and index
-publication lifecycle. Include that evidence in occurrence deduplication,
-selection and retirement for these facts. Missing canonical evidence remains
-legacy projection evidence and cannot be promoted into canonical proof.
-
-Use existing source ownership, generations, witnesses and compatibility machinery.
-Advance producer compatibility if serialized meaning changes. Retain all prior
-facts for non-migrated producers under their established keys. Do not change
-global EntityRef equality, public response schemas, name-based query selectors,
-or add an independent registry/cache/publication lifecycle. Angular interprets
-the relation; TypeScript declaration IDs supply endpoint identity.
-
-The exact internal carrier should be chosen after tracing every serialization,
-replacement, selection and retirement use. Full snapshots of dependency sources
-and whole-program retention remain prohibited. An unavoidable expansion beyond
-this scope must be reported before implementation.
+Current normative owner: [AUTH.ANGULAR_CANONICAL_RELATIONS](../architecture/contracts/angular-canonical-relations.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives
 

@@ -1,58 +1,14 @@
 # Issue #162: exact source-declared resolve membership
 
+B4b owner navigation: [AUTH.ANGULAR_RESOLVER](../architecture/contracts/angular-resolver.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: generation-78 unqualified resolver repair APPROVED and authored, UNRUN; public key question OPEN.
 Approved semantic repair authored; no agent runtime execution.
 
 ## Generation-78 unqualified resolver repair approved and authored, UNRUN
 
-The owner explicitly approves canonical ResolvedBy written-use support from exact
-RouteOccurrence to exact runtime DeclarationId. route_resolvers shares existing
-native ownership and neutral mapping replay. One public relation per object/target
-retains all key occurrences privately. Unique fully proved siblings survive named
-mapping refusal; competing outer fields refuse the container; duplicate inner key
-spellings refuse that key without first/last-wins. Public Resolver grants no
-executable/type/framework eligibility. Public key-specific answers remain OPEN.
-
-The existing RouteDecl resolver branch and object span select legacy replacement
-before emission: owned resolve contribution is suppressed even on canonical refusal;
-outside ownership stays exact generic noncanonical compatibility. All route targets,
-providers and five guard kinds remain independent. Canonical admission is relation-
-specific and replays the same projection; no generic endpoint exception or borrowed
-field/key/target fallback. The existing routing presentation section was relocated unchanged from angular_meta/
-mod.rs into RouteShape::append_meta_section to keep the active module declaration
-file below the size ceiling. Routing/marker behavior remains a preservation gate.
-
-Semantic generation advances to 78; other generations,
-public fields, durable schema/codec and discovery remain unchanged.
-
-The existing neutral carrier now retains the ordinary spelling/pair/key evidence
-of unsupported named values while keeping their values Unsupported and unevaluated.
-This is needed to refuse a duplicate even when its competing value is unsupported;
-no recursive capture/evaluator or new record layout is introduced. Unknown-key
-computed/spread/shorthand structure remains unsupported for canonical membership.
-
-Valid RED/control and original probe/registration bytes were raw-byte isolated
-under target/issue-162/resolve78-approved-isolation/. The six original acquisition
-probes were restored unchanged; only the approved semantic oracle is tightened to
-exact sixteen object/target supports. Existing key-only collision remains a valid
-observation of intentionally unqualified output. New registrations follow restore.
-No Git stash, HEAD or index operation was performed.
-
-Six new control/lifecycle batches cover forged/borrowed membership, broad values,
-partial/duplicate keys and outer fields, unsupported duplicate values, owned
-no-fallback/outside legacy, key support retirement and all relation siblings;
-SQLite/index before queries, cold/warm/refresh/withinPath, owner/target deletion/
-recreation, key/field/object/child/provider/root changes and unchanged-owner target/
-barrel/package/config invalidation, stale restore and repair. The
-[acceptance map](ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md) links obligations to tests.
-
-Handoff: verification/live-acceptance/issue-162/run-route-resolver78-focused.ps1.
-Operator formats unfrozen files, checks sizes, compiles, runs focused production/
-neutral/affected preservation, then Clippy/fmt and original six probes. All post-edit
-gates UNRUN; no agent formatter/Cargo/Node/build/runtime ran. Binary checkpoint,
-full repository and final Claude field stay later. Performance remains deferred.
-Return for separate bounded public-key design after this repair is accepted.
+Current normative owner: [AUTH.ANGULAR_RESOLVER](../architecture/contracts/angular-resolver.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Five association REDs observed; key-only public collision GREEN
 

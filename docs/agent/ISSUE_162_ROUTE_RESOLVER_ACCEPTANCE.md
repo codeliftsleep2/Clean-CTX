@@ -1,45 +1,17 @@
 # Issue #162: generation-78 unqualified resolver membership acceptance
 
+B4b evidence scope: historical banners and later outcomes remain stage-specific. Generation78 local/binary acceptance is distinct from public resolver keys, current-executable validation and full #162/field certification. Existing receipt input drift is recorded in B4B_HISTORICAL_RECEIPTS.csv; no campaign was rerun.
+
 Agent: Agent MaxHeadRoom
 Status: approved production repair authored; all post-edit gates UNRUN.
 
 ## Approved question and limit
 
-Which exact runtime declarations are written under ordinary named resolve mappings
-of this exact admitted native typed-const Routes object? ResolvedBy publishes one
-RouteOccurrence/DeclarationId support, displayed as Resolver written use. Repeated
-keys/values remain neutral evidence. No executable eligibility is certified.
-Which exact public key registers each declaration remains explicitly OPEN and must
-return as a separate bounded public design after this repair is accepted.
+Current normative owner: [AUTH.ANGULAR_RESOLVER](../architecture/contracts/angular-resolver.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Production authority and lifecycle
 
-route_resolvers::project reuses route_objects native ownership, unique outer field,
-ordinary Object, unique decoded key, exact resolve_mapping_at and demanded/runtime
-reference agreement. Repeated distinct keys collapse per exact object/target only.
-Competing outer fields refuse the container; duplicate inner spellings refuse that
-key and retain independently proved unique keys. Ordinary unsupported named values
-retain key spelling/pair evidence without contents evaluation, preventing a refused
-value from hiding a duplicate. Unknown-key spread/computed/shorthand container
-structure cannot certify independently unique mappings. Unresolved named values
-refuse locally. No callable/type/framework evaluator is added.
-
-The real Angular routing stage supplies owned source-object spans before legacy
-resolver edge emission and appends canonical projection. RouteDecl already has a
-separate resolver branch and exact object span, so no new origin carrier is needed.
-Owned weak contribution is suppressed even on refusal. Outside native ownership,
-old generic noncanonical behavior remains. Other relation branches stay independent.
-Relation-specific retained admission replays the same projection for canonical
-ResolvedBy; existing (None,None) compatibility facts remain noncanonical legacy,
-not canonical membership proof. No generic endpoint exception is introduced.
-
-Snapshots, workspace index, SQLite/restore, refresh and mutation witnesses are the
-existing shared lifecycle. The existing routing presentation section was relocated unchanged from angular_meta/
-mod.rs into RouteShape::append_meta_section to keep the active module declaration
-file below the size ceiling. Routing/marker behavior remains a preservation gate.
-
-Semantic generation advances 77 to 78; marker/pipeline,
-enum representation, JSON schema/codec and durable generation do not advance.
+Current normative owner: [AUTH.ANGULAR_RESOLVER](../architecture/contracts/angular-resolver.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Question/evidence matrix
 
@@ -70,3 +42,15 @@ After focused GREEN: inspect actual evidence, then prepare one consolidated
 bounded rebuilt-binary checkpoint; do not treat local tests as production stdio
 acceptance. Full repository and final Claude field gates remain later. Performance
 remains owner-deferred; no broad issue closure follows this slice.
+
+```architecture-graph
+node: DOC-270
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Generation78 resolver repair contract and staged verification map
+track: REPOSITORY
+artifact: docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md
+implements:
+  - AUTH.ANGULAR_RESOLVER
+note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+```

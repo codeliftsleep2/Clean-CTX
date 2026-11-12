@@ -1,5 +1,7 @@
 # Issue #162: retained declaration evidence for module composition
 
+B4b evidence scope: historical banners and later outcomes remain stage-specific. Generation78 local/binary acceptance is distinct from public resolver keys, current-executable validation and full #162/field certification. Existing receipt input drift is recorded in B4B_HISTORICAL_RECEIPTS.csv; no campaign was rerun.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; implementation authored; focused/consolidated relation and lifecycle regressions GREEN; binary/stdio PASS; remaining consumers and final field verification pending.
 
@@ -109,3 +111,15 @@ and isolated registration were frozen in stash
 byte-identically. SHA-256:
 `96354c9a0d2b1227bdd07b9f6c061b366c4c7e229ad59c0dd9e008cfddc19c94`.
 Normal index and HEAD were untouched. No runtime command was run by the agent.
+
+```architecture-graph
+node: DOC-240
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: Bounded retained module declaration evidence and historical lifecycle verification
+track: REPOSITORY
+artifact: docs/agent/ISSUE_162_MODULE_DECLARATION_EVIDENCE_DECISION.md
+implements:
+  - AUTH.TS_RETAINED_EVIDENCE
+note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+```

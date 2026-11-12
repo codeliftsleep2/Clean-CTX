@@ -237,3 +237,42 @@ preserves:
   - WSC-011
 note: Current source-described contract; no witness execution or independent certification is inferred.
 ```
+
+```architecture-graph
+node: INV.ANG_DI_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+preserves:
+  - WSC-012
+note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+```
+
+```architecture-graph
+node: INV.ANG_TPL_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: ANG-TPL-001 Angular Template Ownership and Identity
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+preserves:
+  - SEMDEP-001
+  - WSC-012
+note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+```
+
+```architecture-graph
+node: INV.ANG_TPL_002
+kind: INVARIANT
+status: IMPLEMENTED
+title: ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+depends_on:
+  - INV.ANG_TPL_001
+preserves:
+  - REFINE-001
+note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+```

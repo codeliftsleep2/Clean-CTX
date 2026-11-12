@@ -1,0 +1,39 @@
+id,kind,status,current_owner,scope
+AUTH.ANGULAR_FOUNDATION,AUTHORITY,FROZEN,docs/agent/ISSUE_162_FOUNDATION_DESIGN_FREEZE.md,ANGULAR FOUNDATION
+AUTH.TS_RETAINED_EVIDENCE,AUTHORITY,IMPLEMENTED,docs/agent/ISSUE_162_RETAINED_AUTHORITY_CONTRACT.md,TS RETAINED EVIDENCE
+AUTH.ANGULAR_CANONICAL_RELATIONS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-canonical-relations.md,ANGULAR CANONICAL RELATIONS
+AUTH.ANGULAR_CONSTRUCTOR_TOKENS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-constructor-tokens.md,ANGULAR CONSTRUCTOR TOKENS
+AUTH.ANGULAR_STRING_TOKENS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-string-tokens.md,ANGULAR STRING TOKENS
+AUTH.ANGULAR_MEMBER_IDENTITY,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-member-identity.md,ANGULAR MEMBER IDENTITY
+AUTH.ANGULAR_PUBLIC_ENTRY,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-public-entry.md,ANGULAR PUBLIC ENTRY
+AUTH.ANGULAR_PROVIDER_STRATEGY,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-provider-strategy.md,ANGULAR PROVIDER STRATEGY
+AUTH.ANGULAR_PROVIDER_FACTORY,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-provider-factory.md,ANGULAR PROVIDER FACTORY
+AUTH.ANGULAR_PROVIDER_ALIAS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-provider-alias.md,ANGULAR PROVIDER ALIAS
+AUTH.ANGULAR_PROVIDER_VALUE,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-provider-value.md,ANGULAR PROVIDER VALUE
+AUTH.ANGULAR_DIRECTIVE_PROVIDER,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-directive-provider.md,ANGULAR DIRECTIVE PROVIDER
+AUTH.ANGULAR_VIEW_POSITION,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-view-position.md,ANGULAR VIEW POSITION
+AUTH.ANGULAR_ARRAY_COMPOSITION,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-array-composition.md,ANGULAR ARRAY COMPOSITION
+AUTH.ANGULAR_IMPORTED_ARRAY,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-imported-array.md,ANGULAR IMPORTED ARRAY
+AUTH.ANGULAR_OWNER_COMPOSITION,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-owner-composition.md,ANGULAR OWNER COMPOSITION
+AUTH.ANGULAR_ROUTE_PROVIDERS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-route-providers.md,ANGULAR ROUTE PROVIDERS
+AUTH.ANGULAR_CONFIG_PROVIDERS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-config-providers.md,ANGULAR CONFIG PROVIDERS
+AUTH.ANGULAR_BOOTSTRAP_REFERENCE,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-bootstrap-reference.md,ANGULAR BOOTSTRAP REFERENCE
+AUTH.ANGULAR_INLINE_BOOTSTRAP,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-inline-bootstrap.md,ANGULAR INLINE BOOTSTRAP
+AUTH.ANGULAR_CONFIG_COMPOSITION,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-config-composition.md,ANGULAR CONFIG COMPOSITION
+AUTH.ANGULAR_NESTED_CONFIG,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-nested-config.md,ANGULAR NESTED CONFIG
+AUTH.ANGULAR_LEGACY_BOOTSTRAP,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-legacy-bootstrap.md,ANGULAR LEGACY BOOTSTRAP
+AUTH.ANGULAR_EAGER_COMPONENT,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-eager-component.md,ANGULAR EAGER COMPONENT
+AUTH.ANGULAR_LAZY_COMPONENT,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-lazy-component.md,ANGULAR LAZY COMPONENT
+AUTH.ANGULAR_LOAD_CHILDREN,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-load-children.md,ANGULAR LOAD CHILDREN
+AUTH.ANGULAR_CAN_ACTIVATE,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-can-activate.md,ANGULAR CAN ACTIVATE
+AUTH.ANGULAR_GUARD_KINDS,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-guard-kinds.md,ANGULAR GUARD KINDS
+AUTH.ANGULAR_RESOLVER,AUTHORITY,IMPLEMENTED,docs/architecture/contracts/angular-resolver.md,ANGULAR RESOLVER
+INV.ANG_DI_001,INVARIANT,IMPLEMENTED,docs/invariants/framework-and-tooling.md,ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
+INV.ANG_TPL_001,INVARIANT,IMPLEMENTED,docs/invariants/framework-and-tooling.md,ANG-TPL-001 Angular Template Ownership and Identity
+INV.ANG_TPL_002,INVARIANT,IMPLEMENTED,docs/invariants/framework-and-tooling.md,ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
+META-001,INVARIANT,IMPLEMENTED,docs/invariants/meta-evidence.md,META-001 Framework Annotations Retain Declaration-Local Ownership and Intelligible Values
+INV.INVOCATION_002,INVARIANT,IMPLEMENTED,docs/invariants/invocation.md,INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
+DOC-240,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUE_162_MODULE_DECLARATION_EVIDENCE_DECISION.md,Bounded retained module declaration evidence and historical lifecycle verification
+DOC-270,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md,Generation78 resolver repair contract and staged verification map
+DOC-228,RESEARCH,IMPLEMENTED,docs/agent/ISSUE_162_GENERATION78_BOUNDED_ACCEPTANCE_PROPOSAL.md,Generation78 bounded local and binary evidence consolidation
+DOC-208,IMPLEMENTATION,IMPLEMENTED,docs/agent/ISSUE_157_IMPLEMENTATION_HANDOFF.md,NgModule contributor provenance repair and attributed operator result

@@ -1,5 +1,7 @@
 # Issue #162: declared ApplicationConfig provider membership
 
+B4b owner navigation: [AUTH.ANGULAR_CONFIG_PROVIDERS](../architecture/contracts/angular-config-providers.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-67 scoped Rust/lint GREEN (460 passing executions); integrated binary PASS (config 304, route 305, imported owners 332); broader repository/field gates open.
 
@@ -340,52 +342,7 @@ replace omitted root/object/field proof.
 
 ## Recommended bounded contract
 
-Authorize declared provider membership for a source-owned const variable whose
-explicit annotation resolves to the exact @angular/core ApplicationConfig public
-type, including proved imported type aliases and namespaces. A type-only import
-may prove this type anchor; it grants no runtime eligibility to provider tokens.
-Require the unique native type occurrence within that actual config declaration,
-package/public-entry evidence, const initializer association, source/hash and
-the exact retained object/providers field.
-
-The semantic subject is the real configuration declaration:
-
-    RegistersProvider(ApplicationConfig appConfig, Token)
-
-It is not an application, bootstrap call, Component, route object or provider-array
-contributor. Preserve its existing DeclarationId. Prefer the existing private
-Declaration canonical endpoint and an exact owner site, after auditing key/replay
-meaning; do not fabricate an object declaration or reuse RouteOccurrence identity.
-No new public relation/object fields, global equality change or private identity
-carrier is demonstrated as necessary. Distinct same-named configs in different
-sources retain canonical distinction; competing same-source declarations refuse.
-
-Nominate neutral typed-object structure through the existing resolver/Host capture.
-The Angular consumer must prove the exact native ApplicationConfig root; variable
-names, filenames, object shape or textual ApplicationConfig spelling cannot admit
-it. Retain independent object/field structure and exact source-qualified reference
-proof, using the generation-66 evidence machinery where equivalent. Mutable,
-untyped, foreign, ambiguous, malformed or missing root evidence cannot be rescued
-by an independently valid token or another admitted config elsewhere.
-
-After owner proof, feed its actual providers facet into the shared composition,
-registration-entry, token, strategy and compatibility policies. Admit the already
-approved direct/nested/spread/local/imported const-array and alias provider paths,
-with existing cycle and independently proved sibling behavior. No second provider
-interpreter, textual fallback, arbitrary execution or new callable/value meaning.
-Do not admit viewProviders on a config or reinterpret it as Component view scope.
-
-Canonical config registration and strategy admission must replay the same native
-root/object/providers/composition/entry path, including after proof is removed.
-No downgrade to generic endpoint-only admission. Repeated identical registration
-within one config retains established deduplication; independent config/provider
-removal retires only its source-owned facts.
-
-Reuse witnesses/currentness, artifacts, session/SQLite transport, publication/index
-keys, replacement/retirement and source-qualified imported contributor authority.
-Advance semantic/durable compatibility where required by actual proof changes.
-No resolver, registry, cache, acquisition owner, independent lifecycle, global cap
-or retry policy is authorized by this recommendation.
+Current normative owner: [AUTH.ANGULAR_CONFIG_PROVIDERS](../architecture/contracts/angular-config-providers.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Bootstrap and application-context boundary
 

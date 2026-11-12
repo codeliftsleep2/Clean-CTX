@@ -1,5 +1,7 @@
 # Issue #162: declared view-provider position
 
+B4b owner navigation: [AUTH.ANGULAR_VIEW_POSITION](../architecture/contracts/angular-view-position.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-62 bounded P1.VP1 checkpoint verified; focused/durable/currentness and fmt/Clippy operator-reported GREEN; all 16 split binary suites PASS.
 
@@ -201,35 +203,7 @@ serialization/restore/public answers. No new carrier has been authored.
 
 ## Smallest recommended contract
 
-Authorize one additional typed relation, RegistersViewProvider:
-
-    RegistersProvider(Component, Token)      // ordinary providers
-    RegistersViewProvider(Component, Token)  // viewProviders
-
-Both endpoints keep the existing canonical owner/token identities. The asserting
-file remains the owner. The relation records the declared metadata position,
-not effective visibility. The same Component and token in both positions produce
-two distinct typed facts; repeated identical registrations within one position
-retain established deduplication. Removing one array retires only its fact.
-
-Admit viewProviders only on exact native/API-proved Components. Retain the actual
-metadata field, source/hash, container and entry spans through existing native
-capture. Parameterize shared provider-position selection and admission with an
-explicit Angular position policy. Ordinary providers retain their approved
-Component/Directive/Module owner policy. Do not admit viewProviders on Directive,
-Module, Pipe, Service, foreign/shadow/type-only or unproved owners.
-
-Publish no generic RegistersProvider edge for a view-only entry: that would erase
-the position distinction. Do not fabricate separate endpoint identities or alter
-global EntityRef equality. Preserve separately approved token/strategy policies;
-no new callable/value interpretation is authorized. Existing token-to-strategy
-facts alone do not establish a position-specific strategy association; do not
-claim that richer join from this local registration slice.
-
-Reuse retained authority, source-owned artifacts, witnesses/currentness, durable
-SQLite/session transport, publication/index keys, replacement and retirement.
-Advance semantic compatibility. The deliberate public change is the additional
-relation value, not new object fields or a generic edge-context framework.
+Current normative owner: [AUTH.ANGULAR_VIEW_POSITION](../architecture/contracts/angular-view-position.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Alternatives and tradeoffs
 

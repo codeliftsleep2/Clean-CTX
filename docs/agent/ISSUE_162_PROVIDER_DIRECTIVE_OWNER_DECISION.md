@@ -1,5 +1,7 @@
 # Issue #162: direct Directive provider ownership
 
+B4b owner navigation: [AUTH.ANGULAR_DIRECTIVE_PROVIDER](../architecture/contracts/angular-directive-provider.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-61 provider/durable/currentness batch operator-reported GREEN; rebuilt Directive binary acceptance PASS; bounded P1.D1 checkpoint verified.
 
@@ -132,38 +134,11 @@ owners; this is an owner-admission gap rather than a missing pipeline.
 
 ## Recommended bounded decision
 
-Authorize direct providers metadata on an exact native/API-proved Directive
-through the existing source-owned provider pipeline. Publish RegistersProvider
-with the Directive as subject and the existing canonical provided-token identity
-as object. Preserve Directive identity rather than rendering it as Component.
-
-Reuse the existing provider-array, field, span, token and pair mechanisms with
-explicit Directive owner admission. Existing approved class/factory/alias/value
-strategy policies retain their individual limits; this decision adds an owner
-position, not new target kinds or runtime-value identity.
-
-Require unique compatible native Angular owner/API evidence, the exact providers
-container and source-owned occurrence proof. Foreign, shadowed, type-only,
-competing, missing, forged and stale evidence must fail closed. Pipe and Service
-do not gain provider-owner admission. Preserve Component and Module behavior.
-
-Reuse existing retained authority, witnesses, source ownership, semantic
-compatibility, session/SQLite transport, publication, index identity,
-replacement and retirement. Advance existing semantic compatibility for changed
-admission meaning. No new resolver, registry, cache, lifecycle, public relation
-value, schema field or global EntityRef equality change is proposed.
+Current normative owner: [AUTH.ANGULAR_DIRECTIVE_PROVIDER](../architecture/contracts/angular-directive-provider.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Explicit limits and alternatives
 
-The fact means this Directive directly declares this provider entry. It does
-not prove element-injector instances, effective visibility, precedence, winning
-providers, alias-chain resolution, consumer satisfaction or injector closure.
-viewProviders, route/application/TestBed contexts remain separate obligations.
-
-Recommended: extend the two existing owner guards and preserve the Directive
-subject through shared machinery. Cost: bounded owner-policy and lifecycle
-verification. Rejected: relabel Directive as Component or add a separate provider
-pipeline. Deferral leaves this demonstrated registration gap open.
+Current normative owner: [AUTH.ANGULAR_DIRECTIVE_PROVIDER](../architecture/contracts/angular-directive-provider.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Approval and batched exit criteria
 

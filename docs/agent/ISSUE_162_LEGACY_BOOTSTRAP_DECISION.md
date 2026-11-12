@@ -1,5 +1,7 @@
 # Issue #162: written legacy bootstrap module association
 
+B4b owner navigation: [AUTH.ANGULAR_LEGACY_BOOTSTRAP](../architecture/contracts/angular-legacy-bootstrap.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: generation-72 scoped Rust/lint GREEN (236 passing executions); ecological binary checkpoint inspected PASS (225 legacy + 201 modern + 370 nested); broader repository/field gates open.
 Legacy discovery expansion remains NOT APPROVED.
@@ -149,49 +151,7 @@ lint remain UNRUN after this correction. No agent Cargo/formatter/runtime ran.
 
 ## Approved generation-72 production checkpoint authored, UNRUN
 
-The supplied production owner approval authorizes DeclaresBootstrapModule on the
-exact outer ApplicationBootstrap occurrence for the demonstrated native factory/
-return/member/ordinary Module argument envelope. Global legacy discovery changes
-remain unapproved. No runtime or effective-provider meaning was added.
-
-The unchanged valid RED and registration were raw-byte isolated under
- target/issue-162/legacy-bootstrap72-approved-isolation/ before repair, then restored
-exactly. This is not a Git stash. HEAD and normal index were untouched. An
-additional integrated-test registration was appended after restoration.
-
-legacy_bootstrap::project consumes the verified neutral declared-return/member
-replay, exact public factory export and exact native @angular/core PlatformRef
-return export, then exact ordinary argument-0/reference and shared native class
-role/structure policy for Module. The outer occurrence retains its actual caller
-source/hash/span, public ApplicationBootstrap/bootstrapModule identity and exact
-canonical Module target. Existing modern Component policy is unchanged.
-
-Bootstrap applicability, producer and retained admission use the same projection;
-missing TypeScript proof cannot fall back to endpoints. Existing invocation
-occurrence multiplicity and source-owned lifecycle are reused. Already-demanded
-return-type references now receive package export evidence through the existing
-package capture function; the neutral receiver mechanism is reused unchanged.
-No resolver, cache, registry, new retained payload or legacy discovery policy was
-added. Existing semantic generation advances to 72; compatibility controls move
-to current 72/prior 71. Existing serde enum/payload transport is reused; no durable
-format version is changed solely for the new semantic meaning.
-
-Five integrated controls batch forged/missing/crossed native and target proof,
-unsupported/non-native return/target siblings, complete retained SQLite/index
-restoration before queries, cold/warm/refresh and answers-only withinPath, repeated
-call retirement and target replacement, independent caller deletion, stale
-factory/member/Module/package refusal and unchanged-caller repair. They do not
-certify all 60 approval items merely by being authored. The original four REDs
-and refusal control are byte-identical. The four neutral batches are preserved.
-
-Handoff: verification/live-acceptance/issue-162/run-legacy-bootstrap72-focused.ps1.
-Operator formats only unfrozen files, checks active sizes, compiles, runs legacy/
-neutral controls, semantic compatibility and affected modern/config/inline
-preservation, then fmt/Clippy. All post-repair checks are UNRUN; no agent formatter,
-Cargo/build/Node/binary/runtime execution occurred. Approval-map reconciliation,
-remaining deterministic preservation and a later major binary checkpoint remain
-subsequent gates. A concrete cold/refresh acquisition failure must be returned
-before any discovery policy change. Final Claude field verification stays last.
+Current normative owner: [AUTH.ANGULAR_LEGACY_BOOTSTRAP](../architecture/contracts/angular-legacy-bootstrap.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Intended legacy association RED observed; neutral authority GREEN
 
@@ -218,55 +178,7 @@ No production or test edit accompanies inspection; no agent runtime occurred.
 
 ## Concrete production semantic approval request
 
-Approve DeclaresBootstrapModule from the exact outer ApplicationBootstrap call
-occurrence (display name bootstrapModule, asserting caller file) to the exact
-canonical native Module declaration referenced by ordinary argument 0. Retain
-modern DeclaresBootstrapRoot as Component-only. Reuse the now-tested neutral
-explicit factory-return/member join; no property spelling or independently valid
-factory/method/Module may substitute for exact receiver/call/argument proof.
-
-The Angular consumer must separately establish native factory public export and
-native receiver/member identity under actual package evidence, then require
-source-qualified ordinary-call containment and exact native NgModule role.
-Neutral declared return identity alone grants no Angular role. Require one shared
-producer/retained-admission path, no generic endpoint fallback on missing proof.
-Reuse actual InvocationOccurrence identity, private multiplicity and existing
-session/SQLite/currentness/publication/index lifecycle. Add only the approved
-relation vocabulary and advance existing semantic compatibility for its new
-meaning; review durable compatibility only if actual encoding requires it.
-
-Initially preserve the demonstrated zero-argument factory, ordinary non-optional/
-non-computed member and non-spread named Module argument envelope. Unsupported
-chains preserve modern/config/provider/valid sibling facts. No inherited provider
-registration, active application, Module instance, successful startup, injector
-hierarchy or effectiveness follows.
-
-Alias/barrel/namespace factory references already resolve. Legacy cold/refresh
-caller discovery remains a distinct exit obligation: do not broaden the existing
-modern-only conservative discovery policy without concrete evidence and owner
-approval. A semantic association cannot be claimed complete if required cold or
-refresh callers remain unreachable; return with that exact boundary if observed.
-
-After production approval: isolate unchanged valid RED/registration before repair;
-implement producer and retained admission together; restore exact originals; batch
-public forward/reverse same-name/repeated rows, all neutral/native/position/target
-refusals, forged/crossed/borrowed proof, complete SQLite/index restoration before
-queries, stale caller/factory/return/member/Module/barrel/package/config refusal
-and unchanged-caller repair, independent retirement and modern/config/provider
-preservation. Then lint and one later major rebuilt-binary checkpoint, with each
-suite below 500 checks. Operator owns execution; final Claude field remains last.
-
-Alternatives: direct producer-only edges leave admission incoherent; reusing the
-Component relation changes its contract; name/shape matching loses native method
-identity. Recommended: one bounded legacy relation on the existing exact call
-endpoint consuming shared neutral proof. No new resolver/cache/registry/lifecycle
-or broader receiver evaluator is necessary for the demonstrated envelope.
-
-Owner production disposition is required by the supplied neutral approval, which
-explicitly says not to repair the association RED before returning. AGENTS.md's
-Architectural Approval Gate also applies to the new public relation and native
-Angular role. No further rerun is requested now. Broader P1/P3/AQ14/W04/#162 and
-repository/field gates remain open.
+Current normative owner: [AUTH.ANGULAR_LEGACY_BOOTSTRAP](../architecture/contracts/angular-legacy-bootstrap.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Bounded neutral authority approved and authored, UNRUN
 

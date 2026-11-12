@@ -1,5 +1,7 @@
 # Issue #157: producer provenance repair, static GREEN handoff
 
+B4b evidence scope: subsequent full GREEN is operator-reported without an inspected full-gate transcript; live harness and field acceptance remain unrun. This historical provenance repair does not certify the later native Angular pipeline.
+
 Agent: Agent MaxHeadRoom
 
 Date: 2026-10-20
@@ -237,3 +239,15 @@ Compilation or fixture failures must be classified separately from behavioral
 GREEN. Keep the frozen regression unchanged. After focused GREEN, preservation
 and the authoritative final gate remain in [verification.md](verification.md).
 No live session or binary rebuild is requested at this stage.
+
+```architecture-graph
+node: DOC-208
+kind: IMPLEMENTATION
+status: IMPLEMENTED
+title: NgModule contributor provenance repair and attributed operator result
+track: REPOSITORY
+artifact: docs/agent/ISSUE_157_IMPLEMENTATION_HANDOFF.md
+preserves:
+  - SEMDEP-001
+note: Dated bounded implementation/evidence only; B4b does not rerun its campaign or infer current certification, closure, reclosure or banking.
+```

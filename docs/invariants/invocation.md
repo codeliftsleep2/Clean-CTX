@@ -73,3 +73,15 @@ preserves:
   - PROJ-001
 note: Current source-described contract; no witness execution or independent certification is inferred.
 ```
+
+```architecture-graph
+node: INV.INVOCATION_002
+kind: INVARIANT
+status: IMPLEMENTED
+title: INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
+track: REPOSITORY
+artifact: docs/invariants/invocation.md
+depends_on:
+  - INV.INVOCATION_001
+note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
+```

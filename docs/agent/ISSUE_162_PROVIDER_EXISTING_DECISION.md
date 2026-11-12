@@ -1,5 +1,7 @@
 # Issue #162: existing-token provider aliases
 
+B4b owner navigation: [AUTH.ANGULAR_PROVIDER_ALIAS](../architecture/contracts/angular-provider-alias.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-58 focused/pair/durable/currentness controls GREEN; rebuilt alias binary acceptance PASS; broader certification remains open.
 
@@ -142,67 +144,11 @@ class/factory contracts should be widened. Their approvals explicitly exclude it
 
 ## Recommended bounded contract
 
-Authorize the established source-owned provider pipeline to admit an exact,
-uniquely proved useExisting entry and publish its own canonical token through
-RegistersProvider. The provided token remains distinct from the target token.
-
-Authorize a dedicated ProviderUsesExisting relation whose subject and object
-are canonical ProviderToken endpoints. This is an intentional additional public
-relation value, requiring approval; it does not rename an existing relation.
-Do not encode alias meaning as ProviderUsesClass, ProviderUsesFactory or
-ProviderUsesValue. The target denotes a token, not a constructed class, factory
-result or already-proved winning provider.
-
-Require the exact Angular owner/API, providers container, provide occurrence,
-useExisting occurrence and canonical endpoint pairing. Reuse native resolved
-runtime references and already-proved exact string values where explicitly
-admitted by this decision for either token position. Preserve declaration/object
-versus string identity, same-named declaration distinctions, exact UTF-16 values
-and existing quoted string labels. No arbitrary expression evaluation.
-
-Require unique fields and exact native reference/span joins. Missing, competing,
-type-only, ambiguous, unsupported, forged or stale proof cannot gain alias
-authority through display labels. The existence of two valid tokens elsewhere
-does not establish their association in this provider entry.
-
-Reuse shared provider-position/span/token/pair mechanics with explicit alias
-policy. An alias target is a token: class/function target-kind restrictions from
-the other strategies do not define its contract. Retain source ownership with
-the asserting provider file even when both endpoint declarations are external.
-Keep occurrence/provenance authority separate from endpoint value identity.
-
-Reuse existing endpoint variants, native resolver/Host, retained authority,
-witnesses, generations/compatibility, artifact/session/durable SQLite transport,
-publication, index deduplication, replacement and retirement. No registry, cache,
-new resolver, independent lifecycle or fabricated declaration is proposed.
-Advance compatibility for changed projection/admission meaning. Keep global
-EntityRef equality and public object structure unchanged; the deliberate public
-addition is the new relation enum value and its reachable alias facts.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_ALIAS](../architecture/contracts/angular-provider-alias.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Limits and alternatives
 
-This records an alias assertion at a provider occurrence. It does not prove that
-the target is registered in an applicable injector, that a consumer can reach it,
-which provider wins, runtime alias-chain resolution, cycle behavior, hierarchy,
-scope/precedence, multi semantics or complete satisfaction/closure. Do not
-collapse token identities through alias chains. A target registration elsewhere
-is a separate fact, not a prerequisite invented for this local alias assertion.
-
-Class/factory/value, constructor/field DI, member/module and package/public-entry
-contracts must retain their meanings and preservation coverage. Other provider
-owners/forms remain separate question-driven obligations.
-
-Alternative: admit only RegistersProvider for this entry and leave strategy
-meaning explicitly unrepresented. This is a smaller public change, but leaves
-the concrete AQ08 alias-target question unanswered.
-
-Rejected: reuse a construction/factory relation, equate the two token identities,
-or infer target satisfaction from the alias syntax. Each misstates the fact.
-Deferral keeps useExisting explicitly unsupported and this demonstrated gap open.
-
-Recommended: canonical alias relation plus registration through the shared
-provider pipeline. Cost: bounded producer/admission/enum/schema-consumer audit
-and lifecycle verification, rather than a query-only repair.
+Current normative owner: [AUTH.ANGULAR_PROVIDER_ALIAS](../architecture/contracts/angular-provider-alias.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Approval and verification
 

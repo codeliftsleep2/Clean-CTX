@@ -1,5 +1,7 @@
 # Issue #162 — Retained TypeScript authority contract
 
+B4b standing: original design/authoring banners retain their historical subjects. Native foundation and retained transport/facets govern only their approved scope. Later module-facet and canonical-relation records describe bounded implementation; neither payload retention nor a design freeze establishes every consumer/question, current executable verification or language certification.
+
 Agent: Agent MaxHeadRoom
 Date: 2026-10-22
 Status: implementation contract within approved Phase 3; not implemented or verified.
@@ -116,3 +118,17 @@ type_reference_sites found no consuming implementation. That does not establish
 absence of a required future declaration-metadata consumer. The three observed
 RED positives remain preserved; later negative/lifecycle assertions remain
 unclassified. No repair or test removal is authorized by this record.
+
+```architecture-graph
+node: AUTH.TS_RETAINED_EVIDENCE
+kind: AUTHORITY
+status: IMPLEMENTED
+title: TS RETAINED EVIDENCE
+track: REPOSITORY
+artifact: docs/agent/ISSUE_162_RETAINED_AUTHORITY_CONTRACT.md
+depends_on:
+  - AUTH.ANGULAR_FOUNDATION
+preserves:
+  - SEMDEP-001
+note: The foundation status imports its explicit source-frozen design; retained transport is scoped to implemented facets. Neither establishes complete consumer support, new approval or certification.
+```

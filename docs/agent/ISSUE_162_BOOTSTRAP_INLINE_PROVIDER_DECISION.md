@@ -1,5 +1,7 @@
 # Issue #162: inline bootstrap provider membership
 
+B4b owner navigation: [AUTH.ANGULAR_INLINE_BOOTSTRAP](../architecture/contracts/angular-inline-bootstrap.md) owns the relocated bounded semantic clauses. Original stage approvals, failures, UNRUN checkpoints and execution counts below remain historical; they do not certify today's executable or close the wider campaign.
+
 Agent: Agent MaxHeadRoom
 Status: owner APPROVED; generation-69 focused/preservation/exit Rust GREEN, lint GREEN; bounded binary acceptance inspected PASS; repository/field gates open.
 
@@ -331,36 +333,7 @@ producer. This is a bounded search result, not runtime evidence.
 
 ## Bounded architectural decision
 
-Authorize ordinary, non-spread bootstrap argument 1 Object syntax as a structural
-provider container only when the containing invocation proves the exact native
-public bootstrapApplication API under the existing approved routes. Require a
-unique providers field with exact source/hash/span/call/argument/object/field
-association. Use the actual call InvocationOccurrence as the RegistersProvider
-subject, with public ApplicationBootstrap type/name and asserting caller file.
-Reuse exact token/strategy policies and source-qualified provider composition;
-no textual fallback, copied owner tree offsets or fabricated DeclarationId.
-
-Initially admit only direct inline object syntax. Do not infer contextual native
-ApplicationConfig declaration identity from object shape. Missing/duplicate/
-competing fields or occurrence proof refuse that membership; independently proved
-root association and sibling calls survive. Reuse provider lower-bound semantics
-for unsupported entries. Preserve repeated-call multiplicity and source ownership.
-
-Producer and retained admission must consume the same call/argument/providers path.
-Inventory membership and conservative bootstrap discovery remain candidate-only.
-Reuse existing session/SQLite/publication/index/currentness and retirement. Audit
-whether the existing private retained proof carries every field/entry association;
-if not, document the precise bounded neutral extension before implementation.
-Advance semantic compatibility for the changed owner meaning. No public fields,
-new relation values, resolver, cache, registry, cap or independent lifecycle.
-
-| Option | Tradeoff |
-| --- | --- |
-| Recommended: direct inline declared membership on existing call occurrence | Answers the smallest missing owner question; requires explicit call-owner registration/admission policy and lifecycle controls |
-| Invent an ApplicationConfig declaration for the literal | Misstates identity; reject |
-| Treat all named config registrations as effective bootstrap providers | Crosses runtime/context/precedence authority; reject |
-| Implement mergeApplicationConfig concurrently | Adds argument order, merge/evaluation and provenance decisions; defer to a separate concrete question |
-| Defer inline membership | Preserves current supported boundary but leaves this positive question unresolved |
+Current normative owner: [AUTH.ANGULAR_INLINE_BOOTSTRAP](../architecture/contracts/angular-inline-bootstrap.md). Original clause bytes and chronological context remain available at commit `ec7067fd`.
 
 ## Integrated evidence plan after approval
 
