@@ -276,6 +276,14 @@ claimed newly passed. The authoritative user-owned final gate remains
 `docs/agent/verification.md`; broad Rust suites were deliberately not run for this
 documentation assessment. This PR remains reviewable without fabricating that gate.
 
+## Production migration continuation
+
+This assessment is the historical baseline. Completed migration evidence is
+recorded in [B0/B1 progress](B0_B1_PROGRESS.md) and [B2 subsystem progress](B2_PROGRESS.md).
+The candidate tables above are not a competing current authority: admitted
+source declarations and the focused owners linked by those progress records
+determine current graph standing. C15 and later-batch holds remain explicit.
+
 ## Prepared report declaration
 
 ```architecture-graph

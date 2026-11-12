@@ -159,3 +159,53 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1043-1056, original section `DOTNET-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `8edb8b28a7d8d9be17bd48da3095729f31f91d3e304ee7ac4756afc5e03d7f00`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: EDIT-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: EDIT-001 apply_edit Unit Verification & EOL Preservation
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: MCP-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: MCP-001 MCP Result Envelope Conformance
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: MCP-002
+kind: INVARIANT
+status: IMPLEMENTED
+title: MCP-002 Focused Context Requests Have One Explicit Fidelity Meaning
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: MCP-003
+kind: INVARIANT
+status: IMPLEMENTED
+title: MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: SEL-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: SEL-001 Selector-Value Invariant
+track: REPOSITORY
+artifact: docs/invariants/framework-and-tooling.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

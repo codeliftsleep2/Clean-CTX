@@ -9,9 +9,11 @@ pub(crate) fn descriptor() -> Value {
             "required":["workspaceRoot","mode","tokenizer","tokenBudget"],
             "properties":{"workspaceRoot":{"type":"string","minLength":1},
                 "mode":{"enum":["search","get","history","related","context"]},
+                "responseFormat":{"enum":["inline_v1","source_refs_v1"],"description":"Default inline_v1 preserves version 1 bytes. Explicit source_refs_v1 is context-only and returns version 2 with exact shared sources and per-node references."},
                 "id":{"type":"string","minLength":1},"track":{"type":"string","minLength":1},
                 "text":{"type":"string","minLength":1,"description":"SQLite FTS5 expression, bound as data"},
                 "tokenizer":{"enum":["cl100k","o200k"]},"tokenBudget":{"type":"integer","minimum":1},"maxNodes":{"type":"integer","minimum":1},"maxEdges":{"type":"integer","minimum":1}},
+            "allOf":[{"if":{"required":["responseFormat"],"properties":{"responseFormat":{"const":"source_refs_v1"}}},"then":{"properties":{"mode":{"const":"context"}}}}],
             "oneOf":[{"properties":{"mode":{"const":"search"}},"not":{"required":["id"]}},
                 {"properties":{"mode":{"enum":["get","history","related","context"]}},"required":["id"],
                     "not":{"anyOf":[{"required":["track"]},{"required":["text"]}]}}]}})
@@ -22,7 +24,14 @@ pub(crate) fn handle(id: &Value, params: &Value, state: &McpState) {
         let value = params
             .get("arguments")
             .ok_or(crate::pcg::Error("invalid_request"))?;
-        for name in ["id", "track", "text", "maxNodes", "maxEdges"] {
+        for name in [
+            "id",
+            "track",
+            "text",
+            "maxNodes",
+            "maxEdges",
+            "responseFormat",
+        ] {
             if value.get(name).is_some_and(Value::is_null) {
                 return Err(crate::pcg::Error("invalid_request"));
             }

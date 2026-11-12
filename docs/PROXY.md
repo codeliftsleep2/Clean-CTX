@@ -320,30 +320,7 @@ The `dummy` auth token is intentional — auth is handled by the Copilot bridge 
 
 ### Request Flow
 
-```
-Client (Cline, Copilot, Cursor, etc.) → Proxy (127.0.0.1:8787) → AI API (Anthropic, OpenAI, DeepSeek, etc.)
-```
-
-1. Client sends a normal API request (`/v1/messages` or `/v1/chat/completions`)
-2. Proxy intercepts it, parses the JSON body
-3. **Platform detection** determines the API format (Anthropic, OpenAI, or Generic)
-4. **Transforms** are applied (tool drop, ANSI strip, Bash trim, model override, secret scrub, tool filtering)
-5. **Cache breakpoints** are injected (Anthropic only)
-6. Modified request is forwarded to the upstream API
-7. Response is returned to the client unchanged
-
-Non-intercepted requests pass through untouched.
-
-### Transform Pipeline
-
-The proxy applies transforms in this order:
-
-1. **Tool Drop** — Removes unused tools from `body.tools[]`
-2. **ANSI Strip** — Removes `\x1B[...m` escape sequences from text blocks
-3. **Bash Git Trim** — Truncates Bash description at "Committing changes"
-4. **Model Override** — Rewrites model name in `model` field and system blocks
-5. **Secret Scrub** — Redacts AWS keys, GitHub tokens, JWTs, PEM keys, etc.
-6. **Tool Filtering** — Compresses verbose tool output using TOML-based filters
+Current normative owner: [Proxy request transformation boundary](architecture/contracts/proxy-transforms.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Tool Output Filtering
 
@@ -389,33 +366,11 @@ Filters are loaded from TOML files in the `filters/` directory. You can add cust
 
 ### Secret Scrubbing
 
-The proxy detects and redacts secrets in tool results:
-
-- AWS access keys (`AKIA...`)
-- GitHub tokens (`ghp_...`, `gho_...`)
-- JWTs (`eyJ...`)
-- PEM private keys
-- Authorization headers
-- Database URLs
-- Stripe keys (`sk_live_...`)
-- Slack tokens (`xoxb-...`)
-- Google API keys (`AIza...`)
-- OpenAI keys (`sk-...`)
-- PyPI tokens (`pypi-...`)
-- Vault tokens (`hvs...`)
-
-Secrets are replaced with `[REDACTED]` before they reach the LLM.
+Current normative owner: [Bounded proxy secret scrubbing](architecture/contracts/proxy-secrets.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Cache Breakpoint Strategy
 
-The proxy follows the same proven strategy as [Pino](https://github.com/esetnik/pino):
-
-- **Tools slot** gets a 1-hour TTL (via the `extended-cache-ttl` beta header)
-- **System slot** targets the largest system block, avoiding waste on small blocks
-- **Messages[0] slot** caches the first user message content
-- **Tail slot** is a rolling cache that moves forward with each conversation turn
-
-Any existing `cache_control` headers sent by the client are stripped first to avoid conflicts.
+Current normative owner: [Proxy request transformation boundary](architecture/contracts/proxy-transforms.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Transform Details
 

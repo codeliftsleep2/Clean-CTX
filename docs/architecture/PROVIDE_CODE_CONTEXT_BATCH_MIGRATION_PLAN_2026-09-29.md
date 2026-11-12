@@ -1,5 +1,7 @@
 # `provide_code_context` Batch Migration Plan
 
+B2 authority navigation: The focused [batch contract](contracts/context-batch.md) owns request composition; [context channels](contracts/context-channels.md) owns current output modes. The retained initial output proposal and mirrored measurements below are historical, not an unconditional current channel contract.
+
 **Date:** 2026-09-29  
 **Status:** Complete — Phases 0–8, Checkpoints A–H, tracked regressions, live
 acceptance, architectural audit, and final repository gate are GREEN
@@ -201,35 +203,7 @@ The following are non-negotiable unless separately approved:
 
 ### 5.1 Mutually exclusive forms
 
-`provide_code_context.inputSchema` will accept exactly one of:
-
-1. the existing single form containing `filePath`; or
-2. the batch form containing `files`.
-
-Supplying both `filePath` and `files` is invalid. A batch request contains:
-
-- optional shared `workspaceRoot`;
-- optional shared `tokenizer`;
-- required `files` array.
-
-Each item contains:
-
-- required unique non-empty string `id`;
-- required non-empty string `filePath`;
-- optional `intent`;
-- optional `fidelity`;
-- optional `focusMethods`.
-
-Items may not override `workspaceRoot` or `tokenizer`. This keeps authorization
-and accounting policy explicit at one level and avoids two competing scopes in
-one request.
-
-### 5.2 Why items are heterogeneous
-
-Heterogeneity here means per-item retrieval mode, not different tools. One item
-may request an overview while another requests an Edit-focused body. This is
-essential for the main workflow: inexpensive surrounding context plus exact
-authority only where an edit is planned.
+Current normative owner: [Ordered authoritative context batches](contracts/context-batch.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### 5.3 Duplicate paths
 

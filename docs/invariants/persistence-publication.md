@@ -51,3 +51,33 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 921-933, original section `PUB-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `7b66271a98cd1ae8622eea43b200454c9bf198fc180b65e3981fbc54ae1a1192`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: PERSIST-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: PERSIST-001 Automatic Checkpoints Are Policy; Accepted Mutations Are Durable Authority
+track: REPOSITORY
+artifact: docs/invariants/persistence-publication.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: PERSIST-002
+kind: INVARIANT
+status: IMPLEMENTED
+title: PERSIST-002 Durable Authority Requires Scoped Compatibility Evidence
+track: REPOSITORY
+artifact: docs/invariants/persistence-publication.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: PUB-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: PUB-001 Same-Owner Semantic Publication Is Source-Ordered
+track: REPOSITORY
+artifact: docs/invariants/persistence-publication.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

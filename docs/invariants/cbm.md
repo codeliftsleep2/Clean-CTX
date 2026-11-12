@@ -160,3 +160,109 @@ existing search/readiness controls remain in `workspace_query_8.rs`,
 `workspace_query_9.rs`, and `workspace_query_provider_readiness.rs`.
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 874-907, original section `CBM-OPTIONAL-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `14c5550092bdf1649bc0d6822ae3188bee9c418ec93017cd32fa17555bd0b09d`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: INV.CBM_ID_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_LIFE_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-LIFE-001 Optional Provider Never Gates Core MCP Readiness
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+preserves:
+  - INV.CBM_OPTIONAL_001
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_CACHE_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-CACHE-001 Canonical Project-Owned Graph Cache
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+preserves:
+  - INV.CBM_ID_001
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_E_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-E-001 Explicit CBM Error Propagation
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_IDENTITY_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-IDENTITY-001 Trace Source Resolution Never Guesses
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_WIRE_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_WIRE_002
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Column-Shape-Driven Edge Extraction
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_VERIFY_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-VERIFY-001 Per-Result Caller Verification for `search_graph`
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_VERIFY_002
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-VERIFY-002 Verified Caller Identity Is Retained and Candidate Discovery Reuses the Project-Scoped Graph Cache
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: INV.CBM_OPTIONAL_001
+kind: INVARIANT
+status: IMPLEMENTED
+title: CBM-OPTIONAL-001 Optional Providers Change Cost, Not Core Truth
+track: REPOSITORY
+artifact: docs/invariants/cbm.md
+preserves:
+  - WSC-014
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

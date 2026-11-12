@@ -1,5 +1,7 @@
 # `has_cycle` semantic policy and cycle-witness proposal
 
+B2 authority navigation: The focused [cycle witness contract](contracts/cycle-witness.md) owns the implemented outcome. The retained code-authority findings and proposed response sections describe the pre-migration investigation; they are not a second current response authority.
+
 **Status:** Complete locally; targeted verification GREEN; repository-wide suite remains CI-owned
 **Recorded:** 2026-09-27  
 **Current production surface:** `workspace_query(type = "has_cycle")`  
@@ -25,24 +27,7 @@ breaking change to the existing `has_cycle` field.
 
 ## Implementation outcome (2026-09-27)
 
-- `kind` is optional, defaults to `dependency`, and rejects unknown values.
-- Eligible relations are exactly `Injects` and `ImportsModule`.
-- `WorkspaceIndex` owns one iterative deterministic closed-witness primitive;
-  the compatible boolean delegates to it.
-- Query-local outgoing-edge ordering makes equivalent insertion histories
-  select the same witness. Full cost includes node/edge sorting, not only DFS.
-- Witness steps retain asserting-file provenance. Semantic tuple collisions are
-  explicitly listed with their admitted occurrence files.
-- MCP structured and model-facing responses report
-  `indexed_evidence_only` and `source_complete=false`.
-- The operation performs no discovery, hydration, source compilation,
-  persistence, rendered-context publication, or compression-statistics write.
-- Tracked authorities are `src/tests/workspace/index_cycle_policy.rs` and
-  `src/tests/mcp/workspace_query_cycle_witness.rs`, with existing WSC-004 suites
-  retaining scope-security authority.
-
-Phase 0 findings and the four decisions awaiting approval are recorded in
-`HAS_CYCLE_PHASE0_SEMANTIC_AUDIT.md`.
+Current normative owner: [Scoped indexed cycle witnesses](contracts/cycle-witness.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## 2. Code-authority findings
 

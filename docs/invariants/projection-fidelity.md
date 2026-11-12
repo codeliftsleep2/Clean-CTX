@@ -122,3 +122,13 @@ artifact: docs/invariants/projection-fidelity.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
 ```
+
+```architecture-graph
+node: WSC-006
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware
+track: REPOSITORY
+artifact: docs/invariants/projection-fidelity.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

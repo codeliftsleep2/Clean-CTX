@@ -185,12 +185,7 @@ authority and separate CBM reindexing for graph freshness.
 
 ## Mutation authority
 
-apply_edit requires explicit file authority, current tracked source, a selector
-that identifies one declaration, a current-source precondition, and compatible
-canonical/semantic authority where required. Strong selectors address
-declaration-local signature identity; legacy/name-only selectors succeed only
-when unique. Ambiguity fails closed. Physical source is revalidated immediately
-before commit. Atomic replacement is not authority to overwrite external edits.
+Current normative owner: [Exact source mutation authority](contracts/source-mutation.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## Evidence classes and production owners
 
@@ -201,3 +196,21 @@ Production owners include src/workspace/index/**; query/prepare.rs and
 coverage.rs; query/angular_templates.rs; query/csharp_resolution.rs and its
 dependencies module; mcp/durable_semantics.rs and compatibility validation;
 mcp/tool_handlers/edit.rs; and cbm/client/**.
+
+```architecture-graph
+node: AUTH.SEMANTIC_MODEL
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Source-qualified semantic authority composition
+track: REPOSITORY
+artifact: docs/architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md
+preserves:
+  - AUTH-001
+  - WSC-012
+  - WSC-013
+  - WSC-014
+  - SEMDEP-001
+  - PROJ-001
+  - WSC-019
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

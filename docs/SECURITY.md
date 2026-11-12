@@ -7,25 +7,13 @@
 
 ## Security Posture
 
-The core `clean-ctx` MCP transport is local stdio and can run without network
-access. The complete workspace is not categorically network-free: CBM can be
-launched as a subprocess, and the separately built `clean-ctx-proxy` is an HTTP
-service that forwards requests to a configured upstream. Air-gapped deployment
-therefore requires disabling those optional integrations and provisioning Cargo
-dependencies offline.
-
----
+Current normative owner: [Network and data-handling boundaries](architecture/contracts/network-effects.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## Compliance Checklist
 
 ### Network
 
-| Requirement | Status | Detail |
-|-------------|--------|--------|
-| Core MCP transport | Local | `clean-ctx` serves JSON-RPC over stdin/stdout. |
-| CBM integration | Optional subprocess | May launch and exchange JSON-RPC with a configured local CBM process. |
-| HTTP proxy | Optional network service | `clean-ctx-proxy` listens locally and forwards to its configured upstream. |
-| Air-gapped mode | Supported by configuration | Do not enable/use CBM or the proxy; vendor dependencies for offline builds. |
+Current normative owner: [Network and data-handling boundaries](architecture/contracts/network-effects.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Supply Chain
 
@@ -44,25 +32,11 @@ dependencies offline.
 
 ### Data Handling
 
-| Requirement | Status | Detail |
-|-------------|--------|--------|
-| Data at rest | Configurable | Persistence defaults to SQLite at `.clean-ctx/persistence.db`; CBM and proxy caches/logs may also write under configured locations. |
-| Source mutation | Explicit | `apply_edit` is an authorized write surface with exact-source and transactional guards. |
-| Data in transit | Boundary-dependent | MCP is local stdio; the optional proxy forwards prompts/tool data to its configured upstream. |
-| Secret scrubbing | Proxy feature | Scrubbing reduces accidental disclosure but is not a substitute for upstream trust or least privilege. |
+Current normative owner: [Network and data-handling boundaries](architecture/contracts/network-effects.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Source and workspace boundaries
 
-| Boundary | Contract |
-|----------|----------|
-| `workspaceRoot` | Establishes the primary trusted filesystem root for resolution, hydration, and file-local compilation. Pass it explicitly. |
-| `additional_roots` | Expands the authorized root set only through configuration; a request cannot invent a new trusted root. |
-| `withinPath` | Narrows an already authorized workspace. It never becomes a root and is rejected when outside the authorized root set or when `workspaceRoot` is absent. |
-| Hydration | Name-bearing workspace queries may discover and compile candidates only inside authorized roots; `has_cycle` is index-only and never hydrates. |
-| `entities_in_file` | Compiles the explicit trusted file when needed and replaces stale semantic facts, including replacing them with an empty projection. |
-| Returned paths | Paths returned by Clean-CTX are authoritative; callers must not derive filesystem paths from namespaces or CBM project slugs. |
-
----
+Current normative owner: [Trusted workspace roots](architecture/contracts/trusted-roots.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## Binary Verification
 

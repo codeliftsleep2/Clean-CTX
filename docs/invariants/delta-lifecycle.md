@@ -75,3 +75,33 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 403-415, original section `IRDELTA-003`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `489cc197e50ae85f7774df927fe98c73d360dee6de3a0cfee22629ebe77770b7`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: DELTA-001
+kind: INVARIANT
+status: IMPLEMENTED
+title: DELTA-001 Delta Correctness
+track: REPOSITORY
+artifact: docs/invariants/delta-lifecycle.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: IRDELTA-002
+kind: INVARIANT
+status: IMPLEMENTED
+title: IRDELTA-002 Explicit Code-Side Delta Acknowledgement
+track: REPOSITORY
+artifact: docs/invariants/delta-lifecycle.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: IRDELTA-003
+kind: INVARIANT
+status: IMPLEMENTED
+title: IRDELTA-003 Delta Statistics Mirror the Successful Response Lifecycle
+track: REPOSITORY
+artifact: docs/invariants/delta-lifecycle.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

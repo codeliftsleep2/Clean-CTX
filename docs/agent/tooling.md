@@ -809,3 +809,19 @@ returns rather than reconstructing it.
 
 These are not CBM proxy tool names. They are implemented internally via
 `query_graph` Cypher. The proxy will not forward them correctly.
+
+```architecture-graph
+node: AUTH.TOOL_WORKFLOW
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Clean-first tool and namespace workflow
+track: REPOSITORY
+artifact: docs/agent/tooling.md
+preserves:
+  - MCP-001
+  - MCP-002
+  - MCP-003
+  - WSC-004
+  - INV.CBM_OPTIONAL_001
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

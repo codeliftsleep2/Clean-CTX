@@ -353,30 +353,7 @@ M processData p:payload:$s → $b ctl:IF,RET
 
 ### Corrected Sequence Delta Envelope (`dv:2`)
 
-```json
-{
-  "dv": 2,
-  "file": "α1",
-  "from": 1,
-  "to": 2,
-  "target_hash": "…",
-  "edits": [
-    {
-      "op": "insert",
-      "at": 2,
-      "value": {
-        "identity": {"opcode": "DEF_METHOD", "key": ["DEF_M", "C1", "M3"]},
-        "occurrence": 0
-      },
-      "instruction": ["DEF_M", "C1", "M3", "newMethod"]
-    }
-  ],
-  "intent": null
-}
-```
-
-Legacy `+` / `~` / `-` envelopes are decode-only compatibility input.
-Production generation emits only occurrence-aware `dv:2` sequence edits.
+Current normative owner: [Occurrence-aware sequence delta transport](architecture/contracts/delta-sequence.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Compact Delta Format
 

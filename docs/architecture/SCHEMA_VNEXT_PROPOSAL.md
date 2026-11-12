@@ -5,6 +5,8 @@ path collapse, A3 generated import-handle collapse, and B5 overload correction
 are implemented and production-recaptured. Real-workspace Claude evaluation is
 ongoing post-ship validation, not a prerequisite for production status.
 
+**B2 ownership:** The [focused presentation contract](contracts/presentation-vnext.md) and [token economics](contracts/token-economics.md) own the extracted current propositions. Retained candidate, audit and phase sections preserve historical alternatives and execution evidence; they do not create competing current authority. B4 and Tier C remain deferred under their existing prerequisites.
+
 **Document history:** The filename is retained as a stable link from earlier
 design and measurement records. This document is no longer a proposal; it is
 the current presentation contract plus the migration and evaluation record that
@@ -55,25 +57,7 @@ semantic omission and are therefore out of scope.
 
 ## 2. Current production boundary
 
-The representation layers remain deliberately separate:
-
-```text
-Canonical semantics
-  CompiledIR + aligned semantic edges
-          |
-          +--> Binary 0x04 / dv:2        code-side persistence and transport
-          |
-          +--> workspace_query           on-demand cross-file and detailed facts
-          |
-          `--> SCHEMA-vNext              model-facing file-local presentation
-                    |
-                    `--> raw source      when the complete presentation is not
-                                          safely cheaper, or when explicitly
-                                          requested as Verbatim
-```
-
-SCHEMA-vNext remains a projection. It is not canonical storage,
-an edit protocol, a delta protocol, or a substitute for `workspace_query`.
+Current normative owner: [Model-facing presentation and canonical separation](contracts/presentation-vnext.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Current measured checkpoint
 
@@ -113,28 +97,7 @@ false/redundant annotation behavior.
 
 ## 3. Non-negotiable invariants
 
-Every candidate must preserve these boundaries:
-
-1. **No semantic omission disguised as compression.** Required facts for the
-   selected fidelity remain available either in the presentation or through an
-   already-declared on-demand boundary.
-2. **No fabricated identity.** Presentation scoping may elide internal IDs only
-   after checked ownership has resolved them; it may never replace unresolved
-   identity with a guess.
-3. **No loss of order or duplicates where they are meaningful.** A shorter
-   layout cannot silently convert an ordered occurrence stream into a set.
-4. **No exact-body transformation.** Edit bodies remain byte-exact according to
-   the existing body contract. Verbatim remains the whole-document escape hatch.
-5. **No assumed conversational state.** A prior response, prompt-resource read,
-   or cache hit is not schema acknowledgement.
-6. **No tokenizer-by-character reasoning.** Every candidate is measured using
-   actual target tokenizers or an explicitly bounded approximation.
-7. **Raw continues to win ties.** The final economics selector remains outside
-   the renderer and compares complete alternatives with the same tokenizer.
-8. **Canonical state is unchanged.** Presentation collapses do not remove facts
-   from `CompiledIR`, hierarchy, Binary `0x04`, persistence, or `dv:2`.
-
----
+Current normative owner: [Model-facing presentation and canonical separation](contracts/presentation-vnext.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## 4. Static cost findings
 
@@ -211,24 +174,7 @@ combined candidate is permitted.
 
 #### A1. Single path occurrence
 
-Current:
-
-```text
-// ── α1 (C:\workspace\src\service.ts) ──
-§PATHMAP
-  α1 = C:\workspace\src\service.ts
-```
-
-Candidate:
-
-```text
-// α1
-§PATHMAP
-  α1 = C:\workspace\src\service.ts
-```
-
-The alias remains visible at the file boundary and the authoritative mapping
-still supplies the exact path. Multi-file outputs remain request-scoped.
+Current shipped grammar owner: [presentation contract](contracts/presentation-vnext.md). Original pre/post examples and evaluation chronology are retained at commit `9400d476`.
 
 #### A2. Return-derived pattern collapse
 
@@ -251,9 +197,7 @@ this rule under `IRFACT-002`.
 
 #### A3. Remove unreferenced import handles
 
-Drop the internal import handle only after a production-corpus assertion proves
-that it is not referenced elsewhere in the visible document and is not a
-source-written alias with user-facing meaning.
+Current shipped grammar owner: [presentation contract](contracts/presentation-vnext.md). Original pre/post examples and evaluation chronology are retained at commit `9400d476`.
 
 #### A4. Reduce checked pattern-owner IDs without losing visible attribution
 
@@ -294,46 +238,7 @@ rather than silently redefining SCHEMA-v5.
 
 #### B1. Remove the method scope arrow
 
-Candidate:
-
-```text
-M methodB → void
-M find p:id:string → Order mod:PUBLIC ctl:RET
-```
-
-The single remaining arrow always introduces the return type. Parameters are
-introduced by `p:`. This removes repeated syntax and the visually confusing
-`→ →` shape without making the grammar positional or ambiguous.
-
-#### B2. Replace decorative class comments with a typed record
-
-Current:
-
-```text
-// ── OrderService ──
-```
-
-Candidate:
-
-```text
-C OrderService
-```
-
-`C` becomes the class counterpart to the existing `Q` interface record. This
-is expected to tokenize more predictably than comment punctuation and box-drawing
-characters, but the target tokenizers decide.
-
-#### B3. Group fields at all body-free fidelities
-
-Candidate:
-
-```text
-F id:number name:string email:string
-```
-
-Field order and type information remain intact. If reasoning tests show that a
-single field per line materially improves selection or comparison, this item is
-rejected regardless of token savings.
+Current shipped grammar owner: [presentation contract](contracts/presentation-vnext.md). Original pre/post examples and evaluation chronology are retained at commit `9400d476`.
 
 #### B4. Tokenizer-selected marker vocabulary
 
@@ -635,20 +540,7 @@ negotiation, cold fallback, and cached-versus-uncached measurement.
 
 ## 11. Compatibility and lifecycle requirements
 
-- SCHEMA-vNext is the production presentation. SCHEMA-v5 remains the recorded
-  baseline for the experiments that justified the migration.
-- The grammar change received a new visible version and did not silently
-  reinterpret `SCHEMA v5`.
-- Persistence does not migrate stored presentation text. Restore/replay decode
-  canonical state and regenerate the current approved presentation.
-- Binary `0x04`, `dv:2`, semantic-edge persistence, and workspace-query
-  contracts do not change.
-- Exact-body and `byte_exact` metadata contracts do not change.
-- Cache breakers derive from the rendered baseline, so v5 and vNext payloads
-  cannot share an acknowledged baseline.
-- Raw fallback remains byte-exact and carries no schema wrapper or `PATHMAP`.
-
----
+Current normative owner: [Model-facing presentation and canonical separation](contracts/presentation-vnext.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## 12. Stop conditions
 

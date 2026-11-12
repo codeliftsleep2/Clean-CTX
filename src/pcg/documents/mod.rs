@@ -2,6 +2,7 @@
 mod model;
 mod parse;
 mod profile;
+mod response;
 mod scan;
 mod store;
 mod traversal;
@@ -32,6 +33,8 @@ pub struct Request {
     pub max_nodes: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_edges: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub response_format: Option<String>,
 }
 pub struct Session {
     trusted: Result<Trusted>,
@@ -105,6 +108,11 @@ impl Session {
             ["search", "get", "history", "related", "context"].contains(&q.mode.as_str()),
             "invalid_request",
         )?;
+        let source_refs = match q.response_format.as_deref() {
+            None | Some("inline_v1") => false,
+            Some("source_refs_v1") if q.mode == "context" => true,
+            _ => return Err(Error("invalid_request")),
+        };
         require(
             q.token_budget > 0 && q.token_budget <= trusted.profile.token_budget,
             "request_limits",
@@ -194,6 +202,9 @@ impl Session {
             "freshness":"observed_boundaries_only","continuous_currentness":false,"atomic_filesystem_snapshot":false,
             "scope":{"workspaceRoot":trusted.profile.workspace_root,"documentRoots":trusted.profile.document_roots},
             "budget":{"limit":q.token_budget,"tokenizer":q.tokenizer,"accounting":"serialized_mcp_result_v1"}});
+        if source_refs {
+            response::source_refs(&mut payload)?;
+        }
         let encode = |value: &Value| -> Result<String> {
             let text = identity::canonical(value);
             Ok(identity::canonical(
@@ -204,6 +215,9 @@ impl Session {
         if tokenizer.count_tokens(&serialized) as u64 > q.token_budget {
             payload["documents"] = json!([]);
             payload["historical_documents"] = json!([]);
+            if source_refs {
+                payload["sources"] = json!([]);
+            }
             if let Some(context) = payload.get_mut("context").filter(|v| v.is_object()) {
                 context["complete"] = false.into();
                 context["relationships"] = json!([]);

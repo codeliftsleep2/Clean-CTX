@@ -67,6 +67,7 @@ impl Fixture {
             token_budget: 32768,
             max_nodes: None,
             max_edges: None,
+            response_format: None,
         }
     }
     pub fn payload(&self, mode: &str, id: Option<&str>) -> Value {

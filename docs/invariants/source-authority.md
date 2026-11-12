@@ -215,3 +215,13 @@ artifact: docs/invariants/source-authority.md
 commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
 ```
+
+```architecture-graph
+node: WSC-019
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-019 Provider Health and Provider Authority Are Independent
+track: REPOSITORY
+artifact: docs/invariants/source-authority.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

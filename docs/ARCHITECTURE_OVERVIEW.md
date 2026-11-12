@@ -243,31 +243,7 @@ The persistence layer provides **cross-session persistence** for compression con
 
 ### Design Decisions
 
-- **Load is not authority**: durable rows may decode successfully yet remain
-  ineligible for live adoption. Current source/fidelity plus separate canonical
-  configuration, canonical producer, semantic configuration, and semantic
-  producer identities must validate before their respective live publication.
-- **Trusted restore admission**: `workspaceRoot` plus configured additional
-  roots define the restore admission boundary. Admission precedes recovery,
-  durable owner registration/loading, and every live or cached side effect.
-- **Coherent checkpoint capture**: canonical IR, source identity, fidelity,
-  semantic projection, and compatibility identities are captured from one
-  owner authority epoch under that owner's guard; persistence I/O follows
-  after capture and does not impose a global authority lock.
-- **Owner-scoped ordering**: authority-changing operations for one semantic
-  owner share one commit domain, so an older in-flight operation cannot win by
-  finishing later. Different owners remain independent. The ordering tracks
-  operation generation, not the historical age of a selected snapshot.
-- **Physical source preconditions**: an edit re-proves its exact source-byte
-  precondition at the owner commit boundary before intent staging or atomic
-  replacement; atomic replacement alone is not compare-and-swap.
-- **Durable publication boundary**: persistence-enabled semantic operations commit the requested file's canonical IR and complete edge snapshot before publishing live state; failure is structural and mutation-free.
-- **File-scoped authority**: reads never flush pending work, and one file's save, restore, replay, delta, edit, or deletion cannot commit another file's lifecycle state.
-- **Shared edit recovery**: pending byte-exact edit intents resolve before any durable semantic load, compilation, checkpoint, or index hydration becomes authoritative.
-- **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
-- **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
-- **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
-- **Physical `0x04` authority**: canonical identity, version, operations, order, duplicates, bodies, and spans round-trip in the BLOB itself; DB metadata must agree rather than repair it.
+Current normative owner: [Persistence ownership and recovery](architecture/contracts/persistence-recovery.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### Tools
 

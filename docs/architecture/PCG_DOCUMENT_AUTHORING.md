@@ -69,6 +69,54 @@ heuristic or inferred applicability is used. Large connected descriptive graphs
 may require a narrower starting point or an explicitly larger permitted request.
 This is structural source-backed context, never permission to execute a mission.
 
+## Explicit lossless context transport
+
+Omitting `responseFormat`, or selecting `"inline_v1"`, preserves the original
+version-1 response. Existing clients need no change. Explicitly select
+`"responseFormat":"source_refs_v1"` only with `mode:"context"` and a consumer
+that implements the following version-2 representation. Other modes reject that
+selection; unknown values and explicit null are invalid parameters.
+
+The JSON text in the MCP result has `version:2`,
+`response_format:"source_refs_v1"`, and a `sources` array. Each source entry has
+`source_ref`, `path`, `sha256`, and exact UTF-8 `text`. Identity is the exact
+`(path, sha256)` pair, with exact content equality required on reuse. Identical
+text at different paths remains distinct. References are deterministic hashes
+of the canonical path/hash identity; the array is ordered by path then hash.
+
+Every current document retains its own declaration, revision, previous revision,
+path, source hash, evidence associations and other metadata. Its `source_text`
+is replaced by `source_ref`. Evidence entries containing string `text` similarly
+replace that field with `source_ref`; absent or null text stays unchanged. A
+source used both as declaration text and artifact text shares one pool entry
+when its exact identity and bytes agree. This is response-local sharing, not a
+new storage identity, cache, graph node or authority boundary.
+
+To reconstruct version 1, resolve each document reference and restore
+`source_text`; resolve each evidence reference and restore `text`. Check the
+reference's path/hash against its owner and verify the source bytes against
+SHA-256. Remove those references and the top-level `sources` and
+`response_format`, then restore `version:1`. All remaining fields, including
+node revisions, relationships, witness paths and evidence metadata, are
+unchanged. Consumers must first inspect `result_state`, `catalog_current`, and
+`context.complete`; source references do not turn an incomplete result into
+complete knowledge.
+
+The entire final serialized MCP **result** is metered after projection, including
+reference metadata and JSON escaping. On budget overflow, documents, source
+pool, relationships and witness paths are cleared together; no partial
+authoritative bundle is returned. History remains the separate, unchanged
+version-1 `historical_documents` interface. This format does not change source
+scanning, reconciliation, SQLite schema, traversal, freshness observations,
+authorization or configured limits. Reference overhead can exceed savings for
+contexts without repeated payloads; selecting it does not promise a smaller
+response.
+
+The independent production consumer is
+[`compare-document-source-responses.py`](../../verification/pcg-175/compare-document-source-responses.py).
+It verifies complete reconstruction and same-generation default compatibility
+using captures from the production stdio driver.
+
 ## Author the declaration in Markdown
 
 ````text

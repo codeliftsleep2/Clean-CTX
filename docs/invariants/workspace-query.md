@@ -196,3 +196,113 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 ---
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1010-1023, original section `WSC-011`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `4cc6adf52ca2d8fc6d1eb40a2acc0ecf61b8317cce36afa654d365ce1f0c5c0c`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+```architecture-graph
+node: WSC-002
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-002 CBM Discovers Candidates; Clean-CTX Alone Determines WorkspaceIndex Semantics
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-003
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-003 Hydration Discovery Is Session-State Work
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-004
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-004 Workspace Queries Respect Declared Workspace Scope
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-005
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-005 File-Local Call Inspection Retains Canonical Owner and Occurrence Evidence
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-007
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-007 Dependency-Cycle Results Are Witnessed, Scoped Index Evidence
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-008
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-008 Incomplete Query Identity Resolves Once Without Guessing
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-009
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-009 Workspace Query Batches Isolate Outcomes and Share Final Evidence
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-013
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-013 Authoritative Query Truth Is History-Independent
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-018
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-018 Coverage Detail Cannot Strengthen Completeness
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-010
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-010 Authoritative Refresh Retracts Absent Semantic Owners
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```
+
+```architecture-graph
+node: WSC-011
+kind: INVARIANT
+status: IMPLEMENTED
+title: WSC-011 Direct Declaration Authority Is Independent of Derived Relationships
+track: REPOSITORY
+artifact: docs/invariants/workspace-query.md
+note: Source-described operative contract; migration does not execute or independently certify its witnesses.
+```

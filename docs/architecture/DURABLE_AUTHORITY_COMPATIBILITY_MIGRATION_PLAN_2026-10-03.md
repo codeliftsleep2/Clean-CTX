@@ -33,18 +33,7 @@ current runtime.
 
 ## 2. Frozen invariants
 
-1. Physical decoding and structural coherence do not establish semantic
-   authority.
-2. Canonical and semantic authority have independent configuration and
-   producer identities.
-3. Only producers relevant to an artifact participate in its identity.
-4. Persisted and currently relevant producer sets compare bidirectionally.
-5. One durable delta chain belongs to one canonical compatibility epoch.
-6. Compatibility validation precedes every ordinary live-state mutation.
-7. Crash recovery preserves the recovered transaction's original identities.
-8. Missing legacy identity is not evidence of compatibility.
-9. Coverage certifies only an already-compatible semantic projection.
-10. Compatible persistence reuse remains supported.
+Current normative owner: [Durable authority compatibility](contracts/durable-compatibility.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ## 3. Scope boundaries
 

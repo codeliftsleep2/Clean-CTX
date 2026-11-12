@@ -1,5 +1,7 @@
 # Workspace Query Batch Migration Plan
 
+B2 authority navigation: The focused [workspace batch contract](contracts/workspace-batch.md) owns request composition; WSC-009 and WSC-013 own final evidence and history independence. Retained proposed limits and phase records below are chronology, not new approvals.
+
 **Date:** 2026-09-28  
 **Status:** Complete (2026-09-29). All implementation phases, unchanged
 RED-to-GREEN regressions, live production acceptance, architectural audit,
@@ -195,38 +197,7 @@ cache keys, source-cache ownership, or CBM cache ownership.
 
 ### 5.1 Two mutually exclusive request forms
 
-`workspace_query.inputSchema` will accept exactly one of:
-
-1. the existing single-query form, unchanged; or
-2. the new batch form with shared scope plus `queries`.
-
-The request must not contain both top-level `type` and `queries`. The batch
-form is:
-
-```json
-{
-  "workspaceRoot": "C:/repo",
-  "withinPath": "src/orders",
-  "queries": [
-    { "id": "q1", "type": "find_entities", "name": "OrderService" },
-    { "id": "q2", "type": "reverse_edges", "name": "OrderService" }
-  ]
-}
-```
-
-Rules:
-
-- `queries` must be a non-empty array;
-- every item must be an object;
-- every item must carry a non-empty string `id`;
-- IDs must be unique within the request;
-- every item carries one existing query specification;
-- items may select different query types within the same batch;
-- item fields use the same validation and meaning as the corresponding legacy
-  query;
-- `workspaceRoot` and `withinPath` exist only at the batch top level;
-- item-level scope fields are rejected rather than ignored;
-- input order is semantically significant and preserved in output order.
+Current normative owner: [Workspace query batch scope and identity](contracts/workspace-batch.md). Original text and chronology are retained at commit `9400d476`; this location is navigation, not a second current contract.
 
 ### 5.2 Proposed batch-size policy
 
