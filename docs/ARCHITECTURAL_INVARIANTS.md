@@ -4,6 +4,8 @@
 
 **Audience:** Developers contributing to the Clean-CTX codebase.
 
+**Current role:** Navigation and invariant-governance procedure. Individual normative sections now live under `docs/invariants/`; stable legacy anchors below route to their sole current owners. This index does not duplicate the relocated normative propositions. Source history and enforcement attributes are retained there.
+
 ---
 
 ## Status Classifications
@@ -35,1051 +37,299 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 
 ### WIRE-001 Canonical IR Serialization Stability
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Canonical IR must survive serialization/deserialization without semantic or structural loss. |
-| **Invariant** | Encoding and decoding a valid `CompiledIR` preserves its canonical instruction stream across all supported wire formats. |
-| **Enforcement** | Property tests (100 random seeds) for named wire, binary wire, hierarchical wire, and compact delta formats. All 20 `CoreOp` variants are covered. Determinism and double-encode stability are also verified. |
-| **Authority** | `src/tests/ir/round_trip.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [WIRE-001](invariants/canonical-ir.md#wire-001-canonical-ir-serialization-stability). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### VALID-001 IR Structural Validity
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Canonical IR must not contain invalid references or structurally inconsistent instructions. |
-| **Invariant** | Valid IR passes `DefaultValidator` without E001–E011 violations. Invalid IR (dangling references, orphaned methods/callers, inconsistent effect/context annotations) is detected. |
-| **Enforcement** | `DefaultValidator` implementing `IRValidator`; tracked tests cover every rule, including E011 native-call caller ownership, plus empty-IR and error-display boundaries. |
-| **Authority** | `src/ir/validator.rs` (rules), `src/tests/ir/validator.rs` (tests) |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [VALID-001](invariants/canonical-ir.md#valid-001-ir-structural-validity). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### DELTA-001 Delta Correctness
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Applying a computed delta between two `CompiledIR` states must reproduce the intended semantics of the target state. |
-| **Invariant** | `DeltaComputer::compute(baseline, current)` produces a `Some(delta)` when the two IRs differ, and `None` when they are identical. The delta correctly identifies additions, modifications, and deletions. The delta preserves version chain (`from` / `to`). |
-| **Enforcement** | Unit tests covering: add detection, removal detection, modification detection (renamed methods, changed types), identical-IR returns None, version chain correctness, JSON serialization with `+`/`~`/`-` keys, and edge cases (empty IRs, different files, duplicate keys). |
-| **Authority** | `src/tests/ir/delta.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [DELTA-001](invariants/delta-lifecycle.md#delta-001-delta-correctness). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ARCH-001 Inference State Is Ephemeral
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Inference-layer state must not become part of canonical serialized IR. |
-| **Invariant** | `InferenceLayer` is structurally separate from `CompiledIR`. There is no canonical serialization path that includes `InferenceLayer` data. |
-| **Enforcement** | Rust type system. `CompiledIR` has no field of type `InferenceLayer`. Serialization functions (`ir_to_wire`, `encode`, `ir_to_string_table_wire`, etc.) operate on `CompiledIR` only and cannot access `InferenceLayer`. Violating this invariant requires deliberately changing type signatures. |
-| **Authority** | `src/ir/compiler.rs` (`CompiledIR`), `src/ir/inference_layer.rs` (`InferenceLayer`), `src/ir/wire.rs`, `src/ir/binary_wire.rs` (serialization) |
-| **Type** | STRUCTURAL (type system) |
-| **Gate** | Rust compiler |
-
----
+Current normative owner: [ARCH-001](invariants/canonical-ir.md#arch-001-inference-state-is-ephemeral). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ARCH-002 Language-Agnostic Canonical IR Boundary
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Language-specific layers and meta-layers ultimately produce canonical `CompiledIR` / `CoreOp` representations, enabling common architectural invariants to apply regardless of which source language produced the IR. |
-| **Invariant** | All language layers (TypeScript, C#, Rust, Java) emit `CoreOp` instructions compatible with the canonical instruction stream. Meta-layers enrich the compressed output but participate in the same `CompiledIR` representation. |
-| **Enforcement** | Language conformance tests compile source to `CompiledIR` and verify expected `CoreOp` structure. The validator and round-trip tests operate on the resulting `CompiledIR` without language-specific knowledge. Feature gates (`#[cfg(feature = "...")]`) ensure language layers are compiled only when the corresponding tree-sitter grammar is available. |
-| **Authority** | `src/tests/ir/compiler.rs` (TypeScript conformance), `src/tests/ir/rust_integration.rs` (Rust conformance), `src/tests/ir/layers_integration.rs` (C# + layers), `src/layers/registry.rs` (feature-gated registration) |
-| **Type** | ENFORCED (test architecture) |
-| **Gate** | `cargo test --all-features` |
-
----
+Current normative owner: [ARCH-002](invariants/canonical-ir.md#arch-002-language-agnostic-canonical-ir-boundary). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ARCH-003 Canonical IR and LLM Projection Are Separate Contracts
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Internal correctness structure must not force a verbose model-facing representation, and token optimization must never weaken canonical guarantees. |
-| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, occurrence-preserving, and remains the complete semantic authority. LLM text is a separate compact projection: it may abbreviate while preserving complete meaning, or it may omit bounded semantic categories only when the response explicitly declares that loss in language-scoped, machine-readable degradation metadata. Undeclared semantic loss is forbidden. Exact representations retain their existing exactness guarantees. The model-visible `content` preserves names, typed ownership, signatures, collapsed modifiers, extends/implements, imports, source-written import aliases, type aliases, and exact bodies when requested except for categories explicitly named by such degradation metadata; code-side machinery and workspace-served facts remain available through the reversible codec and `workspace_query`. Import rows render as `$ module [named]`, or `$ [named]` when the canonical module field is empty; removing the generated identity must never leave a phantom column or remove a source-written alias. A structured file presentation identifies its request-scoped file boundary as `// αN`; the exact source path appears once in the trailing `§PATHMAP`, which is authoritative for resolving that alias. `provide_code_context` always returns a complete current presentation under its declared projection contract (or an explicitly selected complete raw representation); it never substitutes a code-side delta receipt. Structured sequence deltas are requested explicitly through `delta_code_context`. |
-| **Enforcement** | Distinct canonical types/wire paths and `render_hierarchical_for_llm`; semantic-family renderer contracts under `src/tests/ir/**`; import-projection contracts in `src/tests/ir/render_llm.rs`; `src/tests/mcp/presentation_footer.rs` pins the alias-only file boundary and single authoritative path mapping; registered provider-boundary regression `src/tests/mcp/provide_complete_context.rs`. |
-| **Authority** | `src/ir/opcodes.rs`, `src/ir/opcodes/semantic.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/mcp/tool_handlers/core/content.rs`, `src/tests/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs`, `src/tests/ir/pattern_facts.rs`, `src/tests/ir/side_effects.rs`, `src/tests/mcp/presentation_footer.rs`, `src/tests/mcp/tool_helpers.rs` |
-| **Type** | STRUCTURAL and ENFORCED |
-| **Gate** | Rust compiler and `cargo test --all-features` |
-
-**Deferred:** After canonical IR repairs, audit token efficiency for LLM views that require whole method bodies. This is presentation work and must preserve complete meaning.
-
----
+Current normative owner: [ARCH-003](invariants/projection-fidelity.md#arch-003-canonical-ir-and-llm-projection-are-separate-contracts). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CONTENT-001 Visible Content Metadata Describes Only the Visible Text
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A consumer must never infer byte-exact source regions from fidelity or from an auxiliary code-side payload when those regions are absent from the visible `content`. |
-| **Invariant** | `content_kind` and `byte_exact` describe the text in `content`, not the requested fidelity, canonical IR, or delta payload. Structural SCHEMA-vNext reports `skeleton`/`[]`; complete Edit bodies report `skeleton_with_verbatim_bodies`/`["method_bodies"]`; partial focused coverage reports `skeleton_with_focused_verbatim_bodies`/`["focused_method_bodies"]`; Edit with no bodies reports `skeleton`/`[]`; whole-document source reports `verbatim_document` or `raw_passthrough` with `["document"]`; a visible delta acknowledgement reports `delta_summary`/`[]`. Delta operations remain exclusively code-side auxiliary data and never become an LLM responsibility: the explicit `delta_code_context` result carries `result.delta` while `content` contains only its acknowledgement. `provide_code_context` never carries a delta payload or acknowledgement. |
-| **Enforcement** | The typed `ContentKind` enum is the wire-value authority. `contract_fields_for_hierarchy` derives regenerated Edit coverage from the actual hierarchy instead of fidelity alone. `src/tests/mcp/tool_handlers_contract.rs` pins every wire string; `src/tests/mcp/content_kind_lifecycle.rs` crosses explicit delta generation, baseline/cache, apply, restart, restore, replay, full/focused/empty Edit coverage, and provider raw fallback while asserting that structured delta data remains auxiliary. `src/tests/mcp/provide_complete_context.rs` pins the complete-provider boundary. |
-| **Authority** | `src/mcp/tool_handlers/core/common.rs`, `src/mcp/tool_handlers/core/{delta,provide,delta_apply,restore}.rs`, `src/mcp/tool_handlers/persistence/mod.rs`, `src/mcp/prompts.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-
----
+Current normative owner: [CONTENT-001](invariants/projection-fidelity.md#content-001-visible-content-metadata-describes-only-the-visible-text). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ARCH-004 Production Integration Is the Completion Boundary
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Prevent implemented but unreachable features from being reported as complete. |
-| **Invariant** | A component or semantic family is not complete until its real default production lifecycle is traced and evidenced: producer, production pipeline, result boundary, persistent owner, workspace/session lifecycle, actual consumer, MCP/API exposure, and applicable live reachability. Code existence, populated test-only state, custom-pipeline tests, and isolated unit tests are implementation evidence only. |
-| **Enforcement** | Phase 9 records concrete entry points, owners, lifecycle behavior, consumers, external exposure, tracked production-path coverage, and removal of obsolete bypasses. The completed `0.8.0` production certification is the reference application of this invariant; future work must satisfy the same boundary independently. |
-| **Authority** | `AGENTS.md` §11, `docs/architecture/IR_ARCHITECTURE_CERTIFICATION.md`, and the Phase 9 audit records |
-| **Type** | GOVERNANCE and INTEGRATION |
-| **Gate** | Production lifecycle trace, applicable tracked integration tests, and applicable live end-to-end verification |
-
----
+Current normative owner: [ARCH-004](invariants/completion-governance.md#arch-004-production-integration-is-the-completion-boundary). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### PIPELINE-001 Compilation Pipeline Ordering
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Compilation stages must execute in a known architectural order. |
-| **Invariant** | The production `PassPipeline` must register passes in the required order: `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass`. This ordering reflects the data and semantic dependencies between stages. |
-| **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
-| **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
-**Rationale for ordering:**
-- **CoreIR** must precede **Language Finalize**: The core capture/emission phase must process all captures before language-layer finalization occurs.
-- **Language Finalize** must precede **Meta Layer**: Meta layers depend on the instruction stream after language-layer processing.
-- **Meta Layer** must precede **Pattern Recognition**: Pattern recognition operates on the complete instruction stream including meta-layer output.
-- **Pattern Recognition** must precede **Alias Resolution**: Alias resolution must see all relevant `Extends`/`Implements` instructions after pattern processing.
-- **Alias Resolution** must precede **Validation**: Validation must inspect the final canonical instruction stream after all transformations.
+Current normative owner: [PIPELINE-001](invariants/canonical-ir.md#pipeline-001-compilation-pipeline-ordering). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### C-22 — Meta-Layer Source Context from Canonical Capture Identity
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Meta-layer source context MUST be derived from the canonical `CapEntry` capture identity — NOT from the compacted `CoreOp::DefClass.name`. |
-| **Invariant** | `MetaLayerPass` derives each class capture's canonical source span from `PassContext.captures` (the persisted capture identity). `class_source_from_capture()` produces the decorator/annotation/attribute-inclusive class text (TS `@Name(...)`, Java `@Name`, C# `[Name]`). The compilation-scoped `MetaLayerContext` carries those spans and the existing canonical source path into one combined layer evaluation without changing either identity's authority. No `DefClass.name` round-trip is permitted. Non-decorated classes use the declaration-keyword byte as fallback (backward compatible). |
-| **Enforcement** | `class_source_from_capture_c22_identity` asserts reconstruction from source + `CapEntry`. `MetaLayerPass::run()` in `src/ir/pipeline/meta_layer.rs` filters type-root captures and constructs the shared context. Multi-class cross-contamination tests verify per-class isolation; Angular testing regressions verify canonical-path delivery and backward-compatible path-independent output. |
-| **Authority** | `src/meta_util.rs` (`class_source_from_capture`), `src/layers/meta/context.rs` (`MetaLayerContext`), `src/ir/pipeline/meta_layer.rs` (`MetaLayerPass::run`), `src/layers/registry.rs` (combined context dispatch), `src/tests/meta_util.rs` (C-22 identity test), `src/tests/compression/pipeline.rs` (multi-class tests), `src/tests/ir/pipeline_meta_layer.rs` (canonical-path integration) |
-| **Type** | ENFORCED (test + structural) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [C-22](invariants/meta-evidence.md#c-22--meta-layer-source-context-from-canonical-capture-identity). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### META-001 Framework Annotations Retain Declaration-Local Ownership and Intelligible Values
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Framework enrichment must add compact, useful facts without losing which declaration supplied them or turning incidental syntax into plausible-looking annotations. |
-| **Invariant** | A framework annotation is derived only from evidence inside its owning declaration or statement. An annotation that represents a method-local construct identifies that containing method; an assignment-owned construct uses only the assignment's local left-hand declaration. Field/declaration annotations contain genuine declaration identities, never parameter types, default values, punctuation fragments, or text borrowed from an earlier declaration. Projection and rendering preserve these values but do not guess or repair ownership after extraction. |
-| **Enforcement** | RxJS extraction separates observable/subject declarations from pipe/combinator extraction. Observable-field recognition rejects method parameter lists and return annotations. Pipe ownership examines only the current assignment statement or resolves the actual enclosing TypeScript method. Unit regressions pin both rules, and the registered MCP regression verifies the complete `provide_code_context` → meta-layer → `CoreOp::TypeAlias` → hierarchy → SCHEMA-vNext lifecycle. |
-| **Authority** | `src/angular_meta/rx/extract.rs`, `src/angular_meta/rx/pipes.rs`, `src/ir/pipeline/meta_layer.rs`, `src/tests/angular_meta/rx.rs`, `src/tests/mcp/rxjs_meta_presentation.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-| **Relationship to C-22** | C-22 establishes the canonical type-level source span delivered to a meta-layer. META-001 governs declaration- and statement-level ownership inside that span; receiving the correct class source does not authorize whole-prefix evidence borrowing within the class. |
-
----
+Current normative owner: [META-001](invariants/meta-evidence.md#meta-001-framework-annotations-retain-declaration-local-ownership-and-intelligible-values). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### META-002 Compilation-Scoped Single Evaluation
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Framework enrichment must reuse immutable evidence already owned by the current compilation instead of reparsing the file or independently deriving the marker and semantic projections. |
-| **Invariant** | `MetaLayerPass` constructs one `MetaLayerContext`, including one shared `LexicalRegions` index, and sends it through one registry evaluation. Each applicable registered layer makes one applicability decision and returns markers plus semantic edges in one `MetaLayerEvaluation`. Angular and .NET production applicability reuse compilation-scoped evidence and do not invoke their standalone AST detector; standalone detector entry points retain their established behavior for non-pipeline callers. The text compression pipeline may retain its text-oriented API, but it does not create a second compilation-context route. |
-| **Enforcement** | The combined registry regressions pin one applicability check and one evaluation hook per layer. Production-pipeline regressions pin one registry evaluation, one lexical index, one framework detection pass, and zero detection-only AST parses. Framework-specific work counters pin shared Angular testing/NgRx/routing shapes and shared .NET ASP.NET/EF Core analyses where both projections consume the same facts. |
-| **Authority** | `src/layers/meta/context.rs`, `src/layers/meta/mod.rs`, `src/layers/registry.rs`, `src/ir/pipeline/meta_layer.rs`, `src/tests/layers/registry.rs`, `src/tests/ir/pipeline_meta_layer.rs` |
-| **Type** | STRUCTURAL + ENFORCED (test) |
-| **Gate** | Focused meta-layer regressions locally; complete `cargo test --all-features` in CI |
-
----
+Current normative owner: [META-002](invariants/meta-evidence.md#meta-002-compilation-scoped-single-evaluation). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-ID-001 Canonical CBM Project Identity & Multi-Root Lifecycle
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Every CBM interaction — indexing, readiness, querying, proxy routing, and cache partitioning — must address the project CBM actually indexed, regardless of how many repos are configured. |
-| **Invariant** | **Never derive or invent a CBM project identifier independently of the canonical-root mapping.** CBM's canonical project slug is the single source of identity for indexing, readiness, querying, proxy routing, and cache partitioning. Specifically: (1) A CBM project identity is the slug derived from the canonical repo path (`cbm_project_slug()`), never a directory basename. (2) Every configured root (primary + `additional_roots`) maps to its own CBM project ID via the bridge's two-way identity map (`project_ids` / `project_paths`). (3) One CBM subprocess serves all configured roots. (4) Indexing begins asynchronously at bridge construction for every root (`start_indexing_roots()`). (5) Indexing/readiness state is tracked independently per CBM project; untracked projects pass through as ready rather than dead-ending in a permanent gate. (6) Graph queries and `cbm_proxy` resolve targets through the root/project mapping (`resolve_project_id`) and never invent a dirname-based identity. An exact configured-root basename is an accepted alias, but `cbm_proxy` MUST rewrite that alias to the canonical slug in the actual arguments forwarded to CBM; resolving only the readiness gate is insufficient. Unknown or partial names remain literal and CBM rejects them authoritatively. (7) Project-independent CBM tools (e.g. `list_projects`) bypass the indexing gate entirely. (8) The verified CBM 0.8.1 wire contract is preserved: `index_repository(repo_path, mode)` takes no project parameter — CBM derives the ID from the canonical path. |
-| **Enforcement** | Regression tests covering: slug fidelity against live-captured CBM responses; per-root registration for primary + additional roots; dirname/path overrides canonicalizing instead of diverging; per-project readiness isolation with untracked pass-through; single-root backward compatibility; proxy gate scoping (project-less calls skip the gate). |
-| **Authority** | `src/cbm/bridge.rs` (`cbm_project_slug`, `try_create_with_roots`, `resolve_project_id`, `ensure_indexed_for`), `src/cbm/proxy.rs` (`resolve_proxy_target_project`, `resolve_and_apply_proxy_target_project`), `src/tests/cbm/regression.rs`, `src/tests/cbm/proxy_errors.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
+Current normative owner: [CBM-ID-001](invariants/cbm.md#cbm-id-001-canonical-cbm-project-identity--multi-root-lifecycle). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-LIFE-001 Optional Provider Never Gates Core MCP Readiness
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Clean-CTX must establish its stdio MCP session independently of optional CBM startup, while retaining deterministic ownership of every provider process and startup task it creates. |
-| **Invariant** | `McpState` construction performs no CBM launch or admission. A successfully flushed Clean `initialize` response permits `auto_launch`; it does not prove that the client will remain connected. One session-owned lifecycle authority coalesces concurrent launch requests and owns admission state, the admitted bridge, background indexing workers, and shutdown. With `auto_launch = false`, only the first provider-dependent consumer starts that same lifecycle. `get_cbm_status` is report-only. Provider consumers fail closed while status is `initializing`, `degraded`, or `unavailable`; Clean-owned semantic authority never depends on provider readiness. On transport shutdown, Clean joins any in-flight admission and all indexing workers before retiring the directly owned frontend. No provider startup work is fire-and-forget. |
-| **Enforcement** | `src/tests/cbm/startup_readiness.rs` pins core readiness independence; `src/tests/mcp/cbm_lifecycle.rs` pins the initialize trigger, lazy mode, coalescing, observable initialization, and admission joining; `src/tests/cbm/frontend_lifecycle.rs` pins indexing-worker ownership and frontend retirement ordering. |
-| **Authority** | `src/mcp/cbm_lifecycle.rs`, `src/mcp/state.rs`, `src/mcp/handlers.rs`, `src/mcp/server.rs`, `src/cbm/bridge/indexing.rs`, `src/cbm/bridge/lifecycle.rs` |
-| **Type** | STRUCTURAL + ENFORCED (test) |
-| **Gate** | Focused lifecycle regressions and the complete all-feature verification gate |
+Current normative owner: [CBM-LIFE-001](invariants/cbm.md#cbm-life-001-optional-provider-never-gates-core-mcp-readiness). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-CACHE-001 Canonical Project-Owned Graph Cache
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Cached graph results must never cross repository boundaries, and refreshing one repository must not discard or invalidate another repository's results. |
-| **Invariant** | Every structured graph-cache entry is structurally owned by exactly one canonical CBM project through `GraphCacheKey { project, query }`. Active-project and explicit-project queries use the same query text namespace; ownership is never inferred from active bridge state or encoded by manually prefixing the query string. Memory lookup, insertion, expiration, and removal require that owner. Disk lookup/write-through resolves the owner's registered root only through `project_paths`; an unregistered project may be cached in memory but is never assigned an invented disk root. A successful graph refresh invalidates all and only the target project's memory entries and registered SQLite partition. Failed refreshes leave the project dirty and do not invalidate as though fresh. Switching the active project or workspace root preserves safely isolated entries. TTL, SQLite schema, repository-scoped CBM `index_repository(repo_path, mode)` behavior, and public MCP contracts remain unchanged. |
-| **Enforcement** | The Rust key type makes cross-project memory reuse structural. `src/tests/cbm/cache_ownership.rs` pins switch-time retention, explicit-project disk hydration, and target-only disk invalidation through unchanged RED→GREEN regressions. Existing freshness regressions pin failure and generation coalescing. `e2e_apply_edit_triggers_reindex_and_graph_is_fresh` crosses registered `apply_edit` and `graph_search` handlers against live CBM, verifies the fresh structured response and repeated cache hit, and preserves an unrelated-project sentinel. |
-| **Authority** | `src/cbm/bridge.rs` (`GraphCacheKey`), `src/cbm/bridge/cache.rs`, `src/cbm/bridge/indexing.rs`, `src/cbm/bridge/lifecycle.rs`, `src/cbm/bridge/query.rs`, `src/tests/cbm/cache_ownership.rs`, `src/tests/cbm/regression/freshness.rs`, `src/tests/cbm/e2e_reindex.rs` |
-| **Type** | STRUCTURAL + ENFORCED (test) + LIVE INTEGRATION |
-| **Gate** | Focused cache-ownership and live lifecycle regressions locally; complete `cargo test --workspace --all-targets --all-features` in the final gate |
+Current normative owner: [CBM-CACHE-001](invariants/cbm.md#cbm-cache-001-canonical-project-owned-graph-cache). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-E-001 Explicit CBM Error Propagation
 
-| Property | Value |
-|----------|-------|
-| **Intent** | CBM unavailability or failure must never masquerade as legitimate empty graph data. |
-| **Invariant** | Every graph-intelligence bridge method returns `Result<_, CbmError>`. `Ok(empty)` is reserved for valid zero-result queries; any CBM-reported tool failure (`result.isError` envelope), transport fault, timeout, or open circuit surfaces as `Err(CbmError)`. Downstream consumers (intelligence layer, inference pass, MCP handlers) propagate or explicitly handle `Err`; none may convert it into empty success data. The pipeline-level failure policy is fixed: log loudly and continue without enrichment - CBM is strictly additive to the IR. |
-| **Enforcement** | `check_soft_error()` maps isError envelopes to `CbmError::ToolError` in the parsed transport path before callers observe them; `proxy_tool_error()` applies the same boundary to raw `cbm_proxy` responses before verification or compression and emits one clean MCP `isError` result; deterministic fixtures pin both envelope paths; live probes assert failure on unknown projects vs valid empty results. |
-| **Authority** | `src/cbm/client.rs` (`CbmError::ToolError`, `check_soft_error`), `src/cbm/bridge.rs` (Result signatures), `src/ir/inference_layer.rs`, `src/ir/pipeline.rs`, `src/tests/cbm/graph_intel.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
+Current normative owner: [CBM-E-001](invariants/cbm.md#cbm-e-001-explicit-cbm-error-propagation). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-IDENTITY-001 Trace Source Resolution Never Guesses
 
-| Field | Contract |
-|---|---|
-| **Intent** | A trace must never silently select one same-named symbol and present that path as authoritative. |
-| **Invariant** | Canonical CBM source identities are a no-search fast path. A bare trace source is resolved by exact symbol name within the explicitly selected project before tracing. Distinct physical search occurrences with one canonical ID are one identity. Exactly one canonical identity proceeds; zero returns explicit not-found; multiple return JSON-RPC `-32602` with deterministic canonical candidates. `graph_trace` and `cbm_proxy(trace_path)` share this resolution boundary. Proxy resolution is scoped to that call and must not mutate the bridge's active project. |
-| **Enforcement** | `src/cbm/trace_identity.rs` owns exact-name grouping and errors; `GraphBridge::search_scoped` owns non-mutating project lookup; `src/tests/cbm/trace_identity_resolution.rs` protects wrapper/proxy parity and the canonical fast path; `verification/cbm/scripts/Investigate-DuplicateTraceNames.ps1` verifies the built stdio boundary against a controlled duplicate-name repository. |
-| **Authority** | `src/cbm/trace_identity.rs`, `src/cbm/handlers.rs`, `src/cbm/proxy.rs`, `src/cbm/bridge/query.rs` |
+Current normative owner: [CBM-IDENTITY-001](invariants/cbm.md#cbm-identity-001-trace-source-resolution-never-guesses). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-WIRE-001 Verified CBM `trace_path` Wire Contract
 
-| Property | Value |
-|----------|-------|
-| **Intent** | The typed `graph_trace` path must consume what CBM actually emits on the wire — never a presumed shape — so real call-relationship data reaches agents instead of silently collapsing to zero results while the raw proxy path works. |
-| **Invariant** | **`inner["edges"]` is NOT a valid CBM 0.8.1 `trace_path` response shape and must never be assumed** by any parser, wrapper, or fixture. The verified contract (verbatim live captures from a fresh subprocess, 2026-08-24): relationships arrive as directional `callers` / `callees` ARRAYS whose entries carry exactly `name`, `qualified_name`, and `hop` (a JSON number); an empty half is a real empty array, never a missing key and never an `edges` key. Specifically: (1) **Directionality** — every `callers[i]` calls the traced function, and the traced function calls every `callees[i]`; normalized edges always orient caller → callee regardless of which array produced them. (2) **Canonical identity** — edge endpoints are `qualified_name` with fallback to the bare `name` (`map_search_result` precedent); `hop` is dropped: a `GraphEdge` represents a relationship, not traversal metadata. Note the raw wire key is `name` — `nm` exists only in Clean-CTX's own compressed proxy view. (3) **Boundary matching** — the API accepts bare names while the wire carries qualified names, so a target matches a canonical endpoint when the endpoint EQUALS the target (fully qualified form) OR its FINAL DOT SEGMENT equals the bare target; a bare `to` name with qualified wire endpoints MUST retain the edge; partial/multi-segment targets match nothing. `__file__` module pseudo-node callers are genuine relationships and pass through untouched. (4) **Both directions work** — outbound-reachable pairs resolve on the FIRST attempt (pre-fix behavior preserved byte-for-byte); inbound-only relationships are discovered through a SINGLE inbound fallback taken only when the outbound attempt succeeds but yields no edge touching the target; errors are never swapped for the other direction. (5) **Depth honesty** — depth>1 responses are FLAT hop-tagged BFS discoveries with NO parent linkage; only `hop: 1` entries convert into edges; `hop > 1` entries are unattributable and must NEVER become invented edges (they remain available via `cbm_proxy`). (6) **Ordering & dedup** — CBM emission order is preserved; ONLY exact duplicate edges may collapse, preserving first-seen order; repeated nodes are not relationships and are never merged away. (7) **Result semantics** — a valid query yielding no relationships remains `Ok(empty)`; any CBM soft error (`result.isError` envelope, e.g. `"error": "function not found"`) propagates as an explicit `Err(CbmError::ToolError)` BEFORE parsing — failure is never a valid empty result (normative generalization: CBM-E-001). |
-| **Enforcement** | Deterministic pins against verbatim raw captures (`TRACE_INBOUND_WIRE_CAPTURE`, `TRACE_OUTBOUND_WIRE_CAPTURE`, `TRACE_BOTH_WIRE_CAPTURE`, `TRACE_DEEP_OUTBOUND_WIRE_CAPTURE`, `TRACE_NOT_FOUND_RESULT_ENVELOPE`): directional synthesis, hop-1-only conversion (the depth-3 capture proves flat semantics and cross-hop node repeats), qualified→name fallback, exact-duplicate dedupe ordering, absent-array leniency, not-found → `ToolError` gate, boundary predicate strictness (exact/final-segment retained; partial/multi-segment rejected; `regression_bare_to_name_with_qualified_endpoint_is_retained`). Four fresh-process `serial(cbm_live)` probes over a SYNTHETIC temp-dir fixture repo (caller → callee is the only relationship; nothing derives from this repository): typed `graph_query` CALLS rows, two-endpoint outbound preservation, single-endpoint inbound discovery, and THE regression — two-endpoint inbound-only discovery via the fallback. Finalization evidence: `cargo fmt --all -- --check` clean; `cargo clippy --all-targets -- -D warnings` zero warnings; `cargo test --workspace --all-targets --all-features` 2,497 passed / 0 failed / 5 ignored including `e2e_cbm_multiroot_multilingual_integration` green against live CBM 0.8.1 (commit `193f885`). |
-| **Authority** | `src/cbm/client.rs` (`extract_trace_edges`, `trace_entry_endpoint`, `trace_entry_is_direct`), `src/cbm/bridge.rs` (`GraphBridge::trace_path` direction determination, `edge_touches_target`, `filter_trace_edges`), `src/tests/cbm/trace_wire.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
+Current normative owner: [CBM-WIRE-001](invariants/cbm.md#cbm-wire-001-verified-cbm-trace_path-wire-contract). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-WIRE-002 Verified CBM `query_graph` Wire Contract & Column-Shape-Driven Edge Extraction
 
-| Property | Value |
-|----------|-------|
-| **Intent** | `query_graph` interprets the semantic projection described by CBM's echoed `columns`; it must NOT infer relationship semantics from row arity. The typed `graph_query` path surfaces relationship data CBM actually returns instead of collapsing it into duplicated column-0 nodes with a permanently empty edge list, and never fabricates edges from arbitrary column data. |
-| **Invariant** | CBM answers `query_graph` with `{columns, rows, total}`; cells are JSON strings (numeric projections arrive stringly, e.g. in_degree `"10"`); undirected `-[r]-` patterns are supported and one result set may mix every relationship type (DEFINES / DECORATES / USAGE / CALLS — captured live 2026-08-24). Columns echo RETURN expressions VERBATIM, including inner whitespace (`"type( r )"`). ALIAS RULE (captured live): an `AS` alias REPLACES the whole expression in the echo (`type(r) AS rel_kind` ⇒ `"rel_kind"`; `a.name AS caller` ⇒ `"caller"`) — an aliased type() projection is INTENTIONALLY indistinguishable from an ordinary projected scalar at the typed layer and must never be reverse-engineered into relationship semantics. Conversion is COLUMN-SHAPE driven: a projection is relationship-shaped IFF it contains exactly ONE unaliased `type(...)` column AND ≥3 columns AND every row aligns with the echoed columns; then endpoints are the FIRST and LAST non-type projected columns (projection order rules), the type cell becomes `GraphEdge.label`, and every other projected column maps into `GraphEdge.properties` keyed by echoed column text with its projected JSON value preserved verbatim; no nodes are synthesized. ANY other shape — including zero or multiple type(...) columns (ambiguity: refuse to guess) and row/column misalignment (untrustworthy metadata) — keeps the legacy column-0 node mapping with NO edges, REGARDLESS of column count. Rationale: the retired strict-arity rule fabricated semantically invented data — a uniform numeric triple `[name, in_degree, out_degree]` became a fake edge labelled `"10"`. Deliberately excluded from this contract (separate findings): node deduplication, file-path population, endpoint normalization. Qualified/bare M-01 matching does NOT apply here because graph_query performs no target filtering. Cache compatibility: populated edges reuse the existing serialized `edges` key — no key versioning. |
-| **Enforcement** | Verbatim raw captures for EIGHT shapes (fresh subprocesses, 2026-08-24): directed CALLS bare names, undirected mixed types, qualified endpoints, aliased-type (`rel_kind`), 5-column mid-projection type(), 6-column SCRAMBLED type()-at-index-2 with trailing file_path, type()-first, numeric triple `[f.name, f.in_degree, f.out_degree]`, and the whitespace variant `"type( r )"`. Deterministic pins: shape-driven conversion + property mapping (`five_column_projection_maps_extras_into_properties`, `scrambled_six_column_projection_follows_column_metadata`, `type_first_projection_still_identifies_endpoints`, `whitespace_tolerant_type_detection`), THE fabrication regression (`numeric_triple_without_type_column_is_never_an_edge`), alias pin (`aliased_type_projection_is_intentionally_node_shaped`), ambiguity/misalignment/empty/duplicate policy pins. Four fresh-process `serial(cbm_live)` probes over the SYNTHETIC temp-dir fixture repo: 3-column CALLS baseline edge, wide scrambled 4-column projection mapping middle columns into properties, aliased+numeric-triple fabrication guards live, node-only control. Full finalization gate green (fmt clean; clippy `-D warnings` zero; workspace tests incl. live CBM probes + multilingual fixture). |
-| **Authority** | `src/cbm/client.rs` (`QueryRows` — columns MUST NOT be discarded, `query_graph`), `src/cbm/bridge.rs` (`single_type_column`, `convert_query_rows`, `GraphBridge::query_graph`), `src/tests/cbm/query_wire.rs`; generated live-session captures are runtime evidence under `target/**`, not authority |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [CBM-WIRE-002](invariants/cbm.md#cbm-wire-002-verified-cbm-query_graph-wire-contract--column-shape-driven-edge-extraction). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-VERIFY-001 Per-Result Caller Verification for `search_graph`
 
-| Property | Value |
-|----------|-------|
-| **Intent** | CBM's search-side `in_degree` is not a verified caller count (it counts additional edge kinds versus the stored property, and overload conflations inflate it), so caller verification belongs to each returned symbol — never to the search response as a whole. A raw count must never be indistinguishable from a verified one, and search breadth must never decide whether verification runs. |
-| **Invariant** | `search_graph` builds ONE verification request per result carrying `in_degree` (a single result is a batch of one) and reuses the shared C# arity verifier unchanged; the arity algorithm, candidate narrowing, and trusted-path reads are not duplicated. Every `in_degree` result carries its own truth: `raw_in_degree` (the verbatim CBM value, never replaced), `verified_in_degree` (the verifier's compatible-caller count for THAT symbol, `0` when nothing was established), `in_degree_evidence` (`cbm_raw` when at least one compatible caller was established, otherwise `cbm_raw_unverified`), `in_degree_resolution` (the per-result verdict), and `in_degree_reason` for every non-verified verdict. Eligibility is callable-only: results whose label is a known non-callable kind, whose own file is not C# source, which carry no usable `qualified_name`, or whose identity occurs more than once in the response are annotated as unverifiable/ambiguous and never verified — an unattributable identity is never guessed. Verification never runs for results without `in_degree` (those stay untouched). One unverifiable or ambiguous result never suppresses verification of its neighbours, and evidence is attached to the planned response position confirmed against that entry's stable `qualified_name` (a unique identity match is the defensive fallback when the array was reshaped; a duplicated identity is reported ambiguous and never guessed), so the wrong overload can never be annotated. The top-level block keeps its single-target field set — identity and arity survive only while every folded target agrees — adds `results_total` plus the disposition counters `results_verified` / `results_ambiguous` / `results_rejected_or_adjusted` / `results_unverifiable` / `results_not_eligible` (which partition `results_total`), and reports the weakest-link resolution across independently verified targets. `trace_path` and `query_graph` remain single-target surfaces. |
-| **Enforcement** | Deterministic pins with the shared verifier injected as a canned closure (no CBM required): `src/tests/cbm/caller_verify_search.rs` — `RED-SG1` single-result control (existing fields and top-level verdict preserved), `RED-SG2` one eligible among non-callable kinds, `RED-SG3` several callable results verified independently with no count bleed, `RED-SG4` verified + ambiguous coexistence, `RED-SG5` verified + unverifiable coexistence (including a result with no identity), `RED-SG6` the unanchored `OrderBy` reproduction, `RED-SG7` anchored/unanchored parity for the same symbol, `RED-SG8` no bare raw `in_degree` in a mixed response plus the counter-partition invariant; `aggregate_folds_targets_without_inventing_identity` and `search_targets_are_empty_without_a_results_array_or_degree` pin aggregation and the untouched-response path. `src/tests/cbm/caller_verify_proxy.rs` pins the single-target request construction, the single-target count writer, and the stable gap-reason codes. |
-| **Authority** | `src/cbm/caller_verify_search.rs` (per-result planning, orchestration, annotation, aggregation), `src/cbm/caller_verify_proxy.rs` (`VerificationRequest`, `VerificationAttempt`, `VerificationGap`, `verify_request_sources`, `verify_search_surface`), `src/cbm/caller_verify.rs` (`verify_csharp_callers` — unchanged algorithm, `CallerVerificationSummary::{empty, fold}`, `aggregate_resolution`, `caller_evidence_metadata`), plus `src/cbm/caller_verify_arity.rs` (arity extraction and the request-local `ParseMemo`), `src/tests/cbm/caller_verify_search.rs`, `src/tests/cbm/caller_verify_proxy.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [CBM-VERIFY-001](invariants/cbm.md#cbm-verify-001-per-result-caller-verification-for-search_graph). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-VERIFY-002 Verified Caller Identity Is Retained and Candidate Discovery Reuses the Project-Scoped Graph Cache
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Verifying a CBM candidate and then discarding which candidate verified wastes the work: the consumer must ask CBM again to learn the caller/file identity verification already knew, and that second round-trip is exactly the cost verification was meant to remove. Candidate discovery is also repeated work: an identical discovery query in the same valid cache scope must not pay a fresh provider round-trip. |
-| **Invariant** | (1) **Identity retention.** `CallerVerificationSummary` keeps every established counter (`raw_candidates`, `verified`, `rejected_arity`, `ambiguous`, `unverifiable`, `verified_caller_files`, `compatible_caller_files`, `resolution`) and adds structured evidence beside them: `verified_candidates` (candidates whose source verification established compatibility) and `ambiguous_candidates` (candidates compatible with a target that stayed ambiguous). Each retained candidate carries CBM's projected caller file (`cbm_file` — the advisory candidate identity, never promoted to a semantic fact), the path Clean-CTX actually read after the trusted-path gate (`file`), the distinct accepted explicit argument counts (`argument_counts`, ascending), and its own `status`. Rejected candidates are counted, never enumerated. A candidate CBM proposed that source verification contradicted is never reported as verified, and ambiguity is never presented as a unique resolution. (2) **Authority unchanged.** The truth claim is always "CBM proposed candidate X, Clean-CTX verified X against source": CBM remains advisory discovery/narrowing only, no CBM edge is imported into `WorkspaceIndex`, and cached discovery never makes verification truth stale — source verification still runs and still rejects. (3) **Candidate discovery reuses the project-owned graph cache.** `GraphBridge::query_graph_scoped(cypher, project)` shares the same cache, TTL, disk write-through, and invalidation as `query_graph`. Both use the identical `cypher2:{cypher}` query namespace; `GraphCacheKey.project` supplies the canonical structural owner, so two repositories with identical Cypher text remain isolated without string-prefix conventions or active-project cache clearing. A request that names **no** project keeps the original raw proxy call: it is answered by CBM's own default project, which the active project does not describe, so no structured cache owner can be assigned. (4) **Batch-local parse reuse.** One verification batch (one response) owns exactly one `ParseMemo`, so a file referenced by several results is parsed once; the memo is request-local, never persisted, and never a source-freshness substitute (`McpState::read_source` still decides which bytes are current). Original arity semantics (extension-receiver subtraction, optional parameters, `params`, exact fixed arity, same-name/same-arity ambiguity) are unchanged. |
-| **Enforcement** | Deterministic pins (no CBM required; the mock bridge owns no client, so a provider round-trip is observable as a recorded error): `src/tests/cbm/caller_verify.rs` — `RED-CV1` verified identity retained beside the count, `RED-CV2` rejected identity absent from `verified_candidates`, `RED-CV3` anchored and unanchored ambiguity preserved with evidence, `RED-CV4` extension-receiver evidence (receiver excluded, argc retained, identity surfaced), `RED-CV6` every established counter preserved, `RED-CV10` one batch parses a referenced file once, `RED-CV11` distinct files verified independently (the memo never collapses two paths). `src/tests/cbm/caller_verify_proxy.rs` — `RED-CV5` end-to-end (cached discovery for a project that is not the active project + real source verification + rendered response exposing the identity with no provider call), `RED-CV7` cached candidate discovery with a miss as the only provider contact, `RED-CV8` typed project ownership isolating two workspaces with identical query strings, `RED-CV9` cache ownership per provider instance, `RED-CV10` batch-level parse reuse through the real search orchestration, `RED-CV12` source verification refuting a candidate that discovery served from cache. |
-| **Authority** | `src/cbm/caller_verify.rs` (`VerifiedCallerCandidate`, `CallerVerificationSummary`, `verify_csharp_callers`, `candidate_evidence`), `src/cbm/caller_verify_arity.rs` (arity extraction, `ParseMemo`), `src/cbm/caller_verify_proxy.rs` (`candidate_paths`, `caller_paths_from_query`, `LoadedCandidate`, `verify_request_sources`, `read_trusted_source`), `src/cbm/caller_verify_search.rs` (batch memo ownership, per-result evidence), `src/cbm/bridge/query.rs` (`query_graph_scoped`, `query_graph_inner`), `src/tests/cbm/caller_verify.rs`, `src/tests/cbm/caller_verify_proxy.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
-
+Current normative owner: [CBM-VERIFY-002](invariants/cbm.md#cbm-verify-002-verified-caller-identity-is-retained-and-candidate-discovery-reuses-the-project-scoped-graph-cache). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### IDENT-001 One Physical File, One Stable Alias
 
-| Property | Value |
-|----------|-------|
-| **Intent** | All in-session file-keyed state — alias registry, IR context versions, text-delta baselines, LLM text cache, `§PATHMAP` output, AND SessionStats per-file tracking — must attribute every operation to ONE identity per physical file, regardless of which path spelling a caller supplies (Non-CBM audit 2026-08-25 #3: fragmented aliases silently split per-file state so one alias's cache never saw updates recorded under the other; same mechanism fragmented stats into duplicate rows with double-counted totals). |
-| **Invariant** | `PathDictionary::get_or_create_alias` maps different caller-supplied spellings of the same on-disk file (absolute path, workspace-root-joined relative form, redundant-segment form) to the SAME alias, and `SessionStats::record_compression`/`file_stats` key on the SAME canonical identity via the shared `dictionary::path::canonical_identity_key`. Canonicalization = `fs::canonicalize` when possible (Windows verbatim `\\?\` prefix stripped so stored keys stay readable); unresolvable paths fall back to the raw argument unchanged so synthetic strings neither collide nor panic. Canonical paths that share one platform physical identity—Windows `(volume serial, file index)`, Unix `(st_dev, st_ino)`—additionally converge through an `McpState`-owned auxiliary registry: canonical paths remain the public/provenance identity, while the first durable spelling remains the SQLite owner and is re-registered at startup. A physical file with multiple hard links is not structurally editable because atomic pathname replacement would split the links. **Deliberate compatibility rule:** ordinary SQLite persistence keys remain caller-shaped as supplied; physical-ID lookup changes only hard-link alias ownership and does not replace durable paths with opaque file IDs. |
-| **Enforcement** | `canonical_identity_key` remains the lexical/canonical path authority. `PhysicalIdentityRegistry` adds platform physical alias resolution at session alias, semantic publication, and durable-owner boundaries; persisted owners seed it before requests are served. `apply_edit` rejects Windows `number_of_links > 1` or Unix `st_nlink > 1` before recovery, source reads, staging, or state mutation. Unsupported or unavailable physical metadata falls back to canonical-path identity. The ordinary persistence-key exception remains pinned by `persistence_keys_are_caller_shaped_by_contract`. |
-| **Authority** | `src/dictionary/path.rs`; `src/mcp/state/physical_identity.rs`; `McpState::{semantic_owner_path,durable_owner_path}`; `src/mcp/tool_handlers/{core/provide,hydration/publication,edit}.rs`; Windows- and Unix-gated regressions in `src/tests/mcp/state.rs`, `workspace_query_hydration_fidelity.rs`, and `apply_edit_transaction.rs`; `src/tests/mcp/session_stats.rs`; `src/tests/mcp/sqlite_store.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [IDENT-001](invariants/identity-occurrences.md#ident-001-one-physical-file-one-stable-alias). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### EDIT-001 apply_edit Unit Verification & EOL Preservation
 
-| Property | Value |
-|----------|-------|
-| **Intent** | `apply_edit`'s optimistic-concurrency verification must be robust to transport-level line-ending normalization while never altering the file's stored ending convention. |
-| **Invariant** | EOL representation may differ across transport, but after normalization to the target file's convention, `expectedOldText` must match the tracked target bytes exactly. Incoming replacement/insertion text is adapted to the FILE's measured EOL convention before splicing — endings are never rewritten as a side effect and never mixed. Content differences beyond EOL width remain hard rejections. |
-| **Enforcement** | `edit::spans::{crlf_file_accepts_lf_normalized_copy_and_preserves_crlf_on_disk, lf_file_accepts_crlf_padded_copy_and_preserves_lf_on_disk, content_changes_are_still_rejected_regardless_of_eol}` — both transport directions plus a forged-content guard; the acceptance tests were RED pre-fix with exact newline-count deltas. |
-| **Authority** | `src/edit/apply.rs` (`verify_expected`, `to_unit_eol`, `unit_is_crlf`) |
-| **Type** | ENFORCED (test) |
-
----
+Current normative owner: [EDIT-001](invariants/framework-and-tooling.md#edit-001-apply_edit-unit-verification--eol-preservation). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### MCP-001 MCP Result Envelope Conformance
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Every externally exposed Clean-CTX MCP tool result MUST conform to the canonical MCP `CallToolResult` envelope so schema-validating MCP clients receive a renderable `content` channel. Domain-specific fields MUST NOT be emitted directly at the MCP result level. |
-| **Invariant** | The JSON-RPC `result` object of any successful tool call carries a non-empty `content` array (`[{type:"text", text:"..."}]`) as the human/model-readable representation. Machine-readable payloads, when applicable, live in `structuredContent` and are described by a declared `outputSchema` in `tools/list`. Metadata, when applicable, lives in `_meta`. No ad-hoc domain fields are permitted directly under `result`. `structuredContent`/`outputSchema`/`_meta` remain optional — the invariant is about valid canonical result structure, not about forcing every tool into structured output. Result-level failures use `isError: true` (errors that use the JSON-RPC `error` object are outside this envelope). |
-| **Enforcement** | Shared `crate::tests::assert_valid_mcp_envelope` applied at the dispatched-handler/wire boundary: CBM graph tools (`src/tests/cbm/handlers.rs`), `apply_edit` (`src/tests/mcp/apply_edit.rs`), all seven `workspace_query` operations (`src/tests/mcp/workspace_query.rs`, `src/tests/mcp/workspace_query_calls_in_file.rs`), comprehensive `outputSchema`↔`structuredContent` consistency (`src/tests/cbm/handlers.rs`, `src/tests/mcp/apply_edit.rs`, `src/tests/mcp/workspace_query.rs`, `src/tests/mcp/workspace_query_calls_in_file.rs`), Phase-3 migrated tools (`src/tests/mcp/phase3_contract.rs`), and the complete dispatched-handler coverage suite for remaining result-producing tools (`src/tests/mcp/envelope_contract.rs`). `compress_code_context`/`delta_code_context` remain the sole documented exceptions (R-46, deferred to 0.6.0). |
-| **Authority** | Reference implementation: `src/cbm/handlers.rs` (`handle_graph_search` — `content` + `structuredContent` + declared `outputSchema`). Shared helper: `src/tests/mod.rs::assert_valid_mcp_envelope`. |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [MCP-001](invariants/framework-and-tooling.md#mcp-001-mcp-result-envelope-conformance). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### MCP-002 Focused Context Requests Have One Explicit Fidelity Meaning
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A caller that requests selected method bodies must never receive a successful structural response in which that selection was silently ignored, nor have an explicit non-Edit choice silently overridden. |
-| **Invariant** | `provide_code_context.focusMethods` is Edit-only targeting. A non-empty focus with neither `fidelity` nor `intent` implies Edit. Explicit Edit fidelity or intent accepts focus. Any explicit non-Edit fidelity or intent conflicts and returns `-32602` before file IO or session mutation. An empty focus retains its specialized “Edit structure with no bodies” meaning and therefore requires explicit Edit fidelity or intent. Focus resolution and ambiguity rules remain governed by CTX-001 after this request-boundary validation. |
-| **Enforcement** | `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/tests/mcp/focus_fidelity_contract.rs` (implicit Edit, explicit-fidelity conflict, explicit-intent conflict, and empty implicit-focus rejection); existing canonical focus tests under `src/tests/ir/focus.rs` and `src/tests/mcp/control_full_content.rs`. |
-| **Authority** | `provide::evaluate::evaluate` request validation followed by `heuristics::decide` and canonical focus resolution |
-| **Type** | ENFORCED (request boundary + test) |
-| **Gate** | `cargo test --all-features focus_fidelity_contract_tests` |
-
----
+Current normative owner: [MCP-002](invariants/framework-and-tooling.md#mcp-002-focused-context-requests-have-one-explicit-fidelity-meaning). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Reading several independently useful source files in one MCP call must reduce repeated tool invocation, setup, and caller-orchestration overhead without creating a second compilation lifecycle, hiding item failures, weakening exact-text authority, or implying a cross-file transaction. Callers may avoid compatibility mirroring only through an explicit projection suited to a verified host. |
-| **Invariant** | `provide_code_context` accepts exactly one of singular `filePath` or batched `files`. A batch contains at most eight ordered items with unique non-empty IDs, shares top-level workspace/tokenizer scope, and evaluates items sequentially through the same typed single-file evaluator used by the legacy form. Successful items retain normal per-file persistence/publication/statistics effects. Batch-only `responseMode` resolves to `mirrored` when omitted, `structured`, or `indexed`, and the response declares `response_mode`. Mirrored places exact text in both each successful item's `content` and a `content_index`-identified top-level block. Structured places it only in the item and emits a routing notice. Indexed places it only in the indexed top-level block. Item failures remain ordered structured errors with no content and never suppress successful siblings. Later items resolving to an already evaluated canonical file fail locally so focus-sensitive state is never order-dependent. The outer cache identity includes the selected mode and covers the ordered successful blocks. An all-failure batch emits one non-authoritative fallback text block solely to preserve the non-empty MCP envelope; no item points to it. Batching grants no rollback, aggregate truncation, concurrency, retry, or cross-file edit authority. |
-| **Enforcement** | Structural separation in `src/mcp/tool_handlers/core/provide/{evaluate,batch,outcome}.rs`; public schema in `src/mcp/tool_schemas.rs` and `src/mcp/tools.rs`; tracked dispatch regressions in `src/tests/mcp/provide_code_context_batch.rs` cover request shape, ordered mixed modes, legacy parity, each exact placement contract, isolated failures, duplicate canonical files, all-failure envelope validity, and truthful token accounting. `src/tests/mcp/provide_code_context_response_mode_economics.rs` verifies distinct reusable mode-scoped cache identities and reports 2/4/8-item serialized sizes. |
-| **Authority** | `provide::evaluate::evaluate` owns the complete per-file lifecycle; `provide::batch` owns only structural validation, shared-field projection, ordered coordination, and the outer response/cache envelope. |
-| **Type** | STRUCTURAL and ENFORCED (test) |
-| **Gate** | `cargo test --all-features provide_code_context_batch_tests` and `cargo test --all-features response_modes_have_distinct_reusable_cache_identities_and_measured_sizes -- --nocapture` |
+Current normative owner: [MCP-003](invariants/framework-and-tooling.md#mcp-003-batched-context-reads-reuse-one-authoritative-file-evaluator). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
----
 ### IRWIRE-001 Semantic Binary Round Trip
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Binary compactness must never discard canonical identity, metadata, ordering, or occurrence multiplicity. |
-| **Invariant** | Physical binary `0x04` satisfies `decode(encode(value)) == value` for every valid supported `CompiledIR`. Decoding never fabricates empty or synthetic operands and rejects malformed, trailing, or unsupported-version input structurally. The Phase 7 delta version remains independent. |
-| **Enforcement** | `src/tests/ir/binary_wire_v04.rs`, `src/tests/ir/binary_wire.rs`, and `src/tests/ir/round_trip*.rs` enforce all-variant equality, duplicate/order, metadata, malformed-input, wrapper, randomized, and deterministic contracts. `src/tests/mcp/persistence_lifecycle.rs` crosses registered dispatch, buffered persistence, SQLite ownership, reload, corrected-delta replay, and byte-exact editing. |
-| **Authority** | `src/ir/binary_wire.rs`, `src/ir/binary_wire/decode.rs`, `src/mcp/sqlite_store/replay.rs`, and `docs/architecture/BINARY_V04_CONTRACT.md` |
-| **Type** | STRUCTURAL + ENFORCED (test), including user-verified Phase 8C production persistence |
-| **Gate** | Binary-wire and round-trip tracked tests plus the final verification gate |
+Current normative owner: [IRWIRE-001](invariants/identity-occurrences.md#irwire-001-semantic-binary-round-trip). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
----
 ### IRDELTA-001 Exact Occurrence-Preserving Delta Replay
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Incremental transport must reconstruct the canonical stream exactly; compactness never authorizes loss of repeated facts or semantic order. |
-| **Invariant** | Corrected delta protocol `dv: 2` satisfies `replay(base, delta(base, target)) == target`. Each positional edit carries typed semantic identity and occurrence ordinal; removals and replacements also carry the expected existing tuple. Replay validates position, tuple, identity, and occurrence before committing transactionally. Production emits only corrected sequence deltas. Legacy `+ / ~ / -` input is compatibility-only and fails when a target is ambiguous. Delta protocol versioning is independent of CoreOp binary serialization. |
-| **Enforcement** | `src/tests/ir/delta_sequence.rs` covers exact duplicates, same-target/different-payload facts, arbitrary positions, duplicate replacement, ordering, deterministic generation, compact round trip, conflict rollback, empty/equal algebra, and valid-stream property cases. `src/tests/mcp/delta_sequence.rs` covers real dispatched `delta_code_context` → corrected payload → `apply_delta`. |
-| **Authority** | `src/ir/delta/sequence.rs`, `src/ir/replay.rs`, `src/ir/replay/sequence.rs`, `src/mcp/tool_handlers/core/delta.rs` |
-| **Type** | STRUCTURAL + ENFORCED (test) |
-| **Gate** | `cargo test` |
+Current normative owner: [IRDELTA-001](invariants/delta-lifecycle.md#irdelta-001-exact-occurrence-preserving-delta-replay). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
----
 ### IRDELTA-002 Explicit Code-Side Delta Acknowledgement
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Delta generation must never silently mutate the canonical baseline, and acknowledgement must install exactly the server-authorized target state or install nothing. |
-| **Invariant** | `delta_code_context` leaves live canonical IR and indexed semantics at the acknowledged baseline while retaining one server-owned pending transition for the exact file, version pair, target hash, delta identity, and complete target edge set. Repeating generation against the same source is deterministic and replaces that same pending key rather than accumulating transitions. `apply_delta` requires the expected live version and exact pending authority; when persistence is enabled, it durably commits the canonical delta plus semantic snapshot before replacing live IR and indexed edges, then consumes only the matching transition. A rejected delta is never partially installed: state and pending authority remain coherent, while preflight may first complete a separately durable edit intent. Delta operations remain code-side auxiliary data; the repository ships the explicit server tools but no automatic production host consumer. |
-| **Enforcement** | `src/tests/mcp/durable_semantic_restore.rs` crosses dispatched generation, deterministic repeat generation, forged-transition rejection, mutation coherence, exact acknowledgement, durable restart/restore, index replacement, pending consumption, and replay rejection. `src/tests/mcp/delta_edit_recovery.rs` covers recovery ordering and recovery-failure atomicity. `src/tests/mcp/content_kind_lifecycle.rs` enforces the model-visible boundary. |
-| **Authority** | `src/mcp/durable_semantics.rs`, `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/delta_apply.rs`, `src/mcp/tool_handlers/core/delta/persistence.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
+Current normative owner: [IRDELTA-002](invariants/delta-lifecycle.md#irdelta-002-explicit-code-side-delta-acknowledgement). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
----
 ### IRDELTA-003 Delta Statistics Mirror the Successful Response Lifecycle
 
-| Property | Value |
-|----------|-------|
-| **Intent** | The read-only statistics dashboard must describe what a successful delta-capable handler actually returned; observability must not invent, omit, or double-count transport events. |
-| **Invariant** | Every successful `delta_code_context` response records exactly one session event using its resolved fidelity, Angular classification, selected token counts, and actual strategy. Initial, cached, and no-difference complete responses are `full`; a non-empty generated sequence delta is `delta` and retains the prior full-compression token baseline for efficiency accounting. Every `provide_code_context` response is independently recorded once as `full`. `context_stats` remains a read-only projection of this already-recorded state. |
-| **Enforcement** | `src/tests/mcp/delta_stats_lifecycle.rs` crosses registered dispatch for the dedicated full-baseline → external-change → generated-delta lifecycle and repeated complete provider reads. The regressions assert strategy, fidelity, Angular status, non-zero tokens, and per-file/session delta counts. |
-| **Authority** | `src/mcp/tool_handlers/core/delta.rs`, `src/mcp/tool_handlers/core/provide/evaluate.rs`, `src/mcp/session_stats.rs`, `src/mcp/tool_handlers/stats/mod.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-| **Relationship to IRDELTA-002** | IRDELTA-002 governs pending-transition authority and acknowledgement. IRDELTA-003 governs truthful observation of generation and complete-response events; recording statistics never applies or acknowledges a delta. |
+Current normative owner: [IRDELTA-003](invariants/delta-lifecycle.md#irdelta-003-delta-statistics-mirror-the-successful-response-lifecycle). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
----
 ### IRPAT-001 IR Identity Preservation During Consumptive Pattern Transformations
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Consumptive IR pattern compression must never corrupt the method-identity ownership relationship between a compressed `DefMethod` and the annotations that reference it. |
-| **Invariant** | A consumptive IR pattern transformation must not consume a `DefMethod(M)` while leaving surviving IR operations that reference `M` without a valid representation/ownership relationship. If an M-referencing operation cannot be represented within the resulting `PatternOp`, the pattern must decline compression rather than consume the `DefMethod` and orphan the reference. The currently relevant M-referencing operation kinds are `DataFlow`, `SideEffect`, `ExecutionContext`, `ControlFlow`, and `Body` — but the invariant governs ANY future M-referencing op kind. This is an **IR transformation invariant**, not a rule specific to Angular, TypeScript, constructors, or RxJS. |
-| **Enforcement** | `CompressingPatternRecognizer` declines CTOR/EMPTY_CTOR compression when an unrepresentable M-reference survives after the pattern's consumed span. Typed `PatternFacts` participate only as annotations; `Body` remains an unrepresentable reference that conservatively blocks compression. The Edit-fidelity regression asserts exact body text, exact absolute span endpoints, and `UnitTable` addressability after both production recognizers. |
-| **Authority** | `src/ir/patterns/recognize/guards.rs`, `src/ir/patterns/recognize.rs`, and `src/tests/ir/regression_ctor_pattern_orphan.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [IRPAT-001](invariants/identity-occurrences.md#irpat-001-ir-identity-preservation-during-consumptive-pattern-transformations). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### PATID-001 Method Identity Survives Pattern Recognition (F2)
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Pattern recognition classifies or summarizes a method; it must never erase the declaration identity that every downstream consumer depends on. |
-| **Invariant** | No IR transformation may delete an identity-bearing method declaration while emitting another op that still semantically refers to that method. The identity-bearing method facts are `DefMethod`, its `Param*`, and its `Return`. A consumptive pattern classification is therefore ADDITIVE: it is emitted AFTER the retained declaration ops and reports them to the caller as `PatternMatch::retained` (`src/ir/patterns/recognize.rs`). Only genuinely redundant, non-identity ops may still be summarized (`Injects` for CTOR, typed `PatternFacts(OVERRIDE)` for OVERRIDE, and adjacent typed pattern-annotation runs the wrapper consumes). `MethodModifiers` remain authoritative and are retained when adjacent to a classified declaration; `Async` is independent execution metadata and never changes a Promise contract into an Observable contract. Reinventing the declaration downstream — for example teaching the hierarchical encoder to rebuild a method from a `PAT` payload — is explicitly NOT a valid alternative: the canonical declaration already exists upstream. This is language-agnostic and pattern-agnostic: it governs every present and future consumptive recognizer. |
-| **Enforcement** | All seven consumptive recognizers report a `retained` count and `compress_merged` re-emits those ops unchanged before the `Pattern` op (`src/ir/patterns.rs`, `src/ir/patterns/recognize.rs`). Regressions: `src/tests/ir/pattern_identity.rs` (production-shape CTOR/PROMISE/OBSERVABLE/EMPTY_CTOR identity retention, the complete consumptive surface incl. OVERRIDE/GETTER/SETTER, the no-orphan-classification invariant across Low/Medium/High/Edit, and the structural compression-impact report) and `src/tests/ir/pattern_identity_downstream.rs` (hierarchical `MethodNode`, rendered `M` line, `UnitTable` addressing, semantic registration, and `Calls` caller identity). |
-| **Authority** | `src/ir/patterns/recognize.rs` (`PatternMatch`, `MatcherResult`), `src/ir/patterns.rs` (`compress_merged`); regressions `src/tests/ir/pattern_identity.rs`, `src/tests/ir/pattern_identity_downstream.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-| **Relationship to IRPAT-001** | IRPAT-001 is the decline rule that protects M-referencing annotations whose payload a `PatternOp` cannot represent. PATID-001 is the stronger, unconditional property that makes the identity survive regardless; IRPAT-001's conservative decline is retained unchanged (weakening it would newly compress shapes that have never been compressed — a separate compression-policy decision). |
-
----
+Current normative owner: [PATID-001](invariants/identity-occurrences.md#patid-001-method-identity-survives-pattern-recognition-f2). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### IRFACT-001 Derived Facts Use Declaration-Local Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Compiler-derived facts are presented as verified conclusions, so their evidence must belong to the declaration receiving the fact. |
-| **Invariant** | An additive fact keyed to method `M` may use only operations whose canonical owner is `M` and may not scan across the next declaration boundary for supporting evidence. Every evidence component required by the fact's established contract must be present; independent partial signals are not interchangeable. Downstream hierarchy and presentation layers project the canonical fact and must not infer, relocate, or repair its ownership. This rule applies to every derived fact family, not only `PatternFact::Observable`. |
-| **Enforcement** | `CodePatternRecognizer::try_observable_pattern` stops at the next `DefMethod` and accepts a qualifying Observable return only when its owner is the triggering method ID. Unit regressions reject neighboring-method evidence and non-Observable evidence; registered MCP regressions cover both `provide_code_context` and the initial-full `delta_code_context` path. |
-| **Authority** | `src/ir/layers/patterns.rs`, `src/tests/ir/layers/patterns.rs`, `src/tests/mcp/pattern_fact_ownership.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-| **Relationship to IRPAT-001 and PATID-001** | IRPAT-001 and PATID-001 preserve declaration identity during consumptive transformations. IRFACT-001 governs the separate additive-producer boundary: a surviving identity must not receive a fact derived from another declaration. |
-
----
+Current normative owner: [IRFACT-001](invariants/source-authority.md#irfact-001-derived-facts-use-declaration-local-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### IRFACT-002 Observable and Promise Classifications Are Semantically Disjoint
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A typed pattern name is a verified semantic conclusion. Observable and Promise are distinct contracts and must never be inferred from one another or from an unrelated execution modifier. |
-| **Invariant** | `PatternFact::Observable` and `PatternOp::Observable` require an owner-matched declared `Observable` or `IObservable` return type. `PatternOp::Promise` requires a declared `Promise` return or its canonical `$P` opcode. `Async` is independent method metadata: it neither establishes Observable identity nor prevents Promise identity. Body-level `df:reads:observable` remains independent because consuming or transforming an Observable does not imply returning one. Canonical classifications remain typed and available code-side; SCHEMA-vNext suppresses `pf:OBSERVABLE` and `P OBSERVABLE` only when the rendered `→ Observable<...>`/`IObservable<...>` return already states the same fact. This suppression is presentation-only and does not alter canonical IR or wire compatibility. |
-| **Enforcement** | Shared identifier-aware return predicates in `src/ir/patterns.rs` are the single semantic authority used by both additive and consumptive recognizers. The focused `observable_semantics` regressions cover genuine Observable returns, async Promises, declaration ownership, and SCHEMA-vNext redundancy collapse; production-shape identity and two-pass regressions retain the declarations and modifiers around both classifications. |
-| **Authority** | `src/ir/patterns.rs`, `src/ir/patterns/recognize.rs`, `src/ir/layers/patterns.rs`, `src/ir/render_llm.rs`; `src/tests/ir/observable_pattern_semantics.rs`, `src/tests/ir/layers/patterns.rs`, `src/tests/ir/render_llm.rs`, `src/tests/ir/pattern_identity.rs`, `src/tests/ir/patterns_pipeline.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-| **Relationship to IRFACT-001** | IRFACT-001 governs which declaration may supply evidence. IRFACT-002 governs what that owner-matched evidence is allowed to mean. |
-
----
+Current normative owner: [IRFACT-002](invariants/source-authority.md#irfact-002-observable-and-promise-classifications-are-semantically-disjoint). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### SEL-001 Selector-Value Invariant
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Semantic-edge object names must carry the exact semantic value declared by the source; index/lookup mechanics must never contaminate entity identity. |
-| **Invariant** | The `name` field of a `HasSelector` semantic edge's object `EntityRef` MUST contain the exact CSS selector string declared by the source code (`@Component({ selector: '...' })`), without artificial encoding, wrapping, or normalization. Distinct selector forms (`app-widget`, `[app-widget]`, `.app-widget`) are distinct semantic identities. |
-| **Enforcement** | `src/tests/angular_meta/semantic.rs::has_selector_preserves_literal_selector_forms` (literal extraction of all three selector forms + pairwise distinctness); `src/tests/workspace/index.rs::resolve_selector_literal_forms_are_distinct` (literal lookup through `WorkspaceIndex`, cross-form isolation). |
-| **Authority** | `src/angular_meta/semantic.rs` (`class_to_semantic_edges`), `src/workspace/index.rs` (`resolve_selector`) |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [SEL-001](invariants/framework-and-tooling.md#sel-001-selector-value-invariant). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### IDX-001 Index-Encoding Invariant
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Index/search mechanics are implementation detail; entity identity is semantic. The two must not be conflated. |
-| **Invariant** | Internal lookup-key encoding MUST NOT leak into semantic entity identity. `WorkspaceIndex` may derive lookup structures, but those encodings must not be reflected in `EntityRef.name`. Selector resolution is a distinct operation from generic name lookup — `resolve_selector()` performs literal lookup against the stored `HasSelector` object name rather than reconstructing an encoded key. |
-| **Enforcement** | `src/tests/workspace/index.rs::resolve_selector_literal_forms_are_distinct` (proves literal lookup and that distinct selector forms resolve independently — no cross-form match, no bracket-encoding match). |
-| **Authority** | `src/workspace/index.rs` (`resolve_selector`, `name_index`), `src/angular_meta/semantic.rs` (`HasSelector` construction) |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [IDX-001](invariants/identity-occurrences.md#idx-001-index-encoding-invariant). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### IDX-002 Edge Occurrence Identity Is Source-Occurrence Aware
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Two files may contain occurrences of the same semantic entity identity while asserting distinct edge evidence. The generic WorkspaceIndex edge layer must retain all of that evidence instead of collapsing equivalent-looking edges. |
-| **Invariant** | Semantic entity identity remains `(domain, entity_type, name)` with the file excluded (Model C, unchanged). Edge OCCURRENCE identity is `(asserting source occurrence, relation, subject semantic identity, object semantic identity)`. A repeated extraction of the same triple by the same asserting file produces one indexed occurrence; the same triple asserted by a different file is a distinct occurrence and must never suppress or be suppressed. Consequences: `forward_edges` returns every asserting occurrence's evidence; `reverse_edges` counts every real consumer occurrence; `remove_file` drops exactly the occurrences the removed file asserted and never another file's evidence for the same triple; removal work stays proportional to the affected file (`file_edges`), never to the accumulated workspace. The rule is framework-agnostic — Angular, .NET, Spring, and future semantic layers inherit it, and no semantic layer may compensate for it locally. |
-| **Enforcement** | `src/workspace/index/edges.rs` (`EdgeKey` includes the asserting file; occurrence-aware dedup in `add_edges`), `src/workspace/index/remove.rs` (`remove_file` prunes only `file_edges[file]` occurrences), `src/tests/workspace/index_edge_occurrence.rs` (RED-E1…RED-E5: identity, dedup, unique objects, union, forward/reverse evidence), `src/tests/workspace/index_edge_lifecycle.rs` (RED-E6…RED-E11: removal, recompilation, three-project collision, compile-order independence, unrelated names, dotnet-shaped cross-domain case), `src/tests/workspace/index.rs` (`same_edge_inserted_twice_is_indexed_once`, `edge_occurrence_dedup_preserves_cross_file_evidence`, `counters_reflect_insertion_and_dedup`), `src/tests/workspace/index_queries.rs` (`resolve_selector_unique_despite_cross_file_duplicate_selector`), `src/tests/workspace/index_performance.rs` (file-local removal work unchanged). |
-| **Authority** | `src/workspace/index.rs`, `src/workspace/index/edges.rs`, `src/workspace/index/remove.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [IDX-002](invariants/identity-occurrences.md#idx-002-edge-occurrence-identity-is-source-occurrence-aware). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-001 Authoritative Facts Do Not Imply Authoritative Coverage
 
-| Property | Value |
-|----------|-------|
-| **Intent** | WorkspaceIndex is demand-populated and session-scoped. Its facts are authoritative for the semantic evidence compiled into the index, but the index must never be presented as a complete picture of the workspace. |
-| **Invariant** | Absence of an entity or relationship from a partially populated `WorkspaceIndex` must never be represented as confirmed absence from the workspace. `workspace_query` results are authoritative for what Clean-CTX currently knows — never evidence of completeness beyond the configured discovery coverage. Result cardinality (including `0`) must never drive hydration decisions or completeness claims: `initial count == 0` is not "needs hydration" and `initial count > 0` is not "sufficiently covered". Discovery-provider absence or failure must never be represented as a successful zero-candidate workspace search. Hydration must process every discovered valid, previously-unindexed candidate needed for the query; a resource guard may not silently truncate semantic coverage. Any future guard that prevents exhaustive processing must explicitly report partial/truncated coverage. |
-| **Enforcement** | `src/mcp/tool_handlers/query/prepare.rs` owns request-local hydration execution and final-view deferral; the eligible family preparers in `query/{entities,edges,graph}.rs` perform registered hydration independently of initial result cardinality. `src/tests/mcp/workspace_query_2.rs::red9_partial_nonzero_hydration` proves a non-zero initial result remains hydration-eligible; `red10_fresh_index_hydration` covers a fresh empty index. Batch preparation and final-snapshot behavior are covered by `src/tests/mcp/workspace_query_batch_preparation.rs`. |
-| **Authority** | `src/mcp/tool_handlers/query/prepare.rs`, `src/mcp/tool_handlers/query/{entities,edges,graph}.rs`, `src/mcp/tool_handlers/hydration.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [WSC-001](invariants/source-authority.md#wsc-001-authoritative-facts-do-not-imply-authoritative-coverage). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-002 CBM Discovers Candidates; Clean-CTX Alone Determines WorkspaceIndex Semantics
 
-| Property | Value |
-|----------|-------|
-| **Intent** | CBM or the workspace filesystem may discover candidate files so Clean-CTX's own semantic graph becomes better populated, but advisory discovery semantics must never become WorkspaceIndex facts. The candidate-file boundary is deliberately narrow. |
-| **Invariant** | Healthy CBM discovery may span every configured CBM project associated with the workspace (primary root plus `additional_roots`) and may influence compilation scope only. When CBM cannot cover a configured root, deterministic filesystem discovery scans that trusted root for literal query-name occurrences in source extensions accepted by Clean-CTX's language registry. Filesystem discovery prunes its exact built-in metadata/dependency/build/cache directory set before enumeration and also honors additive configured exclusions. Either provider supplies candidate file paths only; graph relationships and textual matches are advisory and never become WorkspaceIndex facts. Candidate discovery is query-semantic aware: CBM declaration-oriented queries (`find_entities`, `forward_edges`, `transitive_dependencies`) discover target declarations, `reverse_edges` discovers possible inbound referrers, and filesystem fallback naturally considers every non-excluded source file containing the literal identity. There is no path from either provider to a WorkspaceIndex relationship without intervening `resolve_file_path_checked` → `compile_file_ir_focused` → Clean-CTX semantic extraction → `semantic_edges` → `WorkspaceIndex.add_edges`. A candidate that compiles but yields zero matching semantic edges contributes zero fabricated relationships. Provider and completion metadata are deterministic and observable, so zero candidates cannot silently conceal unavailable discovery. That metadata reaches an LLM as a SPARSE projection: expected state is omitted entirely and only exceptional, decision-relevant deviation is serialized (one optional `discovery` object with a compact completeness status, the engaged provider, the fallback reason, non-zero candidate counts and exceptional-only project entries), while the internal `HydrationReport` keeps the complete provider/completion/candidate/coverage record for debugging, telemetry and the regressions — LLM context cost is reduced without reducing observability. |
-| **Enforcement** | `src/mcp/tool_handlers/hydration.rs` (`discover_candidate_paths` — selects declaration or inbound-reference discovery and searches each configured project explicitly despite advisory local readiness; `select_candidates` — merged-pool normalization/dedup/exclude-indexed/deterministic sort with no semantic candidate ceiling; `compile_candidate` — trusted-root validation + existing compiler path; WorkspaceIndex updated only from returned `semantic_edges`); `src/mcp/tool_handlers/hydration/filesystem.rs` (exact safe-default directory pruning plus additive configured exclusions, no symlink following, authoritative language registry); `src/cbm/project_search.rs` (project-explicit declaration search and path-only inbound graph query do not mutate active-project state); `src/tests/mcp/workspace_query_2.rs::red11_cbm_authority_cardinality_isolation` and RED-12/13; `src/tests/mcp/workspace_query_3.rs` RED-15 through RED-22; `src/tests/mcp/workspace_query_4.rs` RED-23 through RED-28; `src/tests/mcp/workspace_query_5.rs` RED-C1 through RED-C6; `src/tests/mcp/workspace_query_7.rs` RED-S1 through RED-S9; `src/tests/mcp/workspace_query_diagnostics.rs` RED-DIAG1 through RED-DIAG8 and RED-DIAG14/15 (the LLM-facing projection: omission at expected state, compact status vocabulary, verbatim reason codes, non-zero-only counts, exceptional-only minimized project entries, structured truncation, and the pinned field set of a degraded answer) and `src/tests/mcp/workspace_query_diagnostics_response.rs` RED-DIAG9 through RED-DIAG13/15 (the same contract over the real dispatch path, including that the semantic payload stays byte-identical to the index answer). |
-| **Authority** | `src/mcp/tool_handlers/hydration.rs`, `src/mcp/tool_handlers/hydration/filesystem.rs`, `src/cbm/project_search.rs`, `src/tests/mcp/workspace_query_2.rs`, `src/tests/mcp/workspace_query_3.rs`, `src/tests/mcp/workspace_query_4.rs`, `src/tests/mcp/workspace_query_5.rs`, `src/tests/mcp/workspace_query_7.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [WSC-002](invariants/workspace-query.md#wsc-002-cbm-discovers-candidates-clean-ctx-alone-determines-workspaceindex-semantics). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-003 Hydration Discovery Is Session-State Work
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Discovery is the expensive half of hydration: a CBM project search (including its lazy-reindex gate) or a full filesystem walk-and-read of a root. Candidate publication is already deduplicated by current required semantic projections in `WorkspaceIndex`; discovery must be deduplicated too, or every repeated identical query pays the full discovery cost again only to discard the same candidates as already current. |
-| **Invariant** | Within one session/workspace state, when discovery for the same semantic target, discovery scope (provider + canonical root identity), discovery mode (`Declaration` for `find_entities` / `forward_edges` / `transitive_dependencies`, `InboundReference` for `reverse_edges`), and workspace generation has already completed **successfully**, that discovery MUST NOT be repeated until the scope's generation changes. **HYDRATION-CACHE:** discovery completion is committed only after every selected candidate has either demonstrated a current required semantic projection or successfully published one. A candidate publication failure leaves discovery incomplete and the candidate retryable. Only successful discovery and publication are recorded — including successful discovery that found zero candidates; failed, partial, still-indexing, CBM-unavailable, and candidate-publication-failed cycles are never recorded and remain retryable. A hydration cycle containing a candidate publication failure MUST report partial discovery status and MUST NOT establish reusable discovery completion for that cycle. Recorded state is completion only: no candidates, entities, edges, or query answers are cached, and every `workspace_query` answer is still evaluated against the live `WorkspaceIndex`. Each scope (CBM project or filesystem root) is invalidated independently, and the provider is part of the scope identity so a CBM result never suppresses the filesystem fallback for the same root. **HYDRATION-SINGLE-FLIGHT-001:** concurrent attempts may coalesce only when either execution could safely perform the other's hydration work. A flight communicates only that an attempt ended; it is never discovery, acquisition, proof, or publication authority. Every follower re-enters the ordinary authoritative checks after waking, and an incomplete or failed leader leaves remaining work retryable. Unrelated work-equivalence identities remain concurrent. |
-| **Enforcement** | `src/mcp/discovery_cache.rs` (generation-based scope/entry model; unit regressions in `src/tests/mcp/discovery_cache.rs`); `src/mcp/hydration_flight.rs` (session-owned keyed execution coordination with drop-safe retirement and coherent wait/notification); `src/mcp/tool_handlers/hydration.rs` + `src/mcp/tool_handlers/hydration/publication.rs` (two-phase completion commit and distinct published/current/failed outcomes); `src/mcp/tool_handlers/hydration/cache.rs` (the single check/mark boundary) and `src/mcp/tool_handlers/hydration/invalidation.rs` + `src/mcp/tool_handlers/edit.rs` (`apply_edit`) + `src/cbm/proxy.rs` (`index_repository`) + `src/mcp/state/source_cache.rs` (source-cache mtime/size staleness invalidates the whole cache); `src/tests/mcp/hydration_single_flight.rs` (equivalent work counts, incomplete-leader recheck/retry, and unrelated-key concurrency); `src/tests/mcp/workspace_query_8.rs` RED-H1…RED-H10 (counted discovery invocations through the cfg(test) project-search injection); `src/tests/mcp/workspace_query_9.rs` RED-FS1…RED-FS5 plus negative inbound refresh coverage (thread-local `scan` invocation counter plus `TraversalStats` file counts); `src/tests/mcp/workspace_query_publication_retry.rs` (successful discovery followed by one forced publication failure, no failed projection, equivalent-query retry, successful publication, already-current control, and subsequent completion-cache hit). |
-| **Authority** | `src/mcp/discovery_cache.rs`, `src/mcp/hydration_flight.rs`, `src/mcp/tool_handlers/hydration.rs`, `src/mcp/tool_handlers/hydration/cache.rs`, `src/mcp/tool_handlers/hydration/invalidation.rs`, `src/mcp/tool_handlers/hydration/filesystem.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
-For exact incoming builtin TypeRef acquisition, the provider-bearing discovery
-cache above is only an execution optimization. It cannot satisfy a coverage
-unit or suppress authoritative Clean acquisition. The provider-neutral
-`AcquisitionCompletionCache` separately keys and retains proof-backed unit
-satisfaction after successful publication; its root generations share the edit,
-delete, restore, refresh, and external-change invalidation lifecycle. Current
-CBM searches contribute hints only because CBM exposes no compatible inventory,
-generation, producer, or exhaustiveness proof.
-
----
+Current normative owner: [WSC-003](invariants/workspace-query.md#wsc-003-hydration-discovery-is-session-state-work). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-019 Provider Health and Provider Authority Are Independent
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Sparse discovery diagnostics must distinguish provider failure from a healthy provider response that cannot authorize the request's required proof scope. |
-| **Invariant** | Provider health/readiness and provider authority are independent. `cbm_scope_unavailable` means CBM did not provide authoritative coverage for the request's required scope or proof contract. CBM may still have responded successfully and contributed advisory candidates; this reason does not by itself indicate a CBM failure. `cbm_unavailable`, `cbm_discovery_failed`, and `cbm_partial_failure` retain their existing provider-state meanings. Optional provider output never becomes implicit authority for Clean-CTX semantic truth or completeness. |
-| **Enforcement** | The `workspace_query` output schema documents the public interpretation. `src/tests/mcp/workspace_query_diagnostics.rs::red_diag3_fallback_reason_surfaced` pins the compatible combined-provider response after a ready successful CBM search; `src/tests/mcp/workspace_query_3.rs::workspace_query_schema_declares_sparse_discovery_diagnostics` pins the schema wording. |
-| **Authority** | `src/mcp/tools.rs`, `src/mcp/tool_handlers/hydration.rs`, `src/tests/mcp/workspace_query_diagnostics.rs`, `src/tests/mcp/workspace_query_3.rs` |
-| **Type** | DOCUMENTED and ENFORCED (test) |
-| **Gate** | Focused workspace-query diagnostic and schema tests; complete repository gate in CI |
-
----
+Current normative owner: [WSC-019](invariants/source-authority.md#wsc-019-provider-health-and-provider-authority-are-independent). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-004 Workspace Queries Respect Declared Workspace Scope
 
-| Property | Value |
-|----------|-------|
-| **Intent** | `WorkspaceIndex` deliberately retains the evidence of every repository a session has compiled — that retention is what makes entity ambiguity and cross-file edge evidence truthful — so a query must state which workspace it is asking about. Without a declared scope, a query issued FOR one repository answered with real, semantically valid facts authored by another repository that merely happened to share the session (`reverse_edges` returning unrelated `OrderBy` callers; `find_entities` returning a same-named entity of another project; `transitive_dependencies` walking through another repository's edges; `has_cycle` reporting a cycle assembled from two repositories' halves). |
-| **Invariant** | When `workspace_query` explicitly declares a workspace root, occurrence-bearing results MUST be restricted to semantic evidence belonging to that root plus its configured `additional_roots`. Scoping is a query-time VIEW over globally retained facts: it MUST use source/file provenance — `StoredEdge::asserting_file` for edge occurrences, `EntityRef.file` for entity occurrences — decided by the single shared `WorkspaceScope::admits` rule; it MUST NOT alter Model C identity (`(domain, entity_type, name)`), MUST NOT delete or mutate unrelated workspace evidence, MUST NOT introduce query-specific root parsing, per-repository partitioning, new caches or secondary indexes, and MUST NOT let discovery evidence (CBM) become authoritative. One root set is built per query so the initial answer and the post-hydration rerun are scoped identically. For graph traversal the scope MUST be applied DURING traversal, never to the returned list, because reachability and cycle membership are properties of the walk (`A -> X` in the workspace plus `X -> Y` elsewhere must not report `Y`). `entities_in_file` is the exception that proves the rule: its explicit `file_path` is already validated against the trusted-path/root boundary (component-wise containment), so the accepted set is exactly primary root plus configured additional roots and the path itself is the scope — no redundant occurrence filter is added. A query that declares NO workspace root remains unscoped (the global/session view) and no fallback root may be substituted. |
-| **Enforcement** | `src/workspace/scope.rs` (`WorkspaceScope::new` / `admits` — the one root-set authority, canonicalized through `canonical_identity_key`, component-wise containment so `repo` never admits `repo-old`); `src/workspace/index.rs` (`selected_occurrences` for edge occurrences, `entity_occurrence_admitted` + `find_entities_by_name_in_scope` for entity occurrences); `src/workspace/index/traversal.rs` (`has_cycle_in_scope`, `transitive_dependencies_in_scope` — adjacency-level filtering plus the start-occurrence guard); `src/mcp/tool_handlers/query.rs` (`query_scope` is the only root parser; every occurrence-bearing handler dispatches to the scoped variants); regressions `src/tests/mcp/workspace_query_scope.rs` + `workspace_query_scope_provenance.rs` (RED-SCOPE1–RED-SCOPE10: edge isolation, root identity, lifecycle, object-provenance and root-less controls), `src/tests/mcp/workspace_query_scope_entities.rs` (RED-WSC4-1–RED-WSC4-4), `src/tests/mcp/workspace_query_scope_traversal.rs` (RED-WSC4-5–RED-WSC4-12 plus the start-occurrence guard). |
-| **Authority** | `src/workspace/scope.rs`, `src/workspace/index.rs`, `src/workspace/index/traversal.rs`, `src/mcp/tool_handlers/query.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [WSC-004](invariants/workspace-query.md#wsc-004-workspace-queries-respect-declared-workspace-scope). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-005 File-Local Call Inspection Retains Canonical Owner and Occurrence Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Model C WorkspaceIndex identity is intentionally global and owner-agnostic for methods, so cross-file graph queries cannot distinguish same-named methods owned by different types in one file or isolate overload declarations. Precise file-local inspection must answer from the richer canonical representation without changing global identity or pretending that a post-projection filter can recover discarded evidence. |
-| **Invariant** | `workspace_query(type="calls_in_file")` MUST resolve one trusted source file under `workspaceRoot` plus configured `additional_roots`, honor the shared optional `withinPath` narrowing, and compile a read-only High-fidelity canonical candidate for that request. It MUST NOT hydrate, read answers from, or publish facts into `WorkspaceIndex`; install alias/version/IR-baseline state; mutate source; acknowledge delta transport; expose canonical IDs; or claim resolved callee identity. Selection MUST use typed owner kind+name and method name. An omitted signature selector returns the complete same-name overload family in declaration order; supplied `parameters` and `return_type` selectors match exactly; a missing match returns zero; duplicate matching typed owners are ambiguous (`-32602`) and MUST NOT be guessed. Results MUST preserve overload occurrence, call order, duplicates, callee spelling, written argument-node count, and spread evidence. Existing cross-file operations and Model C identity remain unchanged. |
-| **Enforcement** | `src/mcp/tool_handlers/query/calls.rs` (trusted path, shared scope, canonical candidate compilation, exact typed-owner/signature selection, occurrence projection); `src/mcp/tool_handlers/query.rs` (production dispatch without hydration); `src/mcp/tools.rs` (public schema); `src/tests/mcp/workspace_query_calls_in_file.rs` (same-file owner isolation, overload-family and exact-selector behavior, duplicate/order/spread preservation, fresh source observation without state publication, ambiguity rejection, and registered schema contract). |
-| **Authority** | `src/mcp/tool_handlers/query/calls.rs`, `src/ir/hierarchical.rs`, `src/mcp/tool_helpers.rs::compile_file_ir_candidate` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features mcp::tool_handlers::query::tests_calls_in_file` |
-
----
+Current normative owner: [WSC-005](invariants/workspace-query.md#wsc-005-file-local-call-inspection-retains-canonical-owner-and-occurrence-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-006 File-Local Semantic Coverage Is Fidelity- and Source-Aware
 
-| Property | Value |
-|----------|-------|
-| **Intent** | `entities_in_file` must answer an explicit authorized file in one call without confusing an uncompiled file, stale projection, or insufficient semantic fidelity with a genuine empty result. |
-| **Invariant** | WorkspaceIndex owns semantic coverage beside the file occurrences it qualifies: canonical file identity, normalized semantic fidelity, and source hash. A projection is reusable only when its hash matches current source and its fidelity is at least the requested semantic level. Query Edit/Verbatim normalize to High; an actual Edit/Verbatim compilation does not claim High completeness because extractors are not globally monotonic. Missing, stale, or insufficient coverage compiles a read-only candidate and atomically replaces the file's entities, edges, and coverage, including an empty edge set. Removal clears coverage with occurrences. Query-only compilation creates no session alias, rendered context, persistence record, or compression-statistics claim. |
-| **Enforcement** | `src/workspace/index/coverage.rs`; `src/workspace/index/remove.rs`; `src/mcp/tool_handlers/query/entities.rs`; `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/tests/mcp/workspace_query_entities_auto_compile.rs` (one-call first touch, invalid fidelity, schema, High→Low reuse without recompilation, Low→Medium .NET action upgrade, source invalidation, empty replacement, no context/alias publication, and provide→query reuse). WSC-004 suites retain path/root/withinPath authority. |
-| **Authority** | `WorkspaceIndex::has_current_semantic_projection`, `WorkspaceIndex::replace_semantic_projection`, `SemanticFidelity` |
-| **Type** | ENFORCED (state ownership + test) |
-| **Gate** | `cargo test --all-features tests_entities_auto_compile` |
-
----
+Current normative owner: [WSC-006](invariants/projection-fidelity.md#wsc-006-file-local-semantic-coverage-is-fidelity--and-source-aware). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-007 Dependency-Cycle Results Are Witnessed, Scoped Index Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | `has_cycle` must return an actionable architectural dependency cycle without implying that the retained index is a complete or fresh inventory of every source file in the workspace. |
-| **Invariant** | `workspace_query(type="has_cycle")` defaults to and currently accepts only `kind="dependency"`; unknown kinds return `-32602`. A dependency cycle may contain only `SemanticRelation::Injects` and `ImportsModule`; native calls, containment, routing, mapping, testing, event flow, and `Autowired` are excluded. The existing boolean and the ordered closed witness share one index-owned iterative traversal. Nodes use semantic tuple identity `(domain, entity_type, name)`; every witness edge retains its asserting file. Multiple admitted physical occurrences of a witness identity are disclosed through `identity_ambiguous` and `identity_ambiguities`, never presented as unique physical resolution. Workspace scope and `withinPath` filter edge occurrences during traversal. Stable node and query-local edge ordering make witness selection independent of insertion history; the full query includes node/edge sorting rather than claiming plain DFS complexity. Responses explicitly report `indexed_evidence_only` and `source_complete=false`. The operation performs no discovery, hydration, source compilation, persistence, rendered-context publication, or statistics mutation. |
-| **Enforcement** | `src/workspace/index/traversal.rs` owns relation eligibility, deterministic witness reconstruction, scope filtering, and identity-ambiguity projection. `src/mcp/tool_handlers/query/graph.rs` owns kind validation and the additive MCP response. `src/tests/workspace/index_cycle_policy.rs` covers approved/excluded/mixed relations, self-loops, acyclic graphs, deterministic insertion-order independence, provenance, and scoped isolation. `src/tests/mcp/workspace_query_cycle_witness.rs` covers the compatible boolean, ordered witness, invalid kind, honest coverage, collision disclosure, empty response, and absence of compile/cache/statistics side effects. Existing WSC-004 suites retain root/additional-root/`withinPath` security authority. |
-| **Authority** | `WorkspaceIndex::dependency_cycle_witness`, `WorkspaceIndex::dependency_cycle_witness_in_scope`, `prepare_has_cycle` |
-| **Type** | ENFORCED (state ownership + test) |
-| **Gate** | `cargo test --all-features cycle_policy_tests` and `cargo test --all-features tests_cycle_witness` |
-
----
+Current normative owner: [WSC-007](invariants/workspace-query.md#wsc-007-dependency-cycle-results-are-witnessed-scoped-index-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-008 Incomplete Query Identity Resolves Once Without Guessing
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A caller that knows an entity name should not need a separate `find_entities` round trip solely to discover domain/type, while incomplete identity must never be resolved by arbitrary occurrence ordering. |
-| **Invariant** | `forward_edges`, `reverse_edges`, and `transitive_dependencies` preserve the complete `(domain, entity_type, name)` fast path. When either classification field is omitted, the request ensures its existing registered hydration occurs exactly once per equivalent request-local requirement, then selects occurrences from the exact-name bucket inside the effective workspace/`withinPath` scope, applies every supplied classification field as an exact filter, and groups physical occurrences by semantic identity. Exactly one identity proceeds; zero returns explicit not-found and multiple return `-32602` with distinct deterministic candidates. Repeated files carrying the same semantic identity are not ambiguity. The response exposes `resolved_identity`; resolution never changes Model C identity, scope, edge provenance, or traversal semantics. |
-| **Enforcement** | `src/mcp/tool_handlers/query/identity.rs` owns shared scoped resolution against a caller-provided final index view; `src/mcp/tool_handlers/query/{edges,graph}.rs` retain query-family hydration and semantics. `src/tests/mcp/workspace_query_identity_resolution.rs` covers forward/reverse/traversal resolution, occurrence deduplication, partial filtering, deterministic ambiguity, and explicit not-found. `src/tests/mcp/workspace_query_batch_preparation.rs` ensures batched index-backed operations share the post-preparation view. Existing WSC-004 suites protect scope/provenance and existing exact-identity suites protect compatibility. |
-| **Authority** | `IdentityRequest::resolve`, `WorkspaceIndex::find_entities_by_name[_in_scope]`, exact identity query methods |
-| **Type** | ENFORCED (shared boundary + test) |
-| **Gate** | `cargo test --all-features tests_identity_resolution` |
-
----
+Current normative owner: [WSC-008](invariants/workspace-query.md#wsc-008-incomplete-query-identity-resolves-once-without-guessing). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-009 Workspace Query Batches Isolate Outcomes and Share Final Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A caller may combine independent workspace questions into one request without allowing one invalid item to erase valid siblings or allowing preparation order to give index-backed items different evidence views. |
-| **Invariant** | `workspace_query` accepts either one legacy operation or one heterogeneous `queries` batch, never both. A batch contains 1..=32 uniquely identified items and owns one top-level `workspaceRoot`/`withinPath` scope; item scope overrides are rejected before work. Structurally valid items prepare sequentially. Equivalent hydration requirements (same discovery mode and exact name under that shared root configuration) execute once per request, including failed jobs, without adding persistent cache state. After all preparation, every index-backed item—including incomplete identity selection—evaluates in input order under one final WorkspaceIndex read view. File-local `calls_in_file` remains a fresh unpublished canonical candidate. Every accepted item produces exactly one ordered `ok` or `error` outcome; item-local validation, discovery, compilation, not-found, or ambiguity failures do not suppress independent siblings. The legacy single request and `clean-ctx/workspace-query-answer` v1 envelope remain unchanged; batch content uses `clean-ctx/workspace-query-batch-answer` v1. |
-| **Enforcement** | `src/mcp/tool_handlers/query/batch.rs`, `prepare.rs`, `identity.rs`, and `content.rs`; public schemas in `src/mcp/tool_schemas.rs` and `src/mcp/tools.rs`; `src/tests/mcp/workspace_query_batch.rs` and `workspace_query_batch_preparation.rs` cover request exclusivity, ordered heterogeneous results, failure isolation, schema/envelope shape, hydration deduplication, one final view, and file-local non-publication. Existing single-query suites protect compatibility. |
-| **Authority** | `batch::try_execute`, `PreparationContext`, `PreparedQuery`, and the registered `workspace_query` schema |
-| **Type** | STRUCTURAL + ENFORCED (request boundary + test) |
-| **Gate** | `cargo test --all-features mcp::tool_handlers::query` |
-
----
+Current normative owner: [WSC-009](invariants/workspace-query.md#wsc-009-workspace-query-batches-isolate-outcomes-and-share-final-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ANG-DI-001 Angular Constructor Injection Is Modifier- and Formatting-Independent
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Angular constructor DI identity is semantic, not syntactic. TypeScript parameter-property modifiers control property generation; they must never gate Angular injection extraction, and source formatting must never alter semantic extraction. |
-| **Invariant** | Within a class already recognized as an Angular DI class (a `@Component` / `@Injectable` / `@Directive` / `@Pipe` / `@NgModule` decorator is required before extraction runs — the class-level gate), a **typed** constructor parameter is a constructor injection regardless of whether it also declares a parameter property. `private foo: FooService`, `public foo: FooService`, `protected foo: FooService`, `readonly foo: FooService`, `private readonly foo: FooService`, and `foo: FooService` are equivalent for DI and MUST each contribute exactly one `SemanticRelation::Injects` edge (`angular`, subject class → `angular`/`Service`/`<parameter type>`). Parameter decorators (`@Inject(...)`, `@Optional()`, …) are DI metadata and must not hide the parameter type; the injection identity remains the parameter type. Type-eligibility rules are unchanged (no primitive filter is added or removed, and generic/qualified type names keep the pre-existing leading-identifier reduction). Formatter layout (single-line, multiline, trailing comma, line breaks between decorator / modifier / name / type) MUST NOT change the resulting edges. Ordinary non-Angular TypeScript constructors MUST NOT gain Angular `Injects` edges. Deduplication remains the `WorkspaceIndex` write-boundary contract — the extraction emits one edge per parameter. |
-| **Enforcement** | `src/tests/angular_meta/constructor_injects.rs` (RED-DI1…RED-DI10 extraction-level parity, decorator preservation, formatting independence, single-injection-per-parameter, Φinjects projection); `src/tests/angular_meta/constructor_di_edges.rs` (RED-DI1…RED-DI10 + RED-W1/W2/W3 through the production path: `IRCompiler` → `MetaLayerPass` → `AngularMetaLayer` → `SemanticRelation::Injects` → `WorkspaceIndex` forward/reverse queries, plus the non-Angular class guard). |
-| **Authority** | `src/angular_meta/constructor_injects.rs` (extraction; single source of truth for the `injects` list consumed by `class_to_semantic_edges` and the `Φinjects:` marker), `src/angular_meta/decorators.rs` (`extract_graph_entries` — the class-level Angular gate), `src/angular_meta/semantic.rs` (`class_to_semantic_edges`) |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test` |
-
----
+Current normative owner: [ANG-DI-001](invariants/framework-and-tooling.md#ang-di-001-angular-constructor-injection-is-modifier--and-formatting-independent). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CTX-001 Canonical Semantics and Representation Authorities Stay Distinct
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Token savings and representation changes must never blur semantic correctness, physical persistence, auxiliary wire views, and model-facing presentation. |
-| **Invariant** | Canonical `CompiledIR` plus semantic-edge state preserves explicit typed identity, ownership, occurrence order/grouping/duplicates, unresolved written call names and written-arity/spread evidence, injection facts, edge relation/layer/file provenance, and exact bodies/spans when compiled. Normalized `CONTROL-FULL` is the regenerated semantic correctness oracle, not stored text and not the model-visible presentation. Physical binary `0x04` plus the aligned semantic-edge snapshot is the durable baseline authority; checked `dv:2` history is incremental canonical transport. Reduced `result.ir` is non-reversible auxiliary output. Superseded COMPACT-A1/A3 code is retired; A2 `pretty_text` remains non-authoritative compatibility/diagnostic data and is never used to restore canonical state. `focusMethods` resolves typed owners into canonical method IDs before bodies are filtered: bare selectors spanning owners and duplicate qualified owners are errors; a same-owner overload family selects every canonical occurrence. Verbatim remains the explicit whole-document source mode. |
-| **Enforcement** | `src/ir/control_full.rs` and `src/ir/focus.rs`; exact-oracle and focus regressions under `src/tests/ir/control_full.rs` and `src/tests/ir/focus.rs`; registered MCP dispatch regressions under `src/tests/mcp/control_full_content.rs`; language call regressions under `src/tests/ir/calls_{typescript,java,csharp,rust}.rs`; injection rendering regressions under `src/tests/ir/render_llm_meta.rs` and `src/tests/mcp/tool_handlers_render.rs`. |
-| **Authority** | `src/ir/{compiler,control_full,binary_wire}.rs`, `src/ir/focus.rs`, `src/mcp/sqlite_store/{replay,semantic_state}.rs`, `src/mcp/tool_handlers/core/content.rs`, `docs/architecture/{BINARY_V04_CONTRACT,LLM_CONTEXT_COMPRESSION_RESEARCH}.md` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-
----
+Current normative owner: [CTX-001](invariants/projection-fidelity.md#ctx-001-canonical-semantics-and-representation-authorities-stay-distinct). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### PERSIST-001 Automatic Checkpoints Are Policy; Accepted Mutations Are Durable Authority
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Operators must be able to keep ordinary context reads session-only without weakening crash recovery, edit safety, or explicitly requested persistence. |
-| **Invariant** | `persistence.enabled = false` creates no durable store. With persistence enabled, `auto_save = true` checkpoints canonical read-produced baselines before publishing their live owners; `auto_save = false` leaves ordinary `provide_code_context`, `compress_code_context`, and read-only delta-generation results session-only until `save_context`. Edit-fidelity baselines remain durable because they establish safe edit authority. Accepted `apply_edit` and `apply_delta` transitions, explicit saves, and explicit deletions remain durable regardless of `auto_save`. Verbatim and Angular-template presentations are never checkpointed because they own no canonical IR. Every required checkpoint atomically aligns canonical IR, semantic edges, source hash, version, fidelity, and compatibility identities before live publication. The complete payload is captured from one owner authority epoch while holding that owner's guard; persistence I/O may follow after capture and does not require a global authority lock. |
-| **Enforcement** | `src/mcp/tool_handlers/core/provide_persistence.rs` owns read-checkpoint policy; canonical producers consult it before live publication. Mutation handlers retain their independent transactional persistence boundaries. `src/tests/mcp/auto_save_contract.rs` covers disabled persistence, manual session-only reads, every canonical automatic producer, explicit save/restart/restore, and mandatory Edit authority. `src/tests/mcp/delta_fidelity_persistence.rs` covers accepted delta durability with auto-save disabled. Existing baseline-publication and edit-transaction regressions enforce failure atomicity. |
-| **Authority** | `src/config.rs` (`PersistenceConfig`), `src/mcp/tool_handlers/core/{provide_persistence,provide,compress,delta,delta_apply}.rs`, `src/mcp/tool_handlers/edit.rs`, `src/mcp/tool_handlers/persistence/mod.rs` |
-| **Type** | ENFORCED (test) |
-| **Gate** | `cargo test --all-features` |
-
----
+Current normative owner: [PERSIST-001](invariants/persistence-publication.md#persist-001-automatic-checkpoints-are-policy-accepted-mutations-are-durable-authority). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### PERSIST-002 Durable Authority Requires Scoped Compatibility Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Structurally decodable durable state must never become live canonical or semantic authority under a runtime that would have produced different facts. |
-| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Structural decoding, intrinsic semantic validation (`Calls` iff call evidence exists), current-source/fidelity validation, canonical compatibility, and semantic compatibility precede their respective live adoption/publication boundaries. Canonical IR validity and derived-semantic validity are separate: a semantic snapshot records every external source actually consulted by its producer, and reuse or adoption requires each recorded source identity/hash state to remain current; missing, changed, or restored dependencies force current-source semantic derivation while relationship ownership remains with the asserting source. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
-| **Publication** | `CompatibleCanonicalState` and `CompatibleSemanticProjection` are the typed evidence boundary. Compatible restore, replay, recovery, and mutating delta publication share `McpState::publish_compatible_semantic_projection`; coverage is recorded only for the projection's own source hash and a certifiable compilation fidelity. WorkspaceIndex stores coverage but owns no compatibility policy. |
-| **Producer generations** | Each producing module owns its generation constant and increments it only when identical relevant inputs can yield different durable canonical facts, markers, or semantic edges. Configuration changes are represented by configuration identity instead. Refactors with identical durable output do not bump generations, and unrelated producers are never bumped together. |
-| **Diagnostics** | Rejections expose a stable structured `reason` and affected `component`; human-readable details may describe source hashes or fidelity but never substitute for the structured classification. |
-| **Enforcement** | Identity determinism and scoping: `src/tests/mcp/durable_compatibility_identity.rs`. Atomic persistence and legacy absence: `durable_compatibility_persistence.rs`. Pure validation: `durable_compatibility_validation.rs`. Production restore/replay/delta/recovery/publication: `durable_restore_compatibility.rs`, `historical_replay_compatibility.rs`, `delta_compatibility_epoch.rs`, `delta_fidelity_persistence.rs`, `semantic_publication_recovery.rs`, `delta_edit_recovery.rs`, and `replay_edit_recovery.rs`. |
-| **Authority** | `src/mcp/compatibility/{identity,producer,validator}.rs`; `src/mcp/sqlite_store/{compatibility_schema,semantic_state,edit_intent}.rs`; `src/mcp/durable_semantics.rs`; restore, replay, delta, and edit handlers under `src/mcp/tool_handlers/` |
-| **Type** | STRUCTURAL + ENFORCED (test) |
-| **Gate** | Focused compatibility authorities plus the final `cargo test --workspace --all-targets --all-features` and zero-warning Clippy gate |
-
----
+Current normative owner: [PERSIST-002](invariants/persistence-publication.md#persist-002-durable-authority-requires-scoped-compatibility-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### AUTH-001 Refinement Joins Authority; It Never Manufactures It
 
-**Status:** ENFORCED
-
-Framework/domain classification, exact declaration binding, and source
-occurrence evidence retain their own producers. A refinement stage may publish
-a joined fact only when every required authority is current and compatible.
-Name, spelling, proximity, or shared storage never supplies a missing authority.
-
-**Enforcement:** producer-specific extraction plus exact Angular/C# refinement.
+Current normative owner: [AUTH-001](invariants/source-authority.md#auth-001-refinement-joins-authority-it-never-manufactures-it). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### MECHANISM-REUSE-001 Equivalent Mechanics Are Shared; Semantics Keep Their Owners
 
-**Status:** DOCUMENTED (architectural and certification review; not a new executable gate)
-
-Cross-cutting semantic mechanics SHOULD be shared across language and meta-layers
-whenever their authority, lifecycle and correctness contracts are equivalent.
-Specialized layers own semantic interpretation and policy; they SHOULD NOT
-independently recreate equivalent lower-layer authority or shared infrastructure.
-A parallel implementation of equivalent machinery requires an explicit architectural
-reason. Equivalence of contract, rather than similarity of code, governs reuse.
-
-When a lower layer already establishes a fact authoritatively, a higher layer
-MUST NOT manufacture competing authority for that fact merely for convenience.
-Prove at the lowest authoritative owner, retain and transport the evidence,
-reuse it, then specialize its meaning above that boundary. This complements
-AUTH-001, ARCH-002/003/004 and the question-driven semantic envelope; it does not
-replace any authority, identity, completeness or production-integration obligation.
-
-For each material addition, first distinguish mechanics from semantic interpretation.
-For mechanics, inspect existing acquisition/snapshots, project context, identity
-transport, provenance/witnesses, dependencies/currentness, generations/compatibility,
-persistence/restoration, publication, relation deduplication/selection/replacement/
-retirement, completeness and query transport. Reuse or extend an existing mechanism
-when those contracts match. When none matches, choose the smallest correctly owned
-mechanism justified by demonstrated consumers. Interpret specialized meaning at its
-authoritative layer: language binding in the language authority, Angular roles in
-Angular, and DI/NgRx/forms/routes or other specialized relationships in their owners.
-
-Different evidence, authority, lifecycle dependencies, identity forms, completeness,
-publication, invalidation or query contracts can justify specialized implementations.
-Record the actual difference; a shared consumer does not by itself require a shared
-producer. Repeated code is a review signal, not automatic proof of a defect. Compare
-concrete requirements before extracting common mechanics; do not build a universal
-framework around hypothetical future layers or remove specialized machinery before
-equivalence has been demonstrated.
-
-Material consumer reviews MUST identify identity/authority origins; acquisition and
-retained provenance; currentness and persistence/restoration; publication, duplicate
-prevention and retirement; completeness representation; shared infrastructure and
-specialized interpretation. Explain equivalent parallel paths and planned migration
-or their explicit architectural justification. Correct point answers alone do not
-prove correct ownership. Review applies to every layer/meta-layer touched, while
-unrelated historical debt remains separately recorded rather than triggering an
-unbounded repository-wide refactor.
-
-**Enforcement:** existing architecture audit and Language/Meta-Layer Certification
-Standard §9 review. This convention does not claim automatic enforcement, certify
-current implementations, authorize a redesign or change the existing runtime gate.
+Current normative owner: [MECHANISM-REUSE-001](invariants/completion-governance.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-012 Workspace Tuple Identity Is Not Exact Declaration Identity
 
-**Status:** ENFORCED
-
-The (domain, entity_type, name) tuple groups WorkspaceIndex occurrences.
-Multiple declarations may share that tuple. Consumers needing exact
-declaration/member/overload identity must establish it independently from
-current source evidence.
-
-**Enforcement:** occurrence-preserving WorkspaceIndex storage, declaration
-authority, and language-specific resolvers.
+Current normative owner: [WSC-012](invariants/identity-occurrences.md#wsc-012-workspace-tuple-identity-is-not-exact-declaration-identity). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-013 Authoritative Query Truth Is History-Independent
 
-**Status:** ENFORCED FOR CERTIFIED DOMAINS; LOWER-BOUND FAMILIES EXPLICIT
-
-Warm state may reduce acquisition cost but may not improve semantic truth.
-Authoritative batch items union acquisition requirements before final
-interpretation and use one compatible post-acquisition generation. Generic
-indexed graph families remain explicitly lower-bound where closure is unproved.
-Exact reverse builtin TypeRef queries may become authoritative only through the
-proof-backed acquisition lifecycle for every active producer unit.
-
-**Enforcement:** query preparation, batch coordination, proof-backed acquisition
-cache, and coverage projection; `workspace_query_reverse_edge_completeness.rs`
-pins exact/partial and cold/warm equivalence.
+Current normative owner: [WSC-013](invariants/workspace-query.md#wsc-013-authoritative-query-truth-is-history-independent). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-014 Completeness Is Earned from Evidence, Not Population
 
-**Status:** ENFORCED
-
-Completeness requires declared scope, complete proof coverage of every required
-provider-neutral coverage unit, satisfied evidence requirements, a compatible
-source generation, producer support, and valid dependencies.
-File-scoped exactness is therefore scoped to supported producer patterns. A
-detected unsupported framework form must be named in `semantic_omissions`; an
-exact result inside that explicit scope cannot be interpreted as absence of the
-omitted semantic class.
-For NgRx object actions, the omission is removed per fact only when current
-workspace reconciliation proves the qualified action member through exact
-Store dispatch authority and proves the switch handler through exact reducer
-registration plus case identity. Shorthand and reference-valued members retain
-their qualified member identity while referencing an exact value declaration.
-A bare switch case joins only through that declaration identity; equal text or
-equal string values never join facts, and multiple authorized members backed by
-one declaration remain ambiguous. Reducer-map members gain reducer authority
-only through an exact NgRx registration consumer. Syntax recognition alone
-never removes an omission.
-Populated caches/indexes, provider success, or stable empty results never grant
-exhaustiveness. Lack of a certificate means “not authorized to claim complete,”
-not “the returned facts are false.”
-
-**Enforcement:** `AcquisitionRequirement`, `CoverageUnit`, validated acquisition
-proofs, `AcquisitionSatisfaction`, the proof-backed completion cache,
-`CompletenessCertificate`, and producer-owned exact/lower-bound projection in
-the workspace-query coverage path. Acquisition/cache/hydration tests and
-`workspace_query_reverse_edge_completeness.rs` are the test authorities.
+Current normative owner: [WSC-014](invariants/source-authority.md#wsc-014-completeness-is-earned-from-evidence-not-population). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-018 Coverage Detail Cannot Strengthen Completeness
 
-**Status:** ENFORCED
-
-`coverage_detail` is an additive, bounded explanation of exact-identity
-coverage. It may classify processing as terminal, incomplete, not attempted, or
-indeterminate and proof as complete, structural, operational, mixed,
-unsupported, or indeterminate. It must never authorize `source_complete=true`,
-`result_semantics=exact`, or `omitted_possible=false`; only a
-`CompletenessCertificate` may do that. Returned positive facts remain
-`authoritative_observed` while absence authority follows only the legacy tuple.
-Reasons use a closed public vocabulary, deterministic ordering, and no source,
-root, provider, or owner identities. Residual counts exist only when an actual
-acquisition requirement exists.
-
-`AcquisitionOutcome` is request-local and retains typed proof dispositions plus
-processing state. It is not persisted or negative-cached. The completion cache
-continues to store only complete `AcquisitionSatisfaction`; warm reuse may
-reconstruct terminal complete detail but cannot persist structural or transient
-barriers. Provider readiness and discovery counters cannot determine proof
-state or retryability.
-
-**Enforcement:** `src/mcp/acquisition/satisfaction.rs`;
-`src/mcp/tool_handlers/hydration/{acquisition,execution,publication}.rs`;
-`src/mcp/tool_handlers/query/{coverage,content}.rs`; the `workspace_query`
-output schema; `workspace_query_coverage.rs`,
-`workspace_query_exact_identity_coverage.rs`, `workspace_query_content.rs`, and
-`workspace_query_reverse_edge_completeness.rs`.
+Current normative owner: [WSC-018](invariants/workspace-query.md#wsc-018-coverage-detail-cannot-strengthen-completeness). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### SEMDEP-001 Semantic Validity Follows Dependencies
 
-**Status:** ENFORCED
-
-Source-cache, canonical-IR, and derived-semantic validity are separate. The file
-owning an assertion need not be the full set of files proving it. Refresh,
-restore, and publication validate/retract semantic dependencies rather than
-assuming storage ownership proves current meaning.
-
-**Enforcement:** WorkspaceIndex dependency projection, compatibility validation,
-durable semantics, hydration invalidation, and refresh.
+Current normative owner: [SEMDEP-001](invariants/source-authority.md#semdep-001-semantic-validity-follows-dependencies). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### PROJ-001 Acquisition Strength Does Not Upgrade Publication Fidelity
 
-**Status:** ENFORCED
-
-Reconciliation may acquire stronger internal evidence than the requested
-presentation, but Low/Medium/High output retains its requested bounded contract.
-Omitted supported semantic categories are declared; Edit and Verbatim exactness
-remain separate guarantees.
-
-**Enforcement:** context projection metadata and framework bounded projections.
+Current normative owner: [PROJ-001](invariants/projection-fidelity.md#proj-001-acquisition-strength-does-not-upgrade-publication-fidelity). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CBM-OPTIONAL-001 Optional Providers Change Cost, Not Core Truth
 
-**Status:** ENFORCED
-
-Clean-CTX's core semantic graph must be independently sufficient to establish
-every core query contract. CBM may discover or narrow candidates, but it neither
-authors Clean-CTX semantics nor certifies WorkspaceIndex completeness. External
-providers may accelerate or enrich graph construction, but their readiness must
-never gate core correctness, availability, or completion. Optional acceleration
-must not become optional correctness.
-
-Provider evidence may be usable before provider coverage is authoritative. A
-successful provider operation is not proof of complete provider coverage:
-`StillIndexing`, Ready, successful search, and an empty result remain advisory
-unless the provider supplies a validated proof for exact compatible coverage
-units. Current CBM supplies no proof, so it cannot suppress Clean-owned incoming
-TypeRef acquisition. Clean inventory, certified producer-specific candidate
-selection, required compilation/publication, reconciliation, and final
-proof-set evaluation establish Clean authority. A future optional provider may
-substitute only the exact units it proves; Clean acquires the residual. CBM
-readiness is neither necessary nor sufficient for core completion.
-
-Warm state may improve performance. It must never improve truth. Clean-CTX owns
-its frontend/session transport, not the shared account daemon.
-
-**Enforcement:** `src/mcp/acquisition/**` owns provider-neutral requirements,
-proof validation, satisfaction, and cache identity;
-`src/mcp/tool_handlers/hydration/**` unions provider hints with Clean residual
-acquisition and commits satisfaction only after publication. The acquisition
-test suites and `workspace_query_reverse_edge_completeness.rs` cover no-proof,
-empty, mixed-unit, failure, invalidation, cold/warm, and exact-result behavior;
-existing search/readiness controls remain in `workspace_query_8.rs`,
-`workspace_query_9.rs`, and `workspace_query_provider_readiness.rs`.
+Current normative owner: [CBM-OPTIONAL-001](invariants/cbm.md#cbm-optional-001-optional-providers-change-cost-not-core-truth). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### REFINE-001 Reconciliation Ownership Is Domain-Local
 
-**Status:** ENFORCED
-
-A reconciler may replace/refine only facts in the semantic domain it owns.
-Sharing WorkspaceIndex, caches, or durable storage does not grant authority over
-unrelated producer-owned facts.
-
-**Enforcement:** domain-specific Angular template, NgRx, C#, and ASP.NET
-reconciliation paths plus occurrence-preserving publication.
+Current normative owner: [REFINE-001](invariants/source-authority.md#refine-001-reconciliation-ownership-is-domain-local). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ## Concurrent Authority
 
 ### PUB-001 Same-Owner Semantic Publication Is Source-Ordered
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Parallel compilation, edits, and historical adoption may finish out of order, but completion order must never let an older same-owner authority operation replace authority already committed by a newer operation. Historical snapshot age and operation age remain distinct: a restore/replay genuinely begun later may deliberately establish compatible historical state. |
-| **Invariant** | Every authoritative `provide_code_context`, `delta_code_context`, `apply_edit`, hydration, restore, and replay operation receives a generation from its canonical semantic owner before its unlocked candidate-selection work. Compilation candidates validate their compiled source hash again at the commit boundary. An edit additionally compares the physical source bytes with its exact validated precondition while holding the owner commit boundary; a superseded generation or byte mismatch occurs before staging, durable intent, replacement, or live publication. Historical adoption validates durable compatibility under its established rules, while its ticket represents the restore/replay operation's ordering position rather than the selected snapshot's age. Delta generation additionally binds its captured version, canonical instructions, and source hash to that same authority epoch before it may return a transition. Commit is serialized only for that owner. A candidate whose source or captured baseline is no longer current, or whose operation generation is older than an already committed generation, publishes no canonical IR, fidelity, semantic-edge snapshot, WorkspaceIndex projection, rendered cache, pending delta transition, durable checkpoint, or physical edit. Different semantic owners remain independently compilable and publishable. |
-| **Enforcement** | `src/mcp/state/publication.rs`; `src/mcp/tool_handlers/edit.rs`; `src/mcp/tool_handlers/core/provide/evaluate.rs`; `src/mcp/tool_handlers/core/{delta,restore}.rs`; `src/mcp/tool_handlers/hydration/publication.rs`; `src/mcp/tool_handlers/persistence/replay.rs`; deterministic controlled-interleaving regressions `src/tests/mcp/provide_publication_race.rs`, `src/tests/mcp/delta_publication_race.rs`, `src/tests/mcp/historical_adoption_publication_race.rs`, and `src/tests/mcp/apply_edit_transaction.rs`; later historical replay authority coverage in `src/tests/mcp/historical_replay_compatibility.rs`. |
-| **Authority** | `McpState::begin_semantic_publication`; `SemanticPublicationTicket::commit` |
-| **Type** | ENFORCED (file-scoped operation generation, candidate preconditions, and tests) |
-| **Gate** | `cargo test --all-features` |
-
----
+Current normative owner: [PUB-001](invariants/persistence-publication.md#pub-001-same-owner-semantic-publication-is-source-ordered). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-010 Authoritative Refresh Retracts Absent Semantic Owners
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Evidence owned by a source that has been deleted, renamed, or otherwise removed from the current semantic source universe must not remain queryable as current workspace truth after an authoritative refresh. |
-| **Invariant** | A successful authoritative source-universe refresh structurally retracts `WorkspaceIndex` entity, edge, and coverage ownership for sources under the refreshed root before targeted hydration republishes current evidence. Retraction is a refresh-boundary lifecycle operation, not per-query filtering, filesystem watching, historical-state promotion, or a CBM semantic decision. CBM may discover candidate locations; only Clean-CTX compilation and authority publication establish semantic truth. Other roots retain independent ownership. |
-| **Enforcement** | `src/mcp/tool_handlers/hydration/invalidation.rs`; `src/workspace/index/remove.rs`; `src/tests/mcp/workspace_query_9.rs` covers stale positive evidence, deleted owners, cycle evidence, non-hydrating queries, and root isolation. |
-| **Authority** | `reconcile_external_refresh_for_root`; `WorkspaceIndex::remove_files_in_root` |
-| **Type** | ENFORCED (structural reconciliation boundary + tests) |
-| **Gate** | `cargo test --all-features workspace_query_9` |
-
----
+Current normative owner: [WSC-010](invariants/workspace-query.md#wsc-010-authoritative-refresh-retracts-absent-semantic-owners). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ANG-TPL-001 Angular Template Ownership and Identity
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Component/template linkage must follow structured Angular ownership without filename or basename inference. |
-| **Invariant** | Structured Component metadata exclusively authors `HasTemplate`. External Template identity is its canonical physical/semantic-owner path; inline identity is deterministic and Component-scoped. The declaring TypeScript file owns publication and retraction. |
-| **Enforcement** | Phase 4 production-path identity, forward/reverse, replacement, transition, deduplication, deletion/restoration, refresh, and generation regressions. |
-| **Authority** | `src/angular_meta/semantic.rs`; `src/tests/mcp/workspace_query_angular_templates.rs` |
-| **Type** | ENFORCED (structured producer boundary + tests) |
-| **Gate** | `cargo test --all-features workspace_query_angular_template_tests` |
-
----
+Current normative owner: [ANG-TPL-001](invariants/framework-and-tooling.md#ang-tpl-001-angular-template-ownership-and-identity). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Repeated selector uses and their controlling conditions must survive query-time resolution without inventing durable cross-file ownership. |
-| **Invariant** | Every occurrence-derived `UsesSelector` and `UsesComponent` result carries its Template occurrence evidence: a zero-based half-open UTF-8 byte span and control ancestry. Neutral `UsesSelector` remains present when unique typed refinement is returned. Neither relationship enters WorkspaceIndex, producer generations, or snapshots. |
-| **Enforcement** | Ordered-authority extraction plus production MCP forward/reverse, ambiguity, mixed-syntax, replacement, refresh, deletion/restoration, and producer-generation regressions. |
-| **Authority** | `src/angular_meta/template_occurrences.rs`; `src/mcp/tool_handlers/query/angular_templates.rs`; `src/tests/mcp/workspace_query_angular_selector_occurrences.rs` |
-| **Type** | ENFORCED (request-local type boundary + tests) |
-| **Gate** | `cargo test --all-features workspace_query_angular_selector_occurrence_tests` |
-
----
+Current normative owner: [ANG-TPL-002](invariants/framework-and-tooling.md#ang-tpl-002-angular-selector-refinement-is-occurrence-preserving-and-ephemeral). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
 
-| Property | Value |
-|----------|-------|
-| **Invariant** | TypeScript and C# invocation occurrences retain written UTF-8 byte spans, callee structure, ordered arguments and qualifiers, type arguments, immediate invocation parents, and supported declaration contexts. They contain no resolved target or framework meaning. Source slices require a view bound to the producing source identity and SHA-256. Edits cannot reuse the old set as current evidence. |
-| **Boundary** | Evidence is compilation-local, cleared before compilation and published only after success. It remains outside CompiledIR, canonical formats, semantic edges, WorkspaceIndex, producer generations, and persistence. CoreOp::Call and CallEvidence remain their existing compact canonical authorities. Unsupported targets retain occurrences without invented terminals. |
-| **Enforcement** | Private structural types and validated slicing; same-parse capture assembly; cross-language consumer parity, identity/hash mismatch, edit/empty replacement, and populated-failure regressions. |
-| **Authority** | `src/ir/invocation_evidence.rs`; `src/ir/invocation_evidence/collect.rs`; `src/tests/ir/invocation_generic_consumer.rs`; `src/tests/ir/invocation_evidence_lifecycle.rs` |
-| **Type** | STRUCTURAL + ENFORCED |
+Current normative owner: [INVOCATION-001](invariants/invocation.md#invocation-001-written-invocation-evidence-is-source-bound-and-ephemeral). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
 
-| Property | Value |
-|----------|-------|
-| **Invariant** | Production RxJS pipe discovery and top-level operator argument boundaries consume the compiler's borrowed validated occurrence view, including authoritative empty evidence. They do not reparse or reconstruct pipe bodies with substring scans or comma splitting. The standalone source API performs one TypeScript capture walk through the same collector because it has no upstream parse. |
-| **Domain boundary** | RxJS retains operator interpretation, textual owner policy, minimum-operator filtering, shape and rendering. Combinator scanning remains outside the migrated slice. Unavailable structural evidence does not fall back to textual pipe discovery. |
-| **Enforcement** | Production and standalone parse-count assertions, spaced/commented syntax regression, frozen shape/operator assertions, lexical-decoy and ownership preservation suites. |
-| **Authority** | `src/ir/pipeline/meta_layer.rs`; `src/layers/meta/context.rs`; `src/angular_meta/rx/pipes.rs`; `src/tests/angular_meta/rx_invocation_evidence.rs` |
-| **Type** | ENFORCED |
+Current normative owner: [INVOCATION-002](invariants/invocation.md#invocation-002-rxjs-pipe-structure-uses-the-shared-occurrence-authority). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### INVOCATION-003 Exact C# Calls Use Capability-Gated Artifact Authority
 
-| Property | Value |
-|----------|-------|
-| **Invariant** | A durable C# `Calls` edge to a `csharp/Method` identity is published only when current structured receiver evidence and the complete admitted C# declaration authority select one owner/signature-bearing target. Missing, incompatible, or ambiguous targets publish no exact edge. Generic written-call evidence remains unchanged. |
-| **Lifecycle** | One parse produces a source-bound semantic artifact containing compiled IR, local declarations, invocation evidence, non-call semantic facts, source identity, fidelity, and producer generations. Publication retains the artifact and dirties exact-call authority. Reverse TypeRef and unrelated consumers never prepare Calls authority. The first exact C# Calls consumer validates or compiles only missing/stale artifacts, derives one deterministic capability fingerprint from the complete admitted manifest, projects from retained artifacts without rereading or reparsing them, and advances exact-call coverage only after a complete generation succeeds. Additions, removals, renames, signature changes, ambiguity, scope policy, and producer changes can therefore establish or revoke exact facts independent of file order or warm history. |
-| **Concurrency and commit** | Compilation uses the session-owned bounded Rayon executor and returns provisional immutable artifacts in canonical input order. Workers do not mutate shared authority. The coordinator rejects stale source/generation results and publishes projections plus exact-call coverage under one index write boundary; a failed or superseded preparation remains dirty and cannot be read as current. Concurrent consumers serialize/coalesce at the lifecycle boundary. |
-| **Fidelity preservation** | Exact-call projection may strengthen exact-call evidence, but it preserves each artifact publication's semantic fidelity. Preparing Calls authority never upgrades a Low or Medium projection to High. A later explicit higher-fidelity request remains the only authority for that upgrade. Dirty Calls authority does not make independently current TypeRef evidence inadequate. |
-| **Boundary** | Retained invocation evidence remains source-bound under INVOCATION-001 and is owned only by the in-session artifact store; artifacts are not durable persistence. Exact-call currentness is capability-scoped through `CSharpAuthorityFingerprint`, not modeled as per-edge all-authority-file dependencies. Provider availability and query target identity do not participate in semantic truth or the fingerprint. |
-| **Enforcement** | `SemanticCompilationArtifact` is the compiler return boundary. `CSharpCallAuthorityState` owns artifacts and dirty/current generation state; query preparation is the sole exact-call capability gate; `WorkspaceIndex` separately owns capability coverage. Structural work counters pin K-only compilation, zero eager TypeRef projection, artifact-backed projection, one manifest per generation, and O(1) warm currentness. Lifecycle, artifact-reconciliation, fingerprint, ambiguity, deletion/restore, and fidelity regressions enforce fail-closed behavior. |
-| **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 4. |
-| **Authority** | `src/ir/csharp_exact_calls.rs`; `src/mcp/semantic_compilation/`; `src/mcp/csharp_calls/`; `src/workspace/index/capability_coverage.rs`; `src/tests/mcp/issue_144_performance_work_counts.rs`; `src/tests/mcp/csharp_call_authority_lifecycle.rs`; `src/tests/mcp/csharp_call_artifact_reconciliation.rs`; `src/tests/mcp/csharp_call_authority_fingerprint.rs` |
-| **Type** | ENFORCED |
-| **Gate** | Focused Issue #144 artifact, parallelism, lifecycle, reconciliation, fingerprint, and work-count regressions; then the authoritative Final Verification Gate. |
-
----
+Current normative owner: [INVOCATION-003](invariants/invocation.md#invocation-003-exact-c-calls-use-capability-gated-artifact-authority). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### WSC-011 Direct Declaration Authority Is Independent of Derived Relationships
 
-| Property | Value |
-|----------|-------|
-| **Intent** | A current, authoritative declaration must remain discoverable even when a derived relationship is absent, replaced, retracted, or recomputed at another lifecycle boundary. |
-| **Invariant** | Direct current declaration evidence must not depend on survival of a derived durable relationship to remain discoverable. A declaration proven directly by current structured source is materialized from that source authority; relationship edges may enrich or connect it but are not its existence certificate. Losing or replacing a derived projection must never erase the independently proven declaration. Optional provider or hydration completeness may change acquisition cost but never suppress declaration evidence already proven by the current admitted source. This rule does not permit inference from names, filenames, proximity, or unresolved ancestry: the direct declaration evidence itself must be authoritative. |
-| **ASP.NET application** | A resolved `ApiControllerAttribute`, `ControllerAttribute`, `Controller`, or `ControllerBase` proof registers a durable `dotnet/Controller` role independently of route/action payload. Generation reconciliation rebuilds that role from current admitted artifacts when exact-call or other derived projections are replaced. |
-| **Enforcement** | The shared C# resolver and `src/dotnet_meta/semantic.rs` establish the role; `src/mcp/semantic_compilation/artifact.rs` preserves it during generation reconciliation. `src/tests/mcp/workspace_query.rs::red_direct_controller_declaration_survives_derived_edge_replacement`, `src/tests/mcp/workspace_query_builtin.rs::builtin_framework_coexistence`, and the R9/R11 lifecycle suites pin independence and coexistence. |
-| **Authority** | CSHARP-RESOLUTION-001; `src/dotnet_meta/semantic.rs`; `src/mcp/semantic_compilation/artifact.rs`; `src/workspace/index/edges.rs` |
-| **Type** | ENFORCED (current-source declaration authority + tests) |
-| **Gate** | Focused workspace-query regressions plus `cargo test --workspace --all-targets --all-features` |
-
----
+Current normative owner: [WSC-011](invariants/workspace-query.md#wsc-011-direct-declaration-authority-is-independent-of-derived-relationships). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### CSHARP-RESOLUTION-001 Structured C# Resolution Owns Framework Authority
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Written C# spelling must not become framework identity. Shared C# mechanics establish neutral identity; framework modules alone assign framework meaning. |
-| **Invariant** | Base/type and attribute references used by .NET semantic producers resolve through explicit `Resolved`, `Ambiguous`, `Unsupported`, or `Unresolved` dispositions. Only `Resolved` neutral identities authorize framework roles or relationships. All non-success dispositions fail closed while parser-owned neutral evidence survives. Attribute resolution implements suffix elision without turning short written names into authority. |
-| **Supported envelope** | Explicit and `global::` qualification, ordinary imports with proven-candidate collision handling, namespace aliases, type aliases, admitted-source namespace/nesting/name/arity resolution, valid partial-symbol composition, generic/nested identity, and cycle-checked indirect inheritance. An unmodeled imported namespace is not itself evidence of a competing same-name declaration: one proven candidate resolves, multiple proven candidates remain ambiguous, and no proven candidate remains unresolved. Known external identity is bounded to the migrated framework contracts. Arbitrary assemblies/NuGet metadata, implicit SDK evidence absent from admitted source, unproved project-reference legality, and compiler-grade expression/overload binding remain explicit non-success boundaries. |
-| **Consumers** | EF Core `DbContext` and configuration identity, AutoMapper `Profile`, SignalR `Hub`/`Hub<T>`, ASP.NET `Controller`/`ControllerBase` plus controller/route/HTTP attributes, and MSTest `TestClassAttribute`. Marker-only attributes and conventions remain rendering concerns unless separately promoted through an approved semantic migration. |
-| **Applicability** | Resolved framework identity positively admits .NET semantic evaluation. Textual detection may schedule marker/candidate work but cannot establish semantic truth or veto resolved proof. |
-| **Declaration provenance** | Resolve by identity, render by position. Core lowering preserves exact declaration spans with allocated method IDs and emitted names; compilation method facts join through those spans, never by zipping independently produced record sequences. Class generic arity counts only direct type-parameter children associated with their class by one parser query match. Method generic parameters cannot contribute to enclosing class identity. Issues #153/#154 are covered by `csharp_compilation_identity.rs` and `csharp_compilation_identity_preservation.rs` under `src/tests/dotnet_meta/`. |
-| **Lifecycle** | Resolution uses the current admitted-source generation and composes partial owners. Generation reconciliation retracts and reprojects affected roles, relationships, and SignalR realtime execution contexts after edits, alias retargeting, ancestry changes, part changes, refresh, or deletion. Independent consumer facts and independent execution contexts are preserved. Resolution partitions do not invent cross-project reference legality. |
-| **Provider boundary** | Optional providers supply additive acquisition hints only. Provider readiness, empty/subset results, and query history cannot narrow Clean-authoritative semantic truth or earn authoritative root completion without compatible proof. |
-| **Enforcement** | Neutral resolution/result types and the admitted-source symbol index enforce the authority split structurally. R0-R12 tracked resolver, consumer, lifecycle, cross-root, history, and Issue #148 provider-equivalence regressions enforce behavior. R9-R12 live MCP harnesses verify the production boundary separately from CI coverage. |
-| **Authority** | `src/ir/csharp_resolution.rs`; `src/ir/csharp_resolution/`; `src/ir/csharp_symbols.rs`; `src/dotnet_meta/semantic.rs`; `src/mcp/csharp_calls/reconciliation.rs`; `src/mcp/semantic_compilation/artifact.rs`; R0-R12 tests under `src/tests/` |
-| **Type** | STRUCTURAL and ENFORCED |
-| **Gate** | R0-R12 focused regression suites, Issue #148 provider-equivalence suites, then the authoritative Final Verification Gate |
-
----
+Current normative owner: [CSHARP-RESOLUTION-001](invariants/framework-and-tooling.md#csharp-resolution-001-structured-c-resolution-owns-framework-authority). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
 
-| Property | Value |
-|----------|-------|
-| **Intent** | Clean-CTX durably expresses a proven framework role independently of whether that role currently has relationship payload. |
-| **Invariant** | A resolved framework role may register a file-provenanced semantic occurrence independently of `HasEntity`, mappings, hub targets, routes/actions, or tests. Role registration never becomes source declaration authority or graph adjacency; `builtin/Class` remains the C# declaration. A role alone cannot fabricate relationship payload. DbContext and Controller publish explicit role occurrences; relationship-bearing Profile/Hub projections retain their resolved-role authorization even when their current payload is empty. |
-| **Lifecycle** | Role and relationship projections use the same admitted-source resolution generation described by CSHARP-RESOLUTION-001. Publication, replacement, refresh, deletion, rename, warm reuse, partial composition, alias/ancestry changes, producer compatibility, and same-name owner identity use `WorkspaceIndex` owner lifecycle and generation reconciliation. .NET semantic producer generation 6 owns the current projection. |
-| **Enforcement** | `src/dotnet_meta/semantic.rs` owns framework interpretation; `src/mcp/semantic_compilation/artifact.rs` retires and rebuilds generation-owned facts; `src/workspace/index/edges.rs` normalizes role registrations into non-declaration occurrences. R6-R12 tracked suites pin role/payload independence, fail-closed resolution, lifecycle, cross-consumer isolation, and history/provider convergence. |
-| **Authority** | CSHARP-RESOLUTION-001; `src/dotnet_meta/semantic.rs`; `src/mcp/semantic_compilation/artifact.rs`; `src/workspace/index/edges.rs` |
-| **Type** | STRUCTURAL and ENFORCED (test) |
-| **Gate** | Focused R6-R12 regressions, then the authoritative Final Verification Gate |
-
----
+Current normative owner: [DOTNET-001](invariants/framework-and-tooling.md#dotnet-001-framework-role-identity-is-independent-of-relationship-evidence). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ### META-LAYER-COMPLETENESS-001 Supported Framework Semantics Are Complete
 
-| Property | Value |
-|----------|-------|
-| **Invariant** | When Clean-CTX claims semantic support for a framework or language construct, materially used semantic forms within that supported capability must be implemented completely enough to preserve the framework relationships Clean-CTX claims to understand. A known capability gap is not resolved merely by documenting, labeling, degrading, or explaining away missing semantics when sufficient authoritative evidence can be modeled. |
-| **Safety boundary** | Unsupported/degradation metadata is a truthful safety boundary, not a substitute for required semantic capability. Truthful degradation is a safety mechanism, not a completion criterion. |
-| **Engineering rule** | Do not explain away an implementable semantic gap. Either implement the required structured authority or explicitly narrow the meta-layer's supported envelope. A materially used idiom inside the intended envelope must not remain a permanent omission merely because support requires additional identity, reconciliation, or lifecycle machinery. |
-| **Constraint** | Completeness never authorizes guessing: framework roles require structured identity and framework-specific authority; lookalike syntax fails closed. Meta-layers must provide no fabricated semantics, no silent gaps, and no knowingly half-implemented contract inside their declared envelope. |
-| **NgRx application** | Object-member actions require exact Store dispatch authority. Shorthand/reference-valued members preserve qualified member identity and carry a separate exact declaration reference. Bare switch cases join through that declaration identity, never spelling or literal equality, and ambiguity fails closed. Direct reducers and reducer-map members require exact NgRx registration authority; map shape alone grants none. Aliases normalize to declaration identity; handlers publish only after Action, Reducer, and case identity reconcile. Supported registration queries acquire their bounded dependency closure before claiming exact completeness. Derived roles and handlers retract with their last supporting proof. |
-| **Type** | STRUCTURAL and ENFORCED |
-
----
+Current normative owner: [META-LAYER-COMPLETENESS-001](invariants/completion-governance.md#meta-layer-completeness-001-supported-framework-semantics-are-complete). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ## Architectural Debt
 
 ### ARCH-DEBT-001 PassPipeline Migration (RESOLVED)
 
-| Property | Value |
-|----------|-------|
-| **Description** | The `PassPipeline` migration from the monolithic `IRCompiler::compile_inner()` has been completed. `PassPipeline` is now the active production compilation path. |
-| **Resolution** | `IRCompiler::compile_inner()` is an orchestration boundary that constructs a `PassContext`, configures the `PassPipeline`, and delegates compilation to `PassPipeline::run()`. Shared pipeline context and ordering remain in `src/ir/pipeline.rs`; core capture, meta-layer orchestration, and post-meta passes live in cohesive child modules under `src/ir/pipeline/`. |
-| **Production pipeline order** | `CoreIRPass` `→`. `LanguageLayerPass` `→`. `MetaLayerPass` `→`. `PatternRecognitionPass` `→`. `AliasResolutionPass` `→`. `ValidationPass` |
-| **Optional passes** | `ExecutionSemanticsPass`, `ProgramGraphPass`, `InferenceLayerPass` remain outside the default production pipeline. |
-| **See also** | `src/ir/pipeline.rs`, `src/ir/pipeline/core.rs`, `src/ir/pipeline/meta_layer.rs`, `src/ir/pipeline/post.rs`, `src/ir/compiler.rs`, `docs/ARCHITECTURAL_INVARIANTS.md` (PIPELINE-001) |
-
----
+Current normative owner: [ARCH-DEBT-001](invariants/historical-debt.md#arch-debt-001-passpipeline-migration-resolved). Enforcement attributes, witnesses and original source provenance moved with the proposition. See [migration progress](architecture/knowledge-normalization/B0_B1_PROGRESS.md).
 
 ## How to Add a New Invariant
 

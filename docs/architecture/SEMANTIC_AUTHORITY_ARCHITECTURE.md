@@ -4,7 +4,8 @@
 >
 > Audited at d039453bcc5825f47917e1956669bd3446a06cc5 on
 > feature/post-cbm-native-correctness-fixes (2026-10-16). Production behavior
-> and docs/ARCHITECTURAL_INVARIANTS.md remain the ultimate authority.
+> and the focused invariant owners indexed by docs/ARCHITECTURAL_INVARIANTS.md
+> remain the ultimate authority.
 
 ## Governing rule
 

@@ -84,6 +84,16 @@ what actions may proceed; a graph query does not grant that authorization.
 
 ## Unavailable tool or profile
 
+For this repository's configured production workspace, the
+[B0/B1 authoring route](../architecture/knowledge-normalization/B0_B1_PROGRESS.md#using-this-production-authoring-route)
+documents the existing ignored owner profile and a bounded production stdio
+query client. It is an actual-workspace route when the host cannot advertise
+the conditional document tool directly. Use the existing profile and explicit
+workspace; do not substitute a prior controlled corpus. Starting that client
+remains subject to the existing runtime-execution rule and current owner
+authorization. Direct host exposure requires a host session launched with the
+profile; it is not established by writing configuration or by a stdio receipt.
+
 If pcg_documents_v1 is not advertised, the current host/session cannot expose the
 document capability. State that limitation and consult the known authoritative repository
 documents through the normal tooling policy; do not pretend a PCG preflight ran.

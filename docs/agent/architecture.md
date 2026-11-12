@@ -21,7 +21,8 @@ does not satisfy this gate. Apply the standard's required question classes,
 review record, consumer audit and deliverables; link campaign plans to it.
 
 Do not duplicate the durable architectural facts. `docs/ARCHITECTURAL_INVARIANTS.md`
-is authoritative for:
+indexes their sole current normative owners under `docs/invariants/` and retains
+the invariant-governance procedure. Follow its stable links for:
 
 - the invariant catalog (e.g. `PIPELINE-001` compilation-pipeline ordering),
 - the resolved/migration debt record (e.g. `ARCH-DEBT-001` — PassPipeline
@@ -164,7 +165,7 @@ cloning, ownership workarounds, duplicate logic, dead architectural paths.
 
 ### Shared mechanics and specialized semantics
 
-Apply [MECHANISM-REUSE-001](../ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners)
+Apply [MECHANISM-REUSE-001](../invariants/completion-governance.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners)
 to every material language/meta-layer consumer touched by the migration. Trace its
 identity/authority, acquisition/provenance, currentness/persistence/restoration,
 publication/deduplication/selection/replacement/retirement and completeness to

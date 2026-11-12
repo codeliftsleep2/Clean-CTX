@@ -5,6 +5,10 @@ Baseline: `7349c299` on `docs/pcg-preauthoring-adoption`, after PR #176 and
 the pre-authoring integration. This is a planning artifact, not a replacement
 architectural authority, runtime manifest, admission receipt or certification.
 
+Current migration progress: [B0/B1 production adoption](B0_B1_PROGRESS.md).
+The assessment and frozen inventory below retain their original source baseline;
+the progress record identifies relocated owners, actual admission and B2 holds.
+
 ## Finding and proposed disposition
 
 Clean-CTX already has a declared authority spine, independently meaningful

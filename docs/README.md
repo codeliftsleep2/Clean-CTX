@@ -25,13 +25,14 @@ catalog governs; reconcile the prose rather than selecting the stronger claim.
 
 | Document | Role |
 | --- | --- |
-| [ARCHITECTURAL_INVARIANTS.md](ARCHITECTURAL_INVARIANTS.md) | Normative invariant catalog |
+| [ARCHITECTURAL_INVARIANTS.md](ARCHITECTURAL_INVARIANTS.md) | Invariant navigation and governance; focused normative owners under docs/invariants/ |
 | [SEMANTIC_AUTHORITY_ARCHITECTURE.md](architecture/SEMANTIC_AUTHORITY_ARCHITECTURE.md) | Normative semantic-authority composition |
 | [agent/tooling.md](agent/tooling.md) | Normative MCP/code-context workflow |
 | [agent/verification.md](agent/verification.md) | Normative final verification gate |
 | [ENCODING_POLICY.md](ENCODING_POLICY.md) | Encoding contract |
 | [CONFIGURATION.md](CONFIGURATION.md) | Configuration reference |
-| [COMPILER_IR.md](COMPILER_IR.md) | Canonical IR and notation contract |
+| [CANONICAL_IR_AUTHORITY.md](architecture/CANONICAL_IR_AUTHORITY.md) | Canonical IR boundary and composition of focused contract owners |
+| [COMPILER_IR.md](COMPILER_IR.md) | Compiler/notation guide and explicit delta/replay reference |
 | [BINARY_V04_CONTRACT.md](architecture/BINARY_V04_CONTRACT.md) | Binary format contract |
 | [CORE_OP_CONTRACT_MATRIX.md](architecture/CORE_OP_CONTRACT_MATRIX.md) | Core opcode matrix |
 

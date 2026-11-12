@@ -1,5 +1,7 @@
 # Clean-CTX — Compiler IR: Structured State Protocol
 
+> Canonical boundary authority: [Canonical IR authority](architecture/CANONICAL_IR_AUTHORITY.md), the CoreOp matrix and focused invariant owners. This file remains the compiler/notation walkthrough and explicit delta/replay reference; explanatory canonical descriptions do not establish a competing operation or inference boundary.
+
 > **Owner:** Compiler IR spec + delta transport · **Status:** Living reference
 > **Version:** 0.9.1 architecture (Implemented) · **Last updated:** 2026-10-08
 > **Status:** All phases A–H implemented and deployed in production.

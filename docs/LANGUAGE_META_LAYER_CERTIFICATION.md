@@ -52,7 +52,7 @@ The following rules apply throughout certification:
 - Correctness over compression.
 - Resolve by identity, render by position.
 - Share mechanics, specialize semantics.
-- Apply [MECHANISM-REUSE-001](ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): reuse equivalent authority/lifecycle/correctness mechanics and justify genuine specialization; correct answers alone do not prove correct ownership.
+- Apply [MECHANISM-REUSE-001](invariants/completion-governance.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): reuse equivalent authority/lifecycle/correctness mechanics and justify genuine specialization; correct answers alone do not prove correct ownership.
 - Names are not identities.
 - Proximity is not ownership.
 - Framework syntax is not framework authority.
@@ -734,3 +734,22 @@ It is:
 > Can Clean-CTX prove the architectural facts it claims to know about this ecosystem, keep those facts current, expose them through the production interface with an honest completeness contract, survive adversarial and representative real-world repository conditions, demonstrate that the intended consumer can rely on them, and obtain independent agent and owner approval of that exact claim?
 
 Only then is the layer complete.
+
+## Source-owned architecture declaration
+
+The source-described contract is operative. IMPLEMENTED does not assert a new test execution, freeze approval, independent validation, reclosure or banking. Original source identity: commit `655f0a75`, `docs/LANGUAGE_META_LAYER_CERTIFICATION.md`; original SHA-256 is retained in the normalization inventory. Current source bytes are witnessed by PCG revisions.
+
+```architecture-graph
+node: AUTH.LAYER_CERTIFICATION
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Language and meta-layer certification and recertification contract
+track: FOUNDATION
+artifact: docs/LANGUAGE_META_LAYER_CERTIFICATION.md
+commit: 655f0a75
+depends_on:
+  - AUTH.QUESTION_MATRIX
+preserves:
+  - INV.MECHANISM_REUSE_001
+  - INV.META_LAYER_COMPLETENESS_001
+```

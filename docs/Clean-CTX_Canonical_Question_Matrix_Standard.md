@@ -580,7 +580,7 @@ Before approving any semantic implementation, reviewers MUST ask:
 9.  **Will that mutation actually invalidate/retract the answer?**
 10. **Does another meta-layer still answer the same question through
     weaker mechanics?**
-    Apply [MECHANISM-REUSE-001](ARCHITECTURAL_INVARIANTS.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): compare actual authority, lifecycle and correctness contracts, reuse equivalent mechanics and document justified specialization.
+    Apply [MECHANISM-REUSE-001](invariants/completion-governance.md#mechanism-reuse-001-equivalent-mechanics-are-shared-semantics-keep-their-owners): compare actual authority, lifecycle and correctness contracts, reuse equivalent mechanics and document justified specialization.
 11. **Can the answer survive cold/warm, ordering, batching, persistence,
     and restoration?**
 12. **Would the LLM still need raw source to reconstruct something
@@ -624,3 +624,19 @@ REAL QUESTION
 
 This matrix standard is a **hard completion requirement**, not
 documentation guidance.
+
+## Source-owned architecture declaration
+
+The source-described contract is operative. IMPLEMENTED does not assert a new test execution, freeze approval, independent validation, reclosure or banking. Original source identity: commit `655f0a75`, `docs/Clean-CTX_Canonical_Question_Matrix_Standard.md`; original SHA-256 is retained in the normalization inventory. Current source bytes are witnessed by PCG revisions.
+
+```architecture-graph
+node: AUTH.QUESTION_MATRIX
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Production questions authority currentness and queryable completion requirements
+track: FOUNDATION
+artifact: docs/Clean-CTX_Canonical_Question_Matrix_Standard.md
+commit: 655f0a75
+preserves:
+  - ARCH-004
+```

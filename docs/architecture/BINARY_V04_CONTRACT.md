@@ -246,3 +246,21 @@ The Angular template compressor remains a distinct representation without a
 canonical `CompiledIR` producer. Phase 8C removed its empty-IR write rather
 than fabricating canonical semantics. Phase 9 confirmed that no registered
 path persists empty or noncanonical IR in its place.
+
+## Source-owned architecture declaration
+
+The source-described contract is operative. IMPLEMENTED does not assert a new test execution, freeze approval, independent validation, reclosure or banking. Original source identity: commit `655f0a75`, `docs/architecture/BINARY_V04_CONTRACT.md`; original SHA-256 is retained in the normalization inventory. Current source bytes are witnessed by PCG revisions.
+
+```architecture-graph
+node: AUTH.BINARY_V04
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Physical Binary 0x04 exact semantic round trip and strict decoding
+track: FOUNDATION
+artifact: docs/architecture/BINARY_V04_CONTRACT.md
+commit: 655f0a75
+depends_on:
+  - AUTH.CORE_OPS
+preserves:
+  - IRWIRE-001
+```

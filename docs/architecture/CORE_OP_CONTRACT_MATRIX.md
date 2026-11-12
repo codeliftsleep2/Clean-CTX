@@ -405,3 +405,19 @@ legacy decoded documents remain outside this bounded slice.
 - [x] Current binary losses are accurately identified by Phase 8A.
 - [x] The physical corrected-binary version and layout are resolved as `0x04`.
 - [x] Each row has tracked contract and production-path evidence.
+
+## Source-owned architecture declaration
+
+The source-described contract is operative. IMPLEMENTED does not assert a new test execution, freeze approval, independent validation, reclosure or banking. Original source identity: commit `655f0a75`, `docs/architecture/CORE_OP_CONTRACT_MATRIX.md`; original SHA-256 is retained in the normalization inventory. Current source bytes are witnessed by PCG revisions.
+
+```architecture-graph
+node: AUTH.CORE_OPS
+kind: AUTHORITY
+status: IMPLEMENTED
+title: Canonical operation identity cardinality validation and transformation contract
+track: FOUNDATION
+artifact: docs/architecture/CORE_OP_CONTRACT_MATRIX.md
+commit: 655f0a75
+preserves:
+  - IRPAT-001
+```
