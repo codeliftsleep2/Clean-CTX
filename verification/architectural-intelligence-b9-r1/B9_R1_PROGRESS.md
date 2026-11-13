@@ -1,5 +1,60 @@
 # B9-R1 reference-first correction
 
+## Current continuation disposition
+
+Agent MaxHeadRoom: B9-R1 remains the active bounded mission. B10 large-response
+delivery investigation stays suspended. The owner restored all delivered work
+to `(fix)Performance-Regression-Issues` at
+`df4d0414e0b48f78eba876e0338f00edbf1c1e58`; no further branch creation is
+authorized. Earlier stacked-branch delivery directions are superseded by the
+owner's instruction to continue on this performance branch.
+
+Full repository gates are CI-only. Do not run or hand the operator a full gate.
+Earlier chronological gate handoffs below are historical errors, not current
+instructions. The failed gate evidence remains preserved. Focused operator
+tests/builds and relevant production verification remain distinct from CI.
+
+The 80 original non-live failures have passing focused receipts. The broadened
+72-test C# suite and scoped Clippy passed. The installed provider's missing-project
+timeout reproduces outside Clean-CTX and remains an explicit external blocker;
+do not repeat unchanged provider diagnostics. Independent evaluation stays UNRUN.
+
+The next authorized work is to refresh B9-R1 focused tests and production evidence
+after the regression repairs, using `invoke-delivery-refresh.ps1`. It runs only
+document tests, registered knowledge MCP tests, an all-feature product build,
+and the existing actual-root reference/acquisition verifier. Fresh output folders
+and exact rebuilt executable identity are recorded. It introduces no production
+behavior change, repeats no accepted B10 discovery probes, and invokes no CI gate.
+Host follow-up is considered only after inspecting that production receipt.
+
+Latest refresh: `target/pcg-b9-r1/delivery-refresh-20261113-134605-318` passed
+39 document tests, 10 registered knowledge MCP tests, the all-feature build and
+the actual-root production verifier. The rebuilt executable SHA-256 is
+`a555a0ad5374b7bc1b4db4a391ea0e389158880ac7d6c4c210c81f8f708266e0`.
+All 218 identities, 221 relationships, 326 components, eleven context oracles,
+exact acquisition and historical/refusal checks pass at unchanged generation
+`684f1ca847aaec8398506ca3e8d0ebd3bf8f5bbaacb26ba88ede062fb17c6d70`.
+One final bounded host workflow refresh remains against this executable; no
+additional build, B10 probe campaign or large-response investigation is needed.
+
+Completion update: the operator's
+`target/pcg-b9-r1/host-refresh-20261113-142039` completed with exit zero on that
+exact executable/profile. Static `verify-host-capture.ps1` inspection passed:
+seven completed invocations cover all six modes, the eight-node/seven-edge/eight-
+witness canonical context remains structural, and individual/batch acquisitions
+use previously returned exact references with required qualifications and matching
+source bytes. Full-source acquisition also matches exact UTF-8 source and hash.
+All calls are current/complete at the preserved generation. Reported context
+display truncation remains distinct from captured payload completeness; no universal
+model-delivery/comprehension claim or renewed delivery investigation follows.
+
+The bounded B9-R1 implementation and refreshed production/host witness package is
+ready for owner review on the existing performance branch. No further host run,
+rebuild or local full gate is requested. Remaining obligations are CI-only gates,
+the separately reproduced external CBM missing-project timeout, independent
+evaluation isolation (sixteen frozen runs remain UNRUN), and any owner-directed
+publication/acceptance. Do not automatically resume B10 or start a new branch.
+
 Agent: **Agent MaxHeadRoom**. Owner-authorized mission, 2026-11-12.
 Status: intended tracked RED observed; implementation and contract amendments
 prepared; user-owned formatting/GREEN/lint/build and production verification pending.

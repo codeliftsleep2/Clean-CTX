@@ -1,4 +1,8 @@
-param([Parameter(Mandatory)][string]$WorkspaceRoot,[Parameter(Mandatory)][string]$OutputRoot)
+param(
+    [Parameter(Mandatory)][string]$WorkspaceRoot,
+    [Parameter(Mandatory)][string]$OutputRoot,
+    [string]$ExpectedBinarySha256 = 'd91702b1c2a5b8e875b2c937e54b9ed4d5ad6fcbc304d79c9001967aff78fa38'
+)
 # User-run actual-root reconciliation/stdio. No build and no discovery-probe rerun.
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path -LiteralPath $WorkspaceRoot).Path
@@ -6,7 +10,8 @@ $output=[IO.Path]::GetFullPath($OutputRoot)
 if(Test-Path -LiteralPath $output){throw 'Use a fresh production verification directory.'}
 $binary=Join-Path $root 'target/debug/clean-ctx.exe'
 $profile=Join-Path $root '.clean-ctx/pcg-documents/profile.json'
-if((Get-FileHash $binary).Hash.ToLowerInvariant() -ne 'd91702b1c2a5b8e875b2c937e54b9ed4d5ad6fcbc304d79c9001967aff78fa38'){throw 'Production executable identity changed.'}
+if($ExpectedBinarySha256 -notmatch '^[0-9a-f]{64}$'){throw 'Expected binary identity must be a lowercase SHA-256.'}
+if((Get-FileHash $binary).Hash.ToLowerInvariant() -ne $ExpectedBinarySha256){throw 'Production executable identity changed.'}
 if((Get-FileHash $profile).Hash.ToLowerInvariant() -ne '0c1958e1302bd6d1e4a82dd644b03a2e322c687e9349bc038e2835283c1a40e9'){throw 'Profile changed.'}
 New-Item -ItemType Directory -Path $output|Out-Null
 $utf8=[Text.UTF8Encoding]::new($false,$true)

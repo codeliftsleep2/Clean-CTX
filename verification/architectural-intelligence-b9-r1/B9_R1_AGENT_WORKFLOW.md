@@ -30,3 +30,10 @@ recorded B9-R1 generation. This establishes the bounded corrected host workflow;
 it does not inherit B10 probe acceptance for B9-R1, certify every model-visible
 byte or imply comprehension of unacquired authority. Reported graph display
 truncation is retained as a limitation; no extra delivery diagnostic is pursued.
+
+The same bounded workflow was refreshed after regression repairs in
+`target/pcg-b9-r1/host-refresh-20261113-142039` against executable SHA-256
+`a555a0ad5374b7bc1b4db4a391ea0e389158880ac7d6c4c210c81f8f708266e0`.
+The host exited zero; static capture verification passed for all seven calls,
+returned-reference provenance, qualifications and exact acquired/source bytes.
+This refresh retains the same limits on model-delivery and comprehension claims.
