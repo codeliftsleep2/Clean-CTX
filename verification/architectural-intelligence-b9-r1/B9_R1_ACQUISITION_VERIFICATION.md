@@ -1,7 +1,11 @@
 # Acquisition verification checkpoint
 
-Agent: **Agent MaxHeadRoom**. Tracked/scoped GREEN and actual production
-acquisition verified; actual-host workflow and final delivery pending.
+Agent: **Agent MaxHeadRoom**. Focused tracked tests, production acquisition and
+the bounded actual-host workflow are verified. Final evidence changes await commit;
+CI and the external CBM blocker remain separate. Latest production/host receipts:
+`target/pcg-b9-r1/delivery-refresh-20261113-134605-318` and
+`target/pcg-b9-r1/host-refresh-20261113-142039`. The earlier checkpoints below
+retain the original RED/GREEN provenance.
 
 Current update: verification-02 establishes tracked GREEN (2 original regressions,
 39 document tests and 10 registered MCP tests), scoped zero-warning Clippy and

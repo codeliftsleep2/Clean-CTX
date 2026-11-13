@@ -2,8 +2,9 @@
 
 ## Current continuation disposition
 
-Agent MaxHeadRoom: B9-R1 remains the active bounded mission. B10 large-response
-delivery investigation stays suspended. The owner restored all delivered work
+Agent MaxHeadRoom: the owner accepted B9-R1 at the bounded architectural and
+implementation level. Architectural work is complete; only the authorized final
+evidence commit and push remain for closeout. B10 stays suspended. The owner restored all delivered work
 to `(fix)Performance-Regression-Issues` at
 `df4d0414e0b48f78eba876e0338f00edbf1c1e58`; no further branch creation is
 authorized. Earlier stacked-branch delivery directions are superseded by the
@@ -19,13 +20,13 @@ The 80 original non-live failures have passing focused receipts. The broadened
 timeout reproduces outside Clean-CTX and remains an explicit external blocker;
 do not repeat unchanged provider diagnostics. Independent evaluation stays UNRUN.
 
-The next authorized work is to refresh B9-R1 focused tests and production evidence
-after the regression repairs, using `invoke-delivery-refresh.ps1`. It runs only
+The completed refresh used `invoke-delivery-refresh.ps1` after the regression
+repairs. The reusable operator definition runs only
 document tests, registered knowledge MCP tests, an all-feature product build,
 and the existing actual-root reference/acquisition verifier. Fresh output folders
 and exact rebuilt executable identity are recorded. It introduces no production
 behavior change, repeats no accepted B10 discovery probes, and invokes no CI gate.
-Host follow-up is considered only after inspecting that production receipt.
+The subsequent bounded host refresh also completed as recorded below.
 
 Latest refresh: `target/pcg-b9-r1/delivery-refresh-20261113-134605-318` passed
 39 document tests, 10 registered knowledge MCP tests, the all-feature build and
@@ -34,8 +35,8 @@ the actual-root production verifier. The rebuilt executable SHA-256 is
 All 218 identities, 221 relationships, 326 components, eleven context oracles,
 exact acquisition and historical/refusal checks pass at unchanged generation
 `684f1ca847aaec8398506ca3e8d0ebd3bf8f5bbaacb26ba88ede062fb17c6d70`.
-One final bounded host workflow refresh remains against this executable; no
-additional build, B10 probe campaign or large-response investigation is needed.
+The final bounded host workflow refresh against this executable completed below;
+no additional build, B10 probe campaign or large-response investigation is needed.
 
 Completion update: the operator's
 `target/pcg-b9-r1/host-refresh-20261113-142039` completed with exit zero on that
@@ -54,6 +55,19 @@ rebuild or local full gate is requested. Remaining obligations are CI-only gates
 the separately reproduced external CBM missing-project timeout, independent
 evaluation isolation (sixteen frozen runs remain UNRUN), and any owner-directed
 publication/acceptance. Do not automatically resume B10 or start a new branch.
+
+Owner acceptance supersedes the earlier review-pending status: commit final
+evidence, verify the committed identity, push this existing branch, then stop.
+Reusable refresh scripts and preceding evidence are already in `be772ba2`.
+The live CBM regression remains failed, CI owns full repository gates, and all
+sixteen frozen independent evaluations remain UNRUN. No additional implementation,
+provider repair, local full gate or verification campaign is authorized here.
+
+## Historical execution log
+
+The following chronological checkpoints retain their original observations and
+then-pending work. The current continuation disposition above controls status;
+historical commands, branch instructions and pending statements are not new tasks.
 
 Agent: **Agent MaxHeadRoom**. Owner-authorized mission, 2026-11-12.
 Status: intended tracked RED observed; implementation and contract amendments
