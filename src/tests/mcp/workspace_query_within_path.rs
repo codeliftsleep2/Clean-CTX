@@ -168,14 +168,14 @@ fn red_within1_entity_narrowing_across_additional_roots() {
     let state = state(&[&repo_b]);
     seed_generic(
         &state,
-        &repo_a.file("A.cs"),
+        &repo_a.file("A.rs"),
         SemanticRelation::Injects,
         "Service",
         "ClockA",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Injects,
         "Service",
         "ClockB",
@@ -185,8 +185,8 @@ fn red_within1_entity_narrowing_across_additional_roots() {
     assert_eq!(
         narrowed_entities(&state, "Service", Some(&repo_a.key()), None),
         vec![
-            ("Service".to_string(), "A.cs".to_string()),
-            ("Service".to_string(), "B.cs".to_string()),
+            ("Service".to_string(), "A.rs".to_string()),
+            ("Service".to_string(), "B.rs".to_string()),
         ],
         "the authorized workspace contains both repositories before narrowing"
     );
@@ -194,12 +194,12 @@ fn red_within1_entity_narrowing_across_additional_roots() {
     // Narrowing selects exactly one of them, in either direction.
     assert_eq!(
         narrowed_entities(&state, "Service", Some(&repo_a.key()), Some(&repo_a.key())),
-        vec![("Service".to_string(), "A.cs".to_string())],
+        vec![("Service".to_string(), "A.rs".to_string())],
         "withinPath = repo A selects repo A's occurrence only"
     );
     assert_eq!(
         narrowed_entities(&state, "Service", Some(&repo_a.key()), Some(&repo_b.key())),
-        vec![("Service".to_string(), "B.cs".to_string())],
+        vec![("Service".to_string(), "B.rs".to_string())],
         "withinPath = repo B selects repo B's occurrence only, because WSC-004 \
          authorizes it as a configured additional root"
     );

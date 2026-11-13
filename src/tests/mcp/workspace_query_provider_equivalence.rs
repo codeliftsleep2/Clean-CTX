@@ -118,6 +118,7 @@ fn find_context(state: &crate::mcp::McpState, root: &Path) -> Value {
 }
 
 fn write_angular_fixture(root: &Path) {
+    crate::tests::angular_authority_fixture::install(root);
     std::fs::create_dir(root.join(".git")).expect("Git root marker");
     std::fs::write(
         root.join("service-x.ts"),

@@ -219,14 +219,14 @@ fn red_scope_generic_layer_is_shared_with_non_call_relations() {
     let state = state(&[]);
     seed_generic(
         &state,
-        &repo_a.file("A.cs"),
+        &repo_a.file("A.rs"),
         SemanticRelation::Implements,
         "PaymentService",
         "IPaymentGateway",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Implements,
         "PaymentService",
         "IPaymentGateway",
@@ -243,7 +243,7 @@ fn red_scope_generic_layer_is_shared_with_non_call_relations() {
         vec![(
             "PaymentService".to_string(),
             "IPaymentGateway".to_string(),
-            "A.cs".to_string(),
+            "A.rs".to_string(),
             None
         )],
         "a reverse occurrence asserted in repo B must not appear in repo A"
@@ -259,7 +259,7 @@ fn red_scope_generic_layer_is_shared_with_non_call_relations() {
         vec![(
             "PaymentService".to_string(),
             "IPaymentGateway".to_string(),
-            "B.cs".to_string(),
+            "B.rs".to_string(),
             None
         )],
         "the same rule applies to forward edges of a non-call relation"

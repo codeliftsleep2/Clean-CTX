@@ -1,0 +1,10 @@
+boundary,observation,disposition,evidence
+host schema visibility,smoke 03 again reports only mode alternatives and missing workspaceRoot/text/id,operationally blocked; no further identical smoke retries; exact adapter cause unverified,target/pcg-b10/host-smoke-03/agent-response.md and host-events.jsonl
+host invocation,smoke 02 sent unsupported query rather than text and received invalid_request,generic interface instructions added for a separately recorded follow-up; no discovery or retrieval success claimed,target/pcg-b10/host-smoke-02/host-events.jsonl
+host schema visibility,smoke 02 agent reported mode-only argument schema while production tools/list exposes complete properties,reported discrepancy requires direct host-visible schema evidence; not yet attributed to a transformer defect,target/pcg-b10/before/1.response.json and host-smoke-02/agent-response.md
+host configuration loading,first isolated CLI run rejected transportless disabled pilot override before MCP startup,removed unnecessary partial registration; failed run preserved; corrected run pending user,target/pcg-b10/host-smoke-01/stderr.txt
+host advertisement,current interactive tools omit pcg_knowledge_v1,isolated fresh host smoke pending,current tool metadata
+configuration,normal launch omits document-profile env and selects different executable,preserve normal configuration; use bounded isolated overrides,target/pcg-b10/configuration-receipt.json
+source currentness,deliberate all-zero source hash refused,expected negative witness; harness exception is not a production defect,target/pcg-b10/stale-reference-check/2.response.json
+evaluation contamination,current operator has repository-specific memory and conversation,all sixteen independent runs UNRUN; enforced filesystem isolation unestablished,B10_EVALUATION_FEASIBILITY.md
+external environment,latest gh pr view refresh failed at local proxy 127.0.0.1:9,current hosted state unavailable; prior observation not promoted to current,B10_ARCHITECTURAL_READINESS.md

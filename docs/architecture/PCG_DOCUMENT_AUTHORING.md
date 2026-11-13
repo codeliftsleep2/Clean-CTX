@@ -346,6 +346,28 @@ explicit semantic annotations, not inferred facts. Multiple intervals can preser
 shared definitions and qualifications. Do not fabricate missing components or
 duplicate normative prose. Historical reports and uncertainty remain attributed.
 
+### B9-R1 reference-first responsibility correction
+
+Owner decision, 2026-11-12: this section supersedes B9's automatic component
+materialization for knowledge `get` and `context`. Historical B9/B10 reports and
+their captured content-bearing responses remain records of that implementation;
+they are not rewritten as evidence of this corrected contract. The normal
+knowledge response version is 2 under the existing `pcg_knowledge_v1` tool.
+The five existing operation names remain, with explicit `acquire` added for one
+or multiple selected component references. Legacy `pcg_documents_v1` and the
+separate enrolled-evidence interface retain their own behavior and contracts.
+
+Graph retrieval is a map of source-owned knowledge, not source acquisition.
+`search`, `get`, `related` and `context` return structural metadata, complete
+applicable selected graph information and exact references, never component
+text, document bodies or generated excerpts. SQLite continues retaining exact
+source bodies, component intervals/hashes and immutable historical revisions.
+Authoritative Markdown remains the source of truth; Rust/SQLite perform
+deterministic graph/reference/acquisition work. Agents choose necessary explicit
+acquisitions and interpret their meaning without reconstructing closure or
+guessing source boundaries. Selective acquisition does not authorize selective
+compliance with applicable governing authority.
+
 `pcg_knowledge_v1` requires explicit `workspaceRoot` and `mode`:
 
 - `search`: optional FTS `text`, exact `track`, `kind`, `status`, `role`, and `label`.
@@ -359,21 +381,39 @@ duplicate normative prose. Historical reports and uncertainty remain attributed.
   Role/label
   predicates select the explicitly typed components. Order is deterministic ID,
   not a semantic relevance rank. Shared source ownership creates no sibling match.
-- `get`: exact `id`, optionally a declared `role`/`label` selection. Returns exact
-  content, ordered components, source/interval/content hashes, evidence references
-  and outgoing typed relationships. Full units retain all declared qualifications.
-  Filtered acquisition retains all explicitly associated `qualification` components
-  whenever the requested predicate matches; `selected_by_predicate` distinguishes
-  requested components from those required for interpretation. Filtered acquisition
-  explicitly reports `unit_complete:false`; `complete` then
-  refers to the requested component predicate, not the complete unit.
+- `get`: exact `id`, optionally a declared `role`/`label` selection. Returns ordered
+  component descriptors, source/interval/content hashes, evidence references and
+  outgoing typed relationships. Full units retain all qualification references.
+  Filtered structural selection retains qualification descriptors whenever its
+  predicate matches; `selected_by_predicate` distinguishes requested components
+  from required interpretation references. `unit_complete:false` describes a
+  filtered descriptor set, not acquisition of any component text.
 - `related`: exact `id`, optional `edgeKind` and `direction` (`incoming`, `outgoing`,
   `both`). Returns actual typed edges, provenance, meanings and endpoint identities.
   No endpoint source bodies are acquired merely for relationship discovery.
 - `context`: exact `id`, optional existing `maxNodes`/`maxEdges`. Rust computes the
-  unchanged typed transitive closure and deterministic witnesses, then acquires
-  each selected knowledge unit's exact components. No relationship reconstruction
-  is delegated to the LLM. A structural overflow returns no partial authority bundle.
+  unchanged typed transitive closure and deterministic witnesses, returning every
+  selected unit's component/qualification/evidence/obligation references. Query
+  roots, generation and graph completeness remain explicit. No source content
+  is acquired and no relationship reconstruction is delegated to the LLM. A
+  structural overflow returns no partial authority bundle.
+- `acquire`: explicit nonempty `references` array, with one or multiple returned
+  exact component references; no `id` or graph selectors at the request root.
+  Each reference pins `id`, `revision`, `ordinal`, `role`, optional/null `label`,
+  `path`, `sourceSha256`, `start`, `end`, `contentSha256` and `selector`.
+  Rust compares all fields with the stored immutable component descriptor and
+  validates exact UTF-8 bytes/content hashes. Every selected component includes
+  all qualification components associated with that same unit/revision, even
+  when the caller supplied only the non-qualification reference. There is no
+  automatic graph expansion or unrelated unit acquisition.
+  Input order is preserved, with one disposition per reference. Exact duplicate
+  references reuse operation-local resolution but retain a result with
+  `duplicate_of` identifying the earlier input position. Invalid/stale references
+  explicitly refuse with no content; independent successful references remain,
+  and overall `complete:false`/`result_state:incomplete` discloses any refusal.
+  Malformed request shapes/unknown fields refuse the operation. Database/security
+  failures remain operation errors, not silently downgraded reference failures.
+  No arbitrary batch count, token budget or response ceiling is introduced.
 - `source`: exact `id`, optional associated `path`. Returns a complete current
   original artifact, UTF-8 text or lossless byte-array data for binary evidence.
   Source access is restricted to that identity's declared/associated artifacts.
@@ -381,11 +421,16 @@ duplicate normative prose. Historical reports and uncertainty remain attributed.
   `source_revision_changed`, never different bytes under the old reference.
   Existing material-denial checks also apply to a binary detection view without
   changing the returned original bytes. Legitimate security failures remain explicit.
+  Optional `revision` pins the associated knowledge revision as well. Explicit
+  `historical:true` requires `revision` and retrieves the retained associated
+  artifact rather than current filesystem content. If original bytes were not
+  retained under the existing storage contract, return `document_source_unavailable`;
+  never substitute current bytes. Existing legacy history reconstruction remains.
 
 References include workspace, identity and associated path so consumers need no
 database knowledge or arbitrary SQL. Required original evidence is exposed by
 complete, exact, current artifact references and explicit source retrieval; there
-are no optional evidence tiers. Component text is not a summary. No token count
+are no optional evidence tiers. Component acquisition is exact text, not a summary. No token count
 controls selection, admission, completeness or publication. Whole-source legacy
 search remains explicitly document discovery, not proposition discovery.
 
@@ -394,6 +439,24 @@ Discovery over unrepresented identities is incomplete; selected missing knowledg
 also returns incomplete without an authoritative partial bundle. Complete means
 complete against this declared operation/traversal, not all inferred applicability.
 Lifecycle labels and parsed obligations do not establish execution or authorization.
+
+Component references are durable revision-bound data, not session-local handles.
+Default `historical:false` requires that the pinned revision is still the current
+member for that identity. Source change between graph retrieval and acquisition
+returns `source_revision_changed`, never a silently substituted new revision.
+The caller must explicitly reacquire the current graph to adopt changed authority.
+Explicit `historical:true` resolves that retained immutable component revision and
+its original qualifications as `historical_snapshot`; it does not certify current
+authority. Legacy document history continues exact original-document reconstruction.
+Current whole-source `source` references retain their existing source-hash refusal.
+
+Graph selection completeness, complete reference representation, requested content
+acquisition completeness, source currentness, host delivery, agent inspection and
+comprehension are separate claims. `content_acquired:false` on graph responses
+means content has not been retrieved. An acquisition response proves neither
+complete authority acquisition nor model delivery/comprehension. Existing B10
+delivery-boundary findings remain valid and their further investigation is
+suspended under B9-R1; no host limit/presentation policy is changed here.
 
 Catalog schema v2 deduplicates complete `(path,hash)` source storage and adds
 revision-bound unit/component projections and attributed FTS. Exact v1 catalogs

@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "pcg_knowledge_schema.rs"]
+mod schema_interoperability;
+
 fn knowledge_call(state: &McpState, args: Value) -> Value {
     protocol::captured_responses().clear();
     crate::mcp::router::dispatch(
@@ -38,8 +41,12 @@ fn registered_knowledge_is_conditional_closed_and_production_reachable() {
     let payload: Value =
         serde_json::from_str(response["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(payload["contract"], "pcg_knowledge_v1");
+    assert!(payload["units"][0]["components"][0].get("text").is_none());
+    let acquired = knowledge_call(&enabled, payload["units"][0]["acquire_request"].clone());
+    let acquired: Value =
+        serde_json::from_str(acquired["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
     assert_eq!(
-        payload["units"][0]["components"][0]["text"],
+        acquired["acquisitions"][0]["components"][0]["text"],
         "Exact pipeline statement.\n"
     );
     let reference = payload["units"][0]["source_request"].clone();

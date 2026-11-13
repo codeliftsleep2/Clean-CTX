@@ -22,6 +22,7 @@ fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
 }
 
 fn publish(state: &crate::mcp::McpState, root: &Path, component: &Path) {
+    crate::tests::angular_authority_fixture::install(root);
     let response = call(
         state,
         "provide_code_context",

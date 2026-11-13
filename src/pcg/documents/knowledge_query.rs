@@ -18,11 +18,11 @@ fn metadata(c: &Connection, g: &str, id: &str) -> Result<Value> {
         "note":declaration["note"],"verdict":declaration["verdict"],"declared_commit":declaration["commit"],"declared_relationships":declaration["relationships"],"source_request":{"mode":"source","id":id,"sourceSha256":source_sha}}),
     )
 }
-fn acquire(c: &Connection, mut unit: Value, q: &Request) -> Result<Value> {
+fn describe(c: &Connection, mut unit: Value, q: &Request) -> Result<Value> {
     let revision = unit["revision"]
         .as_str()
         .ok_or(Error("knowledge_corruption"))?;
-    let mut components = knowledge_store::content(c, revision)?;
+    let mut components = knowledge_store::components(c, revision)?;
     let selected = |v: &Value| {
         q.role
             .as_ref()
@@ -121,12 +121,25 @@ pub fn execute(
     payload: &mut Value,
 ) -> Result<()> {
     if q.mode == "search" {
-        payload["units"] = search(c, g, q)?.into();
+        let mut units = Vec::new();
+        for unit in search(c, g, q)? {
+            units.push(describe(c, unit, q)?);
+        }
+        payload["units"] = units.into();
         return Ok(());
+    }
+    if q.mode == "source" && q.historical {
+        return super::knowledge_source::historical(c, q, payload);
     }
     let id = q.id.as_deref().ok_or(Error("invalid_request"))?;
     let unit = metadata(c, g, id)?;
     if q.mode == "source" {
+        require(
+            q.revision
+                .as_ref()
+                .is_none_or(|revision| unit["revision"].as_str() == Some(revision.as_str())),
+            "source_revision_changed",
+        )?;
         let node = capture.nodes.get(id).ok_or(Error("document_not_found"))?;
         let path = q.path.as_deref().unwrap_or(&node.path);
         require(
@@ -168,7 +181,7 @@ pub fn execute(
                     "direction":"outgoing","meaning":traversal::meaning(edge["kind"].as_str().unwrap_or("")),
                     "provenance":{"path":unit["path"],"source_sha256":unit["source_sha256"]}})
             }).collect::<Vec<_>>().into();
-            payload["units"] = json!([acquire(c, unit, q)?]);
+            payload["units"] = json!([describe(c, unit, q)?]);
         }
         "related" => {
             let direction = q.direction.as_deref().unwrap_or("both");
@@ -202,7 +215,11 @@ pub fn execute(
                 missing(payload, missing_ids);
                 return Ok(());
             }
-            payload["units"] = endpoints.into_values().collect::<Vec<_>>().into();
+            payload["units"] = endpoints
+                .into_values()
+                .map(|unit| describe(c, unit, q))
+                .collect::<Result<Vec<_>>>()?
+                .into();
             payload["relationships"] = edges.into();
         }
         "context" => {
@@ -220,7 +237,7 @@ pub fn execute(
                 if unit["scope"].is_null() {
                     missing_ids.push(identity.into());
                 } else {
-                    units.push(acquire(c, unit, q)?);
+                    units.push(describe(c, unit, q)?);
                 }
             }
             if !missing_ids.is_empty() {

@@ -25,6 +25,8 @@
 //
 // Every assertion goes through the REAL production path: MCP dispatch →
 // `handle_workspace_query` → hydration → scoped WorkspaceIndex lookup.
+// Synthetic Rust owners isolate generic scoping from C# ancestry acquisition,
+// which cannot truthfully retain manually seeded facts in comment-only files.
 
 use super::workspace_query_scope::{
     DOMAIN, Repo, seed_current_generic, seed_generic, serialize, state,
@@ -187,14 +189,14 @@ fn red_wsc4_1_find_entities_isolates_two_repositories() {
     // The SAME entity name, declared in two repositories, each in its own file.
     seed_generic(
         &state,
-        &repo_a.file("A.cs"),
+        &repo_a.file("A.rs"),
         SemanticRelation::Injects,
         "LoadingComponent",
         "Router",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Injects,
         "LoadingComponent",
         "Router",
@@ -202,19 +204,19 @@ fn red_wsc4_1_find_entities_isolates_two_repositories() {
 
     assert_eq!(
         found_entities(&state, "LoadingComponent", Some(&repo_a.key())),
-        vec![("LoadingComponent".to_string(), "A.cs".to_string())],
+        vec![("LoadingComponent".to_string(), "A.rs".to_string())],
         "a workspace-scoped find_entities answers with that workspace's occurrence only"
     );
     assert_eq!(
         found_entities(&state, "LoadingComponent", Some(&repo_b.key())),
-        vec![("LoadingComponent".to_string(), "B.cs".to_string())],
+        vec![("LoadingComponent".to_string(), "B.rs".to_string())],
         "repo B answers with its own occurrence only"
     );
     assert_eq!(
         found_entities(&state, "LoadingComponent", None),
         vec![
-            ("LoadingComponent".to_string(), "A.cs".to_string()),
-            ("LoadingComponent".to_string(), "B.cs".to_string()),
+            ("LoadingComponent".to_string(), "A.rs".to_string()),
+            ("LoadingComponent".to_string(), "B.rs".to_string()),
         ],
         "a root-less query keeps the global session view"
     );
@@ -232,14 +234,14 @@ fn red_wsc4_2_entity_in_an_additional_root_is_part_of_the_workspace() {
     let state = state(&[&repo_a2]);
     seed_generic(
         &state,
-        &repo_a2.file("A2.cs"),
+        &repo_a2.file("A2.rs"),
         SemanticRelation::Injects,
         "SharedService",
         "Clock",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Injects,
         "SharedService",
         "Clock",
@@ -247,14 +249,14 @@ fn red_wsc4_2_entity_in_an_additional_root_is_part_of_the_workspace() {
 
     assert_eq!(
         found_entities(&state, "SharedService", Some(&repo_a.key())),
-        vec![("SharedService".to_string(), "A2.cs".to_string())],
+        vec![("SharedService".to_string(), "A2.rs".to_string())],
         "an entity declared in a configured additional root is the workspace's own"
     );
     assert_eq!(
         found_entities(&state, "SharedService", Some(&repo_b.key())),
         vec![
-            ("SharedService".to_string(), "A2.cs".to_string()),
-            ("SharedService".to_string(), "B.cs".to_string()),
+            ("SharedService".to_string(), "A2.rs".to_string()),
+            ("SharedService".to_string(), "B.rs".to_string()),
         ],
         "the session holds ONE flat root configuration (no per-primary association), \
          so a configured additional root participates in every scoped query while an \
@@ -274,14 +276,14 @@ fn red_wsc4_3_same_identity_is_retained_and_scoped_by_occurrence() {
     let state = state(&[]);
     seed_generic(
         &state,
-        &repo_a.file("A.cs"),
+        &repo_a.file("A.rs"),
         SemanticRelation::Injects,
         "LoadingComponent",
         "Router",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Injects,
         "LoadingComponent",
         "Router",
@@ -311,7 +313,7 @@ fn red_wsc4_3_same_identity_is_retained_and_scoped_by_occurrence() {
             .file
             .as_deref()
             .unwrap_or_default()
-            .ends_with("A.cs"),
+            .ends_with("A.rs"),
         "the surviving occurrence is the one repo A's file declared: {:?}",
         scoped[0].file
     );
@@ -325,8 +327,8 @@ fn red_wsc4_4_entities_in_file_is_already_bounded_by_its_explicit_path() {
     let base = tempfile::TempDir::new().unwrap();
     let repo_a = Repo::inside(base.path(), "repo-a");
     let repo_b = Repo::inside(base.path(), "repo-b");
-    let file_a = repo_a.file("A.cs");
-    let file_b = repo_b.file("B.cs");
+    let file_a = repo_a.file("A.rs");
+    let file_b = repo_b.file("B.rs");
     let state = state(&[]);
     seed_current_generic(&state, &file_a, SemanticRelation::Injects, "InA", "TargetA");
     seed_current_generic(&state, &file_b, SemanticRelation::Injects, "InB", "TargetB");
@@ -335,8 +337,8 @@ fn red_wsc4_4_entities_in_file_is_already_bounded_by_its_explicit_path() {
     assert_eq!(
         entities_in_file(&state, &file_a, Some(&repo_a.key())),
         vec![
-            ("InA".to_string(), "A.cs".to_string()),
-            ("TargetA".to_string(), "A.cs".to_string()),
+            ("InA".to_string(), "A.rs".to_string()),
+            ("TargetA".to_string(), "A.rs".to_string()),
         ],
         "the declared file of the queried workspace answers with its entities"
     );
@@ -366,8 +368,8 @@ fn red_wsc4_4_entities_in_file_is_already_bounded_by_its_explicit_path() {
     assert_eq!(
         entities_in_file(&configured, &file_b, Some(&repo_a.key())),
         vec![
-            ("InB".to_string(), "B.cs".to_string()),
-            ("TargetB".to_string(), "B.cs".to_string()),
+            ("InB".to_string(), "B.rs".to_string()),
+            ("TargetB".to_string(), "B.rs".to_string()),
         ],
         "a configured additional root's file is inside the workspace boundary"
     );

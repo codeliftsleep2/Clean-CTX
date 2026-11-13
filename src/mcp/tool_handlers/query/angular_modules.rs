@@ -1,8 +1,22 @@
 //! Validate the consumed-source footprint of prepared NgModule responses.
 use super::prepare::PreparationContext;
-use crate::layers::meta::semantic::SemanticDependency;
 use crate::mcp::McpState;
+use crate::workspace::index::{SemanticFidelity, WorkspaceIndex};
 use serde_json::Value;
+
+/// Request-local publication identity, validated by the index's existing native
+/// witnesses and legacy dependencies. It does not copy or invent source authority.
+pub(super) struct ProjectionWitness {
+    owner: String,
+    fidelity: SemanticFidelity,
+    source_hash: String,
+}
+
+impl ProjectionWitness {
+    pub(super) fn is_current(&self, index: &WorkspaceIndex) -> bool {
+        index.has_current_semantic_projection(&self.owner, self.fidelity, &self.source_hash)
+    }
+}
 
 pub(super) fn revalidate(
     state: &McpState,
@@ -11,22 +25,10 @@ pub(super) fn revalidate(
 ) -> Result<bool, String> {
     let stale: Vec<_> = {
         let index = state.workspace_index_read();
-        owners
-            .iter()
-            .filter(|owner| {
-                index
-                    .semantic_dependencies_for_file(owner)
-                    .iter()
-                    .any(|dependency| !dependency.is_current())
-            })
-            .map(|owner| {
-                (
-                    owner.clone(),
-                    index
-                        .semantic_projection_fidelity(owner)
-                        .unwrap_or(crate::workspace::index::SemanticFidelity::High),
-                )
-            })
+        witnesses(&index, owners)
+            .into_iter()
+            .filter(|witness| !witness.is_current(&index))
+            .map(|witness| (witness.owner, witness.fidelity))
             .collect()
     };
     for (owner, fidelity) in &stale {
@@ -39,9 +41,10 @@ pub(super) fn revalidate(
             super::super::hydration::HydrationRequirement::Semantic(*fidelity),
         )?;
     }
-    if !dependencies(state, owners)
+    let index = state.workspace_index_read();
+    if !witnesses(&index, owners)
         .iter()
-        .all(|dependency| dependency.is_current())
+        .all(|witness| witness.is_current(&index))
     {
         return Err("Angular module contributors changed during revalidation; retry".into());
     }
@@ -103,10 +106,23 @@ pub(super) fn owners(
     Vec::new()
 }
 
-pub(super) fn dependencies(state: &McpState, owners: &[String]) -> Vec<SemanticDependency> {
+pub(super) fn dependencies(state: &McpState, owners: &[String]) -> Vec<ProjectionWitness> {
     let index = state.workspace_index_read();
+    witnesses(&index, owners)
+}
+
+fn witnesses(index: &WorkspaceIndex, owners: &[String]) -> Vec<ProjectionWitness> {
     owners
         .iter()
-        .flat_map(|owner| index.semantic_dependencies_for_file(owner))
+        .map(|owner| ProjectionWitness {
+            owner: owner.clone(),
+            fidelity: index
+                .semantic_projection_fidelity(owner)
+                .unwrap_or(SemanticFidelity::High),
+            source_hash: index
+                .semantic_projection_source_hash(owner)
+                .unwrap_or_default()
+                .to_owned(),
+        })
         .collect()
 }

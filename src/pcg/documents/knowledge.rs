@@ -1,7 +1,8 @@
 //! First-class exact knowledge interface. Legacy whole-source operations stay separate.
 pub(crate) use super::content::ROLES;
+pub use super::knowledge_acquisition::ComponentReference as Reference;
 pub(crate) use super::model::{KINDS, RELATIONS, STATUSES};
-use super::{Session, knowledge_query, model, scan, store, validate};
+use super::{Session, knowledge_acquisition, knowledge_query, model, scan, store, validate};
 use crate::pcg::{Error, Result, identity, require};
 use rusqlite::TransactionBehavior;
 use serde::{Deserialize, Serialize};
@@ -39,25 +40,51 @@ pub struct Request {
     pub max_nodes: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_edges: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub references: Option<Vec<Reference>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub revision: Option<String>,
+    #[serde(default)]
+    pub historical: bool,
 }
 impl Request {
     fn completeness_scope(&self) -> &'static str {
         match self.mode.as_str() {
             "search" => "discovery_over_all_declared_units",
-            "get" if self.role.is_some() => "requested_components_with_required_qualifications",
-            "get" => "complete_declared_knowledge_unit",
+            "get" if self.role.is_some() => {
+                "requested_component_descriptors_with_required_qualification_references"
+            }
+            "get" => "complete_declared_knowledge_unit_structure",
             "related" => "requested_typed_incident_relationships_and_endpoint_metadata",
-            "context" => "complete_declared_transitive_authority",
+            "context" => "complete_declared_transitive_authority_graph",
             "source" => "complete_original_source_artifact",
+            "acquire" => "requested_exact_components_with_required_qualifications",
             _ => unreachable!("validated operation"),
         }
     }
     fn validate(&self) -> Result<()> {
         require(
-            ["search", "get", "related", "context", "source"].contains(&self.mode.as_str()),
+            self.mode == "source" || (self.revision.is_none() && !self.historical),
             "invalid_request",
         )?;
-        if self.mode == "search" {
+        require(
+            !self.historical || self.revision.is_some(),
+            "invalid_request",
+        )?;
+        require(
+            ["search", "get", "related", "context", "source", "acquire"]
+                .contains(&self.mode.as_str()),
+            "invalid_request",
+        )?;
+        if self.mode == "acquire" {
+            require(
+                self.id.is_none() && self.references.as_ref().is_some_and(|r| !r.is_empty()),
+                "invalid_request",
+            )?;
+        } else {
+            require(self.references.is_none(), "invalid_request")?;
+        }
+        if ["search", "acquire"].contains(&self.mode.as_str()) {
             require(self.id.is_none(), "invalid_request")?;
         } else {
             identity::id(self.id.as_deref().ok_or(Error("invalid_request"))?)?;
@@ -188,14 +215,14 @@ impl Session {
         } else {
             store::head(&tx)?
         };
-        let mut payload = json!({"contract":"pcg_knowledge_v1","version":1,"operation":q.mode,"workspaceRoot":q.workspace_root,
+        let mut payload = json!({"contract":"pcg_knowledge_v1","version":2,"operation":q.mode,"workspaceRoot":q.workspace_root,
             "generation":generation,"result_state":if valid {"ready"}else{"blocked"},"catalog_current":valid,
             "complete":valid,"units":[],"relationships":[],"paths":[],"sources":[],"diagnostics":capture.diagnostics,
             "completeness_scope":q.completeness_scope(),"inferred_applicability":false,
             "authority_assurance":"source_attributed","verification_execution":"not_executed_by_parser",
             "freshness":"observed_boundaries_only","atomic_filesystem_snapshot":false,"continuous_currentness":false,
             "evidence_delivery":"exact_current_artifact_references_retrievable_by_source_operation",
-            "token_budget_enforced":false});
+            "token_budget_enforced":false,"content_acquired":false,"query_roots":q.id.iter().collect::<Vec<_>>()});
         if valid {
             let unrepresented: Vec<_> = capture
                 .nodes
@@ -208,6 +235,14 @@ impl Session {
                 payload["complete"] = false.into();
                 payload["result_state"] = "incomplete".into();
                 payload["diagnostics"] = json!([{"code":"E_KNOWLEDGE_UNDECLARED","message":"Discovery cannot claim completeness over unrepresented identities"}]);
+            } else if q.mode == "acquire" {
+                knowledge_acquisition::execute(
+                    &tx,
+                    generation.as_deref().ok_or(Error("document_database"))?,
+                    q.references.as_deref().ok_or(Error("invalid_request"))?,
+                    &mut payload,
+                )?;
+                payload["content_acquired"] = true.into();
             } else {
                 knowledge_query::execute(
                     &tx,
@@ -218,6 +253,25 @@ impl Session {
                     max_edges,
                     &mut payload,
                 )?;
+                payload["content_acquired"] = (q.mode == "source").into();
+            }
+        } else if q.mode == "source" && q.historical {
+            super::knowledge_source::historical(&tx, q, &mut payload)?;
+            payload["content_acquired"] = true.into();
+        } else if q.mode == "acquire"
+            && q.references
+                .as_ref()
+                .is_some_and(|refs| refs.iter().all(|reference| reference.historical))
+        {
+            if let Some(generation) = generation.as_deref() {
+                knowledge_acquisition::execute(
+                    &tx,
+                    generation,
+                    q.references.as_deref().ok_or(Error("invalid_request"))?,
+                    &mut payload,
+                )?;
+                payload["freshness"] = "historical_snapshot".into();
+                payload["content_acquired"] = true.into();
             }
         }
         for unit in payload["units"]
@@ -230,15 +284,33 @@ impl Session {
                 }
             }
             let id = unit["id"].clone();
+            let unit_revision = unit["revision"].clone();
+            if let Some(source_request) = unit.get_mut("source_request") {
+                source_request["revision"] = unit_revision.clone();
+            }
             if let Some(components) = unit.get_mut("components").and_then(Value::as_array_mut) {
                 for component in components {
-                    component["source_request"] = json!({"workspaceRoot":q.workspace_root,"mode":"source","id":id,"path":component["path"],"sourceSha256":component["source_sha256"]});
+                    component["source_request"] = json!({"workspaceRoot":q.workspace_root,"mode":"source","id":id,"revision":unit_revision,"path":component["path"],"sourceSha256":component["source_sha256"]});
+                    let reference =
+                        knowledge_acquisition::reference(&id, &unit_revision, component);
+                    component["reference"] = reference.clone();
+                    component["acquire_request"] = json!({"workspaceRoot":q.workspace_root,"mode":"acquire","references":[reference]});
                 }
             }
             if let Some(evidence) = unit.get_mut("evidence").and_then(Value::as_array_mut) {
                 for association in evidence {
                     association["source_request"]["workspaceRoot"] = json!(q.workspace_root);
+                    association["source_request"]["revision"] = unit_revision.clone();
                 }
+            }
+            if let Some(components) = unit.get("components").and_then(Value::as_array) {
+                let references: Vec<_> = components
+                    .iter()
+                    .map(|component| component["reference"].clone())
+                    .collect();
+                unit["get_request"] =
+                    json!({"workspaceRoot":q.workspace_root,"mode":"get","id":id});
+                unit["acquire_request"] = json!({"workspaceRoot":q.workspace_root,"mode":"acquire","references":references});
             }
         }
         capture.completion(trusted)?;

@@ -287,12 +287,11 @@ fn af002_root_inventory_public_dimensions() {
             let elapsed = start.elapsed().as_nanos();
             let w = snapshot();
             assert!(response.get("error").is_none(), "{response}");
-            if phase == "cold" {
-                assert!(
-                    w.calls > 0,
-                    "Actual registered path did not reach per-root construction"
-                );
-            }
+            // Ordinary discovery no longer constructs unused per-root proof manifests.
+            assert_eq!(w.calls, 0, "ordinary discovery constructed proof manifests");
+            assert_eq!(w.predicates, 0);
+            assert_eq!(w.entry_clones, 0);
+            assert_eq!(w.root_manifests, 0);
             assert_eq!(w.predicates, w.entry_clones + w.rejected);
             for (path, source) in &sources {
                 assert_eq!(&std::fs::read_to_string(path).unwrap(), source);

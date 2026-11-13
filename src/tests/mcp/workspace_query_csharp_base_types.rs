@@ -241,7 +241,7 @@ fn csharp_struct_base_type_republication_retracts_and_deduplicates() {
 fn csharp_struct_record_projection_uses_the_v0_10_0_producer_generation() {
     assert_eq!(
         crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION,
-        4,
+        5,
         "v0.10.0 must retain the incremented CSharpSemanticProjection generation"
     );
 }

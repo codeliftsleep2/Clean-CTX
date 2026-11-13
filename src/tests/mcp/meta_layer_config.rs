@@ -26,6 +26,7 @@ fn dispatch_provide(state: &crate::mcp::McpState, path: &Path, root: &Path) -> V
 }
 
 fn write_fixture(root: &tempfile::TempDir, name: &str, source: &str) -> PathBuf {
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join(name);
     let padded = format!(
         "{source}\n{}",

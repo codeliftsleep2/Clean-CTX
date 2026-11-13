@@ -7,14 +7,39 @@ use crate::mcp::tool_handlers::hydration::DependencyEvidence;
 use serde_json::Value;
 use std::collections::BTreeSet;
 
+/// Defer only after this operation has acquired an EF source set and discovered
+/// the identity. A fresh query still needs its initial hydration/publication,
+/// even when another operation previously admitted that owner.
+pub(super) fn can_defer_ef_preparation(
+    args: &Value,
+    state: &McpState,
+    context: &mut PreparationContext,
+) -> bool {
+    if !ef_request(args) || context.ef_sources.is_none() {
+        return false;
+    }
+    let Some(name) = args["name"].as_str().filter(|name| !name.trim().is_empty()) else {
+        return false;
+    };
+    let Ok(scope) = context.scope(state, args) else {
+        return false;
+    };
+    state.workspace_index_read().has_identity_in_scope(
+        "dotnet",
+        args["entity_type"].as_str().unwrap_or_default(),
+        name,
+        scope.as_ref(),
+    )
+}
+
 pub(super) fn prepare(
     operation: WorkspaceQueryOperation,
     args: &Value,
     state: &McpState,
     context: &mut PreparationContext,
-    initial: PreparedQuery,
+    initial: Option<PreparedQuery>,
 ) -> PreparedQuery {
-    if matches!(&initial, PreparedQuery::Ready(Err(_)))
+    if matches!(initial.as_ref(), Some(PreparedQuery::Ready(Err(_))))
         || matches!(
             operation,
             WorkspaceQueryOperation::CallsInFile | WorkspaceQueryOperation::DeclarationsInFile
@@ -28,7 +53,7 @@ pub(super) fn prepare(
             .is_some_and(|domain| domain != "dotnet")
             && !(args["domain"] == "builtin" && args["entity_type"] == "Class"))
     {
-        return initial;
+        return initial.unwrap_or_else(|| operation.prepare_base(args, state, context));
     }
     let generation = state.csharp_authority_generation();
     let ef_view_revision = context.ef_view_revision;
@@ -36,7 +61,9 @@ pub(super) fn prepare(
         .workspace_index_read()
         .has_csharp_publication_generation(generation);
     match acquire(args, state, context) {
-        Ok((evidence, None)) if evidence.is_empty() => initial,
+        Ok((evidence, None)) if evidence.is_empty() => {
+            initial.unwrap_or_else(|| operation.prepare_base(args, state, context))
+        }
         Ok((evidence, ef)) => {
             let changed = generation != state.csharp_authority_generation();
             if changed {
@@ -44,11 +71,13 @@ pub(super) fn prepare(
             } else if !published {
                 context.invalidate_csharp_projection_catalogs();
             }
-            let prepared = if changed || !published || context.ef_view_revision != ef_view_revision
-            {
-                operation.prepare_base(args, state, context)
-            } else {
-                initial
+            let prepared = match initial {
+                Some(initial)
+                    if !changed && published && context.ef_view_revision == ef_view_revision =>
+                {
+                    initial
+                }
+                _ => operation.prepare_base(args, state, context),
             };
             let stamp = evidence
                 .first()
@@ -178,7 +207,7 @@ fn acquire(
     }
 }
 
-fn ef_request(args: &Value) -> bool {
+pub(super) fn ef_request(args: &Value) -> bool {
     args["domain"] == "dotnet"
         && ((args["type"] == "forward_edges" && args["entity_type"] == "DbContext")
             || (args["type"] == "reverse_edges" && args["entity_type"] == "Entity"))

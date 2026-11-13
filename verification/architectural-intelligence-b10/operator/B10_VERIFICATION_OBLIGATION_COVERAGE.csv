@@ -1,0 +1,60 @@
+"id","label","path","start","end","content_sha256","exact_obligation","classification","execution_standing","remaining_review"
+"ARCH-001",,"docs/invariants/canonical-ir.md","5386","5934","f7b1987d4be34e6b1fc1e28bd0fcbf65d942888f5ef1d827259c6eadfb438b67","| **Enforcement** | Rust type system. `CompiledIR` has no field of type `InferenceLayer`. Serialization functions (`ir_to_wire`, `encode`, `ir_to_string_table_wire`, etc.) operate on `CompiledIR` only and cannot access `InferenceLayer`. Violating this invariant requires deliberately changing type signatures. |
+| **Authority** | `src/ir/compiler.rs` (`CompiledIR`), `src/ir/inference_layer.rs` (`InferenceLayer`), `src/ir/wire.rs`, `src/ir/binary_wire.rs` (serialization) |
+| **Type** | STRUCTURAL (type system) |
+| **Gate** | Rust compiler |
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"ARCH-002",,"docs/invariants/canonical-ir.md","7546","8241","6722f75e8701f840329991e7374e6101eb59f6c6b747e8a04a521178eea3b984","| **Enforcement** | Language conformance tests compile source to `CompiledIR` and verify expected `CoreOp` structure. The validator and round-trip tests operate on the resulting `CompiledIR` without language-specific knowledge. Feature gates (`#[cfg(feature = ""..."")]`) ensure language layers are compiled only when the corresponding tree-sitter grammar is available. |
+| **Authority** | `src/tests/ir/compiler.rs` (TypeScript conformance), `src/tests/ir/rust_integration.rs` (Rust conformance), `src/tests/ir/layers_integration.rs` (C# + layers), `src/layers/registry.rs` (feature-gated registration) |
+| **Type** | ENFORCED (test architecture) |
+| **Gate** | `cargo test --all-features` |
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"AUTH.ANGULAR_RESOLVER","public_keys_and_current_producer","docs/architecture/contracts/angular-resolver.md","5176","5692","ecd05b2018a8fd69bd895cc0fd6e1b601d84746fce6c863715f0e0e19262ed03","## Approved question and limit
+
+Which exact runtime declarations are written under ordinary named resolve mappings
+of this exact admitted native typed-const Routes object? ResolvedBy publishes one
+RouteOccurrence/DeclarationId support, displayed as Resolver written use. Repeated
+keys/values remain neutral evidence. No executable eligibility is certified.
+Which exact public key registers each declaration remains explicitly OPEN and must
+return as a separate bounded public design after this repair is accepted.
+
+
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"DOC-206","post_repair_green_and_live","docs/agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md","12099","12757","28a4ae560d6fc6b3f028880f5527065c8fdf94444a2b9f93b442d6a7724d30f1","The regression and its three-line registration were preserved in a narrow
+stash named `issue-156 coverage frozen RED regression only`; its parent diff
+contains only those two paths. With the regression absent, EF `Evidence::apply`
+was changed to use `get_mut(...).and_then(Value::as_array_mut)`, avoiding null
+insertion while retaining removal of `dependencies_current` from existing
+arrays. The exact regression was restored and matched its frozen Git blob.
+No schema, live oracle, or earlier frozen test changed. Focused GREEN and live
+acceptance are NOT RUN after this repair. The earlier authoring notes below
+describe the sequence before operator RED.
+
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"PERF-001-REPLAY","later_footer","docs/agent/AF_PERF_002_GITDIFF_DISCOVERY.md","942","1769","9eea2e4cc8d0ca096e807eccceeb9f2f50ef48b9ca2b237717f8250fb8812d5a","The replacement tracked test is replay_footer_observation_af_perf_002.rs, registered
+from replay.rs. It runs actual registered compression/replay and three controlled
+mutations: unrelated alias insertion, exact alias removal and registered deletion.
+It requires the complete original response with the exact later footer, text-cache
+equality and unchanged held canonical tuples/version/hash. The expected text is
+derived from the first candidate by removing ONLY the exact requested alias suffix
+when the alias is removed; no response normalization or alternative is executed.
+Unrelated insertion must leave the complete response unchanged. A RAII reset clears
+the hook on unwind. The test protects the later rendering observation and does not
+create a new lifecycle guarantee for successful replay after deletion.
+
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"PIPELINE-001",,"docs/invariants/canonical-ir.md","9790","10152","583c259bc347eb3c8738741d952a3169a94af37def287ef7660012b471176f3f","| **Enforcement** | `production_pipeline_preserves_architectural_order` test in `src/tests/ir/pipeline.rs` asserts the exact pass sequence via `PassPipeline::pass_names()`. |
+| **Authority** | `src/ir/pipeline.rs` (`PassPipeline::default_production()`), `src/tests/ir/pipeline.rs` (ordering test) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"VALID-001",,"docs/invariants/canonical-ir.md","3672","4012","580a430e822499d7c46d97a35a9ebfa355c21068fece778e81336b0125715737","| **Enforcement** | `DefaultValidator` implementing `IRValidator`; tracked tests cover every rule, including E011 native-call caller ownership, plus empty-IR and error-display boundaries. |
+| **Authority** | `src/ir/validator.rs` (rules), `src/tests/ir/validator.rs` (tests) |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"
+"WIRE-001",,"docs/invariants/canonical-ir.md","1289","2232","fab6065e7a2beae2da5811ba6b217763b612d19299d0a555a5e9feb0dda8dd05","| **Enforcement** | The current canonical enum has 30 CoreOp variants; physical Binary 0x04 has 31 opcode values because exact and spread Call use distinct opcodes. The dedicated binary_wire_v04 fixture covers all 30 variants and both Call forms with complete-value, order and duplicate assertions. The randomized named/binary generators cover 25 variants over 100 seeds, not the full current enum. Other legacy round-trip tests have format-specific and sometimes partial oracles; their existence does not prove complete all-format coverage. Determinism and double-encode assertions remain tracked. See the B0/B1 C13 source comparison for the exact coverage boundary; no test was rerun by this documentation migration. |
+| **Authority** | `src/tests/ir/round_trip.rs`, `src/tests/ir/round_trip_randomized.rs`, `src/tests/ir/binary_wire_v04.rs`; current enum `src/ir/opcodes.rs` |
+| **Type** | ENFORCED (test) |
+| **Gate** | `cargo test` |
+","independently selectable exact component","source attribution only; no test execution inferred","obligations in broader statements/source/evidence require separate review"

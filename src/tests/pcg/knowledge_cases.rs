@@ -2,6 +2,12 @@ use super::*;
 use crate::pcg::document_fixture::Fixture;
 use serde_json::{Value, json};
 
+#[path = "knowledge_reference_first.rs"]
+mod reference_first;
+
+#[path = "knowledge_acquisition_cases.rs"]
+mod explicit_acquisition;
+
 fn source() -> String {
     "<!-- pcg:PIPE-A:begin -->\nPassPipeline has an explicit order.\n<!-- pcg:PIPE-A:end -->\n\
 <!-- pcg:QUAL:begin -->\nHistorical validation is not current certification.\n<!-- pcg:QUAL:end -->\n\
@@ -28,6 +34,19 @@ fn query(f: &Fixture, q: &knowledge::Request) -> Value {
     Session::new(f.profile.clone()).knowledge(q).unwrap()
 }
 
+fn acquire_components(f: &Fixture, unit: &Value) -> Vec<Value> {
+    let q: knowledge::Request = serde_json::from_value(unit["acquire_request"].clone()).unwrap();
+    let result = query(f, &q);
+    assert_eq!(result["complete"], true);
+    let mut components = std::collections::BTreeMap::new();
+    for acquisition in result["acquisitions"].as_array().unwrap() {
+        for component in acquisition["components"].as_array().unwrap() {
+            components.insert(component["ordinal"].as_u64().unwrap(), component.clone());
+        }
+    }
+    components.into_values().collect()
+}
+
 #[test]
 fn knowledge_search_isolates_siblings_and_acquires_exact_components() {
     let f = fixture();
@@ -38,7 +57,13 @@ fn knowledge_search_isolates_siblings_and_acquires_exact_components() {
     assert_eq!(found["units"].as_array().unwrap().len(), 1);
     assert_eq!(found["units"][0]["id"], "DOC-001");
     assert_eq!(found["units"][0]["matches"][0]["origin"], "statement");
-    assert!(found["units"][0].get("components").is_none());
+    assert!(
+        found["units"][0]["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|c| c.get("text").is_none())
+    );
     assert!(!found.to_string().contains("Wire serialization"));
     assert_eq!(found["sources"], json!([]));
     q.text = Some("PassPipeline certification".into());
@@ -48,12 +73,10 @@ fn knowledge_search_isolates_siblings_and_acquires_exact_components() {
         "composed_knowledge"
     );
     let unit = query(&f, &request(&f, "get", Some("DOC-001")));
+    let acquired = acquire_components(&f, &unit["units"][0]);
+    assert_eq!(acquired[0]["text"], "PassPipeline has an explicit order.\n");
     assert_eq!(
-        unit["units"][0]["components"][0]["text"],
-        "PassPipeline has an explicit order.\n"
-    );
-    assert_eq!(
-        unit["units"][0]["components"][1]["text"],
+        acquired[1]["text"],
         "Historical validation is not current certification.\n"
     );
     assert_eq!(unit["units"][0]["unit_complete"], true);
@@ -61,7 +84,7 @@ fn knowledge_search_isolates_siblings_and_acquires_exact_components() {
     assert!(!unit.to_string().contains("Wire serialization"));
     let raw = query(&f, &request(&f, "source", Some("DOC-001")));
     assert_eq!(raw["sources"][0]["text"], source());
-    for component in unit["units"][0]["components"].as_array().unwrap() {
+    for component in &acquired {
         let start = component["start"].as_u64().unwrap() as usize;
         let end = component["end"].as_u64().unwrap() as usize;
         assert_eq!(&source()[start..end], component["text"].as_str().unwrap());
@@ -129,13 +152,13 @@ fn knowledge_context_preserves_declared_closure_and_relationship_direction() {
     let related = query(&f, &q);
     assert_eq!(related["relationships"][0]["source"], "DOC-001");
     assert_eq!(related["relationships"][0]["direction"], "incoming");
-    assert!(
-        related["units"]
+    assert!(related["units"].as_array().unwrap().iter().all(|u| {
+        u["components"]
             .as_array()
             .unwrap()
             .iter()
-            .all(|u| u.get("components").is_none())
-    );
+            .all(|c| c.get("text").is_none())
+    }));
     let mut q = request(&f, "context", Some("DOC-001"));
     q.max_nodes = Some(1);
     let incomplete = query(&f, &q);
@@ -238,7 +261,7 @@ fn knowledge_has_no_token_ceiling_and_unrepresented_search_is_truthfully_incompl
     let result = query(&f, &request(&f, "get", Some("DOC-001")));
     assert_eq!(result["result_state"], "ready");
     assert_eq!(
-        result["units"][0]["components"][0]["text"]
+        acquire_components(&f, &result["units"][0])[0]["text"]
             .as_str()
             .unwrap()
             .len(),
@@ -306,7 +329,8 @@ fn knowledge_preserves_utf8_bytes_and_binary_original_evidence() {
     std::fs::write(f.root.join("docs/shared.md"), &text).unwrap();
     std::fs::write(f.root.join("evidence.bin"), [0, 255, 128, 1]).unwrap();
     let result = query(&f, &request(&f, "get", Some("DOC-001")));
-    let component = &result["units"][0]["components"][0];
+    let acquired = acquire_components(&f, &result["units"][0]);
+    let component = &acquired[0];
     assert_eq!(component["text"], format!("{unicode}\n"));
     let start = component["start"].as_u64().unwrap() as usize;
     let end = component["end"].as_u64().unwrap() as usize;
@@ -324,7 +348,8 @@ fn knowledge_preserves_utf8_bytes_and_binary_original_evidence() {
         "complete_original_source_artifact"
     );
     let pinned: knowledge::Request =
-        serde_json::from_value(component["source_request"].clone()).unwrap();
+        serde_json::from_value(result["units"][0]["components"][0]["source_request"].clone())
+            .unwrap();
     std::fs::write(
         f.root.join("docs/shared.md"),
         text.replace(unicode, "Changed current statement."),

@@ -27,21 +27,23 @@ fn constructor_edge(subject: &str, target: &str, file: &str) -> SemanticEdge {
 }
 
 fn state() -> crate::mcp::McpState {
+    // Unscoped index-evidence protocol fixture, not native C# source authority.
+    // C# owners would require actual files and dependency acquisition on traversal.
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let mut index = state.workspace_index_lock();
     index.add_edges(
-        "contracts.cs",
+        "contracts.rs",
         vec![
-            registration("Interface", "IFooService", "contracts.cs"),
-            registration("TypeRef", "IUnusedService", "contracts.cs"),
+            registration("Interface", "IFooService", "contracts.rs"),
+            registration("TypeRef", "IUnusedService", "contracts.rs"),
         ],
     );
     index.add_edges(
-        "consumer.cs",
+        "consumer.rs",
         vec![constructor_edge(
             "BarController",
             "IFooService",
-            "consumer.cs",
+            "consumer.rs",
         )],
     );
     drop(index);
@@ -274,6 +276,7 @@ fn workspace_query_exact_identity_coverage_schema() {
             "proof_incompatible",
             "candidate_processing_failed",
             "publication_failed",
+            "dependency_unresolved",
             "capability_not_supported",
             "processing_not_attempted",
             "indeterminate"

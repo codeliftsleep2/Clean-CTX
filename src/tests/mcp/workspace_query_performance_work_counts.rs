@@ -78,6 +78,7 @@ fn equivalent_csharp_batch_items_reuse_one_request_local_catalog() {
 fn repeated_angular_catalog_builds_reprocess_inline_and_external_templates() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let external_component = root.path().join("ExternalHost.ts");
     let inline_component = root.path().join("InlineHost.ts");
     let template = root.path().join("external.html");
@@ -122,6 +123,7 @@ fn repeated_angular_catalog_builds_reprocess_inline_and_external_templates() {
 fn equivalent_angular_batch_items_reuse_compatible_request_local_catalogs() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().expect("workspace");
+    crate::tests::angular_authority_fixture::install(root.path());
     let external_component = root.path().join("ExternalHost.ts");
     let inline_component = root.path().join("InlineHost.ts");
     std::fs::write(
@@ -296,13 +298,19 @@ fn ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
         "using Microsoft.EntityFrameworkCore; public class Entity {} public class Config : IEntityTypeConfiguration<Entity> {} public class AppDbContext : DbContext { protected override void OnModelCreating(ModelBuilder builder) { builder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly); } }",
     )
     .expect("EF fixture");
-    std::fs::write(
-        &added,
-        "using Microsoft.EntityFrameworkCore; public class AddedEntity {} public class AddedConfig : IEntityTypeConfiguration<AddedEntity> {}",
-    )
-    .expect("added fixture");
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     publish(&state, root.path(), &model);
+
+    // Complete dependency acquisition otherwise discovers this file before the
+    // first catalog build. Publish it only after initial query preparation.
+    let late_root = root.path().to_path_buf();
+    super::publication_test_support::arm(move |state| {
+        std::fs::write(
+            &added,
+            "using Microsoft.EntityFrameworkCore; public class AddedEntity {} public class AddedConfig : IEntityTypeConfiguration<AddedEntity> {}",
+        ).expect("late added fixture");
+        publish(state, &late_root, &added);
+    });
 
     work_metrics::reset();
     let response = call(
@@ -313,7 +321,6 @@ fn ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
             "queries": [
                 { "id": "before-first", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
                 { "id": "before-second", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
-                { "id": "publish", "type": "entities_in_file", "file_path": "Added.cs", "fidelity": "high" },
                 { "id": "after-first", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" },
                 { "id": "after-second", "type": "forward_edges", "domain": "dotnet", "entity_type": "DbContext", "name": "AppDbContext" }
             ]
@@ -325,7 +332,7 @@ fn ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
         results.iter().all(|item| item["status"] == "ok"),
         "{response}"
     );
-    for result in [&results[0], &results[1], &results[3], &results[4]] {
+    for result in [&results[0], &results[1], &results[2], &results[3]] {
         let rendered = result["result"].to_string();
         assert!(rendered.contains("Entity"), "{response}");
         assert!(
@@ -334,8 +341,11 @@ fn ef_catalog_build_reuse_invalidate_rebuild_reuse_sequence() {
         );
     }
     let counts = work_metrics::snapshot();
+    eprintln!("EF_INVALIDATION_SEQUENCE_WORK {counts:?}");
     assert_eq!(counts.ef_catalog_builds, 2);
-    assert_eq!(counts.ef_catalog_reuses, 6);
+    // Four items: initial pass, shared-generation pass, and the late-publication
+    // retry. Two evidence generations build once each; ten other uses reuse them.
+    assert_eq!(counts.ef_catalog_reuses, 10);
     assert_eq!(counts.derived_catalog_invalidations, 1);
 }
 

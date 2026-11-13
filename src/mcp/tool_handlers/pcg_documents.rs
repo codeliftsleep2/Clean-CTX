@@ -2,27 +2,109 @@
 use crate::{mcp::McpState, pcg::documents::Request, protocol};
 use serde_json::{Value, json};
 
+fn component_reference_schema() -> Value {
+    json!({
+        "type":"array","minItems":1,
+        "description":"Required only for acquire: one or multiple exact returned component references. Input order and duplicates receive explicit outcomes; all required qualifications accompany each selection. Historical references must be explicitly marked historical; current pins never substitute a new revision.",
+        "items":{
+            "type":"object","additionalProperties":false,
+            "required":["id","revision","ordinal","role","path","sourceSha256","start","end","contentSha256","selector"],
+            "properties":{
+                "id":{"type":"string","description":"Exact knowledge identity."},
+                "revision":{"type":"string","description":"Exact retained knowledge revision."},
+                "ordinal":{"type":"integer","minimum":0,"description":"Exact source-owned component ordinal."},
+                "role":{"type":"string","enum":crate::pcg::documents::knowledge::ROLES},
+                "label":{"type":["string","null"],"description":"Exact source-owned label, null or absent if unlabeled."},
+                "path":{"type":"string","description":"Exact returned associated source path."},
+                "sourceSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+                "start":{"type":"integer","minimum":0},
+                "end":{"type":"integer","minimum":0},
+                "contentSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+                "selector":{"type":"string","description":"Exact source-owned selector; never a guessed heading."},
+                "historical":{"type":"boolean","description":"Default false requires current revision. Explicit true resolves the pinned retained revision as history, not current authority."}
+            }
+        }
+    })
+}
+
 pub(crate) fn knowledge_descriptor() -> Value {
     json!({"name":"pcg_knowledge_v1",
-        "description":"Normal architectural knowledge workflow: discover independently bounded source-owned units, acquire exact components/rationale/qualifications, resolve typed relationships and complete declared authority contexts, or explicitly retrieve original source evidence. Rust/SQLite resolve boundaries and graph composition. No token budgets. Status remains source-attributed, not executed verification or authenticated approval.",
-        "inputSchema":{"type":"object","additionalProperties":false,"required":["workspaceRoot","mode"],
-            "properties":{"workspaceRoot":{"type":"string","minLength":1},"mode":{"enum":["search","get","related","context","source"]},
-                "id":{"type":"string","minLength":1},"text":{"type":"string","minLength":1,"description":"SQLite FTS5 over declared knowledge components and explicit identity/title metadata; no whole-document inference."},
-                "track":{"type":"string","minLength":1},"kind":{"enum":crate::pcg::documents::knowledge::KINDS},
-                "status":{"enum":crate::pcg::documents::knowledge::STATUSES},"role":{"enum":crate::pcg::documents::knowledge::ROLES},"label":{"type":"string","minLength":1},
-                "edgeKind":{"enum":crate::pcg::documents::knowledge::RELATIONS},"direction":{"enum":["incoming","outgoing","both"]},"path":{"type":"string","minLength":1},
-                "sourceSha256":{"type":"string","pattern":"^[0-9a-f]{64}$"},
-                "maxNodes":{"type":"integer","minimum":1},"maxEdges":{"type":"integer","minimum":1}},
-            "allOf":[
-                {"if":{"anyOf":[{"required":["text"]},{"required":["track"]},{"required":["kind"]},{"required":["status"]}]},"then":{"properties":{"mode":{"const":"search"}}}},
-                {"if":{"anyOf":[{"required":["role"]},{"required":["label"]}]},"then":{"properties":{"mode":{"enum":["search","get"]}}}},
-                {"if":{"required":["label"]},"then":{"required":["role"]}},
-                {"if":{"anyOf":[{"required":["edgeKind"]},{"required":["direction"]}]},"then":{"properties":{"mode":{"const":"related"}}}},
-                {"if":{"anyOf":[{"required":["path"]},{"required":["sourceSha256"]}]},"then":{"properties":{"mode":{"const":"source"}}}},
-                {"if":{"anyOf":[{"required":["maxNodes"]},{"required":["maxEdges"]}]},"then":{"properties":{"mode":{"const":"context"}}}}
-            ],
-            "oneOf":[{"properties":{"mode":{"const":"search"}},"not":{"required":["id"]}},
-                {"properties":{"mode":{"enum":["get","related","context","source"]}},"required":["id"]}]}})
+    "description":"Reference-first architectural knowledge: search/get/related/context return graph structure and exact source references, never component text. Explicit acquire resolves one or multiple selected component references with mandatory qualifications. Explicit source retrieves a full original artifact. Rust/SQLite compute graph and acquisition; agents interpret knowledge. No token budgets. Status is source-attributed, not verification or approval.",
+    "inputSchema":{
+        "type":"object","additionalProperties":false,"required":["workspaceRoot","mode"],
+        "description":"search accepts optional discovery predicates and forbids id; get, related, context and source require id. acquire requires a nonempty references array and forbids id and all query selectors. Graph completeness does not mean content acquisition. Rust enforces mode restrictions, source revision pinning and configured structural bounds; unknown fields/invalid combinations are refused.",
+        "properties":{
+            "workspaceRoot":{
+                "type":"string","minLength":1,
+                "description":"Required actual workspace filesystem root, matching the configured document profile."
+            },
+            "mode":{
+                "type":"string","enum":["search","get","related","context","source","acquire"],
+                "description":"Required operation: search discovers references; get returns unit/component descriptors; related returns typed edges; context returns the complete declared graph; acquire explicitly retrieves selected component bytes; source explicitly retrieves a full artifact."
+            },
+            "id":{
+                "type":"string","minLength":1,
+                "description":"Unit identity, required for get, related, context and source; forbidden for search and acquire. Use returned references."
+            },
+            "text":{
+                "type":"string","minLength":1,
+                "description":"Optional search-only SQLite FTS5 expression over declared knowledge components and explicit identity/title metadata; no whole-document inference."
+            },
+            "track":{
+                "type":"string","minLength":1,
+                "description":"Optional exact source-declared track filter; search only."
+            },
+            "kind":{
+                "type":"string","enum":crate::pcg::documents::knowledge::KINDS,
+                "description":"Optional exact source-declared kind filter; search only."
+            },
+            "status":{
+                "type":"string","enum":crate::pcg::documents::knowledge::STATUSES,
+                "description":"Optional exact source-declared lifecycle status filter; search only. Status is not executed verification."
+            },
+            "role":{
+                "type":"string","enum":crate::pcg::documents::knowledge::ROLES,
+                "description":"Optional exact component role predicate for search or get only. Required qualifications accompany a matching get selection."
+            },
+            "label":{
+                "type":"string","minLength":1,
+                "description":"Optional exact source-owned component label for search or get only; requires role."
+            },
+            "edgeKind":{
+                "type":"string","enum":crate::pcg::documents::knowledge::RELATIONS,
+                "description":"Optional exact typed relationship filter; related only."
+            },
+            "direction":{
+                "type":"string","enum":["incoming","outgoing","both"],
+                "description":"Optional related-only relationship direction relative to id; omitted means both."
+            },
+            "path":{
+                "type":"string","minLength":1,
+                "description":"Optional source-only path selecting an associated original artifact; use a returned source reference. Omitted selects the unit's source."
+            },
+            "sourceSha256":{
+                "type":"string","pattern":"^[0-9a-f]{64}$",
+                "description":"Optional source-only exact revision pin; a hash mismatch causes explicit refusal. Use the returned source reference."
+            },
+            "revision":{
+                "type":"string","minLength":1,
+                "description":"Optional source-only exact knowledge revision pin. Required with historical true; never silently substituted."
+            },
+            "historical":{
+                "type":"boolean",
+                "description":"source only: explicit retained artifact retrieval rather than current authority, requires revision. Default false."
+            },
+            "maxNodes":{
+                "type":"integer","minimum":1,
+                "description":"Optional context-only structural node bound, no greater than the configured profile limit."
+            },
+            "maxEdges":{
+                "type":"integer","minimum":1,
+                "description":"Optional context-only structural relationship bound, no greater than the configured profile limit."
+            },
+            "references":component_reference_schema()
+        }
+    }})
 }
 
 pub(crate) fn handle_knowledge(id: &Value, params: &Value, state: &McpState) {

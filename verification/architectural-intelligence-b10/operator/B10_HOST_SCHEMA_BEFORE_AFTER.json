@@ -1,0 +1,601 @@
+{
+  "before_capture": "target/pcg-b10/before/1.response.json",
+  "before": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "text"
+              ]
+            },
+            {
+              "required": [
+                "track"
+              ]
+            },
+            {
+              "required": [
+                "kind"
+              ]
+            },
+            {
+              "required": [
+                "status"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "search"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "role"
+              ]
+            },
+            {
+              "required": [
+                "label"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "enum": [
+                "search",
+                "get"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "required": [
+            "label"
+          ]
+        },
+        "then": {
+          "required": [
+            "role"
+          ]
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "edgeKind"
+              ]
+            },
+            {
+              "required": [
+                "direction"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "related"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "sourceSha256"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "source"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "maxNodes"
+              ]
+            },
+            {
+              "required": [
+                "maxEdges"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "context"
+            }
+          }
+        }
+      }
+    ],
+    "oneOf": [
+      {
+        "not": {
+          "required": [
+            "id"
+          ]
+        },
+        "properties": {
+          "mode": {
+            "const": "search"
+          }
+        }
+      },
+      {
+        "properties": {
+          "mode": {
+            "enum": [
+              "get",
+              "related",
+              "context",
+              "source"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    ],
+    "properties": {
+      "direction": {
+        "enum": [
+          "incoming",
+          "outgoing",
+          "both"
+        ]
+      },
+      "edgeKind": {
+        "enum": [
+          "DEPENDS_ON",
+          "IMPLEMENTS",
+          "VALIDATES",
+          "RECLOSES",
+          "BANKS",
+          "BLOCKED_BY",
+          "SUPERSEDES",
+          "PRESERVES",
+          "FALSIFIES",
+          "USES_EVIDENCE",
+          "DEEPENS",
+          "PRODUCES_AUTHORITY",
+          "CONSUMES_AUTHORITY"
+        ]
+      },
+      "id": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "MISSION",
+          "IMPLEMENTATION",
+          "EXPERIMENT",
+          "RESEARCH",
+          "AUTHORITY",
+          "INVARIANT",
+          "DEBT"
+        ]
+      },
+      "label": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxEdges": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxNodes": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "mode": {
+        "enum": [
+          "search",
+          "get",
+          "related",
+          "context",
+          "source"
+        ]
+      },
+      "path": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "role": {
+        "enum": [
+          "statement",
+          "subject",
+          "scope",
+          "outcome",
+          "rationale",
+          "alternative",
+          "rejected_alternative",
+          "rejection_reason",
+          "consequence",
+          "constraint",
+          "verification_obligation",
+          "observation",
+          "counterexample",
+          "qualification",
+          "historical_applicability",
+          "evidence"
+        ]
+      },
+      "sourceSha256": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "PROPOSED",
+          "INVESTIGATING",
+          "FROZEN",
+          "IMPLEMENTATION_READY",
+          "IMPLEMENTED",
+          "VALIDATED",
+          "RECLOSED",
+          "BANKED",
+          "BLOCKED",
+          "FALSIFIED",
+          "SUPERSEDED",
+          "DEBT"
+        ]
+      },
+      "text": {
+        "description": "SQLite FTS5 over declared knowledge components and explicit identity/title metadata; no whole-document inference.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "track": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "workspaceRoot": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspaceRoot",
+      "mode"
+    ],
+    "type": "object"
+  },
+  "after_source_candidate": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "workspaceRoot",
+      "mode"
+    ],
+    "description": "search accepts optional discovery predicates and forbids id; get, related, context and source require id. All fields must follow their mode-specific descriptions. Rust enforces these conditions, non-null arguments, source pinning and configured structural bounds; invalid combinations and unknown fields are refused.",
+    "properties": {
+      "workspaceRoot": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Required actual workspace filesystem root, matching the configured document profile."
+      },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "search",
+          "get",
+          "related",
+          "context",
+          "source"
+        ],
+        "description": "Required operation: search discovers units; get acquires exact components; related retrieves typed incident edges; context retrieves declared authority closure; source retrieves an original artifact."
+      },
+      "id": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Unit identity, required for get, related, context and source; forbidden for search. Use returned acquisition references."
+      },
+      "text": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Optional search-only SQLite FTS5 expression over declared knowledge components and explicit identity/title metadata; no whole-document inference."
+      },
+      "track": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Optional exact source-declared track filter; search only."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "MISSION",
+          "IMPLEMENTATION",
+          "EXPERIMENT",
+          "RESEARCH",
+          "AUTHORITY",
+          "INVARIANT",
+          "DEBT"
+        ],
+        "description": "Optional exact source-declared kind filter; search only."
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "PROPOSED",
+          "INVESTIGATING",
+          "FROZEN",
+          "IMPLEMENTATION_READY",
+          "IMPLEMENTED",
+          "VALIDATED",
+          "RECLOSED",
+          "BANKED",
+          "BLOCKED",
+          "FALSIFIED",
+          "SUPERSEDED",
+          "DEBT"
+        ],
+        "description": "Optional exact source-declared lifecycle status filter; search only. Status is not executed verification."
+      },
+      "role": {
+        "type": "string",
+        "enum": [
+          "statement",
+          "subject",
+          "scope",
+          "outcome",
+          "rationale",
+          "alternative",
+          "rejected_alternative",
+          "rejection_reason",
+          "consequence",
+          "constraint",
+          "verification_obligation",
+          "observation",
+          "counterexample",
+          "qualification",
+          "historical_applicability",
+          "evidence"
+        ],
+        "description": "Optional exact component role predicate for search or get only. Required qualifications accompany a matching get selection."
+      },
+      "label": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Optional exact source-owned component label for search or get only; requires role."
+      },
+      "edgeKind": {
+        "type": "string",
+        "enum": [
+          "DEPENDS_ON",
+          "IMPLEMENTS",
+          "VALIDATES",
+          "RECLOSES",
+          "BANKS",
+          "BLOCKED_BY",
+          "SUPERSEDES",
+          "PRESERVES",
+          "FALSIFIES",
+          "USES_EVIDENCE",
+          "DEEPENS",
+          "PRODUCES_AUTHORITY",
+          "CONSUMES_AUTHORITY"
+        ],
+        "description": "Optional exact typed relationship filter; related only."
+      },
+      "direction": {
+        "type": "string",
+        "enum": [
+          "incoming",
+          "outgoing",
+          "both"
+        ],
+        "description": "Optional related-only relationship direction relative to id; omitted means both."
+      },
+      "path": {
+        "type": "string",
+        "minLength": 1,
+        "description": "Optional source-only path selecting an associated original artifact; use a returned source reference. Omitted selects the unit's source."
+      },
+      "sourceSha256": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$",
+        "description": "Optional source-only exact revision pin; a hash mismatch causes explicit refusal. Use the returned source reference."
+      },
+      "maxNodes": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Optional context-only structural node bound, no greater than the configured profile limit."
+      },
+      "maxEdges": {
+        "type": "integer",
+        "minimum": 1,
+        "description": "Optional context-only structural relationship bound, no greater than the configured profile limit."
+      }
+    }
+  },
+  "after_production_capture": {
+    "additionalProperties": false,
+    "description": "search accepts optional discovery predicates and forbids id; get, related, context and source require id. All fields must follow their mode-specific descriptions. Rust enforces these conditions, non-null arguments, source pinning and configured structural bounds; invalid combinations and unknown fields are refused.",
+    "properties": {
+      "direction": {
+        "description": "Optional related-only relationship direction relative to id; omitted means both.",
+        "enum": [
+          "incoming",
+          "outgoing",
+          "both"
+        ],
+        "type": "string"
+      },
+      "edgeKind": {
+        "description": "Optional exact typed relationship filter; related only.",
+        "enum": [
+          "DEPENDS_ON",
+          "IMPLEMENTS",
+          "VALIDATES",
+          "RECLOSES",
+          "BANKS",
+          "BLOCKED_BY",
+          "SUPERSEDES",
+          "PRESERVES",
+          "FALSIFIES",
+          "USES_EVIDENCE",
+          "DEEPENS",
+          "PRODUCES_AUTHORITY",
+          "CONSUMES_AUTHORITY"
+        ],
+        "type": "string"
+      },
+      "id": {
+        "description": "Unit identity, required for get, related, context and source; forbidden for search. Use returned acquisition references.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "kind": {
+        "description": "Optional exact source-declared kind filter; search only.",
+        "enum": [
+          "MISSION",
+          "IMPLEMENTATION",
+          "EXPERIMENT",
+          "RESEARCH",
+          "AUTHORITY",
+          "INVARIANT",
+          "DEBT"
+        ],
+        "type": "string"
+      },
+      "label": {
+        "description": "Optional exact source-owned component label for search or get only; requires role.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxEdges": {
+        "description": "Optional context-only structural relationship bound, no greater than the configured profile limit.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxNodes": {
+        "description": "Optional context-only structural node bound, no greater than the configured profile limit.",
+        "minimum": 1,
+        "type": "integer"
+      },
+      "mode": {
+        "description": "Required operation: search discovers units; get acquires exact components; related retrieves typed incident edges; context retrieves declared authority closure; source retrieves an original artifact.",
+        "enum": [
+          "search",
+          "get",
+          "related",
+          "context",
+          "source"
+        ],
+        "type": "string"
+      },
+      "path": {
+        "description": "Optional source-only path selecting an associated original artifact; use a returned source reference. Omitted selects the unit's source.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "role": {
+        "description": "Optional exact component role predicate for search or get only. Required qualifications accompany a matching get selection.",
+        "enum": [
+          "statement",
+          "subject",
+          "scope",
+          "outcome",
+          "rationale",
+          "alternative",
+          "rejected_alternative",
+          "rejection_reason",
+          "consequence",
+          "constraint",
+          "verification_obligation",
+          "observation",
+          "counterexample",
+          "qualification",
+          "historical_applicability",
+          "evidence"
+        ],
+        "type": "string"
+      },
+      "sourceSha256": {
+        "description": "Optional source-only exact revision pin; a hash mismatch causes explicit refusal. Use the returned source reference.",
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "status": {
+        "description": "Optional exact source-declared lifecycle status filter; search only. Status is not executed verification.",
+        "enum": [
+          "PROPOSED",
+          "INVESTIGATING",
+          "FROZEN",
+          "IMPLEMENTATION_READY",
+          "IMPLEMENTED",
+          "VALIDATED",
+          "RECLOSED",
+          "BANKED",
+          "BLOCKED",
+          "FALSIFIED",
+          "SUPERSEDED",
+          "DEBT"
+        ],
+        "type": "string"
+      },
+      "text": {
+        "description": "Optional search-only SQLite FTS5 expression over declared knowledge components and explicit identity/title metadata; no whole-document inference.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "track": {
+        "description": "Optional exact source-declared track filter; search only.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "workspaceRoot": {
+        "description": "Required actual workspace filesystem root, matching the configured document profile.",
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspaceRoot",
+      "mode"
+    ],
+    "type": "object"
+  },
+  "status": "Actual flat production schema captured; all five host modes succeeded; exact host Unicode capture comparison pending raw-stream rerun",
+  "runtime": "handlers/parser/validation/query unchanged",
+  "corrected_red_log": "target/pcg-b10/schema-red-corrected.log",
+  "restored_test_sha256": "8814dc730313f0cba1ac95736384f44d16f387661991e35ab601940cfba82579"
+}

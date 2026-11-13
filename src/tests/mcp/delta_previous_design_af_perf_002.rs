@@ -36,9 +36,9 @@ struct Work {
     capture: Value,
     events: Vec<&'static str>,
 }
-struct Mode(bool, bool, bool, bool);
+pub(super) struct Mode(bool, bool, bool, bool);
 impl Mode {
-    fn historical(delay: bool, observe: bool) -> Self {
+    pub(super) fn historical(delay: bool, observe: bool) -> Self {
         let mode = Self::new(delay, observe);
         HISTORICAL.set(true);
         mode

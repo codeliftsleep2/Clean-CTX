@@ -20,7 +20,7 @@ pub(super) enum PreparedQuery {
     #[cfg(feature = "angular")]
     ModuleContributors(
         Box<PreparedQuery>,
-        Vec<crate::layers::meta::semantic::SemanticDependency>,
+        Vec<super::angular_modules::ProjectionWitness>,
     ),
     Indexed(IndexedEvaluator),
     #[cfg(feature = "csharp")]
@@ -36,7 +36,7 @@ impl PreparedQuery {
     #[cfg(feature = "angular")]
     pub(super) fn with_module_contributors(
         self,
-        dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+        dependencies: Vec<super::angular_modules::ProjectionWitness>,
     ) -> Self {
         if dependencies.is_empty() || !self.is_indexed() {
             return self;
@@ -75,7 +75,7 @@ impl PreparedQuery {
         if let Self::ModuleContributors(prepared, dependencies) = self {
             return dependencies
                 .iter()
-                .all(|dependency| dependency.is_current())
+                .all(|dependency| dependency.is_current(index))
                 && prepared.publication_is_current(index);
         }
         #[cfg(feature = "csharp")]
@@ -90,10 +90,13 @@ impl PreparedQuery {
         match self {
             #[cfg(feature = "angular")]
             Self::ModuleContributors(prepared, dependencies) => {
-                if !dependencies
-                    .iter()
-                    .all(|dependency| dependency.is_current())
-                {
+                let current = {
+                    let index = state.workspace_index_read();
+                    dependencies
+                        .iter()
+                        .all(|dependency| dependency.is_current(&index))
+                };
+                if !current {
                     return Err(QueryFailure::internal(
                         "Angular module contributor changed; retry",
                     ));
@@ -124,7 +127,7 @@ impl PreparedQuery {
             Self::ModuleContributors(prepared, dependencies) => {
                 if !dependencies
                     .iter()
-                    .all(|dependency| dependency.is_current())
+                    .all(|dependency| dependency.is_current(index))
                 {
                     return Err(QueryFailure::internal(
                         "Angular module contributor changed; retry",
@@ -182,10 +185,15 @@ impl PreparationContext {
     }
     #[cfg(feature = "csharp")]
     pub(super) fn restrict_ef_sources(&mut self, sources: &std::collections::BTreeSet<String>) {
-        if self
-            .csharp_catalog
+        let changed = self
+            .ef_sources
             .as_ref()
-            .is_some_and(|catalog| catalog.has_stale_ef_sources(sources))
+            .is_some_and(|previous| previous != sources);
+        if changed
+            || self
+                .csharp_catalog
+                .as_ref()
+                .is_some_and(|catalog| catalog.has_stale_ef_sources(sources))
         {
             self.efcore_catalog = None;
             self.ef_view_revision = self.ef_view_revision.wrapping_add(1);

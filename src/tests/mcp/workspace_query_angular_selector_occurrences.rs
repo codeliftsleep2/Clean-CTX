@@ -18,6 +18,7 @@ fn call(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value {
 }
 
 fn publish(state: &crate::mcp::McpState, root: &Path, file: &Path) {
+    crate::tests::angular_authority_fixture::install(root);
     let response = call(
         state,
         "provide_code_context",
@@ -374,7 +375,7 @@ fn refresh_and_selector_changes_do_not_reuse_stale_results() {
 fn exact_selector_binding_advances_only_the_angular_semantic_generation() {
     assert_eq!(
         crate::layers::meta::ANGULAR_SEMANTIC_PRODUCER_GENERATION,
-        34
+        78
     );
     assert_eq!(crate::layers::meta::ANGULAR_MARKER_PRODUCER_GENERATION, 6);
 }

@@ -1,0 +1,34 @@
+Agent MaxHeadRoom: perform one read-only operational verification of the corrected
+reference-first architectural knowledge interface against the explicit root below.
+This is not an independent engineering evaluation. Do not edit files, run tests,
+build, launch shell runtimes, change configuration or inspect evaluation answer keys.
+Normal reconciliation by the authorized existing MCP tool is permitted.
+
+Use the actual advertised pcg_knowledge_v1 tool, not shell/manual stdio. First
+search for PassPipeline, then retrieve AUTH.CANONICAL_IR context as the fixed
+accepted authority witness. Inspect complete graph membership, relationships,
+witnesses, qualification/evidence references, currentness and generation. Confirm
+graph modes do not carry text/document bodies; descriptors do not mean acquired
+knowledge. Inspect a unit with get and typed relationships with related.
+
+From the actual returned component references, explicitly acquire a single
+PIPELINE-001 statement or rationale reference. Then explicitly acquire a selected
+batch of that unit's statement/rationale and an applicable canonical-authority
+reference, using the returned reference fields exactly. Required qualifications
+must accompany the acquisition. If the host does not expose acquire/references,
+report the exact limitation and stop; do not bypass host controls.
+
+Normal syntax: every request requires workspaceRoot and mode. Graph modes are
+search/get/related/context; search uses text, not query. acquire requires a
+nonempty references array of exact returned component reference objects and no
+top-level id/selectors. source is explicit whole-artifact acquisition with id
+and returned revision/path/sourceSha256 pins. Use it once to verify a complete
+original artifact is available only when explicitly requested. Do not infer
+required knowledge was read from graph descriptors or reconstruct source intervals.
+
+Report actual mode/argument choices, returned identities, per-reference dispositions,
+qualification inclusion, graph versus acquisition completeness and exact source
+provenance. Distinguish captured payloads, host delivery, actual inspection and
+comprehension; do not start large-response diagnostics or change host limits.
+No general adoption, independent certification or current historical-test execution
+claim follows from this operational witness.

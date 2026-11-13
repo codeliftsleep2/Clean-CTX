@@ -420,7 +420,7 @@ fn csharp_structured_headers_version_existing_producer_keys() {
     );
     assert_eq!(
         crate::ir::semantic_projection::CSHARP_SEMANTIC_PROJECTION_GENERATION,
-        4,
+        5,
         "corrected positional Record ownership changes the existing projection output"
     );
 }

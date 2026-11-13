@@ -134,17 +134,6 @@ impl WorkspaceIndex {
         Ok(())
     }
 
-    #[cfg(feature = "angular")]
-    pub(crate) fn semantic_dependencies_for_file(
-        &self,
-        file: &str,
-    ) -> Vec<crate::layers::meta::semantic::SemanticDependency> {
-        self.semantic_coverage
-            .get(file)
-            .map(|coverage| coverage.dependencies.clone())
-            .unwrap_or_default()
-    }
-
     /// Whether this exact semantic identity has an admitted indexed occurrence.
     pub fn has_identity_in_scope(
         &self,
@@ -215,6 +204,13 @@ impl WorkspaceIndex {
         self.semantic_coverage
             .get(file_path)
             .map(|coverage| coverage.fidelity)
+    }
+
+    #[cfg(feature = "angular")]
+    pub(crate) fn semantic_projection_source_hash(&self, file_path: &str) -> Option<&str> {
+        self.semantic_coverage
+            .get(file_path)
+            .map(|coverage| coverage.source_hash.as_str())
     }
 
     #[cfg(test)]

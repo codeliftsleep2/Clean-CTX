@@ -17,11 +17,16 @@ than querying before every edit.
 2. Inspect result_state, catalog_current, diagnostics, complete and catalog coverage.
    Retain the returned generation and relevant node revisions as the preflight
    identity. A successful RPC or nonempty search is not complete context.
-3. Read the exact returned statement, rationale, qualification and other declared
-   content components. Use `get` with `role`/`label` for an independently queryable
-   decision component; inspect `unit_complete` when selecting only some components.
-   Use `related` for typed edge/endpoint discovery and `source` for the exact
-   complete original artifact. Returned references include ready request fields.
+3. Graph operations return descriptors/references, not source text. Use `get`
+   with `role`/`label` to select structural component references and inspect
+   `unit_complete`. Retrieve the complete applicable `context` graph before
+   interpreting its authority. Explicitly follow component `acquire_request`
+   (mode `acquire`) for necessary statements, rationale, qualifications and
+   obligations, individually or with a selected `references` batch. Read the
+   actual acquired knowledge before deciding. Required qualifications accompany
+   each acquisition. Do not guess intervals or treat graph metadata as read text.
+   Use `related` for typed edge/endpoint discovery and explicit `source` for a
+   complete original artifact when needed. Returned references include ready fields.
    The explicit legacy `pcg_documents_v1` interface retains whole-document search,
    acquisition, history and lossless reference transport; it is not the normal
    proposition discovery workflow.
@@ -33,6 +38,12 @@ than querying before every edit.
 5. Carry the relevant constraints and unresolved obligations into the work.
    For example, DOC-081 IMPLEMENTS DOC-068 DEPENDS_ON DOC-042 means the author
    must inspect DOC-068 and DOC-042 before proposing a contradictory change.
+   Acquire their applicable referenced content explicitly; do not read every whole
+   document merely because it is a graph member, or selectively skip controlling
+   authority. Graph completeness does not establish acquisition, host delivery,
+   agent inspection or comprehension. Pins refuse on source revision drift;
+   reacquire current structure or explicitly request retained history without
+   promoting that history into current authority.
    Traversal returns structural relationships, not an inferred applicability or
    conflict verdict. The author assesses the actual proposition and conditions.
 

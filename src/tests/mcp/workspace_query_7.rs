@@ -267,13 +267,19 @@ fn red_s9_no_cbm_multi_root_reverse_edges_completes_authoritatively() {
     let _serial = serial_guard();
     let primary = tempfile::TempDir::new().unwrap();
     let additional = tempfile::TempDir::new().unwrap();
+    crate::tests::angular_authority_fixture::install(primary.path());
+    crate::tests::angular_authority_fixture::install(additional.path());
     write_source(
         &primary.path().join("src/ServiceA.ts"),
         "import { Injectable } from '@angular/core';\n@Injectable()\nexport class ServiceA {}\n",
     );
+    assert_eq!(primary.path().parent(), additional.path().parent());
     write_source(
         &additional.path().join("src/Consumer.ts"),
-        "import { Component } from '@angular/core';\nimport { ServiceA } from './ServiceA';\n@Component({ selector: 'x-consumer' })\nexport class Consumer { constructor(private service: ServiceA) {} }\n",
+        &format!(
+            "import {{ Component }} from '@angular/core';\nimport {{ ServiceA }} from '../../{}/src/ServiceA';\n@Component({{ selector: 'x-consumer' }})\nexport class Consumer {{ constructor(private service: ServiceA) {{}} }}\n",
+            primary.path().file_name().unwrap().to_string_lossy()
+        ),
     );
     for directory in [
         "node_modules",
@@ -293,12 +299,31 @@ fn red_s9_no_cbm_multi_root_reverse_edges_completes_authoritatively() {
         );
     }
 
-    let (result, report) = call(
-        &state(&[additional.path().to_path_buf()], &[]),
-        "reverse_edges",
-        "ServiceA",
-        primary.path(),
-    );
+    let state = state(&[additional.path().to_path_buf()], &[]);
+    let (result, report) = call(&state, "reverse_edges", "ServiceA", primary.path());
+
+    if result.as_array().unwrap().is_empty() {
+        let index = state.workspace_index_read();
+        for path in [
+            primary.path().join("src/ServiceA.ts"),
+            additional.path().join("src/Consumer.ts"),
+        ] {
+            let owner = state.semantic_owner_path(&path.to_string_lossy());
+            let authority = index.retained_typescript_authority(&owner);
+            eprintln!(
+                "MULTI_ROOT_NATIVE_AUTHORITY {}",
+                serde_json::json!({
+                    "owner":owner,
+                    "authority":authority.map(|authority| serde_json::json!({
+                        "source":authority.source, "disposition":authority.disposition,
+                        "facets":authority.declaration_facets,
+                        "parameters":authority.constructor_parameters,
+                        "packages":authority.package_exports
+                    }))
+                })
+            );
+        }
+    }
 
     assert_eq!(result.as_array().unwrap().len(), 1);
     assert_eq!(report.discovery_provider, "filesystem");

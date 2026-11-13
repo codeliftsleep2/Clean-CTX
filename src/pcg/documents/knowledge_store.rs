@@ -1,13 +1,13 @@
 //! Derived knowledge rows share the document publication transaction and revision owner.
 use super::{model::Candidate, store::sql};
-use crate::pcg::{Error, Result, identity, require};
+use crate::pcg::{Error, Result, require};
 use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
 type SearchRow = (String, String, i64, String, Option<String>, String);
 
-fn components(c: &Connection, revision: &str) -> Result<Vec<Value>> {
+pub(super) fn components(c: &Connection, revision: &str) -> Result<Vec<Value>> {
     let mut statement=sql(c.prepare("SELECT ordinal,role,label,path,source_sha,start,end,content_sha,selector FROM knowledge_component WHERE revision=? ORDER BY ordinal"))?;
     sql(statement.query_map([revision],|r|Ok(json!({
         "ordinal":r.get::<_,usize>(0)?,"role":r.get::<_,String>(1)?,"label":r.get::<_,Option<String>>(2)?,
@@ -170,31 +170,4 @@ pub fn publish(
     .map_err(|_| Error("document_database"))?;
     require(actual == expected_search, "knowledge_corruption")?;
     Ok(())
-}
-
-pub fn content(c: &Connection, revision: &str) -> Result<Vec<Value>> {
-    let mut result = components(c, revision)?;
-    for component in &mut result {
-        let body: Vec<u8> = sql(c.query_row(
-            "SELECT substr(body,?3+1,?4-?3) FROM document_source WHERE path=?1 AND sha=?2",
-            params![
-                component["path"].as_str(),
-                component["source_sha"].as_str(),
-                component["start"].as_u64(),
-                component["end"].as_u64()
-            ],
-            |r| r.get(0),
-        ))?;
-        require(
-            identity::sha(&body)
-                == component["content_sha"]
-                    .as_str()
-                    .ok_or(Error("knowledge_corruption"))?,
-            "knowledge_corruption",
-        )?;
-        component["text"] = String::from_utf8(body)
-            .map_err(|_| Error("knowledge_corruption"))?
-            .into();
-    }
-    Ok(result)
 }

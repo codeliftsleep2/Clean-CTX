@@ -125,6 +125,8 @@ fn af002_rolling_read_public_characterization() {
             // Preserve this original-copy discovery as historical characterization.
             let _historical = (tool == "diff_code_context")
                 .then(|| super::ownership_design::Mode::historical(false, true));
+            let _delta_historical = (tool == "delta_code_context")
+                .then(|| super::delta_design::Mode::historical(false, true));
             let root = tempfile::tempdir().unwrap();
             let file = root.path().join("subject.ts");
             let file = file.to_string_lossy().into_owned();

@@ -1,0 +1,11 @@
+probe,question
+P01,"A proposed compiler change moves language-specific finalization after later semantic enrichment. What must be established before approving that change, and what should the engineer do next?"
+P02,"A serializer change removes fields that seem redundant in the in-memory instruction representation. Assess whether it is permissible and identify the evidence and validation required."
+P03,"We want to add semantic extraction for another programming language. What architectural boundaries should govern the implementation and its acceptance?"
+P04,"An optimization would return text rendered earlier in a replay instead of rendering it again immediately before returning the response. Should we proceed, and what evidence controls the decision?"
+P05,"A change to Entity Framework dependency extraction appears to pass a focused test. What must be established before treating the change as accepted, including any relevant unresolved history?"
+P06,"We plan to extend Angular route-resolver support from declarations to behavior at runtime. Determine the current boundary, open design questions and required evidence before implementing."
+P07,"A workspace query obtains declaration candidates through several providers. We want to change the acquisition path. Which correctness and completeness obligations must be established?"
+P08,"A proposed performance optimization reuses work across the point where a response becomes externally observable. What would justify proceeding, and which existing guarantees must be preserved?"
+P09,"We want to change how repository architecture knowledge is ingested and retrieved. Identify applicable constraints and decide what preflight and validation are required."
+P10,"An earlier report records successful validation. How should an engineer determine whether that result still supports approval of a change today? Use an actual relevant repository example."

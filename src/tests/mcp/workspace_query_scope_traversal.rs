@@ -2,6 +2,8 @@
 //
 // WSC-004 — workspace-scoped GRAPH TRAVERSAL (`transitive_dependencies`,
 // `has_cycle`).
+// Synthetic Rust owners keep these generic scope tests separate from native
+// C# ancestry acquisition, which correctly replaces source-inconsistent seeds.
 //
 // Sibling of `workspace_query_scope_entities.rs` (find_entities /
 // entities_in_file), which owns the shared query helpers used below.
@@ -59,14 +61,14 @@ fn red_wsc4_5_scoped_traversal_reflects_only_the_workspaces_own_chain() {
     // repo A: Alpha -> Beta -> Gamma
     seed_generic(
         &state,
-        &repo_a.file("A1.cs"),
+        &repo_a.file("A1.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Beta",
     );
     seed_generic(
         &state,
-        &repo_a.file("A2.cs"),
+        &repo_a.file("A2.rs"),
         SemanticRelation::Injects,
         "Beta",
         "Gamma",
@@ -75,14 +77,14 @@ fn red_wsc4_5_scoped_traversal_reflects_only_the_workspaces_own_chain() {
     // were computed over the global graph.
     seed_generic(
         &state,
-        &repo_b.file("B1.cs"),
+        &repo_b.file("B1.rs"),
         SemanticRelation::Injects,
         "Gamma",
         "Delta",
     );
     seed_generic(
         &state,
-        &repo_b.file("B2.cs"),
+        &repo_b.file("B2.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Epsilon",
@@ -117,14 +119,14 @@ fn red_wsc4_6_scoped_traversal_never_passes_through_an_unrelated_repository() {
     // repo A: Alpha -> Xi;  repo B: Xi -> Ypsi.
     seed_generic(
         &state,
-        &repo_a.file("A1.cs"),
+        &repo_a.file("A1.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Xi",
     );
     seed_generic(
         &state,
-        &repo_b.file("B1.cs"),
+        &repo_b.file("B1.rs"),
         SemanticRelation::Injects,
         "Xi",
         "Ypsi",
@@ -151,8 +153,8 @@ fn red_wsc4_7_edges_across_primary_and_additional_root_stay_traversable() {
     let base = tempfile::TempDir::new().unwrap();
     let repo_a = Repo::inside(base.path(), "repo-a");
     let repo_a2 = Repo::inside(base.path(), "repo-a-additional");
-    let file_a = repo_a.file("A1.cs");
-    let file_a2 = repo_a2.file("A2.cs");
+    let file_a = repo_a.file("A1.rs");
+    let file_a2 = repo_a2.file("A2.rs");
 
     let state = state(&[&repo_a2]);
     seed_generic(&state, &file_a, SemanticRelation::Injects, "Alpha", "Svc");
@@ -202,14 +204,14 @@ fn red_wsc4_8_a_cycle_cannot_be_manufactured_by_mixing_two_repositories() {
     // Each repository contributes one half of what would be a cycle.
     seed_generic(
         &state,
-        &repo_a.file("A1.cs"),
+        &repo_a.file("A1.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Beta",
     );
     seed_generic(
         &state,
-        &repo_b.file("B1.cs"),
+        &repo_b.file("B1.rs"),
         SemanticRelation::Injects,
         "Beta",
         "Alpha",
@@ -239,14 +241,14 @@ fn red_wsc4_9_a_cycle_inside_the_workspace_is_still_detected() {
     let state = state(&[]);
     seed_generic(
         &state,
-        &repo_a.file("A1.cs"),
+        &repo_a.file("A1.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Beta",
     );
     seed_generic(
         &state,
-        &repo_a.file("A2.cs"),
+        &repo_a.file("A2.rs"),
         SemanticRelation::Injects,
         "Beta",
         "Alpha",
@@ -267,8 +269,8 @@ fn red_wsc4_10_a_cycle_spanning_primary_and_additional_root_is_detected() {
     let base = tempfile::TempDir::new().unwrap();
     let repo_a = Repo::inside(base.path(), "repo-a");
     let repo_a2 = Repo::inside(base.path(), "repo-a-additional");
-    let file_a = repo_a.file("A1.cs");
-    let file_a2 = repo_a2.file("A2.cs");
+    let file_a = repo_a.file("A1.rs");
+    let file_a2 = repo_a2.file("A2.rs");
 
     let state = state(&[&repo_a2]);
     seed_generic(&state, &file_a, SemanticRelation::Injects, "Alpha", "Svc");
@@ -312,21 +314,21 @@ fn red_wsc4_11_root_less_queries_keep_the_global_view_on_every_scoped_surface() 
     let state = state(&[]);
     seed_generic(
         &state,
-        &repo_a.file("A1.cs"),
+        &repo_a.file("A1.rs"),
         SemanticRelation::Injects,
         "Alpha",
         "Beta",
     );
     seed_generic(
         &state,
-        &repo_b.file("B1.cs"),
+        &repo_b.file("B1.rs"),
         SemanticRelation::Injects,
         "Beta",
         "Gamma",
     );
     seed_generic(
         &state,
-        &repo_b.file("B2.cs"),
+        &repo_b.file("B2.rs"),
         SemanticRelation::Injects,
         "Gamma",
         "Alpha",
@@ -338,8 +340,8 @@ fn red_wsc4_11_root_less_queries_keep_the_global_view_on_every_scoped_surface() 
     assert_eq!(
         found_entities(&state, "Alpha", None),
         vec![
-            ("Alpha".to_string(), "A1.cs".to_string()),
-            ("Alpha".to_string(), "B2.cs".to_string()),
+            ("Alpha".to_string(), "A1.rs".to_string()),
+            ("Alpha".to_string(), "B2.rs".to_string()),
         ],
         "find_entities without a root answers with every occurrence in the session"
     );
@@ -357,7 +359,7 @@ fn red_wsc4_11_root_less_queries_keep_the_global_view_on_every_scoped_surface() 
     // so the root-less behaviour above is preservation, not scope leakage.
     assert_eq!(
         found_entities(&state, "Alpha", Some(&repo_a.key())),
-        vec![("Alpha".to_string(), "A1.cs".to_string())],
+        vec![("Alpha".to_string(), "A1.rs".to_string())],
         "find_entities scoped to A sees A's occurrence only"
     );
     assert_eq!(
@@ -382,14 +384,14 @@ fn red_wsc4_12_repository_name_prefix_never_admits_a_sibling_repository() {
     let state = state(&[]);
     seed_generic(
         &state,
-        &older.file("Old1.cs"),
+        &older.file("Old1.rs"),
         SemanticRelation::Injects,
         "OldAlpha",
         "OldBeta",
     );
     seed_generic(
         &state,
-        &older.file("Old2.cs"),
+        &older.file("Old2.rs"),
         SemanticRelation::Injects,
         "OldBeta",
         "OldAlpha",
@@ -419,8 +421,8 @@ fn red_wsc4_12_repository_name_prefix_never_admits_a_sibling_repository() {
     assert_eq!(
         found_entities(&state, "OldAlpha", Some(&older.key())),
         vec![
-            ("OldAlpha".to_string(), "Old1.cs".to_string()),
-            ("OldAlpha".to_string(), "Old2.cs".to_string()),
+            ("OldAlpha".to_string(), "Old1.rs".to_string()),
+            ("OldAlpha".to_string(), "Old2.rs".to_string()),
         ],
         "the sibling repository answers its own scoped query"
     );
@@ -438,8 +440,8 @@ fn red_wsc4_gate_scoped_traversal_starts_only_at_a_workspace_entity() {
     let base = tempfile::TempDir::new().unwrap();
     let repo_a = Repo::inside(base.path(), "repo-a");
     let repo_b = Repo::inside(base.path(), "repo-b");
-    let file_a = repo_a.file("A1.cs");
-    let file_b = repo_b.file("B1.cs");
+    let file_a = repo_a.file("A1.rs");
+    let file_b = repo_b.file("B1.rs");
     let state = state(&[]);
     // repo A asserts `Xi -> Zeta`, while Xi's own occurrence is declared in repo B:
     // the FACT is A's evidence, but Xi itself is not an entity of A.

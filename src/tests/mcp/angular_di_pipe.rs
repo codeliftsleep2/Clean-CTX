@@ -17,6 +17,7 @@ fn check(decorator: &str, kind: &str, parameters: &str, expected: &[&str]) {
 fn check_fields(decorator: &str, kind: &str, parameters: &str, fields: &str, expected: &[&str]) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_inject_apis(root.path());
     let path = root.path().join("consumer.ts");
     let field_prefix = if fields.is_empty() {
         String::new()
@@ -221,6 +222,7 @@ fn angular_di_pipe_does_not_admit_unrepaired_functional_evidence() {
 fn angular_di_pipe_refresh_dependency_and_removal() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_inject_apis(root.path());
     let path = root.path().join("pipe.ts");
     let mut config = crate::tests::test_config();
     config

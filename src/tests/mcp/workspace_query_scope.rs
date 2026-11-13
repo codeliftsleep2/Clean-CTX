@@ -515,14 +515,14 @@ fn red_scope7_non_calls_relation_shares_the_same_isolation() {
     // framework relation, never a call fact.
     seed_generic(
         &state,
-        &repo_a.file("A.cs"),
+        &repo_a.file("A.rs"),
         SemanticRelation::Injects,
         "Client",
         "ApiClient",
     );
     seed_generic(
         &state,
-        &repo_b.file("B.cs"),
+        &repo_b.file("B.rs"),
         SemanticRelation::Injects,
         "Client",
         "ApiClient",
@@ -539,7 +539,7 @@ fn red_scope7_non_calls_relation_shares_the_same_isolation() {
         vec![(
             "Client".to_string(),
             "ApiClient".to_string(),
-            "A.cs".to_string(),
+            "A.rs".to_string(),
             None
         )],
         "the isolation is generic, not Calls-specific"
@@ -555,7 +555,7 @@ fn red_scope7_non_calls_relation_shares_the_same_isolation() {
         vec![(
             "Client".to_string(),
             "ApiClient".to_string(),
-            "B.cs".to_string(),
+            "B.rs".to_string(),
             None
         )],
         "repo B sees its own Injects occurrence only"
@@ -571,7 +571,7 @@ fn red_scope8_repository_name_prefix_does_not_admit_a_sibling_repository() {
     let repo = Repo::inside(base.path(), "repo");
     let older = Repo::inside(base.path(), "repo-old");
     let state = state(&[]);
-    seed_call(&state, &older.file("Old.cs"), "Process", "OrderBy", 2);
+    seed_call(&state, &older.file("Old.rs"), "Process", "OrderBy", 2);
 
     assert!(
         older.key().starts_with(&repo.key()),
@@ -598,7 +598,7 @@ fn red_scope8_repository_name_prefix_does_not_admit_a_sibling_repository() {
             "OrderBy",
             Some(&older.key())
         )),
-        vec![call_fact("Process", "OrderBy", "Old.cs", 2)],
+        vec![call_fact("Process", "OrderBy", "Old.rs", 2)],
         "the sibling repository is still queryable on its own root"
     );
 }

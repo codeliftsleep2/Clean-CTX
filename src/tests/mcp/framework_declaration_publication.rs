@@ -13,6 +13,7 @@ fn dispatch(state: &crate::mcp::McpState, tool: &str, arguments: Value) -> Value
 fn isolated(source: &str, domain: &str, kind: &str, name: &str, marker: &str) {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("declaration.ts");
     let source = format!(
         "{source}\n{}",
@@ -111,6 +112,7 @@ fn declaration(domain: &str, name: &str) -> String {
 }
 
 fn state(root: &tempfile::TempDir) -> crate::mcp::McpState {
+    crate::tests::angular_authority_fixture::install(root.path());
     let mut config = crate::tests::test_config();
     config
         .additional_roots
@@ -363,13 +365,31 @@ fn framework_declaration_publication_respects_endpoint_authority() {
         let reference = entities(&state, &root, &used, domain);
         let declaration = entities(&state, &root, &declared, domain);
         assert_eq!(declaration.len(), 1);
-        let expected_references = usize::from(domain == "angular");
+        // Imported endpoints retain their declaration's source identity.
+        let expected_references = 0;
         assert_eq!(reference.len(), expected_references);
         assert_eq!(declaration[0]["file"], declared.to_string_lossy().as_ref());
         assert_eq!(declaration[0]["name"], name);
         if domain == "angular" {
-            assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
-            assert_eq!(reference[0]["name"], name);
+            let result = dispatch(
+                &state,
+                "workspace_query",
+                json!({
+                    "workspaceRoot":root.path(), "type":"forward_edges",
+                    "domain":"angular", "entity_type":"Component", "name":"Consumer"
+                }),
+            );
+            assert!(
+                result["structuredContent"]["edges"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|edge| edge["relation"] == "Injects"
+                        && edge["object"]["name"] == name
+                        && edge["object"]["file"] == declared.to_string_lossy().as_ref()
+                        && edge["subject"]["file"] == used.to_string_lossy().as_ref()),
+                "{result}"
+            );
         }
     }
 }
@@ -412,7 +432,7 @@ fn framework_declaration_publication_removal_respects_endpoint_authority() {
         std::fs::write(&used, source).unwrap();
         let state = state(&root);
         assert_eq!(entities(&state, &root, &declared, domain).len(), 1);
-        let expected_references = usize::from(domain == "angular");
+        let expected_references = 0;
         assert_eq!(
             entities(&state, &root, &used, domain).len(),
             expected_references
@@ -426,8 +446,26 @@ fn framework_declaration_publication_removal_respects_endpoint_authority() {
         assert!(entities(&state, &root, &declared, domain).is_empty());
         let reference = entities(&state, &root, &used, domain);
         assert_eq!(reference.len(), expected_references);
+        // The removed declaration cannot survive as a consumer-owned Service.
         if domain == "angular" {
-            assert_eq!(reference[0]["file"], used.to_string_lossy().as_ref());
+            let result = dispatch(
+                &state,
+                "workspace_query",
+                json!({
+                    "workspaceRoot":root.path(), "type":"entities_in_file", "file_path":used
+                }),
+            );
+            assert!(
+                result["structuredContent"]["entities"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|entity| entity["domain"] == "angular"
+                        && entity["entity_type"] == "Component"
+                        && entity["name"] == "Consumer"
+                        && entity["file"] == used.to_string_lossy().as_ref()),
+                "{result}"
+            );
         }
         let found = dispatch(
             &state,
@@ -447,8 +485,5 @@ fn framework_declaration_publication_removal_respects_endpoint_authority() {
             expected_references,
             "only independently authoritative reference occurrences survive: {found}"
         );
-        if domain == "angular" {
-            assert_eq!(occurrences[0]["file"], used.to_string_lossy().as_ref());
-        }
     }
 }

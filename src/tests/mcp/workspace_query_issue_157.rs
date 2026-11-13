@@ -80,6 +80,7 @@ fn declaration(kind: &str) -> String {
 }
 
 fn fixture(root: &Path, spread: bool) {
+    crate::tests::angular_authority_fixture::install_module_apis(root);
     write(root, "leaf.ts", &declaration("Directive"));
     write(root, "unrelated.ts", "export class Unrelated {}");
     let (binding, expression) = if spread {

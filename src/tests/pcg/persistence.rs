@@ -92,7 +92,9 @@ fn projection_corruption_detected() {
     // Simulate out-of-band storage damage, bypassing admission deliberately.
     // SQLite may enforce FKs by default; only this fixture connection disables
     // them so the inconsistent header can reach the detection assertions.
-    connection.pragma_update(None, "foreign_keys", false).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", false)
+        .unwrap();
     let foreign_keys: i64 = connection
         .query_row("PRAGMA foreign_keys", [], |r| r.get(0))
         .unwrap();
@@ -109,7 +111,9 @@ fn projection_corruption_detected() {
     connection
         .execute("UPDATE generation SET g=?1", [&initial.generation])
         .unwrap();
-    connection.pragma_update(None, "foreign_keys", true).unwrap();
+    connection
+        .pragma_update(None, "foreign_keys", true)
+        .unwrap();
     connection.execute("DELETE FROM binding", []).unwrap();
     // Targeted metadata-open deliberately does not certify intact membership.
     store::reader(&f.trusted(), "fixture").unwrap();

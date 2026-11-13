@@ -1,0 +1,70 @@
+[
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "context",
+    "id": "AUTH.PCG_DOCUMENTS"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "context",
+    "id": "AUTH.PCG_PREAUTHORING"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "context",
+    "id": "AUTH.SEMANTIC_MODEL"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "context",
+    "id": "PERF-004-DOCTRINE"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "search",
+    "text": "PassPipeline"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "get",
+    "id": "PIPELINE-001"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "related",
+    "id": "AUTH.CANONICAL_IR",
+    "edgeKind": "PRESERVES",
+    "direction": "outgoing"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "context",
+    "id": "AUTH.CANONICAL_IR"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "get",
+    "id": "PERF-001-REPLAY",
+    "role": "counterexample",
+    "label": "registered_delete"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "get",
+    "id": "DOC-206",
+    "role": "observation",
+    "label": "live_639_644"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "get",
+    "id": "AUTH.ANGULAR_RESOLVER",
+    "role": "qualification",
+    "label": "historical_input_drift"
+  },
+  {
+    "workspaceRoot": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI",
+    "mode": "source",
+    "id": "PIPELINE-001"
+  }
+]

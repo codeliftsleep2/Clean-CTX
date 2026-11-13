@@ -51,7 +51,11 @@ impl WorkspaceQueryOperation {
                 return PreparedQuery::failure(super::outcome::QueryFailure::internal(error));
             }
         }
+        #[cfg(not(feature = "csharp"))]
         let initial = self.prepare_base(args, state, context);
+        #[cfg(feature = "csharp")]
+        let initial = (!super::dependencies::can_defer_ef_preparation(args, state, context))
+            .then(|| self.prepare_base(args, state, context));
         #[cfg(feature = "csharp")]
         let initial = super::dependencies::prepare(self, args, state, context, initial);
         #[cfg(feature = "angular")]

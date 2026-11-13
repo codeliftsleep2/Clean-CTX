@@ -31,7 +31,12 @@ impl Resolver {
             ));
         }
         let span = SourceSpan::new(operand.start_byte(), operand.end_byte()).ok()?;
-        self.value_reference_for_query(file, source, span, true)
+        Some(
+            self.value_reference_for_query(file, source, span, true)
+                .unwrap_or_else(|| {
+                    Resolution::Unresolved("Type query requires lexical scope authority".into())
+                }),
+        )
     }
 
     pub(super) fn query_value_binding(
@@ -105,6 +110,19 @@ impl Resolver {
                         Namespace::Value,
                         true,
                     );
+                }
+                if let Binding::Import {
+                    module,
+                    imported,
+                    mode,
+                    ..
+                } = binding
+                {
+                    let target = match resolver.module_scope(file, module, *mode) {
+                        Ok(target) => target,
+                        Err(error) => return Resolution::Unresolved(error),
+                    };
+                    return resolver.type_query_namespace_chain(&target, imported, members);
                 }
                 return Resolution::Unresolved(
                     "Qualified type-only alias requires scope authority".into(),

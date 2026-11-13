@@ -252,7 +252,10 @@ fn af002_default_public_history_payload_work() {
         let observed = snapshot();
         assert_eq!(observed.metadata_queries, requests);
         assert_eq!(observed.metadata_rows, requests);
-        assert_eq!(observed.discarded_pretty_bytes, pretty.len() * requests);
+        // Metadata reads validate presentation bytes without allocating a discarded String.
+        assert_eq!(observed.validated_pretty_bytes, pretty.len() * requests);
+        assert_eq!(observed.discarded_pretty_bytes, 0);
+        assert_eq!(observed.discarded_pretty_strings, 0);
         assert!(state.alias_for_path(&file).is_none());
         assert_eq!(state.workspace_index_read().edge_count(), edges);
         report(

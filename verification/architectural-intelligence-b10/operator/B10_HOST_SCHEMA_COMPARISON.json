@@ -1,0 +1,326 @@
+{
+  "production_capture": "target/pcg-b10/before/1.response.json",
+  "capture_sha256": "e4a74cd8faeb9dbb340bee52d04579f40acc5f683f348a196184ab04784c35da",
+  "property_names": [
+    "direction",
+    "edgeKind",
+    "id",
+    "kind",
+    "label",
+    "maxEdges",
+    "maxNodes",
+    "mode",
+    "path",
+    "role",
+    "sourceSha256",
+    "status",
+    "text",
+    "track",
+    "workspaceRoot"
+  ],
+  "required": [
+    "workspaceRoot",
+    "mode"
+  ],
+  "input_schema": {
+    "additionalProperties": false,
+    "allOf": [
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "text"
+              ]
+            },
+            {
+              "required": [
+                "track"
+              ]
+            },
+            {
+              "required": [
+                "kind"
+              ]
+            },
+            {
+              "required": [
+                "status"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "search"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "role"
+              ]
+            },
+            {
+              "required": [
+                "label"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "enum": [
+                "search",
+                "get"
+              ]
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "required": [
+            "label"
+          ]
+        },
+        "then": {
+          "required": [
+            "role"
+          ]
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "edgeKind"
+              ]
+            },
+            {
+              "required": [
+                "direction"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "related"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "path"
+              ]
+            },
+            {
+              "required": [
+                "sourceSha256"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "source"
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "anyOf": [
+            {
+              "required": [
+                "maxNodes"
+              ]
+            },
+            {
+              "required": [
+                "maxEdges"
+              ]
+            }
+          ]
+        },
+        "then": {
+          "properties": {
+            "mode": {
+              "const": "context"
+            }
+          }
+        }
+      }
+    ],
+    "oneOf": [
+      {
+        "not": {
+          "required": [
+            "id"
+          ]
+        },
+        "properties": {
+          "mode": {
+            "const": "search"
+          }
+        }
+      },
+      {
+        "properties": {
+          "mode": {
+            "enum": [
+              "get",
+              "related",
+              "context",
+              "source"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    ],
+    "properties": {
+      "direction": {
+        "enum": [
+          "incoming",
+          "outgoing",
+          "both"
+        ]
+      },
+      "edgeKind": {
+        "enum": [
+          "DEPENDS_ON",
+          "IMPLEMENTS",
+          "VALIDATES",
+          "RECLOSES",
+          "BANKS",
+          "BLOCKED_BY",
+          "SUPERSEDES",
+          "PRESERVES",
+          "FALSIFIES",
+          "USES_EVIDENCE",
+          "DEEPENS",
+          "PRODUCES_AUTHORITY",
+          "CONSUMES_AUTHORITY"
+        ]
+      },
+      "id": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "kind": {
+        "enum": [
+          "MISSION",
+          "IMPLEMENTATION",
+          "EXPERIMENT",
+          "RESEARCH",
+          "AUTHORITY",
+          "INVARIANT",
+          "DEBT"
+        ]
+      },
+      "label": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "maxEdges": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "maxNodes": {
+        "minimum": 1,
+        "type": "integer"
+      },
+      "mode": {
+        "enum": [
+          "search",
+          "get",
+          "related",
+          "context",
+          "source"
+        ]
+      },
+      "path": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "role": {
+        "enum": [
+          "statement",
+          "subject",
+          "scope",
+          "outcome",
+          "rationale",
+          "alternative",
+          "rejected_alternative",
+          "rejection_reason",
+          "consequence",
+          "constraint",
+          "verification_obligation",
+          "observation",
+          "counterexample",
+          "qualification",
+          "historical_applicability",
+          "evidence"
+        ]
+      },
+      "sourceSha256": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "status": {
+        "enum": [
+          "PROPOSED",
+          "INVESTIGATING",
+          "FROZEN",
+          "IMPLEMENTATION_READY",
+          "IMPLEMENTED",
+          "VALIDATED",
+          "RECLOSED",
+          "BANKED",
+          "BLOCKED",
+          "FALSIFIED",
+          "SUPERSEDED",
+          "DEBT"
+        ]
+      },
+      "text": {
+        "description": "SQLite FTS5 over declared knowledge components and explicit identity/title metadata; no whole-document inference.",
+        "minLength": 1,
+        "type": "string"
+      },
+      "track": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "workspaceRoot": {
+        "minLength": 1,
+        "type": "string"
+      }
+    },
+    "required": [
+      "workspaceRoot",
+      "mode"
+    ],
+    "type": "object"
+  },
+  "host_report": "mode-only argument schema; agent report not independently corroborated",
+  "actual_host_request": "target/pcg-b10/host-smoke-02/host-events.jsonl",
+  "interpretation": "unsupported query field observed; host schema normalization defect not established"
+}

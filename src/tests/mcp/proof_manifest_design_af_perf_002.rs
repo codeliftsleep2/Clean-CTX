@@ -238,9 +238,15 @@ fn af002_proof_manifest_actual_comparison() {
                 }
             }
             if missing && index == 1 {
-                assert!(
-                    bw.calls > 0 && aw.skipped_calls > 0,
-                    "Incomplete ordinary retry disappeared"
+                // The integrated ordinary path omits proof construction in both modes.
+                // Failed acquisition must remain explicit in the equal public responses.
+                assert_eq!(bw.calls, 0);
+                assert_eq!(aw.calls, 0);
+                assert_eq!(bw.root_manifests, 0);
+                assert_eq!(aw.root_manifests, 0);
+                assert_eq!(
+                    before["response"]["result"]["structuredContent"]["coverage"]["source_complete"],
+                    false
                 );
             }
             eprintln!(

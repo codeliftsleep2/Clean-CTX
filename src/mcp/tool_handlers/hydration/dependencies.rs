@@ -172,11 +172,8 @@ fn attempt_once(
         let index = state.workspace_index_read();
         index.has_csharp_publication_generation(current_generation)
             && artifact.as_ref().is_some_and(|artifact| {
-                index.has_current_semantic_projection(
-                    owner,
-                    SemanticFidelity::High,
-                    artifact.source_hash(),
-                )
+                artifact.csharp_resolution_unit().is_some()
+                    && projection_is_current(&index, owner, artifact.source_hash())
             })
     };
     if let Some(satisfaction) = cached
@@ -312,9 +309,8 @@ fn attempt_once(
                 state.read_source(file).is_ok_and(|source| {
                     let hash = crate::cache::content_hash(source.as_bytes());
                     artifact.source_hash() == hash
-                        && state
-                            .workspace_index_read()
-                            .has_current_semantic_projection(file, SemanticFidelity::High, &hash)
+                        && artifact.csharp_resolution_unit().is_some()
+                        && projection_is_current(&state.workspace_index_read(), file, &hash)
                 })
             })
     }) && generation == state.csharp_authority_generation();
@@ -399,10 +395,8 @@ pub(in crate::mcp::tool_handlers) fn publish(
             !state.read_source(file).is_ok_and(|source| {
                 let hash = crate::cache::content_hash(source.as_bytes());
                 artifact.source_hash() == hash
-                    && state
-                        .workspace_index_read()
-                        .semantic_projection_fidelity(file)
-                        .is_some_and(|fidelity| fidelity >= SemanticFidelity::High)
+                    && artifact.csharp_resolution_unit().is_some()
+                    && projection_is_current(&state.workspace_index_read(), file, &hash)
             })
         })
         .cloned()
@@ -422,4 +416,14 @@ pub(in crate::mcp::tool_handlers) fn publish(
                 | CandidatePublication::Current
         )
     }))
+}
+
+/// Ancestry consumes retained canonical declarations, not model-facing detail.
+/// Reuse the current publication without silently upgrading its fidelity.
+/// Missing/stale artifacts still follow the existing High compilation path;
+/// full obligation closure and reconciled-generation checks remain mandatory.
+fn projection_is_current(index: &WorkspaceIndex, file: &str, source_hash: &str) -> bool {
+    index
+        .semantic_projection_fidelity(file)
+        .is_some_and(|fidelity| index.has_current_semantic_projection(file, fidelity, source_hash))
 }

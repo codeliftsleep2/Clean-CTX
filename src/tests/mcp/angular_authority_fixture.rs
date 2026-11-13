@@ -33,6 +33,23 @@ pub(crate) fn install(root: &Path) {
     }
 }
 
+/// Close the package graph used by the public NgRx dispatch preservation cases.
+#[cfg(all(feature = "typescript", feature = "angular"))]
+pub(crate) fn install_store_apis(root: &Path) {
+    install(root);
+    let package = root.join("node_modules/@ngrx/store");
+    std::fs::create_dir_all(&package).unwrap();
+    std::fs::write(
+        package.join("package.json"),
+        r#"{"name":"@ngrx/store","version":"20.0.0","types":"index.d.ts"}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        package.join("index.d.ts"),
+        "export interface Action { readonly type: string; }\nexport declare class Store<T> { dispatch(action: Action): void; }\n",
+    ).unwrap();
+}
+
 /// Canonical package inputs for the existing DI preservation fixtures.
 #[cfg(all(feature = "typescript", feature = "angular"))]
 pub(crate) fn install_inject_apis(root: &Path) {
@@ -42,4 +59,15 @@ pub(crate) fn install_inject_apis(root: &Path) {
         "export declare function Injectable(metadata?: unknown): any;\nexport declare function Component(metadata: unknown): any;\nexport declare function Directive(metadata: unknown): any;\nexport declare function Pipe(metadata: unknown): any;\nexport declare function inject(token: unknown, options?: unknown): unknown;\n",
     )
     .expect("DI fixture package declarations");
+}
+
+/// Canonical package inputs for module contributor lifecycle fixtures.
+#[cfg(all(feature = "typescript", feature = "angular"))]
+pub(crate) fn install_module_apis(root: &Path) {
+    install(root);
+    std::fs::write(
+        root.join("node_modules/@angular/core/index.d.ts"),
+        "export declare function Injectable(metadata?: unknown): any;\nexport declare function Component(metadata: unknown): any;\nexport declare function Directive(metadata: unknown): any;\nexport declare function Pipe(metadata: unknown): any;\nexport declare function NgModule(metadata: unknown): any;\n",
+    )
+    .expect("module fixture package declarations");
 }

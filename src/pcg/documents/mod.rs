@@ -1,7 +1,9 @@
 //! Source-owned document admission. SQLite owns admitted graph snapshots/history.
 mod content;
 pub mod knowledge;
+mod knowledge_acquisition;
 mod knowledge_query;
+mod knowledge_source;
 mod knowledge_store;
 mod model;
 mod parse;

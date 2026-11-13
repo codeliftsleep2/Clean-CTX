@@ -49,6 +49,7 @@ fn persistent_state(root: &tempfile::TempDir) -> crate::mcp::McpState {
 fn registered_provide_keeps_local_facts_in_content_and_workspace_edges_auxiliary() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install(root.path());
     let path = root.path().join("consumer.service.ts");
     let mut source = r#"import { Injectable } from '@angular/core';
 @Injectable()

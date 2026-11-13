@@ -80,6 +80,7 @@ fn ngrx_service_dispatch_structural_owner_falsifiers() {
 }
 fn dispatches(source: &str) -> (Value, Vec<Value>, String) {
     let root = tempfile::tempdir().unwrap();
+    crate::tests::angular_authority_fixture::install_store_apis(root.path());
     let path = root.path().join("service.ts");
     std::fs::write(&path, format!("{source}\n{}", "// padding\n".repeat(100))).unwrap();
     let mut config = crate::tests::test_config();
@@ -125,6 +126,27 @@ fn dispatches(source: &str) -> (Value, Vec<Value>, String) {
         "workspace_query",
         json!({"workspaceRoot":root.path(),"type":"entities_in_file","file_path":path}),
     );
+    if !entities["structuredContent"]["entities"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|entity| entity["entity_type"] == "Service" && entity["name"] == "AuditService")
+    {
+        let index = state.workspace_index_read();
+        let authority = index.retained_typescript_authority(&path.to_string_lossy());
+        eprintln!(
+            "NGRX_INDEPENDENT_ROLE_AUTHORITY {}",
+            json!({
+                "present":authority.is_some(),
+                "facets":authority.map(|authority| authority.declaration_facets.iter()
+                    .filter(|facet| facet.declaration.name == "AuditService")
+                    .map(|facet| json!({"declaration":facet.declaration,
+                        "decorators":facet.decorators,
+                        "role":format!("{:?}", crate::angular_meta::class_role_authority::declaration_role(authority, &facet.declaration))}))
+                    .collect::<Vec<_>>())
+            })
+        );
+    }
     (entities, edges, path.to_string_lossy().into_owned())
 }
 #[test]

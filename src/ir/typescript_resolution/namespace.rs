@@ -6,6 +6,41 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 impl Resolver {
+    /// An erased named import may identify a namespace through type-only exports.
+    /// Only the scope walk uses type admission; the endpoint must still be a value.
+    pub(super) fn type_query_namespace_chain(
+        &mut self,
+        scope: &NamespaceScope,
+        object: &str,
+        members: &[&str],
+    ) -> Resolution {
+        let Some((leaf, intermediates)) = members.split_last() else {
+            return Resolution::Unresolved("Type query member path is empty".into());
+        };
+        let (targets, complete) =
+            self.namespace_targets(scope, object, Namespace::Type, true, &mut BTreeSet::new());
+        if !complete || targets.len() != 1 {
+            return Resolution::Unresolved("Type query namespace is not unique and closed".into());
+        }
+        let mut target = targets.into_iter().next().expect("one namespace");
+        for member in intermediates {
+            let (targets, complete) = self.namespace_targets(
+                &target,
+                member,
+                Namespace::Type,
+                true,
+                &mut BTreeSet::new(),
+            );
+            if !complete || targets.len() != 1 {
+                return Resolution::Unresolved(
+                    "Type query intermediate namespace is not unique and closed".into(),
+                );
+            }
+            target = targets.into_iter().next().expect("one namespace");
+        }
+        self.scope_export(&target, leaf, Namespace::Value)
+    }
+
     pub(super) fn namespace_member(
         &mut self,
         file: &Path,

@@ -170,11 +170,14 @@ public class UsersController : ControllerBase {
     let low_entities = low["result"]["structuredContent"]["entities"]
         .as_array()
         .expect("Low entities");
-    assert!(low_entities.iter().all(|entity| {
-        !(entity["domain"] == "dotnet"
-            && entity["entity_type"] == "Action"
-            && entity["name"] == "GetAll")
-    }));
+    assert!(
+        low_entities.iter().all(|entity| {
+            !(entity["domain"] == "dotnet"
+                && entity["entity_type"] == "Action"
+                && entity["name"] == "GetAll")
+        }),
+        "Low publication exposed action entities: {low}"
+    );
 
     let medium = query_entities(&state, root.path(), "UsersController.cs", "medium");
     let medium_entities = medium["result"]["structuredContent"]["entities"]

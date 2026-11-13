@@ -1,0 +1,10 @@
+surface,advertisement,invocation,evidence,limitation
+current interactive host,knowledge/document tools absent,unavailable,current tool metadata enumeration,not an isolated fresh host
+normal project MCP registration,profile env omitted,not attempted,.codex/config.toml inspected,release on-disk executable differs from accepted B9
+accepted B9 production stdio,knowledge tool enumerated,12 requests ready/current/complete,target/pcg-b10/before,operator transport is not agent host adoption
+accepted B9 source hash refusal,knowledge tool enumerated,expected pcg/source_revision_changed,target/pcg-b10/stale-reference-check,incorrect requested hash only; no source mutation
+prepared isolated Codex CLI,UNRUN,UNRUN,infrastructure/invoke-host-smoke.ps1,operator-informed host smoke; no independent evaluation claim
+isolated Codex CLI smoke 02,knowledge tool reached,one actual search rejected -32602 pcg/invalid_request,target/pcg-b10/host-smoke-02/host-events.jsonl,request used unsupported query field; four follow-on modes UNRUN
+isolated Codex CLI smoke 03,agent reports mode-only visible schema,no knowledge invocation; required request fields unavailable,target/pcg-b10/host-smoke-03/agent-response.md,exit 0 is successful reporting of blocked workflow; not successful retrieval
+corrected descriptor production,flat 15-field schema,13 ready/current/complete operations,target/pcg-b10/schema-production-host-01,12 paired serialized results byte-exact; original refusals preserved
+corrected descriptor native host capture,all 15 fields reported and five modes invoked,six completed calls with inspected exact payloads,target/pcg-b10/host-utf8-01,isolated CLI reachability only; no general adoption or independent reasoning claim

@@ -69,6 +69,7 @@ fn leaf(kind: &str) -> String {
 }
 
 fn fixture(root: &Path) {
+    crate::tests::angular_authority_fixture::install_module_apis(root);
     write(root, "leaf.ts", &leaf("Directive"));
     write(
         root,
@@ -136,7 +137,8 @@ fn issue_157_array_retargets_membership_by_existing_import_identity() {
         "shared.ts",
         "import { Other as Current } from './other'; export const SHARED = [Current];",
     );
-    expect(&state, root.path(), &[("Current", "Pipe")]);
+    // The import spelling is Current; the source-owned declaration identity is Other.
+    expect(&state, root.path(), &[("Other", "Pipe")]);
 }
 
 #[test]
@@ -144,11 +146,14 @@ fn issue_157_exact_file_precedence_is_a_resolution_dependency() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     fixture(root.path());
+    // Exercise actual TypeScript extension precedence: .ts wins over .tsx.
+    // An extensionless artifact is not a competing TypeScript source module.
+    std::fs::rename(root.path().join("leaf.ts"), root.path().join("leaf.tsx")).unwrap();
     let state = state(root.path(), false);
     expect(&state, root.path(), &[("Shared", "Directive")]);
-    write(root.path(), "leaf", &leaf("Pipe"));
+    write(root.path(), "leaf.ts", &leaf("Pipe"));
     expect(&state, root.path(), &[("Shared", "Pipe")]);
-    std::fs::remove_file(root.path().join("leaf")).unwrap();
+    std::fs::remove_file(root.path().join("leaf.ts")).unwrap();
     expect(&state, root.path(), &[("Shared", "Directive")]);
 }
 
@@ -191,10 +196,22 @@ fn issue_157_warm_query_reuses_compilation_and_ignores_unrelated_content() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     fixture(root.path());
+    write(root.path(), "unrelated.ts", "export class Unrelated {}");
+    // Keep this file outside the program and change only its content. Adding a
+    // new program member would legitimately invalidate program membership proof.
+    let config_path = root.path().join("tsconfig.json");
+    let mut config: Value =
+        serde_json::from_str(&std::fs::read_to_string(&config_path).unwrap()).unwrap();
+    config["files"] = json!(["app.module.ts"]);
+    std::fs::write(&config_path, serde_json::to_string(&config).unwrap()).unwrap();
     let state = state(root.path(), false);
     expect(&state, root.path(), &[("Shared", "Directive")]);
     state.reset_test_full_semantic_parses();
-    write(root.path(), "unrelated.ts", "export class Unrelated {}");
+    write(
+        root.path(),
+        "unrelated.ts",
+        "export class ChangedUnrelated {}",
+    );
     expect(&state, root.path(), &[("Shared", "Directive")]);
     assert_eq!(state.test_full_semantic_parses(), 0);
 }
@@ -260,11 +277,13 @@ fn issue_157_durable_projection_retains_and_validates_contributors() {
         .unwrap()
         .unwrap();
     for file in ["shared.ts", "leaf.ts"] {
+        let authority = durable.authority.typescript_authority.as_ref().unwrap();
         assert!(
-            durable
-                .semantic_dependencies
-                .iter()
-                .any(|dependency| dependency.file_path.ends_with(file)),
+            authority.witnesses.iter().any(|witness| matches!(witness,
+                    crate::ir::typescript_resolution::Witness::Content { path, hash }
+                    if path.ends_with(file)
+                        && *hash == crate::cache::content_hash(&std::fs::read(path).unwrap())
+                        && witness.current())),
             "{durable:#?}"
         );
     }

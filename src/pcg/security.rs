@@ -57,8 +57,7 @@ pub(super) fn no_links(path: &Path, allow_missing_leaf: bool) -> Result<()> {
             Err(e)
                 if allow_missing_leaf
                     && i + 1 == count
-                    && e.kind() == std::io::ErrorKind::NotFound =>
-            {}
+                    && e.kind() == std::io::ErrorKind::NotFound => {}
             Err(_) => return Err(Error("source_inaccessible")),
         }
     }
