@@ -1,11 +1,16 @@
 //! Source-owned document admission. SQLite owns admitted graph snapshots/history.
+mod admission;
 mod content;
+mod governance;
+mod governance_state;
 pub mod knowledge;
 mod knowledge_acquisition;
 mod knowledge_query;
 mod knowledge_source;
 mod knowledge_store;
+mod membership;
 mod model;
+pub mod operator;
 mod parse;
 mod profile;
 mod response;
@@ -90,8 +95,10 @@ impl Session {
         capture
             .diagnostics
             .extend(store::missing(&connection, &capture.nodes)?);
+        let governance = governance::prepare(&connection, trusted, &mut capture)?;
+        admission::attach_authorities(&connection, root, &mut capture.diagnostics)?;
         require(capture.diagnostics.is_empty(), "document_invalid")?;
-        store::publish(&connection, trusted, &capture.nodes)?;
+        store::publish(&connection, trusted, &capture.nodes, governance.as_ref())?;
         Ok(Some(Guard {
             trusted,
             capture,
@@ -163,9 +170,16 @@ impl Session {
         capture
             .diagnostics
             .extend(store::missing(&tx, &capture.nodes)?);
+        let governance = governance::prepare(&tx, trusted, &mut capture)?;
+        admission::attach_authorities(&tx, &q.workspace_root, &mut capture.diagnostics)?;
         let valid = capture.diagnostics.is_empty();
         let generation = if valid {
-            Some(store::publish(&tx, trusted, &capture.nodes)?)
+            Some(store::publish(
+                &tx,
+                trusted,
+                &capture.nodes,
+                governance.as_ref(),
+            )?)
         } else {
             store::head(&tx)?
         };
@@ -247,3 +261,39 @@ mod knowledge_cases;
 #[cfg(test)]
 #[path = "../../tests/pcg/knowledge_migration.rs"]
 mod knowledge_migration;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_admission_diagnostics.rs"]
+mod admission_diagnostics;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_admission_authority.rs"]
+mod admission_authority;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governed_membership.rs"]
+mod governed_membership;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governance_bootstrap.rs"]
+mod governance_bootstrap;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governance_operator.rs"]
+mod governance_operator;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governance_lifecycle.rs"]
+mod governance_lifecycle;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governance_associations.rs"]
+mod governance_associations;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_admission_rule_components.rs"]
+mod admission_rule_components;
+
+#[cfg(test)]
+#[path = "../../tests/pcg/document_governance_work.rs"]
+mod governance_work;

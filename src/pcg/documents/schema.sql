@@ -1,4 +1,4 @@
-CREATE TABLE document_schema(version INTEGER PRIMARY KEY CHECK(version=2),profile TEXT NOT NULL);
+CREATE TABLE document_schema(version INTEGER PRIMARY KEY CHECK(version=3),profile TEXT NOT NULL);
 CREATE TABLE document_source(
  path TEXT NOT NULL,sha TEXT NOT NULL,body BLOB NOT NULL,
  PRIMARY KEY(path,sha)
@@ -45,4 +45,13 @@ CREATE TABLE knowledge_component(
 CREATE INDEX knowledge_role ON knowledge_component(role,label,revision,ordinal);
 CREATE VIRTUAL TABLE knowledge_search USING fts5(
  id UNINDEXED,revision UNINDEXED,ordinal UNINDEXED,origin UNINDEXED,label UNINDEXED,text
+);
+CREATE TABLE document_governance_authorization(
+ digest TEXT PRIMARY KEY,workspace TEXT NOT NULL,predecessor_g TEXT
+);
+CREATE TABLE document_governance_publication(
+ g TEXT PRIMARY KEY,state TEXT NOT NULL,state_digest TEXT NOT NULL,
+ authorization_digest TEXT,predecessor_g TEXT,
+ FOREIGN KEY(g) REFERENCES document_generation(g),
+ FOREIGN KEY(authorization_digest) REFERENCES document_governance_authorization(digest)
 );

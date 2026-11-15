@@ -35,6 +35,7 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 
 <!-- pcg:INV.INVOCATION_002:end -->
 <!-- pcg:INV.INVOCATION_003:begin -->
+<!-- pcg:INV.INVOCATION_003-policy:begin -->
 ### INVOCATION-003 Exact C# Calls Use Capability-Gated Artifact Authority
 
 | Property | Value |
@@ -45,10 +46,13 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 9
 | **Fidelity preservation** | Exact-call projection may strengthen exact-call evidence, but it preserves each artifact publication's semantic fidelity. Preparing Calls authority never upgrades a Low or Medium projection to High. A later explicit higher-fidelity request remains the only authority for that upgrade. Dirty Calls authority does not make independently current TypeRef evidence inadequate. |
 | **Boundary** | Retained invocation evidence remains source-bound under INVOCATION-001 and is owned only by the in-session artifact store; artifacts are not durable persistence. Exact-call currentness is capability-scoped through `CSharpAuthorityFingerprint`, not modeled as per-edge all-authority-file dependencies. Provider availability and query target identity do not participate in semantic truth or the fingerprint. |
 | **Enforcement** | `SemanticCompilationArtifact` is the compiler return boundary. `CSharpCallAuthorityState` owns artifacts and dirty/current generation state; query preparation is the sole exact-call capability gate; `WorkspaceIndex` separately owns capability coverage. Structural work counters pin K-only compilation, zero eager TypeRef projection, artifact-backed projection, one manifest per generation, and O(1) warm currentness. Lifecycle, artifact-reconciliation, fingerprint, ambiguity, deletion/restore, and fidelity regressions enforce fail-closed behavior. |
+<!-- pcg:INV.INVOCATION_003-policy:end -->
 | **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 5. |
+<!-- pcg:INV.INVOCATION_003-obligations:begin -->
 | **Authority** | `src/ir/csharp_exact_calls.rs`; `src/mcp/semantic_compilation/`; `src/mcp/csharp_calls/`; `src/workspace/index/capability_coverage.rs`; `src/tests/mcp/issue_144_performance_work_counts.rs`; `src/tests/mcp/csharp_call_authority_lifecycle.rs`; `src/tests/mcp/csharp_call_artifact_reconciliation.rs`; `src/tests/mcp/csharp_call_authority_fingerprint.rs` |
 | **Type** | ENFORCED |
 | **Gate** | Focused Issue #144 artifact, parallelism, lifecycle, reconciliation, fingerprint, and work-count regressions; then the authoritative Final Verification Gate. |
+<!-- pcg:INV.INVOCATION_003-obligations:end -->
 
 ---
 
@@ -85,7 +89,9 @@ preserves:
 note: Current source-described contract; no witness execution or independent certification is inferred.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#INV.INVOCATION_003
+  - statement self#INV.INVOCATION_003-policy
+  - verification_obligation self#INV.INVOCATION_003-obligations
+  - observation:source self#INV.INVOCATION_003
   - qualification self#family-standing
 ```
 

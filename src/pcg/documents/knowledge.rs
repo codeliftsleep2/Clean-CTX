@@ -209,9 +209,16 @@ impl Session {
         capture
             .diagnostics
             .extend(store::missing(&tx, &capture.nodes)?);
+        let governance = super::governance::prepare(&tx, trusted, &mut capture)?;
+        super::admission::attach_authorities(&tx, &q.workspace_root, &mut capture.diagnostics)?;
         let valid = capture.diagnostics.is_empty();
         let generation = if valid {
-            Some(store::publish_knowledge(&tx, trusted, &capture.nodes)?)
+            Some(store::publish_knowledge(
+                &tx,
+                trusted,
+                &capture.nodes,
+                governance.as_ref(),
+            )?)
         } else {
             store::head(&tx)?
         };

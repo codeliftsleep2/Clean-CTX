@@ -1,5 +1,7 @@
 # ANGULAR GUARD KINDS
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -9,6 +11,8 @@ Original source checkpoint (historical evidence, not a fresh gate):
 > Source-described approved bounded contract
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
+
+<!-- pcg:B11-standing:end -->
 
 ## Production and public-contract disposition requested
 
@@ -24,6 +28,8 @@ public interpretation before implementation. Options:
 
 Recommended exact public mapping (names are a proposed contract, not implemented):
 
+
+<!-- pcg:B11-governing-1:begin -->
 | Ordinary field | Canonical relation | Target meaning |
 | --- | --- | --- |
 | canActivate | GuardedBy (existing generation-76 behavior unchanged) | Existing exact runtime declaration as written Guard use |
@@ -31,7 +37,11 @@ Recommended exact public mapping (names are a proposed contract, not implemented
 | canDeactivate | GuardedByCanDeactivate | Same written-use classification |
 | canLoad | GuardedByCanLoad | Same written-use classification, no runtime/version/deprecation claim |
 | canActivateChild | GuardedByCanActivateChild | Same written-use classification, not inherited applicability |
+<!-- pcg:B11-governing-1:end -->
 
+
+
+<!-- pcg:B11-governing-2:begin -->
 Under this option, canonical GuardedBy is NOT an additional all-kind summary row:
 retain its accepted canActivate branch only. Each new relation exposes exactly its
 own field. Generic noncanonical GuardedBy outside admitted ownership stays legacy;
@@ -50,9 +60,13 @@ demanded-and-runtime-reference/source-hash/witness proof in producer and admissi
 Broad resolvable runtime functions/typed values/classes/other values are eligible
 only as written use, independently of actual guard suitability. Preserve proved
 slots when siblings refuse; duplicate mappings and unproved/unsupported slots
-cannot borrow another field's endpoint. These choices require explicit approval
+cannot borrow another field's endpoint.
+<!-- pcg:B11-governing-2:end -->
+ These choices require explicit approval
 for the four new kinds; generation-76 alone does not authorize them.
 
+
+<!-- pcg:B11-governing-3:begin -->
 Recommend selective REPLACE of only each migrated field's weak contribution inside
 the shared native typed-const Routes object envelope, even when canonical proof
 refuses. No owned downgrade or old+new duplicate fact. The current parser retains
@@ -69,14 +83,22 @@ Relation-specific admission must replay the exact field for that relation; valid
 canActivate evidence must never admit GuardedByCanMatch or another kind. Existing
 Object/Array/Reference/Declaration and witness lifecycle suffice as demonstrated
 neutral evidence; no new retained payload is currently shown necessary.
+<!-- pcg:B11-governing-3:end -->
+
 
 Request semantic generation 76 to 77 for the public relation/identity interpretation,
-with marker/pipeline unchanged. No durable-format bump is proposed absent actual
+with marker/pipeline unchanged.
+<!-- pcg:B11-governing-4:begin -->
+No durable-format bump is proposed absent actual
 encoding need; preserve existing enum representations/ordinals when adding variants
 and return if the concrete storage codec requires a new disposition. No global
 EntityRef equality, acquisition/discovery, cache/registry/lifecycle or runtime
 applicability change is proposed.
+<!-- pcg:B11-governing-4:end -->
 
+
+
+<!-- pcg:B11-governing-5:begin -->
 After approval: isolate/restore all valid RED/collision bytes, then explicitly
 update the approved relation/multiplicity oracle and collision control for the new
 contract. Batch all reference forms, same-target same/different fields, partial/
@@ -87,6 +109,8 @@ and focused preservation checks, clean lint, then one consolidated bounded binar
 checkpoint. Keep original observations as evidence of the intentional compatibility
 change. Operator owns execution; performance remains deferred and final Claude
 field remains last. No broad issue closure follows.
+<!-- pcg:B11-governing-5:end -->
+
 
 The neutral approval explicitly withholds new projection/admission, kind meaning,
 public vocabulary/equality, replacement and generation advance. AGENTS.md's
@@ -99,9 +123,13 @@ Source: [docs/agent/ISSUE_162_ROUTE_GUARD_KINDS_DECISION.md](../../agent/ISSUE_1
 
 ## Generation-77 production/public approval applied; authored, UNRUN
 
+
+<!-- pcg:B11-governing-6:begin -->
 The owner explicitly approves the four kind-qualified relations and exact per-kind
 support policy, broad written-use targets, partial-slot preservation, field-specific
-retained admission and selective owned replacement. Semantic generation is now 77.
+retained admission and selective owned replacement.
+<!-- pcg:B11-governing-6:end -->
+ Semantic generation is now 77.
 Historical pending requests below are superseded by that approval. No additional
 approval is required inside this implementation boundary.
 
@@ -181,5 +209,12 @@ deepens:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:mapping self#B11-governing-1
+  - constraint:membership self#B11-governing-2
+  - constraint:replacement self#B11-governing-3
+  - constraint:compatibility self#B11-governing-4
+  - verification_obligation:exit self#B11-governing-5
+  - qualification:accepted_scope self#B11-governing-6
+  - observation:source self#whole
 ```

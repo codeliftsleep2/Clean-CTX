@@ -57,16 +57,20 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 3
 
 <!-- pcg:MCP-002:end -->
 <!-- pcg:MCP-003:begin -->
+<!-- pcg:MCP-003-policy:begin -->
 ### MCP-003 Batched Context Reads Reuse One Authoritative File Evaluator
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Reading several independently useful source files in one MCP call must reduce repeated tool invocation, setup, and caller-orchestration overhead without creating a second compilation lifecycle, hiding item failures, weakening exact-text authority, or implying a cross-file transaction. Callers may avoid compatibility mirroring only through an explicit projection suited to a verified host. |
 | **Invariant** | `provide_code_context` accepts exactly one of singular `filePath` or batched `files`. A batch contains at most eight ordered items with unique non-empty IDs, shares top-level workspace/tokenizer scope, and evaluates items sequentially through the same typed single-file evaluator used by the legacy form. Successful items retain normal per-file persistence/publication/statistics effects. Batch-only `responseMode` resolves to `mirrored` when omitted, `structured`, or `indexed`, and the response declares `response_mode`. Mirrored places exact text in both each successful item's `content` and a `content_index`-identified top-level block. Structured places it only in the item and emits a routing notice. Indexed places it only in the indexed top-level block. Item failures remain ordered structured errors with no content and never suppress successful siblings. Later items resolving to an already evaluated canonical file fail locally so focus-sensitive state is never order-dependent. The outer cache identity includes the selected mode and covers the ordered successful blocks. An all-failure batch emits one non-authoritative fallback text block solely to preserve the non-empty MCP envelope; no item points to it. Batching grants no rollback, aggregate truncation, concurrency, retry, or cross-file edit authority. |
+<!-- pcg:MCP-003-policy:end -->
 | **Enforcement** | Structural separation in `src/mcp/tool_handlers/core/provide/{evaluate,batch,outcome}.rs`; public schema in `src/mcp/tool_schemas.rs` and `src/mcp/tools.rs`; tracked dispatch regressions in `src/tests/mcp/provide_code_context_batch.rs` cover request shape, ordered mixed modes, legacy parity, each exact placement contract, isolated failures, duplicate canonical files, all-failure envelope validity, and truthful token accounting. `src/tests/mcp/provide_code_context_response_mode_economics.rs` verifies distinct reusable mode-scoped cache identities and reports 2/4/8-item serialized sizes. |
+<!-- pcg:MCP-003-obligations:begin -->
 | **Authority** | `provide::evaluate::evaluate` owns the complete per-file lifecycle; `provide::batch` owns only structural validation, shared-field projection, ordered coordination, and the outer response/cache envelope. |
 | **Type** | STRUCTURAL and ENFORCED (test) |
 | **Gate** | `cargo test --all-features provide_code_context_batch_tests` and `cargo test --all-features response_modes_have_distinct_reusable_cache_identities_and_measured_sizes -- --nocapture` |
+<!-- pcg:MCP-003-obligations:end -->
 
 ---
 
@@ -165,17 +169,31 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 1
 
 <!-- pcg:INV.CSHARP_RESOLUTION_001:end -->
 <!-- pcg:DOTNET-001:begin -->
+<!-- pcg:DOTNET-001-policy:begin -->
 ### DOTNET-001 Framework Role Identity Is Independent of Relationship Evidence
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Clean-CTX durably expresses a proven framework role independently of whether that role currently has relationship payload. |
 | **Invariant** | A resolved framework role may register a file-provenanced semantic occurrence independently of `HasEntity`, mappings, hub targets, routes/actions, or tests. Role registration never becomes source declaration authority or graph adjacency; `builtin/Class` remains the C# declaration. A role alone cannot fabricate relationship payload. DbContext and Controller publish explicit role occurrences; relationship-bearing Profile/Hub projections retain their resolved-role authorization even when their current payload is empty. |
-| **Lifecycle** | Role and relationship projections use the same admitted-source resolution generation described by CSHARP-RESOLUTION-001. Publication, replacement, refresh, deletion, rename, warm reuse, partial composition, alias/ancestry changes, producer compatibility, and same-name owner identity use `WorkspaceIndex` owner lifecycle and generation reconciliation. .NET semantic producer generation 7 owns the current projection. |
+<!-- pcg:DOTNET-001-policy:end -->
+
+**Lifecycle:**
+
+
+<!-- pcg:DOTNET-001-lifecycle:begin -->
+Role and relationship projections use the same admitted-source resolution generation described by CSHARP-RESOLUTION-001. Publication, replacement, refresh, deletion, rename, warm reuse, partial composition, alias/ancestry changes, producer compatibility, and same-name owner identity use `WorkspaceIndex` owner lifecycle and generation reconciliation.
+<!-- pcg:DOTNET-001-lifecycle:end -->
+ .NET semantic producer generation 7 owns the current projection.
+
+| Property | Value |
+|----------|-------|
 | **Enforcement** | `src/dotnet_meta/semantic.rs` owns framework interpretation; `src/mcp/semantic_compilation/artifact.rs` retires and rebuilds generation-owned facts; `src/workspace/index/edges.rs` normalizes role registrations into non-declaration occurrences. R6-R12 tracked suites pin role/payload independence, fail-closed resolution, lifecycle, cross-consumer isolation, and history/provider convergence. |
+<!-- pcg:DOTNET-001-obligations:begin -->
 | **Authority** | CSHARP-RESOLUTION-001; `src/dotnet_meta/semantic.rs`; `src/mcp/semantic_compilation/artifact.rs`; `src/workspace/index/edges.rs` |
 | **Type** | STRUCTURAL and ENFORCED (test) |
 | **Gate** | Focused R6-R12 regressions, then the authoritative Final Verification Gate |
+<!-- pcg:DOTNET-001-obligations:end -->
 
 ---
 
@@ -233,7 +251,9 @@ artifact: docs/invariants/framework-and-tooling.md
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#MCP-003
+  - statement self#MCP-003-policy
+  - verification_obligation self#MCP-003-obligations
+  - observation:source self#MCP-003
   - qualification self#family-standing
 ```
 
@@ -283,7 +303,10 @@ preserves:
 note: Current source-described contract; no witness execution or independent certification is inferred.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#DOTNET-001
+  - statement self#DOTNET-001-policy
+  - verification_obligation self#DOTNET-001-obligations
+  - constraint:lifecycle self#DOTNET-001-lifecycle
+  - observation:source self#DOTNET-001
   - qualification self#family-standing
 ```
 
@@ -337,4 +360,6 @@ knowledge_content:
   - statement self#INV.ANG_TPL_002
   - qualification self#family-standing
 ```
+
+
 <!-- pcg:DOTNET-001:end -->

@@ -1,5 +1,7 @@
 # ANGULAR NESTED CONFIG
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,12 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
 ## Concrete production request after observed evidence
 
+
+<!-- pcg:B11-1:begin -->
 Approve native typed const merge-result declarations as direct ordinary named
 inputs alongside existing native typed const object configs, reusing the existing
 result_args role proof. Require the exact outer argument-to-input DeclarationId
@@ -26,24 +32,38 @@ is independently proved. The observed native model supplies those prerequisites;
 no new recursive traversal is necessary. The graph can be cyclic without a
 recursive edge-emission algorithm. Refuse invalid/foreign producer roles while
 preserving valid leaf/direct siblings. Do not infer initialization success.
+<!-- pcg:B11-1:end -->
+
 
 The earliest demonstrated refusal remains the Object-only input initializer guard
 in config_composition::project; result_args already proves the native merge role
 independently. Shared producer/admission can consume Object OR independently proved
 merge-result input role without graph traversal or transitive/provider expansion.
+
+<!-- pcg:B11-2:begin -->
 No arbitrary aliases, inferred/mutable values or inline merge expressions follow.
+<!-- pcg:B11-2:end -->
+
 
 Existing neutral demanded declaration/type/initializer/call/argument evidence
 retains the demonstrated inner and outer chains, including repeated positions.
+
+<!-- pcg:B11-3:begin -->
 Source-owned publication must continue to emit only each owner's own initializer
 pairs; imported role proof does not publish imported inner edges as outer facts.
+
+<!-- pcg:B11-3:end -->
 SQLite/index restoration, stale dependency refusal/repair and independent inner/
-outer/caller retirement for the new input role remain UNVERIFIED. They are required
+outer/caller retirement for the new input role remain UNVERIFIED.
+<!-- pcg:B11-4:begin -->
+They are required
 integrated exit controls after approval, alongside forged/borrowed proof, same-name
 joins, all existing config/bootstrap/inline/provider preservation and warning-free
 checks. Semantic compatibility must advance; generic durable encoding changes only
 if actual representation changes require it. One later major binary checkpoint;
 operator owns runtime, Claude last. No P1/P3/AQ14/W04/#162 closure follows.
+<!-- pcg:B11-4:end -->
+
 
 The supplied disposition withheld production input-role/cycle semantics pending
 these observations. Explicit production approval is now requested for this bounded
@@ -54,8 +74,12 @@ Source: [docs/agent/ISSUE_162_NESTED_CONFIG_INPUT_DECISION.md](../../agent/ISSUE
 
 ## Approved generation-71 implementation checkpoint, UNRUN
 
+
+<!-- pcg:B11-5:begin -->
 The supplied owner approval authorizes independently proved named native merge
-results as direct inputs and written self/same-file/multi-file cycle edges. The
+results as direct inputs and written self/same-file/multi-file cycle edges.
+<!-- pcg:B11-5:end -->
+ The
 two unchanged investigation files (ten REDs plus the GREEN foreign-producer control)
 and their registration were isolated as raw bytes under
 target/issue-162/nested-config-approved-isolation/ before repair, then restored
@@ -103,5 +127,11 @@ deepens:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-1
+  - constraint:unsupported self#B11-2
+  - constraint:ownership self#B11-3
+  - verification_obligation:exit self#B11-4
+  - qualification:accepted_scope self#B11-5
+  - observation:source self#whole
 ```

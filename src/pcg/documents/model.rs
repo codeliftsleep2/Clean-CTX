@@ -69,6 +69,28 @@ pub struct Diagnostic {
     pub path: String,
     pub node: Option<String>,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<DiagnosticLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub observed: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub admission_disposition: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accepted_publication: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub governing_authority: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub change_descriptor: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_digest: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub authorization_assurance: Option<&'static str>,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct DiagnosticLocation {
+    pub line: usize,
+    pub column: usize,
+    pub field: String,
 }
 impl Diagnostic {
     pub fn new(code: &str, path: &str, node: Option<&str>, message: &str) -> Self {
@@ -77,7 +99,27 @@ impl Diagnostic {
             path: path.into(),
             node: node.map(str::to_owned),
             message: message.into(),
+            location: None,
+            observed: None,
+            admission_disposition: None,
+            accepted_publication: None,
+            governing_authority: None,
+            change_descriptor: None,
+            authorization_digest: None,
+            authorization_assurance: None,
         }
+    }
+
+    pub fn at_field(mut self, line: usize, column: usize, field: &str, observed: &str) -> Self {
+        self.location = Some(DiagnosticLocation {
+            line,
+            column,
+            field: field.into(),
+        });
+        self.observed = Some(observed.into());
+        self.admission_disposition = Some("rejected");
+        self.accepted_publication = Some(false);
+        self
     }
 }
 pub struct Candidate {

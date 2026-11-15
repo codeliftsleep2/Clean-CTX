@@ -1,3 +1,4 @@
+<!-- pcg:TOOLING-selection:begin -->
 # Tooling: MCP / Code-Context Tool Selection & Workflow
 
 This document is the **authoritative operational guide** for choosing and
@@ -706,7 +707,19 @@ verification guidance.
 
 ---
 
+<!-- pcg:TOOLING-selection:end -->
+<!-- pcg:TOOLING-current-verification:begin -->
 ## 10. Verification Workflow
+
+B11 owner disposition 04, effective 2026-11-13: the consolidated full repository
+gate is CI-owned. Do not run it locally or hand it to the operator as a required
+local step. Focused tests, scoped linting, production builds and repository guards
+remain applicable, with operator execution under Rule #1. The correctness standard
+and final verification obligation are unchanged; report actual CI results and do
+not claim a pending CI gate passed. The current requirements are owned by
+[verification](verification.md). The earlier execution table and commands below
+remain historical instructions, not current execution authorization.
+<!-- pcg:TOOLING-current-verification:end -->
 
 | Phase | Tool | What It Confirms |
 |-------|------|------------------|
@@ -736,6 +749,7 @@ For non-Rust projects, use the equivalent language-specific tools.
 
 ---
 
+<!-- pcg:TOOLING-antipatterns:begin -->
 ## 11. Antipatterns — Do Not
 
 ### ❌ Do Not default to `read_files` for source code
@@ -810,6 +824,7 @@ returns rather than reconstructing it.
 These are not CBM proxy tool names. They are implemented internally via
 `query_graph` Cypher. The proxy will not forward them correctly.
 
+<!-- pcg:TOOLING-antipatterns:end -->
 ```architecture-graph
 node: AUTH.TOOL_WORKFLOW
 kind: AUTHORITY
@@ -826,5 +841,8 @@ preserves:
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:tools self#TOOLING-selection
+  - statement self#TOOLING-current-verification
+  - constraint:antipatterns self#TOOLING-antipatterns
+  - historical_applicability:source self#whole
 ```

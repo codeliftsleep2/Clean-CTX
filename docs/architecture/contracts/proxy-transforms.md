@@ -1,3 +1,4 @@
+<!-- pcg:PROXY-transform-contract:begin -->
 # Proxy request transformation boundary
 
 Agent: Agent MaxHeadRoom. Current contract extracted in B2 from the sources below. Original chronology and implementation evidence remain in the linked source records. IMPLEMENTED records the operative source contract, not new validation.
@@ -41,13 +42,30 @@ The proxy follows the same proven strategy as [Pino](https://github.com/esetnik/
 - **Messages[0] slot** caches the first user message content
 - **Tail slot** is a rolling cache that moves forward with each conversation turn
 
+<!-- pcg:PROXY-client-cache-policy:begin -->
+Owner disposition 05, 2026-11-13: with Anthropic auto-cache enabled, existing
+client `cache_control` breakpoints are preserved and automatic injection is
+skipped; injection applies when no client breakpoints exist. Client-supplied
+breakpoints take precedence over Clean-CTX's automatic injection strategy.
+All other existing injection prerequisites, provider restrictions and applicability
+qualifications remain in force. This reconciles the current policy with
+[cache hints](cache-hints.md); it authorizes no proxy behavior change.
+<!-- pcg:PROXY-client-cache-policy:end -->
+<!-- pcg:PROXY-transform-contract:end -->
+
+<!-- pcg:PROXY-superseded-stripping:begin -->
+Historical statement, superseded by owner disposition 05 and no longer controlling:
+
 Any existing `cache_control` headers sent by the client are stripped first to avoid conflicts.
+<!-- pcg:PROXY-superseded-stripping:end -->
 
 
 Source: [docs/PROXY.md](../../PROXY.md); original section SHA-256 `1283d4f119d9975fc5d93b336ec0ed50f3701d29fcd0f65266568e5045ae6db6`. Original wording and tense are retained; admission is limited to the implemented scope described here.
 
 
+<!-- pcg:PROXY-transform-limits:begin -->
 The ordered pipeline also has optional aging where configured, as recorded in [the pipeline audit](../../agent/AF_PERF_002_PROXY_SCRUB_DISCOVERY.md). Logging has a separate fail-closed scrub boundary; this request contract does not certify logging.
+<!-- pcg:PROXY-transform-limits:end -->
 
 ```architecture-graph
 node: AUTH.PROXY_TRANSFORMS
@@ -61,5 +79,9 @@ preserves:
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement self#PROXY-transform-contract
+  - constraint:client_breakpoints self#PROXY-client-cache-policy
+  - qualification:limits self#PROXY-transform-limits
+  - historical_applicability:superseded_stripping self#PROXY-superseded-stripping
+  - observation:source self#whole
 ```

@@ -12,6 +12,8 @@ registered lifecycle.
 - [`IR_ARCHITECTURE_LOCKDOWN_PLAN.md`](IR_ARCHITECTURE_LOCKDOWN_PLAN.md)
 - [`IR_PROJECTION_RECONNAISSANCE_REPORT.md`](IR_PROJECTION_RECONNAISSANCE_REPORT.md)
 
+
+<!-- pcg:B11-authority-1:begin -->
 ## 1. Governing invariant
 
 For every valid supported `CompiledIR` value:
@@ -49,6 +51,8 @@ Phase 8 changes the canonical binary serialization only. It does not change:
 
 The physical binary version is `0x04`. Calling this format “binary V2” is
 incorrect because it can be confused with physical version `0x02`.
+
+<!-- pcg:B11-authority-1:end -->
 
 ## 3. Current `0x03` inventory
 
@@ -112,12 +116,18 @@ That code is not evidence of a supported persisted input:
 - existing tests construct current output or assert deliberately lossy
   structural comparisons.
 
+
+<!-- pcg:B11-authority-2:begin -->
 Therefore the corrected decoder supports physical `0x04`. It does not preserve
 a silent compatibility route that fabricates missing semantic
 identity for `0x01`–`0x03`. Those versions return a structured unsupported-
 version error. A future compatibility reader requires concrete artifact
 evidence and separate architectural approval.
 
+<!-- pcg:B11-authority-2:end -->
+
+
+<!-- pcg:B11-authority-3:begin -->
 ## 5. Physical `0x04` layout
 
 The magic remains `0xCC, 0x02`. The next byte is physical version `0x04`.
@@ -232,18 +242,28 @@ them green. Required tracked coverage includes:
 Opcode-only, instruction-count-only, and selective-field comparisons are not
 semantic round-trip evidence.
 
+<!-- pcg:B11-authority-3:end -->
+
 ## 9. Production integration boundary
 
-Phase 8C connects the codec to production persistence. Canonical baselines use
+Phase 8C connects the codec to production persistence.
+<!-- pcg:B11-authority-4:begin -->
+Canonical baselines use
 the durable resolved file path rather than a session-local alias, applied
 `dv: 2` deltas are normalized to that identity, and replay accepts corrected
 sequence deltas plus only the existing structurally applicable legacy input.
 Recompilation transactionally replaces the baseline and stale history;
 deletion/reset clear ownership. Registered-dispatch coverage crosses producer,
 buffer, SQLite, reload, replay, MCP response, and byte-exact `apply_edit`.
+<!-- pcg:B11-authority-4:end -->
 
+
+
+<!-- pcg:B11-authority-5:begin -->
 The Angular template compressor remains a distinct representation without a
-canonical `CompiledIR` producer. Phase 8C removed its empty-IR write rather
+canonical `CompiledIR` producer.
+<!-- pcg:B11-authority-5:end -->
+ Phase 8C removed its empty-IR write rather
 than fabricating canonical semantics. Phase 9 confirmed that no registered
 path persists empty or noncanonical IR in its place.
 
@@ -265,5 +285,10 @@ preserves:
   - IRWIRE-001
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:round_trip self#B11-authority-1
+  - constraint:legacy_inputs self#B11-authority-2
+  - constraint:wire_and_failures self#B11-authority-3
+  - verification_obligation:integration self#B11-authority-4
+  - scope:template_boundary self#B11-authority-5
+  - observation:source self#whole
 ```

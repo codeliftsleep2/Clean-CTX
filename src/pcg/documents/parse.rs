@@ -1,13 +1,65 @@
 use super::model::{Declaration, Diagnostic, RELATIONS, Relationship};
 use std::collections::BTreeMap;
 
+/// Locate a field only inside its exact source-owned declaration fence. Fences
+/// nested in illustrative examples are inert, matching declaration parsing.
+pub(super) fn field_location(bytes: &[u8], id: &str, field: &str) -> Option<(usize, usize)> {
+    let text = std::str::from_utf8(bytes).ok()?;
+    let mut fence: Option<(char, usize, bool)> = None;
+    let mut selected_id = None;
+    let mut location = None;
+    for (offset, line) in text.lines().enumerate() {
+        let marker = line.chars().next().filter(|c| *c == '`' || *c == '~');
+        let count = marker.map_or(0, |c| line.chars().take_while(|x| *x == c).count());
+        if let Some((ch, length, selected)) = fence {
+            if marker == Some(ch) && count >= length && line[count..].trim().is_empty() {
+                if selected && selected_id == Some(id) {
+                    return location;
+                }
+                fence = None;
+                selected_id = None;
+                location = None;
+            } else if selected && let Some((key, value)) = line.split_once(':') {
+                if key == "node" {
+                    selected_id = Some(value.trim());
+                }
+                if key == field {
+                    location = Some((offset + 1, 1));
+                }
+            }
+        } else if count >= 3 {
+            fence = Some((marker?, count, line[count..].trim() == "architecture-graph"));
+        }
+    }
+    None
+}
+
 /// GLS flat scalar/block-list subset, not YAML and not a second metadata format.
-fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
-    let error = |message: &str| Diagnostic::new("E_MALFORMED_DECLARATION", path, None, message);
+fn block(path: &str, text: &str, first_line: usize) -> Result<Declaration, Box<Diagnostic>> {
+    let error = |message: &str| {
+        Box::new(Diagnostic::new(
+            "E_MALFORMED_DECLARATION",
+            path,
+            None,
+            message,
+        ))
+    };
     let mut scalars = BTreeMap::<String, String>::new();
     let mut edges = BTreeMap::<String, Vec<String>>::new();
     let mut list: Option<String> = None;
-    for raw in text.lines() {
+    for (offset, raw) in text.lines().enumerate() {
+        let error = |message: &str| {
+            let (field, observed) = raw.split_once(':').unwrap_or(("", raw));
+            Box::new(
+                Diagnostic::new(
+                    "E_MALFORMED_DECLARATION",
+                    path,
+                    scalars.get("node").map(String::as_str),
+                    message,
+                )
+                .at_field(first_line + offset, 1, field.trim(), observed.trim()),
+            )
+        };
         if raw.trim().is_empty() || raw.trim_start().starts_with('#') {
             continue;
         }
@@ -125,8 +177,15 @@ fn block(path: &str, text: &str) -> Result<Declaration, Diagnostic> {
 }
 
 /// Multiple declarations per artifact are supported; nested illustrative fences are inert.
-pub fn declarations(path: &str, bytes: &[u8]) -> Result<Vec<Declaration>, Diagnostic> {
-    let error = |message| Diagnostic::new("E_MALFORMED_DECLARATION", path, None, message);
+pub fn declarations(path: &str, bytes: &[u8]) -> Result<Vec<Declaration>, Box<Diagnostic>> {
+    let error = |message| {
+        Box::new(Diagnostic::new(
+            "E_MALFORMED_DECLARATION",
+            path,
+            None,
+            message,
+        ))
+    };
     if bytes.starts_with(&[0xef, 0xbb, 0xbf]) {
         return Err(error("Save strict UTF-8 without BOM"));
     }
@@ -134,13 +193,14 @@ pub fn declarations(path: &str, bytes: &[u8]) -> Result<Vec<Declaration>, Diagno
     let mut fence: Option<(char, usize, bool)> = None;
     let mut content = String::new();
     let mut found = Vec::new();
-    for line in text.lines() {
+    let mut first_line = 1;
+    for (offset, line) in text.lines().enumerate() {
         let marker = line.chars().next().filter(|c| *c == '`' || *c == '~');
         let count = marker.map_or(0, |c| line.chars().take_while(|x| *x == c).count());
         if let Some((c, n, selected)) = fence {
             if marker == Some(c) && count >= n && line[count..].trim().is_empty() {
                 if selected {
-                    found.push(block(path, &content)?);
+                    found.push(block(path, &content, first_line)?);
                 }
                 fence = None;
                 content.clear();
@@ -149,6 +209,7 @@ pub fn declarations(path: &str, bytes: &[u8]) -> Result<Vec<Declaration>, Diagno
                 content.push('\n');
             }
         } else if count >= 3 {
+            first_line = offset + 2;
             fence = Some((
                 marker.expect("marker"),
                 count,

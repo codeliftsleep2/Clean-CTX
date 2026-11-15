@@ -2,10 +2,16 @@
 
 Agent: **Agent MaxHeadRoom**. Current focused owner of the operative source-described contract. IMPLEMENTED does not certify enforcement, independent acceptance or language completeness.
 
-Scope: existing SourceDependencyClosure ancestry/attribute acquisition and retained/context consumers. This is not EF model-membership closure, a universal C# compiler, or a new neutral capability. The numbered list preserves the dated implementation record, including generation transitions. Its current policy is compatibility-bound publication and proof, not a requirement to reset a producer to a historical number. The original receipt attributes 392/392 MCP checks and operator GREEN; full gate and original-workspace Claude acceptance remain unestablished by that receipt.
+
+<!-- pcg:B11-authority-1:begin -->
+Scope: existing SourceDependencyClosure ancestry/attribute acquisition and retained/context consumers. This is not EF model-membership closure, a universal C# compiler, or a new neutral capability. The numbered list preserves the dated implementation record, including generation transitions. Its current policy is compatibility-bound publication and proof, not a requirement to reset a producer to a historical number.
+<!-- pcg:B11-authority-1:end -->
+ The original receipt attributes 392/392 MCP checks and operator GREEN; full gate and original-workspace Claude acceptance remain unestablished by that receipt.
 
 ## Production components changed
 
+
+<!-- pcg:B11-authority-2:begin -->
 1. Canonical C# dependency obligations in
    `src/ir/csharp_resolution/compilation/dependencies.rs` now include class and
    method attribute references, exact written and suffix discovery hints, aliases,
@@ -28,9 +34,13 @@ Scope: existing SourceDependencyClosure ancestry/attribute acquisition and retai
    index retains its acquired High evidence instead of being overwritten by a
    lower-fidelity rendering. Existing durable persistence receives the consulted
    footprint; existing compatibility validation rejects stale dependency hashes.
+
+<!-- pcg:B11-authority-2:end -->
    C# semantic producer generation advances from 4 to 5 so older snapshots lacking
    the new lifecycle evidence do not remain compatible. Canonical and unrelated
    language producer generations are unchanged.
+
+<!-- pcg:B11-authority-3:begin -->
 4. Typed PublicationStamp validation is shared by dependency evidence, workspace
    prepared evaluators, and provided contexts. Workspace batches reprepare stale
    items until all required stamps match the final guarded index. Context batches
@@ -43,13 +53,19 @@ Scope: existing SourceDependencyClosure ancestry/attribute acquisition and retai
    explicitly allow the bounded dependency string codes already used by the frozen
    supplemental tests. `dependency_proof` is registered as complete with a string
    generation, or unproven. Implementation and schema use those same forms.
+<!-- pcg:B11-authority-3:end -->
 
+
+
+<!-- pcg:B11-authority-4:begin -->
 Cache reuse checks the current target projection's recorded dependencies as well
 as owner/source, partition, producer, root and publication compatibility. Inventory
 acquisition stabilizes its source generation if reading newly changed sources
 invalidates a previous root observation. A source-current retained artifact can be
 reconciled after a base mutation without recompiling that unchanged owner merely
 because its derived dependency footprint became stale.
+
+<!-- pcg:B11-authority-4:end -->
 
 
 Source: [docs/agent/ISSUE_155_FOCUSED_GREEN_HANDOFF.md](../../agent/ISSUE_155_FOCUSED_GREEN_HANDOFF.md), commit `0d8437cc`; original section SHA-256 `266a4d6eda2b7ed83368ac8f05ea0a49a89688d16b21a70ff2065152094d6214`. Original tense, generation numbers and execution wording retain their dated subjects; they do not assert new verification or current universal support.
@@ -72,5 +88,9 @@ preserves:
 note: Current source-described contract; no witness execution or independent certification is inferred.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:scope self#B11-authority-1
+  - statement:dependencies self#B11-authority-2
+  - constraint:publication self#B11-authority-3
+  - constraint:reuse self#B11-authority-4
+  - observation:source self#whole
 ```

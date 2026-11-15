@@ -1,5 +1,7 @@
 # ANGULAR LAZY COMPONENT
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,12 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
 ## Concrete production lazy disposition requested
 
+
+<!-- pcg:B11-governing-1:begin -->
 Approve RouteMapsTo from the existing exact RouteOccurrence to the canonical
 native Component DeclarationId selected by arrow_selection_at for its unique
 ordinary loadComponent field. Reuse shared native typed const Routes/Object/
@@ -21,6 +27,8 @@ must never substitute for selected-export authority. Producer and retained
 admission must recompute one shared lazy projection. Existing eager projection
 remains exact and distinct; no generic endpoint admission or invocation endpoint
 substitution is proposed.
+<!-- pcg:B11-governing-1:end -->
+
 
 Legacy comparison: the old lazy RouteShape row has path/name/asserting-file
 identity and loses module/export/binding proof and repeated-object multiplicity.
@@ -32,6 +40,8 @@ accepted. No new public relation/field, resolver/cache/registry, EntityRef equal
 or discovery policy is proposed. Advance existing semantic compatibility for the
 changed public identity; durable change only if actual encoding requires it.
 
+
+<!-- pcg:B11-governing-2:begin -->
 Recommended ownership/replacement decision: REPLACE only the loadComponent lazy
 branch for ordinary route objects owned by the exact shared native-root envelope.
 Select by actual object/field provenance before old emission loses origin, never
@@ -42,7 +52,11 @@ is refused or competing. This explicitly retires historical lazy rows for
 unsupported callbacks inside that migrated ownership envelope if the old parser
 happened to emit them; this compatibility effect requires owner approval, not an
 inference from generation 73. Duplicate loadComponent fields must not pick one.
+<!-- pcg:B11-governing-2:end -->
 
+
+
+<!-- pcg:B11-governing-3:begin -->
 PRESERVE AS LEGACY outside shared native ownership, including foreign/mutable/
 untyped roots and unsupported spread containers, without certifying exact lazy
 membership. Alternative: preserve unsupported callback shapes even inside native
@@ -54,7 +68,11 @@ compatibility retirement explicit for review. Preserve eager branch, loadChildre
 guards/resolvers and marker/display behavior. Mixed eager/lazy same-object cases
 and exact private occurrence/index multiplicity must be exit controls, not an
 excuse to alter global equality or silently merge proof contracts.
+<!-- pcg:B11-governing-3:end -->
 
+
+
+<!-- pcg:B11-governing-4:begin -->
 After approval: isolate/restore unchanged valid REDs, implement producer and
 retained lazy admission together, keep eager/lazy old origins separate and batch
 exact forward/reverse/multiplicity/empty/child/same-name/re-export/alias cases;
@@ -64,6 +82,8 @@ queries; stale owner/module/export/barrel/package/config repair and independent
 retirement; cold/warm/refresh/withinPath and lower-bound claims. Reconcile the full
 production acceptance map, warning-free checks, then one major rebuilt-binary
 checkpoint with each suite below 500. Operator owns runtime; Claude field last.
+<!-- pcg:B11-governing-4:end -->
+
 
 The neutral owner disposition explicitly requires returning with this semantic
 RED before production lazy semantics or legacy replacement. AGENTS.md Architectural
@@ -156,5 +176,11 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:membership self#B11-governing-1
+  - constraint:replacement self#B11-governing-2
+  - scope:legacy_and_alternatives self#B11-governing-3
+  - verification_obligation:exit self#B11-governing-4
+  - qualification:accepted_scope docs/agent/ISSUE_162_LAZY_ROUTE_COMPONENT_DECISION.md#B11-LAZY-approved-scope
+  - observation:source self#whole
 ```

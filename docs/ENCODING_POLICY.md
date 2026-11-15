@@ -1,3 +1,5 @@
+
+<!-- pcg:B11-boundary-1:begin -->
 # Encoding Policy: UTF-8 as a Project Invariant
 
 **Authoritative rule:** [`.clinerules/encoding.md`](../.clinerules/encoding.md).
@@ -10,6 +12,8 @@ rule file governs; this page never overrides it.
 > policy for collaborators, CI, and non-Cline contributors, while the
 > `.clinerules` copy remains the live instruction source for agent sessions on
 > machines where it exists. Keep the two in sync when the policy changes.
+
+<!-- pcg:B11-boundary-1:end -->
 
 ## Why encoding is an explicit invariant
 
@@ -67,6 +71,8 @@ Both guards keep their own sources pure ASCII where feasible (escapes,
 codepoint construction) so they cannot be corrupted by the very problem they
 detect.
 
+
+<!-- pcg:B11-boundary-2:begin -->
 ## What to do when mojibake appears
 
 Follow §7 of [`.clinerules/encoding.md`](../.clinerules/encoding.md): stop,
@@ -74,6 +80,8 @@ identify the boundary, recover intended text from git history or known intent,
 fix the boundary (not just the bytes), re-run both guards. Never silently
 replace suspicious characters, and never assume non-ASCII means corruption.
 
+
+<!-- pcg:B11-boundary-2:end -->
 
 ## Root-cause analysis of the 2026-08-28 incident
 
@@ -122,6 +130,8 @@ replace suspicious characters, and never assume non-ASCII means corruption.
 | Agent rule: after ANY file write, verify encoding before committing | 🔧 Added to `.clinerules/encoding.md` §5 |
 | `--no-verify` is FORBIDDEN when encoding guard flags any file | 🔧 Added to `.clinerules/encoding.md` §5 |
 
+
+<!-- pcg:B11-boundary-3:begin -->
 ### How to verify this never recurs
 
 When an agent modifies files:
@@ -136,6 +146,8 @@ When an agent modifies files:
 3. **Commit only after the guard passes**
 4. **Never use `--no-verify`** to bypass the encoding guard. A bypass is a
    project policy violation regardless of justification.
+
+<!-- pcg:B11-boundary-3:end -->
 
 ## Root-cause analysis of the 2026-09 letter-substitution incident
 
@@ -180,5 +192,8 @@ artifact: docs/ENCODING_POLICY.md
 note: Source-attributed exact historical subject and limits retained; no current executable claim, independent certification, reclosure or banking.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:policy_owner self#B11-boundary-1
+  - constraint:recovery self#B11-boundary-2
+  - verification_obligation:guards self#B11-boundary-3
+  - observation:source self#whole
 ```

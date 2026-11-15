@@ -1,5 +1,7 @@
 # ANGULAR BOOTSTRAP REFERENCE
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,6 +12,10 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
+
+<!-- pcg:B11-1:begin -->
 ## Recommended bounded contract
 
 - Admit calls to the exact native public @angular/platform-browser
@@ -53,17 +59,25 @@ precedence/multi, runtime app instance, effective injector visibility, consumer
 satisfaction or AQ14/P3/P1/W04/#162 closure. These remain required broader work,
 not facts silently excluded from a claim of completeness.
 
+<!-- pcg:B11-1:end -->
+
 
 Source: [docs/agent/ISSUE_162_BOOTSTRAP_REFERENCE_DECISION.md](../../agent/ISSUE_162_BOOTSTRAP_REFERENCE_DECISION.md), baseline `ec7067fd`, original section SHA-256 `abb956e1fbf49cce83e1fb2a50b3990746bc3e86df1aa4c4a579af558eaf9e59`.
 
 ## Approved query-bounded discovery implementation authored, UNRUN
 
+
+<!-- pcg:B11-2:begin -->
 The supplied owner approval authorizes conservative TypeScript nomination for the
-exact Angular ApplicationBootstrap/bootstrapApplication forward query. The valid
+exact Angular ApplicationBootstrap/bootstrapApplication forward query.
+<!-- pcg:B11-2:end -->
+ The valid
 regression and its registration were isolated as raw bytes under
 target/issue-162/bootstrap68-refresh-approved-isolation/ before production edits,
 then restored byte-identically. HEAD and the normal index were untouched.
 
+
+<!-- pcg:B11-3:begin -->
 A private bootstrap hydration function reuses configured_roots and source_inventory,
 selects TypeScript owners without a spelling predicate, and feeds existing High
 capture/publication. Only the exact forward identity invokes it. Root exclusions
@@ -71,6 +85,8 @@ and source validation remain in existing inventory/publication code; withinPath
 is not passed to acquisition. Generic literal discovery, native proof and retained
 admission remain unchanged. No new cache, scanner, resolver or lifecycle exists.
 Inventory completion does not supply an acquisition satisfaction/completeness proof.
+
+<!-- pcg:B11-3:end -->
 No retained meaning or durable encoding changed; semantic generation remains 68.
 
 One additional tracked control batches cold and post-refresh direct/alias/barrel/
@@ -99,5 +115,9 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-1
+  - qualification:accepted_scope self#B11-2
+  - constraint:discovery self#B11-3
+  - observation:source self#whole
 ```

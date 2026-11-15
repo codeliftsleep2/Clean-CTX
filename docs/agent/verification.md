@@ -4,6 +4,31 @@ This is the **single authoritative definition of the final verification
 gate**. Do not duplicate these command lists elsewhere; other documents
 reference this one.
 
+<!-- pcg:VERIFICATION-current:begin -->
+## Current execution responsibility — B11 owner disposition 04
+
+Effective 2026-11-13, the consolidated full repository gate belongs to CI.
+Agents must neither execute that gate locally nor hand it to an operator as a
+required local step. This changes execution responsibility, not the correctness
+standard: the complete gate must cover the reported change set and pass before
+final verification or migration completion is claimed. Required architectural
+audit, tracked regressions, zero warnings, encoding, active-file guards and
+bounded-work obligations remain in force. CI failures remain failures to address.
+
+Local verification consists of proportionate focused tests, applicable scoped
+linting, production builds and repository guards. Under Rule #1, agents hand all
+tests, Cargo commands and runtimes to the operator unless the owner explicitly
+authorizes that particular run. Static, fast bounded inspection remains allowed.
+Batch local checks and retain actual receipts; do not repeatedly run an unchanged
+checkpoint. Report focused operator results separately from CI and field evidence.
+Pending or unavailable CI is not a successful final gate.
+
+The older execution instructions below are retained as historical applicability,
+including their command lists. Their local/full-gate responsibility statements
+are superseded prospectively by this section. They are not a current local
+handoff. Previous results retain the circumstances under which they were run.
+<!-- pcg:VERIFICATION-current:end -->
+
 ## Final Verification Gate
 
 The complete gate must cover the reported change set before declaring any task
@@ -26,6 +51,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass ./scripts/check-utf8.ps1
 cargo test --all-features encoding
 ```
 
+<!-- pcg:VERIFICATION-guards:begin -->
 A single warning constitutes a build failure. Do not weaken assertions or
 suppress failures merely to obtain green.
 
@@ -41,6 +67,7 @@ Activating a legacy oversized file is a correctness decision, not a cost
 decision: when the architecturally correct change belongs in an oversized file,
 that file is decomposed semantically as part of the change (engineering rules,
 §8a) rather than the architecture being weakened to avoid it.
+<!-- pcg:VERIFICATION-guards:end -->
 
 
 
@@ -97,6 +124,7 @@ push/PR:
 The local gate above mirrors CI; local verification is belt-and-braces, CI is
 the authoritative release-time enforcement.
 
+<!-- pcg:VERIFICATION-obligations:begin -->
 ## Live acceptance harnesses are not tests
 
 Reusable operator harnesses that drive a built binary over MCP stdio are
@@ -157,6 +185,7 @@ only the declared inspected admission families; #173/#174, uninstrumented witnes
 scaling and snapshot lock behavior remain separate open risks. Static unresolved
 findings require recorded review; they are not proven absence of amplification.
 
+<!-- pcg:VERIFICATION-obligations:end -->
 ```architecture-graph
 node: AUTH.FINAL_VERIFICATION
 kind: AUTHORITY
@@ -167,5 +196,8 @@ artifact: docs/agent/verification.md
 note: Source-attributed bounded subject; historical measurements and execution standing are not current-executable certification.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement self#VERIFICATION-current
+  - constraint:guards self#VERIFICATION-guards
+  - verification_obligation:completion self#VERIFICATION-obligations
+  - historical_applicability:source self#whole
 ```

@@ -104,9 +104,22 @@ In the work report, briefly retain:
 - Any relevant generation/revision/relationship changes and the affected
   conclusions revisited; unrelated generation changes need no new investigation.
 
-No separate review ceremony, semantic conflict engine, watcher, vector service
-or corpus manifest is required. Existing owner authorization still determines
-what actions may proceed; a graph query does not grant that authorization.
+For an activated B11-governed corpus, register new source ownership and exact
+expected identities in `docs/architecture/knowledge-governance/corpus.csv`.
+Declare content and typed relationships in the source; the registry does not
+duplicate them. Preserve existing protected components and mandatory qualifications.
+For a proposed membership, protection-set or controlling-content change, obtain
+the Rust-computed descriptor through the operator-only `pcg documents describe`
+workflow in [the document contract](../architecture/PCG_DOCUMENT_AUTHORING.md).
+Present the exact descriptor and proposed changes to the owner. Only the owner
+submits the explicit authorization; an agent must not execute that submission.
+Correct admission diagnostics, then reconcile and compare the resulting graph.
+Keep blocked candidates distinct from retained accepted historical authority.
+
+The earlier no-corpus-manifest practice is superseded only for the explicitly
+governed B11 corpus. This does not add a semantic conflict engine, watcher,
+vector service or general review ceremony. Existing owner authorization still
+determines what actions may proceed; a graph query does not grant authorization.
 
 ## Unavailable tool or profile
 

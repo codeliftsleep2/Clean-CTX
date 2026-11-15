@@ -7,16 +7,30 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 <!-- pcg:family-standing:end -->
 <!-- pcg:ARCH-004:begin -->
+<!-- pcg:ARCH-004-policy:begin -->
 ### ARCH-004 Production Integration Is the Completion Boundary
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Prevent implemented but unreachable features from being reported as complete. |
 | **Invariant** | A component or semantic family is not complete until its real default production lifecycle is traced and evidenced: producer, production pipeline, result boundary, persistent owner, workspace/session lifecycle, actual consumer, MCP/API exposure, and applicable live reachability. Code existence, populated test-only state, custom-pipeline tests, and isolated unit tests are implementation evidence only. |
-| **Enforcement** | Phase 9 records concrete entry points, owners, lifecycle behavior, consumers, external exposure, tracked production-path coverage, and removal of obsolete bypasses. The completed `0.8.0` production certification is the reference application of this invariant; future work must satisfy the same boundary independently. |
+<!-- pcg:ARCH-004-policy:end -->
+
+**Enforcement:**
+
+Phase 9 records concrete entry points, owners, lifecycle behavior, consumers, external exposure, tracked production-path coverage, and removal of obsolete bypasses. The completed `0.8.0` production certification is the reference application of this invariant;
+<!-- pcg:ARCH-004-independent-coverage:begin -->
+future work must satisfy the same boundary independently.
+<!-- pcg:ARCH-004-independent-coverage:end -->
+
+
+| Property | Value |
+|----------|-------|
+<!-- pcg:ARCH-004-obligations:begin -->
 | **Authority** | `AGENTS.md` §11, `docs/architecture/IR_ARCHITECTURE_CERTIFICATION.md`, and the Phase 9 audit records |
 | **Type** | GOVERNANCE and INTEGRATION |
 | **Gate** | Production lifecycle trace, applicable tracked integration tests, and applicable live end-to-end verification |
+<!-- pcg:ARCH-004-obligations:end -->
 
 ---
 
@@ -33,9 +47,14 @@ commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#ARCH-004
+  - statement self#ARCH-004-policy
+  - verification_obligation self#ARCH-004-obligations
+  - qualification:independent_coverage self#ARCH-004-independent-coverage
+  - observation:source self#ARCH-004
   - qualification self#family-standing
 ```
+
+
 
 <!-- pcg:ARCH-004:end -->
 <!-- pcg:INV.MECHANISM_REUSE_001:begin -->

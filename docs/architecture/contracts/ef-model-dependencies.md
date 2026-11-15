@@ -2,8 +2,14 @@
 
 Agent: **Agent MaxHeadRoom**. Current focused owner of the operative source-described contract. IMPLEMENTED does not certify enforcement, independent acceptance or language completeness.
 
-Scope: the implemented EF-owned obligation frontier and existing authorized query universe. Shared acquisition mechanics do not turn EF membership into the ancestry capability or infer project-reference legality. Edges remain request-local and lower-bound. The original record reports a focused 18-test GREEN and later owner-reported gates, but also retains a subsequent coverage-schema RED/repair awaiting GREEN, a prior failed live attempt (639/644 checks), and no post-repair live rerun. Earlier GREEN does not certify that later patch or current broad acceptance. B4a neither repairs nor reexecutes it.
 
+<!-- pcg:B11-authority-1:begin -->
+Scope: the implemented EF-owned obligation frontier and existing authorized query universe. Shared acquisition mechanics do not turn EF membership into the ancestry capability or infer project-reference legality. Edges remain request-local and lower-bound.
+<!-- pcg:B11-authority-1:end -->
+ The original record reports a focused 18-test GREEN and later owner-reported gates, but also retains a subsequent coverage-schema RED/repair awaiting GREEN, a prior failed live attempt (639/644 checks), and no post-repair live rerun. Earlier GREEN does not certify that later patch or current broad acceptance. B4a neither repairs nor reexecutes it.
+
+
+<!-- pcg:B11-authority-2:begin -->
 ## Generalized repair architecture
 
 ```text
@@ -101,6 +107,8 @@ Model/configuration edges remain request-local. They were not made durable index
 facts, no persistence ownership model was introduced, and no durable EF model-edge
 integration is claimed. #155's retained ancestry footprints remain separate.
 
+<!-- pcg:B11-authority-2:end -->
+
 
 Source: [docs/agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md](../../agent/ISSUE_156_IMPLEMENTATION_HANDOFF.md), commit `0d8437cc`; original section SHA-256 `ccb664c309b15f2182d6fe73a52c7a493a6a4944d4ecb22ccaacafbeb67d48b8`. Original tense, generation numbers and execution wording retain their dated subjects; they do not assert new verification or current universal support.
 
@@ -121,5 +129,7 @@ preserves:
 note: Current source-described contract; no witness execution or independent certification is inferred.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:scope self#B11-authority-1
+  - statement:contract self#B11-authority-2
+  - observation:source self#whole
 ```

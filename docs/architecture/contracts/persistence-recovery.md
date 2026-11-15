@@ -1,7 +1,10 @@
 # Persistence ownership and recovery
 
+<!-- pcg:PERSISTENCE-standing:begin -->
 Agent: Agent MaxHeadRoom. Current contract extracted in B2 from the sources below. Original chronology and implementation evidence remain in the linked source records. IMPLEMENTED records the operative source contract, not new validation.
+<!-- pcg:PERSISTENCE-standing:end -->
 
+<!-- pcg:PERSISTENCE-policy:begin -->
 ### Design Decisions
 
 - **Load is not authority**: durable rows may decode successfully yet remain
@@ -26,15 +29,20 @@ Agent: Agent MaxHeadRoom. Current contract extracted in B2 from the sources belo
 - **File-scoped authority**: reads never flush pending work, and one file's save, restore, replay, delta, edit, or deletion cannot commit another file's lifecycle state.
 - **Shared edit recovery**: pending byte-exact edit intents resolve before any durable semantic load, compilation, checkpoint, or index hydration becomes authoritative.
 - **Content-hash deterministic IDs**: `ctx-{sha256_hex}` ensures idempotent saves (same content → same ID → UPSERT).
+<!-- pcg:PERSISTENCE-policy:end -->
 - **Thread-safe state**: `McpState` is wrapped in `RwLock` for the A-09 multi-threaded dispatcher — parallel reads, serial writes.
 - **Lazy initialization**: DB only opens when persistence is enabled — zero overhead for users who don't need persistence.
+<!-- pcg:PERSISTENCE-physical:begin -->
 - **Physical `0x04` authority**: canonical identity, version, operations, order, duplicates, bodies, and spans round-trip in the BLOB itself; DB metadata must agree rather than repair it.
+<!-- pcg:PERSISTENCE-physical:end -->
 
 
 Source: [docs/ARCHITECTURE_OVERVIEW.md](../../ARCHITECTURE_OVERVIEW.md); original section SHA-256 `bd8f8919daa2bda8cc6f5bd52ce42ca297fa35202b30dc65ebfeca52c68b67b6`. Original wording and tense are retained; admission is limited to the implemented scope described here.
 
 
+<!-- pcg:PERSISTENCE-limits:begin -->
 The thread-safe-state and lazy-initialization bullets are retained descriptive implementation notes, not a global locking contract. The scoped invariant owners govern adoption and ordering.
+<!-- pcg:PERSISTENCE-limits:end -->
 
 ```architecture-graph
 node: AUTH.PERSISTENCE_RECOVERY
@@ -51,5 +59,9 @@ preserves:
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:PERSISTENCE-policy self#PERSISTENCE-policy
+  - constraint:physical self#PERSISTENCE-physical
+  - qualification:standing self#PERSISTENCE-standing
+  - qualification:limits self#PERSISTENCE-limits
+  - observation:source self#whole
 ```

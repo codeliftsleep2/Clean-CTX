@@ -1,5 +1,7 @@
 # ANGULAR RESOLVER
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,14 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+
+<!-- pcg:B11-standing:end -->
 <!-- pcg:RESOLVER-standing:begin -->
-C04/C05: generation78 is unqualified written RouteOccurrence/DeclarationId membership only. Public resolver-key and executable eligibility questions remain open. The 319-check/three-session receipt is historical; B4b found 68 of 1,224 listed inputs differ today and a different current binary. Current-producer revalidation, final repository/Claude gates and #162 closure are not established here.
+C04/C05: generation78 is unqualified written RouteOccurrence/DeclarationId membership only. Public resolver-key and executable eligibility questions remain open. The 319-check/three-session receipt is historical; B4b found 68 of 1,224 listed inputs differ today and a different current binary.
+<!-- pcg:B11-current-source-bounds:begin -->
+Current-producer revalidation, final repository/Claude gates and #162 closure are not established here.
+<!-- pcg:B11-current-source-bounds:end -->
+
 
 <!-- pcg:RESOLVER-standing:end -->
 <!-- pcg:RESOLVER-written:begin -->
@@ -32,7 +40,11 @@ providers and five guard kinds remain independent. Canonical admission is relati
 specific and replays the same projection; no generic endpoint exception or borrowed
 field/key/target fallback. The existing routing presentation section was relocated unchanged from angular_meta/
 mod.rs into RouteShape::append_meta_section to keep the active module declaration
-file below the size ceiling. Routing/marker behavior remains a preservation gate.
+file below the size ceiling.
+<!-- pcg:B11-routing-preservation:begin -->
+Routing/marker behavior remains a preservation gate.
+<!-- pcg:B11-routing-preservation:end -->
+
 
 Semantic generation advances to 78; other generations,
 public fields, durable schema/codec and discovery remain unchanged.
@@ -86,6 +98,8 @@ Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md](../../agent/ISSUE_16
 <!-- pcg:RESOLVER-lifecycle:begin -->
 ## Production authority and lifecycle
 
+
+<!-- pcg:B11-resolver-policy:begin -->
 route_resolvers::project reuses route_objects native ownership, unique outer field,
 ordinary Object, unique decoded key, exact resolve_mapping_at and demanded/runtime
 reference agreement. Repeated distinct keys collapse per exact object/target only.
@@ -104,6 +118,8 @@ old generic noncanonical behavior remains. Other relation branches stay independ
 Relation-specific retained admission replays the same projection for canonical
 ResolvedBy; existing (None,None) compatibility facts remain noncanonical legacy,
 not canonical membership proof. No generic endpoint exception is introduced.
+<!-- pcg:B11-resolver-policy:end -->
+
 
 Snapshots, workspace index, SQLite/restore, refresh and mutation witnesses are the
 existing shared lifecycle. The existing routing presentation section was relocated unchanged from angular_meta/
@@ -134,9 +150,12 @@ uses_evidence:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
-  - scope:written_membership self#RESOLVER-written
-  - constraint:native_declaration_identity self#RESOLVER-lifecycle
-  - qualification:historical_input_drift self#RESOLVER-standing
+  - statement self#RESOLVER-questions
+  - observation:source self#whole
+  - qualification:standing self#B11-standing
+  - verification_obligation:routing_preservation self#B11-routing-preservation
+  - scope:written_membership self#B11-resolver-policy
+  - constraint:native_declaration_identity self#B11-resolver-policy
+  - qualification:current_source_bounds self#B11-current-source-bounds
   - verification_obligation:public_keys_and_current_producer self#RESOLVER-questions
 ```

@@ -1,5 +1,7 @@
 # Owner-enrolled immutable evidence authority
 
+
+<!-- pcg:B11-authority-1:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the source propositions below, normalized in B3. IMPLEMENTED denotes an operative, source-described bounded contract, not independent validation or authenticated approval.
 
 ## Scoped standing and original numbering
@@ -8,6 +10,10 @@ C02 is reconciled through the source-attributed stage chain: [M2a-1](../../agent
 
 Original numbered sections remain locatable through the design document's headings and B3_PROVENANCE.csv. Sections 2–6 and trusted-local security are owned by enrolled v1; §4.3 and §7 by acquisition; §8.1/8.3/8.4 by projection; §8.2 and the implemented MCP boundary by evidence MCP. Cross-section numbers retain those original meanings. Acceptance scenarios, pilot data and staged verification history remain evidence/design history, not new normative owners. Proposed oracle names are specifications, not a claim that B3 authored or executed those tests. Runtime approval, autonomous extraction/injection, embeddings, tenancy and the other original deferrals remain unapproved by these bounded stages.
 
+<!-- pcg:B11-authority-1:end -->
+
+
+<!-- pcg:B11-authority-2:begin -->
 ## 2. First-slice responsibility boundary
 
 ```text
@@ -75,6 +81,8 @@ Each corpus has at least one coverage selector. A binding is an explicit `CONSTR
 
 At least one source has `check=current`; all such sources share one exact enrollment commit, which becomes `generation.source_commit`. Historical source rows may name earlier commits. Import/resource ceilings debit raw manifest bytes, examined definitions and actual source bytes before unbounded parsing/reads; ceiling failure is explicit, never partial enrollment. Namespace and `enrollment.complete` are inert until the trusted profile's exact digest admits this manifest.
 
+<!-- pcg:B11-authority-2:end -->
+
 ### 3.3 Complete proposed enrollment example and normalization
 
 This is a complete **unimplemented one-record corpus example**, not the complete A-E pilot and not an owner-approved manifest. Hashes/locators are OBSERVED cloud witnesses (§9). Its record IDs and classification/mapping are PROPOSED. It contains no duplicated decision prose.
@@ -99,11 +107,17 @@ This is a complete **unimplemented one-record corpus example**, not the complete
 
 Normalized representation is exactly: partition from profile; corpus/name/version; a source revision for each `(source-id,commit,blob,sha256,path,check)`; evidence revision for the primary span; one record revision of `delta-capture`; selectors `delta-coverage` and `delta-modify`; one binding revision; and a generation fingerprint. `primary_text` is derived from bytes `[22798,25013)` of the report, not authored in the manifest. `delta-owner` is a **corpus currentness witness**, not a source body stored by default: all declared sources are validated at import; query witness scope is §7.2. Only enrolled excerpts are persisted. Normalized authority includes `assurance="source_attributed"` regardless of the source's approval label. Freshness is `not_checked` until query validation. Evidence execution remains `report_of_execution`; the 110-pass receipt itself is not magically enrolled.
 
+
+<!-- pcg:B11-authority-3:begin -->
 Reject absolute/traversing paths, `.git` traversal, symlinks/reparse-point escapes, sources outside the pinned repository, Git fetch/promisor fallback, missing blobs, hash mismatch, ambiguous heading, wrong byte range, conflicting IDs, unknown edge vocabulary, invalid intervals or unsupported selectors. Git object reads use argument arrays and literal validated OIDs/paths; never shell-built revspecs or hooks. Current working sources must also be regular files beneath the profile root; Git LF/CRLF conversion is **not** normalized away. A mismatch requires reviewed re-enrollment or historical-only interpretation, not a rewritten hash. Initial/replacement invalid import publishes no generation.
+
+<!-- pcg:B11-authority-3:end -->
 
 
 Source: [docs/agent/PCG_175_DESIGN_FREEZE.md](../../agent/PCG_175_DESIGN_FREEZE.md), commit `187d0096`, original section SHA-256 `7b52118ac760893b1a56f0a8846c089dd973214fd97087f6292b0c8ca73f7594`. Original tense and proposed-era labels are retained; acceptance is scoped below, not inferred from that wording.
 
+
+<!-- pcg:B11-authority-4:begin -->
 ## 4. Semantic and relationship model
 
 ### 4.1 Roles and independent dimensions
@@ -136,6 +150,8 @@ All edges have source evidence and immutable endpoint revisions; applicability i
 No caller may choose a weaker closure edge set. `constraints`, `closure`, `impact` and `provenance` all collect mandatory incoming validation/falsification and explicit conflict peers, then their required evidence. Opposing `VALIDATES`/`FALSIFIES` assertions on the same subject are an unresolved conflict unless a source-backed lifecycle/supersession explicitly resolves them. Distinct decision subjects can coexist; same-subject/disposition records retain their distinct logical IDs while identical citation payloads are emitted once. No record receives independent approval merely because a second source repeats it.
 
 Required **historical evidence** is not a required **true premise**: a falsified claim may be emitted to explain a rejection without blocking that rejection. Only controlling active authority and DEPENDS_ON/BLOCKED_BY satisfaction require the corresponding active/noncontradicted state. A historical detector result can be valid evidence of past divergence while the equivalence proposition remains falsified.
+
+
 
 
 Source: [docs/agent/PCG_175_DESIGN_FREEZE.md](../../agent/PCG_175_DESIGN_FREEZE.md), commit `187d0096`, original section SHA-256 `3587cf546ed91ae38bf556d279c1cf0bb11fcb1a193ed15c21b1ce3eedfe01cc`. Original tense and proposed-era labels are retained; acceptance is scoped below, not inferred from that wording.
@@ -323,6 +339,8 @@ A document cannot choose commands, profile, roles, permissions, SQL, tokenizer f
 
 Retention: source owner controls permitted historical retention. The projection may retain old committed generations only while policy allows; local owner can run explicit rebuild with policy excluding old history. Before claiming physical erasure, stop readers, replace/rebuild the derived DB and handle WAL/backups/OS recovery copies under owner retention policy; logical SQL DELETE alone is not erasure evidence. No automatic purge or competing durable decision ledger. Rebuild requires approved manifest plus retained Git source blobs, never summaries or reported receipt paths. Corrupt DB cannot authenticate its own repair.
 
+<!-- pcg:B11-authority-4:end -->
+
 
 Source: [docs/agent/PCG_175_DESIGN_FREEZE.md](../../agent/PCG_175_DESIGN_FREEZE.md), commit `187d0096`, original section SHA-256 `4aa2ad4f5d561f4b10bbfc25de40c30711d4345f3dae3e741d4c1ce4e8a1419f`. Original tense and proposed-era labels are retained; acceptance is scoped below, not inferred from that wording.
 
@@ -337,5 +355,9 @@ artifact: docs/architecture/contracts/pcg-enrolled-v1.md
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-authority-1
+  - statement:enrollment self#B11-authority-2
+  - constraint:source_integrity self#B11-authority-3
+  - constraint:model_and_persistence self#B11-authority-4
+  - observation:source self#whole
 ```

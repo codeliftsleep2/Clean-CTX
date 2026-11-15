@@ -1,5 +1,7 @@
 # ANGULAR MEMBER IDENTITY
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,6 +12,10 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
+
+<!-- pcg:B11-1:begin -->
 ## Proposed bounded decision
 
 Authorize demanded native source-owned class-member declaration evidence for
@@ -32,15 +38,21 @@ Keep global EntityRef equality and public JSON schema unchanged. Keep current
 HasInput/HasOutput name values. Binding aliases, generated Change names,
 inheritance, template joins and closure remain separate decisions/questions.
 
+<!-- pcg:B11-1:end -->
+
 
 Source: [docs/agent/ISSUE_162_MEMBER_IDENTITY_DECISION.md](../../agent/ISSUE_162_MEMBER_IDENTITY_DECISION.md), baseline `ec7067fd`, original section SHA-256 `3fa6311923bbb60eb943a6496fc240a1033e17cb820976a619284d61e5cd7d5a`.
 
 ## Approval and implementation checkpoint
 
+
+<!-- pcg:B11-2:begin -->
 Owner approval in the attached Declaration Identity for Angular Member Projections
 decision authorizes the bounded native pair/initializer evidence and existing
 lifecycle reuse. It excludes aliases, generated names, inheritance, overrides,
 template joins and broader closure/certification.
+<!-- pcg:B11-2:end -->
+
 
 The unchanged RED was frozen through the isolated-index workflow in stash
 302a5a1ecf12f81564bf81edada65d405718dc40 and restored byte-identically:
@@ -58,10 +70,14 @@ transport. Semantic generation advances to 44.
 
 Two additional tracked controls exercise forged owner pairing, wrong occurrence,
 duplicate/missing retained evidence and duplicate class fields. The original RED
-and these controls are UNRUN after repair. Complete endpoint restart, selection,
+and these controls are UNRUN after repair.
+<!-- pcg:B11-3:begin -->
+Complete endpoint restart, selection,
 mutation/retirement and preservation acceptance must be established before this
 bounded identity slice is complete; neither existing carrier reuse nor source
-inspection certifies those gates. No runtime execution was performed here.
+inspection certifies those gates.
+<!-- pcg:B11-3:end -->
+ No runtime execution was performed here.
 
 
 Source: [docs/agent/ISSUE_162_MEMBER_IDENTITY_DECISION.md](../../agent/ISSUE_162_MEMBER_IDENTITY_DECISION.md), baseline `ec7067fd`, original section SHA-256 `074db5a9b5a519adea8d9fd58864591d3269529d1c03edc7783a2bae2f5ce560`.
@@ -81,5 +97,9 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-1
+  - qualification:accepted_scope self#B11-2
+  - verification_obligation:exit self#B11-3
+  - observation:source self#whole
 ```

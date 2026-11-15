@@ -146,6 +146,7 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 2
 
 <!-- pcg:INV.CBM_VERIFY_002:end -->
 <!-- pcg:INV.CBM_OPTIONAL_001:begin -->
+<!-- pcg:INV.CBM_OPTIONAL_001-policy:begin -->
 ### CBM-OPTIONAL-001 Optional Providers Change Cost, Not Core Truth
 
 **Status:** ENFORCED
@@ -180,6 +181,7 @@ empty, mixed-unit, failure, invalidation, cold/warm, and exact-result behavior;
 existing search/readiness controls remain in `workspace_query_8.rs`,
 `workspace_query_9.rs`, and `workspace_query_provider_readiness.rs`.
 
+<!-- pcg:INV.CBM_OPTIONAL_001-policy:end -->
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 874-907, original section `CBM-OPTIONAL-001`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `14c5550092bdf1649bc0d6822ae3188bee9c418ec93017cd32fa17555bd0b09d`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
 ```architecture-graph
@@ -324,7 +326,8 @@ preserves:
 note: Source-described operative contract; migration does not execute or independently certify its witnesses.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#INV.CBM_OPTIONAL_001
+  - statement self#INV.CBM_OPTIONAL_001-policy
+  - observation:source self#INV.CBM_OPTIONAL_001
   - qualification self#family-standing
 ```
 <!-- pcg:INV.CBM_OPTIONAL_001:end -->

@@ -1,7 +1,7 @@
 use super::model::{Candidate, Diagnostic, KINDS, RELATIONS, STATUSES};
 use std::collections::BTreeMap;
 
-fn node_id(id: &str) -> bool {
+pub(super) fn node_id(id: &str) -> bool {
     let upper = |s: &str| {
         !s.is_empty()
             && s.bytes()
@@ -51,8 +51,21 @@ pub fn validate(nodes: &BTreeMap<String, Candidate>) -> Vec<Diagnostic> {
     }
     for (id, node) in nodes {
         let d = &node.declaration;
-        let mut problem =
-            |code, message| errors.push(Diagnostic::new(code, &node.path, Some(id), message));
+        let mut problem = |code, message| {
+            let mut diagnostic = Diagnostic::new(code, &node.path, Some(id), message);
+            let field = match code {
+                "E_INVALID_STATUS" => Some(("status", d.status.as_str())),
+                "E_INVALID_KIND" => Some(("kind", d.kind.as_str())),
+                "E_INVALID_NODE_ID" => Some(("node", id.as_str())),
+                _ => None,
+            };
+            if let Some((field, observed)) = field
+                && let Some((line, column)) = super::parse::field_location(&node.bytes, id, field)
+            {
+                diagnostic = diagnostic.at_field(line, column, field, observed);
+            }
+            errors.push(diagnostic);
+        };
         if !node_id(id) {
             problem(
                 "E_INVALID_NODE_ID",

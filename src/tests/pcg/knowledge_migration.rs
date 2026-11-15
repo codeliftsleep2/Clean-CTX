@@ -124,7 +124,7 @@ fn knowledge_schema_migration_preserves_history_identity_edges_and_legacy_source
     let version: i64 = c
         .query_row("SELECT version FROM document_schema", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(version, 2);
+    assert_eq!(version, 3);
     let sources: i64 = c
         .query_row("SELECT COUNT(*) FROM document_source", [], |r| r.get(0))
         .unwrap();

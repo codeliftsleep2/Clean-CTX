@@ -57,29 +57,37 @@ pub fn publish(
     tx: &Connection,
     trusted: &Trusted,
     nodes: &BTreeMap<String, Candidate>,
+    governance: Option<&super::governance::Prepared>,
 ) -> Result<String> {
-    reconcile(tx, trusted, nodes, true)
+    reconcile(tx, trusted, nodes, true, governance)
 }
 pub(super) fn publish_knowledge(
     tx: &Connection,
     trusted: &Trusted,
     nodes: &BTreeMap<String, Candidate>,
+    governance: Option<&super::governance::Prepared>,
 ) -> Result<String> {
-    reconcile(tx, trusted, nodes, false)
+    reconcile(tx, trusted, nodes, false, governance)
 }
 fn reconcile(
     tx: &Connection,
     trusted: &Trusted,
     nodes: &BTreeMap<String, Candidate>,
     legacy_search: bool,
+    governance: Option<&super::governance::Prepared>,
 ) -> Result<String> {
-    let generation = identity::hash(
-        &json!({"profile":trusted.fingerprint,"revisions":nodes.values().map(|n|&n.revision).collect::<Vec<_>>()}),
-    );
+    let mut publication = json!({"profile":trusted.fingerprint,"revisions":nodes.values().map(|n|&n.revision).collect::<Vec<_>>()});
+    if let Some(governance) = governance {
+        publication["governance"] = json!(governance.state_digest);
+    }
+    let generation = identity::hash(&publication);
     let old_head = head(tx)?;
     if old_head.as_ref() == Some(&generation) {
         verify(tx, &generation, nodes, legacy_search)?;
         super::knowledge_store::publish(tx, &generation, nodes, false)?;
+        if let Some(governance) = governance {
+            super::governance::publish(tx, &generation, governance)?;
+        }
         return Ok(generation);
     }
     sql(tx.execute(
@@ -141,6 +149,9 @@ fn reconcile(
     }
     verify(tx, &generation, nodes, true)?;
     super::knowledge_store::publish(tx, &generation, nodes, true)?;
+    if let Some(governance) = governance {
+        super::governance::publish(tx, &generation, governance)?;
+    }
     sql(tx.execute(
         "INSERT INTO document_head VALUES(1,?) ON CONFLICT(slot) DO UPDATE SET g=excluded.g",
         [&generation],
@@ -279,6 +290,32 @@ pub(super) fn revision(c: &Connection, rev: &str) -> Result<Value> {
     )
 }
 pub fn query(c: &Connection, g: &str, q: &Request) -> Result<Vec<Value>> {
+    if q.mode == "history" {
+        // Historical identity remains queryable after an authorized removal;
+        // current generation membership is not an admission condition for history.
+        let mut history = sql(c.prepare("SELECT p.sequence,p.g,m.revision FROM document_publication p JOIN document_member m ON m.g=p.g WHERE m.id=? ORDER BY p.sequence"))?;
+        let mut answer = Vec::new();
+        for old in sql(history.query_map([&q.id], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        }))? {
+            let (sequence, generation, rev) = sql(old)?;
+            let mut value = revision(c, &rev)?;
+            if q.track
+                .as_ref()
+                .is_some_and(|track| value["declaration"]["track"].as_str() != Some(track))
+            {
+                continue;
+            }
+            value["publication_sequence"] = sequence.into();
+            value["published_generation"] = generation.into();
+            answer.push(value);
+        }
+        return Ok(answer);
+    }
     let mut selected = std::collections::BTreeSet::new();
     if let Some(text) = &q.text {
         let mut s = sql(
@@ -301,7 +338,7 @@ pub fn query(c: &Connection, g: &str, q: &Request) -> Result<Vec<Value>> {
     let mut answer = Vec::new();
     for row in rows {
         let (id, rev) = sql(row)?;
-        if q.mode == "get" || q.mode == "history" {
+        if q.mode == "get" {
             if q.id.as_ref() != Some(&id) {
                 continue;
             }
@@ -315,26 +352,9 @@ pub fn query(c: &Connection, g: &str, q: &Request) -> Result<Vec<Value>> {
         {
             continue;
         }
-        if q.mode == "history" {
-            let mut history = sql(c.prepare("SELECT p.sequence,p.g,m.revision FROM document_publication p JOIN document_member m ON m.g=p.g WHERE m.id=? ORDER BY p.sequence"))?;
-            for old in sql(history.query_map([id], |r| {
-                Ok((
-                    r.get::<_, i64>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                ))
-            }))? {
-                let (sequence, generation, rev) = sql(old)?;
-                let mut value = revision(c, &rev)?;
-                value["publication_sequence"] = sequence.into();
-                value["published_generation"] = generation.into();
-                answer.push(value);
-            }
-        } else {
-            let mut value = value;
-            value["freshness"] = "current_observed_boundaries".into();
-            answer.push(value);
-        }
+        let mut value = value;
+        value["freshness"] = "current_observed_boundaries".into();
+        answer.push(value);
     }
     Ok(answer)
 }

@@ -25,6 +25,8 @@ schema-derived typed pattern targeting and was user-verified on 2026-09-18.
 - [`BINARY_V04_CONTRACT.md`](BINARY_V04_CONTRACT.md)
 - [`IR_ARCHITECTURE_CERTIFICATION.md`](IR_ARCHITECTURE_CERTIFICATION.md)
 
+
+<!-- pcg:B11-authority-1:begin -->
 ## 1. Purpose
 
 This matrix assigns an explicit producer, identity, ownership, cardinality,
@@ -56,8 +58,12 @@ The following defaults were approved on 2026-09-17 and are normative:
 These defaults must not be reopened without direct contradictory source
 evidence and architectural review.
 
+<!-- pcg:B11-authority-1:end -->
+
 ## 3. Source facts affecting the contract
 
+
+<!-- pcg:B11-authority-2:begin -->
 ### 3.1 Identity namespaces
 
 - `DefMethod` facts are later referenced using only `method_id`; method IDs
@@ -82,6 +88,8 @@ symbols not defined in the same compiled IR. Where an operation has a local
 owning identity, that owner must resolve; external symbolic operands and the
 `TypeAlias` payload need not.
 
+<!-- pcg:B11-authority-2:end -->
+
 ### 3.3 Binary version-number contradiction
 
 Before Phase 8, the binary encoder emitted `VERSION = 0x03` and the decoder
@@ -96,8 +104,14 @@ Phase 8A resolves the complete corrected layout in
 persisted binary fixture and no production writer of non-empty binary IR.
 Physical `0x03` omits eight identity operands and raw `file_id`; the corrected
 `0x04` target preserves the complete `CompiledIR`, instruction order, and all
-occurrences. No lossy `0x01`–`0x03` compatibility decoder is authorized.
+occurrences.
+<!-- pcg:B11-authority-3:begin -->
+No lossy `0x01`–`0x03` compatibility decoder is authorized.
+<!-- pcg:B11-authority-3:end -->
 
+
+
+<!-- pcg:B11-authority-4:begin -->
 ## 4. Contract vocabulary
 
 ### 4.1 Cardinality
@@ -354,26 +368,42 @@ The first implementation slice should protect `DefClass`, `DefMethod`,
 The test and corresponding repair land together under the approved rollout
 policy.
 
+<!-- pcg:B11-authority-4:end -->
+
 ## 10. Resolved review items and separately deferred work
 
 Typed semantic-family vocabularies and language mappings were implemented in
 Phase 6. Phase 9 introduced `InterfaceId`, explicit interface-owned member
 operations, and distinct hierarchy/LLM representation.
 
-Resolved on 2026-09-18: method flag occurrences, side effects, and execution
+Resolved on 2026-09-18:
+<!-- pcg:B11-authority-5:begin -->
+method flag occurrences, side effects, and execution
 contexts use hierarchical schema revision `"hs": 2`; unmarked legacy
 documents remain readable through the established compatibility path.
+<!-- pcg:B11-authority-5:end -->
 
-Resolved on 2026-09-18: class flag and injection occurrences use hierarchical
+
+Resolved on 2026-09-18:
+<!-- pcg:B11-authority-6:begin -->
+class flag and injection occurrences use hierarchical
 schema revision `"hs": 3`; strict revision-2 and unmarked legacy documents
 remain readable through decode-only compatibility paths.
+<!-- pcg:B11-authority-6:end -->
 
+
+
+<!-- pcg:B11-authority-7:begin -->
 Import aliases are normatively file-wide because no downstream operation
 carries a narrower owner. `TypeAlias` is not a definition identity; production
 evidence established its ordered-many occurrence contract. Class-scoped
 injectable metadata remains a separately reviewable future semantic family;
 it is not represented as method `ExecutionContext` or as an `Injects` edge.
 
+<!-- pcg:B11-authority-7:end -->
+
+
+<!-- pcg:B11-authority-8:begin -->
 ## 11. Required second-slice tests
 
 The bounded field-identity slice protects `DefField` and `FieldType` with
@@ -406,6 +436,8 @@ legacy decoded documents remain outside this bounded slice.
 - [x] The physical corrected-binary version and layout are resolved as `0x04`.
 - [x] Each row has tracked contract and production-path evidence.
 
+<!-- pcg:B11-authority-8:end -->
+
 ## Source-owned architecture declaration
 
 The source-described contract is operative. IMPLEMENTED does not assert a new test execution, freeze approval, independent validation, reclosure or banking. Original source identity: commit `655f0a75`, `docs/architecture/CORE_OP_CONTRACT_MATRIX.md`; original SHA-256 is retained in the normalization inventory. Current source bytes are witnessed by PCG revisions.
@@ -422,5 +454,13 @@ preserves:
   - IRPAT-001
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:defaults self#B11-authority-1
+  - constraint:identity_namespaces self#B11-authority-2
+  - constraint:legacy_binary self#B11-authority-3
+  - constraint:operation_matrix self#B11-authority-4
+  - constraint:method_wire self#B11-authority-5
+  - constraint:class_wire self#B11-authority-6
+  - scope:alias_and_injection self#B11-authority-7
+  - verification_obligation:review self#B11-authority-8
+  - observation:source self#whole
 ```

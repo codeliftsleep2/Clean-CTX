@@ -1,5 +1,7 @@
 # ANGULAR CAN ACTIVATE
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,12 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
 ## Concrete production decisions requested before repair
 
+
+<!-- pcg:B11-governing-1:begin -->
 Approve canonical GuardedBy from the existing RouteOccurrence to the exact named
 runtime DeclarationId referenced by an element of the unique ordinary canActivate
 Array. Producer and retained admission must replay the same exact native root,
@@ -21,50 +27,72 @@ membership. Reject duplicate fields, unsupported spreads/computed elements,
 type-only/unresolved/ambiguous references and borrowed/crossed/competing proof.
 Preserve independent valid siblings; do not discard other proved slots merely
 because another ordinary named slot is unresolved. Unsupported container structure
-cannot establish a proved slot. This partial-slot policy itself requires approval.
+cannot establish a proved slot.
+<!-- pcg:B11-governing-1:end -->
+ This partial-slot policy itself requires approval.
 
+
+<!-- pcg:B11-governing-2:begin -->
 Recommended public target interpretation: Guard is a written-use classification
 for this exact resolved runtime declaration, not an intrinsic callable/framework
 role or certification that Angular could execute it. Under this interpretation,
 ordinary functions, typed functional values, classes and noncallable runtime values
 can all be written references; do not infer behavior or reject them using names,
-annotations or a new evaluator. This explicitly broad value-reference eligibility
+annotations or a new evaluator.
+<!-- pcg:B11-governing-2:end -->
+ This explicitly broad value-reference eligibility
 is a requested owner decision, NOT implemented or certified by the five positive
 function/typed-value probes. Alternative: require independently proved callable or
 native guard eligibility; that requires a separate precise authority contract and
 possibly new prerequisite work. Do not infer such eligibility from the current RED.
 
+
+<!-- pcg:B11-governing-3:begin -->
 Recommended multiplicity: one public relation per exact object/target pair, with
 all repeated slots retained as neutral support. Distinct objects remain distinct,
-including equal paths and targets. That gives sixteen relations in the fixture,
+including equal paths and targets.
+<!-- pcg:B11-governing-3:end -->
+ That gives sixteen relations in the fixture,
 not eighteen; choosing slot multiplicity instead requires an explicit occurrence
 identity decision. Existing RouteOccurrence plus exact target suffices for support
 multiplicity without a new public carrier or global EntityRef equality change.
 
+
+<!-- pcg:B11-governing-4:begin -->
 Recommend selective REPLACE of only the canActivate contribution inside the shared
 admitted native typed-const Routes object ownership envelope. Suppress its old
 contribution even if canonical field/slot/target proof refuses; no label fallback
 for an owned field. Preserve other guard kinds independently, even when they
 reference the same declaration. Outside that ownership envelope PRESERVE AS LEGACY
 existing guard behavior, explicitly noncanonical. Do not append old and new facts
-for the same migrated support. These compatibility choices require owner approval.
+for the same migrated support.
+<!-- pcg:B11-governing-4:end -->
+ These compatibility choices require owner approval.
 
 The located producer merges canActivate/canLoad/canDeactivate/canMatch into one
 Vec of names in structured::parse_object before RouteShape emits GuardedBy. Object
-spans survive, but per-field provenance is lost. Replacement therefore must retain
+spans survive, but per-field provenance is lost.
+<!-- pcg:B11-governing-5:begin -->
+Replacement therefore must retain
 minimum private guard-kind/source-object/field origin before flattening, or select
 that branch before flattening; never suppress every GuardedBy row by label or
 object alone. Preserve legacy lexical/parser paths outside the proven ownership
-envelope. Exact private representation is a bounded implementation choice only
+envelope.
+<!-- pcg:B11-governing-5:end -->
+ Exact private representation is a bounded implementation choice only
 after approval. No new retained payload is currently demonstrated necessary.
 
 Current retained relation admission accepts noncanonical (None,None) compatibility
-facts and refuses generic RouteOccurrence endpoints. Add only relation-specific
+facts and refuses generic RouteOccurrence endpoints.
+<!-- pcg:B11-governing-6:begin -->
+Add only relation-specific
 GuardedBy membership replay, not a generic endpoint exception. Reuse source-owned
 snapshots, witnesses, SQLite/index/currentness, refresh and retirement machinery.
 No new resolver/cache/registry/discovery or route tree is proposed. Other guard
 kinds, resolvers, provider applicability, inherited/active context and execution
 remain outside this slice.
+<!-- pcg:B11-governing-6:end -->
+
 
 Request semantic compatibility advancement 75 to 76 for the externally observable
 identity/written-use interpretation and selective replacement, retaining marker/
@@ -72,6 +100,8 @@ pipeline generations and durable encoding absent an actual encoding change. Retu
 before expanding authority or changing encoding if implementation demonstrates a
 new requirement.
 
+
+<!-- pcg:B11-governing-7:begin -->
 After approval: isolate/restore valid RED bytes; tighten the chosen multiplicity
 oracle; batch public forward/reverse exact names/files, empty/child/repeated objects,
 all target categories under the approved written-use policy, partial-slot refusal,
@@ -83,6 +113,8 @@ independent slot/field/object/child/target/root retirement, cold/warm/refresh an
 answers-only withinPath, sibling preservation and lint, followed by one consolidated
 rebuilt-binary checkpoint. Operator owns execution; performance remains deferred
 and final repository/Claude field stays last.
+<!-- pcg:B11-governing-7:end -->
+
 
 The field-only approval explicitly withholds target eligibility, Guard meaning,
 producer/admission, replacement and generation change. AGENTS.md Architectural
@@ -94,9 +126,13 @@ Source: [docs/agent/ISSUE_162_ROUTE_GUARD_MEMBERSHIP_DECISION.md](../../agent/IS
 
 ## Generation-76 production approval applied; authored, UNRUN
 
+
+<!-- pcg:B11-governing-8:begin -->
 The owner explicitly approves canonical canActivate written membership, support-level
 multiplicity, broad runtime-value written-use eligibility, partial-slot preservation,
-selective owned legacy replacement and semantic generation 75 to 76. No additional
+selective owned legacy replacement
+<!-- pcg:B11-governing-8:end -->
+ and semantic generation 75 to 76. No additional
 approval is needed for implementation within that contract. Historical pending
 requests below are superseded by this disposition, not silently broadened.
 
@@ -166,5 +202,14 @@ depends_on:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:membership self#B11-governing-1
+  - scope:written_use self#B11-governing-2
+  - constraint:multiplicity self#B11-governing-3
+  - scope:owned_replacement self#B11-governing-4
+  - constraint:origin self#B11-governing-5
+  - constraint:admission self#B11-governing-6
+  - verification_obligation:exit self#B11-governing-7
+  - qualification:accepted_scope self#B11-governing-8
+  - observation:source self#whole
 ```

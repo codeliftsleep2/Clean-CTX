@@ -1,5 +1,7 @@
 # ANGULAR LOAD CHILDREN
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,12 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
 ## Concrete LoadsChildren production disposition requested
 
+
+<!-- pcg:B11-governing-1:begin -->
 Approve LoadsChildren from the actual existing RouteOccurrence to the exact
 canonical declaration selected by the unique ordinary loadChildren field's complete
 arrow_selection_at proof. Keep two explicit framework target branches: Module
@@ -25,8 +31,12 @@ Use existing public LoadsChildren vocabulary with Module and RouteConfig entity
 types respectively, retaining actual selected declaration names/files. Canonical
 RouteConfig denotes that exact exported Routes declaration, not evaluated routes,
 a merged runtime configuration, an active router, module instance, loading success
-or provider applicability. No new public field/relation is proposed. Request
+or provider applicability. No new public field/relation is proposed.
+<!-- pcg:B11-governing-1:end -->
+Request
 explicit approval for this target-role/public identity interpretation.
+
+
 
 Observed legacy behavior is the same for both target-role questions:
 
@@ -42,6 +52,8 @@ proof requires six same-path and four child forward pairs, fourteen total revers
 pairs including empty paths, across two roots with actual target files. Initial
 reverse labels are observations, not successful exact-multiset comparisons.
 
+
+<!-- pcg:B11-governing-2:begin -->
 Recommend selective REPLACE of only the old resolved_load_children contribution
 for loadChildren-bearing objects in the existing shared native typed-const Routes
 ownership envelope. Select by actual object/field source spans before old emission
@@ -64,12 +76,20 @@ compatibility facts but refuses generic RouteOccurrence endpoints; introduce no
 generic exception. Reuse source-owned snapshots, witnesses, SQLite/index/currentness,
 refresh, deletion/recreation and answers-only withinPath. No resolver/cache/registry,
 new route tree, discovery or global EntityRef equality change is proposed.
+<!-- pcg:B11-governing-2:end -->
+
 
 Request existing Angular semantic compatibility advancement to generation 75 for
 the changed public identity/role meaning, retaining marker/pipeline generations.
+
+<!-- pcg:B11-governing-3:begin -->
 No durable bump is proposed absent an actual encoding change; no new retained
 payload is currently demonstrated necessary. Return before any such expansion.
+<!-- pcg:B11-governing-3:end -->
 
+
+
+<!-- pcg:B11-governing-4:begin -->
 After approval: isolate/restore unchanged valid REDs and original probes; batch exact
 forward/reverse Module/RouteConfig same-name/repeated/empty/child/provider-free rows,
 complete retained/native-role/crossed/borrowed/duplicate/unsupported refusals,
@@ -79,6 +99,8 @@ mutation/repair, SQLite/index before queries and cold/warm/refresh/withinPath.
 Preserve routing, Module, providers and all bootstrap/config siblings with clean
 lint, then one consolidated rebuilt-binary checkpoint with each suite below 500.
 Operator owns all execution; full repository/final Claude field stays later.
+<!-- pcg:B11-governing-4:end -->
+
 
 The supplied neutral disposition explicitly withholds canonical LoadsChildren,
 Module/RouteConfig publication and legacy replacement. AGENTS.md Architectural
@@ -162,5 +184,11 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:membership self#B11-governing-1
+  - constraint:replacement self#B11-governing-2
+  - constraint:encoding self#B11-governing-3
+  - verification_obligation:exit self#B11-governing-4
+  - qualification:accepted_scope docs/agent/ISSUE_162_LOAD_CHILDREN_DECISION.md#B11-CHILDREN-approved-scope
+  - observation:source self#whole
 ```

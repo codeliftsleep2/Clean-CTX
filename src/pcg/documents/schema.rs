@@ -8,6 +8,7 @@ use rusqlite::Connection;
 
 const CURRENT: &str = include_str!("schema.sql");
 const LEGACY: &str = include_str!("schema_v1.sql");
+const V2: &str = include_str!("schema_v2.sql");
 
 pub fn check(c: &Connection, trusted: &Trusted) -> Result<Option<i64>> {
     let actual = store::metadata(c)?;
@@ -15,7 +16,7 @@ pub fn check(c: &Connection, trusted: &Trusted) -> Result<Option<i64>> {
         return Ok(None);
     }
     let mut version = None;
-    for (number, schema) in [(2, CURRENT), (1, LEGACY)] {
+    for (number, schema) in [(3, CURRENT), (2, V2), (1, LEGACY)] {
         let reference = sql(Connection::open_in_memory())?;
         sql(reference.execute_batch(schema))?;
         if actual == store::metadata(&reference)? {
@@ -42,14 +43,32 @@ pub fn initialize(tx: &Connection, trusted: &Trusted) -> Result<()> {
         None => {
             sql(tx.execute_batch(CURRENT))?;
             sql(tx.execute(
-                "INSERT INTO document_schema VALUES(2,?)",
+                "INSERT INTO document_schema VALUES(3,?)",
                 [&trusted.scope_fingerprint],
             ))?;
         }
         Some(1) => migrate(tx)?,
-        Some(2) => {}
+        Some(2) => migrate_v2(tx)?,
+        Some(3) => {}
         _ => unreachable!("schema checked"),
     }
+    Ok(())
+}
+
+fn migrate_v2(tx: &Connection) -> Result<()> {
+    let profile: String =
+        sql(tx.query_row("SELECT profile FROM document_schema", [], |row| row.get(0)))?;
+    sql(tx.execute_batch("DROP TABLE document_schema;"))?;
+    let declaration = CURRENT
+        .split(';')
+        .next()
+        .ok_or(crate::pcg::Error("document_schema"))?;
+    sql(tx.execute_batch(&format!("{declaration};")))?;
+    let offset = CURRENT
+        .find("CREATE TABLE document_governance_authorization")
+        .ok_or(crate::pcg::Error("document_schema"))?;
+    sql(tx.execute_batch(&CURRENT[offset..]))?;
+    sql(tx.execute("INSERT INTO document_schema VALUES(3,?)", [profile]))?;
     Ok(())
 }
 
@@ -76,7 +95,7 @@ fn migrate(tx: &Connection) -> Result<()> {
         )))?;
     }
     sql(tx.execute_batch(CURRENT))?;
-    sql(tx.execute_batch("INSERT INTO document_schema SELECT 2,profile FROM legacy_document_schema;
+    sql(tx.execute_batch("INSERT INTO document_schema SELECT 3,profile FROM legacy_document_schema;
         INSERT INTO document_source SELECT DISTINCT path,source_sha,body FROM legacy_document_revision;
         INSERT INTO document_revision SELECT revision,id,path,source_sha,declaration,evidence,previous FROM legacy_document_revision;
         INSERT INTO document_generation SELECT * FROM legacy_document_generation;

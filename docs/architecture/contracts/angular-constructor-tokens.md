@@ -1,5 +1,7 @@
 # ANGULAR CONSTRUCTOR TOKENS
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,6 +12,10 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
+
+<!-- pcg:B11-policy-1:begin -->
 ## Proposed bounded contract
 
 Extend the existing native source-owned payload with demanded constructor
@@ -41,6 +47,8 @@ parameter/declaration/reference identity and type/value binding eligibility.
    those required forms and preserve their contracts; do not silently narrow
    support to the initial class-alias fixtures or claim full DI migration.
 
+<!-- pcg:B11-policy-1:end -->
+
 
 Source: [docs/agent/ISSUE_162_CONSTRUCTOR_TOKEN_EVIDENCE_DECISION.md](../../agent/ISSUE_162_CONSTRUCTOR_TOKEN_EVIDENCE_DECISION.md), baseline `ec7067fd`, original section SHA-256 `e7bff285094cce67800922b632ef65f8589f735407968b307bbbb6af727594ef`.
 
@@ -55,6 +63,8 @@ Left instead of the canonical token name. Later cases remain unclassified. The
 observed test was frozen and restored unchanged before the repair; runtime
 verification is pending.
 
+
+<!-- pcg:B11-policy-2:begin -->
 The [Angular Inject API](https://angular.dev/api/core/Inject) describes the custom
 token and annotation fallback when Inject is absent. This is framework meaning,
 not TypeScript type-to-value promotion. Existing constructor_injects and
@@ -63,6 +73,8 @@ parameter decorators. Those assertions remain unchanged. The new test addresses
 canonical production interpretation under the approved runtime-token contract;
 it does not retroactively call legacy strings canonical proof. Full decorator
 coverage and final migration remain unfinished.
+
+<!-- pcg:B11-policy-2:end -->
 
 
 Source: [docs/agent/ISSUE_162_CONSTRUCTOR_TOKEN_EVIDENCE_DECISION.md](../../agent/ISSUE_162_CONSTRUCTOR_TOKEN_EVIDENCE_DECISION.md), baseline `ec7067fd`, original section SHA-256 `21ed5daf102f706b12c2e349b6e0f74bf28f1c1f5447c71cfe7ee0f64ec95010`.
@@ -77,6 +89,8 @@ The observed test/registration were frozen in isolated temporary-index stash
 byte-identically. Test SHA-256:
 1a71389220c082365583f5102be79647cdabe9f329c513de8896cf4226aa1d77.
 
+
+<!-- pcg:B11-policy-3:begin -->
 The runtime gate now requires a unique identical class endpoint in independently
 successful type/value outcomes. Unequal contributor sets qualify only when the
 existing native same-source merge predicate accepts the full type group, every
@@ -84,6 +98,8 @@ value contributor remains in it, and every additional type contributor is an
 interface. All original contributor IDs remain retained. Ambiguity, duplicate
 classes and unsupported cross-source family differences remain refused. This
 adds no type checking or general common-name/class-intersection heuristic.
+<!-- pcg:B11-policy-3:end -->
+
 
 Existing producer generation advances to 38 because constructor semantic meaning
 changes. Relation admission uses the same gate; no transport/public schema/index
@@ -106,5 +122,9 @@ depends_on:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-policy-1
+  - scope:decorators self#B11-policy-2
+  - constraint:merged_family self#B11-policy-3
+  - observation:source self#whole
 ```

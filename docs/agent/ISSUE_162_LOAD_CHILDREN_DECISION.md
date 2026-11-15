@@ -220,10 +220,14 @@ full repository/final Claude field and broader issue gates remain open.
 
 ## Approved generation-75 production checkpoint authored, UNRUN
 
+
+<!-- pcg:B11-CHILDREN-approved-scope:begin -->
 The supplied production disposition approves canonical LoadsChildren from existing
 RouteOccurrence, complete unique ordinary loadChildren selection, distinct native
 Module and typed-const Routes Array target roles, owned selective replacement,
-outside-envelope legacy preservation and semantic generation 75. No durable bump,
+outside-envelope legacy preservation
+<!-- pcg:B11-CHILDREN-approved-scope:end -->
+ and semantic generation 75. No durable bump,
 new public vocabulary/payload/resolver/cache/registry/route tree/discovery change
 is introduced. Marker and pipeline generations remain unchanged.
 

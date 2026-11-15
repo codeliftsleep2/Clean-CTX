@@ -7,18 +7,34 @@ Graph status IMPLEMENTED records the source-described existing mechanism or oper
 
 <!-- pcg:family-standing:end -->
 <!-- pcg:WIRE-001:begin -->
+<!-- pcg:WIRE-001-policy:begin -->
 ### WIRE-001 Canonical IR Serialization Stability
 
 | Property | Value |
 |----------|-------|
 | **Intent** | Canonical IR must survive serialization/deserialization without semantic or structural loss. |
 | **Invariant** | Encoding and decoding a valid `CompiledIR` preserves its canonical instruction stream across all supported wire formats. |
+<!-- pcg:WIRE-001-policy:end -->
 <!-- pcg:WIRE-001-verification:begin -->
-| **Enforcement** | The current canonical enum has 30 CoreOp variants; physical Binary 0x04 has 31 opcode values because exact and spread Call use distinct opcodes. The dedicated binary_wire_v04 fixture covers all 30 variants and both Call forms with complete-value, order and duplicate assertions. The randomized named/binary generators cover 25 variants over 100 seeds, not the full current enum. Other legacy round-trip tests have format-specific and sometimes partial oracles; their existence does not prove complete all-format coverage. Determinism and double-encode assertions remain tracked. See the B0/B1 C13 source comparison for the exact coverage boundary; no test was rerun by this documentation migration. |
+
+**Enforcement:**
+
+The current canonical enum has 30 CoreOp variants; physical Binary 0x04 has 31 opcode values because exact and spread Call use distinct opcodes. The dedicated binary_wire_v04 fixture covers all 30 variants and both Call forms with complete-value, order and duplicate assertions. The randomized named/binary generators cover 25 variants over 100 seeds, not the full current enum.
+<!-- pcg:WIRE-001-coverage-limits:begin -->
+Other legacy round-trip tests have format-specific and sometimes partial oracles; their existence does not prove complete all-format coverage. Determinism and double-encode assertions remain tracked.
+<!-- pcg:WIRE-001-coverage-limits:end -->
+ See the B0/B1 C13 source comparison for the exact coverage boundary; no test was rerun by this documentation migration.
+
+| Property | Value |
+|----------|-------|
+<!-- pcg:WIRE-001-obligations:begin -->
 | **Authority** | `src/tests/ir/round_trip.rs`, `src/tests/ir/round_trip_randomized.rs`, `src/tests/ir/binary_wire_v04.rs`; current enum `src/ir/opcodes.rs` |
 | **Type** | ENFORCED (test) |
 | **Gate** | `cargo test` |
+<!-- pcg:WIRE-001-obligations:end -->
 <!-- pcg:WIRE-001-verification:end -->
+
+
 
 ---
 
@@ -35,9 +51,12 @@ commit: 655f0a75
 note: Source enforcement attributes are retained in prose; admission does not execute witnesses or establish independent validation.
 knowledge_scope: invariant
 knowledge_content:
-  - statement self#WIRE-001
+  - statement self#WIRE-001-policy
+  - observation:source self#WIRE-001
   - qualification self#family-standing
-  - verification_obligation self#WIRE-001-verification
+  - verification_obligation self#WIRE-001-obligations
+  - qualification:coverage_limits self#WIRE-001-coverage-limits
+  - observation:coverage self#WIRE-001-verification
 ```
 
 <!-- pcg:WIRE-001:end -->

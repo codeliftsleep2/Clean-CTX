@@ -1,5 +1,7 @@
 # ANGULAR EAGER COMPONENT
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -9,6 +11,8 @@ Original source checkpoint (historical evidence, not a fresh gate):
 > Source-described approved bounded contract
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
+
+<!-- pcg:B11-standing:end -->
 
 ## Old/candidate carrier comparison and production disposition requested
 
@@ -40,6 +44,8 @@ validation or a second side-by-side weak fact.
 | Lifecycle | existing source-owned pipeline | reuse same snapshot/SQLite/index/currentness/retirement machinery |
 | Eager/lazy coupling | one shape emits eager and lazy RouteMapsTo separately | migrate only proven source-object eager contribution; preserve lazy branch |
 
+
+<!-- pcg:B11-policy-1:begin -->
 Recommended disposition: REPLACE the older eager contribution for objects owned
 by exact admitted source-owned native typed const Routes roots, with one canonical
 RouteOccurrence RouteMapsTo path. Do not merely add canonical rows beside old
@@ -48,7 +54,11 @@ or proof is refused, preventing a downgrade to label authority. Preserve valid
 siblings, provider independence and native root/children/path policy. Same-path
 and empty-path labels remain presentation; use existing reverse queries to test
 empty paths, without changing empty-name query validation.
+<!-- pcg:B11-policy-1:end -->
 
+
+
+<!-- pcg:B11-policy-2:begin -->
 The replacement boundary must use actual root/object source spans before old
 emission loses eager origin, never label/path matching. The structured parser
 already has the object node; carry only minimum private eager-origin metadata
@@ -56,7 +66,11 @@ if needed to select this boundary. Existing retained Object/field/reference/
 Declaration facets and RouteOccurrence already represent the canonical proof;
 no new retained payload is currently demonstrated necessary. Exact private
 provenance layout remains a bounded implementation choice after approval.
+<!-- pcg:B11-policy-2:end -->
 
+
+
+<!-- pcg:B11-policy-3:begin -->
 Recommended compatibility disposition outside that native-root ownership envelope:
 PRESERVE AS LEGACY the existing noncanonical eager behavior for untyped/foreign/
 mutable/otherwise unsupported roots, without calling it canonical membership.
@@ -64,7 +78,11 @@ This is an explicit owner decision request, not automatic authorization. Canonic
 facts must never fall back to it for an owned route object. Preserve lazy
 RouteMapsTo, LoadsChildren, guards/resolvers and older marker/display behavior;
 do not broaden their authority or claim lazy acceptance from this repair.
+<!-- pcg:B11-policy-3:end -->
 
+
+
+<!-- pcg:B11-policy-4:begin -->
 Approve the shared canonical producer/retained-admission contract, this selective
 REPLACE/PRESERVE-AS-LEGACY policy and semantic compatibility advancement for the
 changed public identity. Reuse existing source-owned artifacts, witnesses,
@@ -72,7 +90,11 @@ SQLite/index/public-query lifecycle and actual Component role. No new public
 relation/field, EntityRef equality change, resolver/cache/registry/discovery policy
 or route activation/provider effectiveness is proposed. Durable compatibility
 changes only if actual encoding changes require them.
+<!-- pcg:B11-policy-4:end -->
 
+
+
+<!-- pcg:B11-policy-5:begin -->
 After approval, isolate/restore unchanged valid REDs and batch exact forward/
 reverse same-name/same-path/empty/child/provider-free rows; foreign/type-only/
 ambiguous targets and duplicate/spread/forged/crossed/borrowed proof; owned weak-row
@@ -82,6 +104,8 @@ field/object/child/provider/target/root retirement; cold/warm/refresh and truthf
 lower-bound coverage. Then affected preservation, zero-warning checks and one
 later rebuilt-binary checkpoint with each suite below 500 checks. Operator owns
 runtime; final Claude field gate stays last. No full AQ12/W06/#162 closure follows.
+<!-- pcg:B11-policy-5:end -->
+
 
 The capture-only disposition explicitly withholds production eager identity and
 old/new replacement. AGENTS.md Architectural Approval Gate applies to this public
@@ -93,8 +117,12 @@ Source: [docs/agent/ISSUE_162_ROUTE_COMPONENT_MEMBERSHIP_DECISION.md](../../agen
 
 ## Approved generation-73 eager membership checkpoint authored, UNRUN
 
+
+<!-- pcg:B11-policy-6:begin -->
 The supplied production owner approval authorizes canonical RouteOccurrence
 RouteMapsTo membership and selective replacement of owned eager RouteShape facts.
+<!-- pcg:B11-policy-6:end -->
+
 Generation 73 is authored; marker generation 6 and canonical pipeline generation 1
 are unchanged. No new public vocabulary, serialized payload, resolver, discovery
 policy or route activation meaning is introduced.
@@ -159,5 +187,12 @@ depends_on:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:replacement self#B11-policy-1
+  - constraint:ownership self#B11-policy-2
+  - scope:legacy self#B11-policy-3
+  - constraint:compatibility self#B11-policy-4
+  - verification_obligation:exit self#B11-policy-5
+  - qualification:accepted_scope self#B11-policy-6
+  - observation:source self#whole
 ```

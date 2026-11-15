@@ -31,7 +31,11 @@ impl Capture {
     pub fn read_work(&self) -> (u64, usize) {
         (self.bytes, self.witnesses.len())
     }
-    fn read(&mut self, trusted: &Trusted, relative: &str) -> Result<std::sync::Arc<Vec<u8>>> {
+    pub(super) fn read(
+        &mut self,
+        trusted: &Trusted,
+        relative: &str,
+    ) -> Result<std::sync::Arc<Vec<u8>>> {
         if let Some(bytes) = self.contents.get(relative) {
             return Ok(bytes.clone());
         }
@@ -142,7 +146,7 @@ pub fn scan(trusted: &Trusted) -> Result<Capture> {
         let declarations = match parse::declarations(&path, &bytes) {
             Ok(values) => values,
             Err(error) => {
-                result.diagnostics.push(error);
+                result.diagnostics.push(*error);
                 continue;
             }
         };
@@ -257,5 +261,6 @@ pub fn scan(trusted: &Trusted) -> Result<Capture> {
             <= trusted.profile.max_edges,
         "document_work_limit",
     )?;
+    super::membership::validate(&mut result, trusted)?;
     Ok(result)
 }

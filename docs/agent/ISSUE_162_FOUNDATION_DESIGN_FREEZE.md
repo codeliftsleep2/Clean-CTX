@@ -1,6 +1,10 @@
 # Issue #162 foundation design freeze
 
+
+<!-- pcg:B11-boundary-8:begin -->
 B4b standing: original design/authoring banners retain their historical subjects. Native foundation and retained transport/facets govern only their approved scope. Later module-facet and canonical-relation records describe bounded implementation; neither payload retention nor a design freeze establishes every consumer/question, current executable verification or language certification.
+<!-- pcg:B11-boundary-8:end -->
+
 
 Agent: Agent MaxHeadRoom
 
@@ -17,6 +21,8 @@ The established 3 PASS / 9 RED receipt is sufficient for this design phase.
 The exact regression hash remains
 `B63883E818FC70DF0990D23E2C31AC9D318FED458DA74B70B693C393DBA86379`.
 
+
+<!-- pcg:B11-boundary-1:begin -->
 ## 1. Selected foundation
 
 Recommend **native in-process Rust authority**: one project-aware TypeScript
@@ -40,6 +46,8 @@ consumer integration has already been demonstrated. Native correctness must be
 earned by the acceptance matrix; no weaker compiler substitute or automatic
 fallback to a different backend is authorized if it fails.
 
+<!-- pcg:B11-boundary-1:end -->
+
 ## 2. Repository evidence that determines the boundary
 
 | Evidence | Architectural consequence |
@@ -62,6 +70,7 @@ named Leaf from different files under aliases. Both can render as the same
 semantic triple. An identity side table populated after shared edge dedup cannot
 recover the lost fact. Retention before dedup is therefore mandatory; merely
 adding file fields is rejected.
+
 
 ## 3. Backend alternatives
 
@@ -104,6 +113,9 @@ Official references: [TS module semantics](https://www.typescriptlang.org/docs/h
 [upstream conformance issues](https://github.com/oxc-project/oxc-resolver/issues).
 These support the comparison; no third-party implementation was installed/run.
 
+
+
+<!-- pcg:B11-boundary-3:begin -->
 ## 4. Canonical identity representation and owner
 
 The following are conceptual records, not approval to introduce a generic
@@ -343,11 +355,15 @@ claimed by this freeze.
 | NgRx | Existing qualified action/member/registration authority consumes shared exact symbols; do not replace #152 with name joins |
 | MCP forward/reverse | Render proven occurrence union; internal traversal uses canonical endpoints; no implicit single-declaration selection |
 
+<!-- pcg:B11-boundary-3:end -->
+
 ## 10. Performance, implementation slices and approval boundary
 
 Expected new work: project discovery/JSONC inheritance, file probes/package
 conditions, source parsing and export binding, closure traversal, canonical-fact
 retention and witness checks. These are real costs; no measured claim is made.
+
+<!-- pcg:B11-boundary-4:begin -->
 Snapshot bytes/hash/AST are reused per compatible source; export summaries per
 module snapshot; resolutions per reference namespace/project/options/use mode;
 composition per owner/expression and canonical dependency generation. Reuse a
@@ -361,7 +377,11 @@ compiling every TypeScript file. Closed-world questions such as project ownershi
 selector scope or reference-use eligibility may require inventory beyond one
 positive edge; record that universe work rather than pretending a partial walk
 closed it. No unconditional whole-workspace recomputation is the default repair.
+<!-- pcg:B11-boundary-4:end -->
 
+
+
+<!-- pcg:B11-boundary-5:begin -->
 Smallest convergent implementation slices:
 
 1. Freeze the exact observed #162 test/registration before production edits.
@@ -379,7 +399,9 @@ Smallest convergent implementation slices:
    query/batch validation across real consumers. Verify collision preservation
    before lossy public projection, not after it.
 6. Continue the entire #162 P0/P1 matrix: provider/root/routing, selector scope,
-   host/queries/defer and ecosystem preservation. The initial nine failures are
+   host/queries/defer and ecosystem preservation.
+<!-- pcg:B11-boundary-5:end -->
+ The initial nine failures are
    acceptance examples, never the issue's completion checklist.
 
 Required approval to freeze this proposal: native no-new-runtime foundation,
@@ -387,15 +409,21 @@ producer-owned retained canonical facts/typed witness payload, unchanged global
 EntityRef equality, and explicit legacy fixture-environment enrichment with
 unchanged assertions. The frozen #162 test stays byte-identical.
 
+
+<!-- pcg:B11-boundary-6:begin -->
 Not approved/introduced by this design: Node/compiler runtime, resolver crate or
 MSRV increase; global shared identity migration; new public canonical-ID selector,
 schema/relation vocabulary or completeness promotion. Bring a concrete mapping
 for any later feature requiring those changes. No new runtime run is requested
 for this design phase. Full native conformance and lifecycle integration remain
 implementation/verification obligations, not assumptions.
+<!-- pcg:B11-boundary-6:end -->
+
 
 FOUNDATION DESIGN: READY TO FREEZE
 
+
+<!-- pcg:B11-boundary-7:begin -->
 ## Subsequent accepted scope interpretation
 
 ### Owner decision — 2026-10-22
@@ -410,6 +438,8 @@ Correct internal facts alone do not satisfy #162. This acceptance changes the
 scheduling rule; it does not certify implementation, remove requirements or
 approve a separate global identity/public-contract redesign. Historical pending
 decision language below describes the investigation before this acceptance.
+
+<!-- pcg:B11-boundary-7:end -->
 
 
 Source: [docs/agent/ISSUE_162_SEMANTIC_BOUNDARY_REASSESSMENT.md](ISSUE_162_SEMANTIC_BOUNDARY_REASSESSMENT.md), baseline `ec7067fd`, original section SHA-256 `a819e3afcd8cf060e494653ea1a2f9e6b68edf0e3d0ead87263bb4df5c276ed1`.
@@ -430,5 +460,12 @@ preserves:
 note: The foundation status imports its explicit source-frozen design; retained transport is scoped to implemented facets. Neither establishes complete consumer support, new approval or certification.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:foundation self#B11-boundary-1
+  - constraint:authority_and_lifecycle self#B11-boundary-3
+  - constraint:bounded_work self#B11-boundary-4
+  - verification_obligation:integration self#B11-boundary-5
+  - scope:unapproved_changes self#B11-boundary-6
+  - qualification:accepted_scope self#B11-boundary-7
+  - qualification:standing self#B11-boundary-8
+  - observation:source self#whole
 ```

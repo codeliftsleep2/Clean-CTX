@@ -1,7 +1,11 @@
 # Source-owned PCG document authoring
 
+
+<!-- pcg:B11-document-1-1:begin -->
 **Normal architectural knowledge workflow:** use `pcg_knowledge_v1` as defined
 below. `pcg_documents_v1` remains the explicit legacy whole-document interface.
+<!-- pcg:B11-document-1-1:end -->
+
 
 For example, pass `@{workspaceRoot=(Get-Location).Path; mode='get'; id='PIPELINE-001'}`
 as the knowledge tool's arguments from this repository root. Use `search` for
@@ -14,10 +18,14 @@ them; SQLite owns admitted graph revisions/history. No document metadata is
 inferred or silently repaired. This interface is distinct from the unchanged
 owner-enrolled `pcg_query_v1` evidence-corpus interface.
 
+
+<!-- pcg:B11-document-2-1:begin -->
 ## Configure once per workspace
 
 Set `CLEAN_CTX_PCG_DOCUMENT_PROFILE` to an absolute owner-controlled JSON file:
 
+
+<!-- pcg:B11-document-2-1:end -->
 ```json
 {
   "schema_version": 1,
@@ -31,6 +39,8 @@ Set `CLEAN_CTX_PCG_DOCUMENT_PROFILE` to an absolute owner-controlled JSON file:
 }
 ```
 
+<!-- pcg:B11-document-2-2:begin -->
+
 The workspace, document directories and DB parent must already exist. These are
 example finite limits, not defaults. max_files debits examined filesystem entries;
 max_bytes covers distinct reads at both observation boundaries. Profiles and DBs
@@ -40,10 +50,16 @@ fresh session. Changing the physical catalog scope requires a new DB; adjusting
 operational ceilings across sessions does not discard history. Profiles are not
 per-document enrollment manifests. There is no watcher or background ingestion.
 
+<!-- pcg:B11-document-2-2:end -->
+
+
+<!-- pcg:B11-document-3-1:begin -->
 ## Legacy whole-document retrieval
 
 Call `pcg_documents_v1` with:
 
+
+<!-- pcg:B11-document-3-1:end -->
 ```json
 {
   "workspaceRoot": "C:\\work\\repository",
@@ -54,6 +70,8 @@ Call `pcg_documents_v1` with:
   "tokenizer": "o200k"
 }
 ```
+
+<!-- pcg:B11-document-3-2:begin -->
 
 Modes: search (optional exact track and SQLite FTS5 text expression), get (ID),
 related (one-hop incoming/outgoing), context (transitive pre-authoring context),
@@ -92,6 +110,10 @@ heuristic or inferred applicability is used. Large connected descriptive graphs
 may require a narrower starting point or an explicitly larger permitted request.
 This is structural source-backed context, never permission to execute a mission.
 
+<!-- pcg:B11-document-3-2:end -->
+
+
+<!-- pcg:B11-document-4-1:begin -->
 ## Explicit lossless context transport
 
 Omitting `responseFormat`, or selecting `"inline_v1"`, preserves the original
@@ -141,8 +163,14 @@ The independent production consumer is
 It verifies complete reconstruction and same-generation default compatibility
 using captures from the production stdio driver.
 
+<!-- pcg:B11-document-4-1:end -->
+
+
+<!-- pcg:B11-document-5-1:begin -->
 ## Author the declaration in Markdown
 
+
+<!-- pcg:B11-document-5-1:end -->
 ````text
 # Proposed architecture work
 
@@ -162,6 +190,8 @@ preserves:
 ```
 ````
 
+<!-- pcg:B11-document-5-2:begin -->
+
 Use the exact GLS seven kinds, twelve statuses and thirteen directional relations
 listed in [the GLS taxonomy below](#inspected-reference-and-exact-taxonomy).
 `node`, `kind`, `status`, `title`, `track` are required. Additional supported scalar
@@ -180,14 +210,139 @@ Status VALIDATED or RECLOSED remains source-declared and does not execute a test
 authenticate an approver or prove independent closure. Use the report body and
 typed evidence relations to retain the actual test subject/outcome/provenance.
 
+<!-- pcg:B11-document-5-2:end -->
+
 ## Admission, history and freshness
 
+### B11 owner policy disposition 01
+
+
+<!-- pcg:B11-document-6-1:begin -->
+Owner decision, 2026-11-13: governed corpus membership must not be inferred
+solely from the presence or absence of an `architecture-graph` declaration.
+A new document whose governed membership is established must satisfy applicable
+declaration requirements. Removing declarations, renaming, relocating or
+reclassifying an existing governed source must not silently discharge its
+governance obligations. Legitimate relocation and authorized membership changes
+remain supported. Ordinary documentation outside that corpus need not declare
+architectural knowledge. Unresolved membership is not successful architectural
+knowledge admission.
+<!-- pcg:B11-document-6-1:end -->
+ Deterministic membership representation beyond existing
+accepted identity history remains subject to owner disposition; this policy
+does not assert that such a mechanism is already implemented.
+
+
+<!-- pcg:B11-document-7-1:begin -->
+Owner disposition 02, 2026-11-13, narrows the intended mechanism to a small
+version-controlled repository corpus registry, separate from operational profile
+configuration. It records canonical source paths and expected stable identities,
+without duplicating document metadata/content. Registered missing declarations
+must reject; unregistered declared sources require registration; unregistered
+ordinary Markdown remains outside admission.
+<!-- pcg:B11-document-7-1:end -->
+ Initial membership and update
+compatibility require owner acceptance before activation. Accepted graph membership
+is bootstrap evidence, not sufficient authorization by itself.
+
+
+<!-- pcg:B11-document-8-1:begin -->
+Changes that establish, replace, weaken or remove controlling decisions,
+invariants, mandatory constraints, verification obligations, authoring/admission
+rules or authority-change requirements require explicit owner authorization.
+Agents may propose changes and implement explicitly authorized changes; a
+candidate's assertion of approval or its own proposed rule cannot authorize
+itself. Previously accepted authority governs validation until a legitimate
+authorized replacement is admitted.
+
+Ordinary revisions, findings, historical evidence, investigations and proposals
+retain their existing contracts. A changed source hash alone is not proof of
+changed architectural meaning. Conversely, inability to prove semantic equivalence
+does not establish authorization. Git commits, branch membership, source fields
+and agent assertions are not owner authorization. The bounded mechanism must
+bind authorization to the exact proposed change and applicable predecessor,
+prevent substitution/reuse, and disclose unresolved authorization honestly.
+<!-- pcg:B11-document-8-1:end -->
+
+Its design requires owner disposition before implementation; no signing system,
+general approval ledger or M4b machinery is introduced by this policy.
+
+
+<!-- pcg:B11-document-9-1:begin -->
+Disposition 02 also establishes exact protected-content comparison, including
+minor textual corrections, rather than arbitrary semantic-equivalence inference.
+The explicit protected identity/component set requires owner review and must
+include applicable governing relationships, required qualifications and evidence
+effects. Unrelated content sharing an artifact is not automatically protected.
+Candidate registry/protected-set removal cannot discharge previously accepted
+obligations.
+<!-- pcg:B11-document-9-1:end -->
+ Owner submission remains held: configuration immutability, a separate
+file or an intended owner CLI does not authenticate approval. The threat model is
+normal agent-assisted development, not a malicious actor with unrestricted OS,
+database and executable access. No enforcement mechanism is established by this
+policy text alone.
+
+
+<!-- pcg:B11-document-10-1:begin -->
+Owner disposition 03, 2026-11-13, supersedes the mechanism holds above. The
+selected mechanism is the source-owned
+`docs/architecture/knowledge-governance/corpus.csv` registry (`source_path`,
+`expected_ids`) plus an explicit `protected.csv` component selection (`id`,
+`role`, `label`, `selector`). Operational profiles do not become corpus registries.
+The initial selection must be reconciled against accepted B9-R1 ownership and
+reviewed for controlling applicability before actual activation; file existence
+alone is not bootstrap authorization. Historical source material remains intact.
+
+The implementation uses the existing document SQLite database for accepted
+governance snapshots and exact procedural grants. Schema migration, accepted
+graph and governance publication share the existing transaction boundary. A
+candidate registry or protection-set change cannot erase accepted obligations.
+Applicable exact protected content, qualifications, outgoing governing
+relationships, evidence, lifecycle and ownership changes require authorization;
+incidental byte offsets and whole-artifact hashes do not replace content-boundary
+comparison. Ordinary incoming implementation references do not by themselves
+change the referenced authority. Unapproved disappearance remains blocked;
+explicitly authorized membership removal or relocation preserves history.
+
+After preparing a valid candidate, an operator uses the built executable's
+`pcg documents describe --profile <profile-path>` command. Rust recomputes the
+descriptor from actual sources and the accepted predecessor. The owner reviews
+the complete descriptor and proposed source changes, then explicitly submits
+`pcg documents authorize --profile <profile-path> --digest <reviewed-digest>`.
+These command forms document the owner workflow; agents must never submit the
+authorization or treat a candidate approval assertion as a grant. Describe does
+not publish graph state. Authorize records only the exact grant, not admission.
+The next normal query recomputes the descriptor and admits only a valid,
+exactly authorized candidate. Other candidate, predecessor, workspace or additional
+unapproved governance changes cannot reuse the grant.
+
+This is procedural operator authorization with deterministic change binding,
+not authenticated human identity or protection against an adversarial actor
+with shared OS/database access. It is not exposed as an authorization-creating
+MCP operation. No signing service, generalized approval ledger or independent
+database is introduced. Actual repository activation and production verification
+must be reported separately from implementation and isolated regression results.
+
+B11 schema v3 adds accepted governance snapshots and exact procedural grants to the existing catalog. Recognized v1 and v2 catalogs migrate within the existing transaction; invalid candidates and failed completion roll back the upgrade. Existing revisions, predecessor/publication history, identities, typed relationships, exact acquisition and the separate enrolled-evidence interface remain preserved. Describe alone publishes neither migration nor graph state; authorize records a reviewed grant without admitting a graph. These are procedural change-binding controls, not authenticated human identity. The schema-v2 description below retains its B9 epoch and does not describe the added governance tables.
+<!-- pcg:B11-document-10-1:end -->
+
+
+The historical statement below that revision authorization was unestablished
+remains evidence of the earlier implementation boundary. This decision establishes
+policy prospectively, not a claim that prior revisions had machine-verifiable
+owner authorization or that the present runtime enforces this new policy.
+
+
+<!-- pcg:B11-document-11-1:begin -->
 The next explicit query detects source changes, validates the complete selected
 candidate graph and atomically publishes revisions/relationships/FTS state. No
 manual import is required. Invalid source receives actionable diagnostics and no
 current document payload; the prior admitted graph remains historical. history
 returns `historical_documents`, separately labelled snapshots, even while the
 candidate is invalid. It never presents them in the current `documents` array.
+<!-- pcg:B11-document-11-1:end -->
+
 Source removal is blocked instead of silently erasing a known identity; rename
 with the same node ID creates a new revision and retains old paths. Represent
 semantic replacement through explicit SUPERSEDES and source status, not deletion.
@@ -198,6 +353,8 @@ matrix. Immutable source revisions and publication order make changes observable
 not prove permission to change an earlier decision. Broader authorization and
 contradiction policy would require concrete separate requirements.
 
+
+<!-- pcg:B11-document-12-1:begin -->
 Freshness is exact source/permission observations before interpretation and after
 packing, not continuous immutability or an atomic filesystem snapshot. Failure
 at COMPLETION discards the response and rolls back publication. With both PCG
@@ -211,6 +368,8 @@ other resource, source, and candidate failures retain their explicit diagnostics
 SQLite busy fails without retry. Current catalog reconciliation
 is a write effect: its MCP annotation is not read-only, despite source documents
 never being edited. FTS5 must be supported by SQLite; absence refuses initialization.
+
+<!-- pcg:B11-document-12-1:end -->
 
 <!-- pcg:GLS-grammar-and-bootstrap:begin -->
 ## Inspected reference and exact taxonomy
@@ -305,9 +464,31 @@ preserves:
 note: Operative source-described contract; status does not authenticate approval or certify implementation.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:normal_workflow self#B11-document-1-1
+  - constraint:configuration_1 self#B11-document-2-1
+  - constraint:configuration_2 self#B11-document-2-2
+  - constraint:legacy_retrieval_1 self#B11-document-3-1
+  - constraint:legacy_retrieval_2 self#B11-document-3-2
+  - constraint:transport self#B11-document-4-1
+  - constraint:declarations_1 self#B11-document-5-1
+  - constraint:declarations_2 self#B11-document-5-2
+  - constraint:governed_membership self#B11-document-6-1
+  - constraint:registry_rules self#B11-document-7-1
+  - constraint:authority_changes self#B11-document-8-1
+  - constraint:protected_scope self#B11-document-9-1
+  - statement:governance self#B11-document-10-1
+  - constraint:atomic_publication self#B11-document-11-1
+  - constraint:currentness self#B11-document-12-1
+  - constraint:knowledge_contract_1 self#B11-document-13-1
+  - constraint:knowledge_contract_2 self#B11-document-13-2
+  - constraint:migration_and_projection self#B11-document-14-1
+  - constraint:corruption_refusal self#B11-corruption-refusal
+  - constraint:legacy_preservation self#B11-legacy-preservation
+  - observation:source self#whole
 ```
 
+
+<!-- pcg:B11-document-13-1:begin -->
 ## Independently retrievable knowledge (B9)
 
 Owner-authorized B9 corrects retrieval granularity without replacing Markdown
@@ -331,11 +512,15 @@ line and end before the end line. Marker names are unique per source. Proper
 nesting is allowed; missing, duplicate, malformed, unclosed or empty boundaries
 refuse admission. Headings, proximity and filenames are not extraction authority.
 
+
+<!-- pcg:B11-document-13-1:end -->
 ```markdown
 <!-- pcg:EXACT-SUBJECT:begin -->
 Exact original proposition, including its necessary conditions and rationale.
 <!-- pcg:EXACT-SUBJECT:end -->
 ```
+
+<!-- pcg:B11-document-13-2:begin -->
 
 Source-owned component roles are `statement`, `subject`, `scope`, `outcome`,
 `rationale`, `alternative`, `rejected_alternative`, `rejection_reason`, `consequence`,
@@ -458,8 +643,12 @@ complete authority acquisition nor model delivery/comprehension. Existing B10
 delivery-boundary findings remain valid and their further investigation is
 suspended under B9-R1; no host limit/presentation policy is changed here.
 
+<!-- pcg:B11-document-13-2:end -->
+
 Catalog schema v2 deduplicates complete `(path,hash)` source storage and adds
-revision-bound unit/component projections and attributed FTS. Exact v1 catalogs
+revision-bound unit/component projections and attributed FTS.
+<!-- pcg:B11-document-14-1:begin -->
+Exact v1 catalogs
 migrate transactionally, retaining every revision, predecessor, generation,
 publication, identity, edge, evidence association and original body. Source-bound
 revision hashing remains unchanged. Explicit external content associations enter
@@ -469,6 +658,16 @@ declared edges and the knowledge index, without materializing or certifying the
 unconsumed legacy FTS view. Explicit legacy reads retain their existing legacy
 index check. Every newly published generation builds and verifies both projections
 in the same transaction.
-Unsupported/corrupt schemas refuse. Old binaries refuse v2; there is no destructive
-downgrade. Legacy response formats and full original history remain supported by
+<!-- pcg:B11-document-14-1:end -->
+
+
+<!-- pcg:B11-corruption-refusal:begin -->
+Unsupported/corrupt schemas refuse.
+<!-- pcg:B11-corruption-refusal:end -->
+ Old binaries refuse v2; there is no destructive
+downgrade.
+<!-- pcg:B11-legacy-preservation:begin -->
+Legacy response formats and full original history remain supported by
 the new executable. The separate enrolled interface and unrelated budgets are unchanged.
+
+<!-- pcg:B11-legacy-preservation:end -->

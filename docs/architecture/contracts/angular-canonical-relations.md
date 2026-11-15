@@ -1,5 +1,7 @@
 # ANGULAR CANONICAL RELATIONS
 
+
+<!-- pcg:B11-boundary-3:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,11 +12,17 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-boundary-3:end -->
+
 ## Owner approval and implementation checkpoint
 
+
+<!-- pcg:B11-boundary-2:begin -->
 The owner explicitly approved this bounded carrier and lifecycle extension.
 Global EntityRef equality, legacy edge-key meaning, public JSON and query
 selectors remain frozen. The proposal below is historical decision context.
+<!-- pcg:B11-boundary-2:end -->
+
 
 Implementation uses optional internal CanonicalEndpoint annotations beside
 EntityRef presentation. Each annotation retains all native declaration identity
@@ -51,6 +59,8 @@ claimed. No Cargo/runtime command was started by the agent.
 
 Source: [docs/agent/ISSUE_162_CANONICAL_RELATION_PUBLICATION_DECISION.md](../../agent/ISSUE_162_CANONICAL_RELATION_PUBLICATION_DECISION.md), baseline `ec7067fd`, original section SHA-256 `848cd1e7e71aad92d9a79c5d45788f7a54205560d0b92880dfa5784af1313cb0`.
 
+
+<!-- pcg:B11-boundary-1:begin -->
 ## Decision requested
 
 Authorize a bounded extension for migrated canonical TypeScript/Angular relation
@@ -72,6 +82,8 @@ replacement, selection and retirement use. Full snapshots of dependency sources
 and whole-program retention remain prohibited. An unavoidable expansion beyond
 this scope must be reported before implementation.
 
+<!-- pcg:B11-boundary-1:end -->
+
 
 Source: [docs/agent/ISSUE_162_CANONICAL_RELATION_PUBLICATION_DECISION.md](../../agent/ISSUE_162_CANONICAL_RELATION_PUBLICATION_DECISION.md), baseline `ec7067fd`, original section SHA-256 `b370603af0c97a8fc6b0379940c6d9400c9901dfb49658c487c2c4d1df8eb988`.
 
@@ -90,5 +102,8 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:contract self#B11-boundary-1
+  - qualification:accepted_scope self#B11-boundary-2
+  - qualification:standing self#B11-boundary-3
+  - observation:source self#whole
 ```

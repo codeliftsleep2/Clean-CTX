@@ -1,5 +1,7 @@
 # ANGULAR LEGACY BOOTSTRAP
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,8 +12,12 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
 ## Concrete production semantic approval request
 
+
+<!-- pcg:B11-1:begin -->
 Approve DeclaresBootstrapModule from the exact outer ApplicationBootstrap call
 occurrence (display name bootstrapModule, asserting caller file) to the exact
 canonical native Module declaration referenced by ordinary argument 0. Retain
@@ -55,6 +61,8 @@ Component relation changes its contract; name/shape matching loses native method
 identity. Recommended: one bounded legacy relation on the existing exact call
 endpoint consuming shared neutral proof. No new resolver/cache/registry/lifecycle
 or broader receiver evaluator is necessary for the demonstrated envelope.
+<!-- pcg:B11-1:end -->
+
 
 Owner production disposition is required by the supplied neutral approval, which
 explicitly says not to repair the association RED before returning. AGENTS.md's
@@ -67,10 +75,14 @@ Source: [docs/agent/ISSUE_162_LEGACY_BOOTSTRAP_DECISION.md](../../agent/ISSUE_16
 
 ## Approved generation-72 production checkpoint authored, UNRUN
 
+
+<!-- pcg:B11-2:begin -->
 The supplied production owner approval authorizes DeclaresBootstrapModule on the
 exact outer ApplicationBootstrap occurrence for the demonstrated native factory/
 return/member/ordinary Module argument envelope. Global legacy discovery changes
 remain unapproved. No runtime or effective-provider meaning was added.
+<!-- pcg:B11-2:end -->
+
 
 The unchanged valid RED and registration were raw-byte isolated under
  target/issue-162/legacy-bootstrap72-approved-isolation/ before repair, then restored
@@ -127,5 +139,8 @@ depends_on:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-1
+  - qualification:accepted_scope self#B11-2
+  - observation:source self#whole
 ```

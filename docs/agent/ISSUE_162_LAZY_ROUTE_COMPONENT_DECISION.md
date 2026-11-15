@@ -127,11 +127,15 @@ No agent formatter, Cargo, binary or runtime ran. Binary/final field gates stay 
 
 ## Approved generation-74 lazy production checkpoint authored, UNRUN
 
+
+<!-- pcg:B11-LAZY-approved-scope:begin -->
 The supplied production disposition authorizes exact canonical lazy RouteMapsTo
 and ownership-based replacement of the legacy loadComponent branch, including
 fail-closed retirement of unsupported callbacks inside migrated native ownership.
 No loadChildren, discovery, runtime callback/router meaning, public schema, global
 EntityRef equality, resolver/cache/registry or durable encoding change is introduced.
+<!-- pcg:B11-LAZY-approved-scope:end -->
+
 Semantic generation advances to 74; compatibility controls use current 74/prior 73.
 
 route_lazy_components consumes the existing shared route_objects ownership,

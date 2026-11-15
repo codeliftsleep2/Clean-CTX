@@ -1,11 +1,17 @@
 # Issue #162 — Retained TypeScript authority contract
 
+
+<!-- pcg:B11-boundary-4:begin -->
 B4b standing: original design/authoring banners retain their historical subjects. Native foundation and retained transport/facets govern only their approved scope. Later module-facet and canonical-relation records describe bounded implementation; neither payload retention nor a design freeze establishes every consumer/question, current executable verification or language certification.
+<!-- pcg:B11-boundary-4:end -->
+
 
 Agent: Agent MaxHeadRoom
 Date: 2026-10-22
 Status: implementation contract within approved Phase 3; not implemented or verified.
 
+
+<!-- pcg:B11-boundary-1:begin -->
 ## Requirement and bounded scope
 
 AQ01 requires the actual Angular API/declaration identity; AQ25 requires exact
@@ -18,6 +24,8 @@ that evidence before those consumers can use it.
 The owner approved retained authority integration and the question-driven
 admission rule on 2026-10-22. This contract adds no language semantics, public
 query schema, global identity policy or parallel publication registry.
+
+<!-- pcg:B11-boundary-1:end -->
 
 ## Observed boundary
 
@@ -36,6 +44,8 @@ query schema, global identity policy or parallel publication registry.
 These are static observations, not executed lifecycle verification. A capture
 getter or removal of drop alone cannot satisfy the requirement.
 
+
+<!-- pcg:B11-boundary-2:begin -->
 ## Minimum transport and owner contract
 
 Preserve an optional typed TypeScriptAuthority payload alongside the existing
@@ -111,13 +121,19 @@ a compiler failure RED. Use the normal narrow test/registration stash lifecycle
 after operator-observed RED, then repair and restore the exact test. Operator
 execution owns Cargo and live runs. No test or runtime run is claimed here.
 
+<!-- pcg:B11-boundary-2:end -->
+
 ## Qualified erased-alias disposition
 
 UNRESOLVED. The bounded Angular source search for type_queries, typeof and
 type_reference_sites found no consuming implementation. That does not establish
 absence of a required future declaration-metadata consumer. The three observed
 RED positives remain preserved; later negative/lifecycle assertions remain
-unclassified. No repair or test removal is authorized by this record.
+unclassified.
+<!-- pcg:B11-boundary-3:begin -->
+No repair or test removal is authorized by this record.
+<!-- pcg:B11-boundary-3:end -->
+
 
 ```architecture-graph
 node: AUTH.TS_RETAINED_EVIDENCE
@@ -133,5 +149,9 @@ preserves:
 note: The foundation status imports its explicit source-frozen design; retained transport is scoped to implemented facets. Neither establishes complete consumer support, new approval or certification.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - statement:requirement self#B11-boundary-1
+  - constraint:transport_and_currentness self#B11-boundary-2
+  - constraint:erased_alias_scope self#B11-boundary-3
+  - qualification:standing self#B11-boundary-4
+  - observation:source self#whole
 ```

@@ -1,5 +1,7 @@
 # ANGULAR STRING TOKENS
 
+
+<!-- pcg:B11-standing:begin -->
 Agent: **Agent MaxHeadRoom**. Current normative owner for the bounded semantic clauses below. B4b relocates the approved contract; it grants no implementation/run permission or language certification.
 
 ## Standing and stage interpretation
@@ -10,6 +12,10 @@ Original source checkpoint (historical evidence, not a fresh gate):
 
 The original proposed/requested wording, generation transitions, pre-change comparisons, and UNRUN/verification handoffs below retain their named stage and date. They are not assertions about today's executable or new approval requests. Later recorded bounded acceptance qualifies those checkpoints without certifying the broader envelope. The operative meaning is the exact source-supported written identity/association policy and its refusal/lifecycle limits; execution and broader completion remain separately attributed. Source bodies stay available in Git and linked records.
 
+<!-- pcg:B11-standing:end -->
+
+
+<!-- pcg:B11-policy-1:begin -->
 ## Recommended bounded contract
 
 1. Generalize the existing internal canonical relation endpoint carrier to
@@ -57,9 +63,13 @@ pre-authorize a global identity redesign, new selectors/status fields, generic
 constant evaluator, numeric/boolean token policy, or Attribute semantics.
 Those remaining obligations remain tracked, not silently certified or removed.
 
+<!-- pcg:B11-policy-1:end -->
+
 
 Source: [docs/agent/ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md](../../agent/ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md), baseline `ec7067fd`, original section SHA-256 `095c9430a749a557587b015fa4373e26a5b7e2cb70a486c8389541eeb1d29d21`.
 
+
+<!-- pcg:B11-policy-2:begin -->
 ## Owner decision and API-surface guardrail
 
 The attached owner approval authorizes distinct string-value identity, exact
@@ -81,6 +91,8 @@ Initial API evidence is the official Angular 20 surface used by the fixtures:
 These are documentary API observations, not an executed TypeScript/Angular
 oracle or full version-family conformance. Selected fixture declarations model
 only the shapes needed by these tests; they are not full official library copies.
+
+<!-- pcg:B11-policy-2:end -->
 
 
 Source: [docs/agent/ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md](../../agent/ISSUE_162_STRING_TOKEN_IDENTITY_DECISION.md), baseline `ec7067fd`, original section SHA-256 `cceb1c16b0549792a494f1282bd4189c7015741de1b4773c9455d4bbca08df46`.
@@ -188,5 +200,8 @@ preserves:
 note: Operative bounded source contract; historical approval and execution remain attributed, not language certification or runtime permission.
 knowledge_scope: authority
 knowledge_content:
-  - statement self#whole
+  - qualification:standing self#B11-standing
+  - statement:contract self#B11-policy-1
+  - scope:consumer_limits self#B11-policy-2
+  - observation:source self#whole
 ```
