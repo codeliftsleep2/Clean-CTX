@@ -77,3 +77,18 @@ pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-forma
 This skips tracked tests and runs only scoped format/Clippy, guards and revised
 actual document admission. A full fresh registration selection now expects 20,
 not the historical 18. Source hashes and warnings remain fail-closed.
+
+## Feature-guard follow-up
+
+The historical CI run failed default-feature compilation on test-only items whose
+consumers require feature rust. Narrow cfg alignment was verified with warnings
+fatal in default and all-feature modes. Reuse those compilation receipts while
+running only scoped format/Clippy, guards and revised actual admission:
+
+```powershell
+pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1 -VerifiedFeatureGuardsFrom target/ang-r2/feature-guard-check-20261116-123207-211
+```
+
+No tracked test runs, production rebuild, field pilot, PR or CI dispatch is hidden
+in this mode. A successful local correction does not turn the failed historical
+CI run green or establish CI for a later commit.

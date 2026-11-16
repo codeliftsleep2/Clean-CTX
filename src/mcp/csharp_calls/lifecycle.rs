@@ -104,7 +104,7 @@ impl CSharpCallAuthorityState {
             .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "rust"))]
     pub(crate) fn status(&self) -> CSharpCallAuthorityStatus {
         self.lock().status
     }

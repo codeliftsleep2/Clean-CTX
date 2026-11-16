@@ -286,11 +286,11 @@ DOC-270 governs the bounded investigation, approved implementation, compatibilit
 lifecycle/performance reconciliation and exact evidence statements of this mission.
 Its explicit document inventory is
 `verification/live-acceptance/issue-162/ang-r2/ANG_R2_EVIDENCE_INDEX.md`, SHA-256
-`7c499ad56bdf9b8a0d3ba2cc7a6be307fc91885010ee047ab6cc68528bc88d02`.
-Document identity manifest SHA-256: `efe214e7714c9a078da9cd5e204c87bb4f756954be5c1c31e69ca0eb086a7004`.
+`1e4c85546809cc4f16b4dda6ab485a64c23564562f1c8bb7fbf90a8fab098186`.
+Document identity manifest SHA-256: `7339af53a20f3e21009d77c10cf8c05cd11a25a6945952b7184de0053117e646`.
 Exact current identities for all 18 Markdown mission documents, including that
 index, are in ANG_R2_DOCUMENT_COVERAGE.json, SHA-256
-`efe214e7714c9a078da9cd5e204c87bb4f756954be5c1c31e69ca0eb086a7004`.
+`7339af53a20f3e21009d77c10cf8c05cd11a25a6945952b7184de0053117e646`.
 The focused handoff checks these pins; all current mission Markdown paths were
 compared with the inventory, with no omitted or spurious document.
 
@@ -378,6 +378,29 @@ validate/reuse current test evidence and run only scoped format/Clippy, guards a
 actual revised admission. No redundant tracked tests or new architecture is required.
 CI, final applicable field verification, guarded follow-up commit/push and full
 mission acceptance remain distinct. No new PR or merge is authorized.
+
+
+### CI feature-guard correction
+
+Existing CI run 43909906505 on 51d2a698 failed default-feature warning-fatal
+compilation before tests. Three test-support items were compiled without feature
+rust although their consumers require it: IR failure reexport, C# status accessor
+and hydration scan instrumentation. Their guards now match the consumers, with no
+production behavior, warning suppression, producer/schema or workflow changes.
+
+Operator capture feature-guard-check-20261116-123207-211 passed
+`cargo check --all-targets` deliberately under default features (166.136998 seconds),
+and `cargo check --all-targets --all-features` (64.0292848 seconds), both with
+RUSTFLAGS including -D warnings. Log hashes match receipts. These are compilation
+results, not runtime tests or successful full CI. No CI run was observed for pushed
+d2eb86dfb53f2b102b461c009fb90495d0181315; no replacement PR or trigger change is
+authorized. The existing format wrapper's -VerifiedFeatureGuardsFrom mode validates
+and reuses these two exact compilation results, skips tracked tests and performs
+scoped format/Clippy, guards and actual revised admission. Those final follow-up
+checks are UNRUN until captured. The last admitted previous record generation is
+c1b38aa21f4919dd6899322571f91ff7c3c7cabd701908019fec7ba841cb8566, not proof
+of admission for this later amendment. A corrected local compile does not rewrite
+the failed CI history. Final CI and applicable field evidence remain separate.
 
 <!-- pcg:ANG-R2-post-normalization-obligations:end -->
 

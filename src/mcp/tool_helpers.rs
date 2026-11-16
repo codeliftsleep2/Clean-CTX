@@ -7,7 +7,7 @@ use crate::compression::Fidelity;
 
 use crate::mcp::McpState;
 use crate::mcp::semantic_compilation::artifact::SemanticCompilationArtifact;
-#[cfg(test)]
+#[cfg(all(test, feature = "rust"))]
 pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_IR_FAILURE;
 #[cfg(test)]
 pub(crate) use crate::mcp::semantic_compilation::compile::TEST_INJECTED_SOURCE_FAILURE;

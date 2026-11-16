@@ -1,4 +1,4 @@
-param([string]$ResumeVerifiedFrom, [string]$VerifiedLifecycleFrom)
+param([string]$ResumeVerifiedFrom, [string]$VerifiedLifecycleFrom, [string]$VerifiedFeatureGuardsFrom)
 # Operator-owned disposition-03 focused tests, scoped formatting/lint, guards and admission.
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Use PowerShell 7 or later.' }
@@ -31,7 +31,22 @@ try {
     }
     $before = ConvertTo-Json -InputObject @(Source-Pins) -Depth 10
     [IO.File]::WriteAllText((Join-Path $out 'source-manifest.json'),$before,$utf8)
-    if ($ResumeVerifiedFrom -and $VerifiedLifecycleFrom) { throw 'Choose one receipt reuse mode.' }
+    if (@($ResumeVerifiedFrom,$VerifiedLifecycleFrom,$VerifiedFeatureGuardsFrom | Where-Object {$_}).Count -gt 1) { throw 'Choose one receipt reuse mode.' }
+    if ($VerifiedFeatureGuardsFrom) {
+        $prior = (Resolve-Path -LiteralPath $VerifiedFeatureGuardsFrom).Path
+        if (-not $prior.StartsWith((Join-Path $root 'target/ang-r2/feature-guard-check-'),[StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid feature-guard receipt directory.' }
+        foreach ($mode in @('default','all-features')) {
+            $receiptPath = Join-Path $prior ($mode+'-receipt.json')
+            $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json
+            $command = if ($mode -eq 'default') {'cargo check --all-targets'} else {'cargo check --all-targets --all-features'}
+            if ($receipt.exit_code -ne 0 -or $receipt.command -cne $command -or $receipt.feature_mode -cne $mode -or $receipt.rustflags -notmatch '-D warnings' -or $receipt.head -cne (& git rev-parse HEAD)) { throw 'Invalid feature-guard result.' }
+            foreach ($channel in @('stdout','stderr')) {
+                if ((Get-FileHash (Join-Path $prior ($mode+'-'+$channel+'.txt'))).Hash.ToLowerInvariant() -cne $receipt.($channel+'_sha256')) { throw 'Feature-guard log mismatch.' }
+            }
+            [ordered]@{category='Reused successful warning-fatal compilation; not runtime test or CI';receipt=$receiptPath;sha256=(Get-FileHash $receiptPath).Hash.ToLowerInvariant()} |
+                ConvertTo-Json | Set-Content -LiteralPath (Join-Path $out ($mode+'-compilation-reused.json')) -Encoding utf8NoBOM
+        }
+    }
     if ($VerifiedLifecycleFrom) {
         $prior = (Resolve-Path -LiteralPath $VerifiedLifecycleFrom).Path
         if (-not $prior.StartsWith((Join-Path $root 'target/ang-r2/remaining-lifecycle-'),[StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid lifecycle receipt directory.' }
@@ -75,6 +90,7 @@ try {
     )
     foreach ($run in $runs) {
         if ($VerifiedLifecycleFrom -and $run.expected) { continue }
+        if ($VerifiedFeatureGuardsFrom -and $run.expected) { continue }
         if ($ResumeVerifiedFrom -and $run.name -notin @('utf8','file-sizes')) { continue }
         $argumentsForRun = $run.arguments
         $stdout = Join-Path $out ($run.name+'-stdout.txt')

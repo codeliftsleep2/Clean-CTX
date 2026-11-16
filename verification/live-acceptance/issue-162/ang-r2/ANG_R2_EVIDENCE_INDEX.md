@@ -62,6 +62,8 @@ the current handoff below for the current normalized source.
 
 - `invoke-remaining-lifecycle.ps1`: two focused additional-root and mutation transport witnesses; no PR/push operation.
 
+- `invoke-feature-guard-check.ps1`: warning-fatal default/all-feature compilation for three observed test-support guard errors; no workflow trigger change.
+
 ## ANG_R2_FORMAT_HANDOFF
 
 Current handoff: `pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1`. It is UNRUN. See
