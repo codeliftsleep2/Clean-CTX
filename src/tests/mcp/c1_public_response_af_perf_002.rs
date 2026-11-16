@@ -1,6 +1,14 @@
 //! Frozen original public result oracle, including independently validated cache breakers.
 use serde_json::{Value, json};
 
+fn canonical_fixture_footer(text: &mut String) {
+    // Only this fixture's root-derived PATHMAP spelling differs by platform.
+    // Preserve the frozen Windows oracle; do not normalize arbitrary slashes.
+    if let Some(prefix) = text.strip_suffix("\n§PATHMAP\n  α1 = <ROOT>/workload.ts") {
+        *text = format!("{prefix}\n§PATHMAP\n  α1 = <ROOT>\\workload.ts");
+    }
+}
+
 fn normalized_result(mut result: Value, root: &std::path::Path) -> Value {
     let actual_text = result["content"][0]["text"].as_str().unwrap();
     let actual_breaker = crate::mcp::cache_hints::compute_baseline_breaker(actual_text);
@@ -30,6 +38,9 @@ fn normalized_result(mut result: Value, root: &std::path::Path) -> Value {
         }
     }
     normalize(&mut result, &root.to_string_lossy());
+    if let Value::String(text) = &mut result["content"][0]["text"] {
+        canonical_fixture_footer(text);
+    }
     let breaker = crate::mcp::cache_hints::compute_baseline_breaker(
         result["content"][0]["text"].as_str().unwrap(),
     );
@@ -40,6 +51,28 @@ fn normalized_result(mut result: Value, root: &std::path::Path) -> Value {
         bp["breaker"] = json!(breaker);
     }
     result
+}
+
+#[test]
+fn afperf_c1_fixture_footer_normalization_is_narrow() {
+    let prefix = "unchanged source / separator";
+    let mut unix = format!("{prefix}\n§PATHMAP\n  α1 = <ROOT>/workload.ts");
+    let windows = format!("{prefix}\n§PATHMAP\n  α1 = <ROOT>\\workload.ts");
+    canonical_fixture_footer(&mut unix);
+    assert_eq!(unix, windows);
+    let mut already_canonical = windows.clone();
+    canonical_fixture_footer(&mut already_canonical);
+    assert_eq!(already_canonical, windows);
+    for unchanged in [
+        "<ROOT>/workload.ts",
+        "\n§PATHMAP\n  α2 = <ROOT>/workload.ts",
+        "\n§PATHMAP\n  α1 = <ROOT>/other.ts",
+        "\n§PATHMAP\n  α1 = <ROOT>/workload.ts\nextra",
+    ] {
+        let mut actual = unchanged.to_owned();
+        canonical_fixture_footer(&mut actual);
+        assert_eq!(actual, unchanged);
+    }
 }
 
 #[test]
