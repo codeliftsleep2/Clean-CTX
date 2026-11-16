@@ -64,6 +64,10 @@ the current handoff below for the current normalized source.
 
 - `invoke-feature-guard-check.ps1`: warning-fatal default/all-feature compilation for three observed test-support guard errors; no workflow trigger change.
 
+- `invoke-audit-dependency-update.ps1`: targeted six-package resolution and actual audit; audit-only mode preserves reviewed lockfile updates.
+- `invoke-local-audit-tool.ps1`: explicit repository-local tool installation and audit retry after Windows launch failures; no security changes.
+- `invoke-dependency-verification.ps1`: locked default/all-feature workspace compilation/lint including proxy; no runtime or CI claim.
+
 ## ANG_R2_FORMAT_HANDOFF
 
 Current handoff: `pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1`. It is UNRUN. See

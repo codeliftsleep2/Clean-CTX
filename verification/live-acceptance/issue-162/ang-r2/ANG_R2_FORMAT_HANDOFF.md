@@ -92,3 +92,17 @@ pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-forma
 No tracked test runs, production rebuild, field pilot, PR or CI dispatch is hidden
 in this mode. A successful local correction does not turn the failed historical
 CI run green or establish CI for a later commit.
+
+## Dependency follow-up
+
+Actual audit reports zero vulnerabilities and warnings after six targeted lockfile
+updates. Default workspace compilation and all-feature workspace Clippy, including
+the proxy, passed with --locked and warnings fatal. Preserve those results:
+
+```powershell
+pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1 -VerifiedDependenciesFrom target/ang-r2/dependency-verification-20261116-151157-282
+```
+
+Only revised-document guards and actual admission run. No compilation, tracked
+tests or audit is repeated. The main audit failure is historical, not relabelled
+green by a feature-branch update; its separate dependency state remains explicit.

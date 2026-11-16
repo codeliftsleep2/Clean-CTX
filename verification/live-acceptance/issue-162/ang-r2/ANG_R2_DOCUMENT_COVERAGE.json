@@ -13,11 +13,11 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_EVIDENCE_INDEX.md",
-    "sha256": "1e4c85546809cc4f16b4dda6ab485a64c23564562f1c8bb7fbf90a8fab098186"
+    "sha256": "a22fa0ac778b1f60e2a6a923412f82ac6eeeaea5ffcc66d7f4794e1c96a4e5af"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_FORMAT_HANDOFF.md",
-    "sha256": "de0d7e6c2c64a0cede03249802fb564bb694688d151816a42d68bd6d42924e99"
+    "sha256": "87c064a836e656b2c2035fc3e07e229abea5eac84c9ae4e5ae2774d4cd9f7365"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_FROZEN_FORMAT_REVIEW.md",
@@ -53,7 +53,7 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_PROGRESS.md",
-    "sha256": "eb77b6bdedd2679ba31a549574d71594f71bf513fb1d2b3494b208404af30962"
+    "sha256": "54ae6d90952bbf59feefef20083af5b730b2317e564fe68badbddb744b2c7763"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_PUBLIC_CONTRACT.md",
@@ -69,6 +69,6 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_VERIFICATION.md",
-    "sha256": "99694b8744dc608b6db647e03d5afce1cabd12aad25d1ac1c443659bb38e8383"
+    "sha256": "5e9a647a004beb565dbd8d7e889fc952d2b6f66fdc415561b7ec95cf2d3f748c"
   }
 ]
