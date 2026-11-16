@@ -2,10 +2,53 @@
 use crate::ir::compiler::CompiledIR;
 use crate::work_observations_af_perf_002 as work;
 use serde_json::{Value, json};
+
+fn canonical_fixture_path(text: &mut String) {
+    // The historical fixture used Windows spelling. Only this fixture's owner
+    // and terminal presentation footer are portable; source text is not.
+    if text == "<ROOT>/clone-budget.ts" {
+        *text = "<ROOT>\\clone-budget.ts".into();
+    } else if let Some(prefix) = text.strip_suffix("\n§PATHMAP\n  α1 = <ROOT>/clone-budget.ts") {
+        *text = format!("{prefix}\n§PATHMAP\n  α1 = <ROOT>\\clone-budget.ts");
+    }
+}
+
+#[test]
+fn afperf_a1_fixture_path_normalization_is_narrow() {
+    for (input, expected) in [
+        ("<ROOT>/clone-budget.ts", "<ROOT>\\clone-budget.ts"),
+        ("<ROOT>\\clone-budget.ts", "<ROOT>\\clone-budget.ts"),
+        (
+            "body\n§PATHMAP\n  α1 = <ROOT>/clone-budget.ts",
+            "body\n§PATHMAP\n  α1 = <ROOT>\\clone-budget.ts",
+        ),
+        ("<ROOT>/other.ts", "<ROOT>/other.ts"),
+        (
+            "source <ROOT>/clone-budget.ts",
+            "source <ROOT>/clone-budget.ts",
+        ),
+        (
+            "body\n§PATHMAP\n  α2 = <ROOT>/clone-budget.ts",
+            "body\n§PATHMAP\n  α2 = <ROOT>/clone-budget.ts",
+        ),
+        (
+            "body\n§PATHMAP\n  α1 = <ROOT>/clone-budget.ts\nextra",
+            "body\n§PATHMAP\n  α1 = <ROOT>/clone-budget.ts\nextra",
+        ),
+    ] {
+        let mut actual = input.to_owned();
+        canonical_fixture_path(&mut actual);
+        assert_eq!(actual, expected);
+    }
+}
+
 fn normalize(mut value: Value, root: &str) -> Value {
     fn walk(value: &mut Value, root: &str) {
         match value {
-            Value::String(text) => *text = text.replace(root, "<ROOT>"),
+            Value::String(text) => {
+                *text = text.replace(root, "<ROOT>");
+                canonical_fixture_path(text);
+            }
             Value::Array(items) => items.iter_mut().for_each(|v| walk(v, root)),
             Value::Object(items) => items.values_mut().for_each(|v| walk(v, root)),
             _ => {}
