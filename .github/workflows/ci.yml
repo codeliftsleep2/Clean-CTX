@@ -1,6 +1,13 @@
 name: CI
 
 on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: "Base Git ref for active-file size validation"
+        required: true
+        default: main
+        type: string
   push:
     branches: [main, master]
   pull_request:
@@ -38,7 +45,7 @@ jobs:
       - name: active-file size guard
         shell: pwsh
         env:
-          FILE_SIZE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          FILE_SIZE_BASE: ${{ github.event.pull_request.base.sha || github.event.before || inputs.base_ref }}
         run: ./scripts/check-file-sizes.ps1 -BaseRef $env:FILE_SIZE_BASE
       - name: UTF-8 / mojibake guard
         shell: pwsh
