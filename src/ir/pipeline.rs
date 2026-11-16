@@ -122,6 +122,9 @@ pub struct PassContext {
     /// Meta-layer semantic edges accumulated by Pass 3 (MetaLayerPass) and
     /// consumed by the inference layer (Pass 8; semantic plan Phase 2).
     pub semantic_edges: Vec<SemanticEdge>,
+    pub(crate) resolver_registration_scope: Option<bool>,
+    pub(crate) resolver_registrations:
+        Option<crate::layers::meta::resolver_registrations::ResolverRegistrations>,
     pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     /// Source code and metadata
     pub source: String,
@@ -201,6 +204,8 @@ impl PassContext {
             program_graph: None,
             inference_layer: None,
             semantic_edges: Vec::new(),
+            resolver_registrations: None,
+            resolver_registration_scope: None,
             semantic_dependencies: Vec::new(),
             source,
             file_id,

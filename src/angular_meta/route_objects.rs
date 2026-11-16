@@ -114,17 +114,20 @@ pub(super) struct RouteObject<'a> {
     pub path: String,
 }
 impl RouteObject<'_> {
+    pub fn occurrence(&self, authority: &TypeScriptAuthority) -> RouteOccurrence {
+        RouteOccurrence {
+            root: (&self.root.declaration).into(),
+            source: authority.source.clone(),
+            source_hash: authority.source_hash.clone(),
+            start: self.object.start,
+            end: self.object.end,
+        }
+    }
     pub fn subject(&self, authority: &TypeScriptAuthority) -> EntityRef {
         let mut subject = EntityRef::new("angular", "Route", &self.path)
             .with_file(authority.source.to_string_lossy().into_owned());
         subject.canonical = Some(CanonicalEndpoint::RouteOccurrence {
-            route_occurrence: RouteOccurrence {
-                root: (&self.root.declaration).into(),
-                source: authority.source.clone(),
-                source_hash: authority.source_hash.clone(),
-                start: self.object.start,
-                end: self.object.end,
-            },
+            route_occurrence: self.occurrence(authority),
         });
         subject
     }

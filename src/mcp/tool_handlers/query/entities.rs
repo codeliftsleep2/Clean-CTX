@@ -544,14 +544,19 @@ fn publish_file_projection(
         let _ = source_path;
         state
             .workspace_index_lock()
-            .replace_semantic_projection_with_retained_authority(
+            .replace_semantic_projection_with_complete_authority(
                 owner,
-                snapshot.edges,
-                fidelity,
-                snapshot.source_hash,
-                snapshot.dependencies,
-                #[cfg(feature = "typescript")]
-                snapshot.authority.typescript_authority,
+                crate::workspace::index::SemanticProjectionInput {
+                    #[cfg(feature = "typescript")]
+                    typescript_authority: snapshot.authority.typescript_authority,
+                    resolver_registrations: snapshot.authority.resolver_registrations,
+                    resolver_registration_scope: snapshot.authority.resolver_registration_scope,
+                    fidelity,
+                    source_hash: snapshot.source_hash,
+                    edges: snapshot.edges,
+                    dependencies: snapshot.dependencies,
+                },
+                crate::layers::meta::resolver_registrations::enabled(&state.config),
             )
             .map_err(QueryFailure::internal)
     })

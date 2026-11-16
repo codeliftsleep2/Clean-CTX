@@ -1,0 +1,40 @@
+{
+  "category": "Static source pins, not Rust governance descriptor or authorization",
+  "baseline": "2aa988868202bb39307d2d256bab113c9e61b219",
+  "accepted_generation": "4f410b2f2f816ce7dc7a4ca74ad04009d19ee0bb2631ed8a36a9ae7103ff57c3",
+  "binary_sha256": "4e3da8ee0b160938a238fc273271ce24d1574348c60d16b5b047ae936260387f",
+  "profile_sha256": "0c1958e1302bd6d1e4a82dd644b03a2e322c687e9349bc038e2835283c1a40e9",
+  "files": [
+    {
+      "path": "docs/architecture/contracts/angular-resolver.md",
+      "predecessor_sha256": "72963d369fdf8201a98902d2352ae713922dfdf8a519c85413ea2a2bd444b87b",
+      "candidate_sha256": "e696b72d57e9530a04faa6a28794162b1887fbf98e205a90e7176b4f4fd40c13",
+      "changed": true
+    },
+    {
+      "path": "docs/architecture/contracts/angular-canonical-relations.md",
+      "predecessor_sha256": "c1589f3e2bdb5a1e5e1651b91c0b8b79340f9c40738d3c15cf0cbdc39391c621",
+      "candidate_sha256": "9bce5cedba7064e367173e69cbaedcf191833595d9fc995bcb12b4973ad11ffd",
+      "changed": true
+    },
+    {
+      "path": "docs/agent/tooling.md",
+      "predecessor_sha256": "0e10ebf08f9b5ca0082257152a7a124d99d2e2a7f014bf70f1703862642b2178",
+      "candidate_sha256": "baf5d09118524957292bfa421396e27ab0f0de5f4f7a017c465e4c97a7f6b234",
+      "changed": true
+    },
+    {
+      "path": "docs/architecture/knowledge-governance/corpus.csv",
+      "predecessor_sha256": "65ead16f50cb66fdec4d56b9da7a78784382997455bb707d5d9aa6ea12a71476",
+      "candidate_sha256": "d27e89bf82b39664dd0d00767f5b328443db84af1a0ca3b005eb2b34f0457485",
+      "changed": false
+    },
+    {
+      "path": "docs/architecture/knowledge-governance/protected.csv",
+      "predecessor_sha256": "776417a1cb057f8a7e4c5dd3e619a7790a4832209f6fa679e74ea5266d0e08e6",
+      "candidate_sha256": "776417a1cb057f8a7e4c5dd3e619a7790a4832209f6fa679e74ea5266d0e08e6",
+      "changed": false
+    }
+  ],
+  "predecessor_hash_basis": "Git HEAD blob bytes; working files may retain checkout CRLF. changed is the Git content delta, not newline-only checkout differences."
+}

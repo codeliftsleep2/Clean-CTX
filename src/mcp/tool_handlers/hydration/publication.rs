@@ -326,14 +326,19 @@ fn commit_candidate(
                 }
                 state
                     .workspace_index_lock()
-                    .replace_semantic_projection_with_retained_authority(
+                    .replace_semantic_projection_with_complete_authority(
                         &publication.canonical,
-                        semantic_edges,
-                        publication.coverage,
-                        compiled_hash,
-                        semantic_dependencies,
-                        #[cfg(feature = "typescript")]
-                        authority.typescript_authority,
+                        crate::workspace::index::SemanticProjectionInput {
+                            #[cfg(feature = "typescript")]
+                            typescript_authority: authority.typescript_authority,
+                            resolver_registrations: authority.resolver_registrations,
+                            resolver_registration_scope: authority.resolver_registration_scope,
+                            fidelity: publication.coverage,
+                            source_hash: compiled_hash,
+                            edges: semantic_edges,
+                            dependencies: semantic_dependencies,
+                        },
+                        crate::layers::meta::resolver_registrations::enabled(&state.config),
                     )?;
                 #[cfg(feature = "csharp")]
                 if publication.published_outcome == CandidatePublication::PublishedCSharp {

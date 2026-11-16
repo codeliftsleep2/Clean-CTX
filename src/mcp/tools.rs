@@ -481,7 +481,13 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
             },
             "outputSchema": {
                 "type": "object",
+                "allOf":[{"if":{"required":["registrations"]},"then":super::tool_schemas::resolver_registrations::result()}],
                 "properties": {
+                    "format_version":{"const":1},
+                    "direction":{"enum":["forward","reverse"]},
+                    "registrations":super::tool_schemas::resolver_registrations::records(),
+                    "semantic_omissions":super::tool_schemas::resolver_registrations::omissions(true),
+                    "candidate_source_omissions":super::tool_schemas::resolver_registrations::omissions(false),
                     "entities": {
                         "type": "array",
                         "description": "Matching entities (find_entities, entities_in_file, declarations_in_file).",

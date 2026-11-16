@@ -152,6 +152,19 @@ See [M4a integration evidence](PCG_175_M4A_IMPLEMENTATION.md).
 | `workspace_query` | `type` (single) or `queries` (batch) | Operation fields; shared `workspaceRoot`, `withinPath` | **READ-ONLY** — Run one legacy operation or up to 32 heterogeneous operations in one ordered batch. A batch requires unique item IDs, shares one top-level scope, deduplicates equivalent hydration, evaluates index-backed items against one final post-preparation view, and returns independent per-item success/error outcomes. The seven operation semantics and authority boundaries are unchanged. |
 | `refresh_workspace` | `workspaceRoot` | — | **READ-ONLY, IDEMPOTENT** — Establish a new Clean-CTX source generation after external edits across `workspaceRoot` plus configured additional roots. Retracts current indexed semantics, source/discovery snapshots, and stale pending semantic transitions while preserving durable history and diff baselines. Reports affected roots and authority counts; the next query hydrates current source. CBM is not invoked. |
 
+ANG-R2 owner disposition 01 accepts the prospective additive
+`workspace_query(type="resolver_registrations")` contract, pending B11 admission
+and implementation. Require authorized workspaceRoot and forward route_path
+(string, empty allowed) or reverse resolver_name (nonempty string), rejecting the
+opposite selector. Return exact written registration snapshot coordinates in
+occurrence buckets, not runtime eligibility. Reuse shared scope, batch isolation,
+asserting-source withinPath and final currentness. Preserve lower-bound coverage
+and distinguish proved selected-bucket omissions from unassociated inspected-source
+diagnostics. The exact contract is owned by
+[ANGULAR RESOLVER](../architecture/contracts/angular-resolver.md); old operation
+contracts and the global query envelope version remain unchanged. This is no new
+test result, execution permission or production acceptance claim.
+
 The seventh operation, `calls_in_file`, requires `filePath`, `workspaceRoot`,
 `owner: {kind: "class"|"interface", name}`, and `method: {name}`. Optional
 `method.parameters` and `method.return_type` are exact visible-signature
@@ -832,6 +845,8 @@ status: IMPLEMENTED
 title: Clean-first tool and namespace workflow
 track: REPOSITORY
 artifact: docs/agent/tooling.md
+depends_on:
+  - AUTH.ANGULAR_RESOLVER
 preserves:
   - MCP-001
   - MCP-002

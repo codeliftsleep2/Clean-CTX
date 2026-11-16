@@ -5,6 +5,11 @@
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub(crate) struct QueryWorkCounts {
+    pub(crate) retirement_owner_passes: usize,
+    pub(crate) retirement_owner_probes: usize,
+    pub(crate) resolver_nominations: usize,
+    pub(crate) resolver_owner_validations: usize,
+    pub(crate) resolver_records_considered: usize,
     pub(crate) ef_dependency_catalog_builds: usize,
     pub(crate) ef_dependency_files_parsed: usize,
     pub(crate) ef_dependency_inventories: usize,
@@ -51,6 +56,11 @@ pub(crate) struct QueryWorkCounts {
 thread_local! {
     static COUNTS: std::cell::Cell<QueryWorkCounts> =
         const { std::cell::Cell::new(QueryWorkCounts {
+            retirement_owner_passes: 0,
+            retirement_owner_probes: 0,
+            resolver_nominations: 0,
+            resolver_owner_validations: 0,
+            resolver_records_considered: 0,
             ef_dependency_catalog_builds: 0,
             ef_dependency_files_parsed: 0,
             ef_dependency_inventories: 0,
@@ -247,4 +257,24 @@ pub(crate) fn record_declaration_candidate_index(keys: usize, indexed: usize, ma
         counts.declaration_candidate_max_bucket_size =
             counts.declaration_candidate_max_bucket_size.max(maximum);
     });
+}
+
+pub(crate) fn record_resolver_nomination() {
+    update(|counts| counts.resolver_nominations += 1);
+}
+
+pub(crate) fn record_retirement_pass() {
+    update(|counts| counts.retirement_owner_passes += 1);
+}
+
+pub(crate) fn record_retirement_probe() {
+    update(|counts| counts.retirement_owner_probes += 1);
+}
+
+pub(crate) fn record_resolver_owner_validation() {
+    update(|counts| counts.resolver_owner_validations += 1);
+}
+
+pub(crate) fn record_resolver_records(count: usize) {
+    update(|counts| counts.resolver_records_considered += count);
 }

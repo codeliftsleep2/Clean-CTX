@@ -38,6 +38,9 @@ impl SemanticFidelity {
 
 #[derive(Debug, Clone)]
 pub(super) struct SemanticCoverage {
+    pub(super) resolver_registration_admitted: bool,
+    pub(super) resolver_registrations:
+        Option<crate::layers::meta::resolver_registrations::ResolverRegistrations>,
     #[cfg(feature = "typescript")]
     pub(super) typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
     pub(super) fidelity: SemanticFidelity,
@@ -46,6 +49,11 @@ pub(super) struct SemanticCoverage {
 }
 
 impl WorkspaceIndex {
+    /// Existing published source owners, not a source inventory or completeness proof.
+    pub(crate) fn semantic_projection_owners(&self) -> Vec<String> {
+        self.semantic_coverage.keys().cloned().collect()
+    }
+
     /// Known owners are revalidation candidates, never discovery/completeness
     /// proof. Cached discovery cannot certify their consumed TS dependencies.
     #[cfg(feature = "typescript")]
@@ -255,6 +263,8 @@ impl WorkspaceIndex {
         self.semantic_coverage.insert(
             file_path.to_string(),
             SemanticCoverage {
+                resolver_registration_admitted: false,
+                resolver_registrations: None,
                 #[cfg(feature = "typescript")]
                 typescript_authority: None,
                 fidelity,

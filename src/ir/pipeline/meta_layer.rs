@@ -120,8 +120,13 @@ impl IRPass for MetaLayerPass {
             );
         }
 
-        let (meta_results, mut semantic_edges, semantic_dependencies) =
-            registry.evaluate_meta_layers_context(&context);
+        let (
+            meta_results,
+            mut semantic_edges,
+            semantic_dependencies,
+            resolver_registrations,
+            resolver_registration_scope,
+        ) = registry.evaluate_owned_meta_layers_context(&context);
         append_marker_aliases(state, &meta_results);
         for edge in &mut semantic_edges {
             if edge.subject.file.is_none() {
@@ -131,6 +136,8 @@ impl IRPass for MetaLayerPass {
                 edge.object.file = Some(file_provenance.clone());
             }
         }
+        state.resolver_registrations = resolver_registrations;
+        state.resolver_registration_scope = resolver_registration_scope;
         state.semantic_edges.extend(semantic_edges);
         state.semantic_dependencies.extend(semantic_dependencies);
         Ok(())

@@ -14,6 +14,7 @@ pub(super) enum WorkspaceQueryOperation {
     TransitiveDependencies,
     HasCycle,
     CallsInFile,
+    ResolverRegistrations,
 }
 
 impl WorkspaceQueryOperation {
@@ -27,6 +28,7 @@ impl WorkspaceQueryOperation {
             "transitive_dependencies" => Some(Self::TransitiveDependencies),
             "has_cycle" => Some(Self::HasCycle),
             "calls_in_file" => Some(Self::CallsInFile),
+            "resolver_registrations" => Some(Self::ResolverRegistrations),
             _ => None,
         }
     }
@@ -85,6 +87,9 @@ impl WorkspaceQueryOperation {
             }
             Self::HasCycle => super::graph::prepare_has_cycle(args, state, context),
             Self::CallsInFile => super::calls::prepare_calls_in_file(args, state, context),
+            Self::ResolverRegistrations => {
+                super::resolver_registrations::prepare(args, state, context)
+            }
         }
     }
 }

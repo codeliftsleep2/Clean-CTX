@@ -1,0 +1,11 @@
+{
+  "category": "Static candidate identity; not a Rust descriptor or protected grant",
+  "baseline": "2aa988868202bb39307d2d256bab113c9e61b219",
+  "accepted_generation": "5c3e27fc7f9b107e4161b25bcb0c704dd1952532dad9dc9b42b5ff1810727174",
+  "source": "docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md",
+  "candidate_sha256": "3b490732dea81fd52c226e7113b786367af75a87d9a671a226e6e5df796a63a8",
+  "binary_sha256": "93f1431f8be130ae2f764b31a5d6e0d579955c8274c0d0b207d54ee20bdc0ffa",
+  "profile_sha256": "0c1958e1302bd6d1e4a82dd644b03a2e322c687e9349bc038e2835283c1a40e9",
+  "expected_node": "DOC-270",
+  "scope": "Existing governed evidence source only; no corpus/protection membership change"
+}

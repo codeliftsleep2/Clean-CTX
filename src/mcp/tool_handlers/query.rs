@@ -73,6 +73,7 @@ mod identity;
 mod outcome;
 mod prepare;
 mod request;
+mod resolver_registrations;
 #[cfg(test)]
 pub(crate) mod work_metrics;
 
@@ -94,7 +95,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "code": -32602,
                     "message": "Missing required argument: 'type'. Supported values: \
                      find_entities, forward_edges, reverse_edges, entities_in_file, declarations_in_file, \
-                     transitive_dependencies, has_cycle, calls_in_file.".to_string()
+                     transitive_dependencies, has_cycle, calls_in_file, resolver_registrations.".to_string()
                 }
             }));
             return;
@@ -111,7 +112,7 @@ pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpStat
                     "message": format!(
                         "Unknown query type: '{}'. Supported values: find_entities, \
                          forward_edges, reverse_edges, entities_in_file, declarations_in_file, \
-                         transitive_dependencies, has_cycle, calls_in_file.",
+                         transitive_dependencies, has_cycle, calls_in_file, resolver_registrations.",
                         query_type
                     )
                 }

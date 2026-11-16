@@ -1,6 +1,7 @@
 //! Reusable schema fragments for public tools with polymorphic requests.
 
 use serde_json::{Value, json};
+pub(super) mod resolver_registrations;
 
 pub(super) fn apply_edit_operations() -> Value {
     json!({
@@ -190,7 +191,7 @@ pub(super) fn workspace_query_properties() -> Value {
     let properties = properties
         .as_object_mut()
         .expect("workspace query properties are an object");
-    properties.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Shared primary trusted workspace root. Required when any item is calls_in_file; optional for cross-file operations." }));
+    properties.insert("workspaceRoot".into(), json!({ "type": "string", "description": "Shared primary trusted workspace root. Required for calls_in_file and resolver_registrations; optional for other cross-file operations." }));
     properties.insert("withinPath".into(), json!({ "type": "string", "description": "Shared optional answer projection inside workspaceRoot plus configured additional roots. Narrows returned occurrences by their asserting file; discovery, hydration, and compilation still cover all authorized roots. Rejected when outside that authorized set or when workspaceRoot is absent." }));
     properties.insert("queries".into(), workspace_query_batch_queries());
     Value::Object(properties.clone())
@@ -198,7 +199,7 @@ pub(super) fn workspace_query_properties() -> Value {
 
 fn workspace_query_operation_properties() -> Value {
     json!({
-        "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "declarations_in_file", "transitive_dependencies", "has_cycle", "calls_in_file"], "description": "Type of workspace query." },
+        "type": { "type": "string", "enum": ["find_entities", "forward_edges", "reverse_edges", "entities_in_file", "declarations_in_file", "transitive_dependencies", "has_cycle", "calls_in_file", "resolver_registrations"], "description": "Type of workspace query." },
         "domain": { "type": "string", "description": "Optional exact domain for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With entity_type, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "entity_type": { "type": "string", "description": "Optional exact entity type for forward_edges, reverse_edges, transitive_dependencies, or declaration-only find_entities. With domain, edge queries use the exact-identity fast path; alone, filters name resolution." },
         "name": { "type": "string", "minLength": 1, "description": "Exactly one entity name. Required for find_entities, forward_edges, reverse_edges, and transitive_dependencies. For multiple names, use top-level queries with one independently identified item per name; do not pass an array or a names field." },
@@ -209,6 +210,9 @@ fn workspace_query_operation_properties() -> Value {
         "filePath": { "type": "string", "description": "Trusted source file for calls_in_file." },
         "owner": { "type": "object", "description": "Typed caller owner for calls_in_file.", "properties": { "kind": { "type": "string", "enum": ["class", "interface"] }, "name": { "type": "string" } }, "required": ["kind", "name"] },
         "method": { "type": "object", "description": "Caller method for calls_in_file. Omit signature fields for the complete overload family.", "properties": { "name": { "type": "string" }, "parameters": { "type": "array", "items": { "type": "string" }, "description": "Optional exact visible parameter-signature selector." }, "return_type": { "type": "string" } }, "required": ["name"] },
+        "direction": {"type":"string","enum":["forward","reverse"],"description":"resolver_registrations only."},
+        "route_path": {"type":"string","description":"Forward written-registration route occurrence bucket; empty allowed."},
+        "resolver_name": {"type":"string","minLength":1,"description":"Reverse written-registration declaration name bucket."},
         "depth": { "type": "integer", "description": "Traversal depth for transitive_dependencies: 0 = unlimited, 1 = direct, 2 = transitive. Default: 1." },
     })
 }
@@ -243,7 +247,8 @@ fn workspace_query_variants(require_calls_root: bool) -> Value {
         query_variant("declarations_in_file", &["file_path"]),
         query_variant("transitive_dependencies", &["name"]),
         query_variant("has_cycle", &[]),
-        query_variant("calls_in_file", calls_required)
+        query_variant("calls_in_file", calls_required),
+        resolver_registrations::input_variant(require_calls_root)
     ])
 }
 
@@ -273,7 +278,7 @@ fn workspace_query_batch_queries() -> Value {
 }
 
 pub(super) fn workspace_query_batch_results() -> Value {
-    json!({
+    let mut schema = json!({
         "type": "array",
         "description": "Ordered outcomes, exactly one per accepted batch item.",
         "items": {
@@ -307,7 +312,12 @@ pub(super) fn workspace_query_batch_results() -> Value {
                 }
             ]
         }
-    })
+    });
+    schema["items"]["allOf"] = json!([{
+        "if":{"properties":{"type":{"const":"resolver_registrations"},"status":{"const":"ok"}},"required":["type","status"]},
+        "then":{"properties":{"result":resolver_registrations::result()}}
+    }]);
+    schema
 }
 
 fn query_variant(kind: &str, operation_fields: &[&str]) -> Value {

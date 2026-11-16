@@ -73,6 +73,7 @@ macro_rules! lock_or_recover {
 
 pub(crate) mod physical_identity;
 pub(crate) mod publication;
+mod retirement;
 mod source_cache;
 
 #[path = "durable_semantics.rs"]

@@ -367,14 +367,22 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                         effective_fidelity,
                     ) {
                         Some(semantic_fidelity) => index
-                            .replace_semantic_projection_with_retained_authority(
+                            .replace_semantic_projection_with_complete_authority(
                                 &canonical_path,
-                                semantic_edges.clone(),
-                                semantic_fidelity,
-                                source_hash.clone(),
-                                semantic_dependencies.clone(),
-                                #[cfg(feature = "typescript")]
-                                authority.typescript_authority.clone(),
+                                crate::workspace::index::SemanticProjectionInput {
+                                    #[cfg(feature = "typescript")]
+                                    typescript_authority: authority.typescript_authority.clone(),
+                                    resolver_registrations: authority
+                                        .resolver_registrations
+                                        .clone(),
+                                    resolver_registration_scope: authority
+                                        .resolver_registration_scope,
+                                    fidelity: semantic_fidelity,
+                                    source_hash: source_hash.clone(),
+                                    edges: semantic_edges.clone(),
+                                    dependencies: semantic_dependencies.clone(),
+                                },
+                                crate::layers::meta::resolver_registrations::enabled(&state.config),
                             )?,
                         None => {
                             index.remove_file(&canonical_path);

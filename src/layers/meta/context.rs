@@ -24,6 +24,24 @@ pub struct MetaLayerEvaluation {
     pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
+/// Additive owned transport; the existing public evaluation shape stays intact.
+#[derive(Debug, Default)]
+pub struct MetaLayerOwnedEvaluation {
+    pub(crate) resolver_registration_scope: Option<bool>,
+    pub evaluation: MetaLayerEvaluation,
+    pub(crate) resolver_registrations: Option<super::resolver_registrations::ResolverRegistrations>,
+}
+
+impl From<MetaLayerEvaluation> for MetaLayerOwnedEvaluation {
+    fn from(evaluation: MetaLayerEvaluation) -> Self {
+        Self {
+            evaluation,
+            resolver_registrations: None,
+            resolver_registration_scope: None,
+        }
+    }
+}
+
 /// Immutable inputs and shared lexical evidence for one meta-layer pass.
 pub struct MetaLayerContext<'a> {
     #[cfg(feature = "typescript")]

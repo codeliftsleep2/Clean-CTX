@@ -15,6 +15,24 @@ struct PhysicalOwner {
     durable_path: Option<String>,
 }
 
+#[cfg(any(windows, unix))]
+impl PhysicalOwner {
+    /// A live spelling must not resolve back to a confirmed absent owner.
+    /// Valid hard-link owners and unknown/failed observations stay unchanged.
+    fn reconcile_deleted_path(&mut self, current: &str) {
+        let missing = |path: &str| {
+            std::fs::symlink_metadata(path)
+                .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+        };
+        if self.semantic_path != current && missing(&self.semantic_path) {
+            self.semantic_path = current.to_owned();
+        }
+        if self.durable_path.as_deref().is_some_and(missing) {
+            self.durable_path = None;
+        }
+    }
+}
+
 /// Session-local bridge from physical file identity to the stable canonical
 /// path that owns Clean-CTX semantic and durable state. Paths remain the public,
 /// provenance, and durable representation; the file identity is lookup-only.
@@ -29,15 +47,15 @@ impl PhysicalIdentityRegistry {
         let canonical = crate::dictionary::path::canonical_identity_key(path);
         #[cfg(any(windows, unix))]
         if let Some(identity) = physical_file_identity(&canonical) {
-            return self
+            let owner = self
                 .owners
                 .entry(identity)
                 .or_insert_with(|| PhysicalOwner {
                     semantic_path: canonical.clone(),
                     durable_path: None,
-                })
-                .semantic_path
-                .clone();
+                });
+            owner.reconcile_deleted_path(&canonical);
+            return owner.semantic_path.clone();
         }
         canonical
     }
@@ -50,9 +68,10 @@ impl PhysicalIdentityRegistry {
                 .owners
                 .entry(identity)
                 .or_insert_with(|| PhysicalOwner {
-                    semantic_path: canonical,
+                    semantic_path: canonical.clone(),
                     durable_path: None,
                 });
+            owner.reconcile_deleted_path(&canonical);
             return owner
                 .durable_path
                 .get_or_insert_with(|| path.to_string())

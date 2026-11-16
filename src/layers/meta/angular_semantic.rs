@@ -8,6 +8,8 @@ use crate::layers::meta::semantic::SemanticEdge;
 pub(super) struct ProjectionEvidence<'a> {
     #[cfg(feature = "typescript")]
     typescript_authority: Option<&'a crate::ir::typescript_resolution::TypeScriptAuthority>,
+    resolver_registrations:
+        Option<&'a mut Option<super::resolver_registrations::ResolverRegistrations>>,
     module_dependencies: Option<&'a mut Vec<crate::layers::meta::semantic::SemanticDependency>>,
     lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
@@ -305,7 +307,12 @@ pub(super) fn extract_non_testing_edges(
 
     #[cfg(feature = "typescript")]
     if routing_enabled && let Some(authority) = evidence.typescript_authority {
-        edges.extend(crate::angular_meta::route_resolvers::project(authority));
+        let resolver_projection =
+            crate::angular_meta::route_resolvers::project_with_registrations(authority);
+        edges.extend(resolver_projection.edges);
+        if let Some(output) = evidence.resolver_registrations {
+            *output = Some(resolver_projection.registrations);
+        }
         edges.extend(crate::angular_meta::route_guards::project(authority));
         edges.extend(crate::angular_meta::route_guards::project_kinds(authority));
         edges.extend(crate::angular_meta::route_load_children::project(authority));
@@ -334,6 +341,14 @@ pub(super) fn evaluate(
     context: &super::MetaLayerContext<'_>,
     precomputed_angular: Option<bool>,
 ) -> super::MetaLayerEvaluation {
+    evaluate_owned(layer_name, context, precomputed_angular).evaluation
+}
+
+pub(super) fn evaluate_owned(
+    layer_name: &'static str,
+    context: &super::MetaLayerContext<'_>,
+    precomputed_angular: Option<bool>,
+) -> super::MetaLayerOwnedEvaluation {
     let meta_config = context
         .config
         .and_then(|config| config.meta_layers.get("angular"));
@@ -450,6 +465,7 @@ pub(super) fn evaluate(
         .iter()
         .map(|(_, text)| text.clone())
         .collect();
+    let mut resolver_registrations = None;
     let mut module_dependencies = Vec::new();
     let mut semantic_edges = extract_non_testing_edges(
         context.source,
@@ -460,6 +476,7 @@ pub(super) fn evaluate(
         ProjectionEvidence {
             #[cfg(feature = "typescript")]
             typescript_authority: context.typescript_authority,
+            resolver_registrations: Some(&mut resolver_registrations),
             module_dependencies: Some(&mut module_dependencies),
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),
@@ -534,68 +551,20 @@ pub(super) fn evaluate(
             context.source,
         ));
     }
-    super::MetaLayerEvaluation {
-        output,
-        semantic_edges,
-        semantic_dependencies,
-    }
-}
-
-pub(super) fn evaluate_if_applicable(
-    layer_name: &'static str,
-    context: &super::MetaLayerContext<'_>,
-) -> Option<super::MetaLayerEvaluation> {
-    let meta_config = context
-        .config
-        .and_then(|config| config.meta_layers.get("angular"));
-    if meta_config.is_some_and(|config| !config.enabled) {
-        return None;
-    }
-    let is_angular = crate::angular_meta::detect::is_angular_file_with_regions(
-        context.source,
-        context.lexical_regions,
-    );
     #[cfg(feature = "typescript")]
-    let is_angular = is_angular
-        || context.typescript_authority.is_some_and(|authority| {
-            crate::angular_meta::class_role_authority::has_class_role(authority)
-                || crate::angular_meta::functional_authority::has_role(authority)
-                || crate::angular_meta::application_config_providers::has_owner(authority)
-                || crate::angular_meta::bootstrap_references::has_call(authority)
-                || crate::angular_meta::config_composition::has_owner(authority)
-        });
-    let testing_enabled = meta_config
-        .map(|config| config.testing.enabled)
-        .unwrap_or(true);
-    let reactive_forms_enabled = meta_config
-        .map(|config| config.reactive_forms.enabled)
-        .unwrap_or(true);
-    let formly_enabled = meta_config
-        .map(|config| config.formly.enabled)
-        .unwrap_or(true);
-    let applicable = is_angular
-        || crate::angular_meta::rx::has_rxjs_imports(context.source)
-        || crate::angular_meta::ngrx::has_ngrx_imports(context.source)
-        || crate::angular_meta::ngrx::discriminants::has_switch_action_type_handlers(
-            context.source,
-        )
-        || crate::angular_meta::signals::has_signal_imports(context.source)
-        || reactive_forms_enabled
-            && crate::angular_meta::reactive_forms::extract_reactive_form_shape_with_regions(
-                context.source,
-                Fidelity::Low,
-                context.lexical_regions,
-            )
-            .is_some()
-        || formly_enabled
-            && crate::angular_meta::formly::extract_formly_shape_with_regions(
-                context.source,
-                Fidelity::Low,
-                context.lexical_regions,
-            )
-            .is_some()
-        || crate::angular_meta::routing::has_router_imports(context.source)
-        || testing_enabled
-            && crate::angular_meta::testing::is_testing_source(context.source, context.path);
-    applicable.then(|| evaluate(layer_name, context, Some(is_angular)))
+    let resolver_registration_scope = Some(
+        meta_config.is_none_or(|value| value.routing.enabled)
+            && context.typescript_authority.is_some(),
+    );
+    #[cfg(not(feature = "typescript"))]
+    let resolver_registration_scope = Some(false);
+    super::MetaLayerOwnedEvaluation {
+        resolver_registration_scope,
+        evaluation: super::MetaLayerEvaluation {
+            output,
+            semantic_edges,
+            semantic_dependencies,
+        },
+        resolver_registrations,
+    }
 }

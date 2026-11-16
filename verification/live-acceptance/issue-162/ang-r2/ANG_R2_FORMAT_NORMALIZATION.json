@@ -1,0 +1,26 @@
+{
+  "category": "Owner-approved formatting applied; not post-normalization execution evidence",
+  "retention_manifest": "target/ang-r2/frozen-format-retention-20261116/manifest.json",
+  "retention_manifest_sha256": "7af8f0742cab618c7ecca3c22346758eb1bfd80e6baea88a9165c370ffb695e5",
+  "witnesses": [
+    {
+      "file": "src/tests/mcp/angular_deleted_owner_membership_issue_162.rs",
+      "original_sha256": "69c27a304b59029f7aee0ed2bfd511eb47c2702c0a8a43bb22d09653368b797f",
+      "proposed_sha256": "1399e46e1b5e2573b1ba70021e9172957d448ceb74c3ffa039204b6a04222cc0",
+      "diff": "target\\ang-r2\\format-application-20261116\\angular_deleted_owner_membership_issue_162.rs.diff"
+    },
+    {
+      "file": "src/tests/mcp/angular_resolver_registration_public_issue_162.rs",
+      "original_sha256": "8b047c6e817adb63aa6ba078375258b68ce2b3677e73b88b15f2d283d78821dc",
+      "proposed_sha256": "9af4593ad4cc62b462dd8d7ca292970018c3dcf3508724ab2ca8ed30c431978b",
+      "diff": "target\\ang-r2\\format-application-20261116\\angular_resolver_registration_public_issue_162.rs.diff"
+    }
+  ],
+  "original_public_witness_stash": "a4bd12ca4df42c4bf34063bc5139fa2d463f76fa",
+  "post_normalization_status": "19 tracked tests, scoped format/Clippy and guards PASS; normal DOC-270 admission ready/current/complete in format-verification-20261116-111528-924",
+  "durable_git_evidence_bundle": {
+    "path": "verification/live-acceptance/issue-162/ang-r2/historical-witness-evidence.zip",
+    "sha256": "ea328ed56679bf05800658c6577d2a919f3de93fdcdd6a1ca9ba61eddd0b8b53",
+    "format": "ordinary ZIP_STORED archive of exact historical source/log/receipt bytes; not executable tests"
+  }
+}

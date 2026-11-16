@@ -1,0 +1,17 @@
+{
+  "category": "Proposed formatting only; source mutation NOT authorized/performed",
+  "files": [
+    {
+      "file": "src/tests/mcp/angular_deleted_owner_membership_issue_162.rs",
+      "original_sha256": "69c27a304b59029f7aee0ed2bfd511eb47c2702c0a8a43bb22d09653368b797f",
+      "proposed_sha256": "1399e46e1b5e2573b1ba70021e9172957d448ceb74c3ffa039204b6a04222cc0",
+      "diff": "target\\ang-r2\\format-application-20261116\\angular_deleted_owner_membership_issue_162.rs.diff"
+    },
+    {
+      "file": "src/tests/mcp/angular_resolver_registration_public_issue_162.rs",
+      "original_sha256": "8b047c6e817adb63aa6ba078375258b68ce2b3677e73b88b15f2d283d78821dc",
+      "proposed_sha256": "9af4593ad4cc62b462dd8d7ca292970018c3dcf3508724ab2ca8ed30c431978b",
+      "diff": "target\\ang-r2\\format-application-20261116\\angular_resolver_registration_public_issue_162.rs.diff"
+    }
+  ]
+}

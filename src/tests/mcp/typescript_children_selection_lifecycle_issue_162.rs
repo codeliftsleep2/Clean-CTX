@@ -122,6 +122,7 @@ fn issue_162_children_selection_owner_member_and_field_retirement() {
             assert_ne!(old.source_hash, a.source_hash);
             let authority = crate::mcp::semantic_compilation::retained::RetainedAuthority {
                 typescript_authority: Some(old.clone()),
+                ..Default::default()
             };
             assert!(!authority.is_current(&a.source_hash));
         } else {

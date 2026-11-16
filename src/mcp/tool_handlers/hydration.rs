@@ -51,12 +51,16 @@ mod invalidation;
 pub(crate) use invalidation::invalidate_discovery_for_root;
 pub(crate) use invalidation::{
     RefreshReconciliation, invalidate_discovery_for_edited_path,
-    reconcile_external_refresh_for_root,
+    invalidate_discovery_for_edited_paths, reconcile_external_refresh_for_root,
 };
 
 mod publication;
 #[cfg(feature = "angular")]
+mod resolver_registrations;
+#[cfg(feature = "angular")]
 pub(super) use publication::compile_candidates_for as revalidate_module_owners;
+#[cfg(feature = "angular")]
+pub(super) use resolver_registrations::{ResolverNomination, hydrate_resolver_owners};
 mod readiness;
 mod report;
 #[cfg(all(test, feature = "rust"))]

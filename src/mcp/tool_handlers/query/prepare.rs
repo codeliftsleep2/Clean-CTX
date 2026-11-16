@@ -161,12 +161,16 @@ struct HydrationKey {
 /// Shared, request-local preparation state. It is deliberately neither stored
 /// in `McpState` nor synchronized: one coordinator owns it for one request.
 pub(super) struct PreparationContext {
+    #[cfg(feature = "angular")]
+    pub(super) resolver_nomination:
+        Option<Result<super::super::hydration::ResolverNomination, String>>,
     #[cfg(feature = "csharp")]
     pub(super) ef_dependencies: HashMap<String, super::csharp_resolution::EfDependencyEvidence>,
     pub(super) ef_sources: Option<std::collections::BTreeSet<String>>,
     #[cfg(feature = "csharp")]
     pub(super) ef_view_revision: usize,
     scope: Option<Result<Option<WorkspaceScope>, String>>,
+    retirement: Option<Result<(), String>>,
     hydration: HashMap<HydrationKey, Result<HydrationReport, String>>,
     csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
     #[cfg(feature = "csharp")]
@@ -180,6 +184,7 @@ pub(super) struct PreparationContext {
 impl PreparationContext {
     #[cfg(feature = "angular")]
     pub(super) fn invalidate_module_preparation(&mut self) {
+        self.resolver_nomination = None;
         self.hydration.clear();
         self.invalidate_derived_catalogs();
     }
@@ -202,12 +207,15 @@ impl PreparationContext {
     }
     pub(super) fn new() -> Self {
         Self {
+            #[cfg(feature = "angular")]
+            resolver_nomination: None,
             #[cfg(feature = "csharp")]
             ef_dependencies: HashMap::new(),
             ef_sources: None,
             #[cfg(feature = "csharp")]
             ef_view_revision: 0,
             scope: None,
+            retirement: None,
             hydration: HashMap::new(),
             csharp_catalog: None,
             #[cfg(feature = "csharp")]
@@ -255,10 +263,16 @@ impl PreparationContext {
         state: &McpState,
         args: &serde_json::Value,
     ) -> Result<Option<WorkspaceScope>, QueryFailure> {
-        self.scope
+        let scope = self
+            .scope
             .get_or_insert_with(|| super::query_scope(state, args))
             .clone()
-            .map_err(super::scope_failure)
+            .map_err(super::scope_failure)?;
+        self.retirement
+            .get_or_insert_with(|| state.reconcile_deleted_semantic_sources(scope.as_ref()))
+            .clone()
+            .map_err(QueryFailure::internal)?;
+        Ok(scope)
     }
 
     pub(super) fn hydrate(

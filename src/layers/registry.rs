@@ -14,6 +14,15 @@ use crate::layers::meta::{MetaLayer, MetaLayerContext, MetaLayerOutput};
 use std::path::Path;
 use std::sync::OnceLock;
 
+/// Owned results from one combined meta-layer dispatch.
+type OwnedMetaLayerResults = (
+    Vec<MetaLayerOutput>,
+    Vec<SemanticEdge>,
+    Vec<crate::layers::meta::semantic::SemanticDependency>,
+    Option<crate::layers::meta::resolver_registrations::ResolverRegistrations>,
+    Option<bool>,
+);
+
 /// Global registry, initialized once per process.
 static LAYER_REGISTRY: OnceLock<LayerRegistry> = OnceLock::new();
 
@@ -252,15 +261,32 @@ impl LayerRegistry {
         Vec<SemanticEdge>,
         Vec<crate::layers::meta::semantic::SemanticDependency>,
     ) {
+        let (outputs, edges, dependencies, _, _) = self.evaluate_owned_meta_layers_context(context);
+        (outputs, edges, dependencies)
+    }
+
+    pub(crate) fn evaluate_owned_meta_layers_context(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> OwnedMetaLayerResults {
         #[cfg(test)]
         CONTEXT_EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
+        let mut resolver_registrations = None;
+        let mut resolver_registration_scope = Some(false);
         let mut outputs = Vec::new();
         let mut edges = Vec::new();
         let mut dependencies = Vec::new();
         for layer in &self.meta_layers {
-            let Some(evaluation) = layer.evaluate_if_applicable(context) else {
+            let Some(evaluation) = layer.evaluate_owned_if_applicable(context) else {
                 continue;
             };
+            if evaluation.resolver_registration_scope.is_some() {
+                resolver_registration_scope = evaluation.resolver_registration_scope;
+            }
+            if evaluation.resolver_registrations.is_some() {
+                resolver_registrations = evaluation.resolver_registrations;
+            }
+            let evaluation = evaluation.evaluation;
             if let Some(output) = evaluation.output {
                 outputs.push(output);
             }
@@ -269,7 +295,13 @@ impl LayerRegistry {
         }
         dependencies.sort_by(|left, right| left.file_path.cmp(&right.file_path));
         dependencies.dedup_by(|left, right| left.file_path == right.file_path);
-        (outputs, edges, dependencies)
+        (
+            outputs,
+            edges,
+            dependencies,
+            resolver_registrations,
+            resolver_registration_scope,
+        )
     }
 
     /// Check if a specific meta-layer is enabled.

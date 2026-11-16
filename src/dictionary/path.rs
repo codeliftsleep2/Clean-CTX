@@ -70,6 +70,11 @@ impl Default for PathDictionary {
 }
 
 impl PathDictionary {
+    /// Existing session path bindings; these carry no current semantic proof.
+    pub(crate) fn known_paths(&self) -> impl Iterator<Item = &str> {
+        self.forward.values().map(String::as_str)
+    }
+
     pub fn new() -> Self {
         Self {
             forward: HashMap::new(),

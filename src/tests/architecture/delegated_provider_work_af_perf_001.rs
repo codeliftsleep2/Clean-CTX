@@ -183,6 +183,7 @@ fn af_delegated_001_mixed_fresh_calls_and_mutation() {
     // Bare legacy consumer replay intentionally does not replace that boundary.
     let retained = crate::mcp::semantic_compilation::retained::RetainedAuthority {
         typescript_authority: Some(a.clone()),
+        ..Default::default()
     };
     assert!(
         !retained.is_current(&a.source_hash),

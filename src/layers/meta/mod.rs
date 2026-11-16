@@ -18,13 +18,17 @@
 // this pattern.
 
 #[cfg(feature = "angular")]
+pub(crate) mod angular_applicability;
+#[cfg(feature = "angular")]
 mod angular_semantic;
 pub mod builtin;
 pub(crate) mod canonical_endpoint;
 mod context;
 pub mod semantic;
 
+pub use context::MetaLayerOwnedEvaluation;
 pub use context::{MetaLayerContext, MetaLayerEvaluation, StructuredClassBase};
+pub(crate) mod resolver_registrations;
 
 use crate::compression::Fidelity;
 use crate::config::CleanCtxConfig;
@@ -34,7 +38,7 @@ use std::path::Path;
 /// Increment marker and semantic generations independently when identical
 /// Angular inputs change that producer's durable markers or semantic edges.
 pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 6;
-pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 78;
+pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 79;
 
 /// Structured output of a single meta-layer pass.
 ///
@@ -195,6 +199,15 @@ pub trait MetaLayer: Send + Sync {
             ),
             semantic_dependencies: Vec::new(),
         }
+    }
+
+    /// Owned semantic side outputs share this same evaluation, without changing
+    /// existing implementors or the legacy public evaluation struct.
+    fn evaluate_owned_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerOwnedEvaluation> {
+        self.evaluate_if_applicable(context).map(Into::into)
     }
 
     /// Decide applicability and evaluate without discarding detection evidence.
@@ -379,11 +392,19 @@ impl MetaLayer for AngularMetaLayer {
         angular_semantic::evaluate(self.name(), context, None)
     }
 
+    fn evaluate_owned_if_applicable(
+        &self,
+        context: &MetaLayerContext<'_>,
+    ) -> Option<MetaLayerOwnedEvaluation> {
+        angular_applicability::evaluate_if_applicable(self.name(), context)
+    }
+
     fn evaluate_if_applicable(
         &self,
         context: &MetaLayerContext<'_>,
     ) -> Option<MetaLayerEvaluation> {
-        angular_semantic::evaluate_if_applicable(self.name(), context)
+        angular_applicability::evaluate_if_applicable(self.name(), context)
+            .map(|owned| owned.evaluation)
     }
 }
 

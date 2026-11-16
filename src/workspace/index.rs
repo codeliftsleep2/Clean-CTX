@@ -46,6 +46,8 @@ use std::collections::{HashMap, HashSet};
 
 mod capability_coverage;
 mod coverage;
+mod resolver_registrations;
+pub(crate) use resolver_registrations::SemanticProjectionInput;
 mod declarations;
 mod edges;
 mod ngrx_refinement;

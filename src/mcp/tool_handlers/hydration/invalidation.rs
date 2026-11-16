@@ -28,21 +28,36 @@ use crate::mcp::McpState;
 /// Over-invalidating only costs one rediscovery; missing an invalidation would
 /// silently serve an incomplete candidate set.
 pub(crate) fn invalidate_discovery_for_edited_path(state: &McpState, file_path: &str) {
-    let edited = crate::dictionary::path::canonical_identity_key(file_path);
-    let matched = configured_roots(state, None)
+    invalidate_discovery_for_edited_paths(state, &[file_path.to_owned()]);
+}
+
+/// Apply the existing path invalidation policy once per affected root.
+pub(crate) fn invalidate_discovery_for_edited_paths(state: &McpState, paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    let roots: Vec<_> = configured_roots(state, None)
         .iter()
         .map(|root| root_key(root))
-        .filter(|root| crate::workspace::path_identity::is_within_root(&edited, root))
-        .max_by_key(String::len);
-    match matched {
-        Some(root) => {
-            state.hydration_discovery_lock().invalidate_root(&root);
-            state.acquisition_completion_lock().invalidate_root(&root);
-        }
-        None => {
+        .collect();
+    let mut matched = std::collections::HashSet::new();
+    for path in paths {
+        let edited = crate::dictionary::path::canonical_identity_key(path);
+        if let Some(root) = roots
+            .iter()
+            .filter(|root| crate::workspace::path_identity::is_within_root(&edited, root))
+            .max_by_key(|root| root.len())
+        {
+            matched.insert(root);
+        } else {
             state.hydration_discovery_lock().invalidate_all();
             state.acquisition_completion_lock().invalidate_all();
+            return;
         }
+    }
+    for root in matched {
+        state.hydration_discovery_lock().invalidate_root(root);
+        state.acquisition_completion_lock().invalidate_root(root);
     }
 }
 

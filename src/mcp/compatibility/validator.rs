@@ -122,7 +122,7 @@ impl CompatibilityFailure {
 }
 
 pub(crate) fn validate_current_context(
-    loaded: UntrustedDurableContext,
+    mut loaded: UntrustedDurableContext,
     source: &str,
     path: &Path,
     config: &CleanCtxConfig,
@@ -140,11 +140,12 @@ pub(crate) fn validate_current_context(
             detail: format!("compatibility identity derivation failed: {error}"),
         }
     })?;
+    bind_registration_scope(&mut loaded, source, path, config);
     validate_with_identities(loaded, &current, required_fidelity)
 }
 
 pub(crate) fn validate_historical_context(
-    loaded: UntrustedDurableContext,
+    mut loaded: UntrustedDurableContext,
     current_source: &str,
     path: &Path,
     config: &CleanCtxConfig,
@@ -155,7 +156,36 @@ pub(crate) fn validate_historical_context(
             detail: format!("compatibility identity derivation failed: {error}"),
         }
     })?;
+    bind_registration_scope(&mut loaded, current_source, path, config);
     validate_with_identities(loaded, &current, required_fidelity)
+}
+
+fn bind_registration_scope(
+    loaded: &mut UntrustedDurableContext,
+    source: &str,
+    path: &Path,
+    config: &CleanCtxConfig,
+) {
+    let _ = (source, path, config);
+    #[cfg(all(feature = "angular", feature = "typescript"))]
+    let applies = loaded
+        .authority
+        .typescript_authority
+        .as_ref()
+        .is_some_and(|authority| {
+            crate::layers::meta::angular_applicability::registrations_apply(
+                source,
+                path,
+                loaded.fidelity,
+                config,
+                authority,
+            )
+        });
+    #[cfg(not(all(feature = "angular", feature = "typescript")))]
+    let applies = false;
+    // The serde-skipped runtime scope is unknown after decoding; bind it from
+    // the real source/config/native context, not a conservative producer hint.
+    loaded.authority.resolver_registration_scope = Some(applies);
 }
 
 fn validate_with_identities(
@@ -224,10 +254,16 @@ pub(crate) fn validate_semantic(
     if persisted_producers != &current.semantic_producers {
         return Err(CompatibilityFailure::SemanticProducerIncompatible);
     }
-    if !loaded.authority.is_current(&loaded.source_hash)
-        || !loaded
-            .authority
-            .admits_relation_evidence(&loaded.semantic_edges)
+    let authority = loaded.authority.clone();
+    if !authority.is_current(&loaded.source_hash)
+        || !authority.admits_semantic_projection(
+            &loaded.semantic_edges,
+            current
+                .semantic_config
+                .angular
+                .as_ref()
+                .is_some_and(|a| a.enabled && a.routing_enabled),
+        )
     {
         return Err(CompatibilityFailure::SemanticDependencyStale);
     }
@@ -239,7 +275,7 @@ pub(crate) fn validate_semantic(
         return Err(CompatibilityFailure::SemanticDependencyStale);
     }
     Ok(CompatibleSemanticProjection {
-        authority: loaded.authority.clone(),
+        authority,
         semantic_edges: loaded.semantic_edges.clone(),
         semantic_dependencies: loaded.semantic_dependencies.clone(),
         source_hash: loaded.source_hash.clone(),

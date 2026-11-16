@@ -96,6 +96,11 @@ fn answer_envelope(
         "depth": args.get("depth"),
         "kind": args.get("kind"),
     });
+    if query_type == "resolver_registrations" {
+        query["direction"] = args["direction"].clone();
+        query["route_path"] = args.get("route_path").cloned().unwrap_or(Value::Null);
+        query["resolver_name"] = args.get("resolver_name").cloned().unwrap_or(Value::Null);
+    }
     if file_local_calls {
         let query = query
             .as_object_mut()

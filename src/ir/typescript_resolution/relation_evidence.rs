@@ -5,12 +5,30 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
 
 impl TypeScriptAuthority {
     pub(crate) fn admits_relation_evidence(&self, edges: &[SemanticEdge]) -> bool {
+        self.admits_registration_projection(edges, None, false)
+    }
+
+    pub(crate) fn admits_registration_projection(
+        &self,
+        edges: &[SemanticEdge],
+        registrations: Option<&crate::layers::meta::resolver_registrations::ResolverRegistrations>,
+        required: bool,
+    ) -> bool {
+        if required && registrations.is_none() {
+            return false;
+        }
+        #[cfg(not(feature = "angular"))]
+        if registrations.is_some() || required {
+            return false;
+        }
         #[cfg(all(test, feature = "angular"))]
         let _observation = crate::angular_meta::admission_work_metrics::begin();
         // One synchronous admission owns this lazy projection. Never retained
         // across calls, source changes, publication or snapshot lifecycles.
         #[cfg(feature = "angular")]
-        let mut resolver_projection: Option<Vec<SemanticEdge>> = None;
+        let mut resolver_projection: Option<
+            crate::angular_meta::route_resolvers::ResolverProjection,
+        > = None;
         #[cfg(feature = "angular")]
         let mut activate_projection: Option<Vec<SemanticEdge>> = None;
         #[cfg(feature = "angular")]
@@ -37,15 +55,19 @@ impl TypeScriptAuthority {
         let mut config_composition_projection: Option<Vec<SemanticEdge>> = None;
         #[cfg(feature = "angular")]
         let mut imported_provider_projection: Option<Vec<SemanticEdge>> = None;
-        edges.iter().all(|edge| {
+        let admitted = edges.iter().all(|edge| {
             if edge.relation == crate::layers::meta::semantic::SemanticRelation::ResolvedBy
                 && (edge.subject.canonical.is_some() || edge.object.canonical.is_some())
             {
                 #[cfg(feature = "angular")]
                 {
-                    let projected = resolver_projection
-                        .get_or_insert_with(|| crate::angular_meta::route_resolvers::project(self));
-                    return crate::angular_meta::route_resolvers::admits_projected(projected, edge);
+                    let projected = resolver_projection.get_or_insert_with(|| {
+                        crate::angular_meta::route_resolvers::project_with_registrations(self)
+                    });
+                    return crate::angular_meta::route_resolvers::admits_projected(
+                        &projected.edges,
+                        edge,
+                    );
                 }
                 #[cfg(not(feature = "angular"))]
                 {
@@ -261,7 +283,36 @@ impl TypeScriptAuthority {
                 && site.is_some_and(|(start, end)| start < end && end <= declaration.end)
                 && self.admits_endpoint(&edge.subject, subject)
                 && self.admits_endpoint(&edge.object, object)
-        })
+        });
+        if !admitted {
+            return false;
+        }
+        #[cfg(feature = "angular")]
+        if let Some(actual) = registrations {
+            let expected = resolver_projection.get_or_insert_with(|| {
+                crate::angular_meta::route_resolvers::project_with_registrations(self)
+            });
+            if !actual.matches(&expected.registrations) {
+                return false;
+            }
+            // Complete production support is required here; the old subset
+            // membership API above retains its original contract.
+            let supplied: std::collections::HashSet<_> = edges
+                .iter()
+                .filter(|edge| {
+                    edge.relation == crate::layers::meta::semantic::SemanticRelation::ResolvedBy
+                })
+                .map(|edge| (&edge.subject.canonical, &edge.object.canonical))
+                .collect();
+            if !expected
+                .edges
+                .iter()
+                .all(|edge| supplied.contains(&(&edge.subject.canonical, &edge.object.canonical)))
+            {
+                return false;
+            }
+        }
+        true
     }
 
     fn admits_member_pair(&self, edge: &SemanticEdge) -> bool {

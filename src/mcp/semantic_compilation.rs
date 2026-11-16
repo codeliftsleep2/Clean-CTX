@@ -477,3 +477,31 @@ mod angular_admission_work_af_perf_001;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/angular_admission_lifecycle_af_perf_001.rs"]
 mod angular_admission_lifecycle_af_perf_001;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_registration_transport_issue_162.rs"]
+mod angular_resolver_registration_transport_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_registration_public_issue_162.rs"]
+mod angular_resolver_registration_public_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs"]
+mod angular_resolver_registration_lifecycle_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_registration_support_issue_162.rs"]
+mod angular_resolver_registration_support;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_resolver_registration_persistence_issue_162.rs"]
+mod angular_resolver_registration_persistence_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/angular_deleted_owner_membership_issue_162.rs"]
+mod angular_deleted_owner_membership_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/semantic_retirement_controls_issue_162.rs"]
+mod semantic_retirement_controls_tests;

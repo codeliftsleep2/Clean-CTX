@@ -89,6 +89,9 @@ pub struct IRCompiler {
     /// This is the boundary where meta-layer semantic facts survive the
     /// production compilation lifecycle (Phase 4 integration).
     pub semantic_edges: Vec<SemanticEdge>,
+    pub(crate) resolver_registration_scope: Option<bool>,
+    pub(crate) resolver_registrations:
+        Option<crate::layers::meta::resolver_registrations::ResolverRegistrations>,
     pub semantic_dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
     /// Source-bound invocation evidence from the most recent successful compile.
     /// This side output is never part of CompiledIR or durable state.
@@ -113,6 +116,8 @@ impl IRCompiler {
             pattern_recognizers: Vec::new(),
             config: None,
             semantic_edges: Vec::new(),
+            resolver_registrations: None,
+            resolver_registration_scope: None,
             semantic_dependencies: Vec::new(),
             invocation_evidence: None,
             #[cfg(feature = "typescript")]
@@ -253,6 +258,8 @@ impl IRCompiler {
         // Clear before fallible work so failure cannot expose stale spans.
         self.invocation_evidence = None;
         self.semantic_edges.clear();
+        self.resolver_registrations = None;
+        self.resolver_registration_scope = None;
         self.semantic_dependencies.clear();
         #[cfg(feature = "csharp")]
         {
@@ -299,6 +306,8 @@ impl IRCompiler {
             self.typescript_authority = ctx.typescript_authority.take();
         }
         self.semantic_edges = std::mem::take(&mut ctx.semantic_edges);
+        self.resolver_registrations = ctx.resolver_registrations.take();
+        self.resolver_registration_scope = ctx.resolver_registration_scope.take();
         self.semantic_dependencies = std::mem::take(&mut ctx.semantic_dependencies);
 
         // Language-agnostic generic facts are projected at the compilation

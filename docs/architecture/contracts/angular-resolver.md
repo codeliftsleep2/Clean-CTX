@@ -92,6 +92,120 @@ Which exact public key registers each declaration remains explicitly OPEN and mu
 return as a separate bounded public design after this repair is accepted.
 
 
+
+### ANG-R2 public written registration contract — owner disposition 01
+
+This candidate records the owner's accepted architectural direction, subject to
+exact predecessor-bound B11 admission. Until admission the accepted predecessor
+remains governing. This is prospective policy, not implementation or verification.
+The earlier OPEN public-key wording above is the generation-78 checkpoint; upon
+admission this bounded contract supersedes that deferral only. Executable eligibility,
+current binary acceptance, final gates and issue closure remain unestablished.
+
+Produce a typed source-owned registration collection beside existing semantic edges
+in the same Angular semantic evaluation, compilation result, source publication,
+retained snapshot, durable JSON payload and index coverage entry. No second store,
+owner, lock, registry, inverse index or query-time interpreter. One shared projection
+produces memberships and registrations before membership-only target deduplication;
+admission reuses one operation-local result, not per-record full-set replay.
+Preserve ResolvedBy as unqualified written route/target membership with its exact
+existing equality, deduplication, direction, order, public fields and interpretation.
+No new CoreOps, generic edge metadata, endpoint variants or graph node types.
+
+Registration site is the exact existing RouteOccurrence plus source-qualified mapping
+pair occurrence and admitted decoded key; fact identity additionally includes the
+exact canonical resolver declaration. Keep raw source evidence separate from decoded
+key equality. Existing route/root source hashes make this snapshot identity, never
+a stable cross-edit ID. Display paths and resolver names are occurrence buckets,
+not canonical joins. Preserve native ownership, existing key decoding/applicability,
+duplicate refusal, runtime reference agreement, type-only refusal and independent
+siblings. Do not expand key decoding, callable/framework semantics or legacy scope.
+
+Collection format_version is 1, with records and typed source-qualified omissions.
+Records carry route, display route_path, decoded key, canonical resolver and evidence
+source/hash/outer field pair/key/mapping Object/pair/key/value byte spans. Use existing
+lossless route/declaration coordinates. All spans are half-open UTF-8 byte intervals.
+Validate full proof and the complete expected owner registration multiset plus
+matching memberships, rejecting missing, extra, crossed, borrowed or altered records.
+Existing subset membership-admission APIs retain their meaning for old callers.
+
+The optional collection distinguishes absent support from a current produced empty
+collection. Advance Angular semantic producer generation 78 to 79 when implemented;
+marker, canonical pipeline, global wire/query envelope and physical SQLite schema
+remain unchanged. Old producer payloads refuse current semantic admission and use
+normal reacquisition. An applicable generation-79 payload missing its collection,
+unsupported collection version, stale/forged proof or failed required acquisition
+must reacquire or fail through existing categories, never synthesize registrations
+from names/edges or report successful empty proof. Non-applicable producer absence
+remains absence, not evidence for this capability. Retain historical payloads.
+
+Add explicit workspace_query type resolver_registrations, operation format_version 1.
+Require authorized workspaceRoot. Forward direction requires string route_path
+(empty allowed); reverse requires nonempty string resolver_name. Reject missing or
+wrongly typed direction/selector, opposite selector, nulls and arrays. Old request
+validation and global envelope version remain unchanged. Reuse shared WorkspaceScope,
+batch isolation/deduplicated preparation and final currentness. withinPath filters
+asserting sources only; it neither selects targets nor narrows prerequisites.
+
+For either direction nominate eligible TypeScript owners independently of selector
+text through configured-root source_inventory, select_candidates and High-semantic
+compile_candidates_for. Existing preparation reuses current compatible owners and
+normal dependencies/publication; no unconditional recompilation or new discovery
+authority. Direct, alias, barrel, namespace and local forms retain existing support.
+Required nominated acquisition/publication failure is non-success, not merely an
+empty partial result. Incomplete inventory stays explicit bounded discovery. If
+shared mechanics cannot support this envelope, identify the missing prerequisite
+before broadening implementation. No global discovery/failure policy is changed.
+
+Return exact records, count, direction, format_version, coverage and existing
+discovery projection when present. Sort records by asserting source, route Object
+span, mapping pair span and target source/span. Preserve multiplicity and namesakes.
+Coverage uses indexed_evidence_only, authoritative_indexed_occurrences,
+source_complete=false, result_semantics=lower_bound, omitted_possible=true and the
+existing object reason form code bounded_written_resolver_registration_scope.
+Declare exact fields/coordinates in tools/list schema and preserve identical meaning
+in model-facing text, structured output and batch results; render selector/direction
+explicitly. No new global coverage string enum or completeness certificate.
+
+Detected omissions retain actual source/hash/span and a proved bounded reason:
+duplicate_resolve_field, duplicate_mapping_key, unsupported_mapping_key,
+unsupported_mapping_value, unresolved_mapping_target, ambiguous_mapping_target,
+type_only_mapping_target or mapping_proof_not_established. Do not guess specificity.
+Optional route/path and resolver coordinates require independent actual proof.
+semantic_omissions contains only proved selected-bucket associations: forward needs
+the selected route/path and attribution selected_route; reverse needs the exact
+proved target declaration in the selected name bucket and attribution
+selected_resolver. Imports, neighboring supported siblings or selector text do not
+establish association for an unsupported occurrence.
+
+Return other inspected candidate-source occurrences in candidate_source_omissions
+with attribution candidate_source, explicitly unassociated with the requested
+registration bucket. Never fabricate target/route identity, spans or relevance.
+Each occurrence appears in only one array per answer; deduplicate by source/span/
+reason and exact proved association, sort by source/span/reason/attribution and
+optional exact coordinates, and apply asserting scope/final currentness to both.
+General bounded-discovery limits belong in coverage/discovery, not invented
+occurrences. Empty diagnostics do not certify absence. Missing required proof,
+stale payload and required acquisition failure remain non-success, not omissions.
+
+Replacement, mutation, deletion, reset, restart and durable restore carry records
+with the same source owner and witnesses as membership. Key-only changes must
+replace registrations even when rendered membership is identical; no mixed current
+old/new publication or stale target success. Preserve independent siblings and
+other relation families, routing/markers and supported legacy behavior.
+
+Required tracked witnesses preserve the old key-only membership collision unchanged
+and establish a separate behavioral public-operation RED then the same GREEN.
+Verify genuine first-query cold forward and reverse direct/alias/barrel/namespace/
+local nomination in fresh state/durable storage, with no preseeded index or warm-up;
+namesakes, exact evidence, both omission attributions, unassociated reverse refusal,
+scope/batch/schema/text parity, missing/old/forged payloads and full lifecycle.
+Measure actual incremental enclosing cold/warm costs and deterministic bounded work;
+no duplicate evaluator or repeated owner reconstruction. Do not reopen accepted P0
+or blanket witness/lock/index optimization. Full gates are CI-owned; every local
+long-running invocation needs explicit per-run operator permission. No runtime
+eligibility, navigation, effective DI, execution or language certification is granted.
+
 <!-- pcg:RESOLVER-questions:end -->
 Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md](../../agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md), baseline `ec7067fd`, original section SHA-256 `40111762876a985c81d9c6da796f992dc6faa6bbee04e2e668ee98e70bf080bf`.
 
@@ -143,6 +257,7 @@ track: REPOSITORY
 artifact: docs/architecture/contracts/angular-resolver.md
 depends_on:
   - AUTH.TS_RETAINED_EVIDENCE
+  - AUTH.ANGULAR_CANONICAL_RELATIONS
 preserves:
   - AUTH.ANGULAR_GUARD_KINDS
 uses_evidence:

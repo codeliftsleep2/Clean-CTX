@@ -28,11 +28,14 @@ pub(crate) struct ArtifactIdentity {
 
 #[derive(Debug)]
 pub(crate) struct SemanticCompilationArtifact {
+    resolver_registration_scope: Option<bool>,
     #[cfg(feature = "typescript")]
     typescript_authority: Option<crate::ir::typescript_resolution::TypeScriptAuthority>,
     identity: ArtifactIdentity,
     source_snapshot: Arc<String>,
     compiled: CompiledIR,
+    resolver_registrations:
+        Option<crate::layers::meta::resolver_registrations::ResolverRegistrations>,
     semantic_edges: Vec<SemanticEdge>,
     semantic_dependencies: Vec<SemanticDependency>,
     invocation_evidence: Option<InvocationEvidenceSet>,
@@ -44,6 +47,8 @@ pub(crate) struct SemanticCompilationArtifact {
 impl SemanticCompilationArtifact {
     pub(crate) fn take_retained_authority(&mut self) -> super::retained::RetainedAuthority {
         super::retained::RetainedAuthority {
+            resolver_registration_scope: self.resolver_registration_scope,
+            resolver_registrations: self.resolver_registrations.take(),
             #[cfg(feature = "typescript")]
             typescript_authority: self.typescript_authority.take().filter(|authority| {
                 // Preserve a once-valid capture if a dependency became stale.
@@ -79,6 +84,8 @@ impl SemanticCompilationArtifact {
     ) -> Result<Self, crate::error::CleanCtxError> {
         let producer_generations = ProducerGenerationFingerprint::current(source, path, config)
             .map_err(|error| crate::error::CleanCtxError::Ir(error.to_string()))?;
+        let resolver_registration_scope = compiler.resolver_registration_scope.take();
+        let resolver_registrations = compiler.resolver_registrations.take();
         let semantic_edges = std::mem::take(&mut compiler.semantic_edges);
         let semantic_dependencies = std::mem::take(&mut compiler.semantic_dependencies);
         let invocation_evidence = compiler.invocation_evidence.take();
@@ -99,6 +106,7 @@ impl SemanticCompilationArtifact {
         let _ = (authorized_roots, typescript_project);
 
         Ok(Self {
+            resolver_registration_scope,
             #[cfg(feature = "typescript")]
             typescript_authority: compiler.typescript_authority.take(),
             identity: ArtifactIdentity {
@@ -109,6 +117,7 @@ impl SemanticCompilationArtifact {
             },
             source_snapshot: Arc::new(source.to_string()),
             compiled,
+            resolver_registrations,
             semantic_edges,
             semantic_dependencies,
             invocation_evidence,
@@ -127,11 +136,13 @@ impl SemanticCompilationArtifact {
         String,
     ) {
         let Self {
+            resolver_registration_scope: _,
             #[cfg(feature = "typescript")]
             typescript_authority,
             identity,
             source_snapshot,
             compiled,
+            resolver_registrations,
             semantic_edges,
             semantic_dependencies,
             invocation_evidence,
@@ -157,6 +168,9 @@ impl SemanticCompilationArtifact {
             source_snapshot,
         ));
         drop(invocation_evidence);
+        // Source-owned callers take the complete retained payload before this
+        // legacy canonical/edge decomposition; canonical-only callers discard it.
+        drop(resolver_registrations);
         #[cfg(feature = "typescript")]
         drop(typescript_authority);
         let _ = dotnet_testing_enabled;

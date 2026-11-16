@@ -43,9 +43,11 @@ pub(crate) struct SemanticSnapshot {
 }
 
 impl SemanticSnapshot {
-    fn is_current(&self) -> bool {
+    fn is_current(&self, registrations_enabled: bool) -> bool {
         self.authority.is_current(&self.source_hash)
-            && self.authority.admits_relation_evidence(&self.edges)
+            && self
+                .authority
+                .admits_semantic_projection(&self.edges, registrations_enabled)
             && self
                 .dependencies
                 .iter()
@@ -364,9 +366,10 @@ impl super::McpState {
         projection: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
     ) -> Result<(), String> {
         if !projection.authority.is_current(&projection.source_hash)
-            || !projection
-                .authority
-                .admits_relation_evidence(&projection.semantic_edges)
+            || !projection.authority.admits_semantic_projection(
+                &projection.semantic_edges,
+                crate::layers::meta::resolver_registrations::enabled(&self.config),
+            )
         {
             return Err("Typed authority changed before compatible publication".into());
         }
@@ -381,14 +384,21 @@ impl super::McpState {
             let mut index = self.workspace_index_lock();
             match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
                 Some(fidelity) => index
-                    .replace_semantic_projection_with_retained_authority(
+                    .replace_semantic_projection_with_complete_authority(
                         &canonical_path,
-                        projection.semantic_edges,
-                        fidelity,
-                        projection.source_hash,
-                        projection.semantic_dependencies,
-                        #[cfg(feature = "typescript")]
-                        projection.authority.typescript_authority,
+                        crate::workspace::index::SemanticProjectionInput {
+                            #[cfg(feature = "typescript")]
+                            typescript_authority: projection.authority.typescript_authority,
+                            resolver_registrations: projection.authority.resolver_registrations,
+                            resolver_registration_scope: projection
+                                .authority
+                                .resolver_registration_scope,
+                            fidelity,
+                            source_hash: projection.source_hash,
+                            edges: projection.semantic_edges,
+                            dependencies: projection.semantic_dependencies,
+                        },
+                        crate::layers::meta::resolver_registrations::enabled(&self.config),
                     )
                     .map_err(str::to_string)?,
                 None => {
@@ -410,7 +420,9 @@ impl super::McpState {
         .filter(|snapshot| {
             #[cfg(test)]
             let _observation = crate::work_observations_af_perf_002::snapshot_scope();
-            snapshot.is_current()
+            snapshot.is_current(crate::layers::meta::resolver_registrations::enabled(
+                &self.config,
+            ))
         })
         .cloned()
     }
@@ -434,9 +446,10 @@ impl super::McpState {
             return Err("generated semantic projection has wrong target hash".to_string());
         }
         if !semantic.authority.is_current(&target_source_hash)
-            || !semantic
-                .authority
-                .admits_relation_evidence(&semantic.semantic_edges)
+            || !semantic.authority.admits_semantic_projection(
+                &semantic.semantic_edges,
+                crate::layers::meta::resolver_registrations::enabled(&self.config),
+            )
         {
             return Err("generated TypeScript authority is stale".to_string());
         }

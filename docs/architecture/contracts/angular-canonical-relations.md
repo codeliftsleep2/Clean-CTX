@@ -21,6 +21,13 @@ The original proposed/requested wording, generation transitions, pre-change comp
 The owner explicitly approved this bounded carrier and lifecycle extension.
 Global EntityRef equality, legacy edge-key meaning, public JSON and query
 selectors remain frozen. The proposal below is historical decision context.
+
+ANG-R2 owner disposition 01 accepts a bounded additive exception, subject to exact
+B11 admission: typed written resolver registrations may accompany existing edges
+in their existing source-owned lifecycle and expose approved snapshot coordinates
+through resolver_registrations only. This prospective clause does not claim
+implementation or amend old relationship/public-query meanings. Global equality,
+edge identity, existing schemas/selectors and other capability limits stay frozen.
 <!-- pcg:B11-boundary-2:end -->
 
 
@@ -82,6 +89,15 @@ replacement, selection and retirement use. Full snapshots of dependency sources
 and whole-program retention remain prohibited. An unavoidable expansion beyond
 this scope must be reported before implementation.
 
+
+For the ANG-R2 bounded exception, AUTH.ANGULAR_RESOLVER owns exact registration
+identity, provenance, omission attribution, cold nomination, compatibility and
+verification. The additive query/typed collection may expose the approved exact
+route and declaration snapshot coordinates without changing EntityRef equality,
+CanonicalEndpoint/EdgeKey, existing response schemas or selector interpretation.
+No generic public canonical-ID API, metadata extension, independent store/index,
+lock, publication lifecycle or runtime/executable eligibility follows. This
+candidate becomes controlling only through exact predecessor-bound B11 admission.
 <!-- pcg:B11-boundary-1:end -->
 
 
