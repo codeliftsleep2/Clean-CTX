@@ -64,7 +64,12 @@ try {
         }
         & cargo test --lib --all-features --quiet $selection.filter -- --test-threads=1 --nocapture *> $testLog
         $testExit = $LASTEXITCODE
-        if ($testExit -ne 0) { throw "AF-PERF-001 tracked tests failed: $testLog" }
+        if ($testExit -ne 0) {
+            # Hosted runners are ephemeral: retain the actual failing assertion
+            # in the job output as well as the existing complete local log.
+            Get-Content -LiteralPath $testLog -Tail 120 | Write-Output
+            throw "AF-PERF-001 tracked tests failed: $testLog"
+        }
         $summary = [regex]::Match((Get-Content -LiteralPath $testLog -Raw),'test result: ok\. (\d+) passed; 0 failed; 0 ignored;')
         if (-not $summary.Success -or [int]$summary.Groups[1].Value -lt $selection.minimum) { throw "Missing/ignored required tests: $testLog" }
         Write-Output "$($selection.filter): $($summary.Value)"
