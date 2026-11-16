@@ -5,6 +5,183 @@ use crate::mcp::McpState;
 use serde_json::{Value, json};
 
 #[test]
+fn issue_162_resolver_registration_remaining_additional_root_refresh() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (primary, mut config) = fixture("direct");
+    let (additional, _) = fixture("direct");
+    config
+        .additional_roots
+        .push(additional.path().to_string_lossy().into_owned());
+    let state = McpState::new(config);
+    let before = query(&state, primary.path(), "forward");
+    assert_eq!(before["count"], 4, "{before:#}");
+    let selected = call(
+        &state,
+        primary.path(),
+        "workspace_query",
+        json!({
+            "type":"resolver_registrations", "direction":"forward", "route_path":"dashboard",
+            "withinPath":additional.path()
+        }),
+    );
+    assert_eq!(selected["count"], 2);
+    assert!(
+        selected["registrations"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| row["evidence"]["source"]
+                .as_str()
+                .unwrap()
+                .starts_with(&*additional.path().to_string_lossy()))
+    );
+    let file = additional.path().join("one.ts");
+    let source = std::fs::read_to_string(&file).unwrap();
+    std::fs::write(&file, source.replace("secondary:", "replaced:")).unwrap();
+    call(
+        &state,
+        primary.path(),
+        "refresh_workspace",
+        json!({"scope":"configured_roots"}),
+    );
+    assert!(
+        state
+            .workspace_index_read()
+            .semantic_projection_owners()
+            .is_empty()
+    );
+    let after = query(&state, primary.path(), "forward");
+    assert_eq!(
+        keys(&after),
+        ["primary", "primary", "replaced", "secondary"]
+    );
+    assert_eq!(
+        query(&state, primary.path(), "reverse")["registrations"],
+        after["registrations"]
+    );
+}
+
+#[test]
+fn issue_162_resolver_registration_remaining_edit_and_delta_transport() {
+    let _serial = crate::protocol::handler_response_serial();
+    let (root, config) = fixture("direct");
+    let p = root.path();
+    let file = p.join("one.ts");
+    let routing = std::fs::read_to_string(&file).unwrap();
+    let initial = format!(
+        "{routing}\nexport class Worker {{ run():number {{return 1;}} }}\n{}",
+        "// stable-padding-0123456789abcdef\n".repeat(1000)
+    );
+    std::fs::write(&file, &initial).unwrap();
+    let state = McpState::new(config.clone());
+    call(
+        &state,
+        p,
+        "provide_code_context",
+        json!({"filePath":file,"fidelity":"edit"}),
+    );
+    let alias = state.alias_for_path(&file.to_string_lossy()).unwrap();
+    let before = state
+        .semantic_snapshot(&alias)
+        .unwrap()
+        .authority
+        .resolver_registrations
+        .unwrap();
+    call(
+        &state,
+        p,
+        "apply_edit",
+        json!({"filePath":file,"operations":[{
+            "type":"replace_body", "target":"Worker.run", "expectedOldText":"{return 1;}", "newText":"{return 2;}"
+        }]}),
+    );
+    let edited = state
+        .semantic_snapshot(&alias)
+        .unwrap()
+        .authority
+        .resolver_registrations
+        .unwrap();
+    assert_eq!(edited.records.len(), 2);
+    assert_ne!(
+        edited.records[0].evidence.source_hash,
+        before.records[0].evidence.source_hash
+    );
+    assert_eq!(
+        edited
+            .records
+            .iter()
+            .map(|r| r.key.as_str())
+            .collect::<Vec<_>>(),
+        ["primary", "secondary"]
+    );
+    let target = std::fs::read_to_string(&file)
+        .unwrap()
+        .replace("secondary:", "renamed:")
+        .replace("return 2;", "return 3;");
+    std::fs::write(&file, &target).unwrap();
+    state.invalidate_source_cache(&file.to_string_lossy());
+    crate::protocol::captured_responses().clear();
+    crate::mcp::tools::dispatch_tools_call(
+        &json!(16203),
+        "delta_code_context",
+        &json!({"arguments":{
+            "filePath":file,"workspaceRoot":p,"fidelity":"edit"
+        }}),
+        &state,
+    );
+    let generated = crate::protocol::captured_responses().pop().unwrap();
+    assert!(generated.get("error").is_none(), "{generated:#}");
+    assert_eq!(generated["result"]["strategy"], "delta", "{generated:#}");
+    call(
+        &state,
+        p,
+        "apply_delta",
+        json!({
+            "delta":generated["result"]["delta"],"currentVersion":generated["result"]["from_version"]
+        }),
+    );
+    // Edit fidelity owns retained semantic data, not certified index coverage.
+    // Inspect the mutation snapshot before query hydration can reconstruct it.
+    let applied = state
+        .semantic_snapshot(&alias)
+        .unwrap()
+        .authority
+        .resolver_registrations
+        .unwrap();
+    assert_eq!(
+        applied
+            .records
+            .iter()
+            .map(|r| r.key.as_str())
+            .collect::<Vec<_>>(),
+        ["primary", "renamed"]
+    );
+    assert!(
+        applied
+            .records
+            .iter()
+            .all(|record| record.evidence.source_hash
+                == crate::cache::content_hash(target.as_bytes()))
+    );
+    drop(state);
+    let restarted = McpState::new(config);
+    call(&restarted, p, "restore_context", json!({"filePath":file}));
+    let restored_alias = restarted.alias_for_path(&file.to_string_lossy()).unwrap();
+    assert_eq!(
+        restarted
+            .semantic_snapshot(&restored_alias)
+            .unwrap()
+            .authority
+            .resolver_registrations,
+        Some(applied)
+    );
+    assert_eq!(
+        keys(&query(&restarted, p, "forward")),
+        ["primary", "renamed"]
+    );
+}
+
+#[test]
 fn issue_162_resolver_registration_replay_adopts_exact_keys_before_query() {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config) = fixture("direct");

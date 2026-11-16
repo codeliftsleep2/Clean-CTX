@@ -60,6 +60,8 @@ the current handoff below for the current normalized source.
 
 - `historical-witness-evidence.zip`: versioned byte-preserving Git archive of exact original/proposed witnesses, raw RED/GREEN outputs and successful pre-format replay evidence; SHA-256 `ea328ed56679bf05800658c6577d2a919f3de93fdcdd6a1ca9ba61eddd0b8b53`. Archival source inside is never executable regression coverage.
 
+- `invoke-remaining-lifecycle.ps1`: two focused additional-root and mutation transport witnesses; no PR/push operation.
+
 ## ANG_R2_FORMAT_HANDOFF
 
 Current handoff: `pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1`. It is UNRUN. See

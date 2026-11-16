@@ -13,11 +13,11 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_EVIDENCE_INDEX.md",
-    "sha256": "a85d0bcc8dfb279be47651692bcd49aa7c094d2865ca92937c7b7ca2d076b653"
+    "sha256": "7c499ad56bdf9b8a0d3ba2cc7a6be307fc91885010ee047ab6cc68528bc88d02"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_FORMAT_HANDOFF.md",
-    "sha256": "ff3761e7601c739ff3e57c28fe6584322d33c8dd85f815ccb1e9ba4f9bd55e8a"
+    "sha256": "742ed9bc51958ea5c44d28b01002ccf6cad149d5c04ea07f85d3518ddfded5ca"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_FROZEN_FORMAT_REVIEW.md",
@@ -33,7 +33,7 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_LIFECYCLE_VERIFICATION.md",
-    "sha256": "b6b3cef93b9c4c38554a205cacf2dbf941e8524dab7f81fd4460db368faa4f70"
+    "sha256": "d45b101a96e4bb92627defe1af9f4140e6feee68ae81fcb1bec5812ac64f0f88"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_OWNER_DISPOSITION_01.md",
@@ -53,7 +53,7 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_PROGRESS.md",
-    "sha256": "2c4d15d88f6abf95fb68dcd94e8b70dec8b471f5bfdb5c9fada2b82b3c86824e"
+    "sha256": "42591ddd02c86f1969e3414ef7634d91a71f49d6a542cb4c567b6449e787c69d"
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_PUBLIC_CONTRACT.md",
@@ -69,6 +69,6 @@
   },
   {
     "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_VERIFICATION.md",
-    "sha256": "a01c5b548cb34affb4d8cdd4b73c1f2d5e3380ee7994e5adc7e642ccf49cdeb8"
+    "sha256": "c89a3f4e187607a6db0e8e96f3b0dc40c930c7c957c7132ee4dbf5297cbc6fc4"
   }
 ]

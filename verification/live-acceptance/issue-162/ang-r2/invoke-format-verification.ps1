@@ -1,4 +1,4 @@
-param([string]$ResumeVerifiedFrom)
+param([string]$ResumeVerifiedFrom, [string]$VerifiedLifecycleFrom)
 # Operator-owned disposition-03 focused tests, scoped formatting/lint, guards and admission.
 $ErrorActionPreference = 'Stop'
 if ($PSVersionTable.PSVersion.Major -lt 7) { throw 'Use PowerShell 7 or later.' }
@@ -31,6 +31,22 @@ try {
     }
     $before = ConvertTo-Json -InputObject @(Source-Pins) -Depth 10
     [IO.File]::WriteAllText((Join-Path $out 'source-manifest.json'),$before,$utf8)
+    if ($ResumeVerifiedFrom -and $VerifiedLifecycleFrom) { throw 'Choose one receipt reuse mode.' }
+    if ($VerifiedLifecycleFrom) {
+        $prior = (Resolve-Path -LiteralPath $VerifiedLifecycleFrom).Path
+        if (-not $prior.StartsWith((Join-Path $root 'target/ang-r2/remaining-lifecycle-'),[StringComparison]::OrdinalIgnoreCase)) { throw 'Invalid lifecycle receipt directory.' }
+        $receiptPath = Join-Path $prior 'focused-tests-receipt.json'
+        $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding utf8 | ConvertFrom-Json
+        $command = 'cargo test --lib --all-features --quiet issue_162_resolver_registration_remaining_edit_and_delta_transport -- --test-threads=1 --nocapture'
+        if ($receipt.exit_code -ne 0 -or $receipt.command -cne $command -or $receipt.head -cne (& git rev-parse HEAD) -or $receipt.test_sha256 -cne (Get-FileHash 'src/tests/mcp/angular_resolver_registration_persistence_issue_162.rs').Hash.ToLowerInvariant()) { throw 'Lifecycle receipt/source differs.' }
+        foreach ($channel in @('stdout','stderr')) {
+            if ((Get-FileHash (Join-Path $prior ('focused-tests-'+$channel+'.txt'))).Hash.ToLowerInvariant() -cne $receipt.($channel+'_sha256')) { throw 'Lifecycle log mismatch.' }
+        }
+        if (Select-String -LiteralPath (Join-Path $prior 'focused-tests-stderr.txt') -Pattern '^warning:' -Quiet) { throw 'Lifecycle compiler warnings.' }
+        if (-not (Select-String -LiteralPath (Join-Path $prior 'focused-tests-stdout.txt') -SimpleMatch -Pattern 'test result: ok. 1 passed; 0 failed;' -Quiet)) { throw 'Lifecycle count mismatch.' }
+        [ordered]@{category='Reused verified lifecycle result; no new test execution';receipt=$receiptPath;sha256=(Get-FileHash $receiptPath).Hash.ToLowerInvariant()} |
+            ConvertTo-Json | Set-Content -LiteralPath (Join-Path $out 'lifecycle-reused.json') -Encoding utf8NoBOM
+    }
     if ($ResumeVerifiedFrom) {
         $prior = (Resolve-Path -LiteralPath $ResumeVerifiedFrom).Path
         $allowed = Join-Path $root 'target/ang-r2/format-verification-'
@@ -52,12 +68,13 @@ try {
     $runs = @(
         @{name='scoped-format';exe='rustfmt';arguments=(@('--edition','2024','--config','skip_children=true','--check')+$paths)},
         @{name='normalized-retirement';exe='cargo';expected=1;arguments=@('test','--lib','--all-features','--quiet','issue_162_deleted_owner_legacy_membership_is_retired','--','--test-threads=1','--nocapture')},
-        @{name='normalized-registration-and-relocation';exe='cargo';expected=18;arguments=@('test','--lib','--all-features','--quiet','issue_162_resolver_registration_','--','--test-threads=1','--nocapture')},
+        @{name='normalized-registration-and-relocation';exe='cargo';expected=20;arguments=@('test','--lib','--all-features','--quiet','issue_162_resolver_registration_','--','--test-threads=1','--nocapture')},
         @{name='scoped-clippy';exe='cargo';arguments=@('clippy','--lib','--bin','clean-ctx','--tests','--all-features','--','-D','warnings')},
         @{name='utf8';exe='pwsh';arguments=@('-NoProfile','-File','scripts/check-utf8.ps1')},
         @{name='file-sizes';exe='pwsh';arguments=@('-NoProfile','-File','scripts/check-file-sizes.ps1')}
     )
     foreach ($run in $runs) {
+        if ($VerifiedLifecycleFrom -and $run.expected) { continue }
         if ($ResumeVerifiedFrom -and $run.name -notin @('utf8','file-sizes')) { continue }
         $argumentsForRun = $run.arguments
         $stdout = Join-Path $out ($run.name+'-stdout.txt')

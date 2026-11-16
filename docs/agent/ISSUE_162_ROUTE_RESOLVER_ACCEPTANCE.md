@@ -286,11 +286,11 @@ DOC-270 governs the bounded investigation, approved implementation, compatibilit
 lifecycle/performance reconciliation and exact evidence statements of this mission.
 Its explicit document inventory is
 `verification/live-acceptance/issue-162/ang-r2/ANG_R2_EVIDENCE_INDEX.md`, SHA-256
-`a85d0bcc8dfb279be47651692bcd49aa7c094d2865ca92937c7b7ca2d076b653`.
-Document identity manifest SHA-256: `09be3c7d0ff9ad38e01edd9788eb63e0779fa4857532b357fd3504a35bd2ccdb`.
+`7c499ad56bdf9b8a0d3ba2cc7a6be307fc91885010ee047ab6cc68528bc88d02`.
+Document identity manifest SHA-256: `efe214e7714c9a078da9cd5e204c87bb4f756954be5c1c31e69ca0eb086a7004`.
 Exact current identities for all 18 Markdown mission documents, including that
 index, are in ANG_R2_DOCUMENT_COVERAGE.json, SHA-256
-`09be3c7d0ff9ad38e01edd9788eb63e0779fa4857532b357fd3504a35bd2ccdb`.
+`efe214e7714c9a078da9cd5e204c87bb4f756954be5c1c31e69ca0eb086a7004`.
 The focused handoff checks these pins; all current mission Markdown paths were
 compared with the inventory, with no omitted or spurious document.
 
@@ -342,6 +342,43 @@ actual revised admission. No redundant tracked tests are requested.
 This record creates no execution authorization, field/CI success or delivery claim.
 Full repository gates remain CI-owned. No formatter skip, test weakening, ignored
 required gate or protected-authority self-authorization is introduced.
+
+### Additional-root and mutation follow-up
+
+The owner requested push-only delivery; draft PR 189 was closed without merging
+or deleting the branch. Do not create another PR unless requested. The pushed
+checkpoint remains 51d2a698d4a3efafcde0b297bcf9badb6eaa3261.
+
+Additional-root configured refresh/reacquisition passed in
+remaining-lifecycle-20261116-114846-300: independent root supports, asserting
+withinPath, root-scoped projection reset and current forward/reverse key replacement.
+The same run's mutation witness failed before mutation at an incorrect Edit-fidelity
+index assumption. The test was corrected to inspect actual retained snapshots,
+consistent with the unchanged Edit-fidelity index-certification limit.
+
+Corrected apply_edit/apply_delta/durable restore test passed in
+remaining-lifecycle-20261116-115908-481, exit 0, one passed / zero failed, no warnings,
+101.0288367 seconds enclosing / 29.52 seconds test time. Its exact test-file
+SHA-256 is 40f457028bc78375ae8e0940f6513437b242b3f71edf708f82bdd6a3a88ca97d;
+stdout 25ca968dd0d59b8a4727909745e94ae6e462e4391bb853222bb241f3e9308c62;
+stderr a36d189f2a941bc250f01651aceed61c488e436e527f8369a1153e899257e043.
+The test inspects mutated snapshot keys/source hashes before query hydration and
+exact restored collection before the final public query. No production code changed.
+Existing refresh/state-restart boundaries are exercised; no new reset API is proposed.
+These exact results narrow earlier additional-root/edit/delta gaps without granting
+unrestricted edit/expression support. Existing direct replay and retirement evidence
+remains separate. Current registration test count is 20; old 18-pass receipts stay 18.
+
+The previous document amendment was admitted with no diagnostics in generation
+a3028b7c9a072ebb0525c8a0f29faa8f4849c97d8672fcc8f5a92df9cf481257, revision
+81b2acc4642c346137c0194d76c574aee0e2bb816f46fdd40330495a5582f22e. This later
+follow-up requires its own actual admission. Invoke the existing format packet with
+-VerifiedLifecycleFrom target/ang-r2/remaining-lifecycle-20261116-115908-481 to
+validate/reuse current test evidence and run only scoped format/Clippy, guards and
+actual revised admission. No redundant tracked tests or new architecture is required.
+CI, final applicable field verification, guarded follow-up commit/push and full
+mission acceptance remain distinct. No new PR or merge is authorized.
+
 <!-- pcg:ANG-R2-post-normalization-obligations:end -->
 
 ```architecture-graph

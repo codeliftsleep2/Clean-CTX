@@ -61,3 +61,19 @@ pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-forma
 Only documentation guards and actual revised-document admission run. Rust source
 manifests, prior result logs/counts and baseline must match or the wrapper refuses.
 The archive is byte-preserving historical evidence, not executable test coverage.
+
+## Lifecycle follow-up
+
+Two additional tests cover configured additional-root refresh/reacquisition and
+actual apply_edit/apply_delta durable transport. Both have passing evidence in
+remaining-lifecycle-20261116-114846-300 (root test) and
+remaining-lifecycle-20261116-115908-481 (corrected mutation test). No production
+code changed. Use the existing packet with the verified lifecycle receipt:
+
+```powershell
+pwsh -NoProfile -File verification/live-acceptance/issue-162/ang-r2/invoke-format-verification.ps1 -VerifiedLifecycleFrom target/ang-r2/remaining-lifecycle-20261116-115908-481
+```
+
+This skips tracked tests and runs only scoped format/Clippy, guards and revised
+actual document admission. A full fresh registration selection now expects 20,
+not the historical 18. Source hashes and warnings remain fail-closed.
