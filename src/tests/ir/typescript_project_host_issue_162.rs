@@ -239,7 +239,7 @@ fn issue_162_project_host_authorized_root_alias_preserves_physical_identity() {
     write(root.path(), "real/leaf.ts", "export class Leaf {}");
     let route = root.path().join("alias");
     std::os::unix::fs::symlink(root.path().join("real"), &route).unwrap();
-    let mut host = Host::new(&[route.clone()]).unwrap();
+    let mut host = Host::new(std::slice::from_ref(&route)).unwrap();
     assert!(host.read(&route.join("leaf.ts")).is_some());
     assert_eq!(
         host.normalized(&route.join("leaf.ts")).unwrap(),
