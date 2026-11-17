@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "baseline": "b94273186a67d5f4ef8d3ec01209e71c69ecfc03",
+  "features": "all-features",
+  "test_threads": 1,
+  "scope": "Existing fitness groups only, not general performance certification or discovery completeness",
+  "oracle_files": [
+    {
+      "path": "src/tests/mcp/fixtures/binary_clone_public_identities.json",
+      "sha256": "875eb716763f278b3600d3a0ec61fd7bf0478c9c8ce9faadf3f99b07c6c1af8e",
+      "rows": 40
+    },
+    {
+      "path": "src/tests/mcp/fixtures/sqlite_text_public_identities.json",
+      "sha256": "f4fd47e5fc1b1c3f9f6f76277135ed7f2d7d457a71be762032fe58cb91ee145f",
+      "rows": 12
+    }
+  ],
+  "fitness_groups_path": "fitness-membership.json",
+  "measurements_path": "measurement-membership.json",
+  "expected_fitness_groups": 57,
+  "expected_measurements": 18
+}

@@ -1,0 +1,572 @@
+[
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af_perf_001_",
+    "minimum": 14,
+    "tests": [
+      "mcp::semantic_compilation::angular_admission_lifecycle_af_perf_001::af_perf_001_lifecycle_publication_restore_snapshot_query",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_activate_child_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_activate_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_children_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_deactivate_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_eager_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_lazy_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_load_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_match_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_mixed_fresh_calls_and_dependency_refusal",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_providers_growth",
+      "mcp::semantic_compilation::angular_admission_work_af_perf_001::af_perf_001_unrelated_and_short_circuit_zero_work",
+      "semantic_work_static::af_perf_001_ast_direct_and_helper_amplification_detection",
+      "semantic_work_static::af_perf_001_ast_retained_admission_has_no_known_per_candidate_projection"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "issue_162_replay_p0_",
+    "minimum": 5,
+    "tests": [
+      "mcp::semantic_compilation::angular_resolver_replay_p0_tests::issue_162_replay_p0_canonical_batch_projects_once_independent_of_edge_count",
+      "mcp::semantic_compilation::angular_resolver_replay_p0_tests::issue_162_replay_p0_fixed_measurement",
+      "mcp::semantic_compilation::angular_resolver_replay_p0_tests::issue_162_replay_p0_independent_runtime_and_forged_refusal",
+      "mcp::semantic_compilation::angular_resolver_replay_p0_tests::issue_162_replay_p0_projection_does_not_repeat_mapping_proof",
+      "mcp::semantic_compilation::angular_resolver_replay_p0_tests::issue_162_replay_p0_unrelated_admission_has_zero_resolver_projections"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af_delegated_001_",
+    "minimum": 6,
+    "tests": [
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_bootstrap_growth",
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_config_composition_growth",
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_config_provider_growth",
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_imported_view_growth",
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_mixed_fresh_calls_and_mutation",
+      "angular_meta::delegated_provider_work_tests::af_delegated_001_unrelated_and_forged_short_circuit"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af174_",
+    "minimum": 9,
+    "tests": [
+      "index_membership_budget_af_perf_002::af174_budget_name_identity_growth",
+      "index_membership_budget_af_perf_002::af174_budget_occurrence_growth",
+      "index_membership_budget_af_perf_002::af174_budget_publisher_unique_key_growth",
+      "index_membership_budget_af_perf_002::af174_existing_duplicate_order_and_clone_behavior",
+      "semantic_work_static::index_membership_static::af174_static_registration_scans_and_writer_drift",
+      "workspace::index::membership::lifecycle_tests::af174_invariant_ngrx_synthetic_add_remove",
+      "workspace::index::membership::lifecycle_tests::af174_invariant_physical_owner_and_none_identity",
+      "workspace::index::membership::lifecycle_tests::af174_invariant_publishers_order_clone_and_retirement",
+      "workspace::index::membership::lifecycle_tests::af174_memory_companion_capacity_payload_and_clone"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_a3_",
+    "minimum": 4,
+    "tests": [
+      "artifact_operation_work_af_perf_002::a3_budget::af002_a3_budget_catalog_growth_and_joint",
+      "artifact_operation_work_af_perf_002::a3_budget::af002_a3_budget_invocation_growth",
+      "artifact_operation_work_af_perf_002::a3_budget::af002_a3_budget_no_demand_builds_nothing",
+      "semantic_work_static::csharp_a3_static::af002_a3_static_selection_scope"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af173_binding_",
+    "minimum": 4,
+    "tests": [
+      "index_ngrx_noop_af_perf_002::binding_budget::af173_binding_budget_demand_once_fresh_and_mixed",
+      "index_ngrx_noop_af_perf_002::binding_budget::af173_binding_budget_no_family_zero_work",
+      "mcp::ngrx_issue_152_semantic_envelope_tests::binding_semantics::af173_binding_semantics_positive_mixed_duplicates_and_repair",
+      "semantic_work_static::ngrx_binding_static::af173_binding_static_guard_and_observation_position"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "compression_token_work::c1_budget_public_raw_count_once",
+    "minimum": 1,
+    "tests": [
+      "artifact_operation_work_af_perf_002::compression_token_work::c1_budget_public_raw_count_once"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "content_economics::tests::c1_equivalence_counted_and_recounted_paths",
+    "minimum": 1,
+    "tests": [
+      "mcp::content_economics::tests::c1_equivalence_counted_and_recounted_paths"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_c1_",
+    "minimum": 3,
+    "tests": [
+      "artifact_operation_work_af_perf_002::c1_public_response::afperf_c1_fixture_footer_normalization_is_narrow",
+      "artifact_operation_work_af_perf_002::c1_public_response::afperf_c1_public_original_responses_and_raw_fallback",
+      "semantic_work_static::c1_token_static::afperf_c1_static_no_public_recount"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_frozen_identity_portability",
+    "minimum": 1,
+    "tests": [
+      "frozen_identity_portability_af_perf_002::af002_frozen_identity_portability"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "ir::hierarchical::placement_repair::",
+    "minimum": 2,
+    "tests": [
+      "ir::hierarchical::placement_repair::hierarchy_placement_bounded_work",
+      "ir::hierarchical::placement_repair::hierarchy_placement_forward_and_refusal_equivalence"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_hierarchy_",
+    "minimum": 1,
+    "tests": [
+      "semantic_work_static::hierarchy_placement_static::afperf_hierarchy_static_placement_sinks"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "mcp::tool_handlers::stats::format_budget_af_perf_002::",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::stats::format_budget_af_perf_002::af002_stats_json_zero_unused_text_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_stats_static_format_sinks",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::stats::format_static_af_perf_002::af002_stats_static_format_sinks"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "artifact_operation_work_af_perf_002::a1_clone_budget::",
+    "minimum": 2,
+    "tests": [
+      "artifact_operation_work_af_perf_002::a1_clone_budget::af002_a1_normalized_input_identity",
+      "artifact_operation_work_af_perf_002::a1_clone_budget::af002_a1_public_redundant_candidate_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_a1_",
+    "minimum": 3,
+    "tests": [
+      "artifact_operation_work_af_perf_002::a1_clone_frozen::afperf_a1_fixture_path_normalization_is_narrow",
+      "artifact_operation_work_af_perf_002::a1_clone_frozen::afperf_a1_frozen_public_and_durable_identity",
+      "artifact_operation_work_af_perf_002::a1_clone_static::afperf_a1_static_handler_clone_sinks"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_a4_lookup_",
+    "minimum": 2,
+    "tests": [
+      "ir::csharp_resolution::compilation::dependencies::a4_lookup_tests::af002_a4_lookup_construction_budget",
+      "ir::csharp_resolution::compilation::dependencies::a4_lookup_tests::af002_a4_lookup_frozen_equivalence"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_a4_",
+    "minimum": 2,
+    "tests": [
+      "ir::csharp_resolution::compilation::dependencies::a4_lookup_acceptance::afperf_a4_paired_construction_cost",
+      "ir::csharp_resolution::compilation::dependencies::a4_lookup_acceptance::afperf_a4_static_original_input_retrieval"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_a4_public_lookup_budget",
+    "minimum": 1,
+    "tests": [
+      "artifact_operation_work_af_perf_002::dependency_footprint::af002_a4_public_lookup_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_edit_end_",
+    "minimum": 2,
+    "tests": [
+      "artifact_operation_work_af_perf_002::edit_relocation_work::af002_edit_end_public_budget",
+      "edit::locate::exact_end_tests::af002_edit_end_frozen_equivalence"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_edit_end_",
+    "minimum": 3,
+    "tests": [
+      "edit::locate::exact_end_acceptance::afperf_edit_end_construction_cost",
+      "edit::locate::exact_end_acceptance::afperf_edit_end_raw_order_and_metadata",
+      "edit::locate::exact_end_acceptance::afperf_edit_end_static_known_joins"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_diff_shortcut_",
+    "minimum": 2,
+    "tests": [
+      "artifact_operation_work_af_perf_002::diff_work::shortcut_budget::af002_diff_shortcut_budget",
+      "artifact_operation_work_af_perf_002::diff_work::shortcut_budget::af002_diff_shortcut_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_diff_shortcut_",
+    "minimum": 2,
+    "tests": [
+      "artifact_operation_work_af_perf_002::diff_work::shortcut_protection::afperf_diff_shortcut_frozen_public",
+      "artifact_operation_work_af_perf_002::diff_work::shortcut_protection::afperf_diff_shortcut_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_overload_frozen_equivalence",
+    "minimum": 1,
+    "tests": [
+      "diff::differ::overload_equivalence::af002_overload_frozen_equivalence"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_overload_public_budget",
+    "minimum": 1,
+    "tests": [
+      "artifact_operation_work_af_perf_002::diff_work::overload_budget::af002_overload_public_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_overload_static",
+    "minimum": 1,
+    "tests": [
+      "diff::differ::overload_acceptance::afperf_overload_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_overload_full_equality_lookup",
+    "minimum": 1,
+    "tests": [
+      "diff::overload_lookup::tests::afperf_overload_full_equality_lookup"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_overload_integrated_frozen_public",
+    "minimum": 1,
+    "tests": [
+      "diff::differ::overload_alternatives::integrated::af002_overload_integrated_frozen_public"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_binary_frozen_semantics",
+    "minimum": 1,
+    "tests": [
+      "binary_clone_equivalence_af_perf_002::af002_binary_frozen_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_binary_public_identity",
+    "minimum": 1,
+    "tests": [
+      "default_operation_observations_af_perf_002::public_work::binary_clone::af002_binary_public_identity"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_binary_public_budget",
+    "minimum": 1,
+    "tests": [
+      "default_operation_observations_af_perf_002::public_work::binary_clone::af002_binary_public_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_binary_clone_static",
+    "minimum": 1,
+    "tests": [
+      "binary_clone_protection_af_perf_002::afperf_binary_clone_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_binary_reverse_frozen_equivalence",
+    "minimum": 1,
+    "tests": [
+      "binary_reverse_equivalence_af_perf_002::af002_binary_reverse_frozen_equivalence"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_binary_reverse_public_budget",
+    "minimum": 1,
+    "tests": [
+      "default_operation_observations_af_perf_002::public_work::binary_clone::reverse_budget::af002_binary_reverse_public_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_binary_reverse_static",
+    "minimum": 1,
+    "tests": [
+      "binary_reverse_integrated_af_perf_002::afperf_binary_reverse_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_binary_reverse_accessor_law",
+    "minimum": 1,
+    "tests": [
+      "binary_clone_equivalence_af_perf_002::original::missing_probe::afperf_binary_reverse_accessor_law"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_sqlite_text_frozen_semantics",
+    "minimum": 1,
+    "tests": [
+      "mcp::sqlite_store::work_af_perf_002::text_repair::af002_sqlite_text_frozen_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_sqlite_text_public_identity",
+    "minimum": 1,
+    "tests": [
+      "mcp::sqlite_store::work_af_perf_002::text_repair::af002_sqlite_text_public_identity"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_sqlite_text_public_budget",
+    "minimum": 1,
+    "tests": [
+      "mcp::sqlite_store::work_af_perf_002::text_repair::af002_sqlite_text_public_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_sqlite_text_static",
+    "minimum": 1,
+    "tests": [
+      "mcp::sqlite_store::work_af_perf_002::text_integrated::afperf_sqlite_text_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_sqlite_text_validation_law",
+    "minimum": 1,
+    "tests": [
+      "mcp::sqlite_store::work_af_perf_002::text_integrated::afperf_sqlite_text_validation_law"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_manifest_frozen_public_semantics",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::repair::af002_manifest_frozen_public_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_manifest_unused_budget",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::repair::af002_manifest_unused_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_manifest_integrated_static",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::integrated::af002_manifest_integrated_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_root_inventory_contracts",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::filesystem::inventory_work::af002_root_inventory_contracts"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_proof_manifest_unknown_demand",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::af002_proof_manifest_unknown_demand_retains"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "incomplete_authorized_root_cannot_earn_declaration_completeness",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::hydration::declaration_acquisition_tests::incomplete_authorized_root_cannot_earn_declaration_completeness"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_diff_source_frozen_semantics",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::ownership_design::repair::af002_diff_source_frozen_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_diff_source_copy_budget",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::ownership_design::repair::af002_diff_source_copy_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_diff_source_static",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::ownership_design::integrated::afperf_diff_source_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_delta_previous_frozen_semantics",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_frozen_semantics"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_delta_previous_unused_budget",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_unused_budget"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "afperf_delta_previous_static",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::delta_design::integrated::afperf_delta_previous_static"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "af002_delta_previous_lock_boundary",
+    "minimum": 1,
+    "tests": [
+      "mcp::tool_handlers::core::delta::delta_design::cases::af002_delta_previous_lock_boundary"
+    ]
+  },
+  {
+    "package": "clean-ctx-proxy",
+    "target": "lib",
+    "filter": "af002_proxy_",
+    "minimum": 6,
+    "tests": [
+      "scrub_equal_length_af_perf_002::af002_proxy_equal_length_direct_scrub",
+      "scrub_equal_length_af_perf_002::af002_proxy_equal_length_request_pipeline",
+      "scrub_equal_length_af_perf_002::af002_proxy_scrub_cancelling_length_changes",
+      "scrub_equal_length_af_perf_002::af002_proxy_scrub_changed_and_unchanged_bytes",
+      "scrub_equal_length_af_perf_002::af002_proxy_scrub_pipeline_shapes_and_idempotence",
+      "scrub_equal_length_af_perf_002::af002_proxy_scrub_rule_order_and_fail_closed_wrapper"
+    ]
+  },
+  {
+    "package": "clean-ctx-proxy",
+    "target": "lib",
+    "filter": "af002_prefilter_",
+    "minimum": 4,
+    "tests": [
+      "scrub_prefilter_af_perf_002::af002_prefilter_exact_96_case_outputs",
+      "scrub_prefilter_af_perf_002::af002_prefilter_existing_rule_triggers",
+      "scrub_prefilter_af_perf_002::af002_prefilter_false_positives_preserve_bytes",
+      "scrub_prefilter_af_perf_002::af002_prefilter_pipeline_existing_assignment"
+    ]
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "filter": "ci_verify_r1::ci_verify_r1_required_execution_and_failure_contracts",
+    "minimum": 1,
+    "tests": [
+      "ci_verify_r1::ci_verify_r1_required_execution_and_failure_contracts"
+    ]
+  }
+]

@@ -29,6 +29,16 @@ fn af002_overload_refinement_public_oracle() {
 }
 #[test]
 fn af002_overload_refinement_costs() {
+    af002_overload_refinement_costs_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_overload_refinement_costs_measurement() {
+    af002_overload_refinement_costs_cases(true);
+}
+
+fn af002_overload_refinement_costs_cases(measure: bool) {
     eprintln!("AF002_REFINE_LAYOUT {}", retrieval::layout());
     for &(n, w, mode, payload) in CASES {
         let (b, c) = fixture(n, w, mode, payload);
@@ -47,6 +57,10 @@ fn af002_overload_refinement_costs() {
             observations.push(
                 serde_json::json!({"original":observed.diff,"replacement":observed.overload}),
             );
+        }
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
         }
         let mut samples: [Vec<u128>; 5] = std::array::from_fn(|_| Vec::new());
         work::unobserved(|| {

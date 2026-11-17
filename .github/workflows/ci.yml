@@ -53,7 +53,7 @@ jobs:
       - name: AF-PERF-001 bounded semantic work fitness
         id: semantic-fitness
         shell: pwsh
-        run: ./scripts/check-semantic-work-fitness.ps1
+        run: ./scripts/check-semantic-work-fitness.ps1 -Consolidated
       - name: retain semantic fitness evidence
         if: ${{ always() && steps.semantic-fitness.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -61,8 +61,6 @@ jobs:
           name: semantic-fitness-${{ github.sha }}-${{ github.run_attempt }}
           path: target/issue-162/af-perf-001-*
           if-no-files-found: warn
-      - name: cargo test
-        run: cargo test --workspace --all-targets --all-features
       - name: cargo audit
         run: |
           cargo install cargo-audit --locked

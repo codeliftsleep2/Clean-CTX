@@ -153,6 +153,16 @@ fn local(roots: &[PathBuf], proof: bool, project: bool) -> u128 {
 
 #[test]
 fn af002_proof_manifest_actual_comparison() {
+    af002_proof_manifest_actual_comparison_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_proof_manifest_actual_comparison_measurement() {
+    af002_proof_manifest_actual_comparison_cases(true);
+}
+
+fn af002_proof_manifest_actual_comparison_cases(measure: bool) {
     let _serial = super::super::super::TEST_PROJECT_HYDRATION_SERIALIZE
         .lock()
         .unwrap_or_else(|e| e.into_inner());
@@ -254,6 +264,9 @@ fn af002_proof_manifest_actual_comparison() {
                 json!({"roots":roots_count,"files_per_root":files,"padding":padding,
                 "overlap":overlap,"missing":missing,"phase":index,"original_work":bw,"candidate_work":aw,"complete_identity":before})
             );
+        }
+        if !measure {
+            continue;
         }
         for proof in [false, true] {
             for _ in 0..3 {

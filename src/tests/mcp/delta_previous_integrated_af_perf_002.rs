@@ -121,6 +121,16 @@ fn local(
 }
 #[test]
 fn af002_delta_previous_integrated_cost() {
+    af002_delta_previous_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_delta_previous_integrated_cost_measurement() {
+    af002_delta_previous_integrated_cost_cases(true);
+}
+
+fn af002_delta_previous_integrated_cost_cases(measure: bool) {
     let _serial = crate::protocol::handler_response_serial();
     for (methods, body, padding) in [
         (1, 0, 0),
@@ -156,6 +166,11 @@ fn af002_delta_previous_integrated_cost() {
                 json!({"methods":methods,"body":body,
                 "padding":padding,"changed":changed,"original":old_work,"current":new_work})
             );
+            // Mandatory assertions above run for every original fixture case.
+            // Only repeated empirical sampling belongs to the explicit campaign.
+            if !measure {
+                continue;
+            }
             for _ in 0..3 {
                 local(root.path(), &text, false, changed, false);
                 local(root.path(), &text, true, changed, false);

@@ -11,6 +11,8 @@ Push-Location $repo
 try {
     $env:AF002_BINARY_PUBLIC_ORACLE = Join-Path $repo 'src/tests/mcp/fixtures/binary_clone_public_identities.json'
     $env:AF002_SQLITE_TEXT_ORACLE = Join-Path $repo 'src/tests/mcp/fixtures/sqlite_text_public_identities.json'
+    $measurementPath=Join-Path $repo 'verification/ci-verify-r1/measurement-membership.json'
+    $measurementNames=@(Get-Content -LiteralPath $measurementPath -Raw|ConvertFrom-Json|ForEach-Object{($_.name -split '::')[-1]})
     $sources = @(Get-ChildItem -LiteralPath 'src/tests' -Recurse -Filter '*af_perf_002.rs' -File)
     $inventory = @()
     $names = @{root=@();proxy=@()}
@@ -18,6 +20,8 @@ try {
         $relative = [IO.Path]::GetRelativePath($repo, $source.FullName).Replace('\','/')
         $text = [IO.File]::ReadAllText($source.FullName)
         $tests = @([regex]::Matches($text, '(?s)#\[test\](?:(?!fn ).)*?fn (\w+)') | ForEach-Object { $_.Groups[1].Value })
+        # Only explicitly separated empirical entries leave this correctness run.
+        $tests = @($tests | Where-Object { $_ -cnotin $measurementNames })
         $package = if ($relative.StartsWith('src/tests/proxy/')) { 'proxy' } else { 'root' }
         $names[$package] += $tests
         $inventory += @{path=$relative;sha256=(Get-FileHash -LiteralPath $source.FullName).Hash;tests=$tests}

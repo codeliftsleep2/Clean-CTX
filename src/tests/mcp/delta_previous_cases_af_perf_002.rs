@@ -334,6 +334,16 @@ fn local(root: &std::path::Path, text: &str, delay: bool, changed: bool) -> u128
 }
 #[test]
 fn af002_delta_previous_cost() {
+    af002_delta_previous_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_delta_previous_cost_measurement() {
+    af002_delta_previous_cost_cases(true);
+}
+
+fn af002_delta_previous_cost_cases(measure: bool) {
     let _serial = crate::protocol::handler_response_serial();
     for (methods, body, padding) in [
         (1, 0, 0),
@@ -348,6 +358,12 @@ fn af002_delta_previous_cost() {
         let root = tempfile::tempdir().unwrap();
         let text = source(methods, body, padding, false);
         for changed in [false, true] {
+            if !measure {
+                // Preserve both helpers' success assertions for every axis/phase.
+                local(root.path(), &text, false, changed);
+                local(root.path(), &text, true, changed);
+                continue;
+            }
             for _ in 0..3 {
                 local(root.path(), &text, false, changed);
                 local(root.path(), &text, true, changed);

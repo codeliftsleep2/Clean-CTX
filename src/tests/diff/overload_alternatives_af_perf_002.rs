@@ -288,6 +288,16 @@ fn measured(which: usize, b: &CapturedStructure, c: &CapturedStructure) -> u128 
 }
 #[test]
 fn af002_overload_alternative_costs() {
+    af002_overload_alternative_costs_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_overload_alternative_costs_measurement() {
+    af002_overload_alternative_costs_cases(true);
+}
+
+fn af002_overload_alternative_costs_cases(measure: bool) {
     eprintln!("AF002_ALT_LAYOUT {}", retrieval::layout());
     for &(n, w, mode, payload) in CASES {
         let (b, c) = fixture(n, w, mode, payload);
@@ -302,6 +312,10 @@ fn af002_overload_alternative_costs() {
             let observation = work::snapshot();
             observations
                 .push(serde_json::json!({"original":observation.diff,"new":observation.overload}));
+        }
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
         }
         let mut samples: [Vec<u128>; 5] = std::array::from_fn(|_| Vec::new());
         work::unobserved(|| {

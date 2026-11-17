@@ -120,6 +120,16 @@ fn afperf_edit_end_raw_order_and_metadata() {
 }
 #[test]
 fn afperf_edit_end_construction_cost() {
+    afperf_edit_end_construction_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn afperf_edit_end_construction_cost_measurement() {
+    afperf_edit_end_construction_cost_cases(true);
+}
+
+fn afperf_edit_end_construction_cost_cases(measure: bool) {
     for (count, density, misses) in [
         (0, 1, 1),
         (1, 1, 1),
@@ -157,7 +167,9 @@ fn afperf_edit_end_construction_cost() {
         assert_eq!(counts.end_editability_lookups, syntax.len());
         let mut before = Vec::new();
         let mut after = Vec::new();
-        for round in 0..25 {
+        // Mandatory mode retains one complete paired assertion per case.
+        // Measurement mode retains the original warmup and 24 samples.
+        for round in 0..if measure { 25 } else { 1 } {
             for old in if round % 2 == 0 {
                 [true, false]
             } else {
@@ -183,6 +195,9 @@ fn afperf_edit_end_construction_cost() {
                     }
                 }
             }
+        }
+        if !measure {
+            continue;
         }
         before.sort_unstable();
         after.sort_unstable();

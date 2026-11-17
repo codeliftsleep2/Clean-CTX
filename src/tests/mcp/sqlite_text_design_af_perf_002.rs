@@ -147,6 +147,16 @@ fn sample(store: &SqliteStore, borrowed: bool, requests: usize) -> u128 {
 
 #[test]
 fn af002_sqlite_text_design_costs() {
+    af002_sqlite_text_design_costs_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_sqlite_text_design_costs_measurement() {
+    af002_sqlite_text_design_costs_cases(true);
+}
+
+fn af002_sqlite_text_design_costs_cases(measure: bool) {
     for disk in [false, true] {
         for (repetitions, requests, deltas) in [
             (0, 1, 0),
@@ -182,6 +192,10 @@ fn af002_sqlite_text_design_costs() {
                 original,
                 outcome(comparison::query(&store.conn, "/design.ts", true))
             );
+            // Keep all original case assertions in the mandatory entry point.
+            if !measure {
+                continue;
+            }
             for _ in 0..3 {
                 sample(&store, false, requests);
                 sample(&store, true, requests);

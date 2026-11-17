@@ -1,0 +1,26 @@
+name: Explicit performance measurements
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
+        with:
+          toolchain: stable
+      - name: Explicit preserved measurement campaigns
+        shell: pwsh
+        run: ./verification/ci-verify-r1/invoke-measurements.ps1
+      - name: Retain empirical evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: empirical-measurements
+          path: target/ci-verify-r1/measurements-*
+          if-no-files-found: error

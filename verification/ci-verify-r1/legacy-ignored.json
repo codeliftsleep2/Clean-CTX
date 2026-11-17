@@ -1,0 +1,65 @@
+[
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::apply_edit_e2e_tests::e2e_apply_edit_round_trip_then_complete_context",
+    "source": "src/tests/mcp/apply_edit_e2e.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::apply_edit_e2e_tests::e2e_apply_edit_same_unit_twice_rejects_second",
+    "source": "src/tests/mcp/apply_edit_e2e.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::apply_edit_e2e_tests::e2e_apply_edit_different_units_both_succeed",
+    "source": "src/tests/mcp/apply_edit_e2e.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::e2e_server::test_e2e_tools_list",
+    "source": "src/tests/mcp/e2e_server.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::e2e_server::test_e2e_unknown_method",
+    "source": "src/tests/mcp/e2e_server.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::e2e_server::test_e2e_diff_commits",
+    "source": "src/tests/mcp/e2e_server.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::e2e_server::test_e2e_init_subcommand",
+    "source": "src/tests/mcp/e2e_server.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::e2e_server::test_e2e_config_dump",
+    "source": "src/tests/mcp/e2e_server.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::hydration::filesystem::tests::measure_gitignore_and_parallel_read_performance",
+    "source": "src/tests/mcp/hydration_filesystem.rs",
+    "standing": "Pre-existing ignored test; unchanged historical applicability"
+  }
+]

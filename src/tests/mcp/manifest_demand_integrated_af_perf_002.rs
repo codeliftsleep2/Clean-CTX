@@ -36,6 +36,16 @@ fn run(roots: &[PathBuf], proof: bool, original: bool, observe: bool) -> (u128, 
 
 #[test]
 fn af002_manifest_integrated_cost() {
+    af002_manifest_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_manifest_integrated_cost_measurement() {
+    af002_manifest_integrated_cost_cases(true);
+}
+
+fn af002_manifest_integrated_cost_cases(measure: bool) {
     let _serial = super::super::super::super::TEST_PROJECT_HYDRATION_SERIALIZE
         .lock()
         .unwrap_or_else(|e| e.into_inner());
@@ -97,6 +107,10 @@ fn af002_manifest_integrated_cost() {
                         .unwrap()
                         .is_empty()
                 );
+            }
+            // Keep all original case assertions in the mandatory entry point.
+            if !measure {
+                continue;
             }
             for _ in 0..3 {
                 run(&roots, proof, true, false);

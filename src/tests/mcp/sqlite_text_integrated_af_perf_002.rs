@@ -129,6 +129,16 @@ fn sample(store: &SqliteStore, old: bool, requests: usize) -> u128 {
 
 #[test]
 fn af002_sqlite_text_integrated_cost() {
+    af002_sqlite_text_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_sqlite_text_integrated_cost_measurement() {
+    af002_sqlite_text_integrated_cost_cases(true);
+}
+
+fn af002_sqlite_text_integrated_cost_cases(measure: bool) {
     for disk in [false, true] {
         for (repetitions, requests, deltas) in [
             (0, 1, 0),
@@ -197,6 +207,11 @@ fn af002_sqlite_text_integrated_cost() {
                 (after.discarded_pretty_strings, after.discarded_pretty_bytes),
                 (0, 0)
             );
+            // Mandatory assertions above run for every original fixture case.
+            // Only repeated empirical sampling belongs to the explicit campaign.
+            if !measure {
+                continue;
+            }
             for _ in 0..3 {
                 sample(&store, true, requests);
                 sample(&store, false, requests);

@@ -1,0 +1,200 @@
+[
+  {
+    "source": "src/tests/mcp/delta_previous_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_delta_previous_integrated_cost",
+    "measurement_identity": "af002_delta_previous_integrated_cost_measurement",
+    "before_sha256": "ac77f5e908a593b42ee2fd8e1b178229284d9e8a229d8c5aed081b5d7b825d67",
+    "after_sha256": "b9ae0a69ad17ca3b43b59e7fed6a2e805389680013ed25ef9bced368ba00e12c",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 23,
+    "candidate_assertion_sites": 23
+  },
+  {
+    "source": "src/tests/mcp/diff_source_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_diff_source_integrated_cost",
+    "measurement_identity": "af002_diff_source_integrated_cost_measurement",
+    "before_sha256": "5f2ae61326297927f86eeeb9cc8397809c63a45f0f6ce93b284064ec894e32ee",
+    "after_sha256": "fa4234fdc27c910f974043b0618ad814068da66688ef902f4307a47939238234",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 14,
+    "candidate_assertion_sites": 14
+  },
+  {
+    "source": "src/tests/mcp/sqlite_text_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_sqlite_text_integrated_cost",
+    "measurement_identity": "af002_sqlite_text_integrated_cost_measurement",
+    "before_sha256": "0412d65d9e8cb0aec83f43ca6d640dbb6a80061372fac6a973376ef689645acb",
+    "after_sha256": "5c4058c68141ff6ecbb4874b4e6abb4b55c02f7d88ecc236b13c18d22fc20f69",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 16,
+    "candidate_assertion_sites": 16
+  },
+  {
+    "source": "src/tests/diff/overload_cost_static_af_perf_002.rs",
+    "mandatory_identity_preserved": "afperf_overload_paired_cost",
+    "measurement_identity": "afperf_overload_paired_cost_measurement",
+    "before_sha256": "a53f7720d0943df1d93db56094d0a4a4d5cf330a56e251ea476dd81cd7c2a5da",
+    "after_sha256": "d31f6c06af588ca0a0a6c0a7ed06332287ffdbbce5d6b11f6dc1ed86119bcb9c",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 8,
+    "candidate_assertion_sites": 8
+  },
+  {
+    "source": "src/tests/diff/overload_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_overload_integrated_cost",
+    "measurement_identity": "af002_overload_integrated_cost_measurement",
+    "before_sha256": "fb63e9a56f53ef3c72a2362e932e4c8f59cdb62a3fa57d39f1cf55bfc4010a05",
+    "after_sha256": "deea80c99a8981872abe6f27e352ca27d5d266e793b8728a5786bb8aff7becc3",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 10,
+    "candidate_assertion_sites": 10
+  },
+  {
+    "source": "src/tests/diff/overload_alternatives_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_overload_alternative_costs",
+    "measurement_identity": "af002_overload_alternative_costs_measurement",
+    "before_sha256": "d43cdbee9c9f107886bc86c05143ac3e3d14a151b289d8b103a8836e7b7ba8fd",
+    "after_sha256": "b2ca448f0dce173b54dd7e99d9f9ec4faac8192746a0ece89d90b6aa8c60c057",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 11,
+    "candidate_assertion_sites": 11
+  },
+  {
+    "source": "src/tests/diff/overload_refinement_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_overload_refinement_costs",
+    "measurement_identity": "af002_overload_refinement_costs_measurement",
+    "before_sha256": "68af1301365084450d0a0c008d12642813424f032e03dc4da15a8733d79e291a",
+    "after_sha256": "9f28f81fa6c11745215ce9cf042b3dd3a279a9df0d215be660bc9457672c7a92",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 1,
+    "candidate_assertion_sites": 1
+  },
+  {
+    "source": "src/tests/diff/overload_source_forms_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_overload_source_forms_cost",
+    "measurement_identity": "af002_overload_source_forms_cost_measurement",
+    "before_sha256": "0cc89fc00b5cda24884f09cf099ee6dc56ae3387875b6e80b651d81e337a66ea",
+    "after_sha256": "d02257ec8909f87d74a93cc1a0f9633af10c222b51dbd94440d3d0bf4f85e223",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 14,
+    "candidate_assertion_sites": 14
+  },
+  {
+    "source": "src/tests/ir/binary_reverse_design_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_binary_reverse_design_cost",
+    "measurement_identity": "af002_binary_reverse_design_cost_measurement",
+    "before_sha256": "99596c4e1cf0a1a9697bc42af882892671d0530e460a128f174017469332e210",
+    "after_sha256": "081dd8bd8d0e53914458602552c31cb592e08a4df2cc4e64dc588b5cf1cdc50c",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 24,
+    "candidate_assertion_sites": 24
+  },
+  {
+    "source": "src/tests/ir/binary_reverse_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_binary_reverse_integrated_cost",
+    "measurement_identity": "af002_binary_reverse_integrated_cost_measurement",
+    "before_sha256": "bb12cf8bd2cceb175a6e86d9c7ffbf6e83baf868b8d462479ef825a009fc617c",
+    "after_sha256": "388663580a91bafa349407870b1f06d50c92d4991deaf6ab64adc20d0dfa1167",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 23,
+    "candidate_assertion_sites": 23
+  },
+  {
+    "source": "src/tests/mcp/manifest_demand_integrated_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_manifest_integrated_cost",
+    "measurement_identity": "af002_manifest_integrated_cost_measurement",
+    "before_sha256": "349288eb56d24da007ee790668b06286fcc65d8cdbe7492b5f10de77bee62163",
+    "after_sha256": "0eb9eea87ead1b84ce3bbded5e925087cb3a0a5f9f17d2381de7e5f8db73b67a",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 10,
+    "candidate_assertion_sites": 10
+  },
+  {
+    "source": "src/tests/mcp/startup_projection_design_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_startup_projection_costs",
+    "measurement_identity": "af002_startup_projection_costs_measurement",
+    "before_sha256": "773bf5269b24081253968021262fb1b55604293c3912acc3ceef2fae016f1ab4",
+    "after_sha256": "0e960ac04e40a562c61ed8e81fb35556219c0be5bee1195f87313c87dd9400fe",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 17,
+    "candidate_assertion_sites": 17
+  },
+  {
+    "source": "src/tests/mcp/sqlite_text_design_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_sqlite_text_design_costs",
+    "measurement_identity": "af002_sqlite_text_design_costs_measurement",
+    "before_sha256": "0464e93d308d6359c1d6a6021286a97e0a0f101aaad32a1e3a9588c15569c405",
+    "after_sha256": "dde0717db07b18e68b639fb917303eaf4bd145855737e15ae907ef66f0d6dfa6",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 11,
+    "candidate_assertion_sites": 11
+  },
+  {
+    "source": "src/tests/ir/a4_lookup_acceptance_af_perf_002.rs",
+    "mandatory_identity_preserved": "afperf_a4_paired_construction_cost",
+    "measurement_identity": "afperf_a4_paired_construction_cost_measurement",
+    "before_sha256": "b5edf4634c999072ca6aae6ae29207bad5d0be03e3f8a96457000755b0ee4bbc",
+    "after_sha256": "5713ce2404e5e89d79f115748e2b3a1a893e9302a5c7441a800bf06429f631b8",
+    "preservation": "Each paired assertion remains mandatory once per original fixture case. Measurement mode retains exactly 25 original rounds, ordering and warmup exclusion.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 9,
+    "candidate_assertion_sites": 9
+  },
+  {
+    "source": "src/tests/edit/exact_end_acceptance_af_perf_002.rs",
+    "mandatory_identity_preserved": "afperf_edit_end_construction_cost",
+    "measurement_identity": "afperf_edit_end_construction_cost_measurement",
+    "before_sha256": "e8913ffb7f17ca794b4a96c5be1fa1fc2200bf1fd0b4c2949569841607380554",
+    "after_sha256": "801ea9342a1cec0d9879593707f67c78af863bd8fd0a4b6d82442619c887b42c",
+    "preservation": "Each paired assertion remains mandatory once per original fixture case. Measurement mode retains exactly 25 original rounds, ordering and warmup exclusion.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 15,
+    "candidate_assertion_sites": 15
+  },
+  {
+    "source": "src/tests/mcp/delta_previous_cases_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_delta_previous_cost",
+    "measurement_identity": "af002_delta_previous_cost_measurement",
+    "before_sha256": "30b25ee75ea1bbca51d496b3b59d2a58663067f40d37f7cc63e80ad95d298a60",
+    "after_sha256": "16e0d289d0e6832030e6f71fc05b5cfd1507ce49fbaf9c2108c6a56f47423f53",
+    "preservation": "Mandatory path invokes both original helpers once per unchanged axis/phase, preserving helper success assertions. Measurement path is unchanged.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 46,
+    "candidate_assertion_sites": 46
+  },
+  {
+    "source": "src/tests/mcp/diff_ownership_cases_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_diff_ownership_local_cost",
+    "measurement_identity": "af002_diff_ownership_local_cost_measurement",
+    "before_sha256": "5e75bef8bff4cf8c999a7b2d50d6f3b8c30f77fc2bb52d91beb9d8c2725dd47d",
+    "after_sha256": "212639f794d0018525a7d7271584170645b5ae14f8402b02b421bdd7f71ad32f",
+    "preservation": "Mandatory path invokes both original helpers once per unchanged axis/phase, preserving helper success assertions. Measurement path is unchanged.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 23,
+    "candidate_assertion_sites": 23
+  },
+  {
+    "source": "src/tests/mcp/proof_manifest_design_af_perf_002.rs",
+    "mandatory_identity_preserved": "af002_proof_manifest_actual_comparison",
+    "measurement_identity": "af002_proof_manifest_actual_comparison_measurement",
+    "before_sha256": "7663189832f44311f70a68afda6a000f4cd32db684ddf1c350046913df7b3e53",
+    "after_sha256": "5756607a44cdab9318dc24e40becc09aad2a81f90ccb826ea3f45a8499d5e27d",
+    "preservation": "Mandatory complete public/proof identity, failure/currentness and work assertions retain all fixture axes and phases; only following timing campaign separated.",
+    "verification": "Assertion-site count preserved statically; first three mandatory companions verified separately; remaining execution pending. Counts do not prove behavioral equivalence.",
+    "baseline_assertion_sites": 28,
+    "candidate_assertion_sites": 28
+  }
+]

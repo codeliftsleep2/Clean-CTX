@@ -1,0 +1,146 @@
+[
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::core::delta::delta_design::integrated::af002_delta_previous_integrated_cost_measurement",
+    "mandatory_companion": "mcp::tool_handlers::core::delta::delta_design::integrated::af002_delta_previous_integrated_cost",
+    "source": "src/tests/mcp/delta_previous_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::core::delta::ownership_design::integrated::af002_diff_source_integrated_cost_measurement",
+    "mandatory_companion": "mcp::tool_handlers::core::delta::ownership_design::integrated::af002_diff_source_integrated_cost",
+    "source": "src/tests/mcp/diff_source_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::sqlite_store::work_af_perf_002::text_integrated::af002_sqlite_text_integrated_cost_measurement",
+    "mandatory_companion": "mcp::sqlite_store::work_af_perf_002::text_integrated::af002_sqlite_text_integrated_cost",
+    "source": "src/tests/mcp/sqlite_text_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes, assertion bodies, warmups and repeated sampling retained in common cases; mandatory entry returns after assertion phase for each case."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "diff::differ::overload_acceptance::afperf_overload_paired_cost_measurement",
+    "mandatory_companion": "diff::differ::overload_acceptance::afperf_overload_paired_cost",
+    "source": "src/tests/diff/overload_cost_static_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "diff::differ::overload_alternatives::integrated::af002_overload_integrated_cost_measurement",
+    "mandatory_companion": "diff::differ::overload_alternatives::integrated::af002_overload_integrated_cost",
+    "source": "src/tests/diff/overload_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "diff::differ::overload_alternatives::af002_overload_alternative_costs_measurement",
+    "mandatory_companion": "diff::differ::overload_alternatives::af002_overload_alternative_costs",
+    "source": "src/tests/diff/overload_alternatives_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "diff::differ::overload_alternatives::refinement::af002_overload_refinement_costs_measurement",
+    "mandatory_companion": "diff::differ::overload_alternatives::refinement::af002_overload_refinement_costs",
+    "source": "src/tests/diff/overload_refinement_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "diff::differ::overload_alternatives::source_forms::af002_overload_source_forms_cost_measurement",
+    "mandatory_companion": "diff::differ::overload_alternatives::source_forms::af002_overload_source_forms_cost",
+    "source": "src/tests/diff/overload_source_forms_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "binary_reverse_design_af_perf_002::af002_binary_reverse_design_cost_measurement",
+    "mandatory_companion": "binary_reverse_design_af_perf_002::af002_binary_reverse_design_cost",
+    "source": "src/tests/ir/binary_reverse_design_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "binary_reverse_integrated_af_perf_002::af002_binary_reverse_integrated_cost_measurement",
+    "mandatory_companion": "binary_reverse_integrated_af_perf_002::af002_binary_reverse_integrated_cost",
+    "source": "src/tests/ir/binary_reverse_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::integrated::af002_manifest_integrated_cost_measurement",
+    "mandatory_companion": "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::integrated::af002_manifest_integrated_cost",
+    "source": "src/tests/mcp/manifest_demand_integrated_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::sqlite_store::work_af_perf_002::startup_projection_design::af002_startup_projection_costs_measurement",
+    "mandatory_companion": "mcp::sqlite_store::work_af_perf_002::startup_projection_design::af002_startup_projection_costs",
+    "source": "src/tests/mcp/startup_projection_design_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::sqlite_store::work_af_perf_002::text_design::af002_sqlite_text_design_costs_measurement",
+    "mandatory_companion": "mcp::sqlite_store::work_af_perf_002::text_design::af002_sqlite_text_design_costs",
+    "source": "src/tests/mcp/sqlite_text_design_af_perf_002.rs",
+    "preservation": "Original fixture axes and untimed correctness/work assertions remain mandatory; empirical repetitions retain original warmups and rotations."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "ir::csharp_resolution::compilation::dependencies::a4_lookup_acceptance::afperf_a4_paired_construction_cost_measurement",
+    "mandatory_companion": "ir::csharp_resolution::compilation::dependencies::a4_lookup_acceptance::afperf_a4_paired_construction_cost",
+    "source": "src/tests/ir/a4_lookup_acceptance_af_perf_002.rs",
+    "preservation": "Each paired assertion remains mandatory once per original fixture case. Measurement mode retains exactly 25 original rounds, ordering and warmup exclusion."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "edit::locate::exact_end_acceptance::afperf_edit_end_construction_cost_measurement",
+    "mandatory_companion": "edit::locate::exact_end_acceptance::afperf_edit_end_construction_cost",
+    "source": "src/tests/edit/exact_end_acceptance_af_perf_002.rs",
+    "preservation": "Each paired assertion remains mandatory once per original fixture case. Measurement mode retains exactly 25 original rounds, ordering and warmup exclusion."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::core::delta::delta_design::cases::af002_delta_previous_cost_measurement",
+    "mandatory_companion": "mcp::tool_handlers::core::delta::delta_design::cases::af002_delta_previous_cost",
+    "source": "src/tests/mcp/delta_previous_cases_af_perf_002.rs",
+    "preservation": "Mandatory path invokes both original helpers once per unchanged axis/phase, preserving helper success assertions. Measurement path is unchanged."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::core::delta::ownership_design::cases::af002_diff_ownership_local_cost_measurement",
+    "mandatory_companion": "mcp::tool_handlers::core::delta::ownership_design::cases::af002_diff_ownership_local_cost",
+    "source": "src/tests/mcp/diff_ownership_cases_af_perf_002.rs",
+    "preservation": "Mandatory path invokes both original helpers once per unchanged axis/phase, preserving helper success assertions. Measurement path is unchanged."
+  },
+  {
+    "package": "clean-ctx",
+    "target": "lib",
+    "name": "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::af002_proof_manifest_actual_comparison_measurement",
+    "mandatory_companion": "mcp::tool_handlers::hydration::filesystem::inventory_work::comparison::af002_proof_manifest_actual_comparison",
+    "source": "src/tests/mcp/proof_manifest_design_af_perf_002.rs",
+    "preservation": "Mandatory complete public/proof identity, failure/currentness and work assertions retain all fixture axes and phases; only following timing campaign separated."
+  }
+]

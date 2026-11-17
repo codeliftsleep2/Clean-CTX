@@ -73,6 +73,16 @@ fn afperf_binary_reverse_static() {
 }
 #[test]
 fn af002_binary_reverse_integrated_cost() {
+    af002_binary_reverse_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_binary_reverse_integrated_cost_measurement() {
+    af002_binary_reverse_integrated_cost_cases(true);
+}
+
+fn af002_binary_reverse_integrated_cost_cases(measure: bool) {
     for (methods, payload, dup) in [
         (0, 0, false),
         (1, 0, false),
@@ -133,6 +143,10 @@ fn af002_binary_reverse_integrated_cost() {
             ],
             [0, 0, 0]
         );
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
+        }
         let samples = work::unobserved(|| {
             let mut samples: [Vec<u128>; 2] = std::array::from_fn(|_| Vec::new());
             for round in 0..27 {

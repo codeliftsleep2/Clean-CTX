@@ -52,6 +52,10 @@ pub mod workspace;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+#[path = "tests/architecture/ci_verify_r1.rs"]
+mod ci_verify_r1;
+
 #[cfg(all(test, feature = "rust", feature = "typescript", feature = "angular"))]
 #[path = "tests/architecture/semantic_work_static.rs"]
 mod semantic_work_static;

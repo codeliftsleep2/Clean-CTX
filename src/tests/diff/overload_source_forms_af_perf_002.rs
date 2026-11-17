@@ -250,6 +250,16 @@ fn timed(which: usize, b: &CapturedStructure, c: &CapturedStructure) -> u128 {
 }
 #[test]
 fn af002_overload_source_forms_cost() {
+    af002_overload_source_forms_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_overload_source_forms_cost_measurement() {
+    af002_overload_source_forms_cost_cases(true);
+}
+
+fn af002_overload_source_forms_cost_cases(measure: bool) {
     for &(n, w, mode, payload) in CASES {
         let (b, c) = fixture(n, w, mode, payload);
         verify(&b, &c);
@@ -262,6 +272,10 @@ fn af002_overload_source_forms_cost() {
             let counts = work::snapshot();
             observations
                 .push(serde_json::json!({"original":counts.diff,"selection":counts.overload}));
+        }
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
         }
         // Two fixed rotations retain 24 samples each to inspect within-run repeatability.
         let mut rounds = Vec::new();

@@ -85,6 +85,16 @@ fn sample(which: usize, b: &CapturedStructure, c: &CapturedStructure) -> u128 {
 }
 #[test]
 fn af002_overload_integrated_cost() {
+    af002_overload_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_overload_integrated_cost_measurement() {
+    af002_overload_integrated_cost_cases(true);
+}
+
+fn af002_overload_integrated_cost_cases(measure: bool) {
     eprintln!(
         "AF002_INTEGRATED_LAYOUT {}",
         json!({"lookup_header":size_of::<crate::diff::overload_lookup::MethodLookup<'_, '_>>(),
@@ -109,6 +119,10 @@ fn af002_overload_integrated_cost() {
             assert_eq!(observation.overload.pairs, expected_pairs);
             observations
                 .push(json!({"original":observation.diff,"replacement":observation.overload}));
+        }
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
         }
         let mut samples: [Vec<u128>; 5] = std::array::from_fn(|_| Vec::new());
         work::unobserved(|| {

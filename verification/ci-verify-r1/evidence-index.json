@@ -1,0 +1,61 @@
+{
+  "baseline": "b94273186a67d5f4ef8d3ec01209e71c69ecfc03",
+  "run": 44134968130,
+  "archive_sha256": "48bdbf84ff49ed0178b0332832871891e3ab76c737689014349e76d63e677b25",
+  "members": [
+    {
+      "entry": "baseline-ci-run.json",
+      "sha256": "edb9f3e5a2205cc47afc3e20f66fb0de60b302f5ccee18740c2549a8ed6a966b"
+    },
+    {
+      "entry": "baseline-ci-run-latest.json",
+      "sha256": "7b57f0f6d710328974c8970df57c1b972d190eafeb886c103b2761930891bfba"
+    },
+    {
+      "entry": "baseline-ci-failed-job.log",
+      "sha256": "f72fc76a080c298c652840adef41d32f6fd5c0eb3d635c32fe9f90ae91706d4a"
+    },
+    {
+      "entry": "baseline-sources.json",
+      "sha256": "1966dd98db9ddc447bc4cd57fa892ecb29b3e3098f575971a52bc70e364c7983"
+    },
+    {
+      "entry": "owner-disposition.txt",
+      "sha256": "97bcba9300f28f432e90d6efbf703d49cc8a7ae643a56763921eff15d91d74d4"
+    },
+    {
+      "entry": "authority-20261117-132802-523/graph-summary.json",
+      "sha256": "f60a180e9b9600f17b7b9f429b382a43e72c55cb40d15d6ba58efb53a2c227e4"
+    },
+    {
+      "entry": "authority-20261117-132802-523/acquisition/2.payload.json",
+      "sha256": "b92525fa5fdef3de83da4688c0d4a637897e3af8a52b8912ed57523ca16be6ce"
+    },
+    {
+      "entry": "completion-authority-20261117-133232-503/graph-summary.json",
+      "sha256": "6890430069ab9cdc7bff80472a964814b138f505426e30ea5b3029e0ad8218af"
+    },
+    {
+      "entry": "completion-authority-20261117-133232-503/acquisition/2.payload.json",
+      "sha256": "26ae5616c583fdc8c91f830afce4ea13feaa7994b955fcb8f4d9089089d95e30"
+    },
+    {
+      "entry": "mixed-preservation-20261117-133714/receipt.json",
+      "sha256": "f520d6d8c7708f72c43c54f36b64593a6103dffb6dd0560ca9970b5edcec82bd"
+    },
+    {
+      "entry": "mixed-preservation-20261117-133714/tracked-tests.log",
+      "sha256": "6628758efaf47d2e0462ef347d6ac58af7e8f200accf395adc5387797662a78f"
+    }
+  ],
+  "baseline_outcome": {
+    "fitness": "passed",
+    "full_suite": {
+      "passed": 5230,
+      "failed": 19,
+      "ignored": 9,
+      "seconds": 5028.75
+    }
+  },
+  "candidate_verification": "Only first three mixed mandatory companions passed; enforcement, remaining companions, CI and admission remain pending."
+}

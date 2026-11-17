@@ -145,6 +145,16 @@ fn sample(base: &CapturedStructure, cur: &CapturedStructure, old: bool) -> u128 
 }
 #[test]
 fn afperf_overload_paired_cost() {
+    afperf_overload_paired_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn afperf_overload_paired_cost_measurement() {
+    afperf_overload_paired_cost_cases(true);
+}
+
+fn afperf_overload_paired_cost_cases(measure: bool) {
     for (n, width, mode, payload) in [
         (0, 1, "exact", 0),
         (1, 1, "exact", 0),
@@ -170,6 +180,10 @@ fn afperf_overload_paired_cost() {
         let new = work::snapshot();
         assert_eq!(actual, expected);
         assert_eq!(new.overload.pairs, old.overload.pairs);
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
+        }
         let (mut a, mut b) = (Vec::new(), Vec::new());
         work::unobserved(|| {
             for _ in 0..3 {

@@ -107,6 +107,16 @@ fn run(
 }
 #[test]
 fn af002_diff_source_integrated_cost() {
+    af002_diff_source_integrated_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_diff_source_integrated_cost_measurement() {
+    af002_diff_source_integrated_cost_cases(true);
+}
+
+fn af002_diff_source_integrated_cost_cases(measure: bool) {
     let _responses = crate::protocol::handler_response_serial();
     for (methods, body, padding) in [
         (0, 0, 0),
@@ -136,6 +146,11 @@ fn af002_diff_source_integrated_cost() {
                 "helper_input_bytes",
             ] {
                 assert_eq!(old["work"][field], new["work"][field]);
+            }
+            // Mandatory assertions above run for every original fixture case.
+            // Only repeated empirical sampling belongs to the explicit campaign.
+            if !measure {
+                continue;
             }
             for _ in 0..3 {
                 run(root.path(), &text, true, changed, false);

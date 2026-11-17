@@ -1,6 +1,11 @@
 # AF-PERF-001: tracked tests are the gate; this script selects and preserves evidence.
-param([string]$ResumeLogDirectory='')
+param([string]$ResumeLogDirectory='', [switch]$Consolidated)
 $ErrorActionPreference = 'Stop'
+if($Consolidated){
+    if($ResumeLogDirectory){throw 'Consolidated verification requires fresh complete-suite evidence; legacy resume remains available in standalone mode.'}
+    & (Join-Path $PSScriptRoot 'invoke-consolidated-verification.ps1')
+    return
+}
 $repoPath = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $oldBinaryOracle=$env:AF002_BINARY_PUBLIC_ORACLE
 $oldSqliteOracle=$env:AF002_SQLITE_TEXT_ORACLE
@@ -14,6 +19,12 @@ $oldConsoleEncoding=[Console]::OutputEncoding
 [Console]::OutputEncoding=[Text.UTF8Encoding]::new($false)
 Push-Location $repoPath
 try {
+    # Preserve focused zero-ignored membership after separating empirical entries.
+    $measurementFile=Join-Path $repoPath 'verification/ci-verify-r1/measurement-membership.json'
+    $measurementSkips=@()
+    foreach($item in @(Get-Content -LiteralPath $measurementFile -Raw|ConvertFrom-Json)){
+        $measurementSkips+=@('--skip',$item.name)
+    }
     $env:AF002_BINARY_PUBLIC_ORACLE=Join-Path $repoPath 'src/tests/mcp/fixtures/binary_clone_public_identities.json'
     $env:AF002_SQLITE_TEXT_ORACLE=Join-Path $repoPath 'src/tests/mcp/fixtures/sqlite_text_public_identities.json'
     # Local closure replays the exact original path-dependent proof oracle.
@@ -66,7 +77,7 @@ try {
             }
             Move-Item -LiteralPath $testLog -Destination ($testLog+'.interrupted-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
         }
-        & cargo test --lib --all-features --quiet $selection.filter -- --test-threads=1 --nocapture *> $testLog
+        & cargo test --lib --all-features --quiet $selection.filter -- --test-threads=1 --nocapture @measurementSkips *> $testLog
         $testExit = $LASTEXITCODE
         if ($testExit -ne 0) {
             # Hosted runners are ephemeral: retain the actual failing assertion

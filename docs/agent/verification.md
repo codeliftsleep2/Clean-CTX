@@ -29,6 +29,46 @@ are superseded prospectively by this section. They are not a current local
 handoff. Previous results retain the circumstances under which they were run.
 <!-- pcg:VERIFICATION-current:end -->
 
+<!-- pcg:VERIFICATION-responsibilities:begin -->
+## CI-VERIFY-R1 candidate responsibility amendment
+
+This amendment is pending predecessor-bound B11 owner authorization and actual
+admission. The accepted predecessor remains controlling until that checkpoint.
+The owner-approved bounded implementation is recorded in [CI-VERIFY-R1](CI_VERIFY_R1.md).
+
+On legitimate admission, the complete mandatory CI entry point is
+scripts/check-semantic-work-fitness.ps1 -Consolidated. It preserves the full
+workspace/all-target/all-feature correctness scope, lists actual registered tests
+without executing them, executes the ordinary suite once with one libtest thread,
+then verifies complete registration/outcome membership and exact deterministic
+fitness groups. Both frozen oracle environments and optional historical replay
+configuration are explicit, pinned and recorded. Missing/duplicate execution,
+failed assertions, invalid mandatory prerequisites, incomplete/empty fitness
+membership and ignored required tests fail the gate. Semantic fitness outcomes
+remain separately attributable in the consolidated receipt.
+
+The original focused fitness command and validated historical local-resume mode
+remain supported for their scoped use; they are not an extra duplicate CI test
+stage. Its older pre-full-suite execution instructions below remain historical
+applicability after admission of this amendment. Existing pipeline status checks,
+compilation/lint/format, encoding, active-file, dependency/security checks and
+repository governance obligations remain applicable.
+
+Repeated empirical studies are explicitly enumerated in the governed measurement
+membership and run only through the manually invoked performance workflow.
+Their original fixture axes, warmups, paired samples and reporting remain intact.
+All unique semantic, lifecycle, persistence, frozen-equivalence and deterministic
+work assertions remain in ordinary mandatory tracked companions. Only measurement
+entries may be ignored by ordinary execution, in addition to the nine explicitly
+recorded pre-existing ignored tests whose standing is unchanged. This does not
+waive an existing empirical acceptance prerequisite for a production change.
+Correctness and deterministic fitness results are not performance certification.
+
+No complete local repository run is required or authorized by this amendment.
+CI remains owner of final verification; focused local invocations stay operator-owned.
+No changed gate is accepted merely because a descriptor or graph query succeeds.
+<!-- pcg:VERIFICATION-responsibilities:end -->
+
 ## Final Verification Gate
 
 The complete gate must cover the reported change set before declaring any task
@@ -197,6 +237,7 @@ note: Source-attributed bounded subject; historical measurements and execution s
 knowledge_scope: authority
 knowledge_content:
   - statement self#VERIFICATION-current
+  - statement:responsibilities self#VERIFICATION-responsibilities
   - constraint:guards self#VERIFICATION-guards
   - verification_obligation:completion self#VERIFICATION-obligations
   - historical_applicability:source self#whole

@@ -145,6 +145,16 @@ fn units(count: usize, density: usize, depth: usize) -> Vec<CSharpCompilationUni
 }
 #[test]
 fn afperf_a4_paired_construction_cost() {
+    afperf_a4_paired_construction_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn afperf_a4_paired_construction_cost_measurement() {
+    afperf_a4_paired_construction_cost_cases(true);
+}
+
+fn afperf_a4_paired_construction_cost_cases(measure: bool) {
     use crate::work_observations_af_perf_002 as work;
     for (count, density, depth) in [
         (0, 1, 0),
@@ -168,7 +178,9 @@ fn afperf_a4_paired_construction_cost() {
         assert!(old_single.requirements.is_empty() && new_single.requirements.is_empty());
         let mut old_times = Vec::new();
         let mut new_times = Vec::new();
-        for round in 0..25 {
+        // Mandatory mode retains one complete paired assertion per case.
+        // Measurement mode retains the original warmup and 24 samples.
+        for round in 0..if measure { 25 } else { 1 } {
             let mut old_result = None;
             let mut new_result = None;
             for old in if round % 2 == 0 {
@@ -219,6 +231,9 @@ fn afperf_a4_paired_construction_cost() {
                 }
             }
             assert_eq!(new_result, old_result, "paired semantic identity");
+        }
+        if !measure {
+            continue;
         }
         old_times.sort_unstable();
         new_times.sort_unstable();

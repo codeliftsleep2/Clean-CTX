@@ -156,6 +156,16 @@ fn af002_binary_reverse_design_semantics() {
 }
 #[test]
 fn af002_binary_reverse_design_cost() {
+    af002_binary_reverse_design_cost_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_binary_reverse_design_cost_measurement() {
+    af002_binary_reverse_design_cost_cases(true);
+}
+
+fn af002_binary_reverse_design_cost_cases(measure: bool) {
     let axes = [
         (0, 0, false),
         (1, 0, false),
@@ -187,6 +197,10 @@ fn af002_binary_reverse_design_cost() {
         assert_eq!(wb.reverse_entries, 0);
         assert_eq!(wa.table_strings, production_work.new_table_strings);
         assert_eq!(wa.lookups, production_work.operand_lookups);
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
+        }
         let mut samples: [Vec<u128>; 2] = std::array::from_fn(|_| Vec::new());
         ENABLED.with(|v| v.set(false));
         for round in 0..27 {

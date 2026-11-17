@@ -207,6 +207,16 @@ fn sample(store: &SqliteStore, projected: bool) -> u128 {
 }
 #[test]
 fn af002_startup_projection_costs() {
+    af002_startup_projection_costs_cases(false);
+}
+
+#[test]
+#[ignore = "explicit CI-VERIFY-R1 empirical measurement workflow"]
+fn af002_startup_projection_costs_measurement() {
+    af002_startup_projection_costs_cases(true);
+}
+
+fn af002_startup_projection_costs_cases(measure: bool) {
     for (contexts, deltas) in [
         (0, 0),
         (1, 0),
@@ -262,6 +272,10 @@ fn af002_startup_projection_costs() {
         );
         assert_eq!(nw.rows, contexts);
         assert_eq!(nw.summaries, 0);
+        // Keep all original case assertions in the mandatory entry point.
+        if !measure {
+            continue;
+        }
         for _ in 0..3 {
             sample(&store, false);
             sample(&store, true);
