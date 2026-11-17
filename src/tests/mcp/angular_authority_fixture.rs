@@ -1,5 +1,51 @@
 use std::path::Path;
 
+/// Move a prepared, not-yet-opened source fixture below its owning temporary
+/// directory. The owner still cleans up source and sibling runtime files.
+#[cfg(all(feature = "typescript", feature = "angular"))]
+pub(crate) fn isolate_program(root: &Path) -> std::path::PathBuf {
+    let project = root.join("project");
+    assert!(root.is_absolute() && project.starts_with(root));
+    assert!(!project.exists());
+    let entries: Vec<_> = std::fs::read_dir(root)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    std::fs::create_dir(&project).unwrap();
+    for source in entries {
+        let target = project.join(source.file_name().unwrap());
+        assert!(source.starts_with(root) && target.starts_with(root));
+        std::fs::rename(source, target).unwrap();
+    }
+    project
+}
+
+/// Own source and runtime storage together without making SQLite sidecars
+/// members of the TypeScript program's witnessed directory inventory.
+#[cfg(all(feature = "typescript", feature = "angular"))]
+pub(crate) struct PersistentProject {
+    owner: tempfile::TempDir,
+    project: std::path::PathBuf,
+}
+
+#[cfg(all(feature = "typescript", feature = "angular"))]
+impl PersistentProject {
+    pub(crate) fn new() -> Self {
+        let owner = tempfile::tempdir().unwrap();
+        let project = owner.path().join("project");
+        std::fs::create_dir(&project).unwrap();
+        Self { owner, project }
+    }
+
+    pub(crate) fn path(&self) -> &Path {
+        &self.project
+    }
+
+    pub(crate) fn database(&self, name: &str) -> std::path::PathBuf {
+        self.owner.path().join(name)
+    }
+}
+
 /// Supply canonical package evidence for hydration fixtures that use Angular APIs.
 /// Package inputs stay under node_modules, outside source discovery candidates.
 pub(crate) fn install(root: &Path) {

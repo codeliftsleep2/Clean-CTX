@@ -1,0 +1,22 @@
+{
+  "archive_sha256": "cfe1af5f38dce4a68c230713da3222e6f38f200b2a95caac667db1618d36d8f5",
+  "members": [
+    {
+      "entry": "remaining-red/receipt.json",
+      "sha256": "97f631fcf86049c1b1bb7bed71aa61bf029e6352fe2bd6b277073530e80dc3d7"
+    },
+    {
+      "entry": "remaining-red/tracked-tests.log",
+      "sha256": "08a46ce8873b1d1e9796ff4c6b0ac68894b4a64e21df5489ff022d334c8b897b"
+    },
+    {
+      "entry": "remaining-red/restore_registration_boundary_issue_162.rs",
+      "sha256": "08a75ac1be842f762c3b3ccef613e1062e8e9d821c35e214356e297cdd9ebae6"
+    },
+    {
+      "entry": "approved/validator.patch",
+      "sha256": "a4c26507d5f7d6d52a3553656a800a29f7f184261a161296f10c7116edefd426"
+    }
+  ],
+  "qualification": "Unpatched validator RED and successful Issue #157 execution share this capture; neither is patched-source verification."
+}

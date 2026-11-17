@@ -303,6 +303,10 @@ fn polymorphic_tool_schemas_encode_operation_specific_requirements() {
             ("reverse_edges", &["type", "name"]),
             ("entities_in_file", &["type", "file_path"]),
             ("declarations_in_file", &["type", "file_path"]),
+            (
+                "resolver_registrations",
+                &["type", "direction", "workspaceRoot"],
+            ),
             ("transitive_dependencies", &["type", "name"]),
             ("has_cycle", &["type"]),
             (

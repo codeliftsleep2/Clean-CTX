@@ -59,8 +59,12 @@ fn proof(state: &crate::mcp::McpState, file: &str) -> Value {
     result
 }
 
-fn setup() -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
-    let root = tempfile::tempdir().unwrap();
+fn setup() -> (
+    crate::tests::angular_authority_fixture::PersistentProject,
+    crate::config::CleanCtxConfig,
+    Vec<Value>,
+) {
+    let root = crate::tests::angular_authority_fixture::PersistentProject::new();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
     std::fs::write(
@@ -97,7 +101,7 @@ fn setup() -> (tempfile::TempDir, crate::config::CleanCtxConfig, Vec<Value>) {
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
     config.persistence.enabled = true;
-    config.persistence.db_path = p.join("entries.db").to_string_lossy().into_owned();
+    config.persistence.db_path = root.database("entries.db").to_string_lossy().into_owned();
     config
         .additional_roots
         .push(p.to_string_lossy().into_owned());

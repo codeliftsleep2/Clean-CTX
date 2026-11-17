@@ -212,7 +212,14 @@ fn issue_162_config_composition_controls_missing_crossed_proof_and_serde() {
 fn issue_162_config_composition_controls_sqlite_before_query_and_stale_repair() {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config) = setup("Base,Feature");
-    let p = root.path();
+    let mut config = config;
+    assert_eq!(
+        config.additional_roots,
+        vec![root.path().to_string_lossy().into_owned()]
+    );
+    let project = crate::tests::angular_authority_fixture::isolate_program(root.path());
+    config.additional_roots = vec![project.to_string_lossy().into_owned()];
+    let p = project.as_path();
     let state = crate::mcp::McpState::new(config.clone());
     let authority = capture(&state, p, "result.ts");
     let alias = state

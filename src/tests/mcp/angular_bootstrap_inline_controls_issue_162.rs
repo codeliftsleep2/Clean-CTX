@@ -278,7 +278,14 @@ fn issue_162_bootstrap_inline_controls_missing_crossed_field_entry_and_serde_ref
 fn issue_162_bootstrap_inline_controls_sqlite_complete_before_query_and_multiplicity() {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config) = setup(&CALL.repeat(2));
-    let p = root.path();
+    let mut config = config;
+    assert_eq!(
+        config.additional_roots,
+        vec![root.path().to_string_lossy().into_owned()]
+    );
+    let project = crate::tests::angular_authority_fixture::isolate_program(root.path());
+    config.additional_roots = vec![project.to_string_lossy().into_owned()];
+    let p = project.as_path();
     let state = crate::mcp::McpState::new(config.clone());
     let mut expected = Vec::new();
     for file in ["main.ts", "neighbor.ts"] {

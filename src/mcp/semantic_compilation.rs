@@ -18,6 +18,14 @@ mod retention_tests;
 
 pub(crate) mod retained;
 
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/restore_registration_boundary_issue_162.rs"]
+mod restore_registration_boundary_tests;
+
+#[cfg(all(test, feature = "typescript", feature = "angular"))]
+#[path = "../tests/mcp/restore_registration_config_matrix_issue_162.rs"]
+mod restore_registration_config_matrix_tests;
+
 #[cfg(all(test, feature = "typescript"))]
 #[path = "../tests/mcp/typescript_provide_retention_issue_162.rs"]
 mod provide_retention_tests;

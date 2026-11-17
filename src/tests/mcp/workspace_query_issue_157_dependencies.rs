@@ -4,11 +4,15 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 fn state(root: &Path, durable: bool) -> McpState {
+    state_with_database(durable, root.join("evidence.db"))
+}
+
+fn state_with_database(durable: bool, database: std::path::PathBuf) -> McpState {
     let mut config = crate::tests::test_config();
     config.cbm.enabled = false;
     config.persistence.enabled = durable;
     config.persistence.auto_save = durable;
-    config.persistence.db_path = root.join("evidence.db").to_string_lossy().into_owned();
+    config.persistence.db_path = database.to_string_lossy().into_owned();
     McpState::new(config)
 }
 
@@ -251,21 +255,18 @@ fn issue_157_durable_projection_retains_and_validates_contributors() {
     let _serial = crate::protocol::handler_response_serial();
     let root = tempfile::tempdir().unwrap();
     fixture(root.path());
-    let state = state(root.path(), true);
+    let project = crate::tests::angular_authority_fixture::isolate_program(root.path());
+    let state = state_with_database(true, root.path().join("evidence.db"));
     let provide = || {
         call(
             &state,
-            root.path(),
+            project.as_path(),
             "provide_code_context",
             json!({"filePath":"app.module.ts", "fidelity":"high"}),
         )
     };
     provide();
-    let path = root
-        .path()
-        .join("app.module.ts")
-        .to_string_lossy()
-        .into_owned();
+    let path = project.join("app.module.ts").to_string_lossy().into_owned();
     let owner = state.durable_owner_path(&path);
     let durable = state
         .persistence_store_lock()
@@ -287,13 +288,19 @@ fn issue_157_durable_projection_retains_and_validates_contributors() {
             "{durable:#?}"
         );
     }
-    let current = crate::mcp::compatibility::derive_identities(
-        &std::fs::read_to_string(&path).unwrap(),
-        Path::new(&path),
-        &state.config,
-    )
-    .unwrap();
-    crate::mcp::compatibility::validator::validate_semantic(&durable, &current).unwrap();
+    let source = std::fs::read_to_string(&path).unwrap();
+    let validate = |snapshot| {
+        // Decoded scope is deliberately unknown. The production entry binds it
+        // from current source/config before validating the complete projection.
+        crate::mcp::compatibility::validator::validate_current_context(
+            snapshot,
+            &source,
+            Path::new(&path),
+            &state.config,
+            crate::compression::Fidelity::High,
+        )
+    };
+    validate(durable.clone()).unwrap();
     let mut old = durable.clone();
     old.compatibility
         .semantic_producers
@@ -304,15 +311,15 @@ fn issue_157_durable_projection_retains_and_validates_contributors() {
             crate::mcp::compatibility::identity::ProducerKey::AngularSemantic,
             26,
         );
-    assert!(matches!(crate::mcp::compatibility::validator::validate_semantic(&old, &current),
+    assert!(matches!(validate(old),
         Err(crate::mcp::compatibility::validator::CompatibilityFailure::SemanticProducerIncompatible)));
-    write(root.path(), "leaf.ts", &leaf("Pipe"));
+    write(project.as_path(), "leaf.ts", &leaf("Pipe"));
     assert!(matches!(
-        crate::mcp::compatibility::validator::validate_semantic(&durable, &current),
+        validate(durable.clone()),
         Err(crate::mcp::compatibility::validator::CompatibilityFailure::SemanticDependencyStale)
     ));
     provide();
-    expect(&state, root.path(), &[("Shared", "Pipe")]);
+    expect(&state, project.as_path(), &[("Shared", "Pipe")]);
 }
 
 #[cfg(all(feature = "dotnet", feature = "csharp"))]

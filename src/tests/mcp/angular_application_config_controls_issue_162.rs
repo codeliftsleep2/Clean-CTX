@@ -7,8 +7,13 @@ const GROUP: &str = "import {Token as Left} from './left'; import {Token as Righ
 const SOURCE: &str = "export const appConfig:NativeConfig={providers:[...GROUP]};";
 const CORE: &str = r#"{"name":"@angular/core","version":"20.0.0","types":"index.d.ts"}"#;
 
-fn setup(body: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
-    let root = tempfile::tempdir().unwrap();
+fn setup(
+    body: &str,
+) -> (
+    crate::tests::angular_authority_fixture::PersistentProject,
+    crate::config::CleanCtxConfig,
+) {
+    let root = crate::tests::angular_authority_fixture::PersistentProject::new();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
     std::fs::write(p.join("node_modules/@angular/core/index.d.ts"),"export declare function Component(metadata:unknown):any; export interface ApplicationConfig {providers:unknown[];}").unwrap();
@@ -33,7 +38,7 @@ fn setup(body: &str) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
         .additional_roots
         .push(p.to_string_lossy().into_owned());
     config.persistence.enabled = true;
-    config.persistence.db_path = p.join("authority.db").to_string_lossy().into_owned();
+    config.persistence.db_path = root.database("authority.db").to_string_lossy().into_owned();
     (root, config)
 }
 fn raw(state: &crate::mcp::McpState, p: &Path, tool: &str, mut args: Value) -> Value {

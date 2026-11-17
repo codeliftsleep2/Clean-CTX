@@ -141,7 +141,12 @@ pub(crate) fn validate_current_context(
         }
     })?;
     bind_registration_scope(&mut loaded, source, path, config);
-    validate_with_identities(loaded, &current, required_fidelity)
+    validate_with_identities(
+        loaded,
+        &current,
+        required_fidelity,
+        crate::layers::meta::resolver_registrations::enabled(config),
+    )
 }
 
 pub(crate) fn validate_historical_context(
@@ -157,7 +162,12 @@ pub(crate) fn validate_historical_context(
         }
     })?;
     bind_registration_scope(&mut loaded, current_source, path, config);
-    validate_with_identities(loaded, &current, required_fidelity)
+    validate_with_identities(
+        loaded,
+        &current,
+        required_fidelity,
+        crate::layers::meta::resolver_registrations::enabled(config),
+    )
 }
 
 fn bind_registration_scope(
@@ -192,6 +202,7 @@ fn validate_with_identities(
     loaded: UntrustedDurableContext,
     current: &CompatibilityIdentities,
     required_fidelity: Fidelity,
+    registrations_enabled: bool,
 ) -> Result<CompatibleDurableContext, CompatibilityFailure> {
     if fidelity_rank(loaded.fidelity) < fidelity_rank(required_fidelity) {
         return Err(CompatibilityFailure::InsufficientFidelity {
@@ -199,7 +210,8 @@ fn validate_with_identities(
             required: required_fidelity,
         });
     }
-    let semantic = validate_semantic(&loaded, current)?;
+    let semantic =
+        validate_semantic_with_registration_config(&loaded, current, registrations_enabled)?;
     let canonical = validate_canonical(&loaded, current)?;
     Ok(CompatibleDurableContext {
         canonical,
@@ -234,9 +246,28 @@ pub(crate) fn validate_canonical(
     })
 }
 
+// Identity-only validation is retained for pure boundary tests. Production
+// current/historical restoration must carry the actual configured predicate.
+#[cfg(test)]
 pub(crate) fn validate_semantic(
     loaded: &UntrustedDurableContext,
     current: &CompatibilityIdentities,
+) -> Result<CompatibleSemanticProjection, CompatibilityFailure> {
+    validate_semantic_with_registration_config(
+        loaded,
+        current,
+        current
+            .semantic_config
+            .angular
+            .as_ref()
+            .is_some_and(|a| a.enabled && a.routing_enabled),
+    )
+}
+
+fn validate_semantic_with_registration_config(
+    loaded: &UntrustedDurableContext,
+    current: &CompatibilityIdentities,
+    registrations_enabled: bool,
 ) -> Result<CompatibleSemanticProjection, CompatibilityFailure> {
     let persisted_config = loaded.compatibility.semantic_config.as_ref().ok_or(
         CompatibilityFailure::MissingLegacyIdentity {
@@ -256,14 +287,7 @@ pub(crate) fn validate_semantic(
     }
     let authority = loaded.authority.clone();
     if !authority.is_current(&loaded.source_hash)
-        || !authority.admits_semantic_projection(
-            &loaded.semantic_edges,
-            current
-                .semantic_config
-                .angular
-                .as_ref()
-                .is_some_and(|a| a.enabled && a.routing_enabled),
-        )
+        || !authority.admits_semantic_projection(&loaded.semantic_edges, registrations_enabled)
     {
         return Err(CompatibilityFailure::SemanticDependencyStale);
     }

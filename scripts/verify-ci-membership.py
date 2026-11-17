@@ -54,7 +54,10 @@ def prerequisites(root, manifest_dir):
     for fixture in config["oracle_files"]:
         path = root / fixture["path"]
         data = path.read_bytes()
-        if hashlib.sha256(data).hexdigest() != fixture["sha256"]:
+        if fixture["hash_normalization"] != "git-text-lf":
+            raise ValueError("Unsupported frozen text identity normalization")
+        canonical = data.replace(b"\r\n", b"\n")
+        if hashlib.sha256(canonical).hexdigest() != fixture["sha256"]:
             raise ValueError(f"Frozen oracle identity changed: {path}")
         rows = json.loads(data)
         if not isinstance(rows, list) or len(rows) != fixture["rows"]:

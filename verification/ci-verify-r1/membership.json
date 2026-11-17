@@ -8,12 +8,16 @@
     {
       "path": "src/tests/mcp/fixtures/binary_clone_public_identities.json",
       "sha256": "875eb716763f278b3600d3a0ec61fd7bf0478c9c8ce9faadf3f99b07c6c1af8e",
-      "rows": 40
+      "rows": 40,
+      "historical_working_copy_sha256": "875eb716763f278b3600d3a0ec61fd7bf0478c9c8ce9faadf3f99b07c6c1af8e",
+      "hash_normalization": "git-text-lf"
     },
     {
       "path": "src/tests/mcp/fixtures/sqlite_text_public_identities.json",
-      "sha256": "f4fd47e5fc1b1c3f9f6f76277135ed7f2d7d457a71be762032fe58cb91ee145f",
-      "rows": 12
+      "sha256": "084f8ba3158925cddf63bdfa5cd3f1afe8936fde6e6ff566ee9239efdc123b82",
+      "rows": 12,
+      "historical_working_copy_sha256": "f4fd47e5fc1b1c3f9f6f76277135ed7f2d7d457a71be762032fe58cb91ee145f",
+      "hash_normalization": "git-text-lf"
     }
   ],
   "fitness_groups_path": "fitness-membership.json",

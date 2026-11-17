@@ -11,8 +11,14 @@ const ROOT: &str = "import {Component} from '@angular/core'; @Component({}) expo
 const CONFIG: &str = "import type {ApplicationConfig} from '@angular/core'; export const appConfig:ApplicationConfig={providers:[]};";
 const MANIFEST: &str =
     r#"{"name":"@angular/platform-browser","version":"20.0.0","types":"index.d.ts"}"#;
-fn setup(body: &str, neighbor: bool) -> (tempfile::TempDir, crate::config::CleanCtxConfig) {
-    let root = tempfile::tempdir().unwrap();
+fn setup(
+    body: &str,
+    neighbor: bool,
+) -> (
+    crate::tests::angular_authority_fixture::PersistentProject,
+    crate::config::CleanCtxConfig,
+) {
+    let root = crate::tests::angular_authority_fixture::PersistentProject::new();
     let p = root.path();
     crate::tests::angular_authority_fixture::install(p);
     std::fs::write(p.join("node_modules/@angular/core/index.d.ts"),"export declare function Component(metadata:unknown):any; export interface ApplicationConfig {providers:unknown[];}").unwrap();
@@ -53,7 +59,7 @@ fn setup(body: &str, neighbor: bool) -> (tempfile::TempDir, crate::config::Clean
         .additional_roots
         .push(p.to_string_lossy().into_owned());
     config.persistence.enabled = true;
-    config.persistence.db_path = p.join("proof.db").to_string_lossy().into_owned();
+    config.persistence.db_path = root.database("proof.db").to_string_lossy().into_owned();
     (root, config)
 }
 fn raw(state: &crate::mcp::McpState, p: &Path, tool: &str, mut args: Value) -> Value {

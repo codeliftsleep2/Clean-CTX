@@ -102,6 +102,8 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
         .to_owned();
     for case in [
         "valid",
+        "lf_checkout",
+        "crlf_checkout",
         "missing_registration",
         "duplicate_registration",
         "missing_execution",
@@ -115,6 +117,7 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
         "empty_fitness",
         "incomplete_fitness",
         "invalid_oracle",
+        "oracle_content_changed",
         "missing_oracle",
         "cargo_failure",
     ] {
@@ -175,8 +178,30 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
             std::fs::write(&fitness_manifest, serde_json::to_vec(&value).unwrap()).unwrap();
         }
         let oracle_path = config["oracle_files"][0]["path"].as_str().unwrap();
+        if matches!(case, "lf_checkout" | "crlf_checkout") {
+            for oracle in config["oracle_files"].as_array().unwrap() {
+                let path = root.join(oracle["path"].as_str().unwrap());
+                let original = std::fs::read_to_string(&path)
+                    .unwrap()
+                    .replace("\r\n", "\n");
+                let changed = if case == "crlf_checkout" {
+                    original.replace('\n', "\r\n")
+                } else {
+                    original
+                };
+                std::fs::write(path, changed).unwrap();
+            }
+        }
         if case == "invalid_oracle" {
             std::fs::write(root.join(oracle_path), b"not JSON").unwrap();
+        } else if case == "oracle_content_changed" {
+            let mut changed = load(&root.join(oracle_path));
+            changed[0]["unexpected_content"] = Value::Bool(true);
+            std::fs::write(
+                root.join(oracle_path),
+                serde_json::to_vec(&changed).unwrap(),
+            )
+            .unwrap();
         } else if case == "missing_oracle" {
             std::fs::remove_file(root.join(oracle_path)).unwrap();
         }
@@ -201,9 +226,10 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
             .arg(&result_path)
             .output()
             .expect("Python is an existing repository verification prerequisite");
+        let expected_success = matches!(case, "valid" | "lf_checkout" | "crlf_checkout");
         assert_eq!(
             output.status.success(),
-            case == "valid",
+            expected_success,
             "{case}: stdout={} stderr={}",
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
@@ -211,9 +237,12 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
         let result = load(&result_path);
         assert_eq!(
             result["errors"].as_array().unwrap().is_empty(),
-            case == "valid"
+            expected_success
         );
-        if matches!(case, "invalid_oracle" | "missing_oracle") {
+        if matches!(
+            case,
+            "invalid_oracle" | "oracle_content_changed" | "missing_oracle"
+        ) {
             std::fs::copy(repo.join(oracle_path), root.join(oracle_path)).unwrap();
         }
         if matches!(case, "empty_fitness" | "incomplete_fitness") {

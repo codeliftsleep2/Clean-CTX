@@ -1,0 +1,38 @@
+{
+  "archive_sha256": "3deaf040025a20a4fbb340d7f145125f768ffa82cc4a1100fb42c2c8f3a2ba6d",
+  "members": [
+    {
+      "entry": "restore-validator-green-20261117-172349/receipt.json",
+      "sha256": "3df54306c1b7e1d6cb6fedd4ad4ab0c8ec43294c1e1f7e2d03810d6c7ce3808e"
+    },
+    {
+      "entry": "restore-validator-green-20261117-172349/tracked-tests.log",
+      "sha256": "05c226494aea65c1056436ef24141482758f208216137dc37abfcf3bf27d6bd1"
+    },
+    {
+      "entry": "restore-validator-green-20261117-172822/receipt.json",
+      "sha256": "58f60e3e112dfe0cc87867641b1789be6007d30304ba29c118a6fedd0a3de23d"
+    },
+    {
+      "entry": "restore-validator-green-20261117-172822/tracked-tests.log",
+      "sha256": "6b01c4e4fbc903852a1deab7fb56d96507fa47b6ad45aebcbb6208ecef06d8a9"
+    },
+    {
+      "entry": "verified-source/src/mcp/compatibility/validator.rs",
+      "sha256": "f8b9c9d5501d78bbe57a5c3c200bd236703fe992a778efab29d56214f723cfe9"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/restore_registration_boundary_issue_162.rs",
+      "sha256": "08a75ac1be842f762c3b3ccef613e1062e8e9d821c35e214356e297cdd9ebae6"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/restore_registration_config_matrix_issue_162.rs",
+      "sha256": "223441a5cc8b7333bfda4547d0fb7ad5170654d511987c74bc3aa0550fdca580"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/workspace_query_issue_157_dependencies.rs",
+      "sha256": "0c5e83326c28f453251b9a9fb3b4c8ed7e8cb85ee68af955427a849a4ba6ae9b"
+    }
+  ],
+  "qualification": "First capture: 20 passed, new matrix failed, one helper warning. Second capture: corrected matrix and helper 2 passed without reported warnings. Production validator and exact original RED source unchanged across captures. Focused operator results, not full CI."
+}

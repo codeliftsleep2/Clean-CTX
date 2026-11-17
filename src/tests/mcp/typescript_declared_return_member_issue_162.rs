@@ -226,7 +226,14 @@ fn retained(state: &crate::mcp::McpState, p: &Path) -> TypeScriptAuthority {
 fn issue_162_declared_return_member_sqlite_stale_dependency_and_repair() {
     let _serial = crate::protocol::handler_response_serial();
     let (root, config) = setup(FACTORY, MEMBER, SOURCE);
-    let p = root.path();
+    let mut config = config;
+    assert_eq!(
+        config.additional_roots,
+        vec![root.path().to_string_lossy().into_owned()]
+    );
+    let project = crate::tests::angular_authority_fixture::isolate_program(root.path());
+    config.additional_roots = vec![project.to_string_lossy().into_owned()];
+    let p = project.as_path();
     let state = crate::mcp::McpState::new(config.clone());
     let a = capture(&state, p, "chain.ts");
     prove(&a);
