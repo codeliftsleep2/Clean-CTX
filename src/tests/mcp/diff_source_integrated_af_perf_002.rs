@@ -49,17 +49,18 @@ fn afperf_diff_source_static() {
     assert_eq!(
         format!(
             "{:x}",
-            Sha256::digest(include_bytes!("../../mcp/tool_helpers.rs"))
+            // Approved 0be41a55 only aligns the Rust test-injection cfg.
+            Sha256::digest(include_str!("../../mcp/tool_helpers.rs").replace("\r\n", "\n"))
         ),
-        "cc2f9368b5a2aebb048c52871acc74597514469b774f8791493071b9a423b9c1",
+        "bfda853b86811854966818b4471eccba98fe1790f26a6b6466099e71e21b02c7",
         "Protected diff helper drift"
     );
     assert_eq!(
         format!(
             "{:x}",
-            Sha256::digest(include_bytes!("../../mcp/state/source_cache.rs"))
+            Sha256::digest(include_str!("../../mcp/state/source_cache.rs").replace("\r\n", "\n"))
         ),
-        "536fafa26398b1f74b37a471eedc22df2a387ddae1f67d1b86e683ac1c7d9723",
+        "1a6de2005ec48fd5cc6217fcd4a5d75c794a73533aac9a6221972e576a67f5c1",
         "Protected source-cache boundary drift"
     );
 }

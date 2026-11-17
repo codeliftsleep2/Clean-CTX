@@ -64,6 +64,10 @@ pub(crate) mod work_observations_af_perf_002;
 #[path = "tests/architecture/default_operation_observations_af_perf_002.rs"]
 pub(crate) mod default_operation_observations_af_perf_002;
 
+#[cfg(all(test, feature = "typescript"))]
+#[path = "tests/mcp/frozen_identity_portability_af_perf_002.rs"]
+pub(crate) mod frozen_identity_portability_af_perf_002;
+
 #[cfg(test)]
 #[path = "tests/ir/binary_clone_equivalence_af_perf_002.rs"]
 pub(crate) mod binary_clone_equivalence_af_perf_002;

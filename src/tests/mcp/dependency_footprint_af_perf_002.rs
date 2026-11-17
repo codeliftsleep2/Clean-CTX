@@ -159,6 +159,18 @@ fn af002_a4_default_footprint_dimensions() {
                 .count(),
             owners
         );
+        // Complete public acquisition before measuring retained reconciliation.
+        // File-only admission does not establish reverse-query readiness.
+        assert_save_call(&query(&state, root.path(), "Method", "Save"));
+        for path in &files {
+            let owner = state.semantic_owner_path(&path.to_string_lossy());
+            let artifact = state.csharp_call_authority.artifact(&owner).unwrap();
+            assert_eq!(
+                artifact.source_hash(),
+                crate::cache::content_hash(&std::fs::read(path).unwrap()),
+                "measurement requires current retained source authority"
+            );
+        }
         let axes = json!({"owners":owners,"classes":classes,"matching_extra_owners":positives,
             "padding_bytes_per_owner":padding,"ancestry_depth":depth,"actual_source_bytes":source_bytes});
         state.mark_csharp_authority_dirty();

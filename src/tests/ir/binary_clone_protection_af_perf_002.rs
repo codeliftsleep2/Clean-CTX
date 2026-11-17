@@ -48,8 +48,8 @@ fn protected(source: &str) -> bool {
 fn afperf_binary_clone_static() {
     let _: Option<crate::binary_clone_equivalence_af_perf_002::original::BinaryDecodeError> = None;
     assert_eq!(
-        include_bytes!("binary_clone_original_decode_af_perf_002.rs"),
-        include_bytes!("../../ir/binary_wire/decode.rs"),
+        include_str!("binary_clone_original_decode_af_perf_002.rs").replace("\r\n", "\n"),
+        include_str!("../../ir/binary_wire/decode.rs").replace("\r\n", "\n"),
         "frozen decoder copy identity"
     );
     let source = include_str!("../../ir/binary_wire.rs");

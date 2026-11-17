@@ -6,12 +6,7 @@ use crate::binary_clone_equivalence_af_perf_002::assert_binary;
 mod reverse_budget;
 
 fn normalize(value: &mut Value, root: &str) {
-    match value {
-        Value::String(s) => *s = s.replace(root, "<ROOT>"),
-        Value::Array(items) => items.iter_mut().for_each(|item| normalize(item, root)),
-        Value::Object(items) => items.values_mut().for_each(|item| normalize(item, root)),
-        _ => {}
-    }
+    crate::frozen_identity_portability_af_perf_002::normalize(value, root);
 }
 fn rows() -> Vec<(Value, Work)> {
     let mut records = Vec::new();
@@ -124,7 +119,10 @@ fn rows() -> Vec<(Value, Work)> {
 }
 fn check_public(records: &[(Value, Work)]) {
     if let Ok(path) = std::env::var("AF002_BINARY_PUBLIC_ORACLE") {
-        let frozen: Vec<Value> = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let mut frozen: Vec<Value> = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        for identity in &mut frozen {
+            normalize(identity, "<ROOT>");
+        }
         let current: Vec<_> = records
             .iter()
             .map(|(identity, _)| identity.clone())
@@ -133,7 +131,12 @@ fn check_public(records: &[(Value, Work)]) {
         for (row, (actual, expected)) in current.iter().zip(&frozen).enumerate() {
             assert!(
                 actual == expected,
-                "complete frozen public/cache/durable identities: row {row}"
+                "complete frozen public/cache/durable identities: row {row}, field {}",
+                crate::frozen_identity_portability_af_perf_002::first_difference(
+                    actual,
+                    expected,
+                    "$".into()
+                )
             );
         }
     }

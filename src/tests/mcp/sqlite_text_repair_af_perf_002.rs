@@ -114,7 +114,16 @@ fn durable(store: &SqliteStore, file: &str) -> Value {
                 instructions,
                 version,
             } = v.ir;
-            json!({"authority":format!("{:?}",v.authority),
+            // This non-Angular fixture predates resolver registration fields.
+            // Check their exact inapplicability before projecting the historical
+            // authority representation; never discard an applicable collection.
+            assert_ne!(v.authority.resolver_registration_scope, Some(true));
+            assert!(v.authority.resolver_registrations.is_none());
+            let authority = format!(
+                "RetainedAuthority {{ typescript_authority: {:?} }}",
+                v.authority.typescript_authority
+            );
+            json!({"authority":authority,
             "ir":{"file_id":file_id,"version":version,"instructions":format!("{instructions:?}")},
             "edges":v.semantic_edges,"dependencies":v.semantic_dependencies,"source_hash":v.source_hash,
             "fidelity":format!("{:?}",v.fidelity),"compatibility":format!("{:?}",v.compatibility)})
@@ -137,16 +146,7 @@ fn identity(state: &crate::mcp::McpState, file: &str) -> Value {
         "edges":state.workspace_index_read().edge_count(),"source":std::fs::read_to_string(file).unwrap()})
 }
 fn normalize(value: &mut Value, root: &str) {
-    match value {
-        Value::String(s) => {
-            *s = s
-                .replace(&root.replace('\\', "\\\\"), "<ROOT>")
-                .replace(root, "<ROOT>")
-        }
-        Value::Array(items) => items.iter_mut().for_each(|v| normalize(v, root)),
-        Value::Object(items) => items.values_mut().for_each(|v| normalize(v, root)),
-        _ => {}
-    }
+    crate::frozen_identity_portability_af_perf_002::normalize(value, root);
 }
 
 fn cases() -> (Vec<Value>, usize, usize) {
@@ -261,12 +261,21 @@ fn cases() -> (Vec<Value>, usize, usize) {
 fn compare(rows: &[Value]) {
     assert_eq!(rows.len(), 12);
     if let Ok(path) = std::env::var("AF002_SQLITE_TEXT_ORACLE") {
-        let expected: Vec<Value> = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let mut expected: Vec<Value> =
+            serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        for row in &mut expected {
+            normalize(row, "<ROOT>");
+        }
         assert_eq!(rows.len(), expected.len(), "Frozen public row count");
         for (index, (actual, original)) in rows.iter().zip(&expected).enumerate() {
             assert!(
                 actual == original,
-                "Frozen SQLite public identity mismatch at case {index}"
+                "Frozen SQLite public identity mismatch at case {index}, field {}",
+                crate::frozen_identity_portability_af_perf_002::first_difference(
+                    actual,
+                    original,
+                    "$".into()
+                )
             );
         }
     }
