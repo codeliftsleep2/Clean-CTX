@@ -22,6 +22,6 @@
   ],
   "fitness_groups_path": "fitness-membership.json",
   "measurements_path": "measurement-membership.json",
-  "expected_fitness_groups": 57,
+  "expected_fitness_groups": 56,
   "expected_measurements": 18
 }

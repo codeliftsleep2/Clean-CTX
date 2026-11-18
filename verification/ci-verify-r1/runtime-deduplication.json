@@ -1,0 +1,19 @@
+{
+  "category": "Static execution-membership reconciliation; execution and elapsed benefit pending",
+  "baseline": "063f672f3460a39621effef179fa5bb6c1f18835",
+  "changes": [
+    {
+      "removed_registration": "artifact_operation_work_af_perf_002::dependency_footprint::af002_a4_default_footprint_dimensions",
+      "survivor": "artifact_operation_work_af_perf_002::dependency_footprint::af002_a4_public_lookup_budget",
+      "preservation": "Same private 19-case helper call and all assertions retained; only duplicate test attribute removed."
+    },
+    {
+      "removed_registration": "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_unused_budget",
+      "survivor": "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_frozen_semantics",
+      "preservation": "Same 380-row records()/compare() call, serial guard, Observation lifetime and exact COPIES budget assertions; budget now checked in frozen test before Observation drops."
+    }
+  ],
+  "fitness_groups_before": 57,
+  "fitness_groups_after": 56,
+  "scope": "No fixture axes, expected rows, oracle source, assertions, production paths, failure contracts or ignored-test permissions removed or weakened."
+}

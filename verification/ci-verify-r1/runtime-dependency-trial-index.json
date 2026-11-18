@@ -1,0 +1,69 @@
+{
+  "archive_sha256": "9c620986bd5cbbc23ad91b25b7d4bb2416bf426f5efb02ac6560209ed2268751",
+  "members": [
+    {
+      "entry": "binary.json",
+      "sha256": "a80b2627102e8143cdfd750e6358c5ce1635d8bc5b7656e227f4c356619af67e"
+    },
+    {
+      "entry": "compile.stderr.txt",
+      "sha256": "a00bd607d588746436ea65f9142776ab6b96d17c61eef960cd42b0f25d57dbbc"
+    },
+    {
+      "entry": "compile.stdout.txt",
+      "sha256": "efaeb83fcd3362cde9f1c0ff5961aa487cb423351236994902a3fdcb5661d0d0"
+    },
+    {
+      "entry": "listing.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "listing.stdout.txt",
+      "sha256": "c19c2cb8708780de1c51ccc548c1fb3f67fdf2c45f040fdf54ff6d8250d0b27a"
+    },
+    {
+      "entry": "membership-enforcement.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "membership-enforcement.stdout.txt",
+      "sha256": "197e6d2ee74ebe159dc8a51ec4dfccb74c55730f118202503a6ee422a35e3c4f"
+    },
+    {
+      "entry": "receipt.json",
+      "sha256": "09756f5ac7754fed57e1f6cad60764e28022666eee7c7d498d75d03de60ceb33"
+    },
+    {
+      "entry": "sources.json",
+      "sha256": "d021b6c7460c2f697d6cdeb08d44ed792c14beaab76bc52b60aae91dfebe9701"
+    },
+    {
+      "entry": "test-1.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-1.stdout.txt",
+      "sha256": "a718ce6af3e8df126af6d04d0192b99543b3b295b84b2b632c4c747607e0b4a1"
+    },
+    {
+      "entry": "test-2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-2.stdout.txt",
+      "sha256": "e59b01773870834c8e5f2b673c6f36f2bc57756b43622b3005015f1b807f0ed9"
+    }
+  ],
+  "qualification": "Windows focused dependency-only optimization trial; all 189 dependency artifact profiles show opt3/debug assertions/overflow checks enabled, main test crate opt0 with both checks enabled. No repository default or production source changed; not full CI.",
+  "compile_seconds": 322.9761919,
+  "runs": [
+    {
+      "test": "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_frozen_semantics",
+      "seconds": 75.3614818
+    },
+    {
+      "test": "artifact_operation_work_af_perf_002::dependency_footprint::af002_a4_public_lookup_budget",
+      "seconds": 24.1779407
+    }
+  ]
+}

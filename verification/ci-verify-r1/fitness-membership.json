@@ -505,15 +505,10 @@
     "minimum": 1,
     "tests": [
       "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_frozen_semantics"
-    ]
-  },
-  {
-    "package": "clean-ctx",
-    "target": "lib",
-    "filter": "af002_delta_previous_unused_budget",
-    "minimum": 1,
-    "tests": [
-      "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_unused_budget"
+    ],
+    "preserves_obligations": [
+      "380-row frozen all-fidelity public/canonical/provenance lifecycle equivalence",
+      "Independent actual-site discarded tuple/string/byte budget assertion, checked on the same corpus"
     ]
   },
   {

@@ -38,6 +38,12 @@ try {
             $oracleIdentities[$name]=@{path=$value;sha256=(Get-FileHash -LiteralPath $value).Hash}
         }
     }
+    # CI-only runtime configuration, measured by the retained focused trials.
+    # Do not change local development or explicit empirical-study profiles.
+    $testProfile=@('--config','profile.test.opt-level=1',
+        '--config','profile.test.package."*".opt-level=3',
+        '--config','profile.test.debug-assertions=true',
+        '--config','profile.test.overflow-checks=true')
     $inventory=@(git ls-files --cached --others --exclude-standard -- src proxy Cargo.toml Cargo.lock scripts verification/ci-verify-r1 .github/workflows docs/agent/verification.md docs/agent/CI_VERIFY_R1.md docs/architecture/knowledge-governance/corpus.csv)
     if($LASTEXITCODE -ne 0){throw 'Source inventory failed'}
     $hashes=@($inventory|Sort-Object -Unique|Where-Object{Test-Path -LiteralPath $_ -PathType Leaf}|ForEach-Object{
@@ -47,8 +53,9 @@ try {
         agent='Agent MaxHeadRoom';head=(git rev-parse HEAD);status=(git status --porcelain)
         features='all-features';test_threads=1;environment=$environment;files=$hashes
         oracle_identities=$oracleIdentities
-        listing_command='cargo test --workspace --all-targets --all-features -- --list'
-        execution_command='cargo test --workspace --all-targets --all-features --no-fail-fast -- --test-threads=1 --format=pretty'
+        test_profile_arguments=$testProfile
+        listing_command='cargo test --workspace --all-targets --all-features <test_profile_arguments> -- --list'
+        execution_command='cargo test --workspace --all-targets --all-features --no-fail-fast <test_profile_arguments> -- --test-threads=1 --format=pretty'
         rustflags=$env:RUSTFLAGS;encoded_rustflags=$env:CARGO_ENCODED_RUSTFLAGS
         build_target=$env:CARGO_BUILD_TARGET;target_directory=$env:CARGO_TARGET_DIR
         scope='Correctness and declared deterministic fitness only; empirical acceptance obligations remain separate.'
@@ -57,9 +64,9 @@ try {
     $execution=Join-Path $out 'execution.log'
     & python (Join-Path $PSScriptRoot 'verify-ci-membership.py') --root $root --prerequisites-only --output (Join-Path $out 'prerequisites.json')
     if($LASTEXITCODE -ne 0){throw "Mandatory verification prerequisite failed; preserve $out"}
-    & cargo test --workspace --all-targets --all-features -- --list *> $listing
+    & cargo test --workspace --all-targets --all-features @testProfile -- --list *> $listing
     if($LASTEXITCODE -ne 0){throw "Registration/compilation failed; preserve $out"}
-    & cargo test --workspace --all-targets --all-features --no-fail-fast -- --test-threads=1 --format=pretty *> $execution
+    & cargo test --workspace --all-targets --all-features --no-fail-fast @testProfile -- --test-threads=1 --format=pretty *> $execution
     $suiteExit=$LASTEXITCODE
     & python (Join-Path $PSScriptRoot 'verify-ci-membership.py') --root $root --listing $listing --execution $execution --suite-exit $suiteExit --output (Join-Path $out 'membership-result.json')
     $membershipExit=$LASTEXITCODE

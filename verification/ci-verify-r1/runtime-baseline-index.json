@@ -1,0 +1,112 @@
+{
+  "archive_sha256": "fda51f39bab9e912fd537f33cbde5fdebf99e63b13104a4a0a83c433403defa0",
+  "members": [
+    {
+      "entry": "binary.json",
+      "sha256": "cc7ecf55e320a6705a08ccb26198b51ace0dd1f90e5fec3f9358740b1cbfc4ec"
+    },
+    {
+      "entry": "compile.stderr.txt",
+      "sha256": "8d6933e07cf3ca788eaf4f8b6604f63c16638b6092caeb7aae2b21ce1e7dfaa3"
+    },
+    {
+      "entry": "compile.stdout.txt",
+      "sha256": "c8a0e269529f7cac3efde250d73c8cdf4e20edab65c50bd33c921675ab897361"
+    },
+    {
+      "entry": "listing.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "listing.stdout.txt",
+      "sha256": "c19c2cb8708780de1c51ccc548c1fb3f67fdf2c45f040fdf54ff6d8250d0b27a"
+    },
+    {
+      "entry": "membership-enforcement.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "membership-enforcement.stdout.txt",
+      "sha256": "b5c047a81cbc7c81d4c408b80a18b4f58458f853084d485257de97ef7fad0978"
+    },
+    {
+      "entry": "receipt.json",
+      "sha256": "75c8ef6386496c2aecdd000bb72f78e69fdb35e1b18ff9dcb32a60c7ae691295"
+    },
+    {
+      "entry": "sources.json",
+      "sha256": "a36932c22588b0e7b226f0f5af5b0d8df230bad35b1951cca19e3bc7455c7dd4"
+    },
+    {
+      "entry": "test-1.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-1.stdout.txt",
+      "sha256": "dfd2803f8734030d3a4b9b0ccf1bb2c0701912fa828e54bdbfc5c901d215a71e"
+    },
+    {
+      "entry": "test-2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-2.stdout.txt",
+      "sha256": "cd7bd5dabb61921a5f74c80659fc6029d6bce0aa5a93f99a2cc05e07a1a9124f"
+    },
+    {
+      "entry": "test-3.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-3.stdout.txt",
+      "sha256": "542fb3dd5e2fe709a661c5531b224eb7047ea4a4540597085244b616d76c33ba"
+    },
+    {
+      "entry": "test-4.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-4.stdout.txt",
+      "sha256": "69b07af5f961075fe1ea33a19e164386a61ecc8536712b9b26489efb493df874"
+    },
+    {
+      "entry": "test-5.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-5.stdout.txt",
+      "sha256": "9b42c846db94beb9f8e2126b21e45a830e84460852943599409d3cd9b39bc2d5"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/delta_previous_repair_af_perf_002.rs",
+      "sha256": "f6e5ece7ee9b9f58fa3d40f9090832fd7269e1dc7dd8863d7ea32e981ff1a555"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/dependency_footprint_af_perf_002.rs",
+      "sha256": "af01a0151c0155612786149db237d95771cb07c34bd619e94487f1a64187049f"
+    }
+  ],
+  "qualification": "Five isolated mandatory tests plus membership enforcement passed on Windows all-feature test profile. No reported compiler warnings. Includes duplicate-removal implementation; not a prior-source baseline, full CI or Linux-equivalent timing.",
+  "timings": [
+    {
+      "test": "mcp::tool_handlers::core::csharp_skeleton_degradation_tests::csharp_structural_fidelities_declare_bounded_semantic_loss",
+      "seconds": 5.7655493
+    },
+    {
+      "test": "mcp::tool_handlers::core::delta::delta_design::repair::af002_delta_previous_frozen_semantics",
+      "seconds": 232.9653046
+    },
+    {
+      "test": "mcp::tool_handlers::core::delta::delta_design::integrated::af002_delta_previous_integrated_cost",
+      "seconds": 49.6479918
+    },
+    {
+      "test": "mcp::tool_handlers::core::delta::delta_design::cases::af002_delta_previous_persistent",
+      "seconds": 12.7801906
+    },
+    {
+      "test": "artifact_operation_work_af_perf_002::dependency_footprint::af002_a4_public_lookup_budget",
+      "seconds": 89.403402
+    }
+  ]
+}

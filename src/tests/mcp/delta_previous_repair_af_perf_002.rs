@@ -278,13 +278,12 @@ fn compare(rows: &[Value]) {
 fn af002_delta_previous_frozen_semantics() {
     let _serial = crate::protocol::handler_response_serial();
     let _observation = Observation::new();
+    // Frozen equivalence and the unused-copy budget observe this same corpus.
+    // Regenerating all 380 rows in a second test added no independent witness.
     compare(&records());
+    assert_unused_budget();
 }
-#[test]
-fn af002_delta_previous_unused_budget() {
-    let _serial = crate::protocol::handler_response_serial();
-    let _observation = Observation::new();
-    compare(&records());
+fn assert_unused_budget() {
     COPIES.with(|v| {
         let v = v.borrow();
         eprintln!("AF002_DELTA_PREVIOUS_UNUSED {}", json!(&*v));

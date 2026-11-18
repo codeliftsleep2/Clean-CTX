@@ -56,7 +56,8 @@ fn report(phase: &str, axes: &serde_json::Value, start: std::time::Instant) {
         "boundary":"actual public operation; logical visits and bytes offered, not allocator/CPU bytes"})
     );
 }
-#[test]
+// Executed by af002_a4_public_lookup_budget; registering this helper as a
+// second test repeated every fixture and assertion under the same configuration.
 fn af002_a4_default_footprint_dimensions() {
     let _serial = crate::protocol::handler_response_serial();
     // F, total classes, matching extra owners, padding bytes, ancestry depth.

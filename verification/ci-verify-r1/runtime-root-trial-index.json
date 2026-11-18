@@ -1,0 +1,59 @@
+{
+  "archive_sha256": "e3fdee2e97e67e98eeb9db7e926a2c84328fbcbf9a674c1a20f76b3348fb4a9c",
+  "members": [
+    {
+      "entry": "binary.json",
+      "sha256": "bb986ab6136bfca3ce7d10197ebbf803e31bc15b8877ccb18945980a12cb72fe"
+    },
+    {
+      "entry": "compile.stderr.txt",
+      "sha256": "f311231054e978b2c13747886f08e4b85ae6b0bbcb8de24808bdf34732b712b4"
+    },
+    {
+      "entry": "compile.stdout.txt",
+      "sha256": "ca248bb24b380f0cbbc56e9fae221c2a5495c60e9d6f44c51ca0bb41379e6226"
+    },
+    {
+      "entry": "listing.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "listing.stdout.txt",
+      "sha256": "c19c2cb8708780de1c51ccc548c1fb3f67fdf2c45f040fdf54ff6d8250d0b27a"
+    },
+    {
+      "entry": "membership-enforcement.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "membership-enforcement.stdout.txt",
+      "sha256": "ebaa5d60b7bee21e05811ce07a96c32c54785bb7af49df796c93aaf4ebca0707"
+    },
+    {
+      "entry": "receipt.json",
+      "sha256": "8ec39c61eb4a05b77827cdfdbc4e4e2c6f8a4faa4d14fde1ed7a6b8ab01c9d1d"
+    },
+    {
+      "entry": "sources.json",
+      "sha256": "31840d08d616426b6690c52fd63aa6b30212603a4199e85dda255d431b373a01"
+    },
+    {
+      "entry": "test-1.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-1.stdout.txt",
+      "sha256": "8371bad2887acf453bd61c4b8f984933bd44a8fa5da86bffcc60dd57edcd844e"
+    },
+    {
+      "entry": "test-2.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "test-2.stdout.txt",
+      "sha256": "19ebad10521df086ca212aa4c835ebe500ea9d7e40ed5ecbceef6f5b1a58e2cc"
+    }
+  ],
+  "capture": "runtime-triage-20261118-104106",
+  "qualification": "Focused Windows root-opt1/dependency-opt3 trial; Rust source and Cargo manifests/lock identical to initial runtime capture. Main Cargo test metadata proves debug assertions and overflow checks enabled. Compilation and all three selected tests passed. Not full CI or a guaranteed overall elapsed-time target."
+}

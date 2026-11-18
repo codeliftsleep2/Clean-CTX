@@ -178,6 +178,96 @@ replay of historical CI evidence plus focused current-source verification, not a
 new full CI run. Scoped lint, guards and current document admission remain pending. This repairs evidence
 attribution within the approved verification contract; it does not change test scope.
 
+Agent MaxHeadRoom, 2026-11-18 runtime continuation: the owner reports numerous
+individual tests exceeding 60 seconds. The retained CI library summary establishes
+5949.39 seconds in total, but its buffered log does not establish individual costs.
+A source-confirmed duplication was found: af002_a4_public_lookup_budget invoked
+af002_a4_default_footprint_dimensions while both functions were registered tests.
+The latter is now an unregistered private helper, still called by the mandatory
+public-budget test. Every original matrix case, semantic assertion, work-count
+assertion and final public-budget assertion is retained; the same 19-case setup
+is no longer independently scheduled twice. The named public-budget fitness
+membership is unchanged. Runtime benefit and patched execution are not yet verified.
+
+The fixed five-test operator batch in verification/ci-verify-r1/invoke-runtime-triage.ps1
+records separate compilation and per-test wall time, actual Cargo-selected executable
+identity, exact test registration, source hashes and full output. Its 60-second
+notices are diagnostic progress, not timeouts, skips, budgets or acceptance criteria.
+It selects the A4 public budget plus C# skeleton degradation and delta combined frozen/unused-budget,
+integrated and persistent correctness witnesses once each, with all features and one libtest thread. It does
+not execute ignored measurement studies, change production behavior, reopen rejected
+optimizations or claim these five tests exhaust all slow paths. Run 406 (44134968130, revision b94273186a67d5f4ef8d3ec01209e71c69ecfc03)
+was subsequently pulled directly. It contains 37 named over-60-second warnings.
+Warning-to-completion elapsed lower bounds include 1441 seconds for C# skeleton
+degradation, 894.39 for delta frozen semantics and 789.73 for delta integrated cost.
+These include shared-lock waits in its parallel run and are not CPU measurements.
+The selection was corrected from these actual logs; it does not rely on
+owner recollection or treat old timings as current-source results. Additional
+repair selection awaits isolated cost evidence.
+Source inspection also established that af002_delta_previous_frozen_semantics and
+ af002_delta_previous_unused_budget each regenerated the identical 380-row corpus
+under the same serial guard and Observation mode. The surviving frozen-semantics
+test now invokes the unchanged unused-budget assertions before that observation
+ends. Its original compare(records()) and all original fixture cases remain;
+the second registration is removed. The fitness declaration now represents both
+obligations in that surviving test, changing 57 groups to 56; the standalone
+runner's duplicate selector is removed too. This is one execution of both required
+contracts, not ignored coverage or a waiver. No production code changes. Exact
+before/after membership is recorded in runtime-deduplication.json. Patched test
+execution and elapsed benefit remain unverified.
+
+The batch also verifies that neither duplicate corpus remains independently
+registered, then executes the existing membership enforcement test once against
+the revised declarations. Capture runtime-triage-20261118-100347 verifies all five selected mandatory tests
+and revised membership enforcement. Compilation took 53.52 seconds; isolated
+C# skeleton, combined delta frozen/budget, delta integrated, delta persistent and
+A4 public budget took 5.77, 232.97, 49.65, 12.78 and 89.40 seconds respectively.
+The C# test's run-406 warning is therefore not evidence of 24 minutes of isolated
+work. These current-source Windows observations cannot be relabeled as Linux
+CI costs or an old/new runtime comparison. Exact receipts and source identities
+are retained in runtime-baseline-evidence.zip and runtime-baseline-index.json.
+
+The next bounded trial uses the same two demonstrated expensive witnesses and
+root test profile, with only an invocation-local Cargo override optimizing test
+dependencies at level 3. It changes no repository profile defaults, production
+source, fixture axes, assertions, debug-assertion settings or overflow policy.
+Compilation cost and test elapsed time are recorded separately. The dependency trial subsequently passed in runtime-triage-20261118-102252.
+Its clean rebuild took 322.98 seconds, and identical delta/A4 witnesses took
+75.36 and 24.18 seconds (versus 232.97 and 89.40). Membership enforcement also
+passed. Actual Cargo artifact metadata establishes 189 opt3 dependency artifacts
+with debug assertions and overflow checks true, plus an opt0 main test crate
+with both checks true. This is a material focused runtime reduction, with a
+separately measured compilation penalty; it is not a full-suite or CI claim.
+Exact evidence is retained in runtime-dependency-trial-evidence.zip and its index.
+
+An invocation-local optimized-root trial additionally requests test opt-level=1,
+retaining opt3 dependencies and the same two witnesses plus membership enforcement.
+The main crate's Cargo profile metadata will establish whether debug assertions
+and overflow checks remain enabled. The root trial passed in runtime-triage-20261118-104106: delta 56.50 seconds, A4 21.07 seconds,
+and membership enforcement 5.39 seconds. Root rebuild cost was 339.34 seconds
+with already-built optimized dependencies; this is not a cold total. Actual main
+crate metadata is opt1 with debug assertions and overflow checks true. Source
+manifests establish identical Rust source, Cargo.toml and Cargo.lock across all
+three timing captures. These are bounded single-run observations, not a repeated
+performance distribution or Linux-wide certification. Evidence is retained in
+runtime-root-trial-evidence.zip and runtime-root-trial-index.json.
+
+The owner-directed CI runtime correction adopts these invocation-local test
+settings only inside the consolidated correctness runner: root opt1, dependencies
+opt3, debug assertions true and overflow checks true. Listing and execution use
+the exact same arguments, which are recorded in configuration.json. Local Cargo
+profile defaults, production source and explicit empirical-study workflows remain
+unchanged. The two observed test runtimes improve about 4.1 and 4.2 times relative
+to the initial current-source capture, in addition to eliminating duplicate corpus
+execution. Rebuild cost rises materially; the decision trades that measured cost
+against repeated expensive execution across the full CI suite. A complete Linux
+CI execution must establish the actual overall benefit and reveal any other slow
+families. No one-to-two-minute CI promise or full slowdown resolution is claimed.
+Scoped lint/guards, final source admission and fresh CI remain pending.
+
+No live Clean-CTX service is a CI prerequisite. Full suite verification remains
+CI-owned; the batch is proportionate operator investigation, not a substitute gate.
+
 <!-- pcg:CI-VERIFY-R1-limits:end -->
 
 ```architecture-graph
@@ -215,6 +305,12 @@ knowledge_content:
   - evidence:enforcement src/tests/architecture/ci_verify_r1.rs#whole
   - evidence:parser_red verification/ci-verify-r1/consolidated-parser-red-index.json#whole
   - evidence:parser_green verification/ci-verify-r1/consolidated-parser-green-index.json#whole
+  - evidence:runtime_root_trial verification/ci-verify-r1/runtime-root-trial-index.json#whole
+  - evidence:runtime_dependency_trial verification/ci-verify-r1/runtime-dependency-trial-index.json#whole
+  - evidence:runtime_baseline verification/ci-verify-r1/runtime-baseline-index.json#whole
+  - evidence:runtime_deduplication verification/ci-verify-r1/runtime-deduplication.json#whole
+  - evidence:runtime_triage verification/ci-verify-r1/invoke-runtime-triage.ps1#whole
+  - evidence:a4_fixture src/tests/mcp/dependency_footprint_af_perf_002.rs#whole
 
 ```
 
