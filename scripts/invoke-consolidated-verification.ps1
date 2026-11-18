@@ -64,9 +64,11 @@ try {
     $execution=Join-Path $out 'execution.log'
     & python (Join-Path $PSScriptRoot 'verify-ci-membership.py') --root $root --prerequisites-only --output (Join-Path $out 'prerequisites.json')
     if($LASTEXITCODE -ne 0){throw "Mandatory verification prerequisite failed; preserve $out"}
+    Write-Output "Compiling and registering the full workspace suite; registration log: $listing"
     & cargo test --workspace --all-targets --all-features @testProfile -- --list *> $listing
     if($LASTEXITCODE -ne 0){throw "Registration/compilation failed; preserve $out"}
-    & cargo test --workspace --all-targets --all-features --no-fail-fast @testProfile -- --test-threads=1 --format=pretty *> $execution
+    Write-Output "Running workspace correctness and deterministic semantic fitness; live per-test results also retained in $execution"
+    & cargo test --workspace --all-targets --all-features --no-fail-fast @testProfile -- --test-threads=1 --format=pretty 2>&1 | Tee-Object -FilePath $execution
     $suiteExit=$LASTEXITCODE
     & python (Join-Path $PSScriptRoot 'verify-ci-membership.py') --root $root --listing $listing --execution $execution --suite-exit $suiteExit --output (Join-Path $out 'membership-result.json')
     $membershipExit=$LASTEXITCODE

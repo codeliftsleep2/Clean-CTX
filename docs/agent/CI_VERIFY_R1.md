@@ -678,6 +678,20 @@ branch delivery after final metadata guards/admission. This is not closure of
 CI-VERIFY-R1: full CI and the requested per-test/family runtime accounting,
 production work attribution and corrected-CI comparison remain outstanding.
 
+The owner subsequently reported loss of individual test progress in Actions.
+The consolidated runner executed the complete workspace/all-target/all-feature
+suite, but redirected its complete output into `execution.log`; the workflow
+retained the older fitness-only step label. The correction names the step
+"Workspace correctness and deterministic semantic fitness" and tees the same
+single native Cargo execution into both the live console and retained log.
+Registration remains a separate non-executing list operation, with an explicit
+phase message. The native suite exit code is still captured immediately and
+passed to the unchanged membership verifier. Test selection, serial execution,
+profiles, ignore governance, artifacts and failure contracts are unchanged.
+This is an observability correction, not a second suite or removal of coverage.
+Source/syntax checks are local evidence; live Actions visibility and complete
+CI remain unverified until the new revision runs.
+
 <!-- pcg:CI-VERIFY-R1-feature-isolation:end -->
 
 <!-- pcg:CI-VERIFY-R1-core-query-approved:end -->

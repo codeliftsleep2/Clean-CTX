@@ -50,7 +50,7 @@ jobs:
       - name: UTF-8 / mojibake guard
         shell: pwsh
         run: ./scripts/check-utf8.ps1
-      - name: AF-PERF-001 bounded semantic work fitness
+      - name: Workspace correctness and deterministic semantic fitness
         id: semantic-fitness
         shell: pwsh
         run: ./scripts/check-semantic-work-fitness.ps1 -Consolidated
