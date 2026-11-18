@@ -1,0 +1,39 @@
+{
+  "category": "Focused tracked RED-to-GREEN repair and scoped lint; not full CI",
+  "capture": "publication-witness-20261118-173217",
+  "archive": "verification/ci-verify-r1/publication-freeze-green-evidence.zip",
+  "archive_sha256": "f241e98a009c1eb342fee5eafbdaeb7677b862b7bbf18049ee2b0bb2266f4c50",
+  "members": [
+    {
+      "entry": "publication-witness-20261118-173217/all-features.log",
+      "sha256": "935d5a9871a90b981832d5f11aca43b242e4a2142827301be71d630a9bcec255"
+    },
+    {
+      "entry": "publication-witness-20261118-173217/csharp-only.log",
+      "sha256": "ae77d9c2f4fb334de55399995f834a96f3864f06bd090d7cac12a2f2de0a7662"
+    },
+    {
+      "entry": "publication-witness-20261118-173217/receipt.json",
+      "sha256": "1ed2007c1f0103faffb8635e361d1974e6515a72e3997a1fd18bebe0454d3b28"
+    },
+    {
+      "entry": "publication-witness-20261118-173217/scoped-clippy.log",
+      "sha256": "9df9320bb813a619d09d30dda55a79ec14bb2fe94dc16070c34aad3df501cf8b"
+    },
+    {
+      "entry": "verified-source/src/mcp/state/publication.rs",
+      "sha256": "b9bc08c1b22d0ce4f757d3c9229dc067ae1524462bb429c8b4bc044b7e219cae"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/semantic_publication_clock_support.rs",
+      "sha256": "7846c0b71076552f2a05b9a836fec81aa9ee5ab3e30d1c7f7a633ede8589ac28"
+    },
+    {
+      "entry": "verified-source/src/tests/mcp/delta_previous_integrated_af_perf_002.rs",
+      "sha256": "b9ae0a69ad17ca3b43b59e7fed6a2e805389680013ed25ef9bced368ba00e12c"
+    }
+  ],
+  "results": "All-features 2/2, CSharp-only 1/1, scoped library/tests all-feature Clippy: all exit zero, complete selection and zero warnings",
+  "source_preservation": "Exact frozen publication source restored; existing delta static witness, expected hashes and fixture assertions unchanged",
+  "remaining": "Metadata guards/admission, guarded branch delivery and actual CI on the repaired commit"
+}

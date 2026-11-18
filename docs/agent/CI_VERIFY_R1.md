@@ -692,6 +692,40 @@ This is an observability correction, not a second suite or removal of coverage.
 Source/syntax checks are local evidence; live Actions visibility and complete
 CI remain unverified until the new revision runs.
 
+CI #412 on `662c7540f7055123213f2cbf7b0cca8374f89344` completed the full
+registered scope (5,636 registrations/outcomes) but failed one static witness:
+`afperf_delta_previous_static` rejected the protected whole-file publication
+hash. The two test-hook feature guards introduced during feature isolation
+changed that file's hash; no other library test failed (5,258 passed, 27 ignored).
+The correction restores the exact original protected publication file and removes
+the corresponding helper guards in the existing test-support file. A new tracked
+language-independent regression exercises the hooks and verifies newer-owner
+ordering, independent sibling ownership, noncurrent-source refusal and failed
+publication without superseding a valid older ticket. The frozen witness's
+expected hashes, assertions and fixtures remain unchanged. This is an
+implemented correction; focused GREEN and scoped lint remain pending.
+
+The retained CI library duration was 1,584.16 seconds in #411 and 271.94 seconds
+in #412; registration compilation was 438 versus 428 seconds. This is descriptive
+evidence of the remaining runtime distribution, with additional tests and a RED
+#412 result, not final performance acceptance or a complete historical per-test
+accounting. The exact failure, configuration, original witness and source identities
+are preserved in the publication-freeze evidence index/archive. The current
+visibility correction is already committed separately as `689338b4`; #412 ran
+before it, explaining why its console exposed only the final log tail.
+
+Capture `publication-witness-20261118-173217` establishes focused GREEN:
+the unchanged static delta witness and new publication-hook regression passed
+2/2 with all features, the hook regression passed 1/1 C#-only, and scoped
+library/test Clippy with all features and warnings denied passed. All three
+runs returned zero with complete selection and no warnings. Source/log hashes
+were checked against the current files before retention. The exact protected
+publication bytes are restored, and no frozen expectation or assertion was
+changed. The green archive includes the verified source bytes separately from
+the original CI RED source identities. This resolves the identified frozen-hash
+failure locally; CI on the repaired revision remains required. Final metadata
+guards and normal admission cover this receipt update before branch delivery.
+
 <!-- pcg:CI-VERIFY-R1-feature-isolation:end -->
 
 <!-- pcg:CI-VERIFY-R1-core-query-approved:end -->
@@ -747,6 +781,10 @@ knowledge_content:
   - evidence:feature_isolation_green verification/ci-verify-r1/feature-isolation-green-index.json#whole
   - evidence:query_case_style verification/ci-verify-r1/core-query-clippy-style-index.json#whole
   - evidence:query_actual_admission verification/ci-verify-r1/core-query-admission-index.json#whole
+  - evidence:publication_freeze_red verification/ci-verify-r1/publication-freeze-red-index.json#whole
+  - evidence:publication_freeze_green verification/ci-verify-r1/publication-freeze-green-index.json#whole
+  - evidence:publication_owner_regression src/tests/mcp/semantic_publication_clock_support.rs#whole
+  - verification_obligation:publication_freeze_green verification/ci-verify-r1/invoke-publication-witness-green.ps1#whole
   - verification_obligation:query_publication_guards verification/ci-verify-r1/invoke-core-query-publication-guards.ps1#whole
   - verification_obligation:feature_isolation verification/ci-verify-r1/invoke-feature-isolation-green.ps1#whole
   - evidence:html_feature_dispatch src/tests/gitdiff/feature_isolation.rs#whole

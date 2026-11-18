@@ -1,0 +1,62 @@
+{
+  "run": 412,
+  "url": "https://github.com/codeliftsleep2/Clean-CTX/actions/runs/44408069015",
+  "head": "662c7540f7055123213f2cbf7b0cca8374f89344",
+  "archive": "verification/ci-verify-r1/publication-freeze-red-evidence.zip",
+  "archive_sha256": "b05b7053df809258a0b6dcb489e0f4f7231e06d1811761055994122b28517c48",
+  "members": [
+    {
+      "entry": "run-412/artifact/semantic-fitness-662c7540f7055123213f2cbf7b0cca8374f89344-1/af-perf-001-20261118-220714/configuration.json",
+      "sha256": "20cb408cf10b5092a7ef5f95e4e3ffae66e3829f06fa21e48e488631b9505fe2"
+    },
+    {
+      "entry": "run-412/artifact/semantic-fitness-662c7540f7055123213f2cbf7b0cca8374f89344-1/af-perf-001-20261118-220714/execution.log",
+      "sha256": "b5c3de191f6512d7d440ee2e7339479f3b4690c098de3ef928628fac3356870d"
+    },
+    {
+      "entry": "run-412/artifact/semantic-fitness-662c7540f7055123213f2cbf7b0cca8374f89344-1/af-perf-001-20261118-220714/membership-result.json",
+      "sha256": "1673c2425d83fc792498143b3157abb1635fc3dbab129f825f9af9bcfa8e4e12"
+    },
+    {
+      "entry": "run-412/artifact/semantic-fitness-662c7540f7055123213f2cbf7b0cca8374f89344-1/af-perf-001-20261118-220714/prerequisites.json",
+      "sha256": "63ea5e6631335ceebd4fdf6de1b68831356fbfd40dc8c222bd4aac7f8e00bedb"
+    },
+    {
+      "entry": "run-412/artifact/semantic-fitness-662c7540f7055123213f2cbf7b0cca8374f89344-1/af-perf-001-20261118-220714/registration.log",
+      "sha256": "aaf2364c6738b0765f33e837760de45882da0da3da0000acaac728c732b02612"
+    },
+    {
+      "entry": "run-412/failed.log",
+      "sha256": "d883f5ed82e919ea4171fbe66ac5179f986b9d1e43e5c5bdaddf2c620480c4c6"
+    },
+    {
+      "entry": "sources/662c7540/src/mcp/state/publication.rs",
+      "sha256": "81c1baace1cfa759ed86947ba7fd7141ab9e76e86e72873ba6ed01dfa8eda0e8"
+    },
+    {
+      "entry": "sources/95153d5c/src/mcp/state/publication.rs",
+      "sha256": "b9bc08c1b22d0ce4f757d3c9229dc067ae1524462bb429c8b4bc044b7e219cae"
+    },
+    {
+      "entry": "sources/662c7540/src/tests/mcp/delta_previous_integrated_af_perf_002.rs",
+      "sha256": "b9ae0a69ad17ca3b43b59e7fed6a2e805389680013ed25ef9bced368ba00e12c"
+    }
+  ],
+  "failure": "afperf_delta_previous_static: exact protected publication.rs LF-normalized hash changed by two test-hook cfg attributes",
+  "preservation": "Restore protected publication.rs to original b9bc08c1b22d0ce4f757d3c9229dc067ae1524462bb429c8b4bc044b7e219cae; expected hash and all static witness assertions remain unchanged",
+  "repair": "Remove corresponding guards only in existing test support; add language-independent hook/owner-order/currentness/failure regression. No production behavior redesign.",
+  "verification": "Correction implemented; focused post-repair execution UNRUN",
+  "library_results": {
+    "passed": 5258,
+    "failed": 1,
+    "ignored": 27,
+    "seconds": 271.94
+  },
+  "runtime_comparison": {
+    "run411_library_seconds": 1584.16,
+    "run412_library_seconds": 271.94,
+    "run411_registration_compile_seconds": 438,
+    "run412_registration_compile_seconds": 428,
+    "limit": "Descriptive CI comparison with additional tests; RED run is not acceptance. Exact per-test historical timings remain unavailable."
+  }
+}
