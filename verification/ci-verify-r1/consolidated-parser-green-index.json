@@ -1,0 +1,30 @@
+{
+  "archive_sha256": "99a9439d6caa0fdd062b7b6af33234ab3f5e9f690f0fdc5aab3a5822101cd538",
+  "members": [
+    {
+      "entry": "receipt.json",
+      "sha256": "80a6900ca59649b69bbb5090026e8aa620ed994db9bb286128b2be5b4be75672"
+    },
+    {
+      "entry": "membership-result.json",
+      "sha256": "6785c82a963e731d6960e92e300a1b6cfbbe5aa77092f1961cda9fc65d4f1e79"
+    },
+    {
+      "entry": "historical-replay.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "tracked-enforcement.log",
+      "sha256": "d752ff03a02938d275728e67203054e62d0e13d7ad4f6c4c5dfdb9e617e17fbd"
+    },
+    {
+      "entry": "verified-source/scripts/verify-ci-membership.py",
+      "sha256": "c42528291a588fa4af75902f5d4891f2f066dab8ef9d84188e2f74d858559ba8"
+    },
+    {
+      "entry": "verified-source/src/tests/architecture/ci_verify_r1.rs",
+      "sha256": "e33a29b7b8925c4c49a2a0ee37ca47b13adcbf06a2d915aa86c2c57e848e3d7a"
+    }
+  ],
+  "qualification": "Corrected-parser replay of historical CI evidence: 5629 registered and 5629 outcomes, no errors. One focused tracked enforcement test passed. Not a new full CI execution or certification."
+}

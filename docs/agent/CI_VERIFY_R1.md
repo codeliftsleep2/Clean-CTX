@@ -156,6 +156,28 @@ The report governs associated CI-VERIFY-R1 manifests, scripts, tracked test
 changes, workflows and evidence listed here. No other mission Markdown is created.
 Publication waits for the real governance checkpoint and applicable verification.
 No owner authorization is generated or submitted by the agent.
+Agent MaxHeadRoom, 2026-11-18: CI run 44303364941 at c3a9cd303ed09ef683c286c8a71354f672538725
+reported passing outer test summaries, including 5252 root-library passes and 27
+approved ignores, but membership reconciliation failed. PowerShell merged stdout
+and stderr out of order: the next Cargo header preceded 211 remaining library
+registration lines. An inherited child libtest run split its parent outcome and
+made its worker appear duplicated. The bounded parser correction associates ordered
+Cargo headers with complete ordered outer libtest blocks, validates block record
+counts and handles nested output only within an unfinished parent test. Required
+registration, unique execution, ignored-test restrictions and fitness membership
+remain enforced. No Clean-CTX server or MCP availability is required in CI.
+Tracked enforcement fixtures cover reordered headers and nested workers alongside
+existing failure cases. Historical evidence is retained in consolidated-parser-red.zip
+with consolidated-parser-red-index.json. Corrected-parser replay and tracked
+execution were initially UNRUN. Operator capture parser-repair-20261118-091856
+subsequently reconciled all 5629 registered tests with 5629 outcomes and no errors.
+The focused all-feature enforcement test passed (one passed, none failed or ignored),
+with no compiler warnings reported. Exact logs, source bytes and hashes are retained
+in consolidated-parser-green.zip and consolidated-parser-green-index.json. This is
+replay of historical CI evidence plus focused current-source verification, not a
+new full CI run. Scoped lint, guards and current document admission remain pending. This repairs evidence
+attribution within the approved verification contract; it does not change test scope.
+
 <!-- pcg:CI-VERIFY-R1-limits:end -->
 
 ```architecture-graph
@@ -191,6 +213,8 @@ knowledge_content:
   - evidence:validator scripts/verify-ci-membership.py#whole
   - evidence:empirical_runner verification/ci-verify-r1/invoke-measurements.ps1#whole
   - evidence:enforcement src/tests/architecture/ci_verify_r1.rs#whole
+  - evidence:parser_red verification/ci-verify-r1/consolidated-parser-red-index.json#whole
+  - evidence:parser_green verification/ci-verify-r1/consolidated-parser-green-index.json#whole
 
 ```
 

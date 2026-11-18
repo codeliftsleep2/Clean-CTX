@@ -1,0 +1,6 @@
+{
+  "run_id": 44303364941,
+  "head": "c3a9cd303ed09ef683c286c8a71354f672538725",
+  "archive_sha256": "67d040a09f467365cac1293b94881d14fd75a48fcd3a850382b007a4bfa5c013",
+  "qualification": "All outer test summaries passed; old membership parser reported 423 attribution errors. Cargo exit zero is evidenced by absence of suite-exit error in original membership result. This is historical RED, not corrected-parser execution."
+}

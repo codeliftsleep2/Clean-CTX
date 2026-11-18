@@ -56,6 +56,8 @@ fn evidence(manifest: &Path) -> (String, String, String) {
         let header = format!("     Running unittests src/lib.rs (target/debug/deps/{binary})\n");
         listing.push_str(&header);
         execution.push_str(&header);
+        let count = tests.len();
+        execution.push_str(&format!("running {count} tests\n"));
         for test in tests {
             listing.push_str(&format!("{test}: test\n"));
             let outcome = if empirical.contains(&(package.clone(), test.clone())) {
@@ -65,6 +67,8 @@ fn evidence(manifest: &Path) -> (String, String, String) {
             };
             execution.push_str(&format!("test {test} ... {outcome}\n"));
         }
+        listing.push_str(&format!("{count} tests, 0 benchmarks\n"));
+        execution.push_str("test result: ok.\n");
     }
     (listing, execution, first)
 }
@@ -102,6 +106,8 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
         .to_owned();
     for case in [
         "valid",
+        "interleaved_headers",
+        "nested_worker",
         "lf_checkout",
         "crlf_checkout",
         "missing_registration",
@@ -125,6 +131,21 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
         let mut execution = executed.clone();
         let fitness_line = format!("test {fitness} ... ok\n");
         match case {
+            "interleaved_headers" => {
+                let header = "     Running unittests src/lib.rs (target/debug/deps/clean_ctx_proxy-fixture)\n";
+                listing = listing.replace(header, "");
+                listing = listing.replacen(
+                    &format!("{fitness}: test\n"),
+                    &format!("{header}{fitness}: test\n"),
+                    1,
+                );
+            }
+            "nested_worker" => {
+                execution = execution.replace(
+                    "test ci_verify_r1::correctness_sentinel ... ok\n",
+                    "test ci_verify_r1::correctness_sentinel ... \nrunning 1 test\ntest nested_worker ... ok\ntest result: ok.\nok\n",
+                );
+            }
             "missing_registration" => {
                 listing = listing.replace(&format!("{fitness}: test\n"), "");
                 execution = execution.replace(&fitness_line, "");
@@ -226,7 +247,10 @@ fn ci_verify_r1_required_execution_and_failure_contracts() {
             .arg(&result_path)
             .output()
             .expect("Python is an existing repository verification prerequisite");
-        let expected_success = matches!(case, "valid" | "lf_checkout" | "crlf_checkout");
+        let expected_success = matches!(
+            case,
+            "valid" | "lf_checkout" | "crlf_checkout" | "interleaved_headers" | "nested_worker"
+        );
         assert_eq!(
             output.status.success(),
             expected_success,

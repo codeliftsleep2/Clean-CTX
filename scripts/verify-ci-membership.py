@@ -18,23 +18,66 @@ def read_json(path):
 
 
 def records(path, listing):
-    target = None
-    found = collections.defaultdict(list)
+    # Cargo writes headers to stderr, libtest writes records to stdout. Merged
+    # PowerShell streams preserve each stream's order, not cross-stream order.
+    # Match ordered Cargo targets to complete ordered outer libtest blocks.
+    targets, blocks, stack = [], [], []
+    current = []
     for raw in path.read_text(encoding="utf-8-sig").splitlines():
         line = ANSI.sub("", raw).strip()
-        header = HEADER.search(line)
+        header = HEADER.fullmatch(line)
         if header:
             executable = header[2].replace("\\", "/").split("/")[-1]
             package = "clean-ctx-proxy" if executable.startswith("clean_ctx_proxy-") else "clean-ctx"
-            target = (package, header[1], executable)
+            targets.append((package, header[1], executable))
             continue
-        match = re.fullmatch(r"(.+): test", line) if listing else re.fullmatch(
-            r"test (.+) \.\.\. (ok|FAILED|ignored(?:,.*)?)", line
-        )
-        if match:
-            if target is None:
-                raise ValueError("Test record has no Cargo target attribution")
-            found[(*target, match[1])].append("listed" if listing else match[2].split(",")[0])
+        if listing:
+            match = re.fullmatch(r"(.+): test", line)
+            if match:
+                current.append((match[1], "listed"))
+            summary = re.fullmatch(r"(\d+) tests?, \d+ benchmarks?", line)
+            if summary:
+                if len(current) != int(summary[1]):
+                    raise ValueError("Registration block count mismatch")
+                blocks.append(current)
+                current = []
+            continue
+        start = re.fullmatch(r"running (\d+) tests?", line)
+        if start:
+            if stack and stack[-1]["pending"] is None:
+                raise ValueError("Nested libtest output without an unfinished parent test")
+            stack.append({"count": int(start[1]), "records": [], "pending": None})
+            continue
+        match = re.fullmatch(r"test (.+) \.\.\. (ok|FAILED|ignored(?:,.*)?)", line)
+        pending = re.fullmatch(r"test (.+) \.\.\.", line)
+        if match or pending:
+            if not stack:
+                raise ValueError("Test record outside a libtest block")
+            frame = stack[-1]
+            if frame["pending"] is not None:
+                raise ValueError("Unterminated test outcome")
+            if match:
+                frame["records"].append((match[1], match[2].split(",")[0]))
+            else:
+                frame["pending"] = pending[1]
+        elif line in ("ok", "FAILED", "ignored") and stack and stack[-1]["pending"]:
+            frame = stack[-1]
+            frame["records"].append((frame["pending"], line))
+            frame["pending"] = None
+        elif line.startswith("test result:"):
+            if not stack:
+                raise ValueError("Libtest summary without a running block")
+            frame = stack.pop()
+            if frame["pending"] is not None or len(frame["records"]) != frame["count"]:
+                raise ValueError("Execution block count mismatch or incomplete outcome")
+            if not stack:
+                blocks.append(frame["records"])
+    if current or stack or len(targets) != len(blocks):
+        raise ValueError("Incomplete or unattributed Cargo target evidence")
+    found = collections.defaultdict(list)
+    for target, block in zip(targets, blocks):
+        for name, outcome in block:
+            found[(*target, name)].append(outcome)
     if not found:
         raise ValueError(f"Empty test evidence: {path}")
     return found
