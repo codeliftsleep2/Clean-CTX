@@ -93,6 +93,7 @@ struct Scope {
     aliases: CSharpAliasContext,
 }
 
+#[cfg(feature = "dotnet")]
 pub(crate) fn resolve_compilation_class_ancestry(
     captures: &[CapEntry],
     file: &str,

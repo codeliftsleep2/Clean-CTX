@@ -15,12 +15,15 @@ pub(crate) const KINDS: [(&str, SemanticRelation); 4] = [
     ),
 ];
 
+#[cfg(feature = "angular")]
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     memberships(authority, &[("canActivate", SemanticRelation::GuardedBy)])
 }
+#[cfg(feature = "angular")]
 pub(crate) fn project_kinds(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     memberships(authority, &KINDS)
 }
+#[cfg(feature = "angular")]
 fn memberships(
     authority: &TypeScriptAuthority,
     kinds: &[(&str, SemanticRelation)],
@@ -88,6 +91,7 @@ fn memberships(
     edges
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &crate::layers::meta::semantic::EntityRef,
                 b: &crate::layers::meta::semantic::EntityRef| {
@@ -107,6 +111,7 @@ pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) 
 }
 
 /// Ownership is independent of field uniqueness, container or target proof.
+#[cfg(feature = "angular")]
 pub(crate) fn owned_objects(authority: &TypeScriptAuthority) -> Vec<(usize, usize)> {
     super::route_objects::project(authority)
         .iter()
@@ -116,6 +121,7 @@ pub(crate) fn owned_objects(authority: &TypeScriptAuthority) -> Vec<(usize, usiz
 }
 
 /// Exact per-field ownership prevents fallback even for duplicate/refused mappings.
+#[cfg(feature = "angular")]
 pub(crate) fn owned_kinds(authority: &TypeScriptAuthority) -> Vec<((usize, usize), &'static str)> {
     let mut owned = Vec::new();
     for route in super::route_objects::project(authority) {
@@ -129,6 +135,7 @@ pub(crate) fn owned_kinds(authority: &TypeScriptAuthority) -> Vec<((usize, usize
 }
 
 /// Complete membership for exactly the requested explicit guard relation.
+#[cfg(feature = "angular")]
 pub(crate) fn project_relation(
     authority: &TypeScriptAuthority,
     relation: SemanticRelation,

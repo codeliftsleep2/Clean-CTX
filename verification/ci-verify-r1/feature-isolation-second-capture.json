@@ -1,0 +1,445 @@
+{
+  "identity": "feature-isolation-20261118-132301",
+  "csharp": "7 selected tracked tests passed; 107 warnings prevent acceptance",
+  "typescript": "Compilation failed with 46 errors and 2 warnings; no tracked tests executed",
+  "source_identity": "Exact source pins and commands retained in archived receipt; subsequent edits are unverified",
+  "corrections": [
+    "CSharp semantic module now requires CSharp, preserving native type authority",
+    "Shared configured-roots export restored independently of CSharp",
+    "Pure package fixture available to TypeScript consumers independently of Angular HTML grammar",
+    "Second generic candidate-index witness conditionally initializes native alias evidence",
+    "Nested NgRx re-export follows Angular consumer"
+  ],
+  "remaining": "Resolve isolated-feature dead-code ownership warnings without suppressions; then operator verification",
+  "warning_inventory": [
+    {
+      "location": "src\\angular_meta\\ngrx\\extract.rs:28:65",
+      "message": "unused import: `extract_ngrx_shape_with_sites`"
+    },
+    {
+      "location": "src\\mcp\\hydration_flight.rs:120:19",
+      "message": "methods `test_arm`, `test_wait_for_leader`, `test_wait_for_followers`, and `test_release` are never used"
+    },
+    {
+      "location": "src\\mcp\\hydration_flight.rs:183:8",
+      "message": "methods `arm`, `wait_for_leader`, `wait_for_followers`, and `release` are never used"
+    },
+    {
+      "location": "src\\mcp\\proxy_stats.rs:99:15",
+      "message": "function `inject_test_proxy_stats` is never used"
+    },
+    {
+      "location": "src\\mcp\\sqlite_store\\edit_intent.rs:66:19",
+      "message": "method `establish_edit_intent` is never used"
+    },
+    {
+      "location": "src\\mcp\\state\\publication.rs:96:19",
+      "message": "methods `arm_semantic_publication_attempt` and `wait_for_semantic_publication_attempt` are never used"
+    },
+    {
+      "location": "src\\mcp\\state\\..\\..\\tests\\mcp\\semantic_publication_clock_support.rs:14:15",
+      "message": "function `arm` is never used"
+    },
+    {
+      "location": "src\\mcp\\state\\..\\..\\tests\\mcp\\semantic_publication_clock_support.rs:29:15",
+      "message": "function `wait_until_attempted` is never used"
+    },
+    {
+      "location": "src\\mcp\\state\\retirement.rs:120:19",
+      "message": "method `reconcile_semantic_sources_for_test` is never used"
+    },
+    {
+      "location": "src\\mcp\\durable_semantics.rs:314:19",
+      "message": "method `remember_semantic_edges` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\core\\common.rs:93:19",
+      "message": "method `as_str` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\core\\restore.rs:28:19",
+      "message": "function `arm` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\core\\restore.rs:50:19",
+      "message": "function `wait_until_paused` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\core\\restore.rs:57:19",
+      "message": "function `release` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\persistence\\..\\..\\..\\tests\\mcp\\save_context_race_support.rs:17:15",
+      "message": "function `arm` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\persistence\\..\\..\\..\\tests\\mcp\\save_context_race_support.rs:39:15",
+      "message": "function `wait_until_paused` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\persistence\\..\\..\\..\\tests\\mcp\\save_context_race_support.rs:46:15",
+      "message": "function `release` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\query\\entities.rs:341:4",
+      "message": "function `prepared_angular_template_in_file` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\query\\work_metrics.rs:262:15",
+      "message": "function `record_resolver_nomination` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\query\\work_metrics.rs:274:15",
+      "message": "function `record_resolver_owner_validation` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\query\\work_metrics.rs:278:15",
+      "message": "function `record_resolver_records` is never used"
+    },
+    {
+      "location": "src\\mcp\\tool_handlers\\..\\..\\tests\\mcp\\control_full_test_support.rs:23:15",
+      "message": "function `has_interface` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\decorators.rs:359:15",
+      "message": "function `extract_component_template_url` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:8:8",
+      "message": "struct `ActionBindings` is never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:14:15",
+      "message": "function `refine_candidates` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:52:4",
+      "message": "function `action_bindings` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:127:4",
+      "message": "function `collect_imported_names` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:157:4",
+      "message": "function `collect_action_occurrences` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\action_imports.rs:173:4",
+      "message": "function `relation_for` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\constructors.rs:199:15",
+      "message": "function `apply` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\discriminants.rs:124:9",
+      "message": "multiple fields are never read"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\discriminants.rs:134:19",
+      "message": "methods `matches_source`, `declaration_edge`, and `transition_edge` are never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\legacy.rs:13:9",
+      "message": "fields `implements_span` and `import_span` are never read"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\legacy.rs:106:15",
+      "message": "function `include` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:14:15",
+      "message": "function `evidence` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:36:15",
+      "message": "function `dependencies` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:63:4",
+      "message": "function `collect_import_paths` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:87:4",
+      "message": "function `resolve_module_path` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:185:4",
+      "message": "function `walk` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:199:4",
+      "message": "function `dispatch` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:241:4",
+      "message": "function `switches` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:271:4",
+      "message": "function `collect_switches` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:332:4",
+      "message": "function `discriminant_binds` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:367:8",
+      "message": "struct `Resolved` is never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:373:4",
+      "message": "function `resolve_member` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:417:4",
+      "message": "function `resolve_value` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:440:4",
+      "message": "function `member_entity` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:443:4",
+      "message": "function `resolved_entity` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:452:4",
+      "message": "function `carrier` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:466:4",
+      "message": "function `pair_value` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:485:4",
+      "message": "function `owner_name` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:496:4",
+      "message": "function `is_exported_object_declaration` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\object_actions.rs:529:7",
+      "message": "trait `NodeKindExt` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_declarations.rs:99:19",
+      "message": "method `edge` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:12:15",
+      "message": "function `admit` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:113:19",
+      "message": "struct `InitializerStoreAuthority` is never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:118:15",
+      "message": "function `initializer_store_authority` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:220:4",
+      "message": "function `parameter_properties` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:278:4",
+      "message": "function `store_receiver` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:311:4",
+      "message": "function `exact_ngrx_select_import` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:336:4",
+      "message": "function `collect_ngrx_select_imports` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\selector_references.rs:354:4",
+      "message": "function `has_unaliased_select_specifier` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\service_owners.rs:69:15",
+      "message": "function `admit_modern_initializer_dispatches` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\service_owners.rs:129:9",
+      "message": "fields `start_byte`, `service`, `action`, `file`, and `source_hash` are never read"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\service_owners.rs:201:15",
+      "message": "function `project` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\transitions.rs:13:9",
+      "message": "fields `action` and `reducer` are never read"
+    },
+    {
+      "location": "src\\angular_meta\\ngrx\\transitions.rs:24:19",
+      "message": "method `edge` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\semantic.rs:147:15",
+      "message": "function `component_template_edge` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_occurrences.rs:11:5",
+      "message": "multiple variants are never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\template_occurrences.rs:27:5",
+      "message": "variants `Legacy` and `Modern` are never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:12:5",
+      "message": "variants `Content` and `Comment` are never constructed"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:37:19",
+      "message": "methods `render` and `prime_ng_markers` are never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:243:4",
+      "message": "function `strip_outer_attribute_quotes` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:252:4",
+      "message": "function `legacy_for_parts` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:305:4",
+      "message": "function `find_control_start` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:339:4",
+      "message": "function `control_boundary` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:355:4",
+      "message": "function `control_header` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:376:4",
+      "message": "function `push_text` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:384:4",
+      "message": "function `collapse_multiline` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:392:4",
+      "message": "function `normalize_modern_headers` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:400:4",
+      "message": "function `normalize_for_headers` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ordered.rs:426:4",
+      "message": "function `matching_paren` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ownership.rs:11:15",
+      "message": "function `source_owns_external_template` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ownership.rs:43:15",
+      "message": "function `resolve_template_path` is never used"
+    },
+    {
+      "location": "src\\angular_meta\\template_ownership.rs:58:4",
+      "message": "function `normalize_lexically` is never used"
+    },
+    {
+      "location": "src\\compression\\capture_pipeline.rs:103:5",
+      "message": "variant `TestProbe` is never constructed"
+    },
+    {
+      "location": "src\\dotnet_meta\\mod.rs:27:18",
+      "message": "constant `MARKER_PRODUCER_GENERATION` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\mod.rs:28:18",
+      "message": "constant `SEMANTIC_PRODUCER_GENERATION` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\mod.rs:197:4",
+      "message": "function `evaluate_applicable_source` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\detect.rs:181:15",
+      "message": "function `is_dotnet_file_with_regions` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\semantic.rs:428:15",
+      "message": "function `has_resolved_dotnet_role` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\semantic.rs:442:15",
+      "message": "function `resolved_dbcontext_role_registrations` is never used"
+    },
+    {
+      "location": "src\\dotnet_meta\\semantic.rs:461:15",
+      "message": "function `resolved_dbcontext_role_names` is never used"
+    },
+    {
+      "location": "src\\ir\\layers\\typescript.rs:29:18",
+      "message": "constant `CANONICAL_PRODUCER_GENERATION` is never used"
+    },
+    {
+      "location": "src\\ir\\layers\\typescript.rs:31:18",
+      "message": "constant `SEMANTIC_INPUT_GENERATION` is never used"
+    },
+    {
+      "location": "src\\ir\\typescript_value_import_binding.rs:100:15",
+      "message": "function `bind_named_value_import` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\mod.rs:40:18",
+      "message": "constant `ANGULAR_MARKER_PRODUCER_GENERATION` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\mod.rs:41:18",
+      "message": "constant `ANGULAR_SEMANTIC_PRODUCER_GENERATION` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\builtin.rs:54:15",
+      "message": "function `reset_evaluation_count` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\builtin.rs:59:15",
+      "message": "function `evaluation_count` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\canonical_endpoint.rs:91:19",
+      "message": "methods `declaration` and `declaration_mut` are never used"
+    },
+    {
+      "location": "src\\layers\\meta\\canonical_endpoint.rs:108:15",
+      "message": "function `string_label` is never used"
+    },
+    {
+      "location": "src\\layers\\meta\\resolver_registrations.rs:72:19",
+      "message": "method `matches` is never used"
+    },
+    {
+      "location": "src\\layers\\registry.rs:35:15",
+      "message": "function `reset_context_evaluation_count` is never used"
+    },
+    {
+      "location": "src\\layers\\registry.rs:40:15",
+      "message": "function `context_route_count` is never used"
+    },
+    {
+      "location": "src\\workspace\\index\\resolver_registrations.rs:109:19",
+      "message": "methods `resolver_registrations` and `has_resolver_registration_admission` are never used"
+    },
+    {
+      "location": "src\\tests\\architecture\\work_observations_af_perf_002.rs:11:9",
+      "message": "multiple fields are never read"
+    }
+  ],
+  "evidence_archive": "verification/ci-verify-r1/feature-isolation-red-evidence.zip"
+}

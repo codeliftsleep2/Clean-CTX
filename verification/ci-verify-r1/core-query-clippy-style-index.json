@@ -1,0 +1,38 @@
+{
+  "capture": "checkpoint-continuation-20261118-161108",
+  "archive": "verification/ci-verify-r1/core-query-clippy-style-evidence.zip",
+  "archive_sha256": "b038bedaf73ae17600e8143868980e6623f8f97695f80219e0e822a3ae407d7b",
+  "members": [
+    {
+      "entry": "checkpoint-continuation-20261118-161108/measurement-registration-only-receipt.json",
+      "sha256": "08811f16fcb0936d2077e255e84abe26c723826cd6726237f6a6db5b0b0c9a1f"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161108/measurement-registration-only.log",
+      "sha256": "5b8166a586e5612683c8093b31fa6c0ae2f55ccb664483959ba9df0888749b95"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161108/root-library-tests-clippy-receipt.json",
+      "sha256": "f6cea8670ce9af0404411c1685371c0fdcb876408e58179e71b89edf980950ad"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161108/root-library-tests-clippy.log",
+      "sha256": "1b7e8c5fba9d8a678922abe4331abf78ecdb2a3a0874dc590e517a51a14b5db7"
+    },
+    {
+      "entry": "historical-source/core_ir_registration.rs",
+      "sha256": "12166f019694be49c0e7858de5e7ae029318b9c1831c4cc11ad7c62b197bce12"
+    },
+    {
+      "entry": "proposed-source/core_ir_registration.rs",
+      "sha256": "33ccb4bff6a1cf0edb9cd0bfbc21d5c91245420b818eb585dd9d96f5be82bdca"
+    }
+  ],
+  "registration": "18 exact measurement assets registered; no measurement campaign executed",
+  "clippy": "Failed only vec_init_then_push in cases() helper",
+  "repair": "Vec literal contains the exact same TypeScript and CSharp tuple expressions in the same order under the same cfg predicates",
+  "before_helper_sha256": "12166f019694be49c0e7858de5e7ae029318b9c1831c4cc11ad7c62b197bce12",
+  "after_helper_sha256": "33ccb4bff6a1cf0edb9cd0bfbc21d5c91245420b818eb585dd9d96f5be82bdca",
+  "verification": "Static expression preservation; scoped Clippy and repository guards pending. Prior five-mode runtime GREEN remains attributable to pre-style source hashes.",
+  "handoff": "Existing continuation now formats this single changed helper before source-pinned registration, scoped Clippy, guards and read-only descriptor"
+}

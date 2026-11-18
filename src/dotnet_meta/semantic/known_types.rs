@@ -1,5 +1,4 @@
 //! Unchanged known-external vocabulary; split for the active-file ceiling.
-use super::*;
 
 pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution::CSharpTypeIdentity>
 {
@@ -27,3 +26,24 @@ pub(crate) fn known_csharp_type_identities() -> Vec<crate::ir::csharp_resolution
     }))
     .collect()
 }
+
+pub(super) const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
+pub(super) const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
+pub(super) const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
+pub(super) const ASPNET_CONTROLLER: &str = "Microsoft.AspNetCore.Mvc.Controller";
+pub(super) const ASPNET_CONTROLLER_BASE: &str = "Microsoft.AspNetCore.Mvc.ControllerBase";
+pub(super) const ASPNET_API_CONTROLLER_ATTRIBUTE: &str =
+    "Microsoft.AspNetCore.Mvc.ApiControllerAttribute";
+pub(super) const ASPNET_CONTROLLER_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.ControllerAttribute";
+pub(super) const ASPNET_ROUTE_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.RouteAttribute";
+pub(super) const ASPNET_HTTP_ATTRIBUTES: &[&str] = &[
+    "Microsoft.AspNetCore.Mvc.HttpGetAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPostAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPutAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpDeleteAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpPatchAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpHeadAttribute",
+    "Microsoft.AspNetCore.Mvc.HttpOptionsAttribute",
+];
+pub(super) const MSTEST_TEST_CLASS_ATTRIBUTE: &str =
+    "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute";

@@ -2,7 +2,9 @@
 use super::decorators::ClassKind;
 use crate::ir::typescript_resolution::declaration_facets::{ExpressionFacet, ExpressionValue};
 use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::SemanticEdge;
+use crate::layers::meta::semantic::{EntityRef, SemanticRelation};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Position {
@@ -171,6 +173,7 @@ pub(super) fn registration_entry(
     canonical_token_in(authority, owner, occurrence, token)
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn admits_registration(
     authority: &TypeScriptAuthority,
     edge: &SemanticEdge,

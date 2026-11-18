@@ -2,7 +2,9 @@
 use crate::ir::typescript_resolution::declaration_facets::{ExpressionFacet, ExpressionValue};
 use crate::ir::typescript_resolution::{DeclarationId, TypeScriptAuthority};
 use crate::layers::meta::canonical_endpoint::{CanonicalEndpoint, LiteralProof, string_label};
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+use crate::layers::meta::semantic::EntityRef;
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 pub(super) fn token(
     owner: &DeclarationId,
@@ -50,6 +52,7 @@ pub(super) fn owner(id: &DeclarationId, owner_type: &'static str) -> EntityRef {
     owner
 }
 
+#[cfg(feature = "angular")]
 pub(super) fn injection_edge(
     id: &DeclarationId,
     owner_type: &'static str,

@@ -679,3 +679,27 @@ cargo test --all-features "mcp::tool_handlers::query::tests_performance_work_cou
 No Cargo command, build, Clippy, binary, MCP, CBM, benchmark, or live
 verification was run. Do not select the next optimization until the observed
 post-index ledger is available.
+
+
+<!-- pcg:CI-VERIFY-R1-core-query-amendment:begin -->
+## Prospective amendment: CI-VERIFY-R1 owner disposition 02, 2026-11-18
+
+Agent MaxHeadRoom. The earlier inventory and executions above retain their
+historical applicability. The owner approved the following narrow prospective
+amendment: retain independent dynamic compilation for arbitrary, custom,
+runtime-dependent, mismatched-grammar and unregistered definitions. Permit closed
+registration of the complete binary-owned TypeScript and C# IR query definitions
+only when their exact base definition and matching grammar are established.
+Reuse the existing OnceLock registration lifecycle with exactly TypeScriptIR and
+CSharpIR. Every source still receives its own parse and mutable query cursor.
+No source trees, captures, semantic results, workspace authority or arbitrary-string
+query map may be cached by this extension.
+
+The controlling owner disposition is retained verbatim under
+verification/ci-verify-r1/core-query-owner-disposition-02.txt. The governing
+CI-VERIFY-R1 report records dependency review, implementation, exact RED/GREEN
+identities, performance qualifications and closure obligations. This amendment
+is owner-approved direction, not B11 predecessor-bound authorization or evidence
+of publication. Applicable protected-authority authorization must be submitted
+by the owner, followed by actual admission and discoverability before pushing.
+<!-- pcg:CI-VERIFY-R1-core-query-amendment:end -->

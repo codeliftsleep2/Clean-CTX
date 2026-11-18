@@ -2,7 +2,9 @@
 use crate::ir::typescript_resolution::declaration_facets::{ExpressionFacet, ExpressionValue};
 use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
 use crate::layers::meta::canonical_endpoint::CanonicalEndpoint;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge};
+use crate::layers::meta::semantic::EntityRef;
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::SemanticEdge;
 
 #[derive(Clone, Copy)]
 pub(super) enum Strategy {
@@ -194,6 +196,7 @@ fn declaration_entity(
 }
 
 /// Replay the exact retained provider positions, never an endpoint cross-product.
+#[cfg(feature = "angular")]
 pub(crate) fn admits(
     authority: &TypeScriptAuthority,
     edge: &SemanticEdge,

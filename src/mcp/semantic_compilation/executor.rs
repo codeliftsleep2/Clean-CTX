@@ -98,6 +98,7 @@ impl crate::mcp::McpState {
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "csharp", feature = "angular"))]
     pub(crate) fn reset_test_full_semantic_parses(&self) {
         self.semantic_compiler
             .full_semantic_parses
@@ -105,6 +106,7 @@ impl crate::mcp::McpState {
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "csharp", feature = "angular"))]
     pub(crate) fn test_full_semantic_parses(&self) -> usize {
         self.semantic_compiler
             .full_semantic_parses

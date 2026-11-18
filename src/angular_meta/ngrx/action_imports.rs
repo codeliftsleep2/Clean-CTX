@@ -11,6 +11,7 @@ struct ActionBindings {
     namespaces: BTreeSet<String>,
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn refine_candidates(
     source_id: &str,
     source: &str,
@@ -49,6 +50,7 @@ pub(crate) fn refine_candidates(
         .collect()
 }
 
+#[cfg(feature = "angular")]
 fn action_bindings(source_id: &str, source: &str) -> ActionBindings {
     let Some(language) = crate::compression::language::safe_typescript_language() else {
         return ActionBindings::default();
@@ -124,6 +126,7 @@ fn action_bindings(source_id: &str, source: &str) -> ActionBindings {
     result
 }
 
+#[cfg(feature = "angular")]
 fn collect_imported_names(
     node: tree_sitter::Node<'_>,
     source: &[u8],
@@ -154,6 +157,7 @@ fn collect_imported_names(
     }
 }
 
+#[cfg(feature = "angular")]
 fn collect_action_occurrences<'tree>(
     node: tree_sitter::Node<'tree>,
     source: &[u8],
@@ -170,6 +174,7 @@ fn collect_action_occurrences<'tree>(
     }
 }
 
+#[cfg(feature = "angular")]
 fn relation_for(node: tree_sitter::Node<'_>, source: &[u8]) -> Option<SemanticRelation> {
     let parent = node.parent()?;
     if parent.kind() == "arguments" {

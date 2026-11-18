@@ -65,6 +65,7 @@ mod csharp_resolution;
 mod dependencies;
 mod diagnostics;
 mod dotnet_testing;
+#[cfg(feature = "csharp")]
 mod edge_merge;
 mod edges;
 mod entities;

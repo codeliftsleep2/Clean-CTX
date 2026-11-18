@@ -9,32 +9,23 @@
 // Phase 3 contract: zero duplication of existing Phi output. Semantic edges
 // are a separate projection of the same framework information.
 
+#[cfg(feature = "csharp")]
 use crate::compression::Fidelity;
+#[cfg(feature = "csharp")]
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
-const EF_CORE_DB_CONTEXT: &str = "Microsoft.EntityFrameworkCore.DbContext";
-const AUTOMAPPER_PROFILE: &str = "AutoMapper.Profile";
-const SIGNALR_HUB: &str = "Microsoft.AspNetCore.SignalR.Hub";
-const ASPNET_CONTROLLER: &str = "Microsoft.AspNetCore.Mvc.Controller";
-const ASPNET_CONTROLLER_BASE: &str = "Microsoft.AspNetCore.Mvc.ControllerBase";
-const ASPNET_API_CONTROLLER_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.ApiControllerAttribute";
-const ASPNET_CONTROLLER_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.ControllerAttribute";
-const ASPNET_ROUTE_ATTRIBUTE: &str = "Microsoft.AspNetCore.Mvc.RouteAttribute";
-const ASPNET_HTTP_ATTRIBUTES: &[&str] = &[
-    "Microsoft.AspNetCore.Mvc.HttpGetAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpPostAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpPutAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpDeleteAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpPatchAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpHeadAttribute",
-    "Microsoft.AspNetCore.Mvc.HttpOptionsAttribute",
-];
-const MSTEST_TEST_CLASS_ATTRIBUTE: &str =
-    "Microsoft.VisualStudio.TestTools.UnitTesting.TestClassAttribute";
-
+#[cfg(feature = "csharp")]
 mod known_types;
+#[cfg(feature = "csharp")]
 pub(crate) use known_types::known_csharp_type_identities;
+#[cfg(feature = "csharp")]
+use known_types::{
+    ASPNET_API_CONTROLLER_ATTRIBUTE, ASPNET_CONTROLLER, ASPNET_CONTROLLER_ATTRIBUTE,
+    ASPNET_CONTROLLER_BASE, ASPNET_HTTP_ATTRIBUTES, ASPNET_ROUTE_ATTRIBUTE, AUTOMAPPER_PROFILE,
+    EF_CORE_DB_CONTEXT, MSTEST_TEST_CLASS_ATTRIBUTE, SIGNALR_HUB,
+};
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_mstest_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -69,6 +60,7 @@ pub(crate) fn project_resolved_mstest_edges(
         .collect()
 }
 
+#[cfg(feature = "csharp")]
 fn is_resolved_mstest_test_class(
     class: &crate::ir::csharp_resolution::CSharpResolvedClass,
 ) -> bool {
@@ -84,6 +76,7 @@ fn is_resolved_mstest_test_class(
     })
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn is_resolved_dbcontext(
     class: &crate::ir::csharp_resolution::CSharpResolvedClass,
 ) -> bool {
@@ -97,6 +90,7 @@ pub(crate) fn is_resolved_dbcontext(
     )
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_dbcontext_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -145,6 +139,7 @@ pub(crate) fn project_resolved_dbcontext_edges(
     edges
 }
 
+#[cfg(feature = "csharp")]
 fn is_resolved_automapper_profile(
     class: &crate::ir::csharp_resolution::CSharpResolvedClass,
 ) -> bool {
@@ -158,6 +153,7 @@ fn is_resolved_automapper_profile(
     )
 }
 
+#[cfg(feature = "csharp")]
 fn is_resolved_signalr_hub(class: &crate::ir::csharp_resolution::CSharpResolvedClass) -> bool {
     matches!(
         &class.ancestry,
@@ -169,6 +165,7 @@ fn is_resolved_signalr_hub(class: &crate::ir::csharp_resolution::CSharpResolvedC
     )
 }
 
+#[cfg(feature = "csharp")]
 fn is_resolved_aspnet_controller(
     class: &crate::ir::csharp_resolution::CSharpResolvedClass,
 ) -> bool {
@@ -188,6 +185,7 @@ fn is_resolved_aspnet_controller(
     })
 }
 
+#[cfg(feature = "csharp")]
 fn resolved_attribute_is(
     attribute: &crate::ir::csharp_resolution::CSharpResolvedAttribute,
     expected: &str,
@@ -202,6 +200,7 @@ fn resolved_attribute_is(
     )
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_aspnet_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -287,12 +286,14 @@ pub(crate) fn project_resolved_aspnet_edges(
     edges
 }
 
+#[cfg(feature = "csharp")]
 fn first_quoted_argument(raw: &str) -> Option<&str> {
     let start = raw.find('"')? + 1;
     let end = raw[start..].find('"')?;
     Some(&raw[start..start + end])
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_automapper_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -344,6 +345,7 @@ pub(crate) fn project_resolved_automapper_edges(
     edges
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_signalr_edges(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -394,6 +396,7 @@ pub(crate) fn project_resolved_signalr_edges(
     edges
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn project_resolved_signalr_execution_contexts(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
     file: &str,
@@ -425,6 +428,7 @@ pub(crate) fn project_resolved_signalr_execution_contexts(
         .collect()
 }
 
+#[cfg(feature = "dotnet")]
 pub(crate) fn has_resolved_dotnet_role(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> bool {
@@ -439,6 +443,7 @@ pub(crate) fn has_resolved_dotnet_role(
 
 /// Register EF Core DbContext roles from the shared resolved class authority.
 /// Relationship payload remains independently gated and may be empty.
+#[cfg(feature = "dotnet")]
 pub(crate) fn resolved_dbcontext_role_registrations(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> Vec<SemanticEdge> {
@@ -458,6 +463,7 @@ pub(crate) fn resolved_dbcontext_role_registrations(
         .collect()
 }
 
+#[cfg(feature = "dotnet")]
 pub(crate) fn resolved_dbcontext_role_names(
     classes: &[crate::ir::csharp_resolution::CSharpResolvedClass],
 ) -> std::collections::HashSet<&str> {
@@ -471,6 +477,7 @@ pub(crate) fn resolved_dbcontext_role_names(
 // ── Private Helpers (mirroring existing .NET extractor patterns) ──────────
 
 /// Extract source/destination type pairs from CreateMap<TSource, TDest>() calls.
+#[cfg(feature = "csharp")]
 fn extract_create_map_mappings(class_source: &str) -> Vec<(String, String)> {
     let mut mappings = Vec::new();
     let mut search_start = 0;
@@ -518,6 +525,7 @@ pub fn extract_class_name_from_class(source: &str) -> Option<String> {
 }
 
 /// Extract hub method names from a SignalR Hub class.
+#[cfg(feature = "csharp")]
 fn extract_hub_methods(class_source: &str) -> Vec<String> {
     let mut methods = Vec::new();
     let mut search_start = 0;
@@ -575,10 +583,10 @@ mod tests_r11;
 #[path = "../tests/dotnet_meta/csharp_convergence_r12.rs"]
 mod tests_r12;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "csharp"))]
 #[path = "../tests/dotnet_meta/csharp_compilation_identity.rs"]
 mod tests_compilation_identity;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "csharp"))]
 #[path = "../tests/dotnet_meta/csharp_compilation_identity_preservation.rs"]
 mod tests_compilation_identity_preservation;

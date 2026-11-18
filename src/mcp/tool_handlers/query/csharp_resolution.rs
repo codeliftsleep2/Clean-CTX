@@ -13,12 +13,15 @@ use tree_sitter::Node;
 mod declaration_candidates;
 mod dependencies;
 mod reference_candidates;
+#[cfg(feature = "csharp")]
 mod using_aliases;
+pub(super) use dependencies::DependencyGraph;
+#[cfg(feature = "csharp")]
+pub(super) use dependencies::EfCoreCatalog;
 #[cfg(feature = "csharp")]
 pub(super) use dependencies::EfDependencyEvidence;
 #[cfg(feature = "csharp")]
 pub(super) use dependencies::prepare_ef_dependencies;
-pub(super) use dependencies::{DependencyGraph, EfCoreCatalog};
 pub(super) use reference_candidates::terminal_lookup_name;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
@@ -52,6 +55,7 @@ struct BaseReference {
     written: String,
     shape: TypeShape,
     imports: Vec<Vec<String>>,
+    #[cfg(feature = "csharp")]
     aliases: Vec<crate::ir::csharp_resolution::CSharpAliasDirective>,
 }
 #[derive(Clone, Debug)]
@@ -66,6 +70,7 @@ pub(super) struct Catalog {
     references: Vec<BaseReference>,
     declaration_candidates: declaration_candidates::DeclarationCandidateIndex,
     reference_candidates: reference_candidates::ReferenceCandidateIndex,
+    #[cfg(feature = "csharp")]
     source_parts: Vec<crate::ir::csharp_symbols::CSharpDeclarationPart>,
     declaration_scopes: std::collections::HashMap<(String, Vec<String>, usize), BaseReference>,
 }
@@ -348,6 +353,7 @@ struct TraversalScope {
     namespace: Vec<String>,
     nesting: Vec<String>,
     imports: Vec<Vec<String>>,
+    #[cfg(feature = "csharp")]
     aliases: Vec<crate::ir::csharp_resolution::CSharpAliasDirective>,
 }
 
@@ -358,6 +364,7 @@ impl TraversalScope {
             namespace: Vec::new(),
             nesting: Vec::new(),
             imports: Vec::new(),
+            #[cfg(feature = "csharp")]
             aliases: Vec::new(),
         }
     }
@@ -368,6 +375,7 @@ fn visit_container(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalo
     scoped.imports.extend(direct_using_namespaces(node, source));
     scoped.imports.sort();
     scoped.imports.dedup();
+    #[cfg(feature = "csharp")]
     scoped.aliases.extend(using_aliases::collect_direct(
         node,
         source,
@@ -432,6 +440,7 @@ fn visit_type(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &m
                 arity,
             },
             imports: scope.imports.clone(),
+            #[cfg(feature = "csharp")]
             aliases: scope.aliases.clone(),
         },
     );
@@ -471,6 +480,7 @@ fn visit_type(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &m
                 written: written.trim().to_string(),
                 shape,
                 imports: scope.imports.clone(),
+                #[cfg(feature = "csharp")]
                 aliases: scope.aliases.clone(),
             });
         }
@@ -481,6 +491,7 @@ fn visit_type(node: Node<'_>, source: &[u8], scope: &TraversalScope, catalog: &m
         namespace: &scope.namespace,
         nesting: &scope.nesting,
         imports: &scope.imports,
+        #[cfg(feature = "csharp")]
         aliases: &scope.aliases,
         owner: &name,
     };

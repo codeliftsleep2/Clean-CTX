@@ -1,0 +1,465 @@
+{
+  "baseline": "95153d5c86c800b8eab523d9b980a44d44a57301",
+  "errors": [
+    {
+      "message": "error[E0432]: unresolved import `provide_angular`",
+      "path": "src/mcp/tool_handlers/core.rs",
+      "line": 11
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 3
+    },
+    {
+      "message": "error[E0432]: unresolved import `crate::ir::typescript_resolution`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 4
+    },
+    {
+      "message": "error[E0432]: unresolved import `crate::ir::typescript_resolution`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 4
+    },
+    {
+      "message": "error[E0432]: unresolved import `super::class_role_authority`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 2
+    },
+    {
+      "message": "error[E0432]: unresolved import `super::provider_position`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 41
+    },
+    {
+      "message": "error[E0432]: unresolved import `super::provider_position`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 60
+    },
+    {
+      "message": "error[E0432]: unresolved import `crate::angular_meta::template::extract_template_shape`",
+      "path": "src/angular_meta/template_compress.rs",
+      "line": 14
+    },
+    {
+      "message": "error[E0433]: cannot find `frozen_identity_portability_af_perf_002` in `crate`",
+      "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+      "line": 149
+    },
+    {
+      "message": "error[E0433]: cannot find `frozen_identity_portability_af_perf_002` in `crate`",
+      "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+      "line": 274
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 8
+    },
+    {
+      "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 14
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 20
+    },
+    {
+      "message": "error[E0433]: cannot find `inject_authority` in `super`",
+      "path": "src/angular_meta/functional_authority.rs",
+      "line": 105
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/member_semantics.rs",
+      "line": 21
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/member_semantics.rs",
+      "line": 124
+    },
+    {
+      "message": "error[E0433]: cannot find `member_authority` in `super`",
+      "path": "src/angular_meta/member_semantics.rs",
+      "line": 130
+    },
+    {
+      "message": "error[E0433]: cannot find `member_authority` in `super`",
+      "path": "src/angular_meta/member_semantics.rs",
+      "line": 193
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 39
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 57
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_position` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 58
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 87
+    },
+    {
+      "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 94
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_composition` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 117
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_composition` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 144
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_position` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 150
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 164
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 169
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 175
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 199
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 207
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 208
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 227
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 233
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 234
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 246
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 293
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 295
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 296
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 303
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 305
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 307
+    },
+    {
+      "message": "error[E0433]: cannot find `provider_imported` in `super`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 338
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 84
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 85
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 163
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 164
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 167
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `angular_meta`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 168
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 175
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+      "path": "src/angular_meta/provider_syntax.rs",
+      "line": 176
+    },
+    {
+      "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 16
+    },
+    {
+      "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 23
+    },
+    {
+      "message": "error[E0433]: cannot find `bootstrap_references` in `super`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 42
+    },
+    {
+      "message": "error[E0433]: cannot find `bootstrap_references` in `super`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 43
+    },
+    {
+      "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "line": 62
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_binding_pattern` in `super`",
+      "path": "src/ir/typescript_identifier_binding.rs",
+      "line": 254
+    },
+    {
+      "message": "error[E0433]: cannot find `typescript_binding_pattern` in `super`",
+      "path": "src/ir/typescript_identifier_binding.rs",
+      "line": 387
+    },
+    {
+      "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+      "path": "src/gitdiff/engine.rs",
+      "line": 344
+    },
+    {
+      "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+      "path": "src/gitdiff/engine.rs",
+      "line": 345
+    },
+    {
+      "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+      "path": "src/gitdiff/engine.rs",
+      "line": 384
+    },
+    {
+      "message": "error[E0609]: no field `typescript_authority` on type `RetainedAuthority`",
+      "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+      "line": 124
+    },
+    {
+      "message": "error[E0433]: cannot find module or crate `tree_sitter_html` in this scope",
+      "path": "src/angular_meta/template_occurrences.rs",
+      "line": 55
+    }
+  ],
+  "warnings": [
+    {
+      "message": "warning: unused import: `crate::mcp::tools::dispatch_tools_call`",
+      "path": "src/mcp/tool_handlers/core/../../../tests/mcp/delta_sequence.rs",
+      "line": 1
+    },
+    {
+      "message": "warning: unused import: `json`",
+      "path": "src/mcp/tool_handlers/core/../../../tests/mcp/delta_sequence.rs",
+      "line": 2
+    },
+    {
+      "message": "warning: unused import: `source_candidates_containing`",
+      "path": "src/mcp/tool_handlers/hydration.rs",
+      "line": 46
+    },
+    {
+      "message": "warning: unused import: `extract_ngrx_shape_with_sites`",
+      "path": "src/angular_meta/ngrx.rs",
+      "line": 61
+    },
+    {
+      "message": "warning: unused imports: `extraction_count` and `reset_extraction_count`",
+      "path": "src/angular_meta/ngrx.rs",
+      "line": 63
+    },
+    {
+      "message": "warning: unused import: `syntax::proved_reference`",
+      "path": "src/angular_meta/provider_semantics.rs",
+      "line": 348
+    },
+    {
+      "message": "warning: unused imports: `extraction_count` and `reset_extraction_count`",
+      "path": "src/angular_meta/routing.rs",
+      "line": 471
+    },
+    {
+      "message": "warning: unused import: `extract::extract_rx_shape_with_evidence`",
+      "path": "src/angular_meta/rx.rs",
+      "line": 400
+    },
+    {
+      "message": "warning: unused imports: `ast_parse_count`, `detection_count`, `reset_ast_parse_count`, and `reset_detection_count`",
+      "path": "src/angular_meta/mod.rs",
+      "line": 94
+    },
+    {
+      "message": "warning: unused imports: `analysis_count` and `reset_analysis_count`",
+      "path": "src/dotnet_meta/mod.rs",
+      "line": 51
+    },
+    {
+      "message": "warning: unused imports: `ast_parse_count`, `detection_count`, `reset_ast_parse_count`, and `reset_detection_count`",
+      "path": "src/dotnet_meta/mod.rs",
+      "line": 54
+    },
+    {
+      "message": "warning: unused imports: `analysis_count as efcore_analysis_count` and `reset_analysis_count as reset_efcore_analysis_count`",
+      "path": "src/dotnet_meta/mod.rs",
+      "line": 58
+    },
+    {
+      "message": "warning: unused imports: `evaluation_count` and `reset_evaluation_count`",
+      "path": "src/dotnet_meta/mod.rs",
+      "line": 61
+    },
+    {
+      "message": "warning: unused import: `resolve_compilation_class_ancestry`",
+      "path": "src/ir/csharp_resolution.rs",
+      "line": 17
+    },
+    {
+      "message": "warning: unused import: `super::*`",
+      "path": "src/ir/../tests/ir/signature_cross_language.rs",
+      "line": 21
+    },
+    {
+      "message": "warning: unused imports: `construction_count` and `reset_construction_count`",
+      "path": "src/meta_util.rs",
+      "line": 27
+    },
+    {
+      "message": "warning: unused imports: `detection_count`, `evaluation_count`, `reset_detection_count`, and `reset_evaluation_count`",
+      "path": "src/spring_meta/mod.rs",
+      "line": 41
+    }
+  ],
+  "source_comparison": [
+    {
+      "path": "src/angular_meta/functional_authority.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/functional_authority.rs"
+    },
+    {
+      "path": "src/angular_meta/legacy_bootstrap.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/legacy_bootstrap.rs"
+    },
+    {
+      "path": "src/angular_meta/member_semantics.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/member_semantics.rs"
+    },
+    {
+      "path": "src/angular_meta/provider_semantics.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/provider_semantics.rs"
+    },
+    {
+      "path": "src/angular_meta/provider_syntax.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/provider_syntax.rs"
+    },
+    {
+      "path": "src/angular_meta/template_compress.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/template_compress.rs"
+    },
+    {
+      "path": "src/angular_meta/template_occurrences.rs",
+      "same_as_head": true,
+      "canonical_path": "src/angular_meta/template_occurrences.rs"
+    },
+    {
+      "path": "src/gitdiff/engine.rs",
+      "same_as_head": true,
+      "canonical_path": "src/gitdiff/engine.rs"
+    },
+    {
+      "path": "src/ir/typescript_identifier_binding.rs",
+      "same_as_head": true,
+      "canonical_path": "src/ir/typescript_identifier_binding.rs"
+    },
+    {
+      "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+      "same_as_head": true,
+      "canonical_path": "src/tests/mcp/sqlite_text_repair_af_perf_002.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/core.rs",
+      "same_as_head": true,
+      "canonical_path": "src/mcp/tool_handlers/core.rs"
+    }
+  ],
+  "qualification": "Static comparison of diagnosed source locations; no baseline-only Cargo invocation was run."
+}

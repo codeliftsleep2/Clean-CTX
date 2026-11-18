@@ -1,25 +1,9 @@
 //! Independent top-level NgRx Selector declarations; no reference resolution.
 use crate::compression::capture_pipeline::CapturedNode;
 use crate::ir::invocation_evidence::SourceSpan;
+#[cfg(feature = "angular")]
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeMap;
-
-pub(crate) const QUERY: &str = r#"
-(program (import_statement
-    (import_clause (named_imports
-        (import_specifier name: (identifier) @ngrx.selector.import_name !alias)))
-    source: (string . (string_fragment) @ngrx.selector.import_source .)) @ngrx.selector.import)
-(program (import_statement (import_clause (named_imports
-    (import_specifier alias: (identifier) @ngrx.selector.alias_binding)))))
-(program (export_statement declaration:
-    (lexical_declaration kind: "const"
-        (variable_declarator
-            name: (identifier) @ngrx.selector.name
-            value: (call_expression
-                function: (identifier) @ngrx.selector.factory
-                arguments: (arguments) @ngrx.selector.arguments) @ngrx.selector.initializer)
-        @ngrx.selector.declaration)))
-"#;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SelectorDeclarationEvidence {
@@ -113,6 +97,7 @@ fn is_selector_factory(name: &str) -> bool {
 }
 
 impl SelectorDeclarationEvidence {
+    #[cfg(feature = "angular")]
     pub(crate) fn edge(&self) -> Option<SemanticEdge> {
         if self.file.is_empty()
             || self.source_hash.is_empty()

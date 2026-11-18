@@ -97,6 +97,7 @@ pub(crate) fn bind_direct_named_value_import_allow_alias(
 
 /// Bind one exact identifier occurrence to one value-space named
 /// import. Framework consumers interpret the returned module specifier.
+#[cfg(feature = "typescript")]
 pub(crate) fn bind_named_value_import(
     source_id: &str,
     source: &str,

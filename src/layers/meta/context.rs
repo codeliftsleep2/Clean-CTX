@@ -65,18 +65,25 @@ pub struct MetaLayerContext<'a> {
     /// Compiler-owned evidence; absence means no upstream parse was supplied.
     pub(crate) invocation_evidence:
         Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
+    #[cfg(feature = "typescript")]
     pub(crate) angular_initializers:
         Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_service_dispatches:
         Option<&'a [crate::angular_meta::ngrx::service_owners::ServiceDispatch]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_constructor_dispatches:
         Option<&'a [crate::angular_meta::ngrx::constructors::ConstructorDispatch]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_legacy_transitions:
         Option<&'a [crate::angular_meta::ngrx::transitions::LegacyTransition]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_legacy_discriminants:
         Option<&'a [crate::angular_meta::ngrx::discriminants::LegacyDiscriminantEvidence]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_class_actions:
         Option<&'a [crate::angular_meta::ngrx::legacy::ClassActionEvidence]>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_selector_declarations:
         Option<&'a [crate::angular_meta::ngrx::selector_declarations::SelectorDeclarationEvidence]>,
 }
@@ -106,12 +113,19 @@ impl<'a> MetaLayerContext<'a> {
             config,
             lexical_regions,
             invocation_evidence: None,
+            #[cfg(feature = "typescript")]
             angular_initializers: None,
+            #[cfg(feature = "typescript")]
             ngrx_class_actions: None,
+            #[cfg(feature = "typescript")]
             ngrx_selector_declarations: None,
+            #[cfg(feature = "typescript")]
             ngrx_legacy_transitions: None,
+            #[cfg(feature = "typescript")]
             ngrx_legacy_discriminants: None,
+            #[cfg(feature = "typescript")]
             ngrx_constructor_dispatches: None,
+            #[cfg(feature = "typescript")]
             ngrx_service_dispatches: None,
         }
     }

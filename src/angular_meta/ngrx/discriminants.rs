@@ -1,12 +1,18 @@
 //! Exact same-file authority for legacy Action discriminant constants.
 
+#[cfg(feature = "typescript")]
 use crate::compression::capture_pipeline::CapturedNode;
+#[cfg(feature = "typescript")]
 use crate::ir::invocation_evidence::SourceSpan;
+#[cfg(feature = "typescript")]
 use crate::ir::typescript_identifier_binding::{
     ValueDeclarationKind, bind_direct_value_identifier,
 };
+#[cfg(feature = "typescript")]
 use crate::ir::typescript_type_import_binding::bind_type_reference_to_named_import;
+#[cfg(feature = "typescript")]
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "typescript")]
 use std::collections::BTreeMap;
 
 pub(crate) fn has_object_string_actions(source: &str) -> bool {
@@ -120,6 +126,7 @@ fn contains_object_action_case(node: tree_sitter::Node<'_>, source: &[u8]) -> bo
 }
 
 #[derive(Debug, Clone)]
+#[cfg(feature = "typescript")]
 pub(crate) struct LegacyDiscriminantEvidence {
     pub name: String,
     pub source_id: String,
@@ -130,6 +137,7 @@ pub(crate) struct LegacyDiscriminantEvidence {
     pub reducer_name: String,
 }
 
+#[cfg(feature = "typescript")]
 impl LegacyDiscriminantEvidence {
     pub(crate) fn matches_source(&self, source_id: &str, source: &str) -> bool {
         self.source_id == source_id
@@ -171,10 +179,12 @@ impl LegacyDiscriminantEvidence {
     }
 }
 
+#[cfg(feature = "typescript")]
 fn span(capture: &CapturedNode) -> SourceSpan {
     SourceSpan::new(capture.start_byte, capture.end_byte).expect("ordered parser span")
 }
 
+#[cfg(feature = "typescript")]
 fn is_string_literal(raw: &str) -> bool {
     raw.len() >= 2
         && ((raw.starts_with('\'') && raw.ends_with('\''))
@@ -183,6 +193,7 @@ fn is_string_literal(raw: &str) -> bool {
 
 /// Admit a top-level string constant only when an exact case reference binds
 /// to it inside an exact NgRx `Action`-typed `switch(parameter.type)` reducer.
+#[cfg(feature = "typescript")]
 pub(crate) fn collect(
     source: &str,
     canonical_path: Option<&str>,

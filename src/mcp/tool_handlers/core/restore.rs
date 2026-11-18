@@ -25,6 +25,7 @@ pub(super) mod historical_adoption_race_test_support {
     });
     static SIGNAL: Condvar = Condvar::new();
 
+    #[cfg(feature = "typescript")]
     pub(crate) fn arm(file_path: &str) {
         *STATE.lock().expect("historical adoption pause state") = PauseState {
             owner: Some(crate::dictionary::path::canonical_identity_key(file_path)),
@@ -47,6 +48,7 @@ pub(super) mod historical_adoption_race_test_support {
         state.owner = None;
     }
 
+    #[cfg(feature = "typescript")]
     pub(crate) fn wait_until_paused() {
         let mut state = STATE.lock().expect("historical adoption pause state");
         while !state.paused {
@@ -54,6 +56,7 @@ pub(super) mod historical_adoption_race_test_support {
         }
     }
 
+    #[cfg(feature = "typescript")]
     pub(crate) fn release() {
         let mut state = STATE.lock().expect("historical adoption pause state");
         state.released = true;

@@ -106,6 +106,7 @@ impl WorkspaceIndex {
     }
 
     /// Callers validate the complete consumed-owner footprint at final evaluation.
+    #[cfg(feature = "angular")]
     pub(crate) fn resolver_registrations(&self, file: &str) -> Option<&ResolverRegistrations> {
         self.semantic_coverage
             .get(file)?
@@ -113,6 +114,7 @@ impl WorkspaceIndex {
             .as_ref()
     }
 
+    #[cfg(feature = "angular")]
     pub(crate) fn has_resolver_registration_admission(&self, file: &str) -> bool {
         self.semantic_coverage
             .get(file)

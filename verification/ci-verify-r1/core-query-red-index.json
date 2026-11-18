@@ -1,0 +1,46 @@
+{
+  "archive_sha256": "4ad2c880b8a1f59ada27ed47bf97c6e03b479abb0aa56b8a81aa5c97a2dd1815",
+  "members": [
+    {
+      "entry": "witness/receipt.json",
+      "sha256": "9951e6aaffcf42ffb2b03351e7ea4cf28d581d8973106bed9b84cc33cfb9129a"
+    },
+    {
+      "entry": "witness/tracked-test.log",
+      "sha256": "d2a607e81baa34f2adc39f80bc023112fc67aba647f4f9ebd5fd431e38959570"
+    },
+    {
+      "entry": "witness/source/Cargo.lock",
+      "sha256": "c1d18af45660ebb7dd3898ff567a856a18f85a2ba9344d15996c49b8a4e74a59"
+    },
+    {
+      "entry": "witness/source/Cargo.toml",
+      "sha256": "f4d19d9db2abd1e31957393776b8f1a3122d116b67a8f5cd5420a9f8fe2627fc"
+    },
+    {
+      "entry": "witness/source/src/compression/capture_pipeline.rs",
+      "sha256": "ae61423c63ecab39f0932774989841d0c58cd4457d9472e2ed215388c0eb5721"
+    },
+    {
+      "entry": "witness/source/src/ir/calls.rs",
+      "sha256": "8f14ee0dda8807d05a6466dddf85fcedb9f0d5c3cba430b1efdbf3f1f3af92e3"
+    },
+    {
+      "entry": "witness/source/src/tests/ir/ci_runtime_core_query.rs",
+      "sha256": "bdc4c262d8b5f799e7c5fa4de44cdd16a662d493124d173a9cbab11f125387b3"
+    },
+    {
+      "entry": "witness/source/src/ir/pipeline/core.rs",
+      "sha256": "a8baf6b49a449db91dffc367ca6cbde2c4e237eaf6ae78dc4bb7566eb82478d8"
+    },
+    {
+      "entry": "proposal/proposal.patch",
+      "sha256": "e01f8f7471c39f74341226bb5723781ad8ec9b2ffa883dec87507c10d7ac3865"
+    },
+    {
+      "entry": "proposal/proposal-index.json",
+      "sha256": "7aca4f27f8ea6d35e7ea0ae1d82fc3cc721552f17644dfae554f99f5734ae026"
+    }
+  ],
+  "qualification": "Exact proposed-budget RED; cold/warm capture and IR equality, one fresh parse/cursor, warm query compilation 1, elapsed 0.8351601 seconds. Proposal is unapplied and uncompiled; no cache extension authorized or verified."
+}

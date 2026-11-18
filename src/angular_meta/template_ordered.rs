@@ -5,21 +5,29 @@
 //! block token and brace in source order. Angular 15–16 structural directives
 //! additionally emit normalized behavioral headers before their owning element.
 
+#[cfg(feature = "angular")]
 use crate::compression::Fidelity;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg(feature = "angular")]
 enum TemplateEvent {
+    #[cfg(feature = "angular")]
     Content(String),
+    #[cfg(feature = "angular")]
     Comment(String),
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct OrderedTemplate {
+    #[cfg(feature = "angular")]
     events: Vec<TemplateEvent>,
+    #[cfg(feature = "angular")]
     custom_elements: Vec<String>,
     selector_occurrences: Vec<crate::angular_meta::template_occurrences::SelectorOccurrence>,
+    #[cfg(feature = "angular")]
     interpolation_count: usize,
     parse_failed: bool,
+    #[cfg(feature = "angular")]
     control_consumed_until: usize,
 }
 
@@ -34,6 +42,7 @@ impl OrderedTemplate {
         &self.selector_occurrences
     }
 
+    #[cfg(feature = "angular")]
     pub(crate) fn render(&self, fidelity: Fidelity) -> Vec<String> {
         if self.parse_failed {
             return vec!["Φtpl:PARSE_ERROR".to_string()];
@@ -67,6 +76,7 @@ impl OrderedTemplate {
         }
     }
 
+    #[cfg(feature = "angular")]
     pub(crate) fn prime_ng_markers(&self) -> Vec<String> {
         let mut markers: Vec<_> = self
             .custom_elements
@@ -240,6 +250,7 @@ fn attribute_parts(attribute: tree_sitter::Node, source: &str) -> Option<(String
     name.map(|name| (name, value))
 }
 
+#[cfg(feature = "angular")]
 fn strip_outer_attribute_quotes(raw: &str) -> &str {
     let bytes = raw.as_bytes();
     if bytes.len() >= 2 && matches!(bytes[0], b'"' | b'\'') && bytes.last() == Some(&bytes[0]) {
@@ -249,6 +260,7 @@ fn strip_outer_attribute_quotes(raw: &str) -> &str {
     }
 }
 
+#[cfg(feature = "angular")]
 fn legacy_for_parts(expression: &str) -> Option<(&str, &str)> {
     let first = expression.split(';').next()?.trim();
     let split = first.find(" of ")?;
@@ -302,6 +314,7 @@ fn push_text_node(node: tree_sitter::Node, source: &str, template: &mut OrderedT
     }
 }
 
+#[cfg(feature = "angular")]
 fn find_control_start(source: &str, start: usize, end: usize) -> Option<usize> {
     const TOKENS: &[&str] = &[
         "@else if",
@@ -336,6 +349,7 @@ fn find_control_start(source: &str, start: usize, end: usize) -> Option<usize> {
     best
 }
 
+#[cfg(feature = "angular")]
 fn control_boundary(source: &str, position: usize, token_len: usize) -> bool {
     let bytes = source.as_bytes();
     let before = position == 0
@@ -352,6 +366,7 @@ fn control_boundary(source: &str, position: usize, token_len: usize) -> bool {
             ))
 }
 
+#[cfg(feature = "angular")]
 fn control_header(source: &str, start: usize) -> Option<(String, usize)> {
     let rest = &source[start..];
     if rest.starts_with("@let") {
@@ -373,6 +388,7 @@ fn control_header(source: &str, start: usize) -> Option<(String, usize)> {
     }
     Some((rest[..end].trim().to_string(), start + end))
 }
+#[cfg(feature = "angular")]
 fn push_text(text: &str, template: &mut OrderedTemplate) {
     for line in text.lines().map(str::trim).filter(|line| !line.is_empty()) {
         template
@@ -381,6 +397,7 @@ fn push_text(text: &str, template: &mut OrderedTemplate) {
     }
 }
 
+#[cfg(feature = "angular")]
 fn collapse_multiline(raw: &str) -> String {
     raw.lines()
         .map(str::trim)
@@ -389,6 +406,7 @@ fn collapse_multiline(raw: &str) -> String {
         .join(" ")
 }
 
+#[cfg(feature = "angular")]
 fn normalize_modern_headers(line: &str) -> String {
     let mut normalized = line.to_string();
     for keyword in ["if", "else if", "switch", "case", "defer"] {
@@ -397,6 +415,7 @@ fn normalize_modern_headers(line: &str) -> String {
     normalize_for_headers(&normalized)
 }
 
+#[cfg(feature = "angular")]
 fn normalize_for_headers(line: &str) -> String {
     let mut output = String::with_capacity(line.len());
     let mut rest = line;
@@ -423,6 +442,7 @@ fn normalize_for_headers(line: &str) -> String {
     output
 }
 
+#[cfg(feature = "angular")]
 fn matching_paren(text: &str) -> Option<usize> {
     let bytes = text.as_bytes();
     if bytes.first().copied() != Some(b'(') {

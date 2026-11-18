@@ -7,12 +7,17 @@
 pub(crate) struct QueryWorkCounts {
     pub(crate) retirement_owner_passes: usize,
     pub(crate) retirement_owner_probes: usize,
+    #[cfg(feature = "angular")]
     pub(crate) resolver_nominations: usize,
+    #[cfg(feature = "angular")]
     pub(crate) resolver_owner_validations: usize,
+    #[cfg(feature = "angular")]
     pub(crate) resolver_records_considered: usize,
     pub(crate) ef_dependency_catalog_builds: usize,
     pub(crate) ef_dependency_files_parsed: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_dependency_inventories: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_dependency_syntax_parses: usize,
     pub(crate) csharp_catalog_builds: usize,
     pub(crate) csharp_catalog_reuses: usize,
@@ -24,18 +29,31 @@ pub(crate) struct QueryWorkCounts {
     pub(crate) angular_template_sources_processed: usize,
     pub(crate) angular_inline_templates_processed: usize,
     pub(crate) angular_external_templates_processed: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_catalog_builds: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_catalog_reuses: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_configuration_declarations_examined: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_configuration_reference_comparisons: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_context_declarations_examined: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_context_reference_comparisons: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_model_occurrences_processed: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_owner_reference_comparisons: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_synthetic_type_parses: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_assembly_configuration_comparisons: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_project_root_lookups: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_project_root_filesystem_resolutions: usize,
+    #[cfg(feature = "csharp")]
     pub(crate) ef_project_root_cache_hits: usize,
     pub(crate) reference_candidate_index_builds: usize,
     pub(crate) reference_candidate_index_keys: usize,
@@ -58,12 +76,17 @@ thread_local! {
         const { std::cell::Cell::new(QueryWorkCounts {
             retirement_owner_passes: 0,
             retirement_owner_probes: 0,
+            #[cfg(feature = "angular")]
             resolver_nominations: 0,
+            #[cfg(feature = "angular")]
             resolver_owner_validations: 0,
+            #[cfg(feature = "angular")]
             resolver_records_considered: 0,
             ef_dependency_catalog_builds: 0,
             ef_dependency_files_parsed: 0,
+            #[cfg(feature = "csharp")]
             ef_dependency_inventories: 0,
+            #[cfg(feature = "csharp")]
             ef_dependency_syntax_parses: 0,
             csharp_catalog_builds: 0,
             csharp_catalog_reuses: 0,
@@ -75,18 +98,31 @@ thread_local! {
             angular_template_sources_processed: 0,
             angular_inline_templates_processed: 0,
             angular_external_templates_processed: 0,
+            #[cfg(feature = "csharp")]
             ef_catalog_builds: 0,
+            #[cfg(feature = "csharp")]
             ef_catalog_reuses: 0,
+            #[cfg(feature = "csharp")]
             ef_configuration_declarations_examined: 0,
+            #[cfg(feature = "csharp")]
             ef_configuration_reference_comparisons: 0,
+            #[cfg(feature = "csharp")]
             ef_context_declarations_examined: 0,
+            #[cfg(feature = "csharp")]
             ef_context_reference_comparisons: 0,
+            #[cfg(feature = "csharp")]
             ef_model_occurrences_processed: 0,
+            #[cfg(feature = "csharp")]
             ef_owner_reference_comparisons: 0,
+            #[cfg(feature = "csharp")]
             ef_synthetic_type_parses: 0,
+            #[cfg(feature = "csharp")]
             ef_assembly_configuration_comparisons: 0,
+            #[cfg(feature = "csharp")]
             ef_project_root_lookups: 0,
+            #[cfg(feature = "csharp")]
             ef_project_root_filesystem_resolutions: 0,
+            #[cfg(feature = "csharp")]
             ef_project_root_cache_hits: 0,
             reference_candidate_index_builds: 0,
             reference_candidate_index_keys: 0,
@@ -105,10 +141,12 @@ thread_local! {
         }) };
 }
 
+#[cfg(any(feature = "csharp", feature = "angular"))]
 pub(crate) fn reset() {
     COUNTS.with(|counts| counts.set(QueryWorkCounts::default()));
 }
 
+#[cfg(any(feature = "csharp", feature = "angular"))]
 pub(crate) fn snapshot() -> QueryWorkCounts {
     COUNTS.with(std::cell::Cell::get)
 }
@@ -129,10 +167,12 @@ pub(crate) fn record_ef_dependency_file_parsed() {
     update(|counts| counts.ef_dependency_files_parsed += 1);
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn record_ef_dependency_inventory() {
     update(|counts| counts.ef_dependency_inventories += 1);
 }
 
+#[cfg(feature = "csharp")]
 pub(crate) fn record_ef_dependency_syntax_parse() {
     update(|counts| counts.ef_dependency_syntax_parses += 1);
 }
@@ -184,39 +224,52 @@ macro_rules! counter {
     };
 }
 
+#[cfg(feature = "csharp")]
 counter!(record_ef_catalog_build, ef_catalog_builds);
+#[cfg(feature = "csharp")]
 counter!(record_ef_catalog_reuse, ef_catalog_reuses);
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_configuration_declaration,
     ef_configuration_declarations_examined
 );
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_configuration_reference_comparison,
     ef_configuration_reference_comparisons
 );
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_context_declaration,
     ef_context_declarations_examined
 );
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_context_reference_comparison,
     ef_context_reference_comparisons
 );
+#[cfg(feature = "csharp")]
 counter!(record_ef_model_occurrence, ef_model_occurrences_processed);
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_owner_reference_comparison,
     ef_owner_reference_comparisons
 );
+#[cfg(feature = "csharp")]
 counter!(record_ef_synthetic_type_parse, ef_synthetic_type_parses);
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_assembly_configuration_comparison,
     ef_assembly_configuration_comparisons
 );
+#[cfg(feature = "csharp")]
 counter!(record_ef_project_root_lookup, ef_project_root_lookups);
+#[cfg(feature = "csharp")]
 counter!(
     record_ef_project_root_filesystem_resolution,
     ef_project_root_filesystem_resolutions
 );
+#[cfg(feature = "csharp")]
 counter!(record_ef_project_root_cache_hit, ef_project_root_cache_hits);
 counter!(
     record_csharp_declaration_resolution_comparison,
@@ -259,6 +312,7 @@ pub(crate) fn record_declaration_candidate_index(keys: usize, indexed: usize, ma
     });
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn record_resolver_nomination() {
     update(|counts| counts.resolver_nominations += 1);
 }
@@ -271,10 +325,12 @@ pub(crate) fn record_retirement_probe() {
     update(|counts| counts.retirement_owner_probes += 1);
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn record_resolver_owner_validation() {
     update(|counts| counts.resolver_owner_validations += 1);
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn record_resolver_records(count: usize) {
     update(|counts| counts.resolver_records_considered += count);
 }

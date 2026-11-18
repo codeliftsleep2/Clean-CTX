@@ -344,7 +344,7 @@ fn project_at(
 
 #[path = "provider_syntax.rs"]
 mod syntax;
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) use syntax::proved_reference;
 pub(crate) use syntax::{decorator_owner, reference_identity};
 use syntax::{find_named_class, pair_value, parse_provider, provider_array};

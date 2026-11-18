@@ -117,6 +117,7 @@ impl McpState {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "angular")]
     pub(crate) fn reconcile_semantic_sources_for_test(
         &self,
         probe: impl FnMut(&str) -> Result<bool, Error>,

@@ -1,7 +1,11 @@
+param(
+    [Parameter(Mandatory)][string]$ReviewDirectory,
+    [Parameter(Mandatory)][string]$ExpectedDigest
+)
 # Operator-owned actual admission/discoverability. Never submits authorization.
 $ErrorActionPreference='Stop'
 $root=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$review=Join-Path $root 'target/ci-verify-r1/descriptor-20261117-152254'
+$review=(Resolve-Path -LiteralPath $ReviewDirectory).Path
 $out=Join-Path $root ('target/ci-verify-r1/admission-'+(Get-Date -Format 'yyyyMMdd-HHmmss'))
 New-Item -ItemType Directory -Path $out|Out-Null
 Push-Location $root
@@ -10,14 +14,14 @@ try {
         if((Get-FileHash -LiteralPath $pin.path).Hash -cne $pin.sha256){throw "Reviewed candidate changed: $($pin.path)"}
     }
     $descriptor=Get-Content (Join-Path $review 'descriptor.json') -Raw|ConvertFrom-Json
-    if($descriptor.digest -cne '9ef404dab3917c2a54d9aa7fef551b18923620ae2dfe5522815c4cbd0df5b5d4'){throw 'Reviewed descriptor drift'}
+    if($descriptor.digest -cne $ExpectedDigest){throw 'Reviewed descriptor drift'}
     $common=@{
         WorkspaceRoot=$root
         Binary=(Join-Path $root 'target/debug/clean-ctx.exe')
         Profile=(Join-Path $root '.clean-ctx/pcg-documents/profile.json')
         LaunchDirectory=(Join-Path $root '.clean-ctx/pcg-documents/authoring')
     }
-    $ids=@('VERIFY-001','VERIFY-002','AUTH.FINAL_VERIFICATION')
+    $ids=@('VERIFY-001','VERIFY-002','AUTH.FINAL_VERIFICATION','PERF-004-DOCTRINE','PERF-005-BOUNDED')
     $requests=@($ids|ForEach-Object{@{workspaceRoot=$root;mode='context';id=$_}})
     $request=Join-Path $out 'contexts.json'
     ConvertTo-Json -InputObject $requests -Depth 20|Set-Content $request -Encoding utf8NoBOM

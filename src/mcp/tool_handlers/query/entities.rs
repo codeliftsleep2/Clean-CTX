@@ -247,6 +247,7 @@ fn try_prepare_entities_in_file(
             )?;
         }
     }
+    #[cfg(feature = "angular")]
     if crate::mcp::tool_handlers::core::is_angular_template(state, workspace_root, &resolved_path) {
         let certificate =
             CompletenessCertificate::current_file(canonical_path.clone(), source_hash);
@@ -337,6 +338,7 @@ fn try_prepare_entities_in_file(
     ))
 }
 
+#[cfg(feature = "angular")]
 fn prepared_angular_template_in_file(
     canonical_path: String,
     certificate: CompletenessCertificate,

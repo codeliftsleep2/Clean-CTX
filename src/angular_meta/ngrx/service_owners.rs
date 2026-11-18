@@ -2,10 +2,10 @@
 use super::constructors::ConstructorDispatch;
 use crate::angular_meta::inject_evidence::ClassInitializerEvidence;
 use crate::compression::capture_pipeline::CapturedNode;
-use crate::ir::invocation_evidence::{
-    ArgumentQualifier, DeclarationContextKind, InvocationEvidenceView, InvocationOccurrence,
-    SourceSpan, WrittenCallee,
-};
+#[cfg(feature = "angular")]
+use crate::ir::invocation_evidence::{ArgumentQualifier, InvocationEvidenceView, WrittenCallee};
+use crate::ir::invocation_evidence::{DeclarationContextKind, InvocationOccurrence, SourceSpan};
+#[cfg(feature = "angular")]
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeMap;
 
@@ -66,6 +66,7 @@ pub(crate) fn authoritative_service_owner(
 /// Attach Service ownership to modern action-creator dispatch occurrences in
 /// non-static property initializers. The generic TypeScript `this` binder
 /// remains method-only; this is the bounded NgRx initializer authority path.
+#[cfg(feature = "angular")]
 pub(crate) fn admit_modern_initializer_dispatches(
     shape: &mut super::NgRxShape,
     evidence: &InvocationEvidenceView<'_>,
@@ -123,12 +124,6 @@ pub(crate) fn admit_modern_initializer_dispatches(
         }
     }
 }
-
-pub(crate) const QUERY: &str = r#"
-(class_declaration body: (class_body (method_definition
-    body: (statement_block (expression_statement (call_expression) @ngrx.service.call)))
-    @ngrx.service.method)) @ngrx.service.owner
-"#;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ServiceDispatch {
@@ -204,6 +199,7 @@ pub(crate) fn collect(
 /// Project precise Service occurrences, leaving all other existing occurrences
 /// to the frozen Component/fallback producer. Never rewrite aggregate edges by
 /// target spelling: one Action can also have an honest non-Service dispatch.
+#[cfg(feature = "angular")]
 pub(crate) fn project(
     raw: super::NgRxShape,
     starts: &[usize],

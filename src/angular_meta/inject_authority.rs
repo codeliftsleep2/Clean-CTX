@@ -1,14 +1,19 @@
 //! Class-field inject dependencies from retained value endpoints, not spellings.
+#[cfg(feature = "angular")]
 use super::{
     class_role_authority as roles, decorators::ClassKind, inject_evidence::ClassInitializerEvidence,
 };
+#[cfg(feature = "angular")]
 use crate::ir::invocation_evidence::{
     ArgumentQualifier, InvocationEvidenceView, SourceSpan, WrittenCallee,
 };
-use crate::ir::typescript_resolution::{DeclarationId, TypeScriptAuthority};
+use crate::ir::typescript_resolution::DeclarationId;
+#[cfg(feature = "angular")]
+use crate::ir::typescript_resolution::TypeScriptAuthority;
 use crate::layers::meta::canonical_endpoint::CanonicalEndpoint;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
+#[cfg(feature = "angular")]
 pub(crate) fn project(
     source: &str,
     authority: &TypeScriptAuthority,

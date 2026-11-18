@@ -1,10 +1,13 @@
 //! Native ApplicationConfig declaration ownership; no application selection.
 use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
 use crate::ir::typescript_resolution::{Namespace, Resolution, TypeScriptAuthority};
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::EntityRef;
+use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 /// Native root nomination only. Fields and terminal membership are still replayed
 /// by project/admission; no written type name or import text grants authority.
+#[cfg(feature = "angular")]
 pub(crate) fn has_owner(authority: &TypeScriptAuthority) -> bool {
     authority.declaration_facets.iter().any(|facet| {
         super::typed_provider_root::admits(authority, facet, "@angular/core", "ApplicationConfig")
@@ -74,10 +77,12 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "angular")]
 pub(crate) fn admits(authority: &TypeScriptAuthority, edge: &SemanticEdge) -> bool {
     admits_projected(&project(authority), edge)
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain

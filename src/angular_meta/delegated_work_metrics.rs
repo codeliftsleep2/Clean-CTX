@@ -4,6 +4,7 @@ thread_local! {
     static COUNTS: std::cell::Cell<[usize;4]> = const { std::cell::Cell::new([0;4]) };
 }
 pub(crate) fn construction(index: usize) {
+    #[cfg(feature = "angular")]
     super::admission_work_metrics::delegated(index);
     COUNTS.with(|c| {
         let mut counts = c.get();

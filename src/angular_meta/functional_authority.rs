@@ -27,6 +27,7 @@ fn role_kind(
 }
 
 /// Producer applicability only; exact owner/call admission remains in project.
+#[cfg(feature = "angular")]
 pub(crate) fn has_role(authority: &TypeScriptAuthority) -> bool {
     authority.type_reference_sites.iter().any(|(_,_,resolution)|
         matches!(resolution, Resolution::Resolved(role) if role_kind(authority, role).is_some()))

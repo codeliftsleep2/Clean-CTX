@@ -63,6 +63,7 @@ pub(super) fn migrate(conn: &Connection) -> Result<(), Box<dyn std::error::Error
 
 impl SqliteStore {
     #[cfg(test)]
+    #[cfg(feature = "typescript")]
     pub(crate) fn establish_edit_intent(
         &mut self,
         intent: &EditIntent,

@@ -135,6 +135,7 @@ pub(super) fn root_key(root: &Path) -> String {
 /// Discover supported source files containing a literal in the effective roots.
 /// Angular ownership uses this only to narrow TypeScript files that are then
 /// verified by structured decorator extraction.
+#[cfg(feature = "angular")]
 pub(crate) fn source_candidates_containing(
     state: &McpState,
     workspace_root: Option<&str>,

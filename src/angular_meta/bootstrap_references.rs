@@ -180,6 +180,7 @@ fn config(authority: &TypeScriptAuthority, id: &DeclarationId) -> bool {
         || super::config_composition::result_args(authority, facet).is_some())
 }
 /// Applicability shares the exact retained callee/call path with projection.
+#[cfg(feature = "angular")]
 pub(crate) fn has_call(authority: &TypeScriptAuthority) -> bool {
     !super::legacy_bootstrap::project(authority).is_empty()
         || authority
@@ -241,6 +242,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     }
     edges
 }
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain

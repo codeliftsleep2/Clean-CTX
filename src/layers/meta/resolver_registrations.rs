@@ -69,6 +69,7 @@ pub(crate) struct ResolverRegistrationOmission {
 }
 
 impl ResolverRegistrations {
+    #[cfg(feature = "angular")]
     pub(crate) fn matches(&self, expected: &Self) -> bool {
         fn exact<T: Eq + std::hash::Hash>(actual: &[T], expected: &[T]) -> bool {
             let a: std::collections::HashSet<_> = actual.iter().collect();

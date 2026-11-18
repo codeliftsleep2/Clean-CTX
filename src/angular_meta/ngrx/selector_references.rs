@@ -9,6 +9,7 @@ use crate::ir::invocation_evidence::{
 /// Project direct `store.select(selector)` and `store.pipe(select(selector))`
 /// invocations whose receiver is an exact NgRx Store binding and whose direct
 /// identifier argument is an exact Selector.
+#[cfg(feature = "angular")]
 pub(crate) fn admit(
     mut shape: NgRxShape,
     evidence: &InvocationEvidenceView<'_>,
@@ -115,6 +116,7 @@ pub(crate) struct InitializerStoreAuthority {
     pub(crate) service_owner: Option<String>,
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn initializer_store_authority(
     call: &crate::ir::invocation_evidence::InvocationOccurrence,
     receiver_span: SourceSpan,
@@ -217,6 +219,7 @@ pub(crate) fn initializer_store_authority(
     })
 }
 
+#[cfg(feature = "angular")]
 fn parameter_properties(
     class: tree_sitter::Node<'_>,
     name: &str,
@@ -275,6 +278,7 @@ fn parameter_properties(
     result
 }
 
+#[cfg(feature = "angular")]
 fn store_receiver(
     call: &crate::ir::invocation_evidence::InvocationOccurrence,
     evidence: &InvocationEvidenceView<'_>,
@@ -308,6 +312,7 @@ fn store_receiver(
     }
 }
 
+#[cfg(feature = "angular")]
 fn exact_ngrx_select_import(source_id: &str, source: &str, reference_span: SourceSpan) -> bool {
     if crate::ir::typescript_identifier_binding::bind_direct_value_identifier(
         source_id,
@@ -333,6 +338,7 @@ fn exact_ngrx_select_import(source_id: &str, source: &str, reference_span: Sourc
     matches == 1
 }
 
+#[cfg(feature = "angular")]
 fn collect_ngrx_select_imports(node: tree_sitter::Node<'_>, source: &[u8], matches: &mut usize) {
     if node.kind() == "import_statement"
         && node
@@ -351,6 +357,7 @@ fn collect_ngrx_select_imports(node: tree_sitter::Node<'_>, source: &[u8], match
     }
 }
 
+#[cfg(feature = "angular")]
 fn has_unaliased_select_specifier(node: tree_sitter::Node<'_>, source: &[u8]) -> bool {
     if node.kind() == "import_specifier" {
         return node.child_by_field_name("alias").is_none()

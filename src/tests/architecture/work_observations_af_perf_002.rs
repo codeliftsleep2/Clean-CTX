@@ -1,13 +1,16 @@
 //! Test-scoped observations only. Never consulted by production authority.
+#[cfg(feature = "typescript")]
 use std::collections::BTreeSet;
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Counts {
     pub publication_copies: std::collections::BTreeMap<&'static str, PublicationCopy>,
     pub publication_sinks: std::collections::BTreeMap<&'static str, [usize; 3]>,
+    #[cfg(feature = "csharp")]
     pub a4: DependencyWork,
     pub edit: EditWork,
     pub diff: DiffWork,
     pub overload: OverloadWork,
+    #[cfg(feature = "typescript")]
     pub witnesses: usize,
     pub stats_initial_text_renders: usize,
     pub stats_initial_text_input_files: usize,
@@ -55,7 +58,9 @@ pub(crate) struct Counts {
     pub alias_ir_calls: usize,
     pub alias_ir_instruction_visits: usize,
     pub alias_ir_operands: usize,
+    #[cfg(feature = "typescript")]
     pub identities: BTreeSet<String>,
+    #[cfg(feature = "typescript")]
     pub variants: [usize; 7],
     pub export_reads: usize,
     pub export_parses: usize,
@@ -68,40 +73,65 @@ pub(crate) struct Counts {
     pub ngrx_switch_binding_visits: usize,
     pub ngrx_reexport_reads: usize,
     pub ngrx_reexport_parses: usize,
+    #[cfg(feature = "typescript")]
     pub reads: usize,
+    #[cfg(feature = "typescript")]
     pub hashes: usize,
+    #[cfg(feature = "typescript")]
     pub enumerations: usize,
+    #[cfg(feature = "typescript")]
     pub canonicalizations: usize,
+    #[cfg(feature = "typescript")]
     pub metadata: usize,
     pub comparisons: [usize; 3],
     pub declaration_comparisons: [usize; 2],
     pub artifact_publication_clones: [usize; 3],
+    #[cfg(feature = "csharp")]
     pub artifact_projection_owners: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_role_entries: [usize; 6],
+    #[cfg(feature = "csharp")]
     pub csharp_role_class_visits: [usize; 6],
+    #[cfg(feature = "csharp")]
     pub csharp_class_file_visits: [usize; 6],
+    #[cfg(feature = "csharp")]
     pub csharp_method_owner_visits: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_raw_part_visits: [usize; 6],
+    #[cfg(feature = "csharp")]
     pub csharp_context_method_visits: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_aspnet_method_visits: usize,
+    #[cfg(feature = "csharp")]
     pub artifact_ir_instruction_clones: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_resolution_calls: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_catalog_population_max: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_declaration_probes: [usize; 2],
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_builds: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_build_visits: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_build_probes: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_probes: usize,
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_capacities: [usize; 4],
+    #[cfg(feature = "csharp")]
     pub csharp_lookup_payload_bytes: usize,
     pub membership_probes: [usize; 3],
     pub registrations: usize,
     pub reconciliation: usize,
     pub candidates: usize,
     pub retired: usize,
+    #[cfg(feature = "typescript")]
     pub root_facets: usize,
     pub snapshot_validations: usize,
     pub lock_depth: usize,
+    #[cfg(feature = "typescript")]
     pub lock_witnesses: usize,
 }
 thread_local! { static COUNTS: std::cell::RefCell<Counts> = std::cell::RefCell::new(Counts::default()); }
@@ -233,6 +263,7 @@ pub(crate) fn publication_sink(site: &'static str, edges: usize, dependencies: u
 
 /// A4 source-backed dependency work. Arrays: [single-owner, partition-batch].
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize)]
+#[cfg(feature = "csharp")]
 pub(crate) struct DependencyWork {
     pub lookup_input_visits: usize,
     pub lookup_insert_attempts: [usize; 3],

@@ -22,6 +22,7 @@ fn compile_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     compiler.semantic_edges
 }
 
+#[cfg(feature = "dotnet")]
 fn compile_csharp_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     let (language, query) =
         crate::compression::language::language_for_extension("cs").expect("C# language");
@@ -41,6 +42,7 @@ fn compile_csharp_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     compiler.semantic_edges
 }
 
+#[cfg(feature = "spring_boot")]
 fn compile_java_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     let (language, query) =
         crate::compression::language::language_for_extension("java").expect("Java language");
@@ -60,6 +62,7 @@ fn compile_java_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     compiler.semantic_edges
 }
 
+#[cfg(feature = "rust")]
 fn compile_rust_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
     let (language, query) =
         crate::compression::language::language_for_extension("rs").expect("Rust language");
@@ -219,6 +222,7 @@ fn production_angular_layer_reuses_compilation_evidence_without_detection_parse(
     );
 }
 
+#[cfg(feature = "dotnet")]
 #[test]
 fn production_dotnet_layer_uses_combined_evaluation_override() {
     crate::dotnet_meta::reset_evaluation_count();
@@ -235,6 +239,7 @@ fn production_dotnet_layer_uses_combined_evaluation_override() {
     );
 }
 
+#[cfg(feature = "dotnet")]
 #[test]
 fn production_dotnet_layer_runs_framework_detection_once() {
     crate::dotnet_meta::reset_detection_count();
@@ -251,6 +256,7 @@ fn production_dotnet_layer_runs_framework_detection_once() {
     );
 }
 
+#[cfg(feature = "dotnet")]
 #[test]
 fn production_dotnet_layer_reuses_compilation_evidence_without_detection_parse() {
     crate::dotnet_meta::reset_ast_parse_count();
@@ -267,6 +273,7 @@ fn production_dotnet_layer_reuses_compilation_evidence_without_detection_parse()
     );
 }
 
+#[cfg(feature = "dotnet")]
 #[test]
 fn production_dotnet_layer_analyzes_each_class_once_for_both_projections() {
     crate::dotnet_meta::reset_analysis_count();
@@ -283,6 +290,7 @@ fn production_dotnet_layer_analyzes_each_class_once_for_both_projections() {
     );
 }
 
+#[cfg(feature = "dotnet")]
 #[test]
 fn production_dotnet_layer_analyzes_efcore_facts_once_for_both_projections() {
     crate::dotnet_meta::reset_efcore_analysis_count();
@@ -299,6 +307,7 @@ fn production_dotnet_layer_analyzes_efcore_facts_once_for_both_projections() {
     );
 }
 
+#[cfg(feature = "spring_boot")]
 #[test]
 fn production_spring_layer_uses_combined_evaluation_override() {
     crate::spring_meta::reset_evaluation_count();
@@ -315,6 +324,7 @@ fn production_spring_layer_uses_combined_evaluation_override() {
     );
 }
 
+#[cfg(feature = "spring_boot")]
 #[test]
 fn production_spring_layer_runs_framework_detection_once() {
     crate::spring_meta::reset_detection_count();
@@ -331,6 +341,7 @@ fn production_spring_layer_runs_framework_detection_once() {
     );
 }
 
+#[cfg(feature = "rust")]
 #[test]
 fn production_builtin_layer_uses_combined_evaluation_override() {
     crate::layers::meta::builtin::reset_evaluation_count();

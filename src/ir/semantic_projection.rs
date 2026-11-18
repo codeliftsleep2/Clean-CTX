@@ -30,6 +30,7 @@ pub(crate) const GENERIC_SEMANTIC_PROJECTION_GENERATION: u32 = 1;
 /// Generation of C#-specific generic semantic projection. This is separate
 /// from the generic generation so a C#-only edge change does not invalidate
 /// durable semantic snapshots for unrelated languages.
+#[cfg(feature = "csharp")]
 pub(crate) const CSHARP_SEMANTIC_PROJECTION_GENERATION: u32 = 5;
 //
 // A callee that is never declared in the compiled workspace still appears as

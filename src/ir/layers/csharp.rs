@@ -29,8 +29,10 @@ use crate::ir::opcodes::{
 use std::collections::HashMap;
 
 /// Increment when identical C# input can emit different canonical IR.
+#[cfg(feature = "csharp")]
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 5;
 /// Increment when C# canonical facts change meaning for projection.
+#[cfg(feature = "csharp")]
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 8;
 
 /// True when `head` (a declaration head, never a full body) carries `word`

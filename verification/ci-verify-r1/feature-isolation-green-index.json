@@ -1,0 +1,91 @@
+{
+  "capture": "feature-isolation-20261118-160057",
+  "category": "Focused tracked verification, not full CI or final admission",
+  "archive": "verification/ci-verify-r1/feature-isolation-green-evidence.zip",
+  "archive_sha256": "66717125fad7034ce8981c5b38ebfdf47c6fbd3b8b0e0fe247913928873db487",
+  "members": [
+    {
+      "entry": "feature-isolation-20261118-160057/all-features.log",
+      "sha256": "7535a9274f4ac614ba4ea60db62a16fde2d01110d236644348f749b00bc0f309"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/angular.log",
+      "sha256": "8a72eb941c6b511d5b35c3779017d0f280586f65c2c3f3410a8d7c55c72882aa"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/csharp.log",
+      "sha256": "f4a11f19c5fbc349f3fcac19d0514113798f87b6191ea7823ff708ca3dcb4868"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/descriptor-stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/descriptor.json",
+      "sha256": "4466123db1ace57e62ca169f2fff6d5facac4c84d8405d1542e10d9ecf8ef06b"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/dotnet.log",
+      "sha256": "70eb999fb56fefde7619dcd16bfc2f3049b348946454f29ac385d585ed5fd13d"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/receipt.json",
+      "sha256": "8af72ba620bbb2244354f45a538334fd63fdbef2d7262f021a9b55a3cf1b6984"
+    },
+    {
+      "entry": "feature-isolation-20261118-160057/typescript.log",
+      "sha256": "59869f9f9166a7ee4c40ef1d9fa9667e0047ea2f68fdce63ec474c806f10940d"
+    }
+  ],
+  "runs": [
+    {
+      "feature": "csharp",
+      "selected_tests": 8,
+      "exitCode": 0,
+      "warnings": false,
+      "complete_selection": true,
+      "elapsed_with_compilation_seconds": 33.35393
+    },
+    {
+      "feature": "typescript",
+      "selected_tests": 10,
+      "exitCode": 0,
+      "warnings": false,
+      "complete_selection": true,
+      "elapsed_with_compilation_seconds": 48.2497649
+    },
+    {
+      "feature": "angular",
+      "selected_tests": 10,
+      "exitCode": 0,
+      "warnings": false,
+      "complete_selection": true,
+      "elapsed_with_compilation_seconds": 127.6659889
+    },
+    {
+      "feature": "dotnet",
+      "selected_tests": 8,
+      "exitCode": 0,
+      "warnings": false,
+      "complete_selection": true,
+      "elapsed_with_compilation_seconds": 86.2722988
+    },
+    {
+      "feature": "all-features",
+      "selected_tests": 12,
+      "exitCode": 0,
+      "warnings": false,
+      "complete_selection": true,
+      "elapsed_with_compilation_seconds": 111.2959747
+    }
+  ],
+  "source_identity": "Exact formatted Rust source pins retained in receipt.json; verified against current working source before archiving",
+  "warm_witness": {
+    "seconds": 0.0005101,
+    "query_compilations": 0,
+    "parses": 1,
+    "cursors": 1,
+    "scope": "One warm TypeScript CoreIRPass observation; not a full-CI performance result"
+  },
+  "governance": "Read-only descriptor reports E_GOVERNANCE_AUTHORIZATION_REQUIRED. It is not admission or owner authorization; documentation/evidence updates after this capture require a refreshed descriptor."
+}

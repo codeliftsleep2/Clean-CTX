@@ -1,3 +1,4 @@
+#![cfg(feature = "angular")]
 // src/angular_meta/template_compress.rs
 //
 // Fidelity-gated Angular template compression entry point.

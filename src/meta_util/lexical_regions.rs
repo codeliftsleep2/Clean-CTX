@@ -5,12 +5,12 @@ thread_local! {
     static CONSTRUCTION_COUNT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) fn reset_construction_count() {
     CONSTRUCTION_COUNT.with(|count| count.set(0));
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) fn construction_count() -> usize {
     CONSTRUCTION_COUNT.with(std::cell::Cell::get)
 }

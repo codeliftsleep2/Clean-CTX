@@ -6,6 +6,7 @@ use crate::ir::typescript_resolution::{DeclarationId, Resolution, TypeScriptAuth
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::BTreeSet;
 
+#[cfg(feature = "angular")]
 pub(super) fn project(
     authority: &TypeScriptAuthority,
     start: usize,
@@ -119,6 +120,7 @@ pub(super) fn project(
     result
 }
 
+#[cfg(feature = "angular")]
 pub(super) fn object<'a>(
     authority: &'a TypeScriptAuthority,
     expression: &'a ExpressionFacet,
@@ -137,6 +139,7 @@ pub(super) fn object<'a>(
     }
 }
 
+#[cfg(feature = "angular")]
 fn collect(
     authority: &TypeScriptAuthority,
     expression: &ExpressionFacet,
@@ -186,6 +189,7 @@ fn collect(
     }
 }
 
+#[cfg(feature = "angular")]
 fn endpoint(
     id: &DeclarationId,
     site: Option<(usize, usize)>,

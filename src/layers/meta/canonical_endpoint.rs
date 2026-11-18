@@ -88,6 +88,7 @@ impl CanonicalEndpoint {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "angular")]
     pub(crate) fn declaration(&self) -> Option<&CanonicalDeclaration> {
         match self {
             Self::Declaration { declaration, .. } => Some(declaration),
@@ -96,6 +97,7 @@ impl CanonicalEndpoint {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "angular")]
     pub(crate) fn declaration_mut(&mut self) -> Option<&mut CanonicalDeclaration> {
         match self {
             Self::Declaration { declaration, .. } => Some(declaration),
@@ -105,6 +107,7 @@ impl CanonicalEndpoint {
 }
 
 /// Stable quoted label without lossy UTF-16 conversion or Unicode normalization.
+#[cfg(feature = "typescript")]
 pub(crate) fn string_label(units: &[u16]) -> String {
     use std::fmt::Write;
     let mut label = String::from("\"");

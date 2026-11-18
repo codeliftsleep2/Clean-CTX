@@ -11,6 +11,7 @@ static STATE: Mutex<AttemptState> = Mutex::new(AttemptState {
 });
 static SIGNAL: Condvar = Condvar::new();
 
+#[cfg(feature = "typescript")]
 pub(super) fn arm(owner: &str) {
     *STATE.lock().expect("publication attempt state") = AttemptState {
         owner: Some(owner.to_string()),
@@ -26,6 +27,7 @@ pub(super) fn publication_attempted(owner: &str) {
     }
 }
 
+#[cfg(feature = "typescript")]
 pub(super) fn wait_until_attempted() {
     let mut state = STATE.lock().expect("publication attempt state");
     while !state.attempted {

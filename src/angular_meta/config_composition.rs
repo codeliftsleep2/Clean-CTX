@@ -3,7 +3,9 @@ use crate::ir::typescript_resolution::declaration_facets::{
     DeclarationFacet, ExpressionFacet, ExpressionValue,
 };
 use crate::ir::typescript_resolution::{Namespace, Resolution, TypeScriptAuthority};
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::EntityRef;
+use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 pub(super) fn result_args<'a>(
     authority: &TypeScriptAuthority,
@@ -40,6 +42,7 @@ pub(super) fn result_args<'a>(
     }
     Some(args)
 }
+#[cfg(feature = "angular")]
 pub(crate) fn has_owner(authority: &TypeScriptAuthority) -> bool {
     authority.declaration_facets.iter().any(|facet| {
         facet.declaration.source == authority.source && result_args(authority, facet).is_some()
@@ -116,6 +119,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     }
     edges
 }
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain

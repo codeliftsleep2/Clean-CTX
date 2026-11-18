@@ -1,0 +1,541 @@
+{
+  "baseline": "95153d5c86c800b8eab523d9b980a44d44a57301",
+  "category": "Static cause classification; repaired compilation and behavior UNRUN",
+  "contract_sources": [
+    "Cargo.toml features",
+    "docs/CONFIGURATION.md compile-time feature flags",
+    "docs/invariants/canonical-ir.md ARCH-002",
+    "src/layers/registry.rs feature-specific registration",
+    "src/compression/language.rs unavailable grammar behavior"
+  ],
+  "error_groups": [
+    {
+      "root_cause": "TS-dependent Angular modules",
+      "diagnostic_count": 52,
+      "diagnostics": [
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 3
+        },
+        {
+          "message": "error[E0432]: unresolved import `crate::ir::typescript_resolution`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 4
+        },
+        {
+          "message": "error[E0432]: unresolved import `crate::ir::typescript_resolution`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 4
+        },
+        {
+          "message": "error[E0432]: unresolved import `super::class_role_authority`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 2
+        },
+        {
+          "message": "error[E0432]: unresolved import `super::provider_position`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 41
+        },
+        {
+          "message": "error[E0432]: unresolved import `super::provider_position`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 60
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 8
+        },
+        {
+          "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 14
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 20
+        },
+        {
+          "message": "error[E0433]: cannot find `inject_authority` in `super`",
+          "path": "src/angular_meta/functional_authority.rs",
+          "line": 105
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/member_semantics.rs",
+          "line": 21
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/member_semantics.rs",
+          "line": 124
+        },
+        {
+          "message": "error[E0433]: cannot find `member_authority` in `super`",
+          "path": "src/angular_meta/member_semantics.rs",
+          "line": 130
+        },
+        {
+          "message": "error[E0433]: cannot find `member_authority` in `super`",
+          "path": "src/angular_meta/member_semantics.rs",
+          "line": 193
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 39
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 57
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_position` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 58
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 87
+        },
+        {
+          "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 94
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_composition` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 117
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_composition` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 144
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_position` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 150
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 164
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 169
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 175
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 199
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 207
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 208
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 227
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 233
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 234
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 246
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 293
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 295
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 296
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 303
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 305
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_pair_authority` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 307
+        },
+        {
+          "message": "error[E0433]: cannot find `provider_imported` in `super`",
+          "path": "src/angular_meta/provider_semantics.rs",
+          "line": 338
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 84
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 85
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 163
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 164
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 167
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `angular_meta`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 168
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 175
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_resolution` in `ir`",
+          "path": "src/angular_meta/provider_syntax.rs",
+          "line": 176
+        },
+        {
+          "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 16
+        },
+        {
+          "message": "error[E0433]: cannot find `class_role_authority` in `super`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 23
+        },
+        {
+          "message": "error[E0433]: cannot find `bootstrap_references` in `super`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 42
+        },
+        {
+          "message": "error[E0433]: cannot find `bootstrap_references` in `super`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 43
+        },
+        {
+          "message": "error[E0433]: cannot find `string_token_authority` in `super`",
+          "path": "src/angular_meta/legacy_bootstrap.rs",
+          "line": 62
+        }
+      ],
+      "correction": "Guard the four owning Angular modules with TypeScript; provider_syntax inherits its owner guard."
+    },
+    {
+      "root_cause": "HTML grammar availability",
+      "diagnostic_count": 2,
+      "diagnostics": [
+        {
+          "message": "error[E0432]: unresolved import `crate::angular_meta::template::extract_template_shape`",
+          "path": "src/angular_meta/template_compress.rs",
+          "line": 14
+        },
+        {
+          "message": "error[E0433]: cannot find module or crate `tree_sitter_html` in this scope",
+          "path": "src/angular_meta/template_occurrences.rs",
+          "line": 55
+        }
+      ],
+      "correction": "Compile template compression and HTML parsing implementations only with angular; retain shared data shapes and existing unsupported paths."
+    },
+    {
+      "root_cause": "Feature-specific dispatch",
+      "diagnostic_count": 4,
+      "diagnostics": [
+        {
+          "message": "error[E0432]: unresolved import `provide_angular`",
+          "path": "src/mcp/tool_handlers/core.rs",
+          "line": 11
+        },
+        {
+          "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+          "path": "src/gitdiff/engine.rs",
+          "line": 344
+        },
+        {
+          "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+          "path": "src/gitdiff/engine.rs",
+          "line": 345
+        },
+        {
+          "message": "error[E0425]: cannot find function `compress_template_to_string` in this scope",
+          "path": "src/gitdiff/engine.rs",
+          "line": 384
+        }
+      ],
+      "correction": "Guard Angular MCP export/consumer and HTML diff branches; preserve the existing nongrammar fallback."
+    },
+    {
+      "root_cause": "Pure syntax-helper registration",
+      "diagnostic_count": 2,
+      "diagnostics": [
+        {
+          "message": "error[E0433]: cannot find `typescript_binding_pattern` in `super`",
+          "path": "src/ir/typescript_identifier_binding.rs",
+          "line": 254
+        },
+        {
+          "message": "error[E0433]: cannot find `typescript_binding_pattern` in `super`",
+          "path": "src/ir/typescript_identifier_binding.rs",
+          "line": 387
+        }
+      ],
+      "correction": "Keep pure Node binding-pattern helpers available with their existing grammar-optional identifier adapters; do not enable a grammar."
+    },
+    {
+      "root_cause": "TS-specific test registration",
+      "diagnostic_count": 3,
+      "diagnostics": [
+        {
+          "message": "error[E0433]: cannot find `frozen_identity_portability_af_perf_002` in `crate`",
+          "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+          "line": 149
+        },
+        {
+          "message": "error[E0433]: cannot find `frozen_identity_portability_af_perf_002` in `crate`",
+          "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+          "line": 274
+        },
+        {
+          "message": "error[E0609]: no field `typescript_authority` on type `RetainedAuthority`",
+          "path": "src/mcp/../tests/mcp/sqlite_text_repair_af_perf_002.rs",
+          "line": 124
+        }
+      ],
+      "correction": "Gate only the TypeScript-specific public SQLite witness module; retain generic SQLite tests."
+    }
+  ],
+  "warning_obligations": "17 original warnings classified as feature-specific test observer/import applicability; no allow attributes or warning suppression added.",
+  "scope": "Existing feature flags and dependencies unchanged. No TypeScript/Angular implication added to C#.",
+  "followup_capture": {
+    "identity": "feature-isolation-20261118-125322",
+    "result": "Compilation failed; no selected tracked tests executed",
+    "csharp": {
+      "errors": 1,
+      "warnings": 7,
+      "cause": "New over-guard on shared Rx export; restored unconditional existing contract"
+    },
+    "typescript": {
+      "errors": 24,
+      "warnings": 6,
+      "causes": [
+        "CSharp-specific test modules registered without CSharp",
+        "CSharp-native EF and alias evidence referenced by grammar-optional shared query catalog"
+      ]
+    },
+    "archive": "verification/ci-verify-r1/feature-isolation-red-evidence.zip",
+    "archive_sha256": "38d60cb37429f05e04e3da6829a7cce00e8d3f4492748f45eda0232716a5e973",
+    "members": [
+      {
+        "entry": "feature-isolation-20261118-125322/csharp.log",
+        "sha256": "892d9cfe5933b0b32305311ca4fa30bbc5936b600cbe207fcb39642b701394ac"
+      },
+      {
+        "entry": "feature-isolation-20261118-125322/receipt.json",
+        "sha256": "032dc43f1c359a40c3255844586afbae54d8d1c5fc3911a3e00c34490d9ad156"
+      },
+      {
+        "entry": "feature-isolation-20261118-125322/typescript.log",
+        "sha256": "c69a71cd77a6374b88c602e43082989f05add1f02d4b9fa6fe1932429fe1cc29"
+      },
+      {
+        "entry": "feature-isolation-20261118-132301/csharp.log",
+        "sha256": "6768c8ee7eee69d74b7f69d08ed3017ab5edb918fc7ae7ffa8e18f66df3642b0"
+      },
+      {
+        "entry": "feature-isolation-20261118-132301/receipt.json",
+        "sha256": "7e9e91a6d72bcd6a7728928bf50daf0984a774046af09a80048b8f37ed5620c3"
+      },
+      {
+        "entry": "feature-isolation-20261118-132301/typescript.log",
+        "sha256": "70d9cdcf2d7fcfe9f3dead4d550fe4425501d6edbb0c6c735dafcc0ccb8d297f"
+      }
+    ],
+    "corrections": "Restore shared Rx export; guard native EF projection and native typed alias/source-part members with CSharp while retaining generic catalog and dependency graph; align feature-specific test registrations and observers with consumers. No Cargo feature/dependency changes.",
+    "verification": "Post-correction compilation, zero warnings, runtime behavior and document admission UNRUN"
+  },
+  "second_feature_capture": {
+    "path": "verification/ci-verify-r1/feature-isolation-second-capture.json",
+    "sha256": "ee8e45cb3a38ec7c5151850e02c68ff6ac3e613bfa6b9226afbdc9fba78c4775",
+    "preservation": "Exact prior structured capture record relocated without changing its values"
+  },
+  "warning_reconciliation": {
+    "capture": "feature-isolation-20261118-132301",
+    "compiler_reported_warning_count": 107,
+    "located_diagnostics": 107,
+    "boundary": "No warning suppression, Cargo feature/dependency changes or public query semantics changes. Native NgRx evidence and propagation follow TypeScript; generic carriers and discovery remain available.",
+    "file_size_relocation": {
+      "source": "src/ir/pipeline.rs",
+      "successor": "src/ir/pipeline/error.rs",
+      "preservation": "Existing PassError definition relocated unchanged; original public path retained by re-export"
+    },
+    "verification": "UNRUN after this correction; prior CSharp 7/7 remains historical evidence for previous source pins only",
+    "diagnostic_catalog": {
+      "path": "verification/ci-verify-r1/feature-isolation-warning-reconciliation.json",
+      "sha256": "00b56f87af69edad19333f045fd342a9bedb156607e63c3b1a27fdfeacc40648"
+    }
+  },
+  "third_feature_capture": {
+    "identity": "feature-isolation-20261118-145353",
+    "result": "Both isolated compilations failed before selected test execution; dead-code warning analysis not established",
+    "csharp_errors": 20,
+    "typescript_errors": 1,
+    "attribution": "Introduced incomplete producer guard and over-broad semantic module guard",
+    "correction": "Guard native NgRx producer together with its TypeScript-owned fields; retain semantic module and original pure class-name helper, gating only CSharp-native functions/imports. Constants relocated unchanged into existing native known_types helper.",
+    "verification": "Implemented correction; post-correction compilation and execution UNRUN",
+    "archive": "verification/ci-verify-r1/feature-isolation-followup-evidence.zip",
+    "archive_sha256": "f55375503a6a9359b5aacc552eaf55ea92b19a0df946e6c7eb91503c29601ee9",
+    "members": [
+      {
+        "entry": "feature-isolation-20261118-145353/csharp.log",
+        "sha256": "b492dca7e022e02bdfefde47fcd3e7d6f1bc71c2d9ae0b2da753a44e6741b3ca"
+      },
+      {
+        "entry": "feature-isolation-20261118-145353/receipt.json",
+        "sha256": "d24398c1439ef9191d2e95ce3004d09659f620c42dd163cfe69613cb1462695b"
+      },
+      {
+        "entry": "feature-isolation-20261118-145353/typescript.log",
+        "sha256": "c7a991b124ff686cd638327647e6e3843aa0d875bd64fd1c6334620691379a2a"
+      }
+    ]
+  },
+  "fourth_feature_capture": {
+    "path": "verification/ci-verify-r1/feature-isolation-fourth-capture.json",
+    "sha256": "321dd25d33b709a9d10aea9a8a14b1841ee508a5ee33c4434ef3e0158a55e6e0",
+    "status": "Historical TypeScript 7/7 with warnings; subsequent corrections unverified"
+  },
+  "post_fourth_reconciliation": {
+    "status": "Implemented; formatter, compilation, selected execution and admission pending",
+    "native_preservation": "Native TypeScript discriminant and service-dispatch records remain produced without Angular. New tracked regression checks exact source identity, currentness refusal, call owner and method provenance.",
+    "observation_boundary": "CSharp-specific capability evidence, dependency observations and projection observations follow CSharp availability; Angular admission observations follow Angular. Generic producer helpers and discovery remain available.",
+    "existing_witness_strengthening": [
+      "Existing optional-call matrix now checks the native syntactic optional-call flag",
+      "Existing EF marker fixture also checks authorized HasEntity relationships"
+    ],
+    "verification_selection": {
+      "csharp": 8,
+      "typescript": 10,
+      "angular": 10,
+      "dotnet": 8,
+      "all-features": 12
+    },
+    "new_test": "src/tests/ir/native_feature_evidence.rs",
+    "handoff": "verification/ci-verify-r1/invoke-feature-isolation-green.ps1",
+    "claim_limit": "Prior TypeScript 7/7 and CSharp 7/7 receipts remain attributable to their own earlier sources only.",
+    "static_checks": [
+      "Strict UTF8 without BOM and active-file ceiling checked across changed/untracked text",
+      "git diff --check passed",
+      "PowerShell handoff parsed without syntax errors",
+      "Original RED source and frozen TS/CS query definitions match their retained SHA256 identities",
+      "Native regression module registration resolves to its tracked test path"
+    ]
+  },
+  "fifth_feature_capture": {
+    "identity": "feature-isolation-20261118-153849",
+    "typescript": "10 selected tracked tests passed; 5 unused-import warnings prevent acceptance",
+    "csharp": "Compilation failed before tests: shared remember_semantic_projection was over-guarded",
+    "correction": "Shared method now available with CSharp or Angular; the five remaining imported symbols follow Angular availability",
+    "verification": "Subsequent source correction UNRUN; historical 10/10 belongs only to this capture source identity",
+    "archive": "verification/ci-verify-r1/feature-isolation-fifth-evidence.zip",
+    "archive_sha256": "e9b9ed67043bb5eac24f9c6fe5be27cd779248c36b5c216e1f8a82010e64bb6e",
+    "members": [
+      {
+        "entry": "feature-isolation-20261118-153849/csharp.log",
+        "sha256": "797396a0b4ac997f52e4dfe37cdedbfd28339d676aaf80cb0569f6235fa2e805"
+      },
+      {
+        "entry": "feature-isolation-20261118-153849/receipt.json",
+        "sha256": "2fbbbfb979508b88f1c4826729c294d55eedbc4742bd460160084102732ab73d"
+      },
+      {
+        "entry": "feature-isolation-20261118-153849/typescript.log",
+        "sha256": "a70980ed7495931a50b81d2a456fc800cf689eba13b8a47bc5a0a74dae83fc86"
+      }
+    ]
+  },
+  "sixth_feature_capture": {
+    "identity": "feature-isolation-20261118-155508",
+    "typescript": "10/10 selected tracked tests passed, exit 0, no warnings",
+    "csharp": "8/8 selected tracked tests passed, exit 0, three dead-code warnings still block acceptance",
+    "correction": "Native initializer collect/span and their imports follow TypeScript; the private MetaLayerContext initializer field and initializer follow TypeScript. Generic PassContext data and existing test compilation remain unchanged.",
+    "verification": "Latest source corrections UNRUN; clean TypeScript result belongs to captured source pins only",
+    "archive": "verification/ci-verify-r1/feature-isolation-sixth-evidence.zip",
+    "archive_sha256": "2432d3dba387c11f1e9dc4047c4e228dd8f555388fd4bd8a45e62a28a113f9db",
+    "members": [
+      {
+        "entry": "feature-isolation-20261118-155508/csharp.log",
+        "sha256": "d8deee96677b854ec9b212138ac0fbfa297d2a40c297d4bd3c63bb10c743eb3d"
+      },
+      {
+        "entry": "feature-isolation-20261118-155508/receipt.json",
+        "sha256": "264e1153e0f7a435e0816bddade8eb96c557c2bb9cf5047d2dcff6abf095fdf1"
+      },
+      {
+        "entry": "feature-isolation-20261118-155508/typescript.log",
+        "sha256": "e72bf677a3960d1391d9604334baf7e7892eb34ce071d262c946602023a9be72"
+      }
+    ]
+  },
+  "verified_resolution": {
+    "capture": "feature-isolation-20261118-160057",
+    "index": "verification/ci-verify-r1/feature-isolation-green-index.json",
+    "result": "All five focused configurations passed their complete selected tests with zero warnings",
+    "limits": "Focused source-pinned evidence only. Scoped Clippy, repository guards, refreshed owner descriptor, actual admission and full CI remain separate."
+  }
+}

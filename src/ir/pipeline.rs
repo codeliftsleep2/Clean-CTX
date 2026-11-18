@@ -61,22 +61,8 @@ pub use signature::MethodSig;
 use signature::parse_method_sig;
 pub(crate) use signature::{find_body_start_in, locate_method_body};
 
-/// Error type for pass execution.
-#[derive(Debug, Clone)]
-pub struct PassError {
-    /// Name of the pass that failed
-    pub pass_name: String,
-    /// Error message
-    pub message: String,
-}
-
-impl std::fmt::Display for PassError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "pass '{}' failed: {}", self.pass_name, self.message)
-    }
-}
-
-impl std::error::Error for PassError {}
+mod error;
+pub use error::PassError;
 
 /// Active nested-type scope: the class id plus the source span of the
 /// type declaration that owns it.
@@ -150,18 +136,25 @@ pub struct PassContext {
     /// TypeScript-local evidence; consumed only during this compilation.
     pub(crate) angular_initializers:
         Vec<crate::angular_meta::inject_evidence::ClassInitializerEvidence>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_class_actions: Vec<crate::angular_meta::ngrx::legacy::ClassActionEvidence>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_selector_declarations:
         Vec<crate::angular_meta::ngrx::selector_declarations::SelectorDeclarationEvidence>,
     /// Private compilation-scoped Action/type association; never a public entity.
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_action_type_bindings:
         Vec<crate::angular_meta::ngrx::type_binding::ActionTypeBinding>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_service_dispatches:
         Vec<crate::angular_meta::ngrx::service_owners::ServiceDispatch>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_constructor_dispatches:
         Vec<crate::angular_meta::ngrx::constructors::ConstructorDispatch>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_legacy_transitions:
         Vec<crate::angular_meta::ngrx::transitions::LegacyTransition>,
+    #[cfg(feature = "typescript")]
     pub(crate) ngrx_legacy_discriminants:
         Vec<crate::angular_meta::ngrx::discriminants::LegacyDiscriminantEvidence>,
     /// Current method being processed (F-27: O(1) tracking).
@@ -221,12 +214,19 @@ impl PassContext {
             typescript_authority: None,
             invocation_occurrences: Vec::new(),
             angular_initializers: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_class_actions: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_selector_declarations: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_action_type_bindings: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_legacy_transitions: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_legacy_discriminants: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_constructor_dispatches: Vec::new(),
+            #[cfg(feature = "typescript")]
             ngrx_service_dispatches: Vec::new(),
             current_method: None,
             current_control_summaries: Vec::new(),

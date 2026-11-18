@@ -22,7 +22,9 @@
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
+#[cfg(feature = "angular")]
 pub(crate) mod action_imports;
+#[cfg(feature = "typescript")]
 pub(crate) mod constructors;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_direct_import_dispatch.rs"]
@@ -33,17 +35,21 @@ mod extract;
 mod extract_selectors;
 #[cfg(test)]
 mod extraction_metrics;
+#[cfg(feature = "typescript")]
 pub(crate) mod legacy;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_legacy_discriminant.rs"]
 mod legacy_discriminant_tests;
 pub(crate) mod object_actions;
 pub(crate) mod object_registration;
+#[cfg(feature = "typescript")]
 pub(crate) mod selector_declarations;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_selector_reference_binding.rs"]
 mod selector_reference_binding_tests;
+#[cfg(feature = "angular")]
 pub(crate) mod selector_references;
+#[cfg(feature = "typescript")]
 pub(crate) mod service_owners;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_service_select_ownership.rs"]
@@ -52,14 +58,18 @@ mod shape;
 #[cfg(test)]
 #[path = "../tests/angular_meta/ngrx_store_receiver_qualification.rs"]
 mod store_receiver_qualification_tests;
+#[cfg(feature = "typescript")]
 pub(crate) mod transitions;
+#[cfg(feature = "typescript")]
 pub(crate) mod type_binding;
 
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.
 pub use extract::extract_ngrx_shape;
-pub(crate) use extract::{extract_ngrx_shape_with_regions, extract_ngrx_shape_with_sites};
-#[cfg(test)]
+pub(crate) use extract::extract_ngrx_shape_with_regions;
+#[cfg(feature = "angular")]
+pub(crate) use extract::extract_ngrx_shape_with_sites;
+#[cfg(all(test, feature = "angular"))]
 pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 
 // ---------------------------------------------------------------------------

@@ -356,6 +356,7 @@ pub(crate) fn extract_module_declarations(
 ///
 /// This reuses the same decorator collection and object-literal parser as the
 /// marker and semantic paths; it is not a second declaration parser.
+#[cfg(feature = "angular")]
 pub(crate) fn extract_component_template_url(raw_class: &str) -> Option<String> {
     let head_end = find_class_head_end(raw_class)?;
     let decorators = collect_decorators(&raw_class[..head_end]);

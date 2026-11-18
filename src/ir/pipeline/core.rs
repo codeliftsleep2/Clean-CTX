@@ -6,14 +6,18 @@ use crate::compaction::{
     extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::{CapturedNode, run_capture_pipeline_nodes};
+use crate::compression::capture_pipeline::{CapturedNode, run_core_capture_pipeline_nodes};
 use crate::ir::calls::{
     ARROW_NAME_CAPTURE, ARROW_ROOT_CAPTURE, CALL_ARGUMENT_CAPTURE, CALL_CALLEE_CAPTURE,
-    CALL_SPREAD_CAPTURE, capture_query,
+    CALL_SPREAD_CAPTURE,
 };
 use crate::ir::opcodes::{ControlSummary, CoreOp, DeclarationModifier};
 use crate::ir::symbol_table::SymbolKind;
 use std::collections::{HashMap, HashSet};
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/ir/ci_runtime_core_query.rs"]
+mod ci_runtime_query_tests;
 
 mod csharp;
 pub(crate) use csharp::CSharpDeclarationInputs;
@@ -59,25 +63,9 @@ impl IRPass for CoreIRPass {
         // ONE tree-sitter parse: the language's invocation-capture query (when a
         // native call producer exists) is compiled into the SAME query, so the
         // call facts are captured by the walk that already parses the file.
-        let mut capture_query = capture_query(&query_string);
-        if query_string == crate::queries::CS_QUERY {
-            capture_query.push('\n');
-            capture_query.push_str(crate::queries::CS_SEMANTIC_QUERY);
-        }
-        if query_string == crate::queries::TS_QUERY {
-            capture_query.push('\n');
-            capture_query.push_str(typescript::DECLARATION_QUERY);
-            capture_query.push('\n');
-            capture_query.push_str(crate::angular_meta::ngrx::legacy::QUERY);
-            capture_query.push_str(crate::angular_meta::ngrx::selector_declarations::QUERY);
-            capture_query.push_str(crate::angular_meta::ngrx::transitions::QUERY);
-            capture_query.push_str(crate::angular_meta::ngrx::constructors::QUERY);
-            capture_query.push_str(crate::angular_meta::ngrx::service_owners::QUERY);
-        }
-
-        let mut captures = run_capture_pipeline_nodes(
+        let mut captures = run_core_capture_pipeline_nodes(
             language,
-            &capture_query,
+            &query_string,
             &source,
             fidelity,
             |capture_name, raw, fidelity| match capture_name {
@@ -115,6 +103,7 @@ impl IRPass for CoreIRPass {
                 crate::ir::invocation_evidence::collect_invocations(&captures);
         }
 
+        #[cfg(feature = "typescript")]
         if query_string == crate::queries::TS_QUERY {
             state.angular_initializers = crate::angular_meta::inject_evidence::collect(
                 &source,
@@ -597,3 +586,7 @@ impl IRPass for LanguageLayerPass {
         Ok(())
     }
 }
+
+#[cfg(all(test, feature = "typescript"))]
+#[path = "../../tests/ir/native_feature_evidence.rs"]
+mod native_feature_evidence_tests;

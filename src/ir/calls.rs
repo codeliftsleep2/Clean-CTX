@@ -79,31 +79,16 @@ pub const ARROW_ROOT_CAPTURE: &str = "arrow.root";
 /// Returns `None` for every language without a native call producer, so those
 /// languages compile exactly as before.
 pub fn call_capture_query(base_query: &str) -> Option<&'static str> {
-    if base_query == crate::queries::CS_QUERY {
-        Some(crate::queries::CS_CALL_QUERY)
-    } else if base_query == crate::queries::TS_QUERY {
-        Some(crate::queries::TS_CALL_QUERY)
-    } else if base_query == crate::queries::JAVA_QUERY {
-        Some(crate::queries::JAVA_CALL_QUERY)
-    } else if base_query == crate::queries::RS_QUERY {
-        Some(crate::queries::RS_CALL_QUERY)
-    } else {
-        None
-    }
+    crate::queries::core_ir::call_capture_query(base_query)
 }
-
 /// The query string to run for one compilation: `base_query` plus the
 /// language's invocation-capture query when a producer exists.
 ///
 /// Both halves are compiled into ONE `Query` and walked in ONE parse, so the
 /// call producer never parses the file a second time.
 pub fn capture_query(base_query: &str) -> String {
-    match call_capture_query(base_query) {
-        Some(call_query) => format!("{base_query}\n{call_query}"),
-        None => base_query.to_string(),
-    }
+    crate::queries::core_ir::capture_query(base_query)
 }
-
 /// Open callable scope: the callable's `DefMethod` id plus the source span of
 /// the declaration that owns it.
 ///

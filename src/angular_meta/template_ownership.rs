@@ -4,10 +4,12 @@
 //! declaration authorities. Filename convention is a fallback route, not
 //! ownership evidence.
 
+#[cfg(feature = "angular")]
 use std::path::{Path, PathBuf};
 
 /// Return whether a TypeScript source structurally declares the target as an
 /// external component template.
+#[cfg(feature = "angular")]
 pub(crate) fn source_owns_external_template(
     source: &str,
     declaring_file: &Path,
@@ -40,6 +42,7 @@ pub(crate) fn source_owns_external_template(
         })
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn resolve_template_path(declaring_file: &Path, written: &str) -> Option<PathBuf> {
     let written = written.trim();
     if written.is_empty() || written.contains("://") {
@@ -55,6 +58,7 @@ pub(crate) fn resolve_template_path(declaring_file: &Path, written: &str) -> Opt
     }
 }
 
+#[cfg(feature = "angular")]
 fn normalize_lexically(path: &Path) -> PathBuf {
     use std::path::Component;
 

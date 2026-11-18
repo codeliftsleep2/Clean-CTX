@@ -5,6 +5,7 @@ use super::{
 use crate::ir::typescript_resolution::TypeScriptAuthority;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 
+#[cfg(feature = "angular")]
 pub(crate) fn project(
     source: &str,
     authority: &TypeScriptAuthority,

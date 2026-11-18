@@ -156,6 +156,7 @@ fn try_prepare_forward_edges(
         let csharp = context.csharp_catalog(state, &index, scope.as_ref());
         super::dotnet_testing::Catalog::build(state, &index, scope.as_ref(), &csharp)
     });
+    #[cfg(feature = "csharp")]
     let efcore_catalog = identity
         .exact()
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "DbContext")
@@ -197,6 +198,7 @@ fn try_prepare_forward_edges(
                 .unwrap_or_default(),
             );
         }
+        #[cfg(feature = "csharp")]
         if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
             super::edge_merge::append_distinct_json_edges(
                 &mut edges,
@@ -322,6 +324,7 @@ fn try_prepare_reverse_edges(
             let csharp = context.csharp_catalog(state, &index, scope.as_ref());
             super::dotnet_testing::Catalog::build(state, &index, scope.as_ref(), &csharp)
         });
+    #[cfg(feature = "csharp")]
     let efcore_catalog = identity
         .exact()
         .is_some_and(|exact| exact.domain == "dotnet" && exact.entity_type == "Entity")
@@ -363,6 +366,7 @@ fn try_prepare_reverse_edges(
                 .unwrap_or_default(),
             );
         }
+        #[cfg(feature = "csharp")]
         if let (Some(exact), Some(catalog)) = (identity.exact(), efcore_catalog.as_ref()) {
             super::edge_merge::append_distinct_json_edges(
                 &mut edges,

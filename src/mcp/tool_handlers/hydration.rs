@@ -38,12 +38,13 @@ pub(super) use execution::{hydrate_workspace_index_for, hydrate_workspace_index_
 
 mod filesystem;
 mod filesystem_discovery;
-#[cfg(feature = "csharp")]
 pub(crate) use filesystem::configured_roots as dependency_roots;
+pub(crate) use filesystem::effective_refresh_roots;
+#[cfg(feature = "angular")]
+pub(crate) use filesystem::source_candidates_containing;
 #[cfg(any(feature = "csharp", all(test, feature = "rust")))]
 pub(crate) use filesystem::source_inventory;
 use filesystem::{RootInventoryManifest, configured_roots, deduplicate_roots, root_key};
-pub(crate) use filesystem::{effective_refresh_roots, source_candidates_containing};
 use filesystem_discovery::filesystem_only_discovery;
 
 mod invalidation;

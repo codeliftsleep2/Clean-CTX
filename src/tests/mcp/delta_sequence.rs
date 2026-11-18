@@ -1,3 +1,5 @@
+#![cfg(feature = "typescript")]
+
 use crate::mcp::tools::dispatch_tools_call;
 use serde_json::{Value, json};
 

@@ -533,3 +533,5 @@ pub const JAVA_QUERY: &str = r#"
     ; `switch_statement`) since Java 14 unified switch expression syntax.
     (switch_expression) @switch.root
 "#;
+
+pub(crate) mod core_ir;

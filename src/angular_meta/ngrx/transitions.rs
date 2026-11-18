@@ -5,32 +5,8 @@ use crate::ir::invocation_evidence::SourceSpan;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub(crate) const QUERY: &str = r#"
-(program (function_declaration parameters: (formal_parameters
-        . (required_parameter !value pattern: (identifier) @ngrx.transition.state_parameter)
-        . (required_parameter !value pattern: (identifier) @ngrx.transition.parameter
-            type: (type_annotation (type_identifier) @ngrx.transition.parameter_type)) .)
-    body: (statement_block
-        (switch_statement value: (parenthesized_expression
-            (member_expression !optional_chain
-                object: (identifier) @ngrx.transition.receiver
-                property: (property_identifier) @ngrx.transition.property))
-            body: (switch_body
-                (switch_case value: (identifier) @ngrx.transition.reference) @ngrx.transition.case)) @ngrx.transition.switch)) @ngrx.transition.owner)
-(program (export_statement declaration: (function_declaration parameters: (formal_parameters
-        . (required_parameter !value pattern: (identifier) @ngrx.transition.state_parameter)
-        . (required_parameter !value pattern: (identifier) @ngrx.transition.parameter
-            type: (type_annotation (type_identifier) @ngrx.transition.parameter_type)) .)
-    body: (statement_block
-        (switch_statement value: (parenthesized_expression
-            (member_expression !optional_chain
-                object: (identifier) @ngrx.transition.receiver
-                property: (property_identifier) @ngrx.transition.property))
-            body: (switch_body
-                (switch_case value: (identifier) @ngrx.transition.reference) @ngrx.transition.case)) @ngrx.transition.switch)) @ngrx.transition.owner))
-(for_in_statement kind: ["var" "let" "const"] left: (_) @ngrx.transition.unsupported_loop)
-
-"#;
+#[cfg(all(test, feature = "typescript"))]
+pub(crate) use crate::queries::core_ir::NGRX_TRANSITIONS_QUERY as QUERY;
 
 #[derive(Debug, Clone)]
 pub(crate) struct LegacyTransition {

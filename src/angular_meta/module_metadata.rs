@@ -5,9 +5,9 @@ use crate::layers::meta::semantic::{
 };
 use std::path::Path;
 
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 mod canonical;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 mod standalone;
 #[cfg(feature = "typescript")]
 pub(crate) const DECLARATION_FIELDS: &[&str] = &[
@@ -35,6 +35,7 @@ pub(crate) const DECLARATION_FIELDS: &[&str] = &[
     "useExisting",
 ];
 #[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) fn project_authoritative(
     authority: &crate::ir::typescript_resolution::TypeScriptAuthority,
     start: usize,

@@ -117,21 +117,25 @@ impl HydrationFlightRegistry {
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     pub(crate) fn test_arm(&self) {
         self.test.arm();
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     pub(crate) fn test_wait_for_leader(&self) {
         self.test.wait_for_leader();
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     pub(crate) fn test_wait_for_followers(&self, count: usize) {
         self.test.wait_for_followers(count);
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     pub(crate) fn test_release(&self) {
         self.test.release();
     }
@@ -180,6 +184,7 @@ struct FlightTestSupport {
 
 #[cfg(test)]
 impl FlightTestSupport {
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     fn arm(&self) {
         *self
             .state
@@ -219,6 +224,7 @@ impl FlightTestSupport {
         }
     }
 
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     fn wait_for_leader(&self) {
         let mut state = self
             .state
@@ -232,6 +238,7 @@ impl FlightTestSupport {
         }
     }
 
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     fn wait_for_followers(&self, count: usize) {
         let mut state = self
             .state
@@ -245,6 +252,7 @@ impl FlightTestSupport {
         }
     }
 
+    #[cfg(any(feature = "rust", feature = "dotnet"))]
     fn release(&self) {
         let mut state = self
             .state

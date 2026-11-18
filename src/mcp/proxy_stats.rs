@@ -96,6 +96,7 @@ pub fn fetch_proxy_stats(proxy_port: u16) -> Option<ProxyStatsResponse> {
 }
 
 #[cfg(test)]
+#[cfg(feature = "typescript")]
 pub(crate) fn inject_test_proxy_stats(stats: ProxyStatsResponse) {
     if let Ok(mut injected) = TEST_PROXY_STATS.lock() {
         *injected = Some(stats);

@@ -16,6 +16,22 @@ mod tests {
                 public DbSet<Order> Orders { get; set; }
             }
         "#;
+        let analysis =
+            crate::dotnet_meta::efcore::analyze_authorized_efcore(source, Fidelity::Medium)
+                .unwrap();
+        let targets: Vec<_> = analysis
+            .semantic_edges
+            .iter()
+            .map(|edge| {
+                assert_eq!(
+                    edge.relation,
+                    crate::layers::meta::semantic::SemanticRelation::HasEntity
+                );
+                assert_eq!(edge.subject.name, "AppDbContext");
+                edge.object.name.as_str()
+            })
+            .collect();
+        assert_eq!(targets, vec!["User", "Order"]);
         let result = extract_efcore(source, Fidelity::Medium);
         assert!(result.is_some());
         let block = result.unwrap();

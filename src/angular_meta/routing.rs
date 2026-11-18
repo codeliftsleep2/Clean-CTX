@@ -467,7 +467,7 @@ pub(crate) fn extract_route_shape_at_with_regions(
     (!shape.is_empty()).then_some(shape)
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 // ---------------------------------------------------------------------------
 // Expansion

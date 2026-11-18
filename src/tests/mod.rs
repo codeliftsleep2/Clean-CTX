@@ -75,6 +75,6 @@ mod integration;
 #[path = "encoding.rs"]
 mod encoding;
 
-#[cfg(any(feature = "rust", all(feature = "typescript", feature = "angular")))]
+#[cfg(any(feature = "rust", feature = "typescript"))]
 #[path = "mcp/angular_authority_fixture.rs"]
 pub(crate) mod angular_authority_fixture;

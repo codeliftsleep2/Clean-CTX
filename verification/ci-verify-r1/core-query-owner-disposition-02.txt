@@ -1,0 +1,194 @@
+# CI-VERIFY-R1 — Owner Disposition 02
+## Closed Registration of Complete Core IR Queries
+
+Agent MaxHeadRoom,
+
+The proposed bounded extension of the existing closed query registration mechanism is approved under the AGENTS.md Architectural Approval Gate.
+
+The confirmed RED demonstrates redundant compilation of an invariant complete IR query during warmed execution. The reported capture and IR equality assertions passed.
+
+This authorization permits reuse of the complete binary-owned TypeScript and C# IR query definitions. It does not authorize general-purpose query caching.
+
+## 1. Authorized implementation
+
+Approve the proposed extension involving:
+
+- src/ir/pipeline/core.rs
+- src/ir/pipeline/core/query_definition.rs
+- src/compression/capture_pipeline.rs
+
+Approve the additional closed registration identities:
+
+- RegisteredQuery::TypeScriptIR
+- RegisteredQuery::CSharpIR
+
+Reuse the existing registered-query OnceLock mechanism.
+
+Preserve a single authoritative composition mechanism for the complete IR query definitions.
+
+The registered and dynamic paths must consume equivalent query definitions rather than maintain independently evolving copies.
+
+Registration eligibility requires the exact supported binary-owned base definition and its matching grammar.
+
+Arbitrary, custom, runtime-dependent, mismatched-grammar and otherwise unregistered queries must retain their existing dynamic compilation behavior.
+
+No additional language registrations are authorized by this disposition.
+
+## 2. Architectural dependency review
+
+Before applying the proposed implementation, verify the architectural validity of the dependency from compression/capture_pipeline.rs to CoreIRPass::complete_query_definition.
+
+The IR producer already consumes the capture pipeline.
+
+Do not introduce an architectural layer violation merely because Rust permits the resulting module references.
+
+If the proposed dependency conflicts with an existing controlling architectural requirement, identify the smallest compliant ownership arrangement.
+
+Reuse existing mechanisms.
+
+Do not introduce a generic query registry, plugin system, dependency injection framework or new caching architecture.
+
+If a compliant arrangement requires a material architectural expansion, stop and return the decision.
+
+## 3. Prior decision amendment
+
+The earlier disposition in SEMANTIC_QUERY_PERFORMANCE_ARCHITECTURE_IMPLEMENTATION_2026-10-16.md explicitly retains dynamic compilation.
+
+Approve a narrow prospective amendment:
+
+Retain dynamic compilation for arbitrary, custom, runtime-dependent and unregistered query definitions. Permit closed registration of the complete binary-owned TypeScript and C# IR query definitions when their exact definition and matching grammar are established.
+
+Preserve the earlier decision and its historical applicability.
+
+Do not reinterpret this amendment as authorization for arbitrary query-text caching.
+
+Prepare the applicable protected-authority amendment and obtain the required B11 owner-operated authorization.
+
+This disposition is not itself a generated predecessor-bound authorization artifact.
+
+## 4. Required semantic preservation
+
+Preserve:
+
+- Exact complete query composition and ordering.
+- Capture names, identities, ordering and multiplicity.
+- TypeScript declaration and invocation semantics.
+- C# invocation and semantic captures.
+- All existing NgRx query contributions.
+- Fidelity-dependent processing.
+- Source parsing and parser behavior.
+- Independent query cursor state.
+- Existing error and refusal behavior.
+- Dynamic/custom query semantics.
+- Existing feature and grammar applicability.
+- Resulting canonical IR behavior.
+
+Do not cache source trees, captures, cursors, source-dependent semantic results or workspace authority.
+
+The compiled query must remain immutable and independent of source, workspace, runtime configuration and fidelity.
+
+Verify that every query composition input satisfies that condition.
+
+## 5. Cache correctness and lifecycle
+
+Preserve the existing closed registration lifecycle.
+
+The extension adds exactly two bounded process-lifetime registrations.
+
+Verify:
+
+- Cold initialization.
+- Warm reuse.
+- Concurrent first access.
+- Independent concurrent query execution.
+- Grammar identity correctness.
+- Feature-disabled behavior.
+- Compilation failure handling.
+- Dynamic fallback behavior for nonregistered definitions.
+
+The existing cached compilation-error semantics may be reused only where the complete definition and grammar are genuinely immutable.
+
+Do not introduce retries, eviction, global query maps, synchronization around source parsing or new cache invalidation mechanisms.
+
+## 6. RED/GREEN verification
+
+Preserve the exact confirmed RED witness and its baseline evidence.
+
+The warmed registered IR path must demonstrate that it no longer recompiles the complete query.
+
+Use deterministic compilation-count evidence rather than a wall-clock threshold as the primary mandatory regression assertion.
+
+Preserve the capture and IR equality assertions.
+
+Establish focused coverage for both TypeScript and C#.
+
+Demonstrate exact equivalence between the registered and dynamic complete-query paths across applicable existing fixtures.
+
+Include relevant declaration, invocation, semantic and NgRx captures.
+
+Verify independent execution against distinct sources and applicable fidelity levels.
+
+Verify that custom queries and mismatched grammars do not accidentally select a closed registration.
+
+Do not weaken existing regression assertions.
+
+## 7. Performance evidence
+
+The reported 0.835-second warmed-path observation establishes a concrete measurement requiring appropriate attribution.
+
+Do not assume that this entire duration is query compilation cost.
+
+Separate, where applicable:
+
+- Complete query definition construction.
+- Query compilation.
+- Source parsing.
+- Capture execution.
+- IR construction.
+- Cold initialization.
+- Warm execution.
+- Enclosing operation cost.
+
+Evaluate the incremental retained-memory and initialization costs of the two additional compiled queries.
+
+Use the existing AF-PERF-002 decision criteria.
+
+The mandatory deterministic regression must remain part of ordinary correctness verification.
+
+Repeated timing studies belong to the explicitly invoked performance workflow under CI-VERIFY-R1.
+
+Do not claim full CI improvement until comparable CI execution evidence establishes it.
+
+Do not extrapolate one warmed-path measurement across the entire test suite.
+
+## 8. Architectural knowledge continuity
+
+Record the demonstrated redundant compilation, earlier decision, prospective amendment, selected implementation, rejected alternatives and verification obligations in the governing CI-VERIFY-R1 knowledge representation.
+
+Associate exact supporting RED/GREEN evidence and performance observations.
+
+Ensure all newly created or substantively modified documents are directly admitted or represented by the appropriate governed document.
+
+Run the actual document admission checker before pushing.
+
+Resolve every applicable admission blocker.
+
+Verify graph discoverability.
+
+Do not generate or submit protected-authority authorization on behalf of the owner.
+
+## 9. Execution boundary
+
+This disposition authorizes the bounded architectural extension and associated source implementation, subject to the dependency and governance requirements above.
+
+It does not authorize additional long-running Cargo commands, tests, builds, benchmarks or runtime invocations.
+
+Prepare the exact focused operator verification handoff.
+
+Full repository verification remains CI-owned.
+
+Do not launch another broad performance investigation.
+
+Proceed with the bounded extension. Stop if the required semantic or architectural preservation cannot be achieved within this authorization.
+
+Commander Shepard — Normandy Mission Control.

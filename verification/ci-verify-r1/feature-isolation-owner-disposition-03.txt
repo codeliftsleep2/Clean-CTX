@@ -1,0 +1,169 @@
+# CI-VERIFY-R1 — Owner Disposition 03
+## Bounded Feature-Isolation Correctness Repair
+
+Agent MaxHeadRoom,
+
+The bounded feature-gating repair is approved under the AGENTS.md Architectural Approval Gate.
+
+This disposition expands the previous authorization only as necessary to restore the established feature-isolated compilation and execution contracts required for the closed Core IR query registration verification.
+
+The reported evidence establishes:
+
+- Frozen query definition verification passed.
+- All eight all-feature controls passed across two captures.
+- C#-only compilation is blocked by 63 compilation errors.
+- All eleven diagnosed source files match the committed baseline.
+
+Preserve these results under their actual source, feature configuration and execution identities.
+
+## 1. Establish the existing feature contract
+
+Acquire the applicable controlling architectural knowledge concerning:
+
+- Language feature isolation.
+- Language registration and dispatch.
+- Conditional compilation.
+- Core IR and capture pipeline ownership.
+- Semantic producer applicability.
+- Final verification obligations.
+
+Inspect the actual Cargo feature declarations and existing feature-specific compilation boundaries.
+
+Establish which feature combinations the repository currently promises to support.
+
+Do not invent a new supported-feature matrix or reinterpret an existing feature as requiring unrelated language functionality.
+
+## 2. Diagnose the complete failure set
+
+Preserve the exact C#-only compilation failure receipt.
+
+Classify all 63 reported errors by root cause.
+
+Distinguish primary feature-wiring defects from cascading compiler diagnostics.
+
+Identify the affected source files, imports, module declarations, types, implementations and dispatch boundaries.
+
+Establish whether each proposed correction restores an existing feature contract or requires an architectural change.
+
+Do not assume that 63 compiler errors require 63 independent repairs.
+
+## 3. Authorized repair
+
+Authorize the smallest architecturally correct changes necessary to restore the existing feature-isolated compilation contract.
+
+Permitted changes include:
+
+- Correcting misplaced or missing conditional compilation attributes.
+- Correcting feature-specific imports.
+- Correcting conditional module registration.
+- Correcting feature-specific implementation applicability.
+- Correcting dispatch wiring to respect existing language availability.
+
+Preserve the existing feature definitions and intended dependency boundaries.
+
+Do not enable TypeScript, Angular or another unrelated feature merely to make C#-only compilation succeed.
+
+Do not introduce placeholder implementations, fabricated semantic results, unconditional success paths or silent capability degradation.
+
+Do not suppress compiler warnings or errors.
+
+## 4. Preserve architectural and semantic behavior
+
+Preserve:
+
+- Existing all-feature behavior.
+- Existing supported isolated-feature behavior.
+- Language and grammar identity.
+- Registered query eligibility.
+- Complete query definition composition.
+- Dynamic/custom query compilation.
+- Source parsing and independent cursor execution.
+- Semantic producer applicability.
+- Canonical IR behavior.
+- Existing failure and refusal contracts.
+
+An unavailable language feature must remain unavailable according to its established contract.
+
+Compilation success must not be obtained by silently removing functionality that the enabled feature is required to provide.
+
+## 5. Closed registration verification
+
+Complete the previously authorized disabled-feature proof.
+
+Establish that:
+
+- C#-only compilation succeeds under its actual supported feature configuration.
+- The C# complete IR query registration remains available and correct.
+- TypeScript-specific registrations cannot execute when TypeScript is unavailable.
+- Existing unavailable-language behavior remains intact.
+- Dynamic/custom query behavior remains correct.
+- Applicable TypeScript-only controls remain valid.
+- All-feature behavior remains preserved after the feature-wiring changes.
+
+Verify other supported feature combinations where the repaired shared boundaries materially affect them.
+
+Do not launch an exhaustive combinatorial feature campaign without demonstrated need.
+
+## 6. RED/GREEN evidence
+
+Preserve the original 63-error compilation failure as the historical RED witness.
+
+Establish GREEN using the same applicable feature configuration after repair.
+
+Retain the previously successful frozen-definition and eight all-feature controls under their original execution identities.
+
+Do not relabel those historical results as post-repair verification.
+
+Identify the smallest focused post-repair verification necessary to establish preservation of the affected contracts.
+
+Compilation GREEN alone does not establish behavioral correctness.
+
+## 7. Scope and escalation boundary
+
+This authorization does not permit:
+
+- Redesigning the Cargo feature architecture.
+- Introducing new feature dependencies.
+- Changing public feature definitions.
+- Broad module restructuring.
+- New language registration mechanisms.
+- General-purpose query caching.
+- Unrelated production performance remediation.
+
+If a correct repair requires any of these changes, stop and return the exact architectural blocker and proposed disposition.
+
+The existing eleven-file diagnostic footprint is evidence, not automatic authorization to modify every file or expand beyond the demonstrated root causes.
+
+## 8. Architectural knowledge continuity
+
+Record the existing feature-isolation defect, exact failure evidence, root causes, owner disposition, repair and verification obligations.
+
+Represent the work in the applicable CI-VERIFY-R1 governing knowledge document.
+
+Associate the supporting source, compiler and regression evidence through the existing knowledge graph mechanisms.
+
+Preserve the distinction between the closed query registration optimization and the pre-existing feature-wiring repair.
+
+Complete all applicable document admission checks before publication.
+
+B11 protected-authority authorization remains pending.
+
+Do not create or submit owner authorization on behalf of the owner.
+
+Do not treat this architectural disposition as a substitute for the required predecessor-bound authorization.
+
+## 9. Execution boundary
+
+This disposition authorizes the bounded investigation and source repair.
+
+It does not authorize additional long-running Cargo commands, compilation runs, tests, benchmarks or runtime invocations.
+
+Prepare the exact focused operator verification commands under the established execution policy.
+
+Full repository verification remains CI-owned.
+
+Do not publish until the applicable governance and verification prerequisites are satisfied.
+
+Proceed with the bounded feature-isolation repair and complete the previously required disabled-feature proof.
+
+Commander Shepard — Normandy Mission Control.

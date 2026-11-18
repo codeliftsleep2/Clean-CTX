@@ -1,0 +1,245 @@
+{
+  "category": "Scoped lint/guards and actual document admission; not full CI or end-to-end performance acceptance",
+  "archive": "verification/ci-verify-r1/core-query-admission-evidence.zip",
+  "archive_sha256": "7a3106e534aa5b4070636eedeefcb5d2cf46c46d4fe1999673145f8dbe44b65f",
+  "members": [
+    {
+      "entry": "checkpoint-continuation-20261118-161906/active-size-receipt.json",
+      "sha256": "2d3d8691ae7ede36c6656dbf46be0c2611d875c8c0eb9f0c0aacd2ee8f7b42dd"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/active-size.log",
+      "sha256": "11667c06b152299a4b7e6f8c3b1f8fef0ca9d1bce6fd8b1fc197f06fde410d67"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/candidate-sources.json",
+      "sha256": "6792b9360cfa31184ec51b457b11a136eebd3cf16dca1b815ecb7b7ed4daa5af"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/case-helper-format-receipt.json",
+      "sha256": "8189af656da57082d3efb4e11be6e0a8c91d84751ea07682ac74f1a3f3a2ffa3"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/case-helper-format.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/descriptor-stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/descriptor.json",
+      "sha256": "4466123db1ace57e62ca169f2fff6d5facac4c84d8405d1542e10d9ecf8ef06b"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/measurement-registration-only-receipt.json",
+      "sha256": "76bfb45a7be0db76c5ac9a428a5a742837251e2613f6501631179d98cfbe8749"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/measurement-registration-only.log",
+      "sha256": "e70596acadfe71c11c41d6b411d129392bec5a10268dd93e3ea0243b45d65de0"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/root-library-tests-clippy-receipt.json",
+      "sha256": "ad6257b09447a2224780be9febc613a3481b2231068bce04547bdce8a50007e7"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/root-library-tests-clippy.log",
+      "sha256": "6f994a28d8aa6499b6d0d9b764dca10728eddc6c4f73a43c7b0bfbdcf965d197"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/utf8-receipt.json",
+      "sha256": "c7824f255a394e7e68e13d020957cdb09e9c26ee97ee9cb404ceff9cfd3ac68b"
+    },
+    {
+      "entry": "checkpoint-continuation-20261118-161906/utf8.log",
+      "sha256": "4abf8d824a2d6d9b8f7bd85c3044b04227b9f714bf072b4e07dd92ba8495abcf"
+    },
+    {
+      "entry": "admission-20261118-162951/acquire.json",
+      "sha256": "15e4642ae617959bb57d68a63ddbac88f82c1c05bea9dedd5838ff5c53260cd3"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/0.request.json",
+      "sha256": "3c5477dd391e9ec494c121f09e20831033f9ba93df560bd5e930c59321b1d090"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/0.response.json",
+      "sha256": "4db5929a547cdf077b21d2b3697c1412be19c788248ed2eed5d5c51db21eaeb2"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/1.request.json",
+      "sha256": "a7856db3c8107662deedb631a8232e4312e1fd0ead06fd15e23ea1504dfd6565"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/1.response.json",
+      "sha256": "fa89bf44f2dd0d8ef4e888630740bc4f779232a73a4dcc07be7cce5cd9e12fcc"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/2.payload.json",
+      "sha256": "96afd446e41e9545b1324bd5f204344203b9230978da493bf5526e50bebd7041"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/2.request.json",
+      "sha256": "32aae7ed6e66f04388ee81834498bb4be4167b39db366c19e8c4723aa711d0bb"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/2.response.json",
+      "sha256": "42dbf638785baeb704e860dfe93e8bcec9afdd10c1f23cba7ad38040d84f96c4"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/2.serialized-result.json",
+      "sha256": "1ebe102ab4313b94c66b35fb5deae05420c5095eed0ace90c7b8668b9335f163"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/queries.json",
+      "sha256": "15e4642ae617959bb57d68a63ddbac88f82c1c05bea9dedd5838ff5c53260cd3"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/receipt.json",
+      "sha256": "6899a879ef7f0090c82eccbec1bb75c4fa177618f56c439219afa0b4e43088b9"
+    },
+    {
+      "entry": "admission-20261118-162951/acquisition/stderr.txt",
+      "sha256": "96dc3ab00b017c9f667a669257205d449196c2a133ca6a20eb8988ed9aaea18c"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/0.request.json",
+      "sha256": "3c5477dd391e9ec494c121f09e20831033f9ba93df560bd5e930c59321b1d090"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/0.response.json",
+      "sha256": "4db5929a547cdf077b21d2b3697c1412be19c788248ed2eed5d5c51db21eaeb2"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/1.request.json",
+      "sha256": "a7856db3c8107662deedb631a8232e4312e1fd0ead06fd15e23ea1504dfd6565"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/1.response.json",
+      "sha256": "fa89bf44f2dd0d8ef4e888630740bc4f779232a73a4dcc07be7cce5cd9e12fcc"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/2.payload.json",
+      "sha256": "6d4e322a95ea496d072e0a406f7b4c68fbf88c8159fde7145f1bd215b64f6ee9"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/2.request.json",
+      "sha256": "84200737785d59369bd34607bf60a0851f5ed6022e1ced83ae56cfe1b8b35642"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/2.response.json",
+      "sha256": "2d4c1c964f3b1a3ee4a9f372dbb3c04a274c8b3787c221a3673ef09f1eed555b"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/2.serialized-result.json",
+      "sha256": "8c3b1f55c9ef27053de82f10d270ac3c6e205590623d97b41bbd7cbcae74e2b7"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/3.payload.json",
+      "sha256": "bcfa54d82791be9792439384542842d30b2bfe36d377c3a81e986e1a08e9e402"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/3.request.json",
+      "sha256": "c9743d1a25036b73b8ad7fa9e2eaa5d7017cc2ee09fd7585013204d0c3571062"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/3.response.json",
+      "sha256": "04df84caeca92db684685ef84f1ddbb6690c7cc5558a9d8d0dc664c5d5be81a2"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/3.serialized-result.json",
+      "sha256": "efd2b5a4aa4998051598edc86bbf1c582c44bb3fdaa0419249d398dbbcc9cb81"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/4.payload.json",
+      "sha256": "f744c379111213ccd01ef21b223162cd61c9a7232c3ec9ad39aa70aec04f2918"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/4.request.json",
+      "sha256": "0a7f3818d318a41d8b7fbc8c32d0660e81cb36d81bc503fa062bbe555242da99"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/4.response.json",
+      "sha256": "84ca1f9a41da26e5ed3231548e84791c437979f71c9b27d707f7379b16cad1eb"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/4.serialized-result.json",
+      "sha256": "b45ba1933e59ae1cc36c714c79eb3a27416c6844977ac2d0c93cf37d3abab45b"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/5.payload.json",
+      "sha256": "0be142d438750e1ea039373fa9d168317a99ab2cf4d796f8ec6f7b903ea1b321"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/5.request.json",
+      "sha256": "e502783962c62f4b5d9ea436ed6f63439f83f2ea78deb0abd2cb9d6d1ac7401d"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/5.response.json",
+      "sha256": "7d8ad9b6326c7afbb22009830dad955c593de238550674f7218959edd6a2d0ac"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/5.serialized-result.json",
+      "sha256": "daa9cf947f54f9115dea3775acc240a77ec85cbbf8561fda4a6f282d60e5fd39"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/6.payload.json",
+      "sha256": "cc1abc9120c520d50e1cc22c9719b1792da613a96d871448ca2528ae47138f1b"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/6.request.json",
+      "sha256": "e37e134c97b0702c61c696bd7a4475ec4f4647e1ffb2b81b0729ecb0e4ce518b"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/6.response.json",
+      "sha256": "7e6dc03d0de72509dfd81297dfa804fb464504f1db55116eb233379cebccc406"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/6.serialized-result.json",
+      "sha256": "81703c9105d7086e051b7ba4d14980088e059c01733f724c78473d6aeb9c4710"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/queries.json",
+      "sha256": "7a4d11241015a9895ae0ef68ade664276eb7029fcde2c52e72a86fd4fe0248e8"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/receipt.json",
+      "sha256": "508ffac0b7cae774611df4d0ce0327660586875161b57b66a01a10a07e8ac227"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts/stderr.txt",
+      "sha256": "f4ce93c8fb904479d44be19d976a12c414667aff2177ed33eb3dc61935e365bc"
+    },
+    {
+      "entry": "admission-20261118-162951/contexts.json",
+      "sha256": "7a4d11241015a9895ae0ef68ade664276eb7029fcde2c52e72a86fd4fe0248e8"
+    },
+    {
+      "entry": "admission-20261118-162951/receipt.json",
+      "sha256": "031acca8d01ad7c6b4be1afba4e6d1d7582aada0acade986833af0a99f9532c6"
+    }
+  ],
+  "checkpoint": "target/ci-verify-r1/checkpoint-continuation-20261118-161906",
+  "checkpoint_results": "Clippy library/tests all-features -D warnings, strict UTF8, active file sizes and eighteen measurement registrations all passed",
+  "admission": {
+    "agent": "Agent MaxHeadRoom",
+    "category": "Actual document admission and source discoverability, not CI or empirical performance",
+    "reviewed_digest": "b6ee555e27f4bdffd456c80b1f64d0664ae9dca9cfc32672b71570fa8957d737",
+    "generation": "d64fb91b0cda1c475a5e58dd8a1157f72a2d2da2d2a173f0a97cee492acbf69f",
+    "ids": [
+      "VERIFY-001",
+      "VERIFY-002",
+      "AUTH.FINAL_VERIFICATION",
+      "PERF-004-DOCTRINE",
+      "PERF-005-BOUNDED"
+    ],
+    "acquisition_sha256": "96AFD446E41E9545B1324BD5F204344203B9230978DA493BF5526E50BEBD7041"
+  },
+  "source_acquisition": {
+    "result_state": "ready",
+    "complete": true,
+    "catalog_current": true
+  },
+  "limits": "Evidence applies to captured source identities. Final mission-record authoring below is subsequent; re-admit final documentation before delivery. Full CI, complete runtime accounting and CI performance comparison remain open."
+}

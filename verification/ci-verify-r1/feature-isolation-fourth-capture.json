@@ -1,0 +1,493 @@
+{
+  "capture": "feature-isolation-20261118-150244",
+  "typescript_result": "7 selected tracked controls passed, exit 0; 117 warnings prevent acceptance",
+  "csharp_result": "Compilation failed with two shared discovery references and one unused import; no selected controls executed",
+  "attribution": "Over-broad discriminant module guard corrected by retaining grammar-optional discovery and guarding native evidence only; obsolete known_types glob import removed",
+  "warning_reconciliation": "Angular-only projection and admission definitions aligned with their consumers; CSharp-only query merge and instrumentation aligned with CSharp. Remaining native evidence fields and feature-specific observations still under reconciliation. No post-edit verification.",
+  "archive": "verification/ci-verify-r1/feature-isolation-typescript-evidence.zip",
+  "archive_sha256": "9bfef3811c4ef6703035e03f54df09aae2a0be9ffd3e04f08abc25cd176f56e3",
+  "members": [
+    {
+      "entry": "feature-isolation-20261118-150244/csharp.log",
+      "sha256": "7207c8a74ef1aaab413ca9866d04408d5482cbb27c5cd600cc269de6c6cc5bc9"
+    },
+    {
+      "entry": "feature-isolation-20261118-150244/receipt.json",
+      "sha256": "e9bfa5c6a3e8d85b741d6802a814c3413d52e85dbe462a6ae611559dde396347"
+    },
+    {
+      "entry": "feature-isolation-20261118-150244/typescript.log",
+      "sha256": "6553fe645e68c804bbcc5c34808fb62c6b23c909f03fa609f305d0e807fb4462"
+    }
+  ],
+  "typescript_warning_diagnostics": [
+    {
+      "diagnostic": "method `invocation_evidence` is never used",
+      "location": "src/mcp/semantic_compilation/artifact.rs:449:19"
+    },
+    {
+      "diagnostic": "methods `reset_test_full_semantic_parses` and `test_full_semantic_parses` are never used",
+      "location": "src/mcp/semantic_compilation/executor.rs:101:19"
+    },
+    {
+      "diagnostic": "method `remember_semantic_projection` is never used",
+      "location": "src/mcp/durable_semantics.rs:319:19"
+    },
+    {
+      "diagnostic": "function `append_distinct_json_edges` is never used",
+      "location": "src/mcp/tool_handlers/query/edge_merge.rs:6:15"
+    },
+    {
+      "diagnostic": "function `same_semantic_identity` is never used",
+      "location": "src/mcp/tool_handlers/query/edge_merge.rs:21:4"
+    },
+    {
+      "diagnostic": "function `reset` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:108:15"
+    },
+    {
+      "diagnostic": "function `snapshot` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:112:15"
+    },
+    {
+      "diagnostic": "function `record_ef_dependency_inventory` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:132:15"
+    },
+    {
+      "diagnostic": "function `record_ef_dependency_syntax_parse` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:136:15"
+    },
+    {
+      "diagnostic": "function `record_ef_catalog_build` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:187:10"
+    },
+    {
+      "diagnostic": "function `record_ef_catalog_reuse` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:188:10"
+    },
+    {
+      "diagnostic": "function `record_ef_configuration_declaration` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:190:5"
+    },
+    {
+      "diagnostic": "function `record_ef_configuration_reference_comparison` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:194:5"
+    },
+    {
+      "diagnostic": "function `record_ef_context_declaration` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:198:5"
+    },
+    {
+      "diagnostic": "function `record_ef_context_reference_comparison` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:202:5"
+    },
+    {
+      "diagnostic": "function `record_ef_model_occurrence` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:205:10"
+    },
+    {
+      "diagnostic": "function `record_ef_owner_reference_comparison` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:207:5"
+    },
+    {
+      "diagnostic": "function `record_ef_synthetic_type_parse` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:210:10"
+    },
+    {
+      "diagnostic": "function `record_ef_assembly_configuration_comparison` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:212:5"
+    },
+    {
+      "diagnostic": "function `record_ef_project_root_lookup` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:215:10"
+    },
+    {
+      "diagnostic": "function `record_ef_project_root_filesystem_resolution` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:217:5"
+    },
+    {
+      "diagnostic": "function `record_ef_project_root_cache_hit` is never used",
+      "location": "src/mcp/tool_handlers/query/work_metrics.rs:220:10"
+    },
+    {
+      "diagnostic": "function `has_owner` is never used",
+      "location": "src/angular_meta/application_config_providers.rs:8:15"
+    },
+    {
+      "diagnostic": "function `admits` is never used",
+      "location": "src/angular_meta/application_config_providers.rs:77:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/application_config_providers.rs:81:15"
+    },
+    {
+      "diagnostic": "fields `selector` and `pipe_name` are never read",
+      "location": "src/angular_meta/class_role_authority.rs:7:9"
+    },
+    {
+      "diagnostic": "function `has_decorated_class` is never used",
+      "location": "src/angular_meta/class_role_authority.rs:97:15"
+    },
+    {
+      "diagnostic": "function `has_class_role` is never used",
+      "location": "src/angular_meta/class_role_authority.rs:138:15"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/constructor_authority.rs:8:15"
+    },
+    {
+      "diagnostic": "function `has_role` is never used",
+      "location": "src/angular_meta/functional_authority.rs:30:15"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/inject_authority.rs:12:15"
+    },
+    {
+      "diagnostic": "field `optional_call` is never read",
+      "location": "src/angular_meta/inject_evidence.rs:29:9"
+    },
+    {
+      "diagnostic": "function `project_authoritative` is never used",
+      "location": "src/angular_meta/module_metadata.rs:38:15"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/module_metadata/canonical.rs:9:15"
+    },
+    {
+      "diagnostic": "function `object` is never used",
+      "location": "src/angular_meta/module_metadata/canonical.rs:122:15"
+    },
+    {
+      "diagnostic": "function `collect` is never used",
+      "location": "src/angular_meta/module_metadata/canonical.rs:140:4"
+    },
+    {
+      "diagnostic": "function `endpoint` is never used",
+      "location": "src/angular_meta/module_metadata/canonical.rs:189:4"
+    },
+    {
+      "diagnostic": "function `eligible` is never used",
+      "location": "src/angular_meta/module_metadata/standalone.rs:8:15"
+    },
+    {
+      "diagnostic": "function `boolean` is never used",
+      "location": "src/angular_meta/module_metadata/standalone.rs:68:4"
+    },
+    {
+      "diagnostic": "function `stable_major` is never used",
+      "location": "src/angular_meta/module_metadata/standalone.rs:88:4"
+    },
+    {
+      "diagnostic": "struct `ActionBindings` is never constructed",
+      "location": "src/angular_meta/ngrx/action_imports.rs:8:8"
+    },
+    {
+      "diagnostic": "function `refine_candidates` is never used",
+      "location": "src/angular_meta/ngrx/action_imports.rs:14:15"
+    },
+    {
+      "diagnostic": "function `action_bindings` is never used",
+      "location": "src/angular_meta/ngrx/action_imports.rs:52:4"
+    },
+    {
+      "diagnostic": "function `collect_imported_names` is never used",
+      "location": "src/angular_meta/ngrx/action_imports.rs:127:4"
+    },
+    {
+      "diagnostic": "function `collect_action_occurrences` is never used",
+      "location": "src/angular_meta/ngrx/action_imports.rs:157:4"
+    },
+    {
+      "diagnostic": "function `relation_for` is never used",
+      "location": "src/angular_meta/ngrx/action_imports.rs:173:4"
+    },
+    {
+      "diagnostic": "function `apply` is never used",
+      "location": "src/angular_meta/ngrx/constructors.rs:199:15"
+    },
+    {
+      "diagnostic": "multiple fields are never read",
+      "location": "src/angular_meta/ngrx/discriminants.rs:124:9"
+    },
+    {
+      "diagnostic": "methods `matches_source`, `declaration_edge`, and `transition_edge` are never used",
+      "location": "src/angular_meta/ngrx/discriminants.rs:134:19"
+    },
+    {
+      "diagnostic": "method `edge` is never used",
+      "location": "src/angular_meta/ngrx/selector_declarations.rs:99:19"
+    },
+    {
+      "diagnostic": "function `admit` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:12:15"
+    },
+    {
+      "diagnostic": "struct `InitializerStoreAuthority` is never constructed",
+      "location": "src/angular_meta/ngrx/selector_references.rs:113:19"
+    },
+    {
+      "diagnostic": "function `initializer_store_authority` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:118:15"
+    },
+    {
+      "diagnostic": "function `parameter_properties` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:220:4"
+    },
+    {
+      "diagnostic": "function `store_receiver` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:278:4"
+    },
+    {
+      "diagnostic": "function `exact_ngrx_select_import` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:311:4"
+    },
+    {
+      "diagnostic": "function `collect_ngrx_select_imports` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:336:4"
+    },
+    {
+      "diagnostic": "function `has_unaliased_select_specifier` is never used",
+      "location": "src/angular_meta/ngrx/selector_references.rs:354:4"
+    },
+    {
+      "diagnostic": "function `admit_modern_initializer_dispatches` is never used",
+      "location": "src/angular_meta/ngrx/service_owners.rs:69:15"
+    },
+    {
+      "diagnostic": "fields `start_byte`, `service`, `action`, `file`, and `source_hash` are never read",
+      "location": "src/angular_meta/ngrx/service_owners.rs:129:9"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/ngrx/service_owners.rs:201:15"
+    },
+    {
+      "diagnostic": "function `project_admission` is never used",
+      "location": "src/angular_meta/provider_imported.rs:181:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/provider_imported.rs:198:15"
+    },
+    {
+      "diagnostic": "function `admits` is never used",
+      "location": "src/angular_meta/provider_pair_authority.rs:197:15"
+    },
+    {
+      "diagnostic": "function `admits_registration` is never used",
+      "location": "src/angular_meta/provider_position.rs:174:15"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/route_components.rs:7:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_components.rs:48:15"
+    },
+    {
+      "diagnostic": "function `owned_objects` is never used",
+      "location": "src/angular_meta/route_components.rs:67:15"
+    },
+    {
+      "diagnostic": "constant `KINDS` is never used",
+      "location": "src/angular_meta/route_guards.rs:8:18"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/route_guards.rs:18:15"
+    },
+    {
+      "diagnostic": "function `project_kinds` is never used",
+      "location": "src/angular_meta/route_guards.rs:21:15"
+    },
+    {
+      "diagnostic": "function `memberships` is never used",
+      "location": "src/angular_meta/route_guards.rs:24:4"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_guards.rs:91:15"
+    },
+    {
+      "diagnostic": "function `owned_objects` is never used",
+      "location": "src/angular_meta/route_guards.rs:110:15"
+    },
+    {
+      "diagnostic": "function `owned_kinds` is never used",
+      "location": "src/angular_meta/route_guards.rs:119:15"
+    },
+    {
+      "diagnostic": "function `project_relation` is never used",
+      "location": "src/angular_meta/route_guards.rs:132:15"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/route_lazy_components.rs:5:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_lazy_components.rs:33:15"
+    },
+    {
+      "diagnostic": "function `owned_objects` is never used",
+      "location": "src/angular_meta/route_lazy_components.rs:51:15"
+    },
+    {
+      "diagnostic": "function `target_role` is never used",
+      "location": "src/angular_meta/route_load_children.rs:6:4"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/route_load_children.rs:40:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_load_children.rs:62:15"
+    },
+    {
+      "diagnostic": "function `owned_objects` is never used",
+      "location": "src/angular_meta/route_load_children.rs:80:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_providers.rs:31:15"
+    },
+    {
+      "diagnostic": "struct `ResolverProjection` is never constructed",
+      "location": "src/angular_meta/route_resolvers.rs:14:19"
+    },
+    {
+      "diagnostic": "function `project` is never used",
+      "location": "src/angular_meta/route_resolvers.rs:20:15"
+    },
+    {
+      "diagnostic": "function `project_with_registrations` is never used",
+      "location": "src/angular_meta/route_resolvers.rs:26:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/route_resolvers.rs:191:15"
+    },
+    {
+      "diagnostic": "function `owned_objects` is never used",
+      "location": "src/angular_meta/route_resolvers.rs:209:15"
+    },
+    {
+      "diagnostic": "function `projection` is never used",
+      "location": "src/angular_meta/route_resolvers/replay_metrics.rs:5:15"
+    },
+    {
+      "diagnostic": "function `mapping` is never used",
+      "location": "src/angular_meta/route_resolvers/replay_metrics.rs:11:15"
+    },
+    {
+      "diagnostic": "function `reset` is never used",
+      "location": "src/angular_meta/route_resolvers/replay_metrics.rs:17:15"
+    },
+    {
+      "diagnostic": "function `counts` is never used",
+      "location": "src/angular_meta/route_resolvers/replay_metrics.rs:20:15"
+    },
+    {
+      "diagnostic": "function `injection_edge` is never used",
+      "location": "src/angular_meta/string_token_authority.rs:53:15"
+    },
+    {
+      "diagnostic": "function `has_call` is never used",
+      "location": "src/angular_meta/bootstrap_references.rs:183:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/bootstrap_references.rs:244:15"
+    },
+    {
+      "diagnostic": "function `has_owner` is never used",
+      "location": "src/angular_meta/config_composition.rs:43:15"
+    },
+    {
+      "diagnostic": "function `admits_projected` is never used",
+      "location": "src/angular_meta/config_composition.rs:119:15"
+    },
+    {
+      "diagnostic": "multiple variants are never constructed",
+      "location": "src/angular_meta/admission_work_metrics.rs:4:5"
+    },
+    {
+      "diagnostic": "function `reset` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:25:15"
+    },
+    {
+      "diagnostic": "function `counts` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:28:15"
+    },
+    {
+      "diagnostic": "fields `calls`, `maximum`, and `witnesses` are never read",
+      "location": "src/angular_meta/admission_work_metrics.rs:35:9"
+    },
+    {
+      "diagnostic": "struct `Admission` is never constructed",
+      "location": "src/angular_meta/admission_work_metrics.rs:43:19"
+    },
+    {
+      "diagnostic": "function `begin` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:44:15"
+    },
+    {
+      "diagnostic": "function `resolver` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:70:15"
+    },
+    {
+      "diagnostic": "function `witness` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:73:15"
+    },
+    {
+      "diagnostic": "function `reset_operations` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:76:15"
+    },
+    {
+      "diagnostic": "function `operations` is never used",
+      "location": "src/angular_meta/admission_work_metrics.rs:83:15"
+    },
+    {
+      "diagnostic": "field `semantic_edges` is never read",
+      "location": "src/dotnet_meta/efcore.rs:19:9"
+    },
+    {
+      "diagnostic": "constant `CANONICAL_PRODUCER_GENERATION` is never used",
+      "location": "src/ir/layers/csharp.rs:32:18"
+    },
+    {
+      "diagnostic": "constant `SEMANTIC_INPUT_GENERATION` is never used",
+      "location": "src/ir/layers/csharp.rs:34:18"
+    },
+    {
+      "diagnostic": "constant `CSHARP_SEMANTIC_PROJECTION_GENERATION` is never used",
+      "location": "src/ir/semantic_projection.rs:33:18"
+    },
+    {
+      "diagnostic": "method `matches` is never used",
+      "location": "src/layers/meta/resolver_registrations.rs:73:19"
+    },
+    {
+      "diagnostic": "field `capability_coverage` is never read",
+      "location": "src/workspace/index.rs:220:5"
+    },
+    {
+      "diagnostic": "methods `commit_csharp_exact_call_coverage`, `has_current_csharp_exact_call_coverage`, and `dirty_csharp_exact_call_coverage` are never used",
+      "location": "src/workspace/index/capability_coverage.rs:13:19"
+    },
+    {
+      "diagnostic": "method `semantic_dependency_count` is never used",
+      "location": "src/workspace/index/coverage.rs:225:19"
+    },
+    {
+      "diagnostic": "multiple fields are never read",
+      "location": "src/tests/architecture/work_observations_af_perf_002.rs:8:9"
+    }
+  ]
+}

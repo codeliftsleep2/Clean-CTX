@@ -2,6 +2,7 @@
 use super::route_objects::{contains, unique};
 use crate::ir::typescript_resolution::TypeScriptAuthority;
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     #[cfg(test)]
     super::admission_work_metrics::projection(super::admission_work_metrics::Consumer::Lazy);
@@ -30,6 +31,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
         })
         .collect()
 }
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain
@@ -48,6 +50,7 @@ pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) 
 }
 /// Ownership precedes proof. Refused/duplicate/unsupported owned fields never
 /// fall back to the legacy spelling/file producer.
+#[cfg(feature = "angular")]
 pub(crate) fn owned_objects(authority: &TypeScriptAuthority) -> Vec<(usize, usize)> {
     super::route_objects::project(authority)
         .iter()

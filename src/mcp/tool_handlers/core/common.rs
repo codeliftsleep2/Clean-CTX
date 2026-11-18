@@ -90,6 +90,7 @@ impl ContentKind {
     /// Wire string for tests — the same string the derived `Serialize` impl
     /// emits. Test-only: production serializes via `Serialize`, not this method.
     #[cfg(test)]
+    #[cfg(feature = "typescript")]
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             ContentKind::Skeleton => "skeleton",

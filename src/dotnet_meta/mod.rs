@@ -24,7 +24,9 @@
 
 /// Increment marker and semantic generations independently when identical
 /// .NET inputs change that producer's durable markers or semantic edges.
+#[cfg(feature = "dotnet")]
 pub(crate) const MARKER_PRODUCER_GENERATION: u32 = 1;
+#[cfg(feature = "dotnet")]
 pub(crate) const SEMANTIC_PRODUCER_GENERATION: u32 = 7;
 
 pub mod aspnet;
@@ -37,7 +39,7 @@ mod detect_metrics;
 pub mod efcore;
 #[cfg(test)]
 mod efcore_analysis_metrics;
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet"))]
 mod evaluation_metrics;
 pub mod general;
 mod marker_builders;
@@ -47,17 +49,17 @@ pub mod serialization;
 pub mod signalr;
 pub mod testing;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet", feature = "angular"))]
 pub(crate) use class_analysis_metrics::{analysis_count, reset_analysis_count};
-#[cfg(test)]
-pub(crate) use detect_metrics::{
-    ast_parse_count, detection_count, reset_ast_parse_count, reset_detection_count,
-};
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet", feature = "angular"))]
+pub(crate) use detect_metrics::{ast_parse_count, reset_ast_parse_count};
+#[cfg(all(test, feature = "dotnet"))]
+pub(crate) use detect_metrics::{detection_count, reset_detection_count};
+#[cfg(all(test, feature = "dotnet", feature = "angular"))]
 pub(crate) use efcore_analysis_metrics::{
     analysis_count as efcore_analysis_count, reset_analysis_count as reset_efcore_analysis_count,
 };
-#[cfg(test)]
+#[cfg(all(test, feature = "dotnet"))]
 pub(crate) use evaluation_metrics::{evaluation_count, reset_evaluation_count};
 
 use crate::compression::Fidelity;
@@ -194,6 +196,7 @@ fn run_meta_layer_for_applicable_source(
     Some(block)
 }
 
+#[cfg(feature = "dotnet")]
 fn evaluate_applicable_source(
     class_captures: &[String],
     fidelity: Fidelity,

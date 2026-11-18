@@ -4,34 +4,6 @@ use crate::compression::capture_pipeline::CapturedNode;
 use crate::ir::invocation_evidence::{InvocationOccurrence, SourceSpan};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub(crate) const QUERY: &str = r#"
-(call_expression function: (member_expression property: (property_identifier) @ngrx.ctor.dispatch)
-    arguments: (arguments . (new_expression) @ngrx.ctor.new)) @ngrx.ctor.call
-(method_definition "static") @ngrx.ctor.static_method
-(call_expression "?.") @ngrx.ctor.optional_call
-(new_expression constructor: (identifier) @ngrx.ctor.endpoint) @ngrx.ctor.new_owner
-(program [(class_declaration) @ngrx.ctor.program_owner
-    (export_statement declaration: (class_declaration) @ngrx.ctor.program_owner)])
-(class_declaration name: (type_identifier) @ngrx.ctor.class_name) @ngrx.ctor.class_owner
-(class_declaration body: (class_body (method_definition
-    name: (property_identifier) @ngrx.ctor.ctor_name
-    parameters: (formal_parameters (required_parameter
-        (accessibility_modifier) @ngrx.ctor.access
-        pattern: (identifier) @ngrx.ctor.store_field
-        type: (type_annotation (generic_type name: (type_identifier) @ngrx.ctor.store_type))))))) @ngrx.ctor.store_owner
-(class_declaration body: (class_body (method_definition body: (statement_block
-    (expression_statement (call_expression
-        function: (member_expression !optional_chain
-            object: (member_expression !optional_chain object: (this)
-                property: (property_identifier) @ngrx.ctor.receiver)
-            property: (property_identifier) @ngrx.ctor.terminal)
-        arguments: (arguments . (new_expression constructor: (identifier) @ngrx.ctor.target) .)) @ngrx.ctor.owned_call))))) @ngrx.ctor.owner
-(class_declaration body: (class_body (public_field_definition name: (_) @ngrx.ctor.other_member))) @ngrx.ctor.member_owner
-(class_declaration body: (class_body (method_definition name: (_) @ngrx.ctor.other_member))) @ngrx.ctor.member_owner
-(for_in_statement kind: ["var" "let" "const"]) @ngrx.ctor.unsupported
-
-"#;
-
 #[derive(Debug, Clone)]
 pub(crate) struct ConstructorDispatch {
     pub start_byte: usize,
@@ -224,6 +196,7 @@ pub(crate) fn collect(
 
 /// Preserve modern/raw sites by exact source-start association, never by token
 /// spelling. Constructor positions cannot manufacture Action declarations.
+#[cfg(feature = "angular")]
 pub(crate) fn apply(
     mut shape: super::NgRxShape,
     starts: &[usize],

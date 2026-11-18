@@ -8,10 +8,12 @@ pub(crate) fn record_extraction() {
     EXTRACTION_COUNT.with(|count| count.set(count.get() + 1));
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn reset_extraction_count() {
     EXTRACTION_COUNT.with(|count| count.set(0));
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn extraction_count() -> usize {
     EXTRACTION_COUNT.with(std::cell::Cell::get)
 }

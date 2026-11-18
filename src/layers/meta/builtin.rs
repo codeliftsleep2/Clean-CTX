@@ -51,11 +51,13 @@ fn record_evaluation() {
 }
 
 #[cfg(test)]
+#[cfg(all(feature = "angular", feature = "rust"))]
 pub(crate) fn reset_evaluation_count() {
     EVALUATION_COUNT.with(|count| count.set(0));
 }
 
 #[cfg(test)]
+#[cfg(all(feature = "angular", feature = "rust"))]
 pub(crate) fn evaluation_count() -> usize {
     EVALUATION_COUNT.with(std::cell::Cell::get)
 }

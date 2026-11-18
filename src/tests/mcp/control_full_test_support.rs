@@ -20,6 +20,7 @@ pub(crate) fn payload(response: &Value) -> Value {
     serde_json::from_str(json).expect("valid CONTROL-FULL JSON")
 }
 
+#[cfg(feature = "typescript")]
 pub(crate) fn has_interface(response: &Value, expected: &str) -> bool {
     if response
         .pointer("/result/content/0/text")

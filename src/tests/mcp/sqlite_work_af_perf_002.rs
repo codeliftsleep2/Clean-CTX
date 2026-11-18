@@ -160,6 +160,7 @@ fn af002_sqlite_enclosing_durable_baseline() {
 #[path = "sqlite_text_design_af_perf_002.rs"]
 mod text_design;
 
+#[cfg(feature = "typescript")]
 #[path = "sqlite_text_repair_af_perf_002.rs"]
 mod text_repair;
 

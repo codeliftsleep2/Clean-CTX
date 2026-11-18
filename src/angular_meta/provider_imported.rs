@@ -178,6 +178,7 @@ fn edge(relation: SemanticRelation, subject: EntityRef, object: EntityRef) -> Se
 
 /// Preserve every eligible facet and Ordinary/View position in original order.
 /// No endpoint deduplication, precedence or provider policy is introduced.
+#[cfg(feature = "angular")]
 pub(super) fn project_admission(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     #[cfg(test)]
     super::delegated_work_metrics::construction(3);
@@ -195,6 +196,7 @@ pub(super) fn project_admission(authority: &TypeScriptAuthority) -> Vec<Semantic
     edges
 }
 
+#[cfg(feature = "angular")]
 pub(super) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |actual: &EntityRef, expected: &EntityRef| {
         actual.domain == expected.domain

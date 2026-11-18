@@ -4,20 +4,8 @@ use std::collections::HashMap;
 
 // Supplemental IR-only evidence: the compression/diff query and the raw
 // decorator-bearing source needed by language/framework layers stay unchanged.
-pub(super) const DECLARATION_QUERY: &str = r#"
-    (class_declaration name: (type_identifier) @ts.identity.name) @ts.identity.owner
-    (abstract_class_declaration name: (type_identifier) @ts.identity.name) @ts.identity.owner
-
-    (class_declaration body: (class_body
-        (public_field_definition name: (property_identifier) @angular.initializer.receiver
-            value: (_) @angular.initializer.value) @angular.initializer.field)) @angular.initializer.owner
-    (abstract_class_declaration body: (class_body
-        (public_field_definition name: (property_identifier) @angular.initializer.receiver
-            value: (_) @angular.initializer.value) @angular.initializer.field)) @angular.initializer.owner
-    (call_expression "?." @angular.initializer.optional) @angular.initializer.optional_call
-    (call_expression arguments: (arguments
-        (identifier) @angular.initializer.identifier_argument)) @angular.initializer.argument_call
-"#;
+#[cfg(test)]
+pub(super) use crate::queries::core_ir::TYPESCRIPT_DECLARATION_QUERY as DECLARATION_QUERY;
 
 pub(super) fn apply_declaration_names(captures: &mut [CapturedNode]) {
     let names: HashMap<usize, &str> = captures

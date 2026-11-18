@@ -8,23 +8,37 @@ pub(crate) struct SourceSpan {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub(crate) enum TemplateControlKind {
+    #[cfg(feature = "angular")]
     If,
+    #[cfg(feature = "angular")]
     ElseIf,
+    #[cfg(feature = "angular")]
     Else,
+    #[cfg(feature = "angular")]
     For,
+    #[cfg(feature = "angular")]
     Empty,
+    #[cfg(feature = "angular")]
     Switch,
+    #[cfg(feature = "angular")]
     Case,
+    #[cfg(feature = "angular")]
     Default,
+    #[cfg(feature = "angular")]
     Defer,
+    #[cfg(feature = "angular")]
     Placeholder,
+    #[cfg(feature = "angular")]
     Loading,
+    #[cfg(feature = "angular")]
     Error,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub(crate) enum TemplateControlSyntax {
+    #[cfg(feature = "angular")]
     Legacy,
+    #[cfg(feature = "angular")]
     Modern,
 }
 
@@ -43,6 +57,7 @@ pub(crate) struct SelectorOccurrence {
     pub(crate) control_ancestry: Vec<TemplateControlFrame>,
 }
 
+#[cfg(feature = "angular")]
 #[derive(Clone)]
 struct ModernRegion {
     frame: TemplateControlFrame,
@@ -50,6 +65,7 @@ struct ModernRegion {
     body_end: usize,
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn extract(source: &str) -> Vec<SelectorOccurrence> {
     let mut parser = tree_sitter::Parser::new();
     let language: tree_sitter::Language = tree_sitter_html::LANGUAGE.into();
@@ -72,6 +88,7 @@ pub(crate) fn extract(source: &str) -> Vec<SelectorOccurrence> {
     occurrences
 }
 
+#[cfg(feature = "angular")]
 fn walk(
     node: tree_sitter::Node,
     source: &str,
@@ -91,6 +108,7 @@ fn walk(
     }
 }
 
+#[cfg(feature = "angular")]
 fn walk_element(
     node: tree_sitter::Node,
     source: &str,
@@ -116,6 +134,7 @@ fn walk_element(
     }
 }
 
+#[cfg(feature = "angular")]
 fn capture_tag(
     tag: tree_sitter::Node,
     source: &str,
@@ -155,6 +174,7 @@ fn capture_tag(
     });
 }
 
+#[cfg(feature = "angular")]
 fn push_legacy_frames(
     tag: tree_sitter::Node,
     element: tree_sitter::Node,
@@ -194,6 +214,7 @@ fn push_legacy_frames(
     legacy.len() - before
 }
 
+#[cfg(feature = "angular")]
 fn tag_name(node: tree_sitter::Node, source: &str) -> Option<String> {
     let mut cursor = node.walk();
     node.named_children(&mut cursor)
@@ -202,6 +223,7 @@ fn tag_name(node: tree_sitter::Node, source: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+#[cfg(feature = "angular")]
 fn attribute_parts(attribute: tree_sitter::Node, source: &str) -> Option<(String, Option<String>)> {
     let mut name = None;
     let mut value = None;
@@ -223,6 +245,7 @@ fn attribute_parts(attribute: tree_sitter::Node, source: &str) -> Option<(String
     name.map(|name| (name, value))
 }
 
+#[cfg(feature = "angular")]
 fn strip_quotes(raw: &str) -> &str {
     let bytes = raw.as_bytes();
     if bytes.len() >= 2 && matches!(bytes[0], b'"' | b'\'') && bytes.last() == Some(&bytes[0]) {
@@ -232,6 +255,7 @@ fn strip_quotes(raw: &str) -> &str {
     }
 }
 
+#[cfg(feature = "angular")]
 fn modern_regions(source: &str) -> Vec<ModernRegion> {
     let mut regions = Vec::new();
     let mut cursor = 0;
@@ -271,6 +295,7 @@ fn modern_regions(source: &str) -> Vec<ModernRegion> {
     regions
 }
 
+#[cfg(feature = "angular")]
 fn modern_kind(text: &str) -> Option<(TemplateControlKind, usize)> {
     const TOKENS: &[(&str, TemplateControlKind)] = &[
         ("@else if", TemplateControlKind::ElseIf),
@@ -291,6 +316,7 @@ fn modern_kind(text: &str) -> Option<(TemplateControlKind, usize)> {
         .find_map(|(token, kind)| text.starts_with(token).then_some((*kind, token.len())))
 }
 
+#[cfg(feature = "angular")]
 fn control_boundary(source: &str, start: usize, token_len: usize) -> bool {
     let bytes = source.as_bytes();
     let before = start == 0
@@ -300,6 +326,7 @@ fn control_boundary(source: &str, start: usize, token_len: usize) -> bool {
         && (after >= bytes.len()
             || (!bytes[after].is_ascii_alphanumeric() && !matches!(bytes[after], b'_' | b'$')))
 }
+#[cfg(feature = "angular")]
 fn find_open_brace(source: &str, start: usize) -> Option<usize> {
     let bytes = source.as_bytes();
     let mut quote = None;
@@ -335,6 +362,7 @@ fn find_open_brace(source: &str, start: usize) -> Option<usize> {
     None
 }
 
+#[cfg(feature = "angular")]
 fn matching_brace(source: &str, open: usize) -> Option<usize> {
     let bytes = source.as_bytes();
     let mut depth = 0usize;
@@ -373,6 +401,7 @@ fn matching_brace(source: &str, open: usize) -> Option<usize> {
     None
 }
 
+#[cfg(feature = "angular")]
 fn collapse(raw: &str) -> String {
     raw.split_whitespace().collect::<Vec<_>>().join(" ")
 }

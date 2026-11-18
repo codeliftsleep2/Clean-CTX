@@ -1,0 +1,82 @@
+{
+  "archive_sha256": "447964d93945c9a2598e0e5e6d3efda8efbb02caf777814c6afe8754b491a08a",
+  "members": [
+    {
+      "entry": "core-query-green-20261118-121354/all-features.log",
+      "sha256": "26c2c60971b164cb5b3988f8950970ef9f2e8f36364f0488c9e3daafba999876"
+    },
+    {
+      "entry": "core-query-green-20261118-121354/receipt.json",
+      "sha256": "125d0509b4b79f83511a7e95271f3f8d13d7435add6fa2d52be2100a38e53e01"
+    },
+    {
+      "entry": "core-query-green-20261118-122039/all-features.log",
+      "sha256": "907eadd1324053d70ac788d0fc78b573028917f83fb44eb48602268f959b3ac8"
+    },
+    {
+      "entry": "core-query-green-20261118-122039/feature-blockers-static.json",
+      "sha256": "2757a26b812ff007d5fb78459db10fe800ec0a90b76e926b66ef13a40cb3fbbf"
+    },
+    {
+      "entry": "core-query-green-20261118-122039/only-csharp.log",
+      "sha256": "c9a290bb73fb6af2c6a3ff26dc5a5df803b4f07d14df250983247da926ae9c62"
+    },
+    {
+      "entry": "core-query-green-20261118-122039/receipt.json",
+      "sha256": "21cca751eec342cb2eb9834f3c0f547b3cf468de8ad424cc11dc8b4e1968c73f"
+    },
+    {
+      "entry": "verified-source/src/queries/core_ir.rs",
+      "sha256": "02345b670a268dceb0013edeae98251c08f754381988cb85ca51aa31efc8b64b"
+    },
+    {
+      "entry": "verified-source/src/tests/compression/core_ir_registration.rs",
+      "sha256": "1acdbad68dec97049a171b256afc016b4770c64ef7c562bdd052273d858129b4"
+    },
+    {
+      "entry": "verified-source/src/angular_meta/ngrx/constructors.rs",
+      "sha256": "80286a1e241cd2940dc12cb7e7b1fa35b092de49ff3dee5cfb7d70402e2ab968"
+    },
+    {
+      "entry": "verified-source/src/angular_meta/ngrx/legacy.rs",
+      "sha256": "ddabc2f69876ae8461bd1c9253b338255e532ae32c9b26a77f6697e13ba80ac2"
+    },
+    {
+      "entry": "verified-source/src/angular_meta/ngrx/selector_declarations.rs",
+      "sha256": "aad659a010e3dc931aee5014af633f129143d885c2ab0ea78f847244a4e18318"
+    },
+    {
+      "entry": "verified-source/src/angular_meta/ngrx/service_owners.rs",
+      "sha256": "110f81b70d2dc650dcee04b1b50681475de5d1168a55b0beb79418e942582c5f"
+    },
+    {
+      "entry": "verified-source/src/angular_meta/ngrx/transitions.rs",
+      "sha256": "38e24109b5861dc6f84c8481727b2640488128a18f3893477789794fafdcf6eb"
+    },
+    {
+      "entry": "verified-source/src/compression/capture_pipeline.rs",
+      "sha256": "ca97a06bbba16970371ffd17d003e57dea79fc9dcf1014a85370f8fe491edcd9"
+    },
+    {
+      "entry": "verified-source/src/ir/calls.rs",
+      "sha256": "95ad8faf5e12f561588457a25cfccda7ec1f65960c3ab9fc6a7a846930ba2b94"
+    },
+    {
+      "entry": "verified-source/src/ir/pipeline/core.rs",
+      "sha256": "59980a3f64c19d77f90cc9caf9b11becee6630db4738251560c00d591f655ef5"
+    },
+    {
+      "entry": "verified-source/src/ir/pipeline/core/typescript.rs",
+      "sha256": "13f7926604065ae61f8543935ff70514a8f252890f4471bf82bbb56c9032eea3"
+    },
+    {
+      "entry": "verified-source/src/queries.rs",
+      "sha256": "15e5867205317cc058dd2faf06e960e27b4e6b3faec77b93747c1665f6c0ea8f"
+    },
+    {
+      "entry": "verified-source/src/tests/ir/ci_runtime_core_query.rs",
+      "sha256": "bdc4c262d8b5f799e7c5fa4de44cdd16a662d493124d173a9cbab11f125387b3"
+    }
+  ],
+  "qualification": "First capture 7 passed/1 fixture-line-ending failure; second capture exact frozen-definition test passed, then C#-only compilation failed before tests. All-feature required behaviors passed across captures with unchanged patched Rust; disabled-feature verification and B11 descriptor remain pending. No full CI claim."
+}

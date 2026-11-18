@@ -7,7 +7,9 @@ use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
 use tree_sitter::Node;
 
+#[cfg(feature = "csharp")]
 mod efcore;
+#[cfg(feature = "csharp")]
 pub(in crate::mcp::tool_handlers::query) use efcore::EfCoreCatalog;
 #[cfg(feature = "csharp")]
 pub(in crate::mcp::tool_handlers::query) use efcore::EfDependencyEvidence;
@@ -55,6 +57,7 @@ pub(super) struct ConstructorContext<'a> {
     pub(super) namespace: &'a [String],
     pub(super) nesting: &'a [String],
     pub(super) imports: &'a [Vec<String>],
+    #[cfg(feature = "csharp")]
     pub(super) aliases: &'a [crate::ir::csharp_resolution::CSharpAliasDirective],
     pub(super) owner: &'a str,
 }
@@ -301,6 +304,7 @@ pub(super) fn collect_constructor_references(
                 written: written.trim().to_string(),
                 shape,
                 imports: context.imports.to_vec(),
+                #[cfg(feature = "csharp")]
                 aliases: context.aliases.to_vec(),
             });
         }

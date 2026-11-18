@@ -3,7 +3,9 @@
 //! the independent framework authorities have been reconciled.
 
 use crate::ir::invocation_evidence::SourceSpan;
+#[cfg(feature = "angular")]
 use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
 use std::path::{Path, PathBuf};
 
 pub(crate) const DISPATCH_LAYER: &str = "ngrx-object-dispatch-evidence";
@@ -11,6 +13,7 @@ pub(crate) const REGISTRATION_LAYER: &str = "ngrx-reducer-registration-evidence"
 pub(crate) const SWITCH_LAYER: &str = "ngrx-object-switch-evidence";
 pub(crate) const SWITCH_VALUE_LAYER: &str = "ngrx-object-switch-value-evidence";
 
+#[cfg(feature = "angular")]
 pub(crate) fn evidence(source_id: &str, source: &str) -> Vec<SemanticEdge> {
     let Some(language) = crate::compression::language::safe_typescript_language() else {
         return Vec::new();
@@ -33,6 +36,7 @@ pub(crate) fn evidence(source_id: &str, source: &str) -> Vec<SemanticEdge> {
 
 /// Current direct-relative imports are semantic dependencies for the
 /// cross-file action/reducer evidence carried by this source file.
+#[cfg(feature = "angular")]
 pub(crate) fn dependencies(
     source_id: &str,
     source: &str,
@@ -60,6 +64,7 @@ pub(crate) fn dependencies(
         .collect()
 }
 
+#[cfg(feature = "angular")]
 fn collect_import_paths(
     node: tree_sitter::Node<'_>,
     source_id: &str,
@@ -84,6 +89,7 @@ fn collect_import_paths(
     }
 }
 
+#[cfg(feature = "angular")]
 fn resolve_module_path(source_id: &str, module: &str) -> Option<String> {
     let parent = Path::new(source_id).parent()?;
     let target = parent.join(module);
@@ -182,6 +188,7 @@ fn collect_hydration_terms(
     }
 }
 
+#[cfg(feature = "angular")]
 fn walk(node: tree_sitter::Node<'_>, source_id: &str, source: &str, out: &mut Vec<SemanticEdge>) {
     if node.kind() == "call_expression" {
         dispatch(node, source_id, source)
@@ -196,6 +203,7 @@ fn walk(node: tree_sitter::Node<'_>, source_id: &str, source: &str, out: &mut Ve
     }
 }
 
+#[cfg(feature = "angular")]
 fn dispatch(node: tree_sitter::Node<'_>, source_id: &str, source: &str) -> Option<SemanticEdge> {
     let function = node.child_by_field_name("function")?;
     let receiver = function
@@ -238,6 +246,7 @@ fn dispatch(node: tree_sitter::Node<'_>, source_id: &str, source: &str) -> Optio
     ))
 }
 
+#[cfg(feature = "angular")]
 fn switches(
     function: tree_sitter::Node<'_>,
     source_id: &str,
@@ -268,6 +277,7 @@ fn switches(
     collect_switches(function, action, name, source_id, source, out);
 }
 
+#[cfg(feature = "angular")]
 fn collect_switches(
     node: tree_sitter::Node<'_>,
     action: tree_sitter::Node<'_>,
@@ -329,6 +339,7 @@ fn collect_switches(
     }
 }
 
+#[cfg(feature = "angular")]
 fn discriminant_binds(
     value: tree_sitter::Node<'_>,
     action: tree_sitter::Node<'_>,
@@ -364,12 +375,14 @@ fn discriminant_binds(
         })
 }
 
+#[cfg(feature = "angular")]
 struct Resolved {
     owner: String,
     member: Option<String>,
     module: Option<String>,
 }
 
+#[cfg(feature = "angular")]
 fn resolve_member(source_id: &str, source: &str, node: tree_sitter::Node<'_>) -> Option<Resolved> {
     let span = SourceSpan::new(node.start_byte(), node.end_byte()).ok()?;
     if let Some(binding) =
@@ -414,6 +427,7 @@ fn resolve_member(source_id: &str, source: &str, node: tree_sitter::Node<'_>) ->
     })
 }
 
+#[cfg(feature = "angular")]
 fn resolve_value(source_id: &str, source: &str, node: tree_sitter::Node<'_>) -> Option<Resolved> {
     let span = SourceSpan::new(node.start_byte(), node.end_byte()).ok()?;
     if let Some(binding) =
@@ -437,9 +451,11 @@ fn resolve_value(source_id: &str, source: &str, node: tree_sitter::Node<'_>) -> 
     })
 }
 
+#[cfg(feature = "angular")]
 fn member_entity(value: &Resolved) -> EntityRef {
     resolved_entity("ngrx", "Action", value)
 }
+#[cfg(feature = "angular")]
 fn resolved_entity(domain: &'static str, ty: &'static str, value: &Resolved) -> EntityRef {
     let name = value.member.as_ref().map_or_else(
         || value.owner.clone(),
@@ -449,6 +465,7 @@ fn resolved_entity(domain: &'static str, ty: &'static str, value: &Resolved) -> 
     entity.file.clone_from(&value.module);
     entity
 }
+#[cfg(feature = "angular")]
 fn carrier(
     relation: SemanticRelation,
     subject: EntityRef,
@@ -463,6 +480,7 @@ fn carrier(
         call_evidence: None,
     }
 }
+#[cfg(feature = "angular")]
 fn pair_value<'a>(
     object: tree_sitter::Node<'a>,
     key: &str,
@@ -482,6 +500,7 @@ fn pair_value<'a>(
                 .flatten()
         })
 }
+#[cfg(feature = "angular")]
 fn owner_name<'a>(mut node: tree_sitter::Node<'a>, source: &'a str) -> Option<&'a str> {
     loop {
         if node.kind() == "class_declaration" {
@@ -493,6 +512,7 @@ fn owner_name<'a>(mut node: tree_sitter::Node<'a>, source: &'a str) -> Option<&'
         node = node.parent()?;
     }
 }
+#[cfg(feature = "angular")]
 fn is_exported_object_declaration(source: &str, declaration: SourceSpan) -> bool {
     object_declaration_exported(source, declaration) == Some(true)
 }
@@ -526,9 +546,11 @@ fn object_declaration_exported(source: &str, declaration: SourceSpan) -> Option<
             .is_some_and(|node| node.kind() == "export_statement"),
     )
 }
+#[cfg(feature = "angular")]
 trait NodeKindExt<'a> {
     fn filter_kind(self, kind: &str) -> Option<tree_sitter::Node<'a>>;
 }
+#[cfg(feature = "angular")]
 impl<'a> NodeKindExt<'a> for tree_sitter::Node<'a> {
     fn filter_kind(self, kind: &str) -> Option<Self> {
         (self.kind() == kind).then_some(self)

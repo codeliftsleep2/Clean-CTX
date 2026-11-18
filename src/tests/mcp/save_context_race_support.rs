@@ -14,6 +14,7 @@ static STATE: Mutex<PauseState> = Mutex::new(PauseState {
 });
 static SIGNAL: Condvar = Condvar::new();
 
+#[cfg(feature = "typescript")]
 pub(crate) fn arm(path: &str) {
     *STATE.lock().expect("save snapshot pause state") = PauseState {
         path: Some(crate::dictionary::path::canonical_identity_key(path)),
@@ -36,6 +37,7 @@ pub(crate) fn pause_after_canonical_capture(path: &str) {
     state.path = None;
 }
 
+#[cfg(feature = "typescript")]
 pub(crate) fn wait_until_paused() {
     let mut state = STATE.lock().expect("save snapshot pause state");
     while !state.paused {
@@ -43,6 +45,7 @@ pub(crate) fn wait_until_paused() {
     }
 }
 
+#[cfg(feature = "typescript")]
 pub(crate) fn release() {
     let mut state = STATE.lock().expect("save snapshot pause state");
     state.released = true;

@@ -18,6 +18,7 @@
 //   * Java's method type-parameter list precedes the return type, so the
 //     identifier that owns the parameter list is unchanged at every fidelity.
 
+#[cfg(any(feature = "typescript", feature = "rust", feature = "java"))]
 use super::*;
 
 /// Compile TypeScript with the production compiler configuration.

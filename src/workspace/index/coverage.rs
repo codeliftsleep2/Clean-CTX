@@ -222,6 +222,7 @@ impl WorkspaceIndex {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "csharp")]
     pub(crate) fn semantic_dependency_count(&self, file_path: &str) -> usize {
         self.semantic_coverage
             .get(file_path)

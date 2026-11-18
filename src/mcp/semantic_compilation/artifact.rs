@@ -446,6 +446,7 @@ impl SemanticCompilationArtifact {
     }
 
     #[cfg(test)]
+    #[cfg(any(feature = "csharp", feature = "angular"))]
     pub(crate) fn invocation_evidence(&self) -> Option<&InvocationEvidenceSet> {
         self.invocation_evidence.as_ref()
     }

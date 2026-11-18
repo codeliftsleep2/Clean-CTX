@@ -5,6 +5,7 @@ use crate::ir::typescript_resolution::declaration_facets::{ExpressionFacet, Expr
 use crate::ir::typescript_resolution::{DeclarationId, Resolution, TypeScriptAuthority};
 use std::collections::BTreeSet;
 
+#[cfg(feature = "angular")]
 pub(super) fn eligible(authority: &TypeScriptAuthority, id: &DeclarationId) -> Option<bool> {
     let kind = roles::declaration_role(authority, id)?;
     if !matches!(
@@ -65,6 +66,7 @@ pub(super) fn eligible(authority: &TypeScriptAuthority, id: &DeclarationId) -> O
     }
 }
 
+#[cfg(feature = "angular")]
 fn boolean(
     authority: &TypeScriptAuthority,
     value: &ExpressionFacet,
@@ -85,6 +87,7 @@ fn boolean(
     }
 }
 
+#[cfg(feature = "angular")]
 fn stable_major(version: &str) -> Option<u32> {
     let parts: Vec<_> = version.split('.').collect();
     let [major, minor, patch] = parts.as_slice() else {

@@ -32,11 +32,13 @@ thread_local! {
 }
 
 #[cfg(test)]
+#[cfg(feature = "angular")]
 pub(crate) fn reset_context_evaluation_count() {
     CONTEXT_EVALUATION_COUNT.with(|count| count.set(0));
 }
 
 #[cfg(test)]
+#[cfg(feature = "angular")]
 pub(crate) fn context_route_count() -> usize {
     CONTEXT_EVALUATION_COUNT.with(std::cell::Cell::get)
 }

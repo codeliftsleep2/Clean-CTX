@@ -29,6 +29,23 @@ No new optimization, cache, authority, resource ceiling or approval system follo
 from these declarations. Historical owner dispositions remain attributed in their
 own records. Policy compliance is not current performance certification.
 
+## Owner-approved complete IR query registration, prospective 2026-11-18
+
+CI-VERIFY-R1 Owner Disposition 02 narrowly amends the October 16 retained-dynamic
+classification for complete binary-owned TypeScript and C# IR query definitions.
+Exactly those two definitions may use the existing closed process-lifetime Query
+registration, subject to exact base and grammar identity. Arbitrary, custom,
+runtime-dependent, mismatched-grammar and otherwise unregistered definitions
+retain independent dynamic compilation. Each source parse and mutable cursor
+remain independent; this permits no source/tree/capture/workspace-authority cache.
+
+The historical inventory and its executions remain historical. The prospective
+amendment and verbatim owner disposition are covered by the governing
+[CI-VERIFY-R1 report](../../agent/CI_VERIFY_R1.md). This source qualification is
+prepared for B11 predecessor-bound owner authorization and actual admission;
+it does not create, submit or substitute that authorization. The normative
+AF-PERF-001/002 policy and its four-criterion decision rule remain unchanged.
+
 <!-- pcg:performance-standing:end -->
 ```architecture-graph
 node: PERF-005-BOUNDED

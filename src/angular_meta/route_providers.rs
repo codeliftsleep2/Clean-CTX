@@ -1,10 +1,12 @@
 //! Exact native Routes-object provider membership through shared ownership.
 use super::route_objects::{contains, unique};
 use crate::ir::typescript_resolution::TypeScriptAuthority;
-use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
+#[cfg(feature = "angular")]
+use crate::layers::meta::semantic::EntityRef;
+use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
-    #[cfg(test)]
+    #[cfg(all(test, feature = "angular"))]
     super::admission_work_metrics::projection(super::admission_work_metrics::Consumer::Providers);
     super::route_objects::project(authority)
         .into_iter()
@@ -28,6 +30,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
 }
 
 /// Reproduce the exact root/object/field/entry join, including subject identity.
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &EntityRef, b: &EntityRef| {
         a.domain == b.domain

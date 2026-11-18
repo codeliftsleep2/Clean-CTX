@@ -311,10 +311,12 @@ impl super::McpState {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "angular")]
     pub(crate) fn remember_semantic_edges(&self, alias: &str, edges: Vec<SemanticEdge>) {
         self.remember_semantic_projection(alias, edges, Vec::new());
     }
 
+    #[cfg(any(feature = "csharp", feature = "angular"))]
     pub(crate) fn remember_semantic_projection(
         &self,
         alias: &str,

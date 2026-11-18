@@ -1,0 +1,57 @@
+{
+  "archive_sha256": "bf2cec7a2e14799a407d1e7b7bbf1f77e0599ca67b6f1a804ce2000274112361",
+  "members": [
+    {
+      "entry": "runs.json",
+      "sha256": "ff4924c4727fd951bcad3b261d55e66e81e66be8f42c9ea762e623a6f3218781"
+    },
+    {
+      "entry": "run-392.log",
+      "sha256": "fa499d70a08e4d98f831a150742243f43eff262822637a94bfb5c714410668a0"
+    },
+    {
+      "entry": "run-393.log",
+      "sha256": "7f471dfce1781ba44ea447935c17af580997740b0874491d84893e66e8265309"
+    },
+    {
+      "entry": "run-410.log",
+      "sha256": "a0811ffc090e96225f9e7684ff9c153f1ebe0919a7a4ebf8ab7d14b785b6b2d8"
+    },
+    {
+      "entry": "run-392-jobs.json",
+      "sha256": "2363010ba372c86c9dca136acf01dc9be539cf723d590bf10f155c1725b3589f"
+    },
+    {
+      "entry": "run-393-jobs.json",
+      "sha256": "c057adaf0ab6b9b83e8e4ae2ba766ec8992525eb806fdd6126adeb4efc34e5d8"
+    },
+    {
+      "entry": "run-410-jobs.json",
+      "sha256": "c952c2d8e3ef5141961d04b3dc69eb3550631850689a8f2c766fc54bbda3aac1"
+    }
+  ],
+  "steps": [
+    {
+      "run": 392,
+      "step": "cargo test",
+      "seconds": 105.0,
+      "conclusion": "success",
+      "observed_library_start_count": 3433
+    },
+    {
+      "run": 393,
+      "step": "cargo test",
+      "seconds": 2404.0,
+      "conclusion": "failure",
+      "observed_library_start_count": 3923
+    },
+    {
+      "run": 410,
+      "step": "AF-PERF-001 bounded semantic work fitness",
+      "seconds": 4113.0,
+      "conclusion": "success",
+      "observed_library_start_count": null
+    }
+  ],
+  "qualification": "Historical GitHub job step metadata supplies durations including test compilation. Older downloaded console logs do not include complete test summaries, so observed starts are not completion proof. No exact causal commit or current total runtime is established."
+}

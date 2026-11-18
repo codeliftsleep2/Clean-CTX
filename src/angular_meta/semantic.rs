@@ -144,6 +144,7 @@ pub fn class_to_semantic_edges(
 /// External templates use their canonical physical identity even when the
 /// target is currently missing. Inline templates use a deterministic identity
 /// scoped to the declaring source and Component.
+#[cfg(feature = "angular")]
 pub(crate) fn component_template_edge(
     class_name: &str,
     kind: ClassKind,

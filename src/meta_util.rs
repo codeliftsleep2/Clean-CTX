@@ -23,7 +23,7 @@ pub use class_source::{
 };
 pub use declaration::{extract_decl_name, extract_entity_type, extract_first_quoted};
 pub use lexical_regions::LexicalRegions;
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) use lexical_regions::{construction_count, reset_construction_count};
 #[cfg(test)]
 pub(crate) use scan_metrics::{legacy_membership_call_count, reset_legacy_membership_call_count};

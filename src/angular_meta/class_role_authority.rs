@@ -4,7 +4,9 @@ use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority, Witness}
 
 pub(crate) struct ClassRole {
     pub kind: ClassKind,
+    #[cfg(feature = "angular")]
     pub selector: Option<String>,
+    #[cfg(feature = "angular")]
     pub pipe_name: Option<String>,
 }
 
@@ -94,6 +96,7 @@ pub(crate) fn declaration_role(
 }
 
 /// Conservative producer applicability only; this grants no framework role.
+#[cfg(feature = "angular")]
 pub(crate) fn has_decorated_class(source: &str) -> bool {
     let Some(language) = crate::compression::language::safe_typescript_language() else {
         return false;
@@ -135,6 +138,7 @@ pub(crate) fn has_decorated_class(source: &str) -> bool {
     false
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn has_class_role(authority: &TypeScriptAuthority) -> bool {
     authority.package_exports.iter().any(|package| {
         package.name == "@angular/core"
@@ -185,23 +189,30 @@ pub(crate) fn class_role(
             if decorator_role(authority, resolution) == Some(kind))
         })
         .collect();
-    let [decorator] = decorators.as_slice() else {
+    if decorators.len() != 1 {
         return None;
-    };
+    }
+    #[cfg(feature = "angular")]
+    let decorator = decorators[0];
+    #[cfg(feature = "angular")]
     let argument = decorator
         .arguments
         .first()
         .and_then(|argument| source.get(argument.start..argument.end))
         .unwrap_or("");
+    #[cfg(feature = "angular")]
     let selector = matches!(kind, ClassKind::Component | ClassKind::Directive)
         .then(|| super::decorator_args::parse_object_literal(argument).selector)
         .flatten();
+    #[cfg(feature = "angular")]
     let pipe_name = (kind == ClassKind::Pipe)
         .then(|| super::decorator_args::parse_pipe_fields(argument).0)
         .flatten();
     Some(ClassRole {
         kind,
+        #[cfg(feature = "angular")]
         selector,
+        #[cfg(feature = "angular")]
         pipe_name,
     })
 }

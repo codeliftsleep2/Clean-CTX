@@ -178,6 +178,7 @@ pub fn is_dotnet_file(source: &str) -> bool {
 
 /// Detect .NET framework evidence without reparsing a source file that is
 /// already inside the compilation pipeline.
+#[cfg(feature = "dotnet")]
 pub(crate) fn is_dotnet_file_with_regions(
     source: &str,
     lexical_regions: &crate::meta_util::LexicalRegions,

@@ -12,9 +12,11 @@ pub use attributes::resolve_attribute_type_reference;
 mod ancestry;
 pub use ancestry::{CSharpInheritanceArc, CSharpInheritanceGraph, resolve_type_ancestry};
 mod compilation;
+#[cfg(feature = "dotnet")]
+pub(crate) use compilation::resolve_compilation_class_ancestry;
 pub(crate) use compilation::{
     CSharpCompilationUnit, CSharpResolvedAttribute, CSharpResolvedClass, collect_compilation_unit,
-    resolve_compilation_class_ancestry, resolve_compilation_units,
+    resolve_compilation_units,
 };
 #[cfg(feature = "csharp")]
 pub(crate) use compilation::{ancestry_obligations, ancestry_obligations_for_files};

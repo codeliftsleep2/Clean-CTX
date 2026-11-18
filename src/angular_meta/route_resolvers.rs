@@ -17,12 +17,14 @@ pub(crate) struct ResolverProjection {
 }
 
 #[cfg(test)]
+#[cfg(feature = "angular")]
 pub(crate) fn project(a: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     project_with_registrations(a).edges
 }
 
 /// One compilation/admission-local traversal produces both written projections.
 /// No result is retained across source, witness or publication generations.
+#[cfg(feature = "angular")]
 pub(crate) fn project_with_registrations(a: &TypeScriptAuthority) -> ResolverProjection {
     #[cfg(test)]
     super::admission_work_metrics::resolver();
@@ -188,6 +190,7 @@ pub(crate) fn project_with_registrations(a: &TypeScriptAuthority) -> ResolverPro
     result
 }
 /// Compare only with the complete projection owned by this admission call.
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |x: &crate::layers::meta::semantic::EntityRef,
                 y: &crate::layers::meta::semantic::EntityRef| {
@@ -206,6 +209,7 @@ pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) 
         })
 }
 /// Field ownership is independent of duplicate/value proof; no owned downgrade.
+#[cfg(feature = "angular")]
 pub(crate) fn owned_objects(a: &TypeScriptAuthority) -> Vec<(usize, usize)> {
     super::route_objects::project(a)
         .iter()

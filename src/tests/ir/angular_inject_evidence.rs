@@ -82,6 +82,12 @@ fn angular_inject_evidence_direct_descendant_and_token_roles() {
         let field = &class.fields[0];
         assert_eq!(field.receiver, "completelyDifferentName");
         assert_eq!(field.classification, expected, "{expression}");
+        #[cfg(feature = "typescript")]
+        assert_eq!(
+            field.optional_call,
+            expression == "inject?.(AuditService)",
+            "{expression}"
+        );
         assert_eq!(field.written_token.as_deref(), token);
         assert_eq!(
             &source[field.initializer_span.start_byte()..field.initializer_span.end_byte()],

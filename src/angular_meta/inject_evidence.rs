@@ -1,8 +1,10 @@
 //! Compilation-local associations from one existing TypeScript capture walk.
+#[cfg(feature = "typescript")]
 use crate::compression::capture_pipeline::CapturedNode;
-use crate::ir::invocation_evidence::{
-    ArgumentQualifier, InvocationOccurrence, SourceSpan, WrittenCallee,
-};
+use crate::ir::invocation_evidence::SourceSpan;
+#[cfg(feature = "typescript")]
+use crate::ir::invocation_evidence::{ArgumentQualifier, InvocationOccurrence, WrittenCallee};
+#[cfg(feature = "typescript")]
 use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -79,12 +81,14 @@ impl ClassInitializerEvidence {
     }
 }
 
+#[cfg(feature = "typescript")]
 fn span(capture: &CapturedNode) -> SourceSpan {
     SourceSpan::new(capture.start_byte, capture.end_byte).expect("parser span is ordered")
 }
 
 /// Owner association is a same-match direct class-body field, joined to the
 /// canonical #139 class capture by exact span. No nearest-owner inference.
+#[cfg(feature = "typescript")]
 pub(crate) fn collect(
     source: &str,
     captures: &[CapturedNode],

@@ -92,30 +92,36 @@ pub(crate) fn reset_query_work_counts() {
 /// Closed identities for binary-owned capture queries that are safe to reuse.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum RegisteredQuery {
+    TypeScriptIR,
+    CSharpIR,
     TypeScript,
     CSharp,
     Rust,
     Java,
     TypeScriptCalls,
-    #[cfg(test)]
+    #[cfg(all(test, feature = "typescript"))]
     TestProbe,
 }
 
 impl RegisteredQuery {
     fn language(self) -> Option<Language> {
         match self {
-            Self::TypeScript | Self::TypeScriptCalls => {
+            Self::TypeScript | Self::TypeScriptCalls | Self::TypeScriptIR => {
                 crate::compression::language::safe_typescript_language()
             }
-            #[cfg(test)]
+            #[cfg(all(test, feature = "typescript"))]
             Self::TestProbe => crate::compression::language::safe_typescript_language(),
-            Self::CSharp => crate::compression::language::safe_csharp_language(),
+            Self::CSharp | Self::CSharpIR => crate::compression::language::safe_csharp_language(),
             Self::Rust => crate::compression::language::safe_rust_language(),
             Self::Java => crate::compression::language::safe_java_language(),
         }
     }
 }
 
+static TYPESCRIPT_IR_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
+static CSHARP_IR_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
+    std::sync::OnceLock::new();
 static TYPESCRIPT_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
     std::sync::OnceLock::new();
 static CSHARP_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
@@ -126,23 +132,41 @@ static JAVA_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
     std::sync::OnceLock::new();
 static TYPESCRIPT_CALL_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
     std::sync::OnceLock::new();
-#[cfg(test)]
+#[cfg(all(test, feature = "typescript"))]
 static TEST_PROBE_QUERY: std::sync::OnceLock<Result<Query, tree_sitter::QueryError>> =
     std::sync::OnceLock::new();
 
 fn registered_query(
     identity: RegisteredQuery,
 ) -> Result<&'static Query, &'static tree_sitter::QueryError> {
-    let (cell, query_text) = match identity {
-        RegisteredQuery::TypeScript => (&TYPESCRIPT_QUERY, crate::queries::TS_QUERY),
-        RegisteredQuery::CSharp => (&CSHARP_QUERY, crate::queries::CS_QUERY),
-        RegisteredQuery::Rust => (&RUST_QUERY, crate::queries::RS_QUERY),
-        RegisteredQuery::Java => (&JAVA_QUERY, crate::queries::JAVA_QUERY),
-        RegisteredQuery::TypeScriptCalls => (&TYPESCRIPT_CALL_QUERY, crate::queries::TS_CALL_QUERY),
-        #[cfg(test)]
-        RegisteredQuery::TestProbe => (&TEST_PROBE_QUERY, crate::queries::TS_QUERY),
+    let cell = match identity {
+        RegisteredQuery::TypeScriptIR => &TYPESCRIPT_IR_QUERY,
+        RegisteredQuery::CSharpIR => &CSHARP_IR_QUERY,
+        RegisteredQuery::TypeScript => &TYPESCRIPT_QUERY,
+        RegisteredQuery::CSharp => &CSHARP_QUERY,
+        RegisteredQuery::Rust => &RUST_QUERY,
+        RegisteredQuery::Java => &JAVA_QUERY,
+        RegisteredQuery::TypeScriptCalls => &TYPESCRIPT_CALL_QUERY,
+        #[cfg(all(test, feature = "typescript"))]
+        RegisteredQuery::TestProbe => &TEST_PROBE_QUERY,
     };
     cell.get_or_init(|| {
+        use std::borrow::Cow;
+        let query_text: Cow<'static, str> = match identity {
+            RegisteredQuery::TypeScriptIR => Cow::Owned(
+                crate::queries::core_ir::complete_query_definition(crate::queries::TS_QUERY),
+            ),
+            RegisteredQuery::CSharpIR => Cow::Owned(
+                crate::queries::core_ir::complete_query_definition(crate::queries::CS_QUERY),
+            ),
+            RegisteredQuery::TypeScript => Cow::Borrowed(crate::queries::TS_QUERY),
+            RegisteredQuery::CSharp => Cow::Borrowed(crate::queries::CS_QUERY),
+            RegisteredQuery::Rust => Cow::Borrowed(crate::queries::RS_QUERY),
+            RegisteredQuery::Java => Cow::Borrowed(crate::queries::JAVA_QUERY),
+            RegisteredQuery::TypeScriptCalls => Cow::Borrowed(crate::queries::TS_CALL_QUERY),
+            #[cfg(all(test, feature = "typescript"))]
+            RegisteredQuery::TestProbe => Cow::Borrowed(crate::queries::TS_QUERY),
+        };
         #[cfg(all(
             test,
             any(feature = "csharp", feature = "typescript", feature = "java")
@@ -152,7 +176,7 @@ fn registered_query(
             &identity
                 .language()
                 .expect("registered query language feature must be enabled"),
-            query_text,
+            &query_text,
         )
     })
     .as_ref()
@@ -327,6 +351,37 @@ where
     )
 }
 
+// Only exact binary-owned IR definitions with their matching grammar select
+// closed registrations. Arbitrary text and mismatched grammars stay dynamic.
+pub(crate) fn run_core_capture_pipeline_nodes<F>(
+    language: Language,
+    base_query: &str,
+    source: &str,
+    fidelity: Fidelity,
+    process: F,
+) -> Result<Vec<CapturedNode>, Box<dyn std::error::Error>>
+where
+    F: FnMut(&str, &str, Fidelity) -> Option<String>,
+{
+    let identity = if base_query == crate::queries::TS_QUERY
+        && crate::compression::language::safe_typescript_language().as_ref() == Some(&language)
+    {
+        Some(RegisteredQuery::TypeScriptIR)
+    } else if base_query == crate::queries::CS_QUERY
+        && crate::compression::language::safe_csharp_language().as_ref() == Some(&language)
+    {
+        Some(RegisteredQuery::CSharpIR)
+    } else {
+        None
+    };
+    if let Some(identity) = identity {
+        run_registered_capture_pipeline_nodes(identity, source, fidelity, process)
+    } else {
+        let query_text = crate::queries::core_ir::complete_query_definition(base_query);
+        run_capture_pipeline_nodes(language, &query_text, source, fidelity, process)
+    }
+}
+
 enum QuerySelection<'a> {
     Dynamic(&'a str),
     Registered(RegisteredQuery),
@@ -412,3 +467,7 @@ where
 #[cfg(test)]
 #[path = "../tests/compression/capture_pipeline.rs"]
 mod tests;
+
+#[cfg(all(test, any(feature = "typescript", feature = "csharp")))]
+#[path = "../tests/compression/core_ir_registration.rs"]
+mod core_ir_registration_tests;

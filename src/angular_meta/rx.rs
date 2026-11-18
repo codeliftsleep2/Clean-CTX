@@ -397,6 +397,7 @@ mod extract;
 mod pipes;
 
 pub use extract::extract_rx_shape;
+#[cfg(feature = "angular")]
 pub(crate) use extract::extract_rx_shape_with_evidence;
 pub(crate) use extract::extract_rx_shape_with_regions;
 

@@ -166,6 +166,7 @@ pub(super) struct PreparationContext {
         Option<Result<super::super::hydration::ResolverNomination, String>>,
     #[cfg(feature = "csharp")]
     pub(super) ef_dependencies: HashMap<String, super::csharp_resolution::EfDependencyEvidence>,
+    #[cfg(feature = "csharp")]
     pub(super) ef_sources: Option<std::collections::BTreeSet<String>>,
     #[cfg(feature = "csharp")]
     pub(super) ef_view_revision: usize,
@@ -175,6 +176,7 @@ pub(super) struct PreparationContext {
     csharp_catalog: Option<Arc<super::csharp_resolution::Catalog>>,
     #[cfg(feature = "csharp")]
     csharp_catalog_generation: Option<u64>,
+    #[cfg(feature = "csharp")]
     efcore_catalog: Option<Arc<super::csharp_resolution::EfCoreCatalog>>,
     angular_catalogs: [Option<Arc<super::angular_templates::Catalog>>; 2],
     #[cfg(feature = "csharp")]
@@ -211,6 +213,7 @@ impl PreparationContext {
             resolver_nomination: None,
             #[cfg(feature = "csharp")]
             ef_dependencies: HashMap::new(),
+            #[cfg(feature = "csharp")]
             ef_sources: None,
             #[cfg(feature = "csharp")]
             ef_view_revision: 0,
@@ -220,6 +223,7 @@ impl PreparationContext {
             csharp_catalog: None,
             #[cfg(feature = "csharp")]
             csharp_catalog_generation: None,
+            #[cfg(feature = "csharp")]
             efcore_catalog: None,
             angular_catalogs: [None, None],
             #[cfg(feature = "csharp")]
@@ -419,6 +423,7 @@ impl PreparationContext {
             .clone()
     }
 
+    #[cfg(feature = "csharp")]
     pub(super) fn efcore_catalog(
         &mut self,
         state: &McpState,
@@ -452,9 +457,10 @@ impl PreparationContext {
 
     pub(super) fn invalidate_derived_catalogs(&mut self) {
         #[cfg(test)]
-        let had_catalog = self.csharp_catalog.is_some()
-            || self.efcore_catalog.is_some()
-            || self.angular_catalogs.iter().any(Option::is_some);
+        let had_catalog =
+            self.csharp_catalog.is_some() || self.angular_catalogs.iter().any(Option::is_some);
+        #[cfg(all(test, feature = "csharp"))]
+        let had_catalog = had_catalog || self.efcore_catalog.is_some();
         #[cfg(test)]
         if had_catalog {
             super::work_metrics::record_derived_catalog_invalidation();
@@ -464,7 +470,10 @@ impl PreparationContext {
         {
             self.csharp_catalog_generation = None;
         }
-        self.efcore_catalog = None;
+        #[cfg(feature = "csharp")]
+        {
+            self.efcore_catalog = None;
+        }
         self.angular_catalogs = [None, None];
     }
 

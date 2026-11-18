@@ -25,7 +25,9 @@ use super::*;
 
 mod orchestration;
 pub use orchestration::extract_ngrx_shape;
-pub(crate) use orchestration::{extract_ngrx_shape_with_regions, extract_ngrx_shape_with_sites};
+pub(crate) use orchestration::extract_ngrx_shape_with_regions;
+#[cfg(feature = "angular")]
+pub(crate) use orchestration::extract_ngrx_shape_with_sites;
 
 /// Extract the feature name from `createFeature({name: '...'})` or
 /// `StoreModule.forFeature('...', ...)`.

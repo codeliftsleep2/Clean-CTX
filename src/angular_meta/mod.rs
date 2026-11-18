@@ -27,7 +27,7 @@
 pub(crate) mod application_config_providers;
 #[cfg(feature = "typescript")]
 pub(crate) mod class_role_authority;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod constructor_authority;
 pub(crate) mod constructor_injects;
 pub(crate) mod decorator_args;
@@ -37,6 +37,7 @@ pub(crate) mod detect;
 #[cfg(test)]
 pub(crate) mod detect_metrics;
 pub mod formly;
+#[cfg(feature = "typescript")]
 pub(crate) mod functional_authority;
 #[cfg(feature = "typescript")]
 pub(crate) mod inject_authority;
@@ -44,6 +45,7 @@ pub(crate) mod inject_evidence;
 pub(crate) mod markers;
 #[cfg(feature = "typescript")]
 pub(crate) mod member_authority;
+#[cfg(feature = "typescript")]
 pub(crate) mod member_semantics;
 pub(crate) mod module_metadata;
 pub mod ngrx;
@@ -56,21 +58,22 @@ pub(crate) mod provider_imported;
 pub(crate) mod provider_pair_authority;
 #[cfg(feature = "typescript")]
 pub(crate) mod provider_position;
+#[cfg(feature = "typescript")]
 pub(crate) mod provider_semantics;
 pub mod reactive_forms;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod route_components;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod route_guards;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod route_lazy_components;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod route_load_children;
 #[cfg(feature = "typescript")]
 mod route_objects;
 #[cfg(feature = "typescript")]
 pub(crate) mod route_providers;
-#[cfg(feature = "typescript")]
+#[cfg(feature = "angular")]
 pub(crate) mod route_resolvers;
 pub mod routing;
 pub mod rx;
@@ -89,7 +92,7 @@ pub mod testing;
 pub(crate) mod typed_provider_root;
 pub mod util;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) use detect_metrics::{
     ast_parse_count, detection_count, reset_ast_parse_count, reset_detection_count,
 };
@@ -598,9 +601,10 @@ mod bootstrap_inline_providers;
 #[cfg(feature = "typescript")]
 pub(crate) mod config_composition;
 
+#[cfg(feature = "typescript")]
 pub(crate) mod legacy_bootstrap;
 
-#[cfg(all(test, feature = "typescript"))]
+#[cfg(all(test, feature = "angular"))]
 pub(crate) mod admission_work_metrics;
 
 #[cfg(all(test, feature = "typescript"))]

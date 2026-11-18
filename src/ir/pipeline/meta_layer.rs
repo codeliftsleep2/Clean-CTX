@@ -92,6 +92,7 @@ impl IRPass for MetaLayerPass {
         {
             context.typescript_authority = state.typescript_authority.as_ref();
         }
+        #[cfg(feature = "typescript")]
         if state.query_string == crate::queries::TS_QUERY {
             context.angular_initializers = Some(&state.angular_initializers);
             context.ngrx_class_actions = Some(&state.ngrx_class_actions);

@@ -17,6 +17,7 @@ try {
         Get-Content -LiteralPath $log -Tail 20
         if($code -ne 0){throw "$Name failed; preserve $out"}
     }
+    Invoke-Step 'case-helper-format' 'rustfmt' @('--edition','2024','--config','skip_children=true','src/tests/compression/core_ir_registration.rs')
     Invoke-Step 'measurement-registration-only' 'pwsh' @('-NoProfile','-File','verification/ci-verify-r1/invoke-measurements.ps1','-ListOnly')
     Invoke-Step 'root-library-tests-clippy' 'cargo' @('clippy','--lib','--tests','--all-features','--','-D','warnings')
     Invoke-Step 'utf8' 'pwsh' @('-NoProfile','-File','scripts/check-utf8.ps1')

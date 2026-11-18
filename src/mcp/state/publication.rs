@@ -93,11 +93,13 @@ impl McpState {
     }
 
     #[cfg(test)]
+    #[cfg(feature = "typescript")]
     pub(crate) fn arm_semantic_publication_attempt(&self, file_path: &str) {
         snapshot_test_support::arm(&self.semantic_owner_path(file_path));
     }
 
     #[cfg(test)]
+    #[cfg(feature = "typescript")]
     pub(crate) fn wait_for_semantic_publication_attempt(&self) {
         snapshot_test_support::wait_until_attempted();
     }

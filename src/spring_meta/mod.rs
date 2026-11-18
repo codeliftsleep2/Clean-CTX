@@ -34,12 +34,13 @@ pub(crate) mod markers;
 pub mod properties;
 pub mod semantic;
 
+#[cfg(test)]
+pub(crate) use evaluation_metrics::record_detection;
 #[cfg(all(test, feature = "spring_boot"))]
 pub(crate) use evaluation_metrics::record_evaluation;
-#[cfg(test)]
+#[cfg(all(test, feature = "spring_boot"))]
 pub(crate) use evaluation_metrics::{
-    detection_count, evaluation_count, record_detection, reset_detection_count,
-    reset_evaluation_count,
+    detection_count, evaluation_count, reset_detection_count, reset_evaluation_count,
 };
 
 use crate::compression::Fidelity;

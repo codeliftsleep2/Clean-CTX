@@ -26,8 +26,10 @@ use crate::ir::opcodes::{
 };
 
 /// Increment when identical TypeScript input can emit different canonical IR.
+#[cfg(feature = "typescript")]
 pub(crate) const CANONICAL_PRODUCER_GENERATION: u32 = 3;
 /// Increment when TypeScript canonical facts change meaning for projection.
+#[cfg(feature = "typescript")]
 pub(crate) const SEMANTIC_INPUT_GENERATION: u32 = 3;
 
 /// TypeScript language layer (Layer 2).

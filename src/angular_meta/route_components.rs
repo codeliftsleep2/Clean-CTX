@@ -4,6 +4,7 @@ use crate::ir::typescript_resolution::declaration_facets::ExpressionValue;
 use crate::ir::typescript_resolution::{Resolution, TypeScriptAuthority};
 use crate::layers::meta::semantic::{SemanticEdge, SemanticRelation};
 
+#[cfg(feature = "angular")]
 pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
     #[cfg(test)]
     super::admission_work_metrics::projection(super::admission_work_metrics::Consumer::Eager);
@@ -45,6 +46,7 @@ pub(crate) fn project(authority: &TypeScriptAuthority) -> Vec<SemanticEdge> {
         .collect()
 }
 
+#[cfg(feature = "angular")]
 pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) -> bool {
     let same = |a: &crate::layers::meta::semantic::EntityRef,
                 b: &crate::layers::meta::semantic::EntityRef| {
@@ -64,6 +66,7 @@ pub(crate) fn admits_projected(projected: &[SemanticEdge], edge: &SemanticEdge) 
 }
 
 /// Ownership, independent of target eligibility, prevents weak fallback on refusal.
+#[cfg(feature = "angular")]
 pub(crate) fn owned_objects(authority: &TypeScriptAuthority) -> Vec<(usize, usize)> {
     super::route_objects::project(authority)
         .iter()
