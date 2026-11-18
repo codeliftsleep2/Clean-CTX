@@ -22,6 +22,9 @@ mod graph_intel;
 #[path = "../tests/cbm/cache_ownership.rs"]
 mod cache_ownership;
 
+#[path = "../tests/cbm/wire_epoch.rs"]
+mod wire_epoch;
+
 // CBM 0.8.1 trace_path wire contract (typed graph_trace parsing +
 // direction determination), pinned by verbatim live captures and
 // fresh-process probes over a synthetic fixture repo.

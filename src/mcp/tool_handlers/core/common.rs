@@ -199,3 +199,68 @@ pub(crate) fn contract_fields_focused(
         _ => (ContentKind::Skeleton, Vec::new()),
     }
 }
+
+/// Declare bounded semantic loss in a C# model-facing skeleton. Canonical IR
+/// remains the semantic authority; exact whole-document representations never
+/// carry a degradation claim.
+pub(crate) fn model_facing_degradation(
+    file_path: &str,
+    fidelity: crate::compression::Fidelity,
+    content_kind: ContentKind,
+) -> Value {
+    if !file_path.to_ascii_lowercase().ends_with(".cs")
+        || matches!(
+            content_kind,
+            ContentKind::VerbatimDocument | ContentKind::RawPassthrough
+        )
+    {
+        return Value::Null;
+    }
+    let omits: &[&str] = match fidelity {
+        crate::compression::Fidelity::Low => &[
+            "method_return_types",
+            "parameter_types",
+            "parameter_defaults",
+            "declaration_attributes",
+            "generic_constraints",
+            "xml_documentation",
+            "field_types",
+            "property_types",
+            "record_positional_parameters",
+            "partial_type_composition",
+            "method_bodies",
+        ],
+        crate::compression::Fidelity::Medium => &[
+            "method_return_types",
+            "parameter_defaults",
+            "declaration_attributes",
+            "generic_constraints",
+            "xml_documentation",
+            "field_types",
+            "property_types",
+            "record_positional_parameters",
+            "partial_type_composition",
+            "method_bodies",
+        ],
+        crate::compression::Fidelity::High => &[
+            "declaration_attributes",
+            "xml_documentation",
+            "record_positional_parameters",
+            "partial_type_composition",
+            "method_bodies",
+        ],
+        crate::compression::Fidelity::Edit => &[
+            "declaration_attributes",
+            "xml_documentation",
+            "record_positional_parameters",
+            "partial_type_composition",
+        ],
+        crate::compression::Fidelity::Verbatim => return Value::Null,
+    };
+    serde_json::json!({
+        "language": "csharp",
+        "semantic_completeness": "declared_loss",
+        "scope": "model_facing_skeleton",
+        "omits": omits,
+    })
+}

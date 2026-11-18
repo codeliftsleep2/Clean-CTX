@@ -230,32 +230,35 @@ public sealed class MethodOnly
     Assert-Coverage $bogus 'identity_not_indexed' $false $false 'bogus exact identity'
     Write-Host 'PASS: a bogus exact identity reports identity_not_indexed instead of absence.'
 
-    $unsupportedInterface = Query-Edges 'reverse_edges' 'Interface' 'IFooService'
-    if ($unsupportedInterface.count -ne 0) {
-        throw "The unsupported Interface consumer shape returned edges: $($unsupportedInterface | ConvertTo-Json -Compress -Depth 20)"
+    $interfaceReverse = Query-Edges 'reverse_edges' 'Interface' 'IFooService'
+    $implementsEdges = @($interfaceReverse.edges | Where-Object {
+        $_.relation -eq 'Implements' -and
+        $_.subject.domain -eq 'builtin' -and
+        $_.subject.entity_type -eq 'Class' -and
+        $_.subject.name -eq 'ImplementsOnly' -and
+        $_.object.domain -eq 'builtin' -and
+        $_.object.entity_type -eq 'Interface' -and
+        $_.object.name -eq 'IFooService'
+    })
+    if ($interfaceReverse.count -ne 1 -or $implementsEdges.Count -ne 1) {
+        throw "The Interface identity did not return exactly its legitimate Implements edge: $($interfaceReverse | ConvertTo-Json -Compress -Depth 20)"
     }
-    Assert-Coverage $unsupportedInterface 'capability_not_established' $true $false 'Interface consumer shape'
-    $alternative = $unsupportedInterface.coverage.alternative_query
-    if ($alternative.type -ne 'reverse_edges' -or
-        $alternative.domain -ne 'builtin' -or
-        $alternative.entity_type -ne 'TypeRef' -or
-        $alternative.name -ne 'IFooService' -or
-        $alternative.relation -ne 'HasConstructorParameterType') {
-        throw "Interface coverage omitted the supported TypeRef alternative: $($unsupportedInterface.coverage | ConvertTo-Json -Compress -Depth 20)"
-    }
-    Write-Host 'PASS: a real Interface identity points to the supported TypeRef constructor-consumer query.'
+    Assert-NoConstructorEdge $interfaceReverse 'ImplementsOnly'
+    Assert-Coverage $interfaceReverse 'established_indexed_capability' $true $true 'Interface reverse edge shape'
+    Write-Host 'PASS: the Interface identity exposes Implements without masquerading as constructor consumption.'
 
     $reverse = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $reverseEdges = @($reverse.edges)
-    if ($reverseEdges.Count -ne 3) {
-        throw "Expected exactly three constructor consumers, found $($reverseEdges.Count): $($reverse | ConvertTo-Json -Compress -Depth 20)"
+    $constructorEdges = @($reverseEdges | Where-Object { $_.relation -eq 'HasConstructorParameterType' })
+    if ($constructorEdges.Count -ne 3) {
+        throw "Expected exactly three constructor consumers, found $($constructorEdges.Count): $($reverse | ConvertTo-Json -Compress -Depth 20)"
     }
     $expectedConsumers = @{
         BarController = $barPath
         BazService = $bazPath
         AttributedConsumer = $attributedPath
     }
-    foreach ($edge in $reverseEdges) {
+    foreach ($edge in $constructorEdges) {
         $subject = [string]$edge.subject.name
         if (-not $expectedConsumers.ContainsKey($subject)) {
             throw "Unexpected constructor consumer '$subject'."
@@ -265,7 +268,7 @@ public sealed class MethodOnly
         }
     }
     foreach ($subject in $expectedConsumers.Keys) {
-        if (@($reverseEdges | Where-Object { $_.subject.name -eq $subject }).Count -ne 1) {
+        if (@($constructorEdges | Where-Object { $_.subject.name -eq $subject }).Count -ne 1) {
             throw "Expected exactly one reverse edge for $subject."
         }
     }
@@ -294,7 +297,7 @@ public sealed class MethodOnly
         workspaceRoot = $workspace
         queries = @(
             @{ id = 'bogus'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'DefinitelyUnsupported'; name = 'DefinitelyMissing' },
-            @{ id = 'unsupported'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'Interface'; name = 'IFooService' },
+            @{ id = 'interface'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'Interface'; name = 'IFooService' },
             @{ id = 'positive'; type = 'reverse_edges'; domain = 'builtin'; entity_type = 'TypeRef'; name = 'IFooService' },
             @{ id = 'zero'; type = 'forward_edges'; domain = 'builtin'; entity_type = 'Class'; name = 'MethodOnly' }
         )
@@ -304,7 +307,7 @@ public sealed class MethodOnly
         throw "Coverage batch did not preserve four successful item outcomes: $($batch | ConvertTo-Json -Compress -Depth 30)"
     }
     Assert-Coverage $batchResults[0].result 'identity_not_indexed' $false $false 'batched bogus identity'
-    Assert-Coverage $batchResults[1].result 'capability_not_established' $true $false 'batched unsupported capability'
+    Assert-Coverage $batchResults[1].result 'established_indexed_capability' $true $true 'batched Interface capability'
     Assert-Coverage $batchResults[2].result 'established_indexed_capability' $true $true 'batched positive capability'
     Assert-Coverage $batchResults[3].result 'established_indexed_capability' $true $true 'batched genuine zero'
     Write-Host 'PASS: batch results preserve independent exact-identity coverage.'
@@ -332,9 +335,10 @@ public sealed class BarController
     Compile-File $barPath
     $afterReplacement = Query-Edges 'reverse_edges' 'TypeRef' 'IFooService'
     $replacementEdges = @($afterReplacement.edges)
-    if ($replacementEdges.Count -ne 2 -or
-        @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'BazService' $bazPath }).Count -ne 1 -or
-        @($replacementEdges | Where-Object { Test-ConstructorEdge $_ 'AttributedConsumer' $attributedPath }).Count -ne 1) {
+    $replacementConstructorEdges = @($replacementEdges | Where-Object { $_.relation -eq 'HasConstructorParameterType' })
+    if ($replacementConstructorEdges.Count -ne 2 -or
+        @($replacementConstructorEdges | Where-Object { Test-ConstructorEdge $_ 'BazService' $bazPath }).Count -ne 1 -or
+        @($replacementConstructorEdges | Where-Object { Test-ConstructorEdge $_ 'AttributedConsumer' $attributedPath }).Count -ne 1) {
         throw "Recompilation did not replace the stale constructor dependency: $($afterReplacement | ConvertTo-Json -Compress -Depth 20)"
     }
     if (@($replacementEdges | Where-Object { $_.subject.name -eq 'BarController' }).Count -ne 0) {

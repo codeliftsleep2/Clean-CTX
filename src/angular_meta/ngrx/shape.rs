@@ -4,10 +4,9 @@
 // semantic-edge projection for an extracted `NgRxShape`.
 //
 // Split out of `src/angular_meta/ngrx.rs` (active-file size policy): the
-// module had exceeded the 615-line ceiling. This is a pure relocation -- the
-// code below is byte-for-byte the previous `impl NgRxShape` block. It
-// references none of the extraction helpers, so it has no cross-module
-// dependencies.
+// module had exceeded the 615-line ceiling. Modern shape behaviour remains
+// preserved; #140 adds an independent class-declaration carrier and marker.
+// Syntax interpretation stays in the NgRx-local producers.
 //
 // Child-module access: a private item of an ancestor module is visible in its
 // descendants, so `use super::*` supplies `NgRxShape` (and its struct fields),
@@ -19,6 +18,7 @@ impl NgRxShape {
     /// Returns `true` if there are no NgRx artifacts to emit.
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
+            && self.class_actions.is_empty()
             && self.reducer.is_none()
             && self.effects.is_empty()
             && self.selectors.is_empty()
@@ -153,6 +153,33 @@ impl NgRxShape {
 
         let mut edges: Vec<SemanticEdge> = Vec::new();
 
+        // Modern ActionDecl recognition, not a dispatch/reducer/effect edge,
+        // owns publication. Existing index normalization keeps these records
+        // out of the relationship graph and deduplicates file occurrences.
+        for action in &self.actions {
+            let entity = EntityRef::new("ngrx", "Action", &action.name);
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "ngrx",
+                call_evidence: None,
+            });
+        }
+
+        // Independently recognized class syntax uses the same declaration
+        // carrier without changing modern ActionDecl publication.
+        for action in &self.class_actions {
+            let entity = EntityRef::new("ngrx", "Action", &action.name);
+            edges.push(SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "ngrx",
+                call_evidence: None,
+            });
+        }
+
         // Action → TriggersReducer → Reducer (via `on(action)` handlers).
         if let Some(reducer) = &self.reducer {
             for transition in &reducer.transitions {
@@ -219,10 +246,13 @@ impl NgRxShape {
             }
         }
 
-        // Component → Dispatches → Action (via `this.store.dispatch(...)`).
-        // Uses the actual component class as the subject when available.
+        // Angular owner → Dispatches → Action (via `this.store.dispatch(...)`).
+        // Exact Service authority is occurrence-local; otherwise retain the
+        // frozen Component/fallback projection.
         for site in &self.dispatch_sites {
-            let subject = if let Some(ref component) = self.component_name {
+            let subject = if let Some(ref service) = site.service_owner {
+                EntityRef::new("angular", "Service", service)
+            } else if let Some(ref component) = self.component_name {
                 EntityRef::new("angular", "Component", component)
             } else {
                 EntityRef::new("angular", "DispatchSite", "store")
@@ -239,16 +269,26 @@ impl NgRxShape {
         // Component → Selects → Selector (via `this.store.select(...)`).
         // Uses the actual component class as the subject when available.
         for site in &self.select_sites {
-            let subject = if let Some(ref component) = self.component_name {
+            let subject = if let Some(ref service) = site.service_owner {
+                EntityRef::new("angular", "Service", service)
+            } else if let Some(ref component) = self.component_name {
                 EntityRef::new("angular", "Component", component)
             } else {
                 EntityRef::new("angular", "SelectSite", "store")
             };
+            let mut object = EntityRef::new("ngrx", "Selector", &site.selector_name);
+            if let Some(module) = &site.module_specifier {
+                object.file = Some(module.clone());
+            }
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Selects,
                 subject,
-                object: EntityRef::new("ngrx", "Selector", &site.selector_name),
-                layer: "ngrx",
+                object,
+                layer: if site.module_specifier.is_some() {
+                    super::direct_imports::REFINEMENT_LAYER
+                } else {
+                    "ngrx"
+                },
                 call_evidence: None,
             });
         }
@@ -310,6 +350,12 @@ impl NgRxShape {
                     }
                 }
             }
+        }
+
+        // Class declarations are not createAction calls. Keep their marker
+        // truthful and independent of unimplemented reference linkage.
+        for action in &self.class_actions {
+            s.push_str(&format!("  Φaction-class:{}\n", action.name));
         }
 
         // Reducer (Medium+)

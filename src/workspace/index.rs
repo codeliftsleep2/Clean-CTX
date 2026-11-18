@@ -45,7 +45,9 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 use std::collections::{HashMap, HashSet};
 
 mod coverage;
+mod declarations;
 mod edges;
+mod ngrx_refinement;
 mod remove;
 mod traversal;
 
@@ -195,6 +197,8 @@ fn find_entities_by_name_with_scope<'a>(
 pub struct WorkspaceIndex {
     /// Entity identity → all entity occurrences (with file context).
     entities: HashMap<EntityKey, Vec<EntityRef>>,
+    /// Entity identity → source occurrences independently proven as declarations.
+    declarations: HashMap<EntityKey, Vec<EntityRef>>,
     /// Entity identity → outgoing edge occurrences (one entry per asserting
     /// source occurrence).
     forward: HashMap<EntityKey, Vec<StoredEdge>>,
@@ -205,9 +209,17 @@ pub struct WorkspaceIndex {
     edge_set: HashSet<EdgeKey>,
     /// File → entity keys in that file (for provenance tracking).
     file_map: HashMap<String, Vec<EntityKey>>,
+    /// File → declaration identity keys proven by that file.
+    file_declarations: HashMap<String, Vec<EntityKey>>,
     /// File → edge keys originating from that file (for precise edge cleanup
     /// on file recompilation or deletion). Populated alongside edge_set.
     file_edges: HashMap<String, Vec<EdgeKey>>,
+    /// Source-derived unresolved NgRx import carriers, owned by their
+    /// dispatch file. They are never query-visible semantic authority.
+    ngrx_refinement_candidates: HashMap<String, Vec<SemanticEdge>>,
+    /// Materialized occurrences derived from the current candidate and
+    /// declaration sets, rebuilt after every affected publication change.
+    ngrx_refined_edges: Vec<EdgeKey>,
     /// Entity name → entity keys (for name-based lookup across domains/types).
     /// Populated alongside the entities map during registration.
     name_index: HashMap<String, Vec<EntityKey>>,
@@ -228,11 +240,15 @@ impl WorkspaceIndex {
     pub fn new() -> Self {
         Self {
             entities: HashMap::new(),
+            declarations: HashMap::new(),
             forward: HashMap::new(),
             reverse: HashMap::new(),
             edge_set: HashSet::new(),
             file_map: HashMap::new(),
+            file_declarations: HashMap::new(),
             file_edges: HashMap::new(),
+            ngrx_refinement_candidates: HashMap::new(),
+            ngrx_refined_edges: Vec::new(),
             name_index: HashMap::new(),
             semantic_coverage: HashMap::new(),
             total_edges_inserted: 0,
@@ -566,6 +582,10 @@ mod query_tests;
 #[cfg(test)]
 #[path = "../tests/workspace/index_graph.rs"]
 mod graph_tests;
+
+#[cfg(test)]
+#[path = "../tests/workspace/index_declaration_authority.rs"]
+mod declaration_authority_tests;
 
 #[cfg(test)]
 #[path = "../tests/workspace/index_cycle_policy.rs"]

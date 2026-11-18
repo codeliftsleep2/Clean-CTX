@@ -284,7 +284,7 @@ controls **which** method bodies receive verbatim content at Edit fidelity.
 
 2. apply_edit(filePath, operations: [{
        type: "replace_body",              // or delete, insert_after, insert_before
-       target: "ClassName.methodName",    // qualified or unambiguous bare name
+       target: "ClassName.methodName(Type)", // signature-qualified for overloads
        expectedOldText: "{...current verbatim body...}",
        newText: "{...replacement body...}"
     }], verify: true)
@@ -306,12 +306,22 @@ controls **which** method bodies receive verbatim content at Edit fidelity.
 | `insert_after` | `anchor`, `unitText` | Inserting a new method after an existing one |
 | `insert_before` | `anchor`, `unitText` | Inserting a new method before an existing one |
 
+Selectors are language-derived and source-local. Use
+`Owner.method(type,...)` when same-owner candidates share a name. A legacy
+`Owner.method` or bare method name is accepted only when it resolves uniquely;
+otherwise `apply_edit` returns `ambiguous_target`. Selector spelling comes from
+the declaration's written parameter types and is edit-addressing authority,
+not a repository-wide semantic identity. Unsupported declarations that are
+known from structured syntax return `uneditable_target`; an absent selector
+returns `not_found`.
+
 ### Prerequisites
 
 - The file must have been read via `provide_code_context` at `fidelity="edit"`
   or `fidelity="verbatim"` **in the current session**.
-- The `expectedOldText` must byte-match the current on-disk body (as
-  delivered by `provide_code_context`).
+- For `replace_body`, `expectedOldText` must match the current tracked body.
+  For `delete`, callers may supply the full declaration text; the historical
+  body-only guard remains accepted for compatibility.
 - Multi-unit batches targeting different units are supported within a single
   `apply_edit` call.
 

@@ -31,9 +31,13 @@ pub(crate) mod detect;
 #[cfg(test)]
 mod detect_metrics;
 pub mod formly;
+pub(crate) mod inject_evidence;
 pub(crate) mod markers;
+pub(crate) mod member_semantics;
+pub(crate) mod module_metadata;
 pub mod ngrx;
 pub mod phi;
+pub(crate) mod provider_semantics;
 pub mod reactive_forms;
 pub mod routing;
 pub mod rx;
@@ -42,6 +46,9 @@ pub mod signals;
 pub mod style;
 pub mod template;
 pub mod template_compress;
+pub(crate) mod template_occurrences;
+pub(crate) mod template_ordered;
+pub mod template_ownership;
 pub mod testing;
 pub mod util;
 
@@ -231,10 +238,12 @@ pub(crate) fn run_meta_layer_with_config_path_and_regions(
 }
 
 #[derive(Default)]
-pub(crate) struct PrecomputedAngularEvidence {
+pub(crate) struct PrecomputedAngularEvidence<'a> {
+    pub rx: Option<Option<rx::RxShape>>,
     pub ngrx: Option<Option<ngrx::NgRxShape>>,
     pub routing: Option<Option<routing::RouteShape>>,
     pub is_angular: Option<bool>,
+    pub initializers: Option<&'a [inject_evidence::ClassInitializerEvidence]>,
 }
 
 pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
@@ -244,7 +253,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     config: Option<&crate::config::MetaLayerConfig>,
     path: &std::path::Path,
     lexical_regions: &crate::meta_util::LexicalRegions,
-    precomputed: PrecomputedAngularEvidence,
+    precomputed: PrecomputedAngularEvidence<'_>,
 ) -> Option<MetaBlock> {
     // Tier 0 (detection): is this an Angular file at all?
     let is_angular = precomputed
@@ -263,7 +272,9 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     // Detect RxJS independently — a file may be RxJS without being
     // Angular (e.g. a standalone RxJS service or utility).
     let rx_shape = if rxjs_enabled {
-        rx::extract_rx_shape_with_regions(source_code, fidelity, lexical_regions)
+        precomputed.rx.unwrap_or_else(|| {
+            rx::extract_rx_shape_with_regions(source_code, fidelity, lexical_regions)
+        })
     } else {
         None
     };
@@ -343,8 +354,20 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
     let mut block = MetaBlock::default();
 
     if is_angular {
-        for raw_class in class_captures {
-            if let Some(result) = decorators::extract_decorators(raw_class, fidelity) {
+        let classes: Vec<_> = match precomputed.initializers {
+            Some(classes) => classes
+                .iter()
+                .map(|class| (class.raw_class.as_str(), class.admitted_tokens()))
+                .collect(),
+            None => class_captures
+                .iter()
+                .map(|raw| (raw.as_str(), Vec::new()))
+                .collect(),
+        };
+        for (raw_class, tokens) in classes {
+            if let Some(result) =
+                decorators::extract_decorators_with_inject_tokens(raw_class, fidelity, &tokens)
+            {
                 block.lines.extend(result.lines);
                 // Tier 2.5: run tree-sitter-html on inline templates.
                 // Only for components with `template:` (not `templateUrl:`)
@@ -357,8 +380,7 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
                         // Fidelity-gated template rendering (ANGULAR_HTML_COMPRESSION_PLAN).
                         // Low → single-line shape summary; Medium/High → multi-line
                         // structural Angular semantics.
-                        let shape = template::extract_template_shape(tpl);
-                        for line in shape.to_marker_lines(fidelity) {
+                        for line in template_compress::compress_template(tpl, fidelity) {
                             if line != "Φtpl:empty" {
                                 block.lines.push(line);
                             }
@@ -369,28 +391,29 @@ pub(crate) fn run_meta_layer_with_config_path_regions_and_evidence(
         }
     }
 
+    let unresolved_spreads =
+        module_metadata::unresolved_spreads(class_captures, source_code, Some(path));
+    if !unresolved_spreads.is_empty() {
+        block.sections.push(MetaSection {
+            header: "// --- Angular Metadata Evidence ---".to_string(),
+            lines: unresolved_spreads
+                .into_iter()
+                .map(|name| format!("Φmodspread:{name}"))
+                .collect(),
+        });
+    }
+
     // Tier 2 (RxJS): append the RxJS meta block if present.
     if let Some(shape) = rx_shape {
-        let rx_block =
-            shape.render_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators));
-        if !rx_block.is_empty() {
-            // The RxJS block has its own `// --- Φ RxJS Meta ---` header.
-            // Split the rendered block into header + lines and store as
-            // a named section so it renders under the correct header.
-            let mut rx_lines: Vec<String> = rx_block.lines().map(|l| l.to_string()).collect();
-            // First line is the header — pop it off.
-            let header = if rx_lines
-                .first()
-                .map(|l| l.starts_with("// ---"))
-                .unwrap_or(false)
-            {
-                rx_lines.remove(0)
-            } else {
-                "// --- Φ RxJS Meta ---".to_string()
-            };
+        let lines = shape
+            .marker_lines_with_config(fidelity, config.map(|c| c.rxjs.min_pipe_operators))
+            .into_iter()
+            .map(|marker| marker.trim_end_matches('\n').to_string())
+            .collect::<Vec<_>>();
+        if !lines.is_empty() {
             block.sections.push(MetaSection {
-                header,
-                lines: rx_lines,
+                header: "// --- Φ RxJS Meta ---".to_string(),
+                lines,
             });
         }
     }

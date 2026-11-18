@@ -16,7 +16,7 @@ use crate::compaction::{
     extract_method_sig, extract_rust_struct_name,
 };
 use crate::compression::Fidelity;
-use crate::compression::capture_pipeline::run_capture_pipeline;
+use crate::compression::capture_pipeline::run_capture_pipeline_nodes;
 use crate::compression::language::detect_language;
 use crate::compression::markers::build_marker;
 use crate::queries;
@@ -202,13 +202,19 @@ fn try_build_with(
     // (capture_name, raw_text) pair to the normalised text the diff
     // path wants stored in the resulting CapEntry. F-08: pass the
     // real `fidelity` through so the per-capture closures honour it.
-    let all_captures = run_capture_pipeline(
+    let comparison_query = if parser_label == "csharp" {
+        format!("{query_string}\n{}", super::csharp_evidence::QUERY)
+    } else {
+        query_string.to_string()
+    };
+    let all_captures = run_capture_pipeline_nodes(
         language.expect("Language must be Some - check feature flags"),
-        query_string,
+        &comparison_query,
         source,
         fidelity,
         |capture_name, raw, f| {
             match capture_name {
+                name if name.starts_with("diff.signature.") => Some(raw.to_string()),
                 "class.root" => Some(extract_class_name(raw)),
                 // C# interfaces and records are distinct AST nodes but
                 // share the same class-like shape. F-01 diff audit.
@@ -238,13 +244,13 @@ fn try_build_with(
             }
         },
     )?;
+    let declarations = super::csharp_evidence::collect(&all_captures);
 
     let mut classes: Vec<CapturedClass> = Vec::new();
     let mut imports: Vec<String> = Vec::new();
     let mut orphan_fields: Vec<String> = Vec::new();
     let mut orphan_methods: Vec<CapturedMethod> = Vec::new();
     let mut pending_fields: Vec<String> = Vec::new();
-    let mut pending_markers: Vec<String> = Vec::new();
     //
     // Nested-type ownership: stack of currently-open declaration scopes
     // as `(index into classes, end_byte of that declaration's span)`.
@@ -257,6 +263,9 @@ fn try_build_with(
     let mut open_scopes: Vec<(usize, usize)> = Vec::new();
 
     for cap in &all_captures {
+        if cap.name.starts_with("diff.signature.") {
+            continue;
+        }
         match cap.name.as_str() {
             "import.root" => {
                 if !cap.text.is_empty() {
@@ -286,12 +295,17 @@ fn try_build_with(
                     methods: Vec::new(),
                 });
                 open_scopes.push((idx, cap.end_byte));
-                pending_markers.clear();
             }
             "method.root" | "constructor.root" | "func.root" => {
                 let method = CapturedMethod {
                     sig: cap.text.clone(),
-                    markers: std::mem::take(&mut pending_markers),
+                    declaration: declarations.get(&(cap.start_byte, cap.end_byte)).cloned(),
+                    // Marker ownership follows the declaration span. Capture
+                    // order is not ownership: descendant captures commonly
+                    // arrive after `method.root`, so a positional buffer
+                    // credited them to the following method and dropped the
+                    // final member's markers entirely.
+                    markers: markers_owned_by(cap, &all_captures),
                     body: extract_method_body(&cap.raw_text),
                 };
                 // Ownership: the enclosing declaration whose span contains
@@ -308,22 +322,8 @@ fn try_build_with(
                     None => orphan_methods.push(method),
                 }
             }
-            "field.root" => {
-                if !cap.text.is_empty() {
-                    pending_fields.push(cap.text.clone());
-                }
-            }
-            _ => {
-                if fidelity == Fidelity::Low {
-                    continue;
-                }
-                // Delegate marker construction to the SHARED module.
-                if let Some(marker) = build_marker(&cap.name, &cap.text)
-                    && pending_markers.last().map(|m| m != &marker).unwrap_or(true)
-                {
-                    pending_markers.push(marker);
-                }
-            }
+            "field.root" if !cap.text.is_empty() => pending_fields.push(cap.text.clone()),
+            _ => {}
         }
     }
 
@@ -346,6 +346,35 @@ fn try_build_with(
         orphan_fields,
         orphan_methods,
     })
+}
+
+/// Return behavior markers structurally owned by one method declaration.
+///
+/// The capture pipeline is declaration-first, so marker capture order cannot
+/// be used to infer an owner. A marker belongs to a method only when its byte
+/// span is contained by that method's tree-sitter declaration span.
+fn markers_owned_by(
+    method: &crate::compression::capture_pipeline::CapturedNode,
+    captures: &[crate::compression::capture_pipeline::CapturedNode],
+) -> Vec<String> {
+    let mut markers = Vec::new();
+    for capture in captures {
+        if capture.start_byte < method.start_byte
+            || capture.end_byte > method.end_byte
+            || capture.name.starts_with("diff.signature.")
+        {
+            continue;
+        }
+        if let Some(marker) = build_marker(&capture.name, &capture.text)
+            && markers
+                .last()
+                .map(|current| current != &marker)
+                .unwrap_or(true)
+        {
+            markers.push(marker);
+        }
+    }
+    markers
 }
 
 /// Extract a normalized body fingerprint from a method's raw source text.

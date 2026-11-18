@@ -288,7 +288,8 @@ pub(super) fn extract_call_sites(
     source: &str,
     shape: &mut NgRxShape,
     lexical_regions: &crate::meta_util::LexicalRegions,
-) {
+) -> Vec<usize> {
+    let mut dispatch_starts = Vec::new();
     for (pattern, kind) in [
         ("this.store.dispatch(", SiteKind::Dispatch),
         ("store.dispatch(", SiteKind::Dispatch),
@@ -336,6 +337,7 @@ pub(super) fn extract_call_sites(
             //     `TOGGLE_PANEL`
             //   - Select / PipeSelect identifier or quoted literal
             //     (`selectAllUsers` / `'panelState'`) -> semantic value
+            let object_literal = kind == SiteKind::Dispatch && body.trim_start().starts_with('{');
             let site_name = match kind {
                 SiteKind::Dispatch => dispatch_action_name(&body),
                 SiteKind::Select | SiteKind::PipeSelect => select_selector_name(&body),
@@ -344,13 +346,19 @@ pub(super) fn extract_call_sites(
             if let Some(name) = site_name {
                 match kind {
                     SiteKind::Dispatch => {
-                        shape
-                            .dispatch_sites
-                            .push(DispatchSite { action_name: name });
+                        dispatch_starts.push(abs_idx);
+                        shape.dispatch_sites.push(DispatchSite {
+                            action_name: name,
+                            call_start: abs_idx,
+                            object_literal,
+                            service_owner: None,
+                        });
                     }
                     SiteKind::Select | SiteKind::PipeSelect => {
                         shape.select_sites.push(SelectSite {
                             selector_name: name,
+                            service_owner: None,
+                            module_specifier: None,
                         });
                     }
                 }
@@ -359,6 +367,7 @@ pub(super) fn extract_call_sites(
             search_from = after_start + end_offset;
         }
     }
+    dispatch_starts
 }
 
 /// First token of a call body slice under the established site-name split

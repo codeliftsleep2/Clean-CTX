@@ -103,7 +103,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Internal correctness structure must not force a verbose model-facing representation, and token optimization must never weaken canonical guarantees. |
-| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, and occurrence-preserving. LLM text is a separate compact projection that may abbreviate presentation only while preserving complete meaning; it is not the canonical storage or validation model. The model-visible `content` preserves names, typed ownership, signatures, collapsed modifiers, extends/implements, imports, source-written import aliases, type aliases, and exact bodies when requested, while omitting code-side machinery (canonical IDs, generated `IMn` import identities, occurrence groups, navigation, legend, body framing) and workspace-served facts (semantic edges, calls, injections), which remain available through the reversible codec and `workspace_query` respectively. Import rows render as `$ module [named]`, or `$ [named]` when the canonical module field is empty; removing the generated identity must never leave a phantom column or remove a source-written alias. A structured file presentation identifies its request-scoped file boundary as `// αN`; the exact source path appears once in the trailing `§PATHMAP`, which is authoritative for resolving that alias. `provide_code_context` always returns a complete current presentation (or an explicitly selected complete raw representation); it never substitutes a code-side delta receipt. Structured sequence deltas are requested explicitly through `delta_code_context`. |
+| **Invariant** | Canonical IR is explicit, typed, ordered, identity-bearing, occurrence-preserving, and remains the complete semantic authority. LLM text is a separate compact projection: it may abbreviate while preserving complete meaning, or it may omit bounded semantic categories only when the response explicitly declares that loss in language-scoped, machine-readable degradation metadata. Undeclared semantic loss is forbidden. Exact representations retain their existing exactness guarantees. The model-visible `content` preserves names, typed ownership, signatures, collapsed modifiers, extends/implements, imports, source-written import aliases, type aliases, and exact bodies when requested except for categories explicitly named by such degradation metadata; code-side machinery and workspace-served facts remain available through the reversible codec and `workspace_query`. Import rows render as `$ module [named]`, or `$ [named]` when the canonical module field is empty; removing the generated identity must never leave a phantom column or remove a source-written alias. A structured file presentation identifies its request-scoped file boundary as `// αN`; the exact source path appears once in the trailing `§PATHMAP`, which is authoritative for resolving that alias. `provide_code_context` always returns a complete current presentation under its declared projection contract (or an explicitly selected complete raw representation); it never substitutes a code-side delta receipt. Structured sequence deltas are requested explicitly through `delta_code_context`. |
 | **Enforcement** | Distinct canonical types/wire paths and `render_hierarchical_for_llm`; semantic-family renderer contracts under `src/tests/ir/**`; import-projection contracts in `src/tests/ir/render_llm.rs`; `src/tests/mcp/presentation_footer.rs` pins the alias-only file boundary and single authoritative path mapping; registered provider-boundary regression `src/tests/mcp/provide_complete_context.rs`. |
 | **Authority** | `src/ir/opcodes.rs`, `src/ir/opcodes/semantic.rs`, `src/ir/hierarchical.rs`, `src/ir/render_llm.rs`, `src/mcp/tool_handlers/core/content.rs`, `src/tests/ir/render_llm.rs`, `src/tests/ir/control_summaries.rs`, `src/tests/ir/pattern_facts.rs`, `src/tests/ir/side_effects.rs`, `src/tests/mcp/presentation_footer.rs`, `src/tests/mcp/tool_helpers.rs` |
 | **Type** | STRUCTURAL and ENFORCED |
@@ -657,7 +657,7 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | Property | Value |
 |----------|-------|
 | **Intent** | Structurally decodable durable state must never become live canonical or semantic authority under a runtime that would have produced different facts. |
-| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Structural decoding, intrinsic semantic validation (`Calls` iff call evidence exists), current-source/fidelity validation, canonical compatibility, and semantic compatibility precede their respective live adoption/publication boundaries. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
+| **Invariant** | Every new durable baseline owns separate canonical configuration and producer identities; every semantic snapshot owns separate semantic configuration and producer identities. Identities contain only applicable configuration and producer generations, and producer sets compare exactly in both directions. Structural decoding, intrinsic semantic validation (`Calls` iff call evidence exists), current-source/fidelity validation, canonical compatibility, and semantic compatibility precede their respective live adoption/publication boundaries. Canonical IR validity and derived-semantic validity are separate: a semantic snapshot records every external source actually consulted by its producer, and reuse or adoption requires each recorded source identity/hash state to remain current; missing, changed, or restored dependencies force current-source semantic derivation while relationship ownership remains with the asserting source. Ordinary restore, historical replay, delta-chain reuse, and recovered-edit publication validate the relevant identities before mutating live authority. One delta chain retains one canonical epoch. Recovery may finish an older transaction under its stored identities, but incompatibility prevents live adoption and never relabels the recovered artifact. Missing legacy identity is unproven and rejected for adoption; remediation is a current-source compilation that establishes a new compatible baseline, never automatic blessing or deletion. Compatible reuse remains supported. |
 | **Publication** | `CompatibleCanonicalState` and `CompatibleSemanticProjection` are the typed evidence boundary. Compatible restore, replay, recovery, and mutating delta publication share `McpState::publish_compatible_semantic_projection`; coverage is recorded only for the projection's own source hash and a certifiable compilation fidelity. WorkspaceIndex stores coverage but owns no compatibility policy. |
 | **Producer generations** | Each producing module owns its generation constant and increments it only when identical relevant inputs can yield different durable canonical facts, markers, or semantic edges. Configuration changes are represented by configuration identity instead. Refactors with identical durable output do not bump generations, and unrelated producers are never bumped together. |
 | **Diagnostics** | Rejections expose a stable structured `reason` and affected `component`; human-readable details may describe source hashes or fidelity but never substitute for the structured classification. |
@@ -693,6 +693,82 @@ No separate executable, trait, registry, or framework is used. Each invariant be
 | **Authority** | `reconcile_external_refresh_for_root`; `WorkspaceIndex::remove_files_in_root` |
 | **Type** | ENFORCED (structural reconciliation boundary + tests) |
 | **Gate** | `cargo test --all-features workspace_query_9` |
+
+---
+
+### ANG-TPL-001 Angular Template Ownership and Identity
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Component/template linkage must follow structured Angular ownership without filename or basename inference. |
+| **Invariant** | Structured Component metadata exclusively authors `HasTemplate`. External Template identity is its canonical physical/semantic-owner path; inline identity is deterministic and Component-scoped. The declaring TypeScript file owns publication and retraction. |
+| **Enforcement** | Phase 4 production-path identity, forward/reverse, replacement, transition, deduplication, deletion/restoration, refresh, and generation regressions. |
+| **Authority** | `src/angular_meta/semantic.rs`; `src/tests/mcp/workspace_query_angular_templates.rs` |
+| **Type** | ENFORCED (structured producer boundary + tests) |
+| **Gate** | `cargo test --all-features workspace_query_angular_template_tests` |
+
+---
+
+### ANG-TPL-002 Angular Selector Refinement Is Occurrence-Preserving and Ephemeral
+
+| Property | Value |
+|----------|-------|
+| **Intent** | Repeated selector uses and their controlling conditions must survive query-time resolution without inventing durable cross-file ownership. |
+| **Invariant** | Every occurrence-derived `UsesSelector` and `UsesComponent` result carries its Template occurrence evidence: a zero-based half-open UTF-8 byte span and control ancestry. Neutral `UsesSelector` remains present when unique typed refinement is returned. Neither relationship enters WorkspaceIndex, producer generations, or snapshots. |
+| **Enforcement** | Ordered-authority extraction plus production MCP forward/reverse, ambiguity, mixed-syntax, replacement, refresh, deletion/restoration, and producer-generation regressions. |
+| **Authority** | `src/angular_meta/template_occurrences.rs`; `src/mcp/tool_handlers/query/angular_templates.rs`; `src/tests/mcp/workspace_query_angular_selector_occurrences.rs` |
+| **Type** | ENFORCED (request-local type boundary + tests) |
+| **Gate** | `cargo test --all-features workspace_query_angular_selector_occurrence_tests` |
+
+---
+
+### INVOCATION-001 Written Invocation Evidence Is Source-Bound and Ephemeral
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | TypeScript and C# invocation occurrences retain written UTF-8 byte spans, callee structure, ordered arguments and qualifiers, type arguments, immediate invocation parents, and supported declaration contexts. They contain no resolved target or framework meaning. Source slices require a view bound to the producing source identity and SHA-256. Edits cannot reuse the old set as current evidence. |
+| **Boundary** | Evidence is compilation-local, cleared before compilation and published only after success. It remains outside CompiledIR, canonical formats, semantic edges, WorkspaceIndex, producer generations, and persistence. CoreOp::Call and CallEvidence remain their existing compact canonical authorities. Unsupported targets retain occurrences without invented terminals. |
+| **Enforcement** | Private structural types and validated slicing; same-parse capture assembly; cross-language consumer parity, identity/hash mismatch, edit/empty replacement, and populated-failure regressions. |
+| **Authority** | `src/ir/invocation_evidence.rs`; `src/ir/invocation_evidence/collect.rs`; `src/tests/ir/invocation_generic_consumer.rs`; `src/tests/ir/invocation_evidence_lifecycle.rs` |
+| **Type** | STRUCTURAL + ENFORCED |
+
+### INVOCATION-002 RxJS Pipe Structure Uses the Shared Occurrence Authority
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | Production RxJS pipe discovery and top-level operator argument boundaries consume the compiler's borrowed validated occurrence view, including authoritative empty evidence. They do not reparse or reconstruct pipe bodies with substring scans or comma splitting. The standalone source API performs one TypeScript capture walk through the same collector because it has no upstream parse. |
+| **Domain boundary** | RxJS retains operator interpretation, textual owner policy, minimum-operator filtering, shape and rendering. Combinator scanning remains outside the migrated slice. Unavailable structural evidence does not fall back to textual pipe discovery. |
+| **Enforcement** | Production and standalone parse-count assertions, spaced/commented syntax regression, frozen shape/operator assertions, lexical-decoy and ownership preservation suites. |
+| **Authority** | `src/ir/pipeline/meta_layer.rs`; `src/layers/meta/context.rs`; `src/angular_meta/rx/pipes.rs`; `src/tests/angular_meta/rx_invocation_evidence.rs` |
+| **Type** | ENFORCED |
+
+### INVOCATION-003 Exact C# Calls Are Reconciled From Current Source
+
+| Property | Value |
+|----------|-------|
+| **Invariant** | A durable C# `Calls` edge to a `csharp/Method` identity is published only when current structured receiver evidence and the complete admitted C# declaration authority select one owner/signature-bearing target. Missing, incompatible, or ambiguous targets publish no exact edge. Generic written-call evidence remains unchanged. |
+| **Lifecycle** | Any admitted C# declaration-authority change reconstitutes authority from current source, recompiles every admitted caller-bearing C# source file, validates all source hashes, and replaces the affected projections. Additions, removals, signature changes, and ambiguity can therefore establish or revoke exact facts independent of file order or warm history. A future dependency index may narrow the affected set only after proving equivalent completeness. |
+| **Fidelity preservation** | Reconciliation may strengthen exact-call evidence, but it must preserve the semantic fidelity of each publication it reconciles. Reconciliation never upgrades a Low or Medium projection to High merely because authority reconstruction itself requires a complete declaration catalog. A later explicit higher-fidelity request remains the only authority for that upgrade. |
+| **Boundary** | Invocation occurrences remain ephemeral under INVOCATION-001. Reconciliation reruns the production compiler and never persists receiver/call candidates, requires no optional provider, and does not alter non-C# call identity. |
+| **Enforcement** | `WorkspaceIndex` retains the current per-file semantic fidelity and `McpState::reconcile_csharp_exact_calls` republishes each projection at that fidelity. `src/tests/mcp/workspace_query_entities_auto_compile.rs::red_reconciliation_preserves_publication_fidelity_until_a_higher_request` is the tracked RED→GREEN regression authority. |
+| **Compatibility** | Exact C# call output is owned by `CSharpSemanticProjection` generation 4. |
+| **Authority** | `src/ir/csharp_exact_calls.rs`; `src/mcp/csharp_call_reconciliation.rs` |
+| **Type** | ENFORCED |
+| **Gate** | `cargo test --all-features csharp_call_reconciliation` |
+
+---
+
+### WSC-011 Direct Declaration Authority Is Independent of Derived Relationships
+
+| Property | Value |
+|----------|-------|
+| **Intent** | A current, authoritative declaration must remain discoverable even when a derived relationship is absent, replaced, retracted, or recomputed at another lifecycle boundary. |
+| **Invariant** | Direct current declaration evidence must not depend on survival of a derived durable relationship to remain discoverable. A declaration proven directly by current structured source is materialized from that source authority; relationship edges may enrich or connect it but are not its existence certificate. Losing or replacing a derived projection must never erase the independently proven declaration. Optional provider or hydration completeness may change acquisition cost but never suppress declaration evidence already proven by the current admitted source. This rule does not permit inference from names, filenames, proximity, or unresolved ancestry: the direct declaration evidence itself must be authoritative. |
+| **ASP.NET application** | Structured `[ApiController]` or `[Controller]` evidence directly proves a `dotnet/Controller` declaration. Query-time C# resolution may reconstruct that declaration from the current admitted source even when C# call reconciliation replaced the file's derived edge projection. Ancestry-only controller classification remains subject to exact import/qualification and unique-declaration resolution. |
+| **Enforcement** | `src/mcp/tool_handlers/query/csharp_resolution.rs` delegates direct attributed declarations to `csharp_resolution/direct_aspnet.rs`. `src/tests/mcp/workspace_query.rs::red_direct_controller_declaration_survives_derived_edge_replacement` is the tracked RED→GREEN regression authority; `src/tests/mcp/workspace_query_builtin.rs::builtin_framework_coexistence` additionally pins coexistence with the neutral builtin declaration. |
+| **Authority** | Current admitted source snapshots and structured C# declaration catalog; `src/mcp/tool_handlers/query/csharp_resolution.rs`; `src/mcp/tool_handlers/query/csharp_resolution/direct_aspnet.rs` |
+| **Type** | ENFORCED (current-source declaration authority + tests) |
+| **Gate** | Focused workspace-query regressions plus `cargo test --workspace --all-targets --all-features` |
 
 ---
 

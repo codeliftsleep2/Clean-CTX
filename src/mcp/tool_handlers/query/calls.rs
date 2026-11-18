@@ -60,7 +60,7 @@ fn evaluate_calls_in_file(
 
     // Candidate compilation reads current source and produces canonical facts
     // without installing an alias, IR baseline, semantic edges, or index state.
-    let (compiled, _, _) = match crate::mcp::tool_helpers::compile_file_ir_candidate(
+    let (compiled, _, _, _) = match crate::mcp::tool_helpers::compile_file_ir_candidate(
         &resolved_path,
         Fidelity::High,
         state,

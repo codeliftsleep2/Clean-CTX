@@ -8,13 +8,12 @@
 // compressor that:
 //
 //   1. Strips the JSON-RPC envelope (checks for errors, extracts result)
-//   2. Compresses the result body via text-based techniques:
-//      - Shortens common JSON keys (e.g., "jsonrpc" → "j", "result" → "r")
-//      - Strips whitespace
-//      - Removes null/empty fields where safe
-//   3. Wraps in Clean-CTX notation with proper opcodes
+//   2. Compacts current MCP JSON without losing provider truth.
+//   3. Preserves tree text and independent MCP channels.
+// Historical bare enrichment objects retain their legacy compact notation.
 //
-// This is the pipe-level interception that achieves ~5000 → ~1100 tokens.
+// Current wire compression prioritizes faithful provider evidence over a
+// fixed savings ratio.
 
 use serde_json::Value;
 
@@ -37,9 +36,9 @@ pub struct CompressedCbmResponse {
 ///
 /// Algorithm:
 ///   1. Parse JSON — if parse fails, return None (compression failed)
-///   2. Check for JSON-RPC error object — extract error message
-///   3. Extract the `result` field content
-///   4. Compress with JSON-aware key shortening + whitespace stripping
+///   2. Retain RPC/tool errors and all accompanying evidence
+///   3. Unwrap only a sole unannotated text channel
+///   4. Compact JSON losslessly or preserve tree text verbatim
 ///   5. Return compressed text with metadata
 pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
     let raw_bytes = raw_text.len();
@@ -51,40 +50,55 @@ pub fn compress_cbm_response(raw_text: &str) -> Option<CompressedCbmResponse> {
         Err(_) => return None,
     };
 
-    // Step 2: Check for JSON-RPC error
-    let cbm_error = parsed.get("error").and_then(|e| {
-        e.get("message")
-            .and_then(|m| m.as_str().map(|s| s.to_string()))
-    });
-
-    // Step 3: Extract the content field from the result
-    let result_body = if let Some(error) = &cbm_error {
-        // CBM returned an error — compress the error message
-        format!("§E: {}", error)
-    } else if let Some(content_arr) = parsed.pointer("/result/content") {
-        // Standard MCP response with content array
-        let texts: Vec<String> = content_arr
-            .as_array()
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(|c| {
-                        c.get("text")
-                            .and_then(|t| t.as_str().map(|s| s.to_string()))
-                    })
-                    .collect()
+    // The current MCP boundary is lossless: compact JSON keeps positional
+    // cells, keys, null/empty values, cursors and independent result channels.
+    let cbm_error = parsed
+        .get("error")
+        .and_then(|e| e["message"].as_str())
+        .map(str::to_owned)
+        .or_else(|| {
+            parsed.get("result").and_then(|result| {
+                match crate::cbm::client::check_soft_error("provider", result) {
+                    Err(crate::cbm::client::CbmError::ToolError { message, .. }) => Some(message),
+                    _ => None,
+                }
             })
-            .unwrap_or_default();
-        texts.join("\n")
-    } else if let Some(result_obj) = parsed.get("result") {
-        // CBM tool response with structured data — serialize compactly
-        serde_json::to_string(result_obj).unwrap_or_default()
+        });
+    let compressed = if let Some(error) = parsed.get("error") {
+        format!("§E: {}", serde_json::to_string(error).ok()?)
+    } else if let Some(result) = parsed.get("result") {
+        // Unwrap only a sole unannotated text block. Additional content,
+        // structuredContent, isError and metadata remain distinct channels.
+        let single_text = result
+            .as_object()
+            .filter(|map| map.len() == 1)
+            .and_then(|_| result["content"].as_array())
+            .filter(|blocks| blocks.len() == 1)
+            .and_then(|blocks| {
+                let block = blocks[0].as_object()?;
+                if block.keys().any(|key| key != "type" && key != "text") {
+                    return None;
+                }
+                if block.get("type").is_some_and(|kind| kind != "text") {
+                    return None;
+                }
+                block.get("text")?.as_str()
+            });
+        if let Some(text) = single_text {
+            match serde_json::from_str::<Value>(text) {
+                Ok(value) => serde_json::to_string(&value).ok()?,
+                // Tree columns/indentation and opaque tokens are data.
+                Err(_) => text.to_owned(),
+            }
+        } else {
+            serde_json::to_string(result).ok()?
+        }
     } else {
-        // Unknown structure — return raw text
-        raw_text.to_string()
+        // Historical internal enrichment compression is not an MCP response.
+        // Keep its existing notation/savings contract; admitted wire responses
+        // always take the result/error branches above.
+        compress_json_body(raw_text)
     };
-
-    // Step 4: Compress the body
-    let compressed = compress_json_body(&result_body);
 
     let comp_tokens_est = compressed.len().div_ceil(4);
 
@@ -219,146 +233,9 @@ pub(crate) fn shorten_key(key: &str) -> &str {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "../tests/cbm/json_compress.rs"]
+mod tests;
 
-    #[test]
-    fn test_compress_invalid_json_returns_none() {
-        let result = compress_cbm_response("not json at all{{{");
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_compress_empty_object() {
-        let result = compress_cbm_response("{}").unwrap();
-        assert!(result.cbm_error.is_none());
-    }
-
-    #[test]
-    fn test_compress_simple_response() {
-        let json = r#"{"jsonrpc":"2.0","id":1,"result":{"name":"test"}}"#;
-        let result = compress_cbm_response(json).unwrap();
-        assert!(result.cbm_error.is_none());
-        assert!(result.raw_bytes > 0);
-        assert!(result.compressed_text.len() < result.raw_bytes);
-    }
-
-    #[test]
-    fn test_compress_extracts_error() {
-        let json =
-            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
-        let result = compress_cbm_response(json).unwrap();
-        assert_eq!(result.cbm_error, Some("Method not found".into()));
-        assert!(result.compressed_text.contains("§E:"));
-    }
-
-    #[test]
-    fn test_compress_with_content_array() {
-        let json = r#"{"jsonrpc":"2.0","id":2,"result":{"content":[{"type":"text","text":"Hello from CBM"}]}}"#;
-        let result = compress_cbm_response(json).unwrap();
-        assert!(result.compressed_text.contains("Hello"));
-    }
-
-    #[test]
-    fn test_compress_graph_search_response() {
-        // Simulate a real CBM graph_search response (simplified)
-        let json = r#"{
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": {
-                "results": [
-                    {"id": "1", "name": "UserService", "file": "src/user.rs", "label": "Class"},
-                    {"id": "2", "name": "PaymentGateway", "file": "src/payment.rs", "label": "Class"}
-                ]
-            }
-        }"#;
-        let result = compress_cbm_response(json).unwrap();
-        assert!(result.cbm_error.is_none());
-        assert!(!result.compressed_text.is_empty());
-        // Should be significantly shorter than the original
-        assert!(result.compressed_text.len() < json.len());
-    }
-
-    #[test]
-    fn test_compress_large_response_not_returned_raw() {
-        // RC-2 regression: even large responses must be compressed
-        let mut items = Vec::new();
-        for i in 0..100 {
-            items.push(serde_json::json!({"name": format!("Symbol_{}", i), "file": "src/test.rs"}));
-        }
-        let json = serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": 1,
-            "result": { "results": items }
-        })
-        .to_string();
-
-        let result = compress_cbm_response(&json).unwrap();
-        assert!(result.cbm_error.is_none());
-        // Compressed text must be shorter than raw
-        assert!(
-            result.compressed_text.len() < json.len(),
-            "Compressed ({}) must be shorter than raw ({})",
-            result.compressed_text.len(),
-            json.len()
-        );
-    }
-
-    #[test]
-    fn test_shorten_key_coverage() {
-        // Ensure all known keys are shortened
-        let keys = [
-            "results",
-            "symbols",
-            "edges",
-            "nodes",
-            "name",
-            "file",
-            "label",
-            "id",
-            "score",
-            "importance",
-            "reason",
-            "modules",
-            "dependencies",
-            "kind",
-            "properties",
-            "from",
-            "to",
-            "changes",
-            "graph_version",
-            "impact",
-            "symbol",
-            "change_type",
-            "query",
-            "project",
-            "arguments",
-            "content",
-            "type",
-            "text",
-            "description",
-            "status",
-            "error",
-            "message",
-            "code",
-            "jsonrpc",
-            "method",
-            "params",
-            "result",
-            "path",
-            "file_count",
-            "matched_symbols",
-            "is_direct",
-            "data",
-        ];
-        for key in &keys {
-            let shortened = shorten_key(key);
-            assert!(
-                shortened.len() <= key.len(),
-                "Key '{}' shortened to '{}' which is longer!",
-                key,
-                shortened
-            );
-        }
-    }
-}
+#[cfg(test)]
+#[path = "../tests/cbm/proxy_truth.rs"]
+mod truth_tests;

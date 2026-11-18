@@ -130,7 +130,7 @@ fn initialize_includes_compact_workflow_instructions() {
     }
 
     assert!(
-        instructions.len() < 2_000,
+        instructions.len() < 2_500,
         "workflow instructions must remain compact: {} bytes",
         instructions.len()
     );

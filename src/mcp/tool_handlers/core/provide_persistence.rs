@@ -1,7 +1,7 @@
 //! Durable publication boundary for `provide_code_context` baselines.
 
 use crate::ir::compiler::CompiledIR;
-use crate::layers::meta::semantic::SemanticEdge;
+use crate::layers::meta::semantic::{SemanticDependency, SemanticEdge};
 use crate::mcp::McpState;
 
 pub(super) fn read_checkpoint_required(
@@ -18,6 +18,7 @@ pub(super) fn persist_read_baseline(
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     semantic_edges: &[SemanticEdge],
+    semantic_dependencies: &[SemanticDependency],
     source_hash: &str,
     source: &str,
     raw_tokens: usize,
@@ -40,7 +41,7 @@ pub(super) fn persist_read_baseline(
     .map_err(|_| "Durable compatibility identity derivation failed")?;
     let persisted = store.sqlite().is_some_and(|mut sqlite| {
         sqlite
-            .save_context_with_compatibility(
+            .save_context_with_dependency_semantics(
                 owner_path,
                 fidelity,
                 "",
@@ -48,6 +49,7 @@ pub(super) fn persist_read_baseline(
                 source_hash,
                 compiled.version,
                 semantic_edges,
+                semantic_dependencies,
                 raw_tokens as u64,
                 compressed_tokens as u64,
                 &identities,

@@ -1,3 +1,4 @@
+mod typescript_issue_139;
 // src/tests/ir/layers/mod.rs
 //
 // Tests for the Layered Encoding module (Phase F).

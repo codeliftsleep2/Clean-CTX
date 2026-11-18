@@ -185,7 +185,9 @@ fn workspace_query_transitive_deps_missing_args() {
 
 #[test]
 #[cfg(any(feature = "csharp", feature = "dotnet"))]
-fn find_entities_after_control_full_publication() {
+fn red_direct_controller_declaration_survives_derived_edge_replacement() {
+    // RED evidence: the 2026-10-16 release gate returned only builtin Class
+    // after reconciliation replaced the derived framework edge projection.
     use crate::mcp::tools::dispatch_tools_call;
     use serde_json::json;
     use tempfile::TempDir;
@@ -293,6 +295,14 @@ mod workspace_query_csharp_base_types;
 #[path = "workspace_query_csharp_cross_file_classification.rs"]
 mod workspace_query_csharp_cross_file_classification;
 
+#[cfg(feature = "dotnet")]
+#[path = "workspace_query_dotnet_test_subjects.rs"]
+mod workspace_query_dotnet_test_subjects;
+
+#[cfg(feature = "dotnet")]
+#[path = "workspace_query_dotnet_aspnet_ancestry.rs"]
+mod workspace_query_dotnet_aspnet_ancestry;
+
 #[cfg(feature = "csharp")]
 #[path = "workspace_query_csharp_structured_headers.rs"]
 mod workspace_query_csharp_structured_headers;
@@ -300,6 +310,16 @@ mod workspace_query_csharp_structured_headers;
 #[cfg(feature = "csharp")]
 #[path = "workspace_query_csharp_constructor_types.rs"]
 mod workspace_query_csharp_constructor_types;
+
+#[cfg(feature = "csharp")]
+#[path = "workspace_query_csharp_constructor_large_cold.rs"]
+mod workspace_query_csharp_constructor_large_cold;
+
+#[path = "workspace_query_csharp_dependencies.rs"]
+mod workspace_query_csharp_dependencies;
+
+#[path = "workspace_query_dotnet_efcore_configurations.rs"]
+mod workspace_query_dotnet_efcore_configurations;
 
 // Workspace-scope regressions: a query issued FOR a workspace answers with the
 // evidence asserted from inside that workspace only (occurrence provenance, never

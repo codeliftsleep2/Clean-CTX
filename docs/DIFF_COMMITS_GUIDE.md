@@ -19,6 +19,7 @@ When both `fromRef` and `toRef` are provided, it runs `git diff --name-status --
 | **Deleted** | One-line entry: `- FILE αN: path (deleted)` |
 | **Renamed** | Diff between old path at `from` and new path at `to` |
 | **Type changed** | One-line entry recording that Git reported a change in the path's object/file type |
+| **Binary** | File-level change plus an explicit binary label; semantic text comparison is not attempted, even for source-looking extensions |
 
 ## How it saves tokens
 
@@ -109,13 +110,20 @@ The tool returns a `content` string with this structure:
 ```
 
 - The header line `§GITDIFF <from>..<to> (N files)` gives the scope.
+- The following `§COMPARISON` line declares that the summary is lossy, the
+  admitted-declaration dimensions compared, and dimensions/source detail that
+  are omitted. The same contract is machine-readable at `_meta.comparison`.
 - Each file section starts with `┌ FILE αN:` (modified/added), `- FILE αN:` (deleted), or `~ FILE αN:` (renamed or type changed). A type-change entry means only that Git reported an object/file-type change; Clean-CTX does not claim the specific old/new physical types.
 - The `(+A -D ~M)` counts are per-file: added/deleted/modified structural elements.
 - Files exceeding resource limits are emitted as one-line skip entries and counted in `skipped`.
 
 ## Security
 
-- **Ref validation**: `fromRef`/`toRef` are validated against `^[A-Za-z0-9][A-Za-z0-9._/\-~]*$` — rejects flag injection (`--upload-pack`), shell metacharacters, and whitespace.
+- **Ref validation**: `fromRef`/`toRef` accept an alphanumeric-leading
+  name/SHA plus bounded decimal `~N`/`^N` selectors (for example `HEAD~2`,
+  `HEAD^1`, `abc123^2`). Invalid input reports this supported grammar and
+  still rejects flag injection, shell metacharacters, whitespace, peel syntax,
+  and arbitrary revision expressions.
 - **Path validation**: paths returned by git are validated against the same allowlist (no absolute escapes, no flag-like paths).
 - **`--end-of-options`**: all git subcommands use `--end-of-options` to prevent path/flag injection.
 - **No shell**: git is invoked via `std::process::Command` (no `shell=True` equivalent).
@@ -153,6 +161,11 @@ renamed + typeChanged + skipped == fileCount` always holds.
 
 - **Non-compressible files** (html/css/json/md) fall back to a **line-count delta** rather than a structural diff — still compact, but less semantic detail.
 - **Added files** emit a skeleton (imports + class names), not the full new content — so if the LLM needs the *body* of a brand-new file, follow up with `compress_code_context`.
+- **Semantic member comparison is explicitly lossy.** For admitted C# methods
+  it compares compact signature, written return type, attributes, modifiers,
+  behavior markers, and normalized body content. Unsupported declarations,
+  compiler-resolved type equivalence, move linking, and full added/deleted
+  source are not claimed; consult `§COMPARISON` / `_meta.comparison`.
 - It's a **summary tool** — for deep work on a specific file, use `compress_code_context` or `provide_code_context` on that file.
 - `diff_commits` with `to` omitted (working-tree diff) includes tracked changes plus **non-ignored untracked files**. Ignored files remain excluded. Untracked files do not need to be staged or intent-to-added.
 

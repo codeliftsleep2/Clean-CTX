@@ -32,8 +32,8 @@ use std::path::Path;
 
 /// Increment marker and semantic generations independently when identical
 /// Angular inputs change that producer's durable markers or semantic edges.
-pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 1;
-pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 1;
+pub(crate) const ANGULAR_MARKER_PRODUCER_GENERATION: u32 = 6;
+pub(crate) const ANGULAR_SEMANTIC_PRODUCER_GENERATION: u32 = 24;
 
 /// Structured output of a single meta-layer pass.
 ///
@@ -192,6 +192,7 @@ pub trait MetaLayer: Send + Sync {
                 context.fidelity,
                 context.config,
             ),
+            semantic_dependencies: Vec::new(),
         }
     }
 
@@ -328,6 +329,7 @@ impl MetaLayer for AngularMetaLayer {
             class_captures,
             fidelity,
             config,
+            None,
             Default::default(),
         );
 
@@ -358,6 +360,7 @@ impl MetaLayer for AngularMetaLayer {
             &captures,
             fidelity,
             config,
+            Some(path),
             Default::default(),
         );
         let testing_enabled = config
@@ -512,6 +515,7 @@ impl MetaLayer for SpringBootMetaLayer {
                 context.fidelity,
                 context.config,
             ),
+            semantic_dependencies: Vec::new(),
         }
     }
 }

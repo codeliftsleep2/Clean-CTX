@@ -1,0 +1,23 @@
+{
+  "benchmark_version": "ngrx-recall-benchmark-v1",
+  "corpus_commit": "3d95daa95b5a53798f33b390815bdccad733995e",
+  "classifications": [
+    {
+      "id": "X001", "status": "REJECTED_NOT_SEMANTIC", "relation": "HandlesAction",
+      "file": "core/settings/settings.effects.ts", "line": 40, "locator": "const INIT",
+      "reason": "INIT is a local Observable value merged into effect streams, not an NgRx Action declaration passed through ofType."
+    },
+    {
+      "id": "X002", "status": "REJECTED_NOT_SEMANTIC", "relation": "HandlesAction",
+      "file": "core/settings/settings.effects.ts", "line": 138, "locator": "SettingsEffects.setTitle router.events",
+      "reason": "Angular Router events are merged into the effect but are not NgRx Action identities handled through ofType."
+    },
+    {
+      "id": "X003", "status": "REJECTED_NOT_SEMANTIC", "relation": "HandlesAction",
+      "file": "features/examples/examples.effects.ts", "line": 32, "locator": "ExamplesEffects.setTitle router.events",
+      "reason": "Angular Router events are not NgRx Action identities handled through ofType."
+    }
+  ],
+  "excluded_unsupported": [],
+  "excluded_ambiguous": []
+}

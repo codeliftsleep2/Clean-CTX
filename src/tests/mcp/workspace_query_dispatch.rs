@@ -432,21 +432,9 @@ fn workspace_query_empty_index_entities_in_file() {
     crate::protocol::captured_responses().clear();
     dispatch_tools_call(&id, "workspace_query", &params, &state);
     let resp = pop_response();
-    assert!(
-        resp.get("result").is_some(),
-        "should return result even for missing file"
-    );
-    let result = resp["result"].as_object().expect("result object");
-    assert_valid_mcp_envelope(result);
-    let sc = result["structuredContent"]
-        .as_object()
-        .expect("structuredContent");
-    let entities = &sc["entities"];
-    assert!(entities.is_array(), "entities should be an array");
     assert_eq!(
-        entities.as_array().unwrap().len(),
-        0,
-        "missing file should return empty array"
+        resp["error"]["data"]["reason"], "file_not_found",
+        "missing file must be distinct from an admitted empty file: {resp}"
     );
 }
 

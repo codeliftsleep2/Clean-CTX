@@ -80,6 +80,34 @@ fn compile_rust_edges(source: &str, path: &str) -> Vec<SemanticEdge> {
 }
 
 #[test]
+fn production_ngmodule_unresolved_spread_reaches_canonical_alias() {
+    let source = "import { NgModule } from '@angular/core'; @NgModule({ declarations: [...missing] }) export class AppModule {}";
+    let (language, query) =
+        crate::compression::language::language_for_extension("ts").expect("TypeScript language");
+    let mut compiler = IRCompiler::new();
+    let compiled = compiler
+        .compile_focused(
+            source,
+            "α-test",
+            Some("C:/repo/app.module.ts"),
+            language,
+            query,
+            Fidelity::High,
+            None,
+            None,
+        )
+        .expect("TypeScript compilation");
+
+    assert!(compiled.instructions.iter().any(|instruction| {
+        matches!(
+            instruction,
+            crate::ir::CoreOp::TypeAlias(alias, value)
+                if alias == "@modspread" && value == "missing"
+        )
+    }));
+}
+
+#[test]
 fn production_meta_pass_constructs_one_shared_lexical_index() {
     crate::meta_util::reset_construction_count();
 

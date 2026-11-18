@@ -16,6 +16,13 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::diff::CapturedStructure;
 
+/// One SHA-256 authority for cache keys and source-bound structural evidence.
+pub(crate) fn content_hash(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
 /// Maximum number of entries in `raw_token_counts` before LRU eviction.
 /// F-FULL-17: Prevents unbounded memory growth in long-running sessions.
 const MAX_RAW_TOKEN_COUNT_ENTRIES: usize = 10_000;
@@ -68,9 +75,7 @@ impl LocalStateCache {
 
     /// Computes an ultra-fast local SHA-256 hash string from file bytes.
     pub fn compute_hash(&self, bytes: &[u8]) -> String {
-        let mut hasher = Sha256::new();
-        hasher.update(bytes);
-        format!("{:x}", hasher.finalize())
+        content_hash(bytes)
     }
 
     /// Checks if a file has changed. Returns `true` if it is a brand-new or

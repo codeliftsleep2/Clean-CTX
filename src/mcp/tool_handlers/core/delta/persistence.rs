@@ -2,8 +2,8 @@
 
 use super::compiled_from_tuples;
 use crate::ir::compiler::CompiledIR;
-use crate::layers::meta::semantic::SemanticEdge;
 use crate::mcp::McpState;
+use crate::mcp::state::durable_semantics::SemanticSnapshot;
 
 pub(super) fn persist_baseline(
     state: &McpState,
@@ -11,7 +11,7 @@ pub(super) fn persist_baseline(
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     source_hash: &str,
-    semantic_edges: &[SemanticEdge],
+    semantic: &SemanticSnapshot,
     source: &str,
 ) -> Result<(), String> {
     let identities = crate::mcp::compatibility::derive_identities(
@@ -26,7 +26,7 @@ pub(super) fn persist_baseline(
         fidelity,
         compiled,
         source_hash,
-        semantic_edges,
+        semantic,
         &identities,
     )
 }
@@ -37,7 +37,7 @@ fn persist_baseline_with_identities(
     fidelity: crate::compression::Fidelity,
     compiled: &CompiledIR,
     source_hash: &str,
-    semantic_edges: &[SemanticEdge],
+    semantic: &SemanticSnapshot,
     identities: &crate::mcp::compatibility::identity::CompatibilityIdentities,
 ) -> Result<(), String> {
     let durable = crate::mcp::persistence_ir::baseline(compiled, file_path);
@@ -45,14 +45,15 @@ fn persist_baseline_with_identities(
     if let Some(ref store) = *state.persistence_store_lock() {
         let persisted = store.sqlite().is_some_and(|mut sqlite| {
             sqlite
-                .save_context_with_compatibility(
+                .save_context_with_dependency_semantics(
                     file_path,
                     fidelity,
                     "",
                     &binary,
                     source_hash,
                     compiled.version,
-                    semantic_edges,
+                    &semantic.edges,
+                    &semantic.dependencies,
                     0,
                     0,
                     identities,
@@ -139,8 +140,8 @@ fn ensure_persisted_baseline_with_identities(
         }
     };
     if missing {
-        let semantic_edges = state
-            .semantic_edges(&compiled.file_id)
+        let semantic = state
+            .semantic_snapshot(&compiled.file_id)
             .ok_or_else(|| "missing authoritative semantic-edge baseline".to_string())?;
         if let Some(identities) = target_identities {
             persist_baseline_with_identities(
@@ -149,7 +150,7 @@ fn ensure_persisted_baseline_with_identities(
                 fidelity,
                 compiled,
                 source_hash,
-                &semantic_edges,
+                &semantic,
                 identities,
             )?;
         } else {
@@ -162,7 +163,7 @@ fn ensure_persisted_baseline_with_identities(
                 fidelity,
                 compiled,
                 source_hash,
-                &semantic_edges,
+                &semantic,
                 &source,
             )?;
         }

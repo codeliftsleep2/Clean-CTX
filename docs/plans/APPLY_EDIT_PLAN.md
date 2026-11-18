@@ -69,7 +69,8 @@ This is an additive extension to a subsystem that (per `EDIT_MODE_PLAN.md`) touc
 
 A small, closed set of structural operations — not an arbitrary line-based patch format (that would just reimplement `git apply`, worse, and lose the structural verification that makes this safe):
 
-- `replace_body` — `(unit_qualified_name, expected_old_text, new_text)`. The primary case.
+- `replace_body` — `(signature_qualified_selector, expected_old_text, new_text)`.
+  Legacy qualified/bare selectors remain valid only when unique.
 - `insert_after` / `insert_before` — add a new unit adjacent to a named anchor.
 - `delete` — remove a named unit.
 
@@ -116,7 +117,9 @@ It's a narrower guarantee, and that's intentional, not a corner cut:
 
 **Where this can actually go wrong:** the unit-relocation step (Design step 2). If a file was restructured (e.g. methods reordered, a wrapping class renamed) between the last known state and this edit, name-only lookup could resolve to the wrong unit that happens to share a name in a different scope (overloads, a same-named method in a different class). Mitigations, both required before this ships:
 
-1. Key relocation on **qualified name + a structural fingerprint** (e.g. parameter types, containing class id) — not bare method name.
+1. Key relocation on a caller-visible, language-derived signature selector
+   (owner + written name + ordered parameter types). Legacy qualified or bare
+   names fail closed when more than one candidate remains.
 2. Treat the [syntax gate](#the-write-path) as a hard, non-bypassable pre-commit check, not a warning — a mis-relocated splice is far more likely to produce a parse error than a valid-but-wrong edit, and the gate exists specifically to catch that class of failure before disk.
 
 A `replace_body` whose `expected_old_text` mismatches *and* fails relocation entirely should fail loudly with both signals surfaced, not silently fall back to "insert somewhere plausible."

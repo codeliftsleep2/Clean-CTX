@@ -230,9 +230,8 @@ async function runScenario() {
     check('F', 'coverage remains a lower bound',
       reverse.coverage?.result_semantics === 'lower_bound' &&
       reverse.coverage?.source_complete === false);
-    check('F', 'neutral alternative guidance remains',
-      reverse.coverage?.alternative_query?.entity_type === 'TypeRef' &&
-      reverse.coverage?.alternative_query?.relation === 'HasBaseType');
+    check('F', 'established typed capability omits fallback guidance',
+      reverse.coverage?.alternative_query === undefined);
 
     console.log('\n[Case G] repeated query is stable and duplicate-free');
     const repeated = await query(client, root, 'reverse_edges', 'Interface', 'ILiveOne',

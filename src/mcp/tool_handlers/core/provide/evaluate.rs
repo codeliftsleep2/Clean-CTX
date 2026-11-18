@@ -211,9 +211,17 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         None
     };
     let ir_result = if let Some((instructions, version)) = cached_ir {
-        state.semantic_edges(&alias).map(|semantic_edges| {
-            super::super::common::compiled_from_tuples(alias.clone(), version, instructions)
-                .map(|ir| (ir, semantic_edges, source_hash.clone()))
+        state.semantic_snapshot(&alias).map(|snapshot| {
+            super::super::common::compiled_from_tuples(alias.clone(), version, instructions).map(
+                |ir| {
+                    (
+                        ir,
+                        snapshot.edges,
+                        snapshot.dependencies,
+                        source_hash.clone(),
+                    )
+                },
+            )
         })
     } else {
         None
@@ -224,7 +232,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
     });
     let compile_ms = compile_start.elapsed().as_millis() as u64;
 
-    let (mut ir, semantic_edges, source_hash) = match ir_result {
+    let (mut ir, semantic_edges, semantic_dependencies, source_hash) = match ir_result {
         Ok(compiled) => compiled,
         Err(error) => {
             tracing::warn!(
@@ -235,7 +243,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             return Err(ProvideFailure::new(
                 -32603,
                 format!(
-                    "IR compilation unavailable for {resolved_path}: {error}. SCHEMA-vNext structural output cannot be produced for this input; retry with fidelity \"verbatim\" or read the source directly."
+                    "IR compilation unavailable for {resolved_path}: {error}. SCHEMA-vNext structural output cannot be produced for this input; retry with fidelity \"verbatim\" for the raw, uncompressed source or read the source directly."
                 ),
                 Some(json!({
                     "reason": "ir_unavailable",
@@ -284,6 +292,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     effective_fidelity,
                     &ir,
                     &semantic_edges,
+                    &semantic_dependencies,
                     &source_hash,
                     source,
                     raw_tokens,
@@ -298,19 +307,25 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
                     match crate::workspace::index::SemanticFidelity::from_compilation(
                         effective_fidelity,
                     ) {
-                        Some(semantic_fidelity) => index.replace_semantic_projection(
-                            &canonical_path,
-                            semantic_edges.clone(),
-                            semantic_fidelity,
-                            source_hash,
-                        ),
+                        Some(semantic_fidelity) => index
+                            .replace_semantic_projection_with_dependencies(
+                                &canonical_path,
+                                semantic_edges.clone(),
+                                semantic_fidelity,
+                                source_hash,
+                                semantic_dependencies.clone(),
+                            ),
                         None => {
                             index.remove_file(&canonical_path);
                             index.add_edges(&canonical_path, semantic_edges.clone());
                         }
                     }
                 }
-                state.remember_semantic_edges(&ir.file_id, semantic_edges);
+                state.remember_semantic_projection(
+                    &ir.file_id,
+                    semantic_edges,
+                    semantic_dependencies,
+                );
                 state
                     .llm_text_cache_lock()
                     .insert(ir.file_id.clone(), economic.text.clone());
@@ -323,6 +338,10 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "Context publication was superseded by a newer same-file source snapshot; retry the request",
         ));
     }
+    #[cfg(feature = "csharp")]
+    state
+        .reconcile_csharp_after_authority_change(&canonical_path)
+        .map_err(ProvideFailure::internal)?;
     let render_ms = render_start.elapsed().as_millis() as u64;
     state.record_compression(
         &canonical_path,
@@ -349,6 +368,11 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
         serde_json::to_value(byte_exact).unwrap_or_default()
     };
     let visible_text = economic.text;
+    let degradation = super::super::common::model_facing_degradation(
+        &canonical_path,
+        effective_fidelity,
+        visible_content_kind,
+    );
     let result = ProvidedContext::new(
         visible_text,
         json!({
@@ -359,7 +383,7 @@ pub(super) fn evaluate(params: &Value, state: &McpState) -> ProvideResult {
             "decision_summary": decision.summary(),
             "content_kind": visible_content_kind,
             "byte_exact": visible_byte_exact,
-            "degradation": null
+            "degradation": degradation
         }),
     );
     let total_ms = overall_start.elapsed().as_millis() as u64;

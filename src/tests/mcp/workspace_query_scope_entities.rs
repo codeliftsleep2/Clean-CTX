@@ -112,10 +112,19 @@ pub(super) fn entities_in_file(
         json!({ "type": "entities_in_file", "file_path": file_path }),
         root,
     );
-    let sc = structured(state, arguments);
-    // A path outside the declared roots is answered with the handler's minimal
-    // zero-result shape; either way, `entities_in_file` is not
-    // hydration-eligible, so it carries no discovery diagnostic at all.
+    crate::protocol::captured_responses().clear();
+    dispatch_tools_call(
+        &json!(1),
+        "workspace_query",
+        &json!({ "arguments": arguments }),
+        state,
+    );
+    let response = pop_response();
+    if response["error"]["data"]["reason"] == "outside_authorized_roots" {
+        return Vec::new();
+    }
+    let sc = response["result"]["structuredContent"].clone();
+    // An admitted entities_in_file query is never hydration-eligible.
     assert!(
         sc.get("discovery").is_none() && sc.get("hydration_attempted").is_none(),
         "entities_in_file must never hydrate: {sc:?}"

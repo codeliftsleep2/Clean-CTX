@@ -8,8 +8,11 @@ use crate::layers::meta::semantic::SemanticEdge;
 pub(super) struct ProjectionEvidence<'a> {
     lexical_regions: Option<&'a crate::meta_util::LexicalRegions>,
     ngrx: Option<Option<&'a crate::angular_meta::ngrx::NgRxShape>>,
+    ngrx_edges: Option<&'a [SemanticEdge]>,
     routing: Option<Option<&'a crate::angular_meta::routing::RouteShape>>,
     is_angular: Option<bool>,
+    initializers: Option<&'a [crate::angular_meta::inject_evidence::ClassInitializerEvidence]>,
+    invocations: Option<&'a crate::ir::invocation_evidence::InvocationEvidenceView<'a>>,
 }
 
 pub(super) fn extract_non_testing_edges(
@@ -17,6 +20,7 @@ pub(super) fn extract_non_testing_edges(
     class_captures: &[String],
     fidelity: Fidelity,
     config: Option<&CleanCtxConfig>,
+    declaring_path: Option<&std::path::Path>,
     evidence: ProjectionEvidence<'_>,
 ) -> Vec<SemanticEdge> {
     let meta_config = config.and_then(|value| value.meta_layers.get("angular"));
@@ -26,37 +30,75 @@ pub(super) fn extract_non_testing_edges(
         .is_angular
         .unwrap_or_else(|| crate::angular_meta::detect::is_angular_file(source))
     {
-        let mut decl_types = std::collections::HashMap::new();
-        for raw_class in class_captures {
-            if let Some((class_name, kind, _, _, _)) =
+        let classes: Vec<_> = match evidence.initializers {
+            Some(classes) => classes
+                .iter()
+                .map(|class| {
+                    (
+                        Some(class.consumer.as_str()),
+                        class.raw_class.as_str(),
+                        class.admitted_tokens(),
+                    )
+                })
+                .collect(),
+            None => class_captures
+                .iter()
+                .map(|raw| (None, raw.as_str(), Vec::new()))
+                .collect(),
+        };
+        for (owner, raw_class, tokens) in classes {
+            if let Some((class_name, kind, selector, mut injects, pipe_name)) =
                 crate::angular_meta::decorators::extract_graph_entries(raw_class)
             {
-                let entity_type = match kind {
-                    crate::angular_meta::decorators::ClassKind::Component => "Component",
-                    crate::angular_meta::decorators::ClassKind::Service => "Service",
-                    crate::angular_meta::decorators::ClassKind::Directive => "Directive",
-                    crate::angular_meta::decorators::ClassKind::Pipe => "Pipe",
-                    crate::angular_meta::decorators::ClassKind::Module => "Module",
-                };
-                decl_types.insert(class_name, entity_type);
-            }
-        }
-        for raw_class in class_captures {
-            if let Some((class_name, kind, selector, injects, pipe_name)) =
-                crate::angular_meta::decorators::extract_graph_entries(raw_class)
-            {
+                let class_name = owner.unwrap_or(&class_name);
+                injects.extend(tokens);
                 edges.extend(crate::angular_meta::semantic::class_to_semantic_edges(
-                    &class_name,
+                    class_name,
                     kind,
                     selector.as_deref(),
                     &injects,
                     pipe_name.as_deref(),
                     raw_class,
                     fidelity,
-                    &decl_types,
                 ));
+                if kind == crate::angular_meta::decorators::ClassKind::Module {
+                    edges.extend(
+                        crate::angular_meta::module_metadata::project(
+                            class_name,
+                            raw_class,
+                            source,
+                            declaring_path,
+                            class_captures,
+                        )
+                        .edges,
+                    );
+                }
+                let source_id = declaring_path
+                    .map(|path| path.to_string_lossy())
+                    .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
+                edges.extend(crate::angular_meta::provider_semantics::project(
+                    &source_id, source, class_name, kind,
+                ));
+                if let Some(path) = declaring_path
+                    && let Some(edge) = crate::angular_meta::semantic::component_template_edge(
+                        class_name, kind, raw_class, path,
+                    )
+                {
+                    edges.push(edge);
+                }
             }
         }
+    }
+
+    if let Some(invocations) = evidence.invocations {
+        let source_id = declaring_path
+            .map(|path| path.to_string_lossy())
+            .unwrap_or_else(|| std::borrow::Cow::Borrowed("<memory>"));
+        edges.extend(crate::angular_meta::member_semantics::project(
+            &source_id,
+            source,
+            invocations,
+        ));
     }
 
     let ngrx_shape = match evidence.ngrx {
@@ -73,15 +115,28 @@ pub(super) fn extract_non_testing_edges(
     if meta_config.map(|value| value.ngrx.enabled).unwrap_or(true)
         && let Some(shape) = ngrx_shape
     {
-        edges.extend(shape.to_ngrx_semantic_edges());
+        edges.extend(
+            evidence
+                .ngrx_edges
+                .map_or_else(|| shape.to_ngrx_semantic_edges(), |edges| edges.to_vec()),
+        );
     }
     let routing_shape = match evidence.routing {
         Some(shape) => shape.cloned(),
         None => evidence.lexical_regions.map_or_else(
-            || crate::angular_meta::routing::extract_route_shape(source, fidelity),
+            || {
+                crate::angular_meta::routing::extract_route_shape_at(
+                    source,
+                    fidelity,
+                    declaring_path,
+                )
+            },
             |regions| {
-                crate::angular_meta::routing::extract_route_shape_with_regions(
-                    source, fidelity, regions,
+                crate::angular_meta::routing::extract_route_shape_at_with_regions(
+                    source,
+                    fidelity,
+                    regions,
+                    declaring_path,
                 )
             },
         ),
@@ -108,13 +163,67 @@ pub(super) fn evaluate(
     let ngrx_enabled = meta_config
         .map(|config| config.ngrx.enabled)
         .unwrap_or(true);
+    let mut ngrx_edges = None;
     let ngrx_shape = ngrx_enabled
         .then(|| {
-            crate::angular_meta::ngrx::extract_ngrx_shape_with_regions(
+            let (shape, starts) = crate::angular_meta::ngrx::extract_ngrx_shape_with_sites(
                 context.source,
                 context.fidelity,
                 context.lexical_regions,
             )
+            .map_or((None, Vec::new()), |(shape, starts)| (Some(shape), starts));
+            let shape = crate::angular_meta::ngrx::legacy::include(
+                shape,
+                context.ngrx_class_actions.unwrap_or(&[]),
+            );
+            shape
+                .map(|shape| {
+                    let mut semantic_shape = context.invocation_evidence.map_or_else(
+                        || {
+                            let mut unsupported = shape.clone();
+                            unsupported.select_sites.clear();
+                            unsupported
+                        },
+                        |invocations| {
+                            crate::angular_meta::ngrx::selector_references::admit(
+                                shape.clone(),
+                                invocations,
+                                context.ngrx_selector_declarations.unwrap_or(&[]),
+                                context.angular_initializers.unwrap_or(&[]),
+                                &context.path.to_string_lossy(),
+                                context.source,
+                            )
+                        },
+                    );
+                    if let Some(invocations) = context.invocation_evidence {
+                        crate::angular_meta::ngrx::service_owners::admit_modern_initializer_dispatches(
+                            &mut semantic_shape,
+                            invocations,
+                            context.angular_initializers.unwrap_or(&[]),
+                            &context.path.to_string_lossy(),
+                            context.source,
+                        );
+                    }
+                    semantic_shape
+                        .dispatch_sites
+                        .retain(|site| !site.object_literal);
+                    ngrx_edges = Some(crate::angular_meta::ngrx::service_owners::project(
+                        semantic_shape,
+                        &starts,
+                        context.ngrx_constructor_dispatches.unwrap_or(&[]),
+                        context.ngrx_service_dispatches.unwrap_or(&[]),
+                        context.source,
+                        &context.path.to_string_lossy(),
+                    ));
+                    crate::angular_meta::ngrx::constructors::apply(
+                        shape,
+                        &starts,
+                        context.ngrx_constructor_dispatches.unwrap_or(&[]),
+                        context.source,
+                        &context.path.to_string_lossy(),
+                    )
+                })
+                .filter(|shape| !shape.is_empty())
         })
         .flatten();
     let routing_enabled = meta_config
@@ -122,10 +231,11 @@ pub(super) fn evaluate(
         .unwrap_or(true);
     let routing_shape = routing_enabled
         .then(|| {
-            crate::angular_meta::routing::extract_route_shape_with_regions(
+            crate::angular_meta::routing::extract_route_shape_at_with_regions(
                 context.source,
                 context.fidelity,
                 context.lexical_regions,
+                Some(context.path),
             )
         })
         .flatten();
@@ -137,9 +247,17 @@ pub(super) fn evaluate(
         context.path,
         context.lexical_regions,
         crate::angular_meta::PrecomputedAngularEvidence {
+            rx: context.invocation_evidence.map(|view| {
+                crate::angular_meta::rx::extract_rx_shape_with_evidence(
+                    context.source,
+                    context.lexical_regions,
+                    view,
+                )
+            }),
             ngrx: Some(ngrx_shape.clone()),
             routing: Some(routing_shape.clone()),
             is_angular: precomputed_angular,
+            initializers: context.angular_initializers,
         },
     );
     let output = block
@@ -160,13 +278,51 @@ pub(super) fn evaluate(
         &captures,
         context.fidelity,
         context.config,
+        Some(context.path),
         ProjectionEvidence {
             lexical_regions: Some(context.lexical_regions),
             ngrx: Some(ngrx_shape.as_ref()),
+            ngrx_edges: ngrx_edges.as_deref(),
             routing: Some(routing_shape.as_ref()),
             is_angular: precomputed_angular,
+            initializers: context.angular_initializers,
+            invocations: context.invocation_evidence,
         },
     );
+    if ngrx_enabled {
+        semantic_edges = crate::angular_meta::ngrx::action_imports::refine_candidates(
+            &context.path.to_string_lossy(),
+            context.source,
+            semantic_edges,
+        );
+        if let Some(shape) = ngrx_shape.as_ref() {
+            semantic_edges.extend(crate::angular_meta::ngrx::direct_imports::candidates(
+                &context.path.to_string_lossy(),
+                context.source,
+                shape,
+            ));
+        }
+        semantic_edges.extend(
+            context
+                .ngrx_selector_declarations
+                .unwrap_or(&[])
+                .iter()
+                .filter_map(|declaration| declaration.edge()),
+        );
+        semantic_edges.extend(
+            context
+                .ngrx_legacy_transitions
+                .unwrap_or(&[])
+                .iter()
+                .map(crate::angular_meta::ngrx::transitions::LegacyTransition::edge),
+        );
+        for discriminant in context.ngrx_legacy_discriminants.unwrap_or(&[]) {
+            if discriminant.matches_source(&context.path.to_string_lossy(), context.source) {
+                semantic_edges.push(discriminant.declaration_edge());
+                semantic_edges.push(discriminant.transition_edge());
+            }
+        }
+    }
     if meta_config
         .map(|config| config.testing.enabled)
         .unwrap_or(true)
@@ -179,9 +335,13 @@ pub(super) fn evaluate(
             ),
         );
     }
+    let semantic_dependencies = routing_shape
+        .map(|shape| shape.semantic_dependencies.clone())
+        .unwrap_or_default();
     super::MetaLayerEvaluation {
         output,
         semantic_edges,
+        semantic_dependencies,
     }
 }
 

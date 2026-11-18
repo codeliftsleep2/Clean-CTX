@@ -2,7 +2,7 @@
 
 use super::SqliteStore;
 use crate::compression::Fidelity;
-use crate::layers::meta::semantic::SemanticEdge;
+use crate::layers::meta::semantic::{SemanticDependency, SemanticEdge};
 use crate::mcp::compatibility::identity::{
     CompatibilityIdentities, PersistedCompatibilityIdentities,
 };
@@ -21,6 +21,7 @@ pub(crate) struct EditIntent {
     pub target_source: Vec<u8>,
     pub target_ir: Vec<u8>,
     pub target_edges: Vec<SemanticEdge>,
+    pub target_dependencies: Vec<SemanticDependency>,
     pub fidelity: Fidelity,
     pub stage_path: String,
 }
@@ -82,11 +83,12 @@ impl SqliteStore {
         intent: &EditIntent,
         identities: Option<&CompatibilityIdentities>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let snapshot = DurableSemanticSnapshot::new(
+        let snapshot = DurableSemanticSnapshot::new_with_dependencies(
             intent.file_path.clone(),
             intent.target_hash.clone(),
             intent.target_version,
             &intent.target_edges,
+            &intent.target_dependencies,
         );
         self.conn.execute(
             "INSERT INTO edit_intents
@@ -193,7 +195,7 @@ impl SqliteStore {
         }
         let edges = snapshot.restore_edges()?;
         if let Some(identities) = complete_identities(&stored.compatibility)? {
-            self.save_context_with_compatibility(
+            self.save_context_with_dependency_semantics(
                 file_path,
                 stored.intent.fidelity,
                 "",
@@ -201,12 +203,13 @@ impl SqliteStore {
                 &stored.intent.target_hash,
                 stored.intent.target_version,
                 &edges,
+                &snapshot.dependencies,
                 0,
                 0,
                 &identities,
             )?;
         } else {
-            self.save_context_with_semantics(
+            self.save_context_with_semantic_dependencies(
                 file_path,
                 stored.intent.fidelity,
                 "",
@@ -214,6 +217,7 @@ impl SqliteStore {
                 &stored.intent.target_hash,
                 stored.intent.target_version,
                 &edges,
+                &snapshot.dependencies,
                 0,
                 0,
             )?;
@@ -250,6 +254,7 @@ impl SqliteStore {
                             target_source: row.get(6)?,
                             target_ir: row.get(7)?,
                             target_edges: Vec::new(),
+                            target_dependencies: Vec::new(),
                             fidelity,
                             stage_path: row.get(10)?,
                         },

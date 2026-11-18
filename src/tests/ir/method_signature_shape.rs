@@ -406,12 +406,11 @@ fn red_sig5_named_tuple_return_preserves_every_field() {
     assert_eq!(facts.params, vec!["values".to_string()]);
     assert_eq!(facts.return_type, "(int alpha, int beta)");
 
-    // MEDIUM: the Medium label contract drops declared return types, so the
-    // tuple members must NOT reappear as the name or as parameters.
+    // MEDIUM preserves the declaration's canonical return type.
     let ir = compile_cs(CS_TUPLES, Fidelity::Medium);
     let facts = method(&ir, "GetPair");
     assert_eq!(facts.params, vec!["values".to_string()]);
-    assert_eq!(facts.return_type, "$v");
+    assert_eq!(facts.return_type, "(int alpha, int beta)");
 
     // LOW: bare parameter names only.
     let ir = compile_cs(CS_TUPLES, Fidelity::Low);

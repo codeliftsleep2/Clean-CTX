@@ -39,28 +39,120 @@ pub fn extract_testing(class_source: &str, fidelity: Fidelity) -> Option<MetaBlo
     Some(MetaBlock { lines })
 }
 
-/// Infer a conservative TestClass --Tests--> SUT relationship.
-pub fn extract_testing_semantic_edge(class_source: &str) -> Option<SemanticEdge> {
-    if !has_attribute(class_source, "TestClass") {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct TestSubjectCandidate {
+    pub(crate) test_class: String,
+    pub(crate) subject: String,
+}
+
+enum ConstructedSubject {
+    None,
+    Unique(String),
+    Ambiguous,
+}
+
+/// Publish the source-proven TestClass declaration without manufacturing a SUT.
+pub(crate) fn extract_testing_declaration(class_source: &str) -> Option<SemanticEdge> {
+    if !is_test_class_declaration(class_source) {
         return None;
     }
     let class_name = extract_class_name_from_class(class_source)?;
+    let entity = EntityRef::new("dotnet", "TestClass", class_name);
+    Some(SemanticEdge {
+        relation: SemanticRelation::Defines,
+        subject: entity.clone(),
+        object: entity,
+        layer: "dotnet",
+        call_evidence: None,
+    })
+}
+
+/// Collect candidate evidence. Exact declaration authority is joined later.
+pub(crate) fn extract_testing_subject_candidate(
+    class_source: &str,
+) -> Option<TestSubjectCandidate> {
+    if !is_test_class_declaration(class_source) {
+        return None;
+    }
+    let class_name = extract_class_name_from_class(class_source)?;
+    let constructed = infer_constructed_sut(class_source, &class_name);
     let naming_candidate = (!class_name.ends_with("IntegrationTests")
         && !class_name.ends_with("UnitTests"))
     .then(|| class_name.strip_suffix("Tests"))
     .flatten();
-    let sut = naming_candidate
-        .filter(|name| !name.is_empty())
-        .map(str::to_string)
-        .or_else(|| infer_constructed_sut(class_source, &class_name))?;
-
-    Some(SemanticEdge {
-        relation: SemanticRelation::Tests,
-        subject: EntityRef::new("dotnet", "TestClass", class_name),
-        object: EntityRef::new("dotnet", "Class", sut),
-        layer: "dotnet",
-        call_evidence: None,
+    let subject = match constructed {
+        ConstructedSubject::Unique(subject) => subject,
+        ConstructedSubject::Ambiguous => return None,
+        ConstructedSubject::None => naming_candidate
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)?,
+    };
+    Some(TestSubjectCandidate {
+        test_class: class_name,
+        subject,
     })
+}
+
+pub(crate) fn test_subject_candidates_in_source(source: &str) -> Vec<TestSubjectCandidate> {
+    let Some(language) = crate::compression::language::safe_csharp_language() else {
+        return Vec::new();
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return Vec::new();
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return Vec::new();
+    };
+    let mut candidates = Vec::new();
+    collect_test_candidates(tree.root_node(), source.as_bytes(), &mut candidates);
+    candidates
+}
+
+fn collect_test_candidates(
+    node: tree_sitter::Node<'_>,
+    source: &[u8],
+    candidates: &mut Vec<TestSubjectCandidate>,
+) {
+    if node.kind() == "class_declaration"
+        && let Ok(class_source) = node.utf8_text(source)
+        && let Some(candidate) = extract_testing_subject_candidate(class_source)
+    {
+        candidates.push(candidate);
+    }
+    let mut cursor = node.walk();
+    for child in node.named_children(&mut cursor) {
+        collect_test_candidates(child, source, candidates);
+    }
+}
+
+fn is_test_class_declaration(source: &str) -> bool {
+    let Some(language) = crate::compression::language::safe_csharp_language() else {
+        return false;
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return false;
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return false;
+    };
+    first_class_has_attribute(tree.root_node(), source.as_bytes(), "TestClass")
+}
+
+fn first_class_has_attribute(node: tree_sitter::Node<'_>, source: &[u8], name: &str) -> bool {
+    if node.kind() == "class_declaration" {
+        let mut cursor = node.walk();
+        return node.named_children(&mut cursor).any(|child| {
+            child.kind() == "attribute_list"
+                && child
+                    .utf8_text(source)
+                    .is_ok_and(|attributes| has_attribute(attributes, name))
+        });
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor)
+        .any(|child| first_class_has_attribute(child, source, name))
 }
 
 fn has_attribute(source: &str, name: &str) -> bool {
@@ -215,18 +307,25 @@ fn concise_return_hint(expression: &str) -> Option<String> {
     }
 }
 
-fn infer_constructed_sut(source: &str, class_name: &str) -> Option<String> {
+fn infer_constructed_sut(source: &str, class_name: &str) -> ConstructedSubject {
     let mut candidates = BTreeSet::new();
     for body in setup_bodies(source, class_name) {
         let mut offset = 0;
         while let Some(relative) = body[offset..].find("= new ") {
             let equals = offset + relative;
-            let lhs = body[..equals].split_whitespace().last()?.trim();
+            let Some(lhs) = body[..equals].split_whitespace().last() else {
+                offset = equals + "= new ".len();
+                continue;
+            };
+            let lhs = lhs.trim();
             let lhs = lhs.strip_prefix("this.").unwrap_or(lhs);
             let type_start = equals + "= new ".len();
-            let type_end = body[type_start..]
-                .find(|character: char| character == '(' || character.is_whitespace())?
-                + type_start;
+            let Some(type_length) = body[type_start..]
+                .find(|character: char| character == '(' || character.is_whitespace())
+            else {
+                break;
+            };
+            let type_end = type_start + type_length;
             let constructed = body[type_start..type_end].trim();
             if lhs.starts_with('_')
                 && is_identifier(lhs)
@@ -238,9 +337,11 @@ fn infer_constructed_sut(source: &str, class_name: &str) -> Option<String> {
             offset = type_end;
         }
     }
-    (candidates.len() == 1)
-        .then(|| candidates.into_iter().next())
-        .flatten()
+    match candidates.len() {
+        0 => ConstructedSubject::None,
+        1 => ConstructedSubject::Unique(candidates.into_iter().next().expect("one candidate")),
+        _ => ConstructedSubject::Ambiguous,
+    }
 }
 
 fn setup_bodies<'a>(source: &'a str, class_name: &str) -> Vec<&'a str> {
@@ -264,15 +365,38 @@ fn setup_bodies<'a>(source: &'a str, class_name: &str) -> Vec<&'a str> {
 }
 
 fn has_persistent_field(source: &str, field: &str) -> bool {
-    source.lines().any(|line| {
-        let trimmed = line.trim();
-        trimmed.ends_with(';')
-            && trimmed
-                .split_whitespace()
-                .any(|token| token.trim_end_matches(';') == field)
-            && !trimmed.starts_with("var ")
-            && !trimmed.contains("= new ")
+    let Some(language) = crate::compression::language::safe_csharp_language() else {
+        return false;
+    };
+    let mut parser = tree_sitter::Parser::new();
+    if parser.set_language(&language).is_err() {
+        return false;
+    }
+    let Some(tree) = parser.parse(source, None) else {
+        return false;
+    };
+    let Some(class) = first_class_node(tree.root_node()) else {
+        return false;
+    };
+    let Some(body) = class.child_by_field_name("body") else {
+        return false;
+    };
+    let mut cursor = body.walk();
+    body.named_children(&mut cursor).any(|declaration| {
+        declaration.kind() == "field_declaration"
+            && declaration.utf8_text(source.as_bytes()).is_ok_and(|text| {
+                text.split(|character: char| character != '_' && !character.is_ascii_alphanumeric())
+                    .any(|token| token == field)
+            })
     })
+}
+
+fn first_class_node(node: tree_sitter::Node<'_>) -> Option<tree_sitter::Node<'_>> {
+    if node.kind() == "class_declaration" {
+        return Some(node);
+    }
+    let mut cursor = node.walk();
+    node.named_children(&mut cursor).find_map(first_class_node)
 }
 
 fn find_matching(source: &str, open: usize, opening: char, closing: char) -> Option<usize> {

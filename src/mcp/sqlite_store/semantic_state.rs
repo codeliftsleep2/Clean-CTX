@@ -33,6 +33,7 @@ pub(super) fn should_fail_semantic_save(file_path: &str) -> bool {
 }
 
 impl SqliteStore {
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn save_context_with_compatibility(
         &mut self,
@@ -55,12 +56,70 @@ impl SqliteStore {
             source_hash,
             version,
             semantic_edges,
+            &[],
             raw_tokens,
             compressed_tokens,
             Some(identities),
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn save_context_with_dependency_semantics(
+        &mut self,
+        file_path: &str,
+        fidelity: Fidelity,
+        compact_output: &str,
+        ir_binary: &[u8],
+        source_hash: &str,
+        version: u64,
+        semantic_edges: &[SemanticEdge],
+        semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+        raw_tokens: u64,
+        compressed_tokens: u64,
+        identities: &CompatibilityIdentities,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        self.save_context_transaction(
+            file_path,
+            fidelity,
+            compact_output,
+            ir_binary,
+            source_hash,
+            version,
+            semantic_edges,
+            semantic_dependencies,
+            raw_tokens,
+            compressed_tokens,
+            Some(identities),
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn save_context_with_semantic_dependencies(
+        &mut self,
+        file_path: &str,
+        fidelity: Fidelity,
+        compact_output: &str,
+        ir_binary: &[u8],
+        source_hash: &str,
+        version: u64,
+        semantic_edges: &[SemanticEdge],
+        semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+        raw_tokens: u64,
+        compressed_tokens: u64,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        self.save_context_transaction(
+            file_path,
+            fidelity,
+            compact_output,
+            ir_binary,
+            source_hash,
+            version,
+            semantic_edges,
+            semantic_dependencies,
+            raw_tokens,
+            compressed_tokens,
+            None,
+        )
+    }
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn durable_state_matches(
         &self,
@@ -71,6 +130,7 @@ impl SqliteStore {
         source_hash: &str,
         version: u64,
         semantic_edges: &[SemanticEdge],
+        semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
         identities: &CompatibilityIdentities,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         if !self.checkpoint_matches(file_path, fidelity, compact_output, ir_binary, source_hash)? {
@@ -101,11 +161,12 @@ impl SqliteStore {
                 },
             )
             .optional()?;
-        let expected = serde_json::to_string(&DurableSemanticSnapshot::new(
+        let expected = serde_json::to_string(&DurableSemanticSnapshot::new_with_dependencies(
             file_path.to_string(),
             source_hash.to_string(),
             version,
             semantic_edges,
+            semantic_dependencies,
         ))?;
         let expected_identities = (
             Some(serde_json::to_string(&identities.canonical_config)?),
@@ -118,6 +179,7 @@ impl SqliteStore {
         }))
     }
 
+    #[cfg(test)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn save_context_with_semantics(
         &mut self,
@@ -139,6 +201,7 @@ impl SqliteStore {
             source_hash,
             version,
             semantic_edges,
+            &[],
             raw_tokens,
             compressed_tokens,
             None,
@@ -155,6 +218,7 @@ impl SqliteStore {
         source_hash: &str,
         version: u64,
         semantic_edges: &[SemanticEdge],
+        semantic_dependencies: &[crate::layers::meta::semantic::SemanticDependency],
         raw_tokens: u64,
         compressed_tokens: u64,
         identities: Option<&CompatibilityIdentities>,
@@ -171,11 +235,12 @@ impl SqliteStore {
                 raw_tokens,
                 compressed_tokens,
             )?;
-            let snapshot = DurableSemanticSnapshot::new(
+            let snapshot = DurableSemanticSnapshot::new_with_dependencies(
                 file_path.to_string(),
                 source_hash.to_string(),
                 version,
                 semantic_edges,
+                semantic_dependencies,
             );
             if let Some(identities) = identities {
                 self.conn.execute(
@@ -325,6 +390,7 @@ impl SqliteStore {
         Ok(Some(UntrustedDurableContext {
             ir,
             semantic_edges,
+            semantic_dependencies: snapshot.dependencies,
             source_hash: snapshot.source_hash,
             fidelity: metadata.fidelity,
             compatibility: PersistedCompatibilityIdentities {

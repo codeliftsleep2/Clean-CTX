@@ -23,11 +23,24 @@ fn valid_refs_are_accepted() {
         "origin/main",
         "release/1.0.0",
         "refs/heads/main",
+        "HEAD^1",
+        "HEAD^2",
+        "abc123^1",
+        "HEAD~2^1",
     ] {
         assert!(
             validate_ref(valid).is_ok(),
             "expected '{valid}' to be a valid ref"
         );
+    }
+}
+
+#[test]
+fn malformed_parent_selectors_name_the_supported_grammar() {
+    for bad in ["HEAD^", "HEAD^x", "HEAD^{commit}", "HEAD^^1", "HEAD^1x"] {
+        let message = validate_ref(bad).unwrap_err().to_string();
+        assert!(message.contains("supported grammar"), "{bad}: {message}");
+        assert!(message.contains("^N"), "{bad}: {message}");
     }
 }
 

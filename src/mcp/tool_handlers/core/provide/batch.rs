@@ -64,6 +64,11 @@ fn execute(args: &Value, state: &McpState) -> Result<Vec<CompletedItem>, Provide
             "'filePath' and 'files' are mutually exclusive request forms.",
         ));
     }
+    if args.get("fidelity").is_some() {
+        return Err(ProvideFailure::invalid(
+            "Top-level 'fidelity' is not valid for a batched 'files' request; specify 'fidelity' on each file item.",
+        ));
+    }
     let files = args["files"]
         .as_array()
         .ok_or_else(|| ProvideFailure::invalid("'files' must be an array."))?;

@@ -204,41 +204,110 @@ fn diff_methods(base: &[CapturedMethod], cur: &[CapturedMethod], actions: &mut V
                 }
             }
             (Some(g1), Some(g2)) => {
-                for i in 0..g1.len().max(g2.len()) {
-                    match (g1.get(i), g2.get(i)) {
-                        (Some(b), Some(c)) => {
-                            if b.sig == c.sig && b.markers == c.markers && b.body == c.body {
-                                actions.push(method_action(DiffKind::Unchanged, &key, c, "", ""));
-                            } else {
-                                let reason = if b.sig != c.sig {
-                                    "sig"
-                                } else if b.markers != c.markers && b.body == c.body {
-                                    "markers"
-                                } else {
-                                    "body"
-                                };
-                                actions.push(method_action(
-                                    DiffKind::Modified,
-                                    &key,
-                                    c,
-                                    &b.sig,
-                                    reason,
-                                ));
-                            }
-                        }
-                        (Some(b), None) => {
-                            actions.push(method_action(DiffKind::Removed, &key, b, "", ""))
-                        }
-                        (None, Some(c)) => {
-                            actions.push(method_action(DiffKind::Added, &key, c, "", ""))
-                        }
-                        _ => {}
+                let mut base_used = vec![false; g1.len()];
+                let mut cur_used = vec![false; g2.len()];
+
+                // First preserve exact declarations regardless of overload
+                // insertion or ordering. Name-group index is not identity.
+                for (base_idx, base_method) in g1.iter().enumerate() {
+                    if let Some((cur_idx, current_method)) = g2
+                        .iter()
+                        .enumerate()
+                        .find(|(idx, method)| !cur_used[*idx] && *method == base_method)
+                    {
+                        base_used[base_idx] = true;
+                        cur_used[cur_idx] = true;
+                        actions.push(method_action(
+                            DiffKind::Unchanged,
+                            &key,
+                            current_method,
+                            "",
+                            "",
+                        ));
+                    }
+                }
+
+                // A stable visible signature independently proves continuity
+                // for body, marker, and producer-evidence changes.
+                for (base_idx, base_method) in g1.iter().enumerate() {
+                    if base_used[base_idx] {
+                        continue;
+                    }
+                    if let Some((cur_idx, current_method)) = g2
+                        .iter()
+                        .enumerate()
+                        .find(|(idx, method)| !cur_used[*idx] && method.sig == base_method.sig)
+                    {
+                        base_used[base_idx] = true;
+                        cur_used[cur_idx] = true;
+                        push_method_comparison(actions, &key, base_method, current_method);
+                    }
+                }
+
+                let remaining_base: Vec<usize> = base_used
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, used)| (!used).then_some(idx))
+                    .collect();
+                let remaining_cur: Vec<usize> = cur_used
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(idx, used)| (!used).then_some(idx))
+                    .collect();
+
+                // A one-to-one remainder in a name group is the existing
+                // bounded signature-change contract. Ambiguous overload
+                // remainders are truthfully remove/add rather than guessed.
+                if let ([base_idx], [cur_idx]) =
+                    (remaining_base.as_slice(), remaining_cur.as_slice())
+                {
+                    base_used[*base_idx] = true;
+                    cur_used[*cur_idx] = true;
+                    push_method_comparison(actions, &key, g1[*base_idx], g2[*cur_idx]);
+                }
+
+                for (idx, method) in g1.iter().enumerate() {
+                    if !base_used[idx] {
+                        actions.push(method_action(DiffKind::Removed, &key, method, "", ""));
+                    }
+                }
+                for (idx, method) in g2.iter().enumerate() {
+                    if !cur_used[idx] {
+                        actions.push(method_action(DiffKind::Added, &key, method, "", ""));
                     }
                 }
             }
             (None, None) => {} // union of keys — unreachable, but Rust requires the arm
         }
     }
+}
+
+fn push_method_comparison(
+    actions: &mut Vec<DiffAction>,
+    key: &str,
+    baseline: &CapturedMethod,
+    current: &CapturedMethod,
+) {
+    if baseline == current {
+        actions.push(method_action(DiffKind::Unchanged, key, current, "", ""));
+        return;
+    }
+    let reason = if baseline.declaration != current.declaration {
+        "declaration"
+    } else if baseline.sig != current.sig {
+        "sig"
+    } else if baseline.markers != current.markers && baseline.body == current.body {
+        "markers"
+    } else {
+        "body"
+    };
+    actions.push(method_action(
+        DiffKind::Modified,
+        key,
+        current,
+        &baseline.sig,
+        reason,
+    ));
 }
 
 fn method_action(

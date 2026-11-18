@@ -22,16 +22,41 @@
 use crate::angular_meta::phi::PhiMarker;
 use crate::compression::Fidelity;
 
+pub(crate) mod action_imports;
+pub(crate) mod constructors;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_direct_import_dispatch.rs"]
+mod direct_import_dispatch_tests;
+pub(crate) mod direct_imports;
+pub(crate) mod discriminants;
 mod extract;
 mod extract_selectors;
 #[cfg(test)]
 mod extraction_metrics;
+pub(crate) mod legacy;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_legacy_discriminant.rs"]
+mod legacy_discriminant_tests;
+pub(crate) mod selector_declarations;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_selector_reference_binding.rs"]
+mod selector_reference_binding_tests;
+pub(crate) mod selector_references;
+pub(crate) mod service_owners;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_service_select_ownership.rs"]
+mod service_select_ownership_tests;
 mod shape;
+#[cfg(test)]
+#[path = "../tests/angular_meta/ngrx_store_receiver_qualification.rs"]
+mod store_receiver_qualification_tests;
+pub(crate) mod transitions;
+pub(crate) mod type_binding;
 
 // Re-exported so the established public path
 // (`crate::angular_meta::ngrx::extract_ngrx_shape`) is unchanged by the split.
 pub use extract::extract_ngrx_shape;
-pub(crate) use extract::extract_ngrx_shape_with_regions;
+pub(crate) use extract::{extract_ngrx_shape_with_regions, extract_ngrx_shape_with_sites};
 #[cfg(test)]
 pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 
@@ -44,6 +69,7 @@ pub(crate) use extraction_metrics::{extraction_count, reset_extraction_count};
 pub enum NgRxKind {
     NgRx,
     Action,
+    ClassAction,
     Reducer,
     Effect,
     Selector,
@@ -59,6 +85,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "Φngrx:",
             Self::Action => "Φaction:",
+            Self::ClassAction => "Φaction-class:",
             Self::Reducer => "Φreducer:",
             Self::Effect => "Φeffect:",
             Self::Selector => "Φselector:",
@@ -75,6 +102,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "NgRx",
             Self::Action => "createAction",
+            Self::ClassAction => "NgRx Action class",
             Self::Reducer => "createReducer",
             Self::Effect => "createEffect",
             Self::Selector => "createSelector",
@@ -89,6 +117,7 @@ impl PhiMarker for NgRxKind {
     /// prevent partial-match issues in string replacement).
     fn all_in_expand_order() -> &'static [NgRxKind] {
         &[
+            Self::ClassAction,
             Self::NgRx,     // Φngrx:     (6 chars)
             Self::Action,   // Φaction:   (8 chars)
             Self::Reducer,  // Φreducer:  (9 chars)
@@ -107,6 +136,7 @@ impl PhiMarker for NgRxKind {
         match token {
             "Φngrx" => Some(Self::NgRx),
             "Φaction" => Some(Self::Action),
+            "Φaction-class" => Some(Self::ClassAction),
             "Φreducer" => Some(Self::Reducer),
             "Φeffect" => Some(Self::Effect),
             "Φselector" => Some(Self::Selector),
@@ -123,6 +153,7 @@ impl PhiMarker for NgRxKind {
         match self {
             Self::NgRx => "Φngrx",
             Self::Action => "Φaction",
+            Self::ClassAction => "Φaction-class",
             Self::Reducer => "Φreducer",
             Self::Effect => "Φeffect",
             Self::Selector => "Φselector",
@@ -193,6 +224,13 @@ pub struct ActionDecl {
     pub props_type: Option<String>,
 }
 
+/// A class implementing the directly imported NgRx Action interface.
+/// Event/payload/provider interpretation is deliberately not inferred.
+#[derive(Debug, Clone)]
+pub struct ClassActionDecl {
+    pub name: String,
+}
+
 /// A single reducer transition (on(action) → state change).
 #[derive(Debug, Clone)]
 pub struct ReducerTransition {
@@ -248,12 +286,17 @@ pub struct EntityAdapterDecl {
 #[derive(Debug, Clone)]
 pub struct DispatchSite {
     pub action_name: String,
+    pub(crate) call_start: usize,
+    pub(crate) object_literal: bool,
+    pub(crate) service_owner: Option<String>,
 }
 
 /// A store select call site.
 #[derive(Debug, Clone)]
 pub struct SelectSite {
     pub selector_name: String,
+    pub(crate) service_owner: Option<String>,
+    pub(crate) module_specifier: Option<String>,
 }
 
 /// The complete NgRx shape extracted from a file.
@@ -266,6 +309,7 @@ pub struct NgRxShape {
     /// just the `Φstore:` marker.
     pub component_name: Option<String>,
     pub actions: Vec<ActionDecl>,
+    pub class_actions: Vec<ClassActionDecl>,
     pub reducer: Option<ReducerDecl>,
     pub effects: Vec<EffectDecl>,
     pub selectors: Vec<SelectorDecl>,

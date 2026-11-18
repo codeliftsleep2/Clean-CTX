@@ -142,6 +142,10 @@ pub(crate) fn handle_replay_history(id: &Value, params: &Value, state: &McpState
         }
         Err(error) => return send_persistence_error(id, &error),
     }
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(file_path) {
+        return send_persistence_error(id, &error);
+    }
     let (content_kind, byte_exact) = contract_fields_for_hierarchy(canonical.fidelity, &hierarchy);
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,

@@ -73,24 +73,34 @@ fn try_prepare_transitive_dependencies(
         workspace_root,
         crate::mcp::tool_handlers::hydration::HydrationRequirement::LegacyEdit,
     )?;
+    let csharp_dependencies = identity.exact().and_then(|exact| {
+        (exact.domain == "builtin" && exact.entity_type == "Class").then(|| {
+            let index = state.workspace_index_read();
+            let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+            super::csharp_resolution::DependencyGraph::build(&catalog, &index, scope.as_ref())
+        })
+    });
     Ok(PreparedQuery::indexed(move |index| {
         let resolved = identity.resolve(index, scope.as_ref())?;
         let resolved_identity = serde_json::to_value(&resolved).unwrap_or_default();
-        let dependencies = match scope.as_ref() {
-            Some(scope) => index.transitive_dependencies_in_scope(
-                &resolved.domain,
-                &resolved.entity_type,
-                &resolved.name,
-                depth,
-                scope,
-            ),
-            None => index.transitive_dependencies(
-                &resolved.domain,
-                &resolved.entity_type,
-                &resolved.name,
-                depth,
-            ),
-        };
+        let dependencies = csharp_dependencies
+            .as_ref()
+            .and_then(|graph| graph.transitive_dependencies(&resolved.name, depth))
+            .unwrap_or_else(|| match scope.as_ref() {
+                Some(scope) => index.transitive_dependencies_in_scope(
+                    &resolved.domain,
+                    &resolved.entity_type,
+                    &resolved.name,
+                    depth,
+                    scope,
+                ),
+                None => index.transitive_dependencies(
+                    &resolved.domain,
+                    &resolved.entity_type,
+                    &resolved.name,
+                    depth,
+                ),
+            });
         let count = dependencies.len();
         let mut structured = serde_json::json!({
             "dependencies": serde_json::to_value(&dependencies).unwrap_or_default(),
@@ -138,7 +148,7 @@ pub(super) fn prepare_has_cycle(
 
 fn try_prepare_has_cycle(
     args: &Value,
-    _state: &McpState,
+    state: &McpState,
     context: &mut PreparationContext,
 ) -> Result<PreparedQuery, QueryFailure> {
     if let Some(kind) = args.get("kind")
@@ -150,22 +160,38 @@ fn try_prepare_has_cycle(
     }
     // The effective scope is resolved BEFORE the index lock is taken, so an
     // unauthorized `withinPath` is refused without touching the index at all.
-    let scope = context.scope(_state, args)?;
+    let scope = context.scope(state, args)?;
+    let csharp_dependencies = {
+        let index = state.workspace_index_read();
+        let catalog = super::csharp_resolution::Catalog::build(state, &index, scope.as_ref());
+        super::csharp_resolution::DependencyGraph::build(&catalog, &index, scope.as_ref())
+    };
     Ok(PreparedQuery::indexed(move |index| {
-        let witness = match scope.as_ref() {
+        let indexed_witness = match scope.as_ref() {
             Some(scope) => index.dependency_cycle_witness_in_scope(scope),
             None => index.dependency_cycle_witness(),
         };
-        let identity_ambiguities = match (&witness, scope.as_ref()) {
+        let identity_ambiguities = match (&indexed_witness, scope.as_ref()) {
             (Some(witness), Some(scope)) => {
                 index.cycle_identity_ambiguities_in_scope(witness, scope)
             }
             (Some(witness), None) => index.cycle_identity_ambiguities(witness),
             (None, _) => Vec::new(),
         };
+        let csharp_witness = csharp_dependencies.cycle_witness();
+        let has_cycle = indexed_witness.is_some() || csharp_witness.is_some();
+        let cycle = indexed_witness
+            .as_ref()
+            .map(|witness| serde_json::to_value(witness).unwrap_or_default())
+            .or_else(|| {
+                csharp_witness
+                    .as_ref()
+                    .map(|witness| serde_json::to_value(witness).unwrap_or_default())
+            })
+            .unwrap_or_else(|| serde_json::json!([]));
         let structured = serde_json::json!({
-            "has_cycle": witness.is_some(),
-            "cycle": witness.unwrap_or_default(),
+            "has_cycle": has_cycle,
+            "cycle": cycle,
             "coverage": {
                 "status": "indexed_evidence_only",
                 "source_complete": false,

@@ -75,6 +75,9 @@ pub(crate) mod physical_identity;
 mod publication;
 mod source_cache;
 
+#[cfg(feature = "csharp")]
+#[path = "csharp_call_reconciliation.rs"]
+mod csharp_call_reconciliation;
 #[path = "durable_semantics.rs"]
 pub(crate) mod durable_semantics;
 
@@ -165,8 +168,7 @@ pub struct McpState {
     /// Exact durable persistence path owned by each session-local IR alias.
     persisted_paths: Mutex<HashMap<String, String>>,
     context_fidelities: Mutex<HashMap<String, Fidelity>>,
-    semantic_edge_snapshots:
-        Mutex<HashMap<String, Vec<crate::layers::meta::semantic::SemanticEdge>>>,
+    semantic_edge_snapshots: Mutex<HashMap<String, durable_semantics::SemanticSnapshot>>,
     pending_semantic_transitions: Mutex<
         HashMap<
             durable_semantics::PendingTransitionKey,
@@ -254,22 +256,14 @@ impl McpState {
             None
         };
 
-        // Rehydrate session stats and register durable physical owners before
-        // any caller spelling can claim session identity.
-        let mut session_stats = SessionStats::new();
+        // Session accounting starts empty even when durable history exists.
+        // Persisted statistics are projected separately by `context_stats`;
+        // loading them here would mislabel prior-process work as this session.
+        let session_stats = SessionStats::new();
         let mut physical_identities = physical_identity::PhysicalIdentityRegistry::default();
         if let Some(ref store) = persistence_store {
             // Rebuild only from already committed durable state.
             if let Some(guard) = store.sqlite() {
-                match guard.rebuild_stats() {
-                    Ok(stats) => {
-                        session_stats = stats;
-                        eprintln!("[clean-ctx] Loaded persisted session stats.");
-                    }
-                    Err(e) => {
-                        eprintln!("[clean-ctx] WARNING: Failed to rebuild stats from DB: {e}");
-                    }
-                }
                 if let Ok(contexts) = guard.list_contexts(i64::MAX as usize) {
                     for context in contexts {
                         physical_identities.register_durable_owner(&context.file_path);
@@ -332,8 +326,8 @@ impl McpState {
         project_root: &std::path::Path,
         additional_roots: &[String],
     ) -> (Option<crate::cbm::GraphBridge>, crate::cbm::CbmStatus) {
-        // Every configured additional root becomes its own CBM project: one
-        // subprocess, one async index per root, each tracked under its own
+        // All configured roots share one frontend subprocess. Each root gets
+        // its own async index request and is tracked under its own
         // canonical CBM slug (see `GraphBridge::try_create_with_roots`).
         let extras: Vec<std::path::PathBuf> = additional_roots
             .iter()

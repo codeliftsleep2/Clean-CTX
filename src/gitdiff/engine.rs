@@ -24,7 +24,7 @@
 
 use crate::compression::Fidelity;
 use crate::diff::{build_snapshot, diff_snapshots, format_diff};
-use crate::gitdiff::workspace::{FileChange, collect_changed_files, show_file};
+use crate::gitdiff::workspace::{FileChange, collect_changed_files, show_file_bytes};
 // ANGULAR_HTML_COMPRESSION_PLAN Phase 2: HTML template compression
 // in the diff path. Only available when the `angular` feature is enabled.
 #[cfg(feature = "angular")]
@@ -43,6 +43,8 @@ pub struct GitDiffSummary {
     pub type_changed: usize,
     /// Number of files skipped because they exceeded resource limits.
     pub skipped: usize,
+    /// Whether the semantic projection omits comparison dimensions or source.
+    pub comparison_lossy: bool,
 }
 
 /// Diff an entire workspace between two git refs.
@@ -82,6 +84,9 @@ pub fn gitdiff_workspace(
         "§GITDIFF {from}..{to_label} ({} files)\n",
         file_count
     ));
+    manifest.push_str(
+        "§COMPARISON lossy=true scope=admitted-declarations compares=[signature,csharp-return-type,csharp-attributes,csharp-modifiers,markers,normalized-body] omits=[unsupported-declarations,compiler-type-equivalence,move-linking,full-added-deleted-source]\n",
+    );
 
     let (mut added, mut deleted, mut modified, mut renamed) = (0usize, 0usize, 0usize, 0usize);
     let mut type_changed = 0usize;
@@ -94,8 +99,8 @@ pub fn gitdiff_workspace(
                 // uncommitted new file does not exist in `HEAD` — read it
                 // from disk instead of `git show HEAD:path`.
                 let content = match to {
-                    Some(t) => show_file(root, t, path),
-                    None => std::fs::read_to_string(std::path::Path::new(root).join(path))
+                    Some(t) => show_file_bytes(root, t, path),
+                    None => std::fs::read(std::path::Path::new(root).join(path))
                         .map_err(|e| crate::error::CleanCtxError::Internal(e.to_string())),
                 };
                 match content {
@@ -109,10 +114,16 @@ pub fn gitdiff_workspace(
                             ));
                         } else {
                             added += 1;
-                            let compressed = compress_added_file(&content, path, fidelity);
-                            manifest.push_str(&format!(
-                                "┌ FILE α{alias}: {path} (+1 -0 ~0)\n{compressed}\n"
-                            ));
+                            if let Some(text) = source_text(&content) {
+                                let compressed = compress_added_file(text, path, fidelity);
+                                manifest.push_str(&format!(
+                                    "┌ FILE α{alias}: {path} (+1 -0 ~0)\n{compressed}\n"
+                                ));
+                            } else {
+                                manifest.push_str(&format!(
+                                    "┌ FILE α{alias}: {path} (added binary; semantic comparison not attempted)\n"
+                                ));
+                            }
                         }
                     }
                     Err(_) => {
@@ -125,7 +136,11 @@ pub fn gitdiff_workspace(
             }
             FileChange::Deleted(path) => {
                 deleted += 1;
-                manifest.push_str(&format!("- FILE α{alias}: {path} (deleted)\n"));
+                let binary = show_file_bytes(root, from, path)
+                    .ok()
+                    .is_some_and(|bytes| source_text(&bytes).is_none());
+                let kind = if binary { "deleted binary" } else { "deleted" };
+                manifest.push_str(&format!("- FILE α{alias}: {path} ({kind})\n"));
             }
             FileChange::Modified(path) => {
                 let (body, err) = diff_modified_file(root, from, to, path, fidelity, max_file_size);
@@ -175,6 +190,7 @@ pub fn gitdiff_workspace(
         counts: (added, deleted, modified, renamed),
         type_changed,
         skipped,
+        comparison_lossy: true,
     })
 }
 
@@ -193,7 +209,7 @@ fn diff_modified_file(
     fidelity: Fidelity,
     max_file_size: Option<usize>,
 ) -> (String, Option<String>) {
-    let from_content = match show_file(root, from, path) {
+    let from_content = match show_file_bytes(root, from, path) {
         Ok(c) => c,
         Err(e) => return (String::new(), Some(e.to_string())),
     };
@@ -206,12 +222,12 @@ fn diff_modified_file(
         );
     }
     let to_content = match to {
-        Some(t) => match show_file(root, t, path) {
+        Some(t) => match show_file_bytes(root, t, path) {
             Ok(c) => c,
             Err(e) => return (String::new(), Some(e.to_string())),
         },
         // Working tree — read from disk.
-        None => match std::fs::read_to_string(std::path::Path::new(root).join(path)) {
+        None => match std::fs::read(std::path::Path::new(root).join(path)) {
             Ok(c) => c,
             Err(e) => return (String::new(), Some(e.to_string())),
         },
@@ -225,7 +241,14 @@ fn diff_modified_file(
         );
     }
 
-    diff_two_contents(&from_content, &to_content, path, fidelity)
+    let (Some(from_text), Some(to_text)) = (source_text(&from_content), source_text(&to_content))
+    else {
+        return (
+            "~ binary content changed (semantic comparison not attempted)".to_string(),
+            None,
+        );
+    };
+    diff_two_contents(from_text, to_text, path, fidelity)
 }
 
 /// Diff the content between the old and new location of a renamed file.
@@ -238,24 +261,36 @@ fn diff_renamed_file(
     fidelity: Fidelity,
     max_file_size: Option<usize>,
 ) -> Result<String, String> {
-    let from_content = show_file(root, from, old).map_err(|e| e.to_string())?;
+    let from_content = show_file_bytes(root, from, old).map_err(|e| e.to_string())?;
     if let Some(max) = max_file_size
         && from_content.len() > max
     {
         return Err(format!("exceeds size limit ({max} bytes)"));
     }
     let to_content = match to {
-        Some(t) => show_file(root, t, new).map_err(|e| e.to_string())?,
+        Some(t) => show_file_bytes(root, t, new).map_err(|e| e.to_string())?,
         // Working tree — read the new path from disk.
-        None => std::fs::read_to_string(std::path::Path::new(root).join(new))
-            .map_err(|e| e.to_string())?,
+        None => std::fs::read(std::path::Path::new(root).join(new)).map_err(|e| e.to_string())?,
     };
     if let Some(max) = max_file_size
         && to_content.len() > max
     {
         return Err(format!("exceeds size limit ({max} bytes)"));
     }
-    Ok(diff_two_contents(&from_content, &to_content, new, fidelity).0)
+    let (Some(from_text), Some(to_text)) = (source_text(&from_content), source_text(&to_content))
+    else {
+        return Ok("~ binary content changed (semantic comparison not attempted)".to_string());
+    };
+    Ok(diff_two_contents(from_text, to_text, new, fidelity).0)
+}
+
+/// Admit source text without lossy decoding. NUL-bearing or non-UTF-8 blobs
+/// are binary for this semantic comparison boundary, regardless of extension.
+fn source_text(bytes: &[u8]) -> Option<&str> {
+    if bytes.contains(&0) {
+        return None;
+    }
+    std::str::from_utf8(bytes).ok()
 }
 
 /// Diff two content strings, returning `(body, Option<error>)`.
@@ -473,3 +508,7 @@ mod file_count_limit_tests;
 #[cfg(test)]
 #[path = "../tests/gitdiff/type_change.rs"]
 mod type_change_tests;
+
+#[cfg(test)]
+#[path = "../tests/gitdiff/issue_137.rs"]
+mod issue_137_tests;

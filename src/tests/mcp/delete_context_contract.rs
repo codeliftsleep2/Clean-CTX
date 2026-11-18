@@ -49,7 +49,7 @@ fn establish_deletion_intent(
         .cloned()
         .expect("source hash");
     let prior_version = state.file_version(&alias).expect("version");
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             file,
             std::str::from_utf8(&source).expect("UTF-8 fixture"),
@@ -69,6 +69,7 @@ fn establish_deletion_intent(
         target_source: source,
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: stage_path.to_string(),
     };

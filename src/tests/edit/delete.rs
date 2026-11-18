@@ -232,3 +232,39 @@ fn delete_does_not_treat_empty_expected_text_as_a_stale_check_bypass() {
     .expect_err("empty expected text must not bypass verification");
     assert!(matches!(error, apply::EditError::Mismatch { .. }));
 }
+
+#[test]
+fn issue_136_delete_accepts_full_declaration_precondition() {
+    let source = "class S { [Obsolete] void Last() {} }";
+    let units = units(source, "cs");
+    let report = apply::apply(
+        source,
+        &units,
+        &[EditOperation::Delete {
+            target: "S.Last".to_string(),
+            expected_old_text: "[Obsolete] void Last() {}".to_string(),
+        }],
+    )
+    .expect("full declaration text is valid delete authority");
+    assert_eq!(report.new_source, "class S {  }");
+}
+
+#[test]
+fn issue_136_delete_refuses_unowned_leading_documentation() {
+    let source = "class S {\n  /// docs\n  void Last() {}\n}\n";
+    let units = units(source, "cs");
+    let error = apply::apply(
+        source,
+        &units,
+        &[EditOperation::Delete {
+            target: "S.Last".to_string(),
+            expected_old_text: "void Last() {}".to_string(),
+        }],
+    )
+    .expect_err("unproven documentation ownership must refuse deletion");
+    assert!(matches!(
+        error,
+        apply::EditError::Locate(crate::edit::locate::LocateError::Uneditable { .. })
+    ));
+    assert!(source.contains("/// docs\n  void Last() {}"));
+}

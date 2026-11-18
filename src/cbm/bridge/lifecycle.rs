@@ -67,17 +67,25 @@ impl GraphBridge {
             }
         }
 
+        let mut failure_status = CbmStatus::Unavailable;
         let client = if config.enabled {
             match binary_path {
                 Some(path) => match CbmClient::try_launch(
                     &path,
+                    &project_root_canon,
                     Duration::from_millis(config.query_timeout_ms),
                     config.max_retries,
                     config.circuit_cooldown_secs,
                 ) {
-                    Ok(Some(c)) => {
-                        eprintln!("[clean-ctx-cbm] Launched from: {}", path.display());
-                        Some(c)
+                    Ok(Some(mut c)) => {
+                        if let Err(error) = c.admit() {
+                            eprintln!("[clean-ctx-cbm] Admission failed: {error}");
+                            failure_status = c.status().clone();
+                            None
+                        } else {
+                            eprintln!("[clean-ctx-cbm] Launched from: {}", path.display());
+                            Some(c)
+                        }
                     }
                     Ok(None) => {
                         eprintln!("[clean-ctx-cbm] Binary not found: {}", path.display());
@@ -85,6 +93,7 @@ impl GraphBridge {
                     }
                     Err(e) => {
                         eprintln!("[clean-ctx-cbm] Launch failed: {e}");
+                        failure_status = CbmStatus::Degraded(e.to_string());
                         None
                     }
                 },
@@ -98,12 +107,14 @@ impl GraphBridge {
             None
         };
 
-        let is_available = client.is_some();
+        let is_available = client
+            .as_ref()
+            .is_some_and(|client| client.status().is_available());
         let mut bridge = Self {
             status: if is_available {
                 CbmStatus::Available
             } else {
-                CbmStatus::Unavailable
+                failure_status
             },
             client: Arc::new(Mutex::new(client)),
             cache: DashMap::new(),

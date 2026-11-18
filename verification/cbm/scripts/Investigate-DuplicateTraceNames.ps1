@@ -1,5 +1,6 @@
 param(
     [string]$BinaryPath,
+    [Parameter(Mandatory)][string]$ProviderPath,
     [switch]$KeepWorkspace
 )
 
@@ -11,7 +12,8 @@ if ([string]::IsNullOrWhiteSpace($BinaryPath)) {
     $BinaryPath = Join-Path $repoRoot 'target\debug\clean-ctx.exe'
 }
 $BinaryPath = (Resolve-Path $BinaryPath).Path
-$workspace = Join-Path ([System.IO.Path]::GetTempPath()) ("clean-ctx-cbm-duplicate-" + [guid]::NewGuid())
+$ProviderPath = (Resolve-Path $ProviderPath).Path
+$workspace = Join-Path $repoRoot ("target\cbm-duplicate-trace-verification\fixture-" + [guid]::NewGuid())
 $source = Join-Path $workspace 'src'
 [System.IO.Directory]::CreateDirectory($source) | Out-Null
 $evidenceRoot = Join-Path $repoRoot 'target\cbm-duplicate-trace-verification'
@@ -46,6 +48,39 @@ function Invoke-McpRequest {
 function Invoke-Tool {
     param([string]$Name, [hashtable]$Arguments)
     Invoke-McpRequest -Method 'tools/call' -Params @{ name = $Name; arguments = $Arguments }
+}
+
+function Test-IndexConflict {
+    param($Response)
+    if ($null -ne $Response.PSObject.Properties['error']) {
+        return ([string]$Response.error.message).EndsWith('another index operation for this project is active with different options')
+    }
+    return $null -ne $Response.PSObject.Properties['result'] -and
+        $null -ne $Response.result.PSObject.Properties['structuredContent'] -and
+        $null -ne $Response.result.structuredContent.PSObject.Properties['error'] -and
+        ([string]$Response.result.structuredContent.error).EndsWith('another index operation for this project is active with different options')
+}
+
+function Invoke-Index {
+    $deadline = [DateTime]::UtcNow.AddSeconds(180)
+    do {
+        $response = Invoke-Tool 'index_repository' @{ repo_path = $workspace; mode = 'fast' }
+        $conflict = Test-IndexConflict $response
+        if ($conflict) {
+            if ([DateTime]::UtcNow -ge $deadline) { throw 'CBM auto-index did not yield before the index deadline.' }
+            Start-Sleep -Milliseconds 250
+        }
+    } while ($conflict)
+    return $response
+}
+
+function Get-ToolBody {
+    param($Response)
+    $body = $Response.result.content[0].text | ConvertFrom-Json -Depth 100
+    if ($null -ne $body.PSObject.Properties['content']) {
+        return $body.content[0].text | ConvertFrom-Json -Depth 100
+    }
+    return $body
 }
 
 function Require-TransportSuccess {
@@ -84,7 +119,7 @@ function Require-AmbiguousTraceSource {
 
 function Invoke-GraphTrace {
     param([string]$From, [string]$To)
-    Invoke-Tool 'graph_trace' @{ from = $From; to = $To; project = $workspace }
+    Invoke-Tool 'graph_trace' @{ from = $From; to = $To; project = $projectSlug }
 }
 
 function Invoke-ProxyTrace {
@@ -125,6 +160,9 @@ pub fn duplicate_probe() {
 
 pub fn beta_leaf() {}
 '@
+    Write-Utf8File (Join-Path $workspace '.clean-ctx.json') (@{
+        cbm=@{enabled=$true;binary_path=$ProviderPath}
+    } | ConvertTo-Json -Depth 10)
 
     $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
     $startInfo.FileName = $BinaryPath
@@ -138,6 +176,13 @@ pub fn beta_leaf() {}
     $process.StartInfo = $startInfo
     if (-not $process.Start()) { throw "Failed to start $BinaryPath" }
 
+    $initialize = Invoke-McpRequest 'initialize' @{
+        protocolVersion='2024-11-05';capabilities=@{};clientInfo=@{name='cbm-duplicate-trace-verification';version='1.0.0'}
+    }
+    Require-TransportSuccess $initialize 'initialize'
+    $process.StandardInput.WriteLine('{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}')
+    $process.StandardInput.Flush()
+
     $tools = Invoke-McpRequest 'tools/list' @{}
     Require-TransportSuccess $tools 'tools/list'
     foreach ($required in @('index_repository', 'graph_search', 'graph_trace', 'cbm_proxy')) {
@@ -147,17 +192,21 @@ pub fn beta_leaf() {}
     }
     Write-Host 'PASS: live server exposes every required CBM surface.'
 
-    $index = Invoke-Tool 'index_repository' @{ repo_path = $workspace; mode = 'full' }
+    $index = Invoke-Index
     Require-TransportSuccess $index 'index_repository'
     if (Test-ToolError $index) {
         throw "CBM rejected fixture indexing: $($index | ConvertTo-Json -Compress -Depth 20)"
+    }
+    $projectSlug = (Get-ToolBody $index).project
+    if ([string]::IsNullOrWhiteSpace($projectSlug)) {
+        throw 'Index response did not expose the canonical CBM project identity.'
     }
     Write-Host 'PASS: controlled duplicate-name repository was submitted to CBM indexing.'
 
     $search = Invoke-Tool 'graph_search' @{
         query = 'duplicate_probe'
         name_pattern = '.*duplicate_probe.*'
-        project = $workspace
+        project = $projectSlug
     }
     Require-TransportSuccess $search 'graph_search duplicate_probe'
     if (Test-ToolError $search) {
@@ -176,10 +225,10 @@ pub fn beta_leaf() {}
     Write-Host 'PASS: graph_search discovered two distinct canonical duplicate_probe identities.'
 
     $alphaSearch = Invoke-Tool 'graph_search' @{
-        query = 'alpha_leaf'; name_pattern = '.*alpha_leaf.*'; project = $workspace
+        query = 'alpha_leaf'; name_pattern = '.*alpha_leaf.*'; project = $projectSlug
     }
     $betaSearch = Invoke-Tool 'graph_search' @{
-        query = 'beta_leaf'; name_pattern = '.*beta_leaf.*'; project = $workspace
+        query = 'beta_leaf'; name_pattern = '.*beta_leaf.*'; project = $projectSlug
     }
     Require-TransportSuccess $alphaSearch 'graph_search alpha_leaf'
     Require-TransportSuccess $betaSearch 'graph_search beta_leaf'
@@ -194,10 +243,9 @@ pub fn beta_leaf() {}
     if ([string]::IsNullOrWhiteSpace($alphaDuplicate) -or [string]::IsNullOrWhiteSpace($betaDuplicate)) {
         throw 'Could not associate canonical duplicate identities with alpha.rs and beta.rs.'
     }
-    $projectSlug = $alphaDuplicate -replace '\.src\.alpha\.duplicate_probe$', ''
-    if ([string]::IsNullOrWhiteSpace($projectSlug) -or
+    if (-not $alphaDuplicate.StartsWith("$projectSlug.", [System.StringComparison]::Ordinal) -or
         -not $betaDuplicate.StartsWith("$projectSlug.", [System.StringComparison]::Ordinal)) {
-        throw 'Could not derive one shared canonical CBM project slug from discovered identities.'
+        throw 'Discovered identities do not belong to the indexed CBM project.'
     }
 
     $wrapper = [ordered]@{
@@ -229,6 +277,10 @@ pub fn beta_leaf() {}
     $evidence = [ordered]@{
         recorded_at = (Get-Date).ToString('o')
         binary = $BinaryPath
+        binary_sha256 = (Get-FileHash $BinaryPath -Algorithm SHA256).Hash
+        provider = $ProviderPath
+        provider_sha256 = (Get-FileHash $ProviderPath -Algorithm SHA256).Hash
+        platform = [Environment]::OSVersion.VersionString
         fixture = $workspace
         discovered = [ordered]@{
             duplicate_nodes = $duplicates

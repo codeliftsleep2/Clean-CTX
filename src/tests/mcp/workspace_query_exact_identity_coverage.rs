@@ -214,7 +214,7 @@ fn workspace_query_exact_identity_coverage_schema() {
     }
     assert_eq!(
         coverage["properties"]["result_semantics"]["enum"],
-        json!(["lower_bound"])
+        json!(["exact", "lower_bound"])
     );
     assert_eq!(
         coverage["properties"]["discovered_not_compiled_this_cycle"]["type"],
@@ -224,4 +224,52 @@ fn workspace_query_exact_identity_coverage_schema() {
         coverage["properties"]["alternative_query"]["type"],
         "object"
     );
+}
+
+#[test]
+fn entities_in_file_earns_exact_current_file_coverage_independent_of_history() {
+    let _serial = crate::protocol::handler_response_serial();
+    let root = tempfile::tempdir().unwrap();
+    std::fs::write(
+        root.path().join("Exact.ts"),
+        "export class ExactFileEntity {}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.path().join("Unrelated.ts"),
+        "export class UnrelatedEntity {}\n",
+    )
+    .unwrap();
+    let mut config = crate::tests::test_config();
+    config.cbm.enabled = false;
+    let state = crate::mcp::McpState::new(config);
+    let exact = || {
+        structured(&dispatch(
+            &state,
+            json!({
+                "type": "entities_in_file",
+                "file_path": "Exact.ts",
+                "workspaceRoot": root.path(),
+                "fidelity": "high"
+            }),
+        ))
+        .clone()
+    };
+    let cold = exact();
+    let _ = dispatch(
+        &state,
+        json!({
+            "type": "entities_in_file",
+            "file_path": "Unrelated.ts",
+            "workspaceRoot": root.path(),
+            "fidelity": "high"
+        }),
+    );
+    let warm = exact();
+    assert_eq!(cold["entities"], warm["entities"]);
+    assert_eq!(cold["coverage"], warm["coverage"]);
+    assert_eq!(cold["coverage"]["status"], "authoritative_complete");
+    assert_eq!(cold["coverage"]["source_complete"], true);
+    assert_eq!(cold["coverage"]["result_semantics"], "exact");
+    assert_eq!(cold["coverage"]["scope"]["kind"], "file");
 }

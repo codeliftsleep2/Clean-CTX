@@ -46,6 +46,44 @@ behavior is superseded.
 
 ---
 
+## DIS-2026-035: Exported Angular Decorators Were Outside the Inner Class Node (#138)
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-15 |
+| **Environment** | Clean-CTX production compiler regressions and consolidated live MCP verification |
+| **Repository/context** | TypeScript Angular source using decorated exported Components and NgModules with signal members and provider registrations |
+| **Symptom** | Direct Angular projector tests were green, but the production compiler and live MCP path emitted no signal or provider edges for `@Component(...) export class ...` and `@NgModule(...) export class ...` declarations. |
+| **Root cause** | tree-sitter TypeScript owns decorators for exported declarations on the enclosing `export_statement`; the new signal and provider projectors inspected only decorators directly under the inner `class_declaration`. Invocation evidence and class identity were correct, but Angular declaration/provider authority was rejected at the final decorator join. |
+| **Classification** | Semantic / production integration |
+| **Reproducible locally?** | Yes |
+| **Local regression** | `src/tests/angular_meta/member_semantics.rs::structured_signals_reach_the_production_compiler_boundary`; `src/tests/angular_meta/provider_semantics.rs::provider_relations_reach_the_production_compiler_boundary` |
+| **Live scenario required?** | Yes — `verification/issue-reconciliation/Invoke-Issue138Acceptance.ps1` covers exported signals/providers and refresh replacement/removal through the production MCP binary. |
+| **Architectural invariant** | Decorator syntax classifies the declaration through its grammar-owned wrapper; declaration syntax remains the canonical class/member identity authority. |
+| **Status** | Verified — focused production regressions and all five consolidated Issue #138 live cases GREEN |
+
+**Resolution:** Angular provider and member-signal projection now share a structured decorator-owner join that accepts the class itself or its exact enclosing `export_statement`. No proximity scan, second symbol table, or spelling-based signal fallback was introduced. Passing live evidence is stored under `target/issue-138-live-verification/20261015-175047-f887030d`.
+
+## DIS-2026-034: Angular Template Ownership, Structure, and Linkage Were Fragmented (#141 / #142 split)
+
+| Field | Value |
+|-------|-------|
+| **Discovered** | 2026-10-10 |
+| **Environment** | Claude + Clean-CTX live MCP testing against real Angular repositories |
+| **Repository/context** | Angular 15–16, Angular 17+, and mixed-migration templates with conventional and arbitrary external filenames |
+| **Symptom** | Arbitrary linked templates could miss Angular processing; compressed output lost or misattributed control-flow/content; Components, Templates, and child-selector occurrences were not coherently linked; partial results lacked actionable diagnostics. |
+| **Root cause** | Filename convention competed with structured Component ownership, the former flat rendering authority discarded source order/containment, and no identity/lifecycle contract existed for Component-to-Template or occurrence-aware selector refinement. Generic coverage metadata also did not describe template-specific missing, unresolved, or ambiguous evidence. |
+| **Classification** | Semantic / presentation truthfulness / query lifecycle |
+| **Reproducible locally?** | Yes — deterministic ordered-template, Angular-version-equivalence, production routing, linkage, occurrence, lifecycle, and diagnostics regressions |
+| **Local regression** | `src/tests/angular_meta/template_structure_regressions.rs`; `src/tests/angular_meta/template_version_equivalence.rs`; `src/tests/mcp/provide_angular_template_ownership.rs`; `src/tests/mcp/workspace_query_angular_templates.rs`; `src/tests/mcp/workspace_query_angular_selector_occurrences.rs`; `src/tests/mcp/angular_template_phase6_diagnostics.rs` |
+| **Live scenario required?** | Yes — one consolidated final production-binary MCP pilot after the complete local gate |
+| **Architectural invariant** | ANG-TPL-001; ANG-TPL-002; WSC-001; WSC-002; WSC-010 |
+| **Status** | Verified — Phases 1–6, final verification gate, and consolidated live MCP pilot GREEN |
+
+**Verification:** The maintainer reported the complete local gate GREEN. The consolidated production-binary MCP pilot passed all checks; generated evidence is stored under `target/live-acceptance/angular-template-linkage/`.
+
+**Resolution:** Structured Component metadata now owns arbitrary external and inline templates; an ordered source authority preserves Angular 15+, modern, and mixed control flow and content. The existing Angular semantic producer publishes Component-owned `HasTemplate` using canonical physical Template identity. Selector occurrences retain UTF-8 byte spans and control ancestry and are refined ephemerally into additive `UsesComponent` knowledge only for a unique authoritative declaration. Template-specific diagnostics and fidelity degradation metadata distinguish loss, missing sources, incomplete discovery, unresolved selectors, and ambiguity without fabricating absence or completeness.
+
 ## DIS-2026-033: C# Constructor-Injected Interface Consumers Were Not Reliably Discoverable ([#97](https://github.com/codeliftsleep2/Clean-CTX/issues/97))
 
 | Field | Value |

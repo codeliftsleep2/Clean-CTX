@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://clean-ctx.dev/schemas/ngrx-recall-benchmark-v1-oracle.json",
+  "title": "Clean-CTX NgRx replacement recall oracle",
+  "type": "object",
+  "required": ["benchmark_version", "corpus_commit", "normalization", "pairs"],
+  "properties": {
+    "benchmark_version": { "const": "ngrx-recall-benchmark-v1" },
+    "corpus_commit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "normalization": { "type": "object" },
+    "pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "relation", "source", "target", "evidence_sites", "status", "review"],
+        "properties": {
+          "id": { "type": "string" },
+          "relation": { "enum": ["Dispatches", "Selects", "HandlesAction", "TriggersReducer"] },
+          "source": { "$ref": "#/$defs/entity" },
+          "target": { "$ref": "#/$defs/entity" },
+          "evidence_sites": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/site" } },
+          "status": { "const": "EXPECTED" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "note": { "type": "string" },
+          "review": { "type": "object", "required": ["reviewed", "reviewer", "method"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "required": ["domain", "kind", "name", "file", "line"],
+      "properties": {
+        "domain": { "type": "string" }, "kind": { "type": "string" }, "name": { "type": "string" },
+        "file": { "type": "string" }, "line": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "site": {
+      "type": "object",
+      "required": ["file", "line", "locator"],
+      "properties": {
+        "file": { "type": "string" }, "line": { "type": "integer", "minimum": 1 }, "locator": { "type": "string" }
+      }
+    }
+  }
+}

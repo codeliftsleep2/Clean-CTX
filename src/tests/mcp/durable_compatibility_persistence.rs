@@ -165,6 +165,7 @@ fn edit_intent_round_trips_target_producer_epoch() {
         target_source: target_source.to_vec(),
         target_ir: Vec::new(),
         target_edges: Vec::new(),
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

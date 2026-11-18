@@ -117,21 +117,28 @@ fn red_t8_configuration_disables_only_testing_metadata_and_edges() {
         layer
             .extract_semantic_edges(&source, &captures, Fidelity::High, Some(&config))
             .iter()
-            .all(|edge| edge.relation != SemanticRelation::Tests)
+            .all(|edge| {
+                edge.relation != SemanticRelation::Tests
+                    && !(edge.relation == SemanticRelation::Defines
+                        && edge.subject.domain == "dotnet"
+                        && edge.subject.entity_type == "TestClass")
+            })
     );
 }
 
 #[test]
-fn red_s1_s3_naming_wins_and_ambiguity_without_naming_is_omitted() {
+fn candidate_precedence_and_ambiguity_are_source_local() {
     let layer = DotNetMetaLayer::new();
     let named =
         layer.extract_semantic_edges(TEST_CLASS, &[TEST_CLASS.to_string()], Fidelity::Low, None);
-    let tests = named
+    let declaration = named
         .iter()
-        .find(|edge| edge.relation == SemanticRelation::Tests)
-        .expect("Tests edge");
-    assert_eq!(tests.subject.name, "AccountsControllerTests");
-    assert_eq!(tests.object.name, "AccountsController");
+        .find(|edge| edge.relation == SemanticRelation::Defines)
+        .expect("TestClass declaration");
+    assert_eq!(declaration.subject.name, "AccountsControllerTests");
+    let candidate = crate::dotnet_meta::testing::extract_testing_subject_candidate(TEST_CLASS)
+        .expect("candidate");
+    assert_eq!(candidate.subject, "AccountsController");
 
     let ambiguous = r#"
 [TestClass]
@@ -147,29 +154,16 @@ public class BehaviorChecks
     }
 }
 "#;
-    assert!(
-        layer
-            .extract_semantic_edges(ambiguous, &[ambiguous.to_string()], Fidelity::High, None)
-            .iter()
-            .all(|edge| edge.relation != SemanticRelation::Tests)
-    );
+    assert!(crate::dotnet_meta::testing::extract_testing_subject_candidate(ambiguous).is_none());
 
     let excluded_suffix = "[TestClass]\npublic class PaymentIntegrationTests {}";
     assert!(
-        layer
-            .extract_semantic_edges(
-                excluded_suffix,
-                &[excluded_suffix.to_string()],
-                Fidelity::High,
-                None,
-            )
-            .iter()
-            .all(|edge| edge.relation != SemanticRelation::Tests)
+        crate::dotnet_meta::testing::extract_testing_subject_candidate(excluded_suffix).is_none()
     );
 }
 
 #[test]
-fn red_s2_construction_and_s4_reverse_index_integration() {
+fn persistent_constructed_subject_is_candidate_evidence() {
     let source = r#"
 [TestClass]
 public class ServiceBehavior
@@ -179,18 +173,14 @@ public class ServiceBehavior
     public void Setup() { _sut = new FooService(); }
 }
 "#;
-    let layer = DotNetMetaLayer::new();
-    let edges = layer.extract_semantic_edges(source, &[source.to_string()], Fidelity::High, None);
-    let mut index = WorkspaceIndex::new();
-    index.add_edges("ServiceBehavior.cs", edges);
-    let reverse = index.reverse_edges_by_identity("dotnet", "Class", "FooService");
-    assert_eq!(reverse.len(), 1);
-    assert_eq!(reverse[0].relation, SemanticRelation::Tests);
-    assert_eq!(reverse[0].subject.name, "ServiceBehavior");
+    let candidate = crate::dotnet_meta::testing::extract_testing_subject_candidate(source)
+        .expect("constructed candidate");
+    assert_eq!(candidate.test_class, "ServiceBehavior");
+    assert_eq!(candidate.subject, "FooService");
 }
 
 #[test]
-fn red_s4_production_pipeline_reaches_workspace_reverse_edges() {
+fn production_pipeline_publishes_testclass_declaration_without_tests_edge() {
     let source = r#"
 public class AccountsController { }
 
@@ -216,8 +206,13 @@ public class AccountsControllerTests
 
     let mut index = WorkspaceIndex::new();
     index.add_edges("C:/repo/AccountsControllerTests.cs", context.semantic_edges);
-    let reverse = index.reverse_edges_by_identity("dotnet", "Class", "AccountsController");
-    assert_eq!(reverse.len(), 1);
-    assert_eq!(reverse[0].relation, SemanticRelation::Tests);
-    assert_eq!(reverse[0].subject.name, "AccountsControllerTests");
+    let declarations =
+        index.declarations_by_identity("dotnet", "TestClass", "AccountsControllerTests");
+    assert_eq!(declarations.len(), 1);
+    assert!(
+        index
+            .forward_edges_by_identity("dotnet", "TestClass", "AccountsControllerTests")
+            .is_empty(),
+        "candidate evidence must not become a durable Tests edge"
+    );
 }

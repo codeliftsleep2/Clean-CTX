@@ -57,7 +57,7 @@ fn establish_irreconcilable_intent(
         .expect("prior hash");
     let prior_version = state.file_version(&alias).expect("prior version");
     let target_source = std::str::from_utf8(target).expect("UTF-8 fixture");
-    let (mut ir, edges, target_hash) = crate::mcp::tool_helpers::compile_source_ir_candidate(
+    let (mut ir, edges, _, target_hash) = crate::mcp::tool_helpers::compile_source_ir_candidate(
         file,
         target_source,
         crate::compression::Fidelity::Edit,
@@ -82,6 +82,7 @@ fn establish_irreconcilable_intent(
         target_source: target.to_vec(),
         target_ir: crate::ir::binary_wire::encode(&ir),
         target_edges: edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };
@@ -322,7 +323,7 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
         .expect("prior hash");
     let prior_version = initial.file_version(&alias).expect("prior version");
     let target_text = std::str::from_utf8(target).expect("UTF-8 target");
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             target_text,
@@ -345,6 +346,7 @@ fn incompatible_recovered_target_completes_durably_without_live_publication() {
         target_source: target.to_vec(),
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };
@@ -411,7 +413,7 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
         .expect("prior hash");
     let prior_version = initial.file_version(&alias).expect("prior version");
     let target_text = std::str::from_utf8(target).expect("UTF-8 target");
-    let (mut target_ir, target_edges, target_hash) =
+    let (mut target_ir, target_edges, _, target_hash) =
         crate::mcp::tool_helpers::compile_source_ir_candidate(
             &file,
             target_text,
@@ -434,6 +436,7 @@ fn compatible_recovered_target_commits_and_publishes_with_stored_identity() {
         target_source: target.to_vec(),
         target_ir: crate::ir::binary_wire::encode(&target_ir),
         target_edges,
+        target_dependencies: Vec::new(),
         fidelity: crate::compression::Fidelity::Edit,
         stage_path: String::new(),
     };

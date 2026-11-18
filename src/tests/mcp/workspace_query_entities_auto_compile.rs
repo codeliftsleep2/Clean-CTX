@@ -149,7 +149,9 @@ fn sufficient_fresh_projection_is_reused_without_recompilation() {
 
 #[test]
 #[cfg(any(feature = "csharp", feature = "dotnet"))]
-fn lower_fidelity_projection_is_replaced_for_a_higher_request() {
+fn red_reconciliation_preserves_publication_fidelity_until_a_higher_request() {
+    // RED evidence: the 2026-10-16 release gate exposed GetAll after the Low
+    // publication because C# reconciliation silently republished at High.
     let root = tempfile::tempdir().expect("workspace");
     std::fs::write(
         root.path().join("UsersController.cs"),

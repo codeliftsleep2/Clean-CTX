@@ -34,12 +34,27 @@ impl PendingSemanticTransition {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct SemanticSnapshot {
+    pub edges: Vec<SemanticEdge>,
+    pub dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+}
+
+impl SemanticSnapshot {
+    fn is_current(&self) -> bool {
+        self.dependencies
+            .iter()
+            .all(|dependency| dependency.is_current())
+    }
+}
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub(crate) struct DurableSemanticSnapshot {
     pub file_path: String,
     pub source_hash: String,
     pub version: u64,
     pub edges: Vec<DurableSemanticEdge>,
+    #[serde(default)]
+    pub dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -60,17 +75,29 @@ struct DurableEntityRef {
 }
 
 impl DurableSemanticSnapshot {
+    #[cfg(test)]
     pub(crate) fn new(
         file_path: String,
         source_hash: String,
         version: u64,
         edges: &[SemanticEdge],
     ) -> Self {
+        Self::new_with_dependencies(file_path, source_hash, version, edges, &[])
+    }
+
+    pub(crate) fn new_with_dependencies(
+        file_path: String,
+        source_hash: String,
+        version: u64,
+        edges: &[SemanticEdge],
+        dependencies: &[crate::layers::meta::semantic::SemanticDependency],
+    ) -> Self {
         Self {
             file_path,
             source_hash,
             version,
             edges: edges.iter().map(DurableSemanticEdge::from).collect(),
+            dependencies: dependencies.to_vec(),
         }
     }
 
@@ -232,6 +259,8 @@ impl super::McpState {
             self.publish_compatible_semantic_projection(&alias, file_path, semantic);
             self.llm_text_cache_lock().remove(&alias);
         });
+        #[cfg(feature = "csharp")]
+        self.reconcile_csharp_after_authority_change(file_path)?;
         Ok(())
     }
 
@@ -266,29 +295,49 @@ impl super::McpState {
             .retain(|path, _| crate::dictionary::path::canonical_identity_key(path) != canonical);
     }
 
+    #[cfg(test)]
     pub(crate) fn remember_semantic_edges(&self, alias: &str, edges: Vec<SemanticEdge>) {
+        self.remember_semantic_projection(alias, edges, Vec::new());
+    }
+
+    pub(crate) fn remember_semantic_projection(
+        &self,
+        alias: &str,
+        edges: Vec<SemanticEdge>,
+        dependencies: Vec<crate::layers::meta::semantic::SemanticDependency>,
+    ) {
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),
             "semantic_edge_snapshots"
         )
-        .insert(alias.to_string(), edges);
+        .insert(
+            alias.to_string(),
+            SemanticSnapshot {
+                edges,
+                dependencies,
+            },
+        );
     }
-
     pub(crate) fn publish_compatible_semantic_projection(
         &self,
         alias: &str,
         file_path: &str,
         projection: crate::mcp::compatibility::validator::CompatibleSemanticProjection,
     ) {
-        self.remember_semantic_edges(alias, projection.semantic_edges.clone());
+        self.remember_semantic_projection(
+            alias,
+            projection.semantic_edges.clone(),
+            projection.semantic_dependencies.clone(),
+        );
         let canonical_path = self.semantic_owner_path(file_path);
         let mut index = self.workspace_index_lock();
         match crate::workspace::index::SemanticFidelity::from_compilation(projection.fidelity) {
-            Some(fidelity) => index.replace_semantic_projection(
+            Some(fidelity) => index.replace_semantic_projection_with_dependencies(
                 &canonical_path,
                 projection.semantic_edges,
                 fidelity,
                 projection.source_hash,
+                projection.semantic_dependencies,
             ),
             None => {
                 index.remove_file(&canonical_path);
@@ -297,15 +346,19 @@ impl super::McpState {
         }
     }
 
-    pub(crate) fn semantic_edges(&self, alias: &str) -> Option<Vec<SemanticEdge>> {
+    pub(crate) fn semantic_snapshot(&self, alias: &str) -> Option<SemanticSnapshot> {
         lock_or_recover!(
             self.semantic_edge_snapshots.lock(),
             "semantic_edge_snapshots"
         )
         .get(alias)
+        .filter(|snapshot| snapshot.is_current())
         .cloned()
     }
 
+    pub(crate) fn semantic_edges(&self, alias: &str) -> Option<Vec<SemanticEdge>> {
+        self.semantic_snapshot(alias).map(|snapshot| snapshot.edges)
+    }
     pub(crate) fn remember_pending_transition(
         &self,
         alias: &str,

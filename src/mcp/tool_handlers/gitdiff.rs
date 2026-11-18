@@ -118,6 +118,24 @@ pub(crate) fn handle_diff_commits(id: &Value, params: &Value, state: &McpState) 
                             "typeChanged": summary.type_changed,
                         },
                         "skipped": summary.skipped,
+                        "comparison": {
+                            "lossy": summary.comparison_lossy,
+                            "scope": "admitted-declarations",
+                            "compares": [
+                                "signature",
+                                "csharp-return-type",
+                                "csharp-attributes",
+                                "csharp-modifiers",
+                                "markers",
+                                "normalized-body"
+                            ],
+                            "omits": [
+                                "unsupported-declarations",
+                                "compiler-type-equivalence",
+                                "move-linking",
+                                "full-added-deleted-source"
+                            ]
+                        },
                     }
                 }
             });

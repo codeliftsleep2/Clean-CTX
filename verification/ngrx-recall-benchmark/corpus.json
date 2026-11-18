@@ -1,0 +1,35 @@
+{
+  "benchmark_version": "ngrx-recall-benchmark-v1",
+  "replacement_notice": "This is a replacement acceptance benchmark for the unrecoverable historical #140 repo-scale recall corpus/oracle. It preserves the original acceptance intent but does not claim to reproduce the original corpus, oracle, or historical measurements.",
+  "repositories": [
+    {
+      "owner": "tomastrajan",
+      "name": "angular-ngrx-material-starter",
+      "canonical_url": "https://github.com/tomastrajan/angular-ngrx-material-starter",
+      "commit": "3d95daa95b5a53798f33b390815bdccad733995e",
+      "default_branch_at_selection": "master",
+      "license": "MIT",
+      "angular_dependency": "~12.2.6",
+      "ngrx_store_dependency": "~12.0.0",
+      "ngrx_effects_dependency": "~12.0.0",
+      "scope": {
+        "workspace_root": ".",
+        "included_roots": ["projects/angular-ngrx-material-starter/src/app"],
+        "included_extensions": [".ts"],
+        "exclude_globs": ["**/*.spec.ts", "**/node_modules/**", "**/dist/**", "**/build/**", "**/coverage/**", "**/generated/**"],
+        "include_tests": false,
+        "include_fixtures_or_examples_outside_roots": false,
+        "follow_symlinks": false,
+        "regular_files_only": true,
+        "expected_included_ts_files": 79
+      }
+    }
+  ],
+  "selection": {
+    "selected_without_clean_ctx_scoring": true,
+    "single_corpus": true,
+    "reason": "The pinned application naturally supplies at least ten independently reviewed unique pairs for all four relations in a manageable, public, non-generated scope."
+  },
+  "oracle_file": "oracle.json",
+  "oracle_sha256": "64f30ff5eafaab5da0a28ba3aeed8d444e5d1e0daf43a1b11b56784061b35171"
+}

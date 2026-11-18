@@ -92,6 +92,9 @@ function Semantic-Json {
     param($Value)
     $copy = $Value | ConvertTo-Json -Depth 100 | ConvertFrom-Json -AsHashtable
     if ($copy.ContainsKey("discovery")) { $copy.Remove("discovery") }
+    if ($copy.ContainsKey("coverage") -and $copy.coverage.ContainsKey("discovered_not_compiled_this_cycle")) {
+        $copy.coverage.Remove("discovered_not_compiled_this_cycle")
+    }
     return ($copy | ConvertTo-Json -Depth 100 -Compress)
 }
 

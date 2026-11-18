@@ -88,3 +88,76 @@ fn empty_instructions_yield_empty_table() {
     let table = UnitTable::from_instructions(&[]);
     assert!(table.is_empty());
 }
+
+#[test]
+fn issue_136_same_owner_overloads_require_signature_selectors() {
+    let table = UnitTable::from_instructions(&[
+        CoreOp::DefClass("C1".into(), "Service".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "Run".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "int".into(), "value".into()),
+        CoreOp::Body("M1".into(), "{ one(); }".into(), Some(10), Some(20)),
+        CoreOp::DefMethod("C1".into(), "M2".into(), "Run".into()),
+        CoreOp::Param("M2".into(), "P2".into(), "string".into(), "value".into()),
+        CoreOp::Body("M2".into(), "{ two(); }".into(), Some(30), Some(40)),
+        CoreOp::DefMethod("C1".into(), "M3".into(), "Run".into()),
+        CoreOp::Param("M3".into(), "P3".into(), "bool".into(), "value".into()),
+        CoreOp::Body("M3".into(), "{ three(); }".into(), Some(50), Some(62)),
+    ]);
+
+    assert_eq!(table.resolve("Service.Run(int)").unwrap().method_id, "M1");
+    assert_eq!(
+        table.resolve("Service.Run(string)").unwrap().method_id,
+        "M2"
+    );
+    assert_eq!(table.resolve("Service.Run(bool)").unwrap().method_id, "M3");
+    assert!(matches!(
+        table.resolve("Service.Run"),
+        Err(LocateError::Ambiguous { candidates, .. }) if candidates.len() == 3
+    ));
+}
+
+#[test]
+fn issue_136_signature_collision_also_fails_closed() {
+    let table = UnitTable::from_instructions(&[
+        CoreOp::DefClass("C1".into(), "Service".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "Run".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "string".into(), "a".into()),
+        CoreOp::Body("M1".into(), "{}".into(), Some(10), Some(12)),
+        CoreOp::DefMethod("C1".into(), "M2".into(), "Run".into()),
+        CoreOp::Param("M2".into(), "P2".into(), "string".into(), "b".into()),
+        CoreOp::Body("M2".into(), "{}".into(), Some(20), Some(22)),
+    ]);
+    assert!(matches!(
+        table.resolve("Service.Run(string)"),
+        Err(LocateError::Ambiguous { candidates, .. }) if candidates.len() == 2
+    ));
+}
+
+#[test]
+fn issue_136_generic_method_accepts_bare_name_signature_alias_when_unique() {
+    let table = UnitTable::from_instructions(&[
+        CoreOp::DefClass("C1".into(), "Service".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "Get<T>".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "T".into(), "value".into()),
+        CoreOp::Body("M1".into(), "{}".into(), Some(10), Some(12)),
+    ]);
+    assert_eq!(table.resolve("Service.Get(T)").unwrap().method_id, "M1");
+    assert_eq!(table.resolve("Service.Get").unwrap().method_id, "M1");
+}
+
+#[test]
+fn issue_136_base_generic_alias_refuses_collision_with_non_generic_member() {
+    let table = UnitTable::from_instructions(&[
+        CoreOp::DefClass("C1".into(), "Service".into()),
+        CoreOp::DefMethod("C1".into(), "M1".into(), "Get<T>".into()),
+        CoreOp::Param("M1".into(), "P1".into(), "T".into(), "value".into()),
+        CoreOp::Body("M1".into(), "{}".into(), Some(10), Some(12)),
+        CoreOp::DefMethod("C1".into(), "M2".into(), "Get".into()),
+        CoreOp::Param("M2".into(), "P2".into(), "T".into(), "value".into()),
+        CoreOp::Body("M2".into(), "{}".into(), Some(20), Some(22)),
+    ]);
+    assert!(matches!(
+        table.resolve("Service.Get(T)"),
+        Err(LocateError::Ambiguous { .. })
+    ));
+}

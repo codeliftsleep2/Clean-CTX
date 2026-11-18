@@ -247,11 +247,16 @@ impl LayerRegistry {
     pub fn evaluate_meta_layers_context(
         &self,
         context: &MetaLayerContext<'_>,
-    ) -> (Vec<MetaLayerOutput>, Vec<SemanticEdge>) {
+    ) -> (
+        Vec<MetaLayerOutput>,
+        Vec<SemanticEdge>,
+        Vec<crate::layers::meta::semantic::SemanticDependency>,
+    ) {
         #[cfg(test)]
         CONTEXT_EVALUATION_COUNT.with(|count| count.set(count.get() + 1));
         let mut outputs = Vec::new();
         let mut edges = Vec::new();
+        let mut dependencies = Vec::new();
         for layer in &self.meta_layers {
             let Some(evaluation) = layer.evaluate_if_applicable(context) else {
                 continue;
@@ -260,8 +265,11 @@ impl LayerRegistry {
                 outputs.push(output);
             }
             edges.extend(evaluation.semantic_edges);
+            dependencies.extend(evaluation.semantic_dependencies);
         }
-        (outputs, edges)
+        dependencies.sort_by(|left, right| left.file_path.cmp(&right.file_path));
+        dependencies.dedup_by(|left, right| left.file_path == right.file_path);
+        (outputs, edges, dependencies)
     }
 
     /// Check if a specific meta-layer is enabled.

@@ -20,9 +20,8 @@ use crate::layers::meta::semantic::{EntityRef, SemanticEdge, SemanticRelation};
 /// Called once per class capture in `extract_semantic_edges()`.
 ///
 /// `pipe_name` is the Angular pipe name (e.g. "uppercase"), used for
-/// Pipe entities. `declaration_types` maps class names to entity types
-/// for NgModule declarations (enables precision in DeclaresInModule edges).
-#[allow(clippy::too_many_arguments)]
+/// Pipe entities. NgModule relationships are projected separately from
+/// declaration-owned metadata authority.
 pub fn class_to_semantic_edges(
     class_name: &str,
     kind: ClassKind,
@@ -31,7 +30,6 @@ pub fn class_to_semantic_edges(
     pipe_name: Option<&str>,
     raw_class: &str,
     fidelity: Fidelity,
-    declaration_types: &std::collections::HashMap<String, &'static str>,
 ) -> Vec<SemanticEdge> {
     let mut edges: Vec<SemanticEdge> = Vec::new();
 
@@ -44,6 +42,19 @@ pub fn class_to_semantic_edges(
     };
 
     let subject = EntityRef::new("angular", entity_type, class_name);
+
+    // The producer has recognized this declaration independently of DI or
+    // other relationships. Reuse the index's existing registration carrier;
+    // it is normalized into an entity occurrence, never a graph self-edge.
+    if kind == ClassKind::Service {
+        edges.push(SemanticEdge {
+            relation: SemanticRelation::Defines,
+            subject: subject.clone(),
+            object: subject.clone(),
+            layer: "angular",
+            call_evidence: None,
+        });
+    }
 
     // Pipe → HasPipeName → pipe-name-string
     if kind == ClassKind::Pipe {
@@ -71,57 +82,24 @@ pub fn class_to_semantic_edges(
         }
     }
 
-    // Component → Injects → Service for each injected type
-    if kind == ClassKind::Component || kind == ClassKind::Service || kind == ClassKind::Directive {
-        for injected in injects {
+    // Pipe admission remains constructor-only, as frozen in #138a. Qualified
+    // functional tokens are supplied separately by the Angular projection;
+    // this guard does not grant functional support to Pipe. Reuse the existing
+    // constructor producer, never recover a token from a receiver or marker.
+    let pipe_constructor_types = (kind == ClassKind::Pipe).then(|| {
+        crate::angular_meta::constructor_injects::extract_constructor_injects(raw_class)
+            .unwrap_or_default()
+    });
+    let admitted = pipe_constructor_types.as_deref().unwrap_or(injects);
+    if matches!(
+        kind,
+        ClassKind::Component | ClassKind::Service | ClassKind::Directive | ClassKind::Pipe
+    ) {
+        for injected in admitted {
             edges.push(SemanticEdge {
                 relation: SemanticRelation::Injects,
                 subject: subject.clone(),
                 object: EntityRef::new("angular", "Service", injected),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
-    }
-
-    // Module → DeclaresInModule → Component/Directive/Pipe for each declaration
-    // Uses the declaration_types map for precise entity type.
-    if kind == ClassKind::Module {
-        let (declarations, imports, exports) =
-            crate::angular_meta::decorators::extract_module_declarations(raw_class);
-        for decl in &declarations {
-            let decl_type = declaration_types
-                .get(decl.as_str())
-                .copied()
-                .unwrap_or("Component");
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::DeclaresInModule,
-                subject: subject.clone(),
-                object: EntityRef::new("angular", decl_type, decl),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
-        // Module → ImportsModule → Module for each import
-        for imp in &imports {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::ImportsModule,
-                subject: subject.clone(),
-                object: EntityRef::new("angular", "Module", imp),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
-        // Module → ExportsFromModule → Component/Directive/Pipe for each export
-        for exp in &exports {
-            let exp_type = declaration_types
-                .get(exp.as_str())
-                .copied()
-                .unwrap_or("Component");
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::ExportsFromModule,
-                subject: subject.clone(),
-                object: EntityRef::new("angular", exp_type, exp),
                 layer: "angular",
                 call_evidence: None,
             });
@@ -156,46 +134,55 @@ pub fn class_to_semantic_edges(
     edges
 }
 
+/// Build the template relationship owned by an Angular Component declaration.
+///
+/// External templates use their canonical physical identity even when the
+/// target is currently missing. Inline templates use a deterministic identity
+/// scoped to the declaring source and Component.
+pub(crate) fn component_template_edge(
+    class_name: &str,
+    kind: ClassKind,
+    raw_class: &str,
+    declaring_file: &std::path::Path,
+) -> Option<SemanticEdge> {
+    if kind != ClassKind::Component || declaring_file.as_os_str().is_empty() {
+        return None;
+    }
+
+    let owner = crate::dictionary::path::canonical_identity_key(&declaring_file.to_string_lossy());
+    let template_name = if let Some(written) =
+        crate::angular_meta::decorators::extract_component_template_url(raw_class)
+    {
+        let path = crate::angular_meta::template_ownership::resolve_template_path(
+            declaring_file,
+            &written,
+        )?;
+        crate::dictionary::path::canonical_identity_key(&path.to_string_lossy())
+    } else if crate::angular_meta::decorators::extract_decorators(raw_class, Fidelity::Low)
+        .and_then(|result| result.inline_template)
+        .is_some()
+    {
+        format!("inline:{owner}#component={class_name}")
+    } else {
+        return None;
+    };
+
+    Some(SemanticEdge {
+        relation: SemanticRelation::HasTemplate,
+        subject: EntityRef::new("angular", "Component", class_name),
+        object: EntityRef::new("angular", "Template", template_name),
+        layer: "angular",
+        call_evidence: None,
+    })
+}
+
 /// Build semantic edges from a RouteShape.
 pub fn routes_to_semantic_edges(
     routes: &[crate::angular_meta::routing::RouteDecl],
 ) -> Vec<SemanticEdge> {
-    let mut edges = Vec::new();
-    for route in routes {
-        let route_entity = EntityRef::new("angular", "Route", &route.path);
-
-        // Route → RouteMapsTo → Component
-        if let Some(ref comp) = route.component {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::RouteMapsTo,
-                subject: route_entity.clone(),
-                object: EntityRef::new("angular", "Component", comp),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
-
-        // Route → GuardedBy → Guard
-        for guard in &route.guards {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::GuardedBy,
-                subject: route_entity.clone(),
-                object: EntityRef::new("angular", "Guard", guard),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
-
-        // Route → ResolvedBy → Resolver
-        for resolver in &route.resolvers {
-            edges.push(SemanticEdge {
-                relation: SemanticRelation::ResolvedBy,
-                subject: route_entity.clone(),
-                object: EntityRef::new("angular", "Resolver", resolver),
-                layer: "angular",
-                call_evidence: None,
-            });
-        }
+    crate::angular_meta::routing::RouteShape {
+        routes: routes.to_vec(),
+        ..Default::default()
     }
-    edges
+    .to_semantic_edges()
 }

@@ -49,9 +49,11 @@ fn with_bridge<'a>(
         }));
         return None;
     }
-    // Circuit breaker: reject early if the LIVE bridge status is degraded/unavailable.
-    // (The bridge status is refreshed on every query via update_status().)
-    if !check_cbm_healthy(id, bridge_opt.as_ref().unwrap().status()) {
+    // A due half-open may enter dispatch; the serialized client performs the
+    // replacement. This eligibility check neither launches nor polls a provider.
+    if !bridge_opt.as_ref().unwrap().can_attempt_provider()
+        && !check_cbm_healthy(id, bridge_opt.as_ref().unwrap().status())
+    {
         return None;
     }
     Some(bridge_opt)

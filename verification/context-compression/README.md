@@ -1,4 +1,10 @@
-# CONTROL-FULL production verification and baseline harness
+# Context-compression research evaluation harness
+
+> **Not a production gate.** Do not include this package in Binary `0x04`, MCP,
+> release, or user-verification gate sequences. Physical Binary `0x04` is the
+> durable production authority. CONTROL-FULL is a regenerated semantic oracle,
+> and COMPACT-A1/A3 are research codecs retained for historical measurement and
+> reproducibility only.
 
 This directory contains the tracked, reusable definitions for the operator-run
 CTX-001 research harness and the Section 14 production-mode matrix. It does not
@@ -19,8 +25,8 @@ infrastructure:
   and edit-readiness (see `schema-v5/README.md`).
 - `scripts/` — shared PowerShell (`McpSession.ps1`, `measure.rs`, fixture and
   capture builders). `McpSession.ps1` and `measure.rs` stay here because the
-  `edge-cases/` and `verification/workspace-query/` harnesses and
-  `measure-helper/Cargo.toml` reference these exact paths.
+  `verification/workspace-query/` harnesses and `measure-helper/Cargo.toml`
+  reference these exact paths.
 - `score.schema.json` — shared scoring schema at the harness root.
 
 ## Prerequisites and exact command order

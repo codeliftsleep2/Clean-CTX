@@ -306,7 +306,7 @@ fn restore_rejects_csharp_semantic_projection_generation_mismatch() {
         "semantic_producer_identity",
         |json| {
             json.replace(
-                "\"c_sharp_semantic_projection\":3",
+                "\"c_sharp_semantic_projection\":4",
                 "\"c_sharp_semantic_projection\":99",
             )
         },
@@ -346,7 +346,7 @@ fn restore_rejects_csharp_snapshot_missing_projection_generation() {
                 .as_object_mut()
                 .expect("producer map")
                 .remove("c_sharp_semantic_projection");
-            assert_eq!(removed, Some(json!(3)));
+            assert_eq!(removed, Some(json!(4)));
             serde_json::to_string(&identity).expect("rewritten semantic identity")
         },
     );
@@ -408,7 +408,15 @@ fn restore_rejects_current_producer_when_persisted_set_lacks_it() {
         1,
         "contexts",
         "canonical_producer_identity",
-        |json| json.replace(",\"type_script_canonical\":1", ""),
+        |json| {
+            let mut identity: Value = serde_json::from_str(&json).expect("canonical identity");
+            let removed = identity["relevant_producers"]
+                .as_object_mut()
+                .expect("producer map")
+                .remove("type_script_canonical");
+            assert_eq!(removed, Some(json!(2)));
+            serde_json::to_string(&identity).expect("rewritten canonical identity")
+        },
     );
     drop(producer);
     let restarted = state_with_config(&root, |_| {});

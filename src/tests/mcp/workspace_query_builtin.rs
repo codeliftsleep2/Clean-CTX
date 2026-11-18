@@ -433,9 +433,9 @@ fn builtin_declaration_coverage() {
 // Test 6 — decorated TS class + corrected NgRx semantic names through the
 // real production path. The builtin layer must register the decorated
 // declaration's real name (`ShellComponent`, not the `@Component(...)`
-// decorator head), and the NgRx edges must carry the corrected semantic
-// names (`panelState`, `TOGGLE_PANEL`) while preserving the action-creator
-// form (`someAction`).
+// decorator head). NgRx Action edges must carry corrected semantic names
+// (`TOGGLE_PANEL`, `someAction`), while a quoted selector use must not
+// manufacture Selector declaration authority.
 #[test]
 fn builtin_decorated_class_and_ngrx_semantic_names_production_path() {
     use tempfile::TempDir;
@@ -443,10 +443,16 @@ fn builtin_decorated_class_and_ngrx_semantic_names_production_path() {
     let dir = TempDir::new().unwrap();
     let state = crate::mcp::McpState::new(crate::tests::test_config());
     let rel = "widget-shell.component.ts";
+    compile_via_provide_code_context(
+        &dir,
+        &state,
+        "actions.ts",
+        "import { createAction } from '@ngrx/store'; export const TOGGLE_PANEL = createAction('[Panel] Toggle'); export const someAction = createAction('[Panel] Some');",
+    );
     let source = r#"
 import { Component } from '@angular/core';
 import { Store } from '@ngrx/store';
-import { TOGGLE_PANEL, someAction } from '../store/actions';
+import { TOGGLE_PANEL, someAction } from './actions';
 
 @Component({ selector: 'widget-shell' })
 export class ShellComponent {
@@ -496,8 +502,8 @@ export class ShellComponent {
     // index under the component subject.
     let edges = query_forward_edges(&state, "angular", "Component", "ShellComponent");
     assert!(
-        edges_contain_to(&edges, "Selects", "ngrx", "Selector", "panelState"),
-        "select('panelState') must index a Selects edge to panelState: {}",
+        !edges_contain_to(&edges, "Selects", "ngrx", "Selector", "panelState"),
+        "a quoted selector use must not manufacture Selector authority: {}",
         edges
     );
     assert!(

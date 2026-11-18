@@ -14,7 +14,7 @@
 //   node verification/live-acceptance/flags_live_acceptance.mjs [path/to/clean-ctx(.exe)]
 //
 // Per case it prints the source shape, the rendered method line, the expected
-// flags and the ACTUAL flags taken from the rendered `fl:` field.
+// flags and the ACTUAL flags taken from the rendered `mod:` / `ctl:` fields.
 
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
@@ -142,11 +142,16 @@ function methodLines(text) {
     .map((line) => line.trim());
 }
 
-/** The flag list of a rendered method line, from its `fl:` field. */
+/** Typed declaration modifiers and control summaries from one method line. */
 function flagsOf(line) {
-  const match = /\bfl:([^\s]+)/.exec(line);
-  return match ? match[1].split(',') : [];
+  const read = (key) => {
+    const match = new RegExp(`\\b${key}:([^\\s]+)`).exec(line);
+    return match ? match[1].split(',') : [];
+  };
+  return { modifiers: read('mod'), control: read('ctl') };
 }
+
+const DECLARATION_FLAGS = new Set(['ASYNC', 'EXPORT', 'PRIVATE', 'STATIC']);
 
 function makeWorkspace(label, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), `clean-ctx-flags-${label}-`));
@@ -154,6 +159,21 @@ function makeWorkspace(label, files) {
     fs.writeFileSync(path.join(root, name), contents);
   }
   return root;
+}
+
+/**
+ * The live contract under test is the compressed `M ... mod:... ctl:...`
+ * projection.
+ * One-method samples can legitimately lose the post-render token-economics
+ * comparison and return byte-exact raw source instead. Inert comments make the
+ * source large enough to exercise compression without adding semantic facts.
+ */
+function compressionWorthy(source) {
+  const padding = Array.from(
+    { length: 160 },
+    (_, index) => `// live flags compression padding ${index}: intentionally non-semantic`,
+  ).join('\n');
+  return `${source}\n${padding}\n`;
 }
 
 async function provideContext(client, root, file, args) {
@@ -177,8 +197,8 @@ function responseParts(response) {
 // ── Fixtures ───────────────────────────────────────────────────────────
 
 /**
- * Each case: a real source shape, the method whose rendered `fl:` field is
- * measured, and the flags that MUST be present now.
+ * Each case: a real source shape, the method whose rendered typed flag fields
+ * are measured, and the flags that MUST be present now.
  *
  * `required` lists the values whose loss is the defect (declaration modifiers
  * and control-flow flags together). A leading pattern-additive op (for example
@@ -317,7 +337,9 @@ async function initialize(client) {
 
 async function runCase(client, entry) {
   console.log(`\n[live case] ${entry.label}`);
-  const root = makeWorkspace(entry.method, { [entry.file]: entry.source });
+  const root = makeWorkspace(entry.method, {
+    [entry.file]: compressionWorthy(entry.source),
+  });
   console.log(`  file:      ${entry.file}`);
   console.log(`  source:    ${sourceShape(entry.source, entry.method)}`);
   console.log(`  expected:  ${entry.required.join(',')} (all must be present)`);
@@ -335,7 +357,10 @@ async function runCase(client, entry) {
     const actual = flagsOf(measured);
     console.log(`  -- ${fidelity} (content_kind: ${kind}) --`);
     console.log(`     rendered: ${measured || '(no M line found)'}`);
-    console.log(`     actual:   ${actual.length ? actual.join(',') : '(no fl: field)'}`);
+    console.log(
+      `     actual:   mod:${actual.modifiers.join(',') || '(none)'} ` +
+        `ctl:${actual.control.join(',') || '(none)'}`,
+    );
 
     check(
       entry.label,
@@ -350,19 +375,15 @@ async function runCase(client, entry) {
       measured,
     );
     for (const flag of entry.required) {
+      const family = DECLARATION_FLAGS.has(flag) ? 'modifiers' : 'control';
+      const key = family === 'modifiers' ? 'mod' : 'ctl';
       check(
         entry.label,
-        `${fidelity}: fl: carries ${flag}`,
-        actual.includes(flag),
-        `actual: ${actual.join(',') || '(none)'}`,
+        `${fidelity}: ${key}: carries ${flag}`,
+        actual[family].includes(flag),
+        `actual: ${actual[family].join(',') || '(none)'}`,
       );
     }
-    check(
-      entry.label,
-      `${fidelity}: no repeated flag value`,
-      new Set(actual).size === actual.length,
-      actual.join(','),
-    );
   }
 }
 

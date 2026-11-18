@@ -24,15 +24,11 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
         })
     };
 
-    let mut merged = if let Some(ref db) = db_stats {
-        let stats = state.session_stats_lock();
-        let mut m = stats.clone();
-        m.merge(db);
-        m
-    } else {
-        let stats = state.session_stats_lock();
-        stats.clone()
-    };
+    let session = state.session_stats_lock().clone();
+    let mut merged = session.clone();
+    if let Some(ref db) = db_stats {
+        merged.merge(db);
+    }
 
     // Proxy observations belong only to this response snapshot. A dashboard
     // read never rewrites the authoritative session accumulator.
@@ -56,7 +52,12 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
         match stats {
             Some(fs) => {
                 let mut text = format!(
-                    "File: {}\n  Raw: {} → Compressed: {} ({:.1}% savings)\n  Version: {}, Deltas: {}, Fidelity: {}\n  Angular: {}, Strategy: {}",
+                    "Accounting scope: {}\nFile: {}\n  Raw: {} → Compressed: {} ({:.1}% savings)\n  Version: {}, Deltas: {}, Fidelity: {}\n  Angular: {}, Strategy: {}",
+                    if db_stats.is_some() {
+                        "combined"
+                    } else {
+                        "session"
+                    },
                     fs.file_path,
                     fs.raw_tokens,
                     fs.compressed_tokens,
@@ -74,6 +75,11 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
                 }
                 if format == "json" {
                     let mut json = serde_json::json!(fs);
+                    json["accounting_scope"] = serde_json::json!(if db_stats.is_some() {
+                        "combined"
+                    } else {
+                        "session"
+                    });
                     json["persistence"] = serde_json::json!({"enabled": db_stats.is_some()});
                     send_response(&serde_json::json!({
                         "jsonrpc": "2.0",
@@ -135,6 +141,12 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
 
         if format == "json" {
             let mut json = crate::mcp::session_stats::render_dashboard_json(&merged);
+            json["accounting"] = serde_json::json!({
+                "session": crate::mcp::session_stats::render_dashboard_json(&session),
+                "persisted": db_stats.as_ref().map(crate::mcp::session_stats::render_dashboard_json),
+                "combined": crate::mcp::session_stats::render_dashboard_json(&merged),
+                "compatibility_scope": "combined"
+            });
             json["tokenizer"] = serde_json::json!(state.config.tokenizer.to_string());
             json["persistence"] = serde_json::json!({"enabled": db_stats.is_some()});
             json["cache"] = render_cache_json(&metrics, state.config.cache.enabled);
@@ -147,6 +159,20 @@ pub(crate) fn handle_context_stats(id: &Value, params: &Value, state: &McpState)
                 }
             }));
         } else {
+            text = format!(
+                "Accounting scope: {}\n\nCurrent session:\n{}\nPersisted history: {}\n\nCombined:\n{}",
+                if db_stats.is_some() {
+                    "combined (current session + persisted history)"
+                } else {
+                    "session"
+                },
+                crate::mcp::session_stats::render_dashboard_text(&session),
+                db_stats
+                    .as_ref()
+                    .map(crate::mcp::session_stats::render_dashboard_text)
+                    .unwrap_or_else(|| "disabled".to_string()),
+                text,
+            );
             drop(metrics);
             send_response(&serde_json::json!({
                 "jsonrpc": "2.0",

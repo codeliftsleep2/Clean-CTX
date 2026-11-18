@@ -58,9 +58,104 @@ fn refresh_workspace_is_a_registered_read_only_idempotent_tool() {
         .expect("refresh_workspace must be public");
 
     assert_eq!(tool["inputSchema"]["required"], json!(["workspaceRoot"]));
+    assert_eq!(
+        tool["inputSchema"]["properties"]["scope"]["enum"],
+        json!(["requested_root", "configured_roots"])
+    );
     assert_eq!(tool["annotations"]["readOnlyHint"], true);
     assert_eq!(tool["annotations"]["destructiveHint"], false);
     assert_eq!(tool["annotations"]["idempotentHint"], true);
+}
+
+#[test]
+fn requested_root_refresh_leaves_unrelated_additional_root_authority_untouched() {
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    let state = filesystem_state_with_additional_root(additional.path());
+    std::fs::write(primary.path().join("Primary.cs"), "public class Primary {}").unwrap();
+    std::fs::write(
+        additional.path().join("Additional.cs"),
+        "public class Additional {}",
+    )
+    .unwrap();
+    assert_eq!(find_count(&state, primary.path(), "Primary"), 1);
+    assert_eq!(find_count(&state, primary.path(), "Additional"), 1);
+
+    let additional_key = crate::dictionary::path::canonical_identity_key(
+        &additional.path().join("Additional.cs").to_string_lossy(),
+    );
+    let refreshed = call(
+        &state,
+        "refresh_workspace",
+        json!({
+            "workspaceRoot": primary.path().to_string_lossy(),
+            "scope": "requested_root"
+        }),
+    );
+    let result = &refreshed["result"]["structuredContent"];
+    assert_eq!(result["scope"], "requested_root");
+    assert_eq!(result["roots_refreshed"], 1);
+    assert!(
+        state
+            .workspace_index_read()
+            .file_map()
+            .contains_key(&additional_key),
+        "unrelated additional-root authority must remain warm"
+    );
+}
+
+#[test]
+fn requested_root_refresh_retracts_proven_cross_root_dependents() {
+    use crate::layers::meta::semantic::{
+        EntityRef, SemanticDependency, SemanticEdge, SemanticRelation,
+    };
+    use crate::workspace::index::SemanticFidelity;
+
+    let primary = tempfile::TempDir::new().unwrap();
+    let additional = tempfile::TempDir::new().unwrap();
+    let state = filesystem_state_with_additional_root(additional.path());
+    let dependency = primary.path().join("Dependency.ts");
+    let owner = additional.path().join("Owner.ts");
+    std::fs::write(&dependency, "export const dependency = 1;").unwrap();
+    std::fs::write(&owner, "export class Owner {}").unwrap();
+    let owner_key = crate::dictionary::path::canonical_identity_key(&owner.to_string_lossy());
+    let entity = EntityRef::new("builtin", "Class", "Owner").with_file(owner_key.clone());
+    state
+        .workspace_index_lock()
+        .replace_semantic_projection_with_dependencies(
+            &owner_key,
+            vec![SemanticEdge {
+                relation: SemanticRelation::Defines,
+                subject: entity.clone(),
+                object: entity,
+                layer: "builtin",
+                call_evidence: None,
+            }],
+            SemanticFidelity::High,
+            "owner-generation".to_string(),
+            vec![SemanticDependency::current(
+                dependency.to_string_lossy().into_owned(),
+            )],
+        );
+
+    let refreshed = call(
+        &state,
+        "refresh_workspace",
+        json!({
+            "workspaceRoot": primary.path().to_string_lossy(),
+            "scope": "requested_root"
+        }),
+    );
+    assert_eq!(
+        refreshed["result"]["structuredContent"]["dependent_owners_retracted"],
+        1
+    );
+    assert!(
+        !state
+            .workspace_index_read()
+            .file_map()
+            .contains_key(&owner_key)
+    );
 }
 
 #[test]

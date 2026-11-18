@@ -27,16 +27,13 @@ impl GraphBridge {
         // Call CBM's index_repository tool to trigger indexing
         let repo_path = self.project_root.to_string_lossy().to_string();
         let client_guard = self.client.lock().unwrap_or_else(|p| p.into_inner());
-        let _result = match client_guard.as_ref() {
+        match client_guard.as_ref() {
             Some(_c) => {
                 // We need mut access — drop guard, reacquire as mut
                 drop(client_guard);
                 let mut cg = self.client.lock().unwrap_or_else(|p| p.into_inner());
                 let client = cg.as_mut().unwrap();
-                client.call_tool(
-                    "index_repository",
-                    serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                )
+                client.index_project(&repo_path, "fast", &project)
             }
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         }?;
@@ -143,10 +140,7 @@ impl GraphBridge {
             Some(c) => c,
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         };
-        client.call_tool(
-            "index_repository",
-            serde_json::json!({"repo_path": repo_path, "mode": mode}),
-        )?;
+        client.index_project(&repo_path, mode, &project)?;
         drop(cg);
 
         // On success, advance indexed_generation to the captured dirty_generation.
@@ -197,10 +191,7 @@ impl GraphBridge {
             Some(c) => c,
             None => return Err(CbmError::LaunchError("CBM not available".into())),
         };
-        client.call_tool(
-            "index_repository",
-            serde_json::json!({"repo_path": repo_path, "mode": mode}),
-        )?;
+        client.index_project(&repo_path, mode, &project)?;
         // Release the lock before cache invalidation (no borrow conflict).
         drop(cg);
 
@@ -264,10 +255,7 @@ impl GraphBridge {
                     };
                     match client_guard.as_mut() {
                         Some(client) => {
-                            match client.call_tool(
-                                "index_repository",
-                                serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                            ) {
+                            match client.index_project(&repo_path, "fast", &project_for_spawn) {
                                 Ok(_) => {
                                     eprintln!("[clean-ctx-cbm] Project indexed successfully");
                                     Ok(())
@@ -344,7 +332,7 @@ impl GraphBridge {
         // binary missing, launch failed), return the same error on every call.
         // (AUDIT-9 regression: previously the first call could spawn a doomed
         // background thread when unavailable.)
-        if !self.is_available() {
+        if !self.can_attempt_provider() {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         let project = self.project_str();
@@ -403,7 +391,7 @@ impl GraphBridge {
     pub fn ensure_indexed_for(&mut self, project: &str) -> Result<IndexingStatus, CbmError> {
         // Guard before touching any state: when CBM is unavailable, return the
         // same error on every call (AUDIT-9 regression).
-        if !self.is_available() {
+        if !self.can_attempt_provider() {
             return Err(CbmError::LaunchError("CBM not available".into()));
         }
         if self.project.as_deref() != Some(project) {
@@ -433,10 +421,7 @@ impl GraphBridge {
                         Some(c) => c,
                         None => return Err(CbmError::LaunchError("CBM not available".into())),
                     };
-                    client.call_tool(
-                        "index_repository",
-                        serde_json::json!({"repo_path": repo_path, "mode": "fast"}),
-                    )?;
+                    client.index_project(&repo_path, "fast", project)?;
                     drop(cg);
 
                     // On success, advance indexed_generation.
@@ -491,5 +476,31 @@ impl GraphBridge {
         self.indexing_state
             .lock()
             .unwrap_or_else(|p| p.into_inner())
+    }
+
+    /// Reconcile a successful explicit provider index with Clean-CTX's
+    /// per-root readiness and freshness gates. This is the recovery half of
+    /// the public `index_repository` contract: provider publication must not
+    /// leave a prior startup failure permanently blocking typed graph tools.
+    pub(crate) fn mark_explicit_index_complete(&mut self, repo_path: &Path) -> bool {
+        let root = repo_path
+            .canonicalize()
+            .unwrap_or_else(|_| repo_path.to_path_buf());
+        let Some(project) = self.project_ids.get(&root).cloned() else {
+            return false;
+        };
+
+        self.indexing_state
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .insert(project.clone(), IndexingState::Complete);
+
+        let mut freshness = self.freshness.lock().unwrap_or_else(|p| p.into_inner());
+        if let Some(entry) = freshness.get_mut(&project) {
+            entry.indexed_generation = entry.dirty_generation;
+        }
+        drop(freshness);
+        self.invalidate_project_cache(&project);
+        true
     }
 }

@@ -53,8 +53,8 @@ verification/context-compression/
 ```
 
 Shared `McpSession.ps1` and `measure.rs` remain in `scripts/` because the
-`edge-cases/` and `verification/workspace-query/` harnesses and
-`measure-helper/Cargo.toml` reference those exact paths.
+`verification/workspace-query/` harnesses and `measure-helper/Cargo.toml`
+reference those exact paths.
 
 The SCHEMA-vNext Phase 0 production economics and independent token anatomy are
 recorded in [`PHASE0_BASELINE.md`](PHASE0_BASELINE.md).

@@ -1,0 +1,20 @@
+# fixture|reference marker|argument text|declaration marker or REFUSE|declaration name|kind
+shadowing.ts|ref:top|target|decl:top|target|LexicalConst
+shadowing.ts|ref:param|target|decl:param|target|Parameter
+shadowing.ts|ref:nested|target|decl:nested|target|LexicalConst
+shadowing.ts|ref:param-restored|target|decl:param|target|Parameter
+shadowing.ts|ref:left|target|decl:left|target|LexicalConst
+shadowing.ts|ref:right|target|decl:right|target|LexicalConst
+shadowing.ts|ref:first|target|decl:first|target|LexicalConst
+shadowing.ts|ref:second|target|decl:second|target|LexicalConst
+shadowing.ts|ref:let|changing|decl:let|changing|LexicalLet
+shadowing.ts|ref:framework|selectAudit|decl:framework|selectAudit|LexicalConst
+removal-parameter.ts|ref:winner|target|decl:param|target|Parameter
+removal-top.ts|ref:winner|target|decl:top|target|LexicalConst
+unsupported.ts|ref:var|legacy|REFUSE||
+unsupported.ts|ref:import|remote|REFUSE||
+unsupported.ts|ref:string|"target"|REFUSE||
+unsupported.ts|ref:member|object.target|REFUSE||
+unsupported.ts|ref:compound|wrapper(target)|REFUSE||
+file-a.ts|ref:file-a|target|decl:file-a|target|LexicalConst
+file-b.ts|ref:file-b|target|REFUSE||

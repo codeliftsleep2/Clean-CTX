@@ -20,5 +20,5 @@ pub(crate) mod workspace;
 
 pub use engine::{GitDiffSummary, gitdiff_workspace};
 pub use refs::{resolve_ref, validate_ref};
-pub use runner::{is_git_repo, run_git};
-pub use workspace::{FileChange, collect_changed_files, show_file};
+pub use runner::{is_git_repo, run_git, run_git_bytes};
+pub use workspace::{FileChange, collect_changed_files, show_file, show_file_bytes};

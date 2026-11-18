@@ -106,13 +106,15 @@ fn save_context_snapshot<'a>(
             return None;
         }
     };
-    let semantic_edges = match state.semantic_edges(&alias) {
-        Some(edges) => edges,
+    let semantic_snapshot = match state.semantic_snapshot(&alias) {
+        Some(snapshot) => snapshot,
         None => {
             send_persistence_error(id, "Missing authoritative semantic-edge state");
             return None;
         }
     };
+    let semantic_edges = semantic_snapshot.edges;
+    let semantic_dependencies = semantic_snapshot.dependencies;
     let compact = crate::mcp::tool_handlers::core::content::presentation_document(
         &session_ir,
         &hierarchy,
@@ -167,6 +169,7 @@ fn save_context_snapshot<'a>(
                     &source_hash,
                     version,
                     &semantic_edges,
+                    &semantic_dependencies,
                     &identities,
                 )
                 .unwrap_or(false)
@@ -176,7 +179,7 @@ fn save_context_snapshot<'a>(
         } else {
             let persisted = store.sqlite().is_some_and(|mut sqlite| {
                 sqlite
-                    .save_context_with_compatibility(
+                    .save_context_with_dependency_semantics(
                         &durable_path,
                         fidelity,
                         &compact,
@@ -184,6 +187,7 @@ fn save_context_snapshot<'a>(
                         &source_hash,
                         version,
                         &semantic_edges,
+                        &semantic_dependencies,
                         raw_tokens,
                         compressed_tokens,
                         &identities,
@@ -300,6 +304,10 @@ pub(crate) fn handle_delete_context(id: &Value, params: &Value, state: &McpState
         alias_removed,
         "validated alias ownership must remain stable"
     );
+    #[cfg(feature = "csharp")]
+    if let Err(error) = state.reconcile_csharp_after_authority_change(&canonical_requested) {
+        return send_persistence_error(id, &error);
+    }
 
     send_response(&serde_json::json!({
         "jsonrpc": "2.0", "id": id,
