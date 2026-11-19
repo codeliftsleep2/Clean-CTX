@@ -1,0 +1,29 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "run_id": 44549504114,
+  "head": "84bb200d75efc3a1d5ecf0f080b5b274d56049ac",
+  "original_job": 135649100722,
+  "warm_job": 135663182970,
+  "archive": "verification/ci-verify-r1/runtime-415-evidence.zip",
+  "archive_sha256": "71a39476cae1573ab5caf865d7bd1ea03a4f61c4739574486083ee8c1d2b3b63",
+  "members": [
+    {
+      "entry": "job-metadata.json",
+      "sha256": "7953c2787dd822fa129a7d28b20b7aedd16d052653a8a34256dad4e03a06d16c"
+    },
+    {
+      "entry": "github.log",
+      "sha256": "cd1cf6cf5fd4025502f8a66bdf95304c93dc879baf1472cbafb02a0d47807365"
+    },
+    {
+      "entry": "warm-job-metadata.json",
+      "sha256": "ff628788e3af18138785cd22b7708a8e77f7b24bf32bb5cd7e0c871b5a7ccb97"
+    },
+    {
+      "entry": "warm-github.log",
+      "sha256": "9c1559c7a8a1a9a958294d7fcfc7f81279897bf0af596683944eea2bd5ad92ee"
+    }
+  ],
+  "owner_acceptance": "completed...good enough...11 mins",
+  "qualification": "Same-source observational CI comparison; not causal attribution of all elapsed savings or historical 108-minute costs."
+}

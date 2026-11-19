@@ -190,3 +190,44 @@ The cache-key correction is implemented under owner approval; other candidates
 remain observations. The broader mission is not closed merely because #414 passed
 or because the cache key changed. No extra local Cargo campaign is required for
 this workflow input and evidence-only change.
+
+## Accepted warm CI checkpoint (2026-11-19)
+
+Agent MaxHeadRoom inspected both completed attempts of CI run 415 at
+`84bb200d75efc3a1d5ecf0f080b5b274d56049ac`. Both passed. The owner accepted
+the warm result with "completed...good enough...11 mins" and directed continuation.
+Further CI performance remediation is parked at this checkpoint.
+
+| Phase | Initial attempt, job 135649100722 | Warm attempt, job 135663182970 |
+| --- | ---: | ---: |
+| Entire job | 16m42s | 11m12s |
+| Correctness and deterministic fitness step | 12m25s | 9m39s |
+| Library execution | 394.24s | 289.84s |
+| Audit step | 2m15s | 2s |
+
+Both library summaries report 5,260 passed, zero failed and 27 ignored.
+The warm log confirms an exact hit and successful restore of the new
+`v0-rust-consolidated-30cefe028142ef2f458318b7fa8e55b77e1070b29aacd5cd0a61cc476bce43d3-check-Linux-x64-88921d97-9e387348`
+key; the initial attempt uploaded 228,041,466 bytes. Warm teardown reports
+Cache up-to-date. This verifies population and reuse. The observed total reduction
+also includes lower library execution time and reuse of the installed audit tool;
+it must not all be attributed to dependency compilation savings. No controlled
+causal speedup, exact historical 108-minute partition or two-minute guarantee is claimed.
+
+[Exact original and warm logs and job metadata](../../verification/ci-verify-r1/runtime-415-evidence.zip)
+are retained with [archive and member hashes](../../verification/ci-verify-r1/runtime-415-index.json).
+Original attempt evidence is preserved separately from the rerun, which shares the
+run ID but has a different job ID. This supersedes the earlier pending warm-result
+status only; source-query, fixture and historical evidence qualifications remain.
+
+ANG-R2 resumes with a successful current CI gate. That does not turn its older
+185-check production stdio capture into execution of this revision, establish
+Claude field acceptance, or conflate written resolver membership, key registration
+and executable eligibility. Reconcile applicable remaining production/field
+obligations before proposing any new execution. No P0 reopening or additional
+optimization campaign is required by this accepted CI result.
+
+Connected PCG tools remain unavailable. This continuation uses the retained actual
+ready/current acquisition from admission-20261119-095656, not a newly started
+runtime. This report remains covered by VERIFY-001; actual admission and normal
+repository guards for this evidence update are still required before publication.
