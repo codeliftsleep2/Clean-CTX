@@ -1,0 +1,123 @@
+{
+  "category": "Retained CI execution and offline accounting; subsequent owner-approved cache implementation remains unmeasured",
+  "archive": "verification/ci-verify-r1/runtime-accounting-414-evidence.zip",
+  "archive_sha256": "c2a87318fb426e5c89adafac353971b32e58017a3476279b09248177c64d0c82",
+  "members": [
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/configuration.json",
+      "sha256": "71874b02feddb93c2b28c06b81eb8e2064c6d6a5f75b6fc52343e89e9bb06043"
+    },
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/execution.log",
+      "sha256": "48c0d17983df61f6624c4cc875e569c92dbb11618b324abef665a39176de99b1"
+    },
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/membership-result.json",
+      "sha256": "945abd289a34bc434c94d1e2a658b23d8331ed15582e9080b1db291d31d254ef"
+    },
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/prerequisites.json",
+      "sha256": "63ea5e6631335ceebd4fdf6de1b68831356fbfd40dc8c222bd4aac7f8e00bedb"
+    },
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/receipt.json",
+      "sha256": "b16d4fb08934bceaec42f4cb0fbc0b0f9b014019dfb8684c6d5d180254832383"
+    },
+    {
+      "entry": "run-411/artifact/semantic-fitness-95153d5c86c800b8eab523d9b980a44d44a57301-1/af-perf-001-20261118-161835/registration.log",
+      "sha256": "2234e888f403a3e164d1643ce25c585551f44e20ac1143a333e017409b46f46c"
+    },
+    {
+      "entry": "run-411/job-metadata.json",
+      "sha256": "d43989fa8bb62dbae9e2cf7f142a3db40d5116d4f581af383c9a6a19ed0e038e"
+    },
+    {
+      "entry": "run-414/accounting/library-result-intervals.csv",
+      "sha256": "a87358d6bfa87d1112376220660978a2c16c72398ed471f258b51180df2752db"
+    },
+    {
+      "entry": "run-414/accounting/membership-comparison.json",
+      "sha256": "525beffb59f07ceebb01c24070b5eb6fa2bfb443d2867ce7fb16e1f15c660b1d"
+    },
+    {
+      "entry": "run-414/accounting/summary.json",
+      "sha256": "a6cc80a6234e06090360151ef999f20bfb0d34be5f0c8c89ba2cbae23056efb0"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/configuration.json",
+      "sha256": "5736c3b0b7045bd3bfd5a225a2b241dc32e79857d8b04e1223a261f01da87d82"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/execution.log",
+      "sha256": "d0e18878b6add3ab6348dc7030a3083af55ef6f818029396b95e2ece97af821d"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/membership-result.json",
+      "sha256": "109a99fd484c7ce1d774a8da5ca89d9e75c198426df682f8b4be9b8fbfa31921"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/prerequisites.json",
+      "sha256": "63ea5e6631335ceebd4fdf6de1b68831356fbfd40dc8c222bd4aac7f8e00bedb"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/receipt.json",
+      "sha256": "b5998f647fdebdb919870774f89d3a23bcbce7fb555e39afc56b4afae523e4fa"
+    },
+    {
+      "entry": "run-414/artifact/semantic-fitness-2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb-1/af-perf-001-20261118-223936/registration.log",
+      "sha256": "a5f8680d6de13ca627c39bd4e8a1971c545ac172f5334082d442fc3c10e351bc"
+    },
+    {
+      "entry": "run-414/github.log",
+      "sha256": "e42633d4153dd8795349ae2818cc97f729d7e05dea8a780f5e1cb95e8a8cf507"
+    },
+    {
+      "entry": "run-414/job-metadata.json",
+      "sha256": "e7d4119903b43408b304cd13104f1bbe586a06b34809e0ec3757c49f6a3bdafa"
+    },
+    {
+      "entry": "cache-profile-proposal/candidate-ci.yml",
+      "sha256": "c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50"
+    },
+    {
+      "entry": "cache-profile-proposal/proposal.json",
+      "sha256": "4e4b3b67e8e83e82c6f2be4a26a1cb58bbbf4d6878580a6786a07db4b35be29d"
+    },
+    {
+      "entry": "cache-profile-proposal/proposal.patch",
+      "sha256": "5d7fcf53cbe91e71e198c2821f304f12e7a6065dd66180e29f32095ed8a40c09"
+    },
+    {
+      "entry": "analyzer/analyze-retained-runtime.py",
+      "sha256": "0f83433b54c8c8768ad2c45dbb8bcdb55fa925d58067fbce021c09b8933e65b0"
+    }
+  ],
+  "run414": {
+    "head": "2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb",
+    "conclusion": "success",
+    "job_seconds": 818,
+    "consolidated_step_seconds": 718,
+    "registration_compile_seconds": 348,
+    "library_seconds": 364.86,
+    "registered": 5637,
+    "outcomes": 5637,
+    "passed": 5610,
+    "ignored": 27,
+    "fitness_groups_passed": 56
+  },
+  "comparison411": {
+    "same_features_profile_threads": true,
+    "baseline_registered": 5627,
+    "removed_identities": 0,
+    "added_identities": 10,
+    "existing_outcome_changes": 0
+  },
+  "timing_qualification": "Native library aggregate duration is reported by libtest. Per-test/family values are exclusive serial completion-arrival intervals, not exact native CPU/body timers. Root outcome sequence matches the existing membership verifier exactly.",
+  "cache_proposal": "Historical unapplied proposal is preserved in the archive. Owner approved the exact patch afterward on 2026-11-19; applied workflow hash matches the reviewed candidate. CI cache population and warm benefit are unverified.",
+  "authority_preflight": "Retained admission-20261118-173649 acquisition: VERIFY-001, AUTH.FINAL_VERIFICATION, PERF-004-DOCTRINE and PERF-005-BOUNDED source hashes compared to current governing files before report authoring.",
+  "owner_decision": {
+    "path": "verification/ci-verify-r1/cache-profile-owner-approval-20261119.txt",
+    "sha256": "e7b368d3113c9b775999935de558c90b2428340e78d96d5b50617f5a4b0ab846",
+    "applied_workflow_sha256": "c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50"
+  }
+}

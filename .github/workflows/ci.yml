@@ -30,6 +30,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1
         with:
           toolchain: stable
+          # CLI-only workflow/test profile changes must select a fresh dependency cache.
+          cache-key: consolidated-${{ hashFiles('.github/workflows/ci.yml', 'scripts/invoke-consolidated-verification.ps1') }}
       - name: cargo check
         run: cargo check --all-targets
       - name: cargo clippy

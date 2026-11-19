@@ -799,6 +799,10 @@ knowledge_content:
   - evidence:core_query_handoff verification/ci-verify-r1/invoke-core-query-witness.ps1#whole
   - verification_obligation:core_query_green verification/ci-verify-r1/invoke-core-query-green.ps1#whole
   - evidence:runtime_history verification/ci-verify-r1/runtime-history-index.json#whole
+  - observation:runtime_accounting docs/agent/CI_VERIFY_R1_RUNTIME_ACCOUNTING.md#whole
+  - evidence:runtime_accounting_receipts verification/ci-verify-r1/runtime-accounting-414-index.json#whole
+  - statement:ci_cache_owner_approval verification/ci-verify-r1/cache-profile-owner-approval-20261119.txt#whole
+  - evidence:retained_interval_analyzer verification/ci-verify-r1/analyze-retained-runtime.py#whole
   - evidence:runtime_root_trial verification/ci-verify-r1/runtime-root-trial-index.json#whole
   - evidence:runtime_dependency_trial verification/ci-verify-r1/runtime-dependency-trial-index.json#whole
   - evidence:runtime_baseline verification/ci-verify-r1/runtime-baseline-index.json#whole

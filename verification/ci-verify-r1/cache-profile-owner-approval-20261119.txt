@@ -1,0 +1,16 @@
+Agent MaxHeadRoom: owner decision provenance, 2026-11-19.
+
+Owner response, verbatim: yes
+
+The response approves the reviewed cache-key correction proposed in
+target/ci-verify-r1/cache-profile-proposal/proposal.patch.
+Patch SHA-256: 5d7fcf53cbe91e71e198c2821f304f12e7a6065dd66180e29f32095ed8a40c09
+Resulting workflow SHA-256: c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50
+
+Approved scope: use the existing pinned setup action cache-key input, hashing
+the workflow and consolidated runner. Preserve action pins, existing cache
+options, workspace-crate exclusion, test profiles and all mandatory gates.
+
+This records the actual conversational decision. It is not a B11 procedural
+grant or measured evidence of cache benefit. CI population and warm reuse
+verification remain pending.
