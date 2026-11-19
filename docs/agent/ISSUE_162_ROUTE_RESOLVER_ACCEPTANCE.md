@@ -282,6 +282,13 @@ text/hash checks are not a Rust AST equivalence proof or executed verification.
 <!-- pcg:ANG-R2-mission-document-coverage:begin -->
 ## Covered ANG-R2 mission documents and assets
 
+The combined [Claude ANG-R1/ANG-R2 field testing instruction](../../verification/live-acceptance/issue-162/ang-r2/CLAUDE_ANG_R1_R2_TESTING.md)
+is covered by this mission-document component. It distinguishes baseline written
+membership from public key registration and executable eligibility, reuses current
+local evidence, and batches remaining real-workspace questions into one session.
+It is an operator instruction with field execution UNRUN, not a new authority or
+an executed acceptance result. New admission/publication remains required.
+
 DOC-270 governs the bounded investigation, approved implementation, compatibility,
 lifecycle/performance reconciliation and exact evidence statements of this mission.
 Its explicit document inventory is
