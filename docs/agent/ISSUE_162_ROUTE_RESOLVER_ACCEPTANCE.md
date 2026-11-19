@@ -509,6 +509,40 @@ No historical execution is relabeled as patched-source GREEN. Actual document
 admission/discoverability and applicable guards must pass before branch publication;
 if the real checker identifies a protected-authority change, B11 owner authorization
 is required. No authorization is created by this report.
+
+### Current production checkpoint (2026-11-19)
+
+Agent MaxHeadRoom verified the operator build registration-build-20261119-110831-771
+and production capture registration-stdio-2026-11-19T16-10-15-762Z at
+`aee244bfc514cd78cf085dd54739a963f4822541`. All-feature scoped Clippy passed
+without warnings, production build passed, and UTF-8/active-file guards passed.
+All captured source pins match current source and before/after manifests agree;
+receipt output hashes and executable identity were checked directly.
+
+Executable SHA-256: `f03052a27e2a916ddf52dfb0a18deb246b387c386c04584f8dc8d8115c3ff4cd`.
+All 185 production stdio assertions passed in cold-forward, cold-reverse and
+restore-and-mutate sessions. Wrapper exit was zero (19.9174166 seconds).
+This refreshes the production boundary after the shared restore-validator repair;
+the November 16 185-check result retains its original executable/source identity.
+
+[Current production evidence archive](../../verification/live-acceptance/issue-162/ang-r2/production-20261119-evidence.zip)
+and [exact archive/member hashes](../../verification/live-acceptance/issue-162/ang-r2/production-20261119-index.json)
+preserve source manifests, build/guard logs, executable manifest, raw RPC traces,
+fixture/runtime evidence and the production report. The archive is evidence,
+not a substitute for tracked tests. No compiled executable is added to Git.
+
+CI run 415 passed twice at production-source-equivalent predecessor 84bb200d;
+aee244bf adds only the admitted warm-CI evidence checkpoint. This does not relabel
+CI as running aee244bf. Current production evidence is separate from that CI gate.
+Written membership, public key registration and executable eligibility remain
+distinct; the production witness explicitly refuses an executable assertion.
+No accepted P0 work is reopened. Current Claude/real-workspace acceptance is not
+established by these synthetic sessions. Any applicable field-only questions must
+be consolidated after local obligation reconciliation, rather than repeating
+builds or launching an exploratory pilot. Actual admission and repository guards
+for this evidence amendment remain required before publication; no protected
+authorization is manufactured and no controlling contract is amended.
+
 <!-- pcg:ANG-R2-restore-validator-repair:end -->
 
 ```architecture-graph

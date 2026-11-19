@@ -1,0 +1,216 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "category": "Operator production binary/stdio; not tracked tests, CI or Claude field acceptance",
+  "head": "aee244bfc514cd78cf085dd54739a963f4822541",
+  "binary_sha256": "f03052a27e2a916ddf52dfb0a18deb246b387c386c04584f8dc8d8115c3ff4cd",
+  "checks_passed": 185,
+  "checks_failed": 0,
+  "archive": "verification/live-acceptance/issue-162/ang-r2/production-20261119-evidence.zip",
+  "archive_sha256": "a40c43edb7ce93dd005fecc61cc2ff95f474e25af24e201c1abd9d48e744cd0f",
+  "members": [
+    {
+      "entry": "registration-build-20261119-110831-771/binary.json",
+      "sha256": "7236dd8f0fb6a961f4249bbd395c51caa888b4eb66f17f31a7583e0c39590ba7"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/file-sizes-receipt.json",
+      "sha256": "5641796f453f570c6a0c493099ce461738e36ec42d34b7cb51009a1292f2959a"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/file-sizes-stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/file-sizes-stdout.txt",
+      "sha256": "3447598bc1ec93b162fb29043b5723deb861ea641a1bb00f02213e48df500801"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/production-build-receipt.json",
+      "sha256": "18510fdf52e08f30f23e24842497bb09585422aec016e8e30d4ef63c29bc21ea"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/production-build-stderr.txt",
+      "sha256": "ce36efec9a1eea885b7964e471f8e3cf311092a9ec83bff15e1c5c4e8cd59649"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/production-build-stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/scoped-clippy-receipt.json",
+      "sha256": "be5a902b7b1b7267107453d36101bcf122bdce4a713aa04318b40ddfdbcf1f0b"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/scoped-clippy-stderr.txt",
+      "sha256": "6170e2913f24c24ce81c4bd5f3305d39710b84b6171512c8efffa6a4e1bf62fd"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/scoped-clippy-stdout.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/source-manifest-after.json",
+      "sha256": "cebb507c894f33115e5f7d992c60650850a2efe2b10935ea11996a1b0c5ad819"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/source-manifest.json",
+      "sha256": "cebb507c894f33115e5f7d992c60650850a2efe2b10935ea11996a1b0c5ad819"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/utf8-receipt.json",
+      "sha256": "7e0835980710170ee9389f66c467487001ad633b2f2dac8098d8191c67509c00"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/utf8-stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "registration-build-20261119-110831-771/utf8-stdout.txt",
+      "sha256": "b33fe9139f4fcb5c0c0cbbb495cef8c9557a3cf6af5603dae6b1327611ea3147"
+    },
+    {
+      "entry": "retirement-production-20261119-111014-097/receipt.json",
+      "sha256": "2f5077f287e5663b4e456b39e75b9902a4233a6593c3528bf1304cf6b00bd494"
+    },
+    {
+      "entry": "retirement-production-20261119-111014-097/stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "retirement-production-20261119-111014-097/stdout.txt",
+      "sha256": "0c2325a6331d7b9efcdd14aad795a39046976114cbd4c2a76e66e2c7f45826ef"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/cold-forward/rpc.jsonl",
+      "sha256": "8f1a4cf99c146a1dbaf05c95f05b2ac6fd12d23936c4bcb26789928dbf00382d"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/cold-forward/stderr.log",
+      "sha256": "ceaffd993abd58a17d5b030ebb0ecfdc3095ae911bae2e57297108504efc4500"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/cold-reverse/rpc.jsonl",
+      "sha256": "f33389e0dd29f884653f19dfd0be5b07e14944273a58e1c6a7527c86045cbda7"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/cold-reverse/stderr.log",
+      "sha256": "5e8216ae79e3cbd49fab6f4e3be4d6fd8f3797086157e15026ff394aed256647"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/.clean-ctx.json",
+      "sha256": "cae01796d09cea883a7413f5b585e89863fb0291e68e2f7565adef4b87b662b4"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/authority.db",
+      "sha256": "2b5da7e3427e412342243b553b3ed66844de9a4a7cd0066a629f90f463ee031e"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/core/index.d.ts",
+      "sha256": "31360c0f0ed8d775b5a876aae13c7a39b66a3583ba1f0e695484dbd0b7b772f7"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/core/package.json",
+      "sha256": "b44c0e5244c51c174a2be9abd0259855687c0f926242ae3af50e9bd47f75a825"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/platform-browser/index.d.ts",
+      "sha256": "f52fe5a63c3d3fd340ebbb022ef122648bb0efb01d104ea8b0bdb68b5a3227bd"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/platform-browser/package.json",
+      "sha256": "72bcf3844f6508bdd879f021e05fd04760b96029ecabfaaedc4c5d7f3653d3b6"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/router/index.d.ts",
+      "sha256": "13048568b675e90ebe705dd1ab039931660186c20fcf081f3195cae74d139b03"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/node_modules/@angular/router/package.json",
+      "sha256": "593e28fda2e9c02a3100fdbce21129c5163d546f15e3a81df79ec4f5fa12ffef"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/one.ts",
+      "sha256": "a40685a261bb74d7e5f01deaa30b673ce8b51accecb832f6c5b0a6044aef9e36"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/resolver-a.ts",
+      "sha256": "e0528f530d30a76a91853983c143e628174d356e73d25f870dd2cd290a33d032"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/resolver-b.ts",
+      "sha256": "ff1982c483dc77ba05e7c5bd972b029ba67a7cc2b1c922abac0a93e6eefd41fb"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/resolver-screen.ts",
+      "sha256": "f89ef7b779b8fd2381f33c5c60d60bdb6c09156ad612db792b04cf321f42baeb"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/forward/workspace/tsconfig.json",
+      "sha256": "79ead6bcfe95ef465e6da3046f45fa1099881f90079355628a1352835f3bbed2"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/report.json",
+      "sha256": "9be3c2a8bdb80c066f9645648a040feaffce16aebac12b9158912720b5fb1390"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/restore-and-mutate/rpc.jsonl",
+      "sha256": "3eb0436c041b00e71efe98d5dbe9f47b08e74be7db20c85e46956e9d38feeee4"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/restore-and-mutate/stderr.log",
+      "sha256": "bf18f655121a9fa1fb5509ec435356b328fdcadacd0783766431f4b91019d49e"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/.clean-ctx.json",
+      "sha256": "02dfdd4762ac36a836c77a713d53a5b2f6d42b3b009ab2dbb2a66d1a23693185"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/authority.db",
+      "sha256": "039080cb2b2132c93cb36ab4306c76516e8a04c7790b70a4e537422aa15d6a93"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/core/index.d.ts",
+      "sha256": "31360c0f0ed8d775b5a876aae13c7a39b66a3583ba1f0e695484dbd0b7b772f7"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/core/package.json",
+      "sha256": "b44c0e5244c51c174a2be9abd0259855687c0f926242ae3af50e9bd47f75a825"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/platform-browser/index.d.ts",
+      "sha256": "f52fe5a63c3d3fd340ebbb022ef122648bb0efb01d104ea8b0bdb68b5a3227bd"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/platform-browser/package.json",
+      "sha256": "72bcf3844f6508bdd879f021e05fd04760b96029ecabfaaedc4c5d7f3653d3b6"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/router/index.d.ts",
+      "sha256": "13048568b675e90ebe705dd1ab039931660186c20fcf081f3195cae74d139b03"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/node_modules/@angular/router/package.json",
+      "sha256": "593e28fda2e9c02a3100fdbce21129c5163d546f15e3a81df79ec4f5fa12ffef"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/one.ts",
+      "sha256": "a40685a261bb74d7e5f01deaa30b673ce8b51accecb832f6c5b0a6044aef9e36"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/resolver-a.ts",
+      "sha256": "e0528f530d30a76a91853983c143e628174d356e73d25f870dd2cd290a33d032"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/resolver-b.ts",
+      "sha256": "ff1982c483dc77ba05e7c5bd972b029ba67a7cc2b1c922abac0a93e6eefd41fb"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/resolver-screen.ts",
+      "sha256": "f89ef7b779b8fd2381f33c5c60d60bdb6c09156ad612db792b04cf321f42baeb"
+    },
+    {
+      "entry": "registration-stdio-2026-11-19T16-10-15-762Z/reverse/workspace/tsconfig.json",
+      "sha256": "79ead6bcfe95ef465e6da3046f45fa1099881f90079355628a1352835f3bbed2"
+    }
+  ]
+}
