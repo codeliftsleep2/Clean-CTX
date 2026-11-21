@@ -1,0 +1,10 @@
+control,implemented_change_or_retained_obligation,evidence_status
+seed_is_not_sibling_disk_authority,Added exact one-acquisition and accepted-qualification assertions,M2 negative experiment pending
+standalone_capture_and_missing_module_qualification,Missing-module half now requires actual reuse,M2 negative experiment pending
+precached_attached_unit_replays_only_its_source,Requires one attached proof and accepted reuse before receipt scope inspection,M2 negative experiment pending
+same_config_different_automatic_type_lookup_stays_distinct,Asserts same selected config but distinct acquisition bases,Positive execution; directory-key mutant not executed
+csharp,"Asserts both item statuses, exact Go->Hit Calls edges, source file and Current authority",Accepted implementation execution pending in final sequence
+hydration_and_explicit,Exact target hash/current retained authority; explicit TS scope; exact hydrated Class identity,First invalid LegacyEdit assumption retained as failed evidence; corrected version passed
+retirement,Asserts retained owner set before public query can reacquire,Selected reappearance and sibling lifecycle controls
+resolver_positive,Four bounded form tests preserve both directions and every original assertion,Original resource stop retained; decomposed execution pending
+config_roots_and_route_changes_stay_independent,Original explicit key-inequality assertion unchanged in meaning,M3 detected at original line59 before changed acquisition

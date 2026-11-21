@@ -1,0 +1,41 @@
+--- a/docs/agent/verification.md
++++ b/docs/agent/verification.md
+@@ -224,6 +224,21 @@
+ only the declared inspected admission families; #173/#174, uninstrumented witness
+ scaling and snapshot lock behavior remain separate open risks. Static unresolved
+ findings require recorded review; they are not proven absence of amplification.
++
++### OPS-R1 selected golden enforcement
++
++The selected golden membership is an obligation of this final verification gate.
++The existing consolidated run executes its ten allfeature identities once; the
++existing verifier requires exact nonignored outcomes. Supported C#-only and
++TypeScript-only controls execute separately because allfeatures is not isolation.
++The three retained behavioral defect witnesses require reviewed successors rather
++than silent source/expected-hash updates. Their original RED/GREEN identity remains.
++The source-owned golden membership component below is protected change-control
++data, not proof of semantic effectiveness; historical negative evidence and
++applicable consumer preservation remain mandatory. Changes to its required tests,
++feature modes or witness identities require the existing B11 owner review and
++authorization. No separate runner, duplicate allfeature suite, global time budget
++or waiver of existing fitness/security/field obligations is introduced.
+ 
+ <!-- pcg:VERIFICATION-obligations:end -->
+ ```architecture-graph
+@@ -240,5 +255,6 @@
+   - statement:responsibilities self#VERIFICATION-responsibilities
+   - constraint:guards self#VERIFICATION-guards
+   - verification_obligation:completion self#VERIFICATION-obligations
++  - evidence:golden_membership verification/ci-verify-r1/golden-membership.json#whole
+   - historical_applicability:source self#whole
+ ```
+--- a/docs/architecture/knowledge-governance/protected.csv
++++ b/docs/architecture/knowledge-governance/protected.csv
+@@ -138,6 +138,7 @@
+ AUTH.FINAL_VERIFICATION,statement,,VERIFICATION-current
+ AUTH.FINAL_VERIFICATION,constraint,guards,VERIFICATION-guards
+ AUTH.FINAL_VERIFICATION,verification_obligation,completion,VERIFICATION-obligations
++AUTH.FINAL_VERIFICATION,evidence,golden_membership,whole
+ AUTH.LAYER_CERTIFICATION,statement,,whole
+ AUTH.NETWORK_EFFECTS,statement,,whole
+ AUTH.PCG_ACQUISITION_V1,statement,,whole

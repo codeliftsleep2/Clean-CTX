@@ -1,0 +1,158 @@
+{
+  "standing": "36 distinct accepted controls passed; five affected controls rerun after final canonical-owner assertions; executions retain exact source/binary identities",
+  "distinct_accepted_controls": 36,
+  "accepted_invocations_in_final_reconciliation": 41,
+  "accepted_execution_sources": [
+    "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+    "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f"
+  ],
+  "m3": {
+    "standing": "M3 DETECTED by unchanged explicit basis inequality before changed acquisition",
+    "execution_receipt": "target\\ops-r1\\m3-isolated-23\\target\\ops-r1\\p0-config_roots_and_route_changes_stay_independent-20261120-221227\\receipt.json",
+    "execution_receipt_sha256": "9100596f15ab0bc7ee586145bc08ca7e108f46200039212fa1dda35d6a803a0e",
+    "actual_test_exit": 101,
+    "adapter_exit": 1,
+    "expected_assertion": "isolation.rs:59:5 assert_ne basis",
+    "source_tree_sha256": "96117651f06c96a11a63aa3cab70b8e4ab903e2f75fcaf6622e5f037987cab92",
+    "executable_sha256": "752226a7682cbcd23be795145720138bb8281ef8ec40c3a70becb7151f897020",
+    "elapsed_seconds": 0.21602890000212938,
+    "watchdog_or_resource_stop": false,
+    "loaded_false_and_positive_reuse_assertions": "passed before targeted assertion",
+    "no_mutation_promoted": true
+  },
+  "m2_experiments": [
+    {
+      "case": "seed_is_not_sibling_disk_authority",
+      "expectation": "hardened-fail",
+      "source_tree_sha256": "2fe8c86f1b39d69ae286d4f24d4d5a79fb4e71768ab2c627ff0a06eaae461f58",
+      "executable_sha256": "3d40c8b32a25a61b11cb0cba64c30aa245c5c29688a3914f7496bb3814e3faad",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-seed_is_not_sibling_disk_authority-20261120-223310/receipt.json",
+      "receipt_sha256": "748c7d4a47ab0ed3a6f25b2835d04b367311898ef72eabd250b078e4ba8e326e"
+    },
+    {
+      "case": "standalone_capture_and_missing_module_qualification",
+      "expectation": "hardened-fail",
+      "source_tree_sha256": "2fe8c86f1b39d69ae286d4f24d4d5a79fb4e71768ab2c627ff0a06eaae461f58",
+      "executable_sha256": "3d40c8b32a25a61b11cb0cba64c30aa245c5c29688a3914f7496bb3814e3faad",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-standalone_capture_and_missing_module_qualification-20261120-223313/receipt.json",
+      "receipt_sha256": "acabb7664243d29bad799b0bb974562664d6ad1dd9389cd6203df9b7c5992a8a"
+    },
+    {
+      "case": "precached_attached_unit_replays_only_its_source",
+      "expectation": "hardened-fail",
+      "source_tree_sha256": "2fe8c86f1b39d69ae286d4f24d4d5a79fb4e71768ab2c627ff0a06eaae461f58",
+      "executable_sha256": "3d40c8b32a25a61b11cb0cba64c30aa245c5c29688a3914f7496bb3814e3faad",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-precached_attached_unit_replays_only_its_source-20261120-223315/receipt.json",
+      "receipt_sha256": "93202cd3a62129f11ac102274b00cbec8cc81018b9e39bf3889b820ce998babe"
+    },
+    {
+      "case": "seed_is_not_sibling_disk_authority",
+      "expectation": "legacy-pass",
+      "source_tree_sha256": "1b088ca6914cba88981f5b7c59708ac73acf6a62aee01a57614664ea7cab8f9a",
+      "executable_sha256": "3a26742e4421f6d2a97d0dd2ea73972a76a3f033ff0e641462545eb943dc88e4",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-seed_is_not_sibling_disk_authority-20261120-223527/receipt.json",
+      "receipt_sha256": "ce6ef744100eef5bc997a6f888a9147cff3e1813bf37f7a71f15260520e60c52"
+    },
+    {
+      "case": "standalone_capture_and_missing_module_qualification",
+      "expectation": "legacy-pass",
+      "source_tree_sha256": "1b088ca6914cba88981f5b7c59708ac73acf6a62aee01a57614664ea7cab8f9a",
+      "executable_sha256": "3a26742e4421f6d2a97d0dd2ea73972a76a3f033ff0e641462545eb943dc88e4",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-standalone_capture_and_missing_module_qualification-20261120-223529/receipt.json",
+      "receipt_sha256": "e9e8cd963164e60948c9468238b6702e88183a8e5ec742c9d49c096b3b68b5ad"
+    },
+    {
+      "case": "precached_attached_unit_replays_only_its_source",
+      "expectation": "legacy-pass",
+      "source_tree_sha256": "1b088ca6914cba88981f5b7c59708ac73acf6a62aee01a57614664ea7cab8f9a",
+      "executable_sha256": "3a26742e4421f6d2a97d0dd2ea73972a76a3f033ff0e641462545eb943dc88e4",
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/p0-precached_attached_unit_replays_only_its_source-20261120-223531/receipt.json",
+      "receipt_sha256": "ad774b9e645e520f6e787ba86632ead2c3bed04d1dd28c13ec7abc56ce7b6dff"
+    }
+  ],
+  "builds": [
+    {
+      "receipt": "target/ops-r1/shared-hardening-24-build-01/build-receipt.json",
+      "receipt_sha256": "657fb1b3887cd31bfc187ed7a766dca6739e8cf5f48a782229d593baac394b68",
+      "source_tree_sha256": "6597c5374e4e77ae5b4ca26b229a9b6974b55b25dd62968a04104189ef2cb919",
+      "executable_sha256": "3e3a94a9aac950789bddb18bc9cb1b431567e97fec7b75ee6b0175f42d930abc",
+      "elapsed_seconds": 90.6716768,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/shared-hardening-24-build-02/build-receipt.json",
+      "receipt_sha256": "489aa1949e3c1476027ce42f89a8b7dd66a6e80551c54d018836abc1e7e0acb7",
+      "source_tree_sha256": "35728c887c63d929ada71cdc9824b3d56db475c7755909bbd1893dcb3f7d26d4",
+      "executable_sha256": "ce7635c0b821dd61e6707d46524c6c1f7b134d6342d3689b57321ffc2a1e1509",
+      "elapsed_seconds": 53.2589603,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/shared-hardening-24-build-03/build-receipt.json",
+      "receipt_sha256": "5e3821d763caa0754cc518238988f203dc5c66949c6816b84e5fc8253616ba6b",
+      "source_tree_sha256": "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+      "executable_sha256": "57fbfdd1cddb662272f1e43ec2992b9e66b80f039cc82ca5b17cd8d9823efd99",
+      "elapsed_seconds": 77.6795351,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/shared-hardening-24-build-04/build-receipt.json",
+      "receipt_sha256": "f5b8cec406d99407d87200a1b0e23c0f253938e06dde9fba2abd54fd9d2d16b6",
+      "source_tree_sha256": "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+      "executable_sha256": "57fbfdd1cddb662272f1e43ec2992b9e66b80f039cc82ca5b17cd8d9823efd99",
+      "elapsed_seconds": 0.7575501,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/shared-hardening-24-build-05/build-receipt.json",
+      "receipt_sha256": "134e33d9f0858828d36975e61bc61c3fcc6d57f1054926b6bd60ac3b2226b443",
+      "source_tree_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+      "executable_sha256": "ce6dc4454eea4bd667eda9bc7185209914ad7fc7fac0cd65e9a13d6eefb58c7c",
+      "elapsed_seconds": 68.0739726,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/shared-m3-24-build-reviewed/build-receipt.json",
+      "receipt_sha256": "d73c6062adb5dd8889e2f3f892d1b5f10df8052bd187b0a1f379e822946bb7fe",
+      "source_tree_sha256": "96117651f06c96a11a63aa3cab70b8e4ab903e2f75fcaf6622e5f037987cab92",
+      "executable_sha256": "752226a7682cbcd23be795145720138bb8281ef8ec40c3a70becb7151f897020",
+      "elapsed_seconds": 313.2252107,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/shared-no-sharing-24-build-01/build-receipt.json",
+      "receipt_sha256": "b194e82b49dbd0de01e8c52753f0a0ee18a730469535e48311d80aca487fb772",
+      "source_tree_sha256": "2fe8c86f1b39d69ae286d4f24d4d5a79fb4e71768ab2c627ff0a06eaae461f58",
+      "executable_sha256": "3d40c8b32a25a61b11cb0cba64c30aa245c5c29688a3914f7496bb3814e3faad",
+      "elapsed_seconds": 63.4104828,
+      "diagnostics": 0
+    },
+    {
+      "receipt": "target/ops-r1/m3-isolated-23/target/ops-r1/shared-no-sharing-legacy-24-build-01/build-receipt.json",
+      "receipt_sha256": "5816cad67ec0404e241518cb8a059aa88a4fdc35b7272315794389b40092080b",
+      "source_tree_sha256": "1b088ca6914cba88981f5b7c59708ac73acf6a62aee01a57614664ea7cab8f9a",
+      "executable_sha256": "3a26742e4421f6d2a97d0dd2ea73972a76a3f033ff0e641462545eb943dc88e4",
+      "elapsed_seconds": 53.4895897,
+      "diagnostics": 0
+    }
+  ],
+  "final_clippy_receipt": "target/ops-r1/mission-24-clippy-final/receipt.json",
+  "final_clippy_sha256": "6cbaf4cb959479dabcb1897049be2ff33f0ed306ae44d63964cf46b4df9341f1",
+  "initial_recovery_assertion_failure_preserved": true,
+  "initial_resolver_safety_stop_preserved": true,
+  "accepted_production_changes": false,
+  "final_accepted_source_tree_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+  "final_accepted_executable_sha256": "ce6dc4454eea4bd667eda9bc7185209914ad7fc7fac0cd65e9a13d6eefb58c7c",
+  "validation_evidence_archive_sha256": "d53f0be46ce3b448432ce2ebc9ea977e855b73b7b17a2a2809921de150c40e82",
+  "verifier_history_archive_sha256": "06575891ff0499871206cceb0d7b69301b89534a46a8c73cd499faa92cc64133",
+  "test_source_history_archive_sha256": "d2abf74910f80c57a3e6b33707f6ada3a65062b619ef20a9ed25fcf700eaeb5d",
+  "only_changed_accepted_source_files": [
+    "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "src/tests/mcp/semantic_publication_recovery.rs",
+    "src/tests/mcp/semantic_retirement_controls_issue_162.rs"
+  ],
+  "scope": "Selected fault-detection/test-hardening workstream complete; no full CI, field, all-option completeness, performance or leak certification"
+}

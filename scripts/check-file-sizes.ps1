@@ -10,7 +10,7 @@
     untracked files. With -BaseRef, committed changes from the merge base to
     HEAD are included as active for CI and branch verification.
 
-    Exemptions: generated dependency lockfiles are exempt by filename,
+    Exemptions: verification/** is exempt by directory, generated dependency lockfiles are exempt by filename,
     markdown documentation files are exempt by extension, and paths listed
     in $ExemptPaths are excluded from the active set entirely. Every
     exemption carries its justification next to its declaration.
@@ -55,6 +55,11 @@ $GeneratedDependencyLockfiles = @(
 # fragmenting the record it exists to provide. Exempted by explicit maintainer
 # decision (2026-09-24).
 $ExemptExtensions = @('.md', '.markdown')
+
+# Maintainer decision (2026-11-21): verification definitions and pinned evidence
+# are outside the source-file size policy. Preserve exact historical bytes.
+# The trailing slash keeps similarly named sibling directories enforced.
+$ExemptDirectoryPrefixes = @('verification/')
 
 # Path-scoped exemptions from the active-file line-count policy.
 #
@@ -121,6 +126,9 @@ function Invoke-GitLines {
 function Test-NormalTextFile {
     param([string]$RelativePath)
     $normalizedPath = $RelativePath.Replace('\', '/')
+    foreach ($prefix in $ExemptDirectoryPrefixes) {
+        if ($normalizedPath.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    }
     if ($ExemptPaths -contains $normalizedPath) { return $false }
     $fileName = [System.IO.Path]::GetFileName($normalizedPath)
     if ($GeneratedDependencyLockfiles -contains $fileName) { return $false }

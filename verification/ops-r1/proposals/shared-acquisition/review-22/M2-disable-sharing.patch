@@ -1,0 +1,11 @@
+--- a/src/ir/typescript_resolution/program.rs
++++ b/src/ir/typescript_resolution/program.rs
+@@ -141,7 +141,7 @@
+         let operation = self.operation.clone();
+         let slot = operation
+             .as_ref()
+-            .filter(|_| self.program_active.len() == 1)
++            .filter(|_| self.program_active.len() == 0)
+             .and_then(|operation| basis(self, file, &project).map(|basis| operation.slot(basis)));
+         // No mutable Resolver is stored in the group. The active recursion guard precedes this lock.
+         let mut slot = slot

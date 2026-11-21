@@ -1,0 +1,14 @@
+{
+  "historical_red_source_sha256": "1270621a113d93c1b367089cbe6e2c2b9b7c255c56120c609835792d25f7431d",
+  "candidate_source_tree_sha256": "7ddaadaf7dbc8f7d2744d314f59d8933199f35fb2eadf48d825c154c0e9fec39",
+  "manifest_sha256": "c005ebe338af98b28cebb31fbc2d7f3b964973e8820a1c43fa7190fe6d8760c9",
+  "adapter_sha256": "7ccfcda3e210332f9c9d5afe52f8b08737e52bd242da2d23360bf0a86c05d899",
+  "historical_red_archive_sha256": "e1bbad36cc877d274a69762ed38957a72eddecb7db13ef63242436daba4df2bc",
+  "preserved_red_binary_sha256": "ead1babde38b31cd7e680ea0c87a07e378863eb770dc1c7d7b20c25bd360ea20",
+  "test_sha256": "26ec58ef540fb041ef82bd9ee677171aa9df5adcc174cd6510db60226b1244b1",
+  "production_changed_files": [
+    "src/ir/typescript_resolution/host.rs",
+    "src/ir/typescript_resolution/acquisition_inputs.rs"
+  ],
+  "tests_executed": false
+}

@@ -1,0 +1,57 @@
+--- a/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
++++ b/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
+@@ -1,7 +1,7 @@
+ //! Configuration, ownership, concurrency and invalidation controls.
+ use super::support::{acquire, fixture, resolver, write};
+ use crate::ir::typescript_resolution::Resolver;
+-use crate::ir::typescript_resolution::shared_acquisition::operation;
++use crate::ir::typescript_resolution::shared_acquisition::{basis, operation};
+ use std::sync::Arc;
+ 
+ #[test]
+@@ -20,6 +20,10 @@
+     );
+     let mut second = resolver(path, "b.ts", &op);
+     acquire(&mut second, &b);
++    let second_project = second.project_identity(&b).unwrap();
++    assert_eq!(second_project.options["strict"].value, true);
++    let second_basis = basis(&second, &b, &second_project).unwrap();
++    assert_eq!(op.counts(), [2, 2, 4]);
+     let extra = tempfile::tempdir().unwrap();
+     let mut third = Resolver::new(&[path.to_path_buf(), extra.path().to_path_buf()]).unwrap();
+     third.operation = Some(Arc::clone(&op));
+@@ -30,9 +34,33 @@
+         .seed(&a, &std::fs::read_to_string(&a).unwrap())
+         .unwrap();
+     acquire(&mut third, &a);
++    assert_eq!(op.counts(), [3, 3, 6]);
++    let dotted = path.join(".").join("b.ts");
+     let mut fourth = resolver(path, "b.ts", &op);
+-    acquire(&mut fourth, &path.join(".").join("b.ts"));
++    assert_eq!(fourth.host.normalized(&dotted), fourth.host.normalized(&b));
++    assert_eq!(fourth.host.logical(&dotted), fourth.host.logical(&b));
++    let fourth_project = fourth.project_identity(&dotted).unwrap();
++    assert_eq!(basis(&fourth, &dotted, &fourth_project).unwrap(), second_basis);
++    let qualified_before = op.work_counts()[1];
++    acquire(&mut fourth, &dotted);
++    assert_eq!(op.counts(), [3, 3, 6]);
++    assert_eq!(op.work_counts()[1], qualified_before + 1);
++
++    // A changed effective option establishes real authority divergence.
++    write(
++        path,
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[],"strict":false},"include":["*.ts"]}"#,
++    );
++    let mut changed = resolver(path, "b.ts", &op);
++    let changed_project = changed.project_identity(&b).unwrap();
++    assert_eq!(changed_project.config, second_project.config);
++    assert_eq!(changed_project.options["strict"].value, false);
++    assert_ne!(basis(&changed, &b, &changed_project).unwrap(), second_basis);
++    let qualified_before = op.work_counts()[1];
++    acquire(&mut changed, &b);
+     assert_eq!(op.counts(), [4, 4, 8]);
++    assert_eq!(op.work_counts()[1], qualified_before);
+ }
+ 
+ #[test]

@@ -1,0 +1,88 @@
+{
+  "standing": "UNAPPLIED, UNCOMPILED AND UNRUN; final operator approval required",
+  "source_head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "files": [
+    {
+      "path": "src/tests/architecture/ops_r1_observation.rs",
+      "baseline_bytes_sha256": null,
+      "candidate_normalized_lf_sha256": "46036fb9019b9e94bcf6a97c0f2968716b0386e9ef0a5fca11cad78fdbbb2f58",
+      "candidate_lines": 53
+    },
+    {
+      "path": "src/tests/mcp/ops_r1_absent_route.rs",
+      "baseline_bytes_sha256": null,
+      "candidate_normalized_lf_sha256": "146c790b11eb6ca3b7ccf2f51d0c0cc91c0fce2f75bd66317068da22f423780c",
+      "candidate_lines": 80
+    },
+    {
+      "path": "src/lib.rs",
+      "baseline_bytes_sha256": "b613f3c2f73fd9684f8b49c94649ab55bc688145d5fa5619c2b9725ae49d6120",
+      "candidate_normalized_lf_sha256": "29217e3460777221c605b4f8d77eb84877cab7a1fdf4689bab40366cd6edb6f2",
+      "candidate_lines": 121
+    },
+    {
+      "path": "src/mcp/semantic_compilation.rs",
+      "baseline_bytes_sha256": "33b587ee3645030c30fcc2b72b8e57c7e4c082beb7a37107caf9b0955b7479dd",
+      "candidate_normalized_lf_sha256": "176aaaa1ca91027f38bbebcc19e2fdc75878409a7f04e46340c5d86d403c7fcf",
+      "candidate_lines": 519
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/filesystem.rs",
+      "baseline_bytes_sha256": "1c6c219245d7d5395f6520f32e20c783dcb52f0d640b3e7ce841795b6c479ed6",
+      "candidate_normalized_lf_sha256": "46c8af01e334fe284087ed898f8b82f2d4fac6ddce11f39f44feeb21c44253b8",
+      "candidate_lines": 369
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/resolver_registrations.rs",
+      "baseline_bytes_sha256": "a7ebef09914ea62d5534fb8a6e112a4ee76d237185a29ec77ef1aa2064426cb5",
+      "candidate_normalized_lf_sha256": "06ecee8e6e868e7cb4548c3b0717dab26fbbd895103d7314d4d3fc12cdfd3a5f",
+      "candidate_lines": 73
+    },
+    {
+      "path": "src/mcp/semantic_compilation/executor.rs",
+      "baseline_bytes_sha256": "2d40507e388496f8b5461a37ad9c6779061f3139e713c602753a997ca6a908f4",
+      "candidate_normalized_lf_sha256": "4b594b116a2a5a900cdc33de7abe8cf4d3d6fae8b93c85e37350b7d7bbc7fd21",
+      "candidate_lines": 122
+    },
+    {
+      "path": "src/ir/typescript_resolution/program.rs",
+      "baseline_bytes_sha256": "58db97383c4cca5a5233beb8b392b1f99575a99e2714ab1295e46ad11ba0f760",
+      "candidate_normalized_lf_sha256": "08ca24d0e1f77f786f3ae891c536e349bcee741ef41ea9c5e2f49aaa294be465",
+      "candidate_lines": 368
+    },
+    {
+      "path": "src/ir/typescript_resolution/host.rs",
+      "baseline_bytes_sha256": "9f79ebe636a747b9fbb85fcdba94098bd08a038d4f219faf5645e533d211825d",
+      "candidate_normalized_lf_sha256": "084b033746ef4ea93f4f58efbbbee81b263bdd361f483bf5968ca50759253254",
+      "candidate_lines": 453
+    },
+    {
+      "path": "src/compression/capture_pipeline.rs",
+      "baseline_bytes_sha256": "7a2319cef08ef6f5d581cabcde6b05bb81742506acfc830af4734465c479b0b7",
+      "candidate_normalized_lf_sha256": "fa2307d272d1d6f7fdb6a914b2381e8fee85b6cd8971be8dda7ecf85007f661b",
+      "candidate_lines": 477
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/publication.rs",
+      "baseline_bytes_sha256": "9cae7955ac71c6483ad1752bd30bdbaff78a61b0b90853e574bd4e24af433278",
+      "candidate_normalized_lf_sha256": "96401542aa97891cab84526916a1558b985387570d8c33b72535faefa91d161c",
+      "candidate_lines": 355
+    }
+  ],
+  "source_tree_algorithm": "SHA256 of compact JSON sorted tracked src/build-input path/SHA256 rows; Rust/TOML/lock normalized LF, other fixtures/query inputs byte-exact; separators comma/colon",
+  "baseline_source_tree_sha256": "5b8314eb76bdad1adf3b24aab708f813f55288ea11c7275b07a6a22062695bda",
+  "candidate_source_tree_sha256": "393f7d7b0ba31dbe0f78cceb43539dccdb120598a154af8c7a7c415b33a661c1",
+  "candidate_source_file_count": 1522,
+  "test_identities": [
+    "mcp::semantic_compilation::ops_r1_repro_tests::ops_r1_absent_route_observation",
+    "mcp::semantic_compilation::ops_r1_repro_tests::ops_r1_fixed_job_project_observation"
+  ],
+  "instrumentation_limits": [
+    "Counters are isolated-child test observations, not authority or thresholds.",
+    "No exact retained-object/allocation-byte counter is proposed; pending batch size and OS working set remain distinct from leak proof.",
+    "Project-loop iterations observe program expansion, not all subsystem retry loops.",
+    "Query::new hooks cover capture pipeline sites, not every query compiler in the repository.",
+    "Host read misses are host snapshot acquisition attempts, not all filesystem IO.",
+    "These fixtures establish observations and empty-result semantics; no work-budget RED is claimed before the legitimate relationship is established."
+  ]
+}

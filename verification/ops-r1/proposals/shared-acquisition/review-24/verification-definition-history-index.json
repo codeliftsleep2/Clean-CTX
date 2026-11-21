@@ -1,0 +1,15 @@
+{
+  "standing": "Exact executed historical adapter bytes retained; reconstructed bytes accepted only after matching actual recorded SHA256",
+  "adapter_hashes": [
+    "57cf1977854f9df112899c9d0d6ca06a151a76145f12ad19ae9ce221e304e0f4",
+    "eab639d02d55659fb41ea307895f19a9bb4fb486a448860bb16ae47329ee14d3",
+    "f45f674d43d099ffd33889dee4c203e1f79fbd7393c210d5d9b1d96269f05b7b",
+    "f873f1ef80f3c5e93acfcef1a02877f0ad64ba0be1d013a3d885ca1f22e69f29",
+    "ec34a89d81c50613f12f0c5bccd986e7758f9c615ffc536d7e66fdfc4f07760f",
+    "c9a52c29c9f48e83c6c70c31535f8ff71509d9694f0813795fa75b1655194f75",
+    "04c5eaaa916e3c79c275029de65f750c8a8b504b0c5ae149ac57a1395dca449e",
+    "c7a36e3f5ae17b4878be7dc596c7ed1bfa87309bc45c24be403d5aa38f866a3b",
+    "3edb434bacc05b5a7ae64dd646dbe6687fb851ffc8ac1756693f745fcdafae5b"
+  ],
+  "archive_sha256": "c4201e9e6ff7483ef92322e601216a3d3c4ac61e97dbd4d1bf7c4119addddaea"
+}

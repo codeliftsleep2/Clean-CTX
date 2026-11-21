@@ -1,0 +1,7 @@
+{
+  "source_tree_sha256": "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+  "manifest_sha256": "1355f65fdfab0e1c695b12d113e773aad839681f821e487f8becdb50618e5feb",
+  "adapter_sha256": "04c5eaaa916e3c79c275029de65f750c8a8b504b0c5ae149ac57a1395dca449e",
+  "cases": 35,
+  "decomposition": "Four forms x two directions; assertions and fresh-state fixture preserved; prior resource stop retained"
+}

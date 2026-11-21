@@ -1,0 +1,32 @@
+{
+  "category": "Actual operator descriptor and normal admission refusal, not current packet admission or authorization",
+  "capture": "target/ops-r1/checkpoint-20261120-113420",
+  "archive": "verification/ops-r1/review-03/b11-refusal-evidence.zip",
+  "archive_sha256": "39240c0db08790e06eed06717ed67892775f914cef2c3dd0f9100220f226c4ba",
+  "members": [
+    {
+      "entry": "receipt.json",
+      "sha256": "ea5fd52e2311270e36f84e90be0a74c23256764b3089fa4c15994aee7d1ec912"
+    },
+    {
+      "entry": "descriptor.json",
+      "sha256": "29d3bdf6a68ad806026f6b47c04860b95333b9852621f89b2245137b8b7196c8"
+    },
+    {
+      "entry": "candidate-sources.json",
+      "sha256": "b0bff67b4bf406e5e5dfb8971837666730e70c73ff75a8248e8cc2b75a68cfa8"
+    },
+    {
+      "entry": "check-utf8.ps1-stdout.txt",
+      "sha256": "58fa1a270c450ac13966c8b8ba222a2aaa2ff2eb6edc6c4f5c3a5ed5e9d694c3"
+    },
+    {
+      "entry": "check-file-sizes.ps1-stdout.txt",
+      "sha256": "e9fafad64e93eb038a27a06c82becc9651f2d970facd6ac9e069460116debd49"
+    },
+    {
+      "entry": "contexts/2.payload.json",
+      "sha256": "65e21327091780cc530fdb40d318517ec8bba36d52c91f0ec499712c44d60f35"
+    }
+  ]
+}

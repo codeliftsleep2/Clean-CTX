@@ -1,0 +1,294 @@
+--- a/src/tests/ir/ops_r1_shared_acquisition_proof.rs
++++ b/src/tests/ir/ops_r1_shared_acquisition_proof.rs
+@@ -50,6 +50,8 @@
+     acquire(&mut first, &a);
+     let mut second = resolver(path, "b.ts", &op);
+     acquire(&mut second, &b);
++    assert_eq!(op.counts(), [1, 1, 2], "dependency proof must be reused");
++    assert_eq!(op.qualification_counts()[1], 1);
+     assert!(
+         second
+             .host
+@@ -163,6 +165,12 @@
+     );
+     let mut second = resolver(path, "b.ts", &op);
+     acquire(&mut second, &path.join("b.ts"));
++    assert_eq!(
++        op.counts(),
++        [1, 1, 2],
++        "missing-module proof must be reused"
++    );
++    assert_eq!(op.qualification_counts()[1], 1);
+     assert!(second.host.current());
+     assert!(
+         !second.program_evidence[&path.join("tsconfig.json")]
+@@ -182,6 +190,13 @@
+     acquire(&mut first, &a);
+     let mut second = resolver(path, "b.ts", &op);
+     acquire(&mut second, &b);
++    assert_eq!(
++        op.counts(),
++        [1, 1, 2],
++        "attached-unit control requires reuse"
++    );
++    assert_eq!(op.qualification_counts()[1], 1);
++    assert_eq!(second.attached_programs.len(), 1);
+     let scope = second.host.witnesses.begin();
+     assert!(second.unit(&a).is_some());
+     let inputs = second.host.witnesses.finish(scope);
+--- a/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
++++ b/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
+@@ -40,7 +40,10 @@
+     assert_eq!(fourth.host.normalized(&dotted), fourth.host.normalized(&b));
+     assert_eq!(fourth.host.logical(&dotted), fourth.host.logical(&b));
+     let fourth_project = fourth.project_identity(&dotted).unwrap();
+-    assert_eq!(basis(&fourth, &dotted, &fourth_project).unwrap(), second_basis);
++    assert_eq!(
++        basis(&fourth, &dotted, &fourth_project).unwrap(),
++        second_basis
++    );
+     let qualified_before = op.work_counts()[1];
+     acquire(&mut fourth, &dotted);
+     assert_eq!(op.counts(), [3, 3, 6]);
+@@ -172,7 +175,16 @@
+     );
+     let mut first = resolver(path, "a.ts", &op);
+     assert_eq!(first.program_units(&path.join("a.ts")).unwrap().len(), 3);
++    let first_project = first.request_project(&path.join("a.ts")).unwrap();
++    let first_basis = basis(&first, &path.join("a.ts"), &first_project).unwrap();
+     let mut second = resolver(path, "sub/c.ts", &op);
++    let second_project = second.request_project(&path.join("sub/c.ts")).unwrap();
++    assert_eq!(first_project.config, second_project.config);
++    assert_ne!(
++        first_basis,
++        basis(&second, &path.join("sub/c.ts"), &second_project).unwrap(),
++        "directory-dependent automatic types require distinct acquisition bases"
++    );
+     assert_eq!(
+         second.program_units(&path.join("sub/c.ts")).unwrap().len(),
+         4
+--- a/src/tests/mcp/csharp_call_authority_lifecycle.rs
++++ b/src/tests/mcp/csharp_call_authority_lifecycle.rs
+@@ -103,6 +103,32 @@
+ 
+     assert!(response.get("error").is_none(), "{response}");
+     assert_eq!(state.test_csharp_reconciliation_count(), 1);
++    assert_eq!(
++        state.csharp_call_authority.status(),
++        CSharpCallAuthorityStatus::Current
++    );
++    let items = response["result"]["structuredContent"]["results"]
++        .as_array()
++        .expect("exact batch results");
++    assert_eq!(items.len(), 2);
++    let expected_owner = state.semantic_owner_path(&root.path().join("Calls.cs").to_string_lossy());
++    for (item, id) in items.iter().zip(["a", "b"]) {
++        assert_eq!(item["id"], id);
++        assert_eq!(item["status"], "ok", "{response}");
++        let edges = item["result"]["edges"].as_array().unwrap();
++        assert_eq!(edges.len(), 1, "{response}");
++        assert_eq!(edges[0]["subject"]["name"], "Go");
++        assert_eq!(edges[0]["object"]["name"], "Hit");
++        assert_eq!(edges[0]["relation"], "Calls");
++        for endpoint in ["subject", "object"] {
++            assert_eq!(edges[0][endpoint]["domain"], "builtin");
++            assert_eq!(edges[0][endpoint]["entity_type"], "Method");
++            assert_eq!(
++                state.semantic_owner_path(edges[0][endpoint]["file"].as_str().unwrap()),
++                expected_owner
++            );
++        }
++    }
+ }
+ 
+ #[test]
+--- a/src/tests/mcp/semantic_publication_recovery.rs
++++ b/src/tests/mcp/semantic_publication_recovery.rs
+@@ -237,6 +237,8 @@
+         let response = dispatch(&restarted, id, tool, request(&root, &file));
+         assert!(response.get("error").is_none(), "{response}");
+         assert!(restarted.alias_for_path(&file).is_some());
++        assert_ne!(response["result"]["isError"], true);
++        assert_recovered_source(&restarted, &file, target, true);
+         assert!(
+             response["result"]["content"][0]["text"]
+                 .as_str()
+@@ -270,12 +272,42 @@
+         }),
+     );
+     assert!(response.get("error").is_none(), "{response}");
+-    assert!(
+-        response["result"]["structuredContent"]["count"]
+-            .as_u64()
+-            .unwrap()
+-            > 0
+-    );
++    assert_ne!(response["result"]["isError"], true);
++    let result = &response["result"]["structuredContent"];
++    assert_eq!(result["count"], 1, "{response}");
++    let entities = result["entities"].as_array().unwrap();
++    assert_eq!(entities.len(), 1);
++    assert_eq!(entities[0]["name"], "HydratedOk");
++    assert_eq!(entities[0]["domain"], "builtin");
++    assert_eq!(entities[0]["entity_type"], "Class");
++    assert_eq!(
++        restarted.semantic_owner_path(entities[0]["file"].as_str().unwrap()),
++        restarted.semantic_owner_path(&file)
++    );
++    assert_recovered_source(&restarted, &file, target, false);
++}
++
++fn assert_recovered_source(
++    state: &crate::mcp::McpState,
++    file: &str,
++    expected: &[u8],
++    requires_typescript: bool,
++) {
++    let alias = state.alias_for_path(file).expect("recovered source alias");
++    let snapshot = state
++        .semantic_snapshot(&alias)
++        .expect("recovered authority");
++    assert_eq!(snapshot.source_hash, crate::cache::content_hash(expected));
++    // Ordinary declaration hydration permits a LegacyEdit projection without TS proof.
++    // Explicit provision in this fixture retains TS authority and must not lose it.
++    if requires_typescript {
++        let authority = snapshot.authority.typescript_authority.as_ref().unwrap();
++        assert_eq!(
++            state.semantic_owner_path(&authority.source.to_string_lossy()),
++            state.semantic_owner_path(file)
++        );
++    }
++    assert!(snapshot.authority.is_current(&snapshot.source_hash));
+ }
+ 
+ #[test]
+--- a/src/tests/mcp/semantic_retirement_controls_issue_162.rs
++++ b/src/tests/mcp/semantic_retirement_controls_issue_162.rs
+@@ -113,6 +113,10 @@
+             .len(),
+         owners.len()
+     );
++    assert_eq!(
++        state.workspace_index_read().semantic_projection_owners(),
++        owners
++    );
+     assert_eq!(edges(&state, root.path(), false), before);
+ }
+ 
+@@ -122,6 +126,7 @@
+     let (root, config) = fixture();
+     let state = McpState::new(config);
+     let before = edges(&state, root.path(), false);
++    let owners = state.workspace_index_read().semantic_projection_owners();
+     let mut probes = 0;
+     let changed = state.reconcile_semantic_sources_for_test(|_| {
+         probes += 1;
+@@ -129,6 +134,10 @@
+     });
+     assert!(changed.is_err());
+     assert_eq!(probes, 2, "one missing observation plus commit recheck");
++    assert_eq!(
++        state.workspace_index_read().semantic_projection_owners(),
++        owners
++    );
+     assert_eq!(edges(&state, root.path(), false), before);
+ }
+ 
+--- a/src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs
++++ b/src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs
+@@ -6,43 +6,60 @@
+ use std::path::Path;
+ 
+ #[test]
+-fn issue_162_resolver_registration_cold_alias_barrel_namespace_local() {
+-    let _serial = crate::protocol::handler_response_serial();
+-    for form in ["alias", "barrel", "namespace", "local"] {
+-        for direction in ["forward", "reverse"] {
+-            // A new fixture, state and never-created durable DB for EACH direction.
+-            let (root, config) = fixture(form);
+-            assert!(!Path::new(&config.persistence.db_path).exists());
+-            if form == "barrel" {
+-                assert!(
+-                    !std::fs::read_to_string(root.path().join("one.ts"))
+-                        .unwrap()
+-                        .contains("Gate")
+-                );
+-            }
+-            let state = McpState::new(config);
+-            let answer = query(&state, root.path(), direction);
++fn issue_162_resolver_registration_cold_alias() {
++    assert_cold_form("alias");
++}
++
++#[test]
++fn issue_162_resolver_registration_cold_barrel() {
++    assert_cold_form("barrel");
++}
++
++#[test]
++fn issue_162_resolver_registration_cold_namespace() {
++    assert_cold_form("namespace");
++}
++
++#[test]
++fn issue_162_resolver_registration_cold_local() {
++    assert_cold_form("local");
++}
++
++fn assert_cold_form(form: &str) {
++    let _serial = crate::protocol::handler_response_serial();
++    for direction in ["forward", "reverse"] {
++        // A new fixture, state and never-created durable DB for EACH direction.
++        let (root, config) = fixture(form);
++        assert!(!Path::new(&config.persistence.db_path).exists());
++        if form == "barrel" {
++            assert!(
++                !std::fs::read_to_string(root.path().join("one.ts"))
++                    .unwrap()
++                    .contains("Gate")
++            );
++        }
++        let state = McpState::new(config);
++        let answer = query(&state, root.path(), direction);
++        assert_eq!(
++            keys(&answer),
++            ["primary", "secondary"],
++            "{form} {direction}: {answer:#}"
++        );
++        assert_eq!(answer["count"], 2);
++        for record in answer["registrations"].as_array().unwrap() {
++            assert_eq!(record["resolver"]["name"], "Gate");
++            assert_eq!(record["route_path"], "dashboard");
++            let file = record["evidence"]["source"].as_str().unwrap();
++            let source = std::fs::read(file).unwrap();
+             assert_eq!(
+-                keys(&answer),
+-                ["primary", "secondary"],
+-                "{form} {direction}: {answer:#}"
++                record["evidence"]["source_hash"],
++                crate::cache::content_hash(&source)
+             );
+-            assert_eq!(answer["count"], 2);
+-            for record in answer["registrations"].as_array().unwrap() {
+-                assert_eq!(record["resolver"]["name"], "Gate");
+-                assert_eq!(record["route_path"], "dashboard");
+-                let file = record["evidence"]["source"].as_str().unwrap();
+-                let source = std::fs::read(file).unwrap();
+-                assert_eq!(
+-                    record["evidence"]["source_hash"],
+-                    crate::cache::content_hash(&source)
+-                );
+-                let span = record["evidence"]["key"].as_array().unwrap();
+-                assert_eq!(
+-                    &source[span[0].as_u64().unwrap() as usize..span[1].as_u64().unwrap() as usize],
+-                    record["key"].as_str().unwrap().as_bytes()
+-                );
+-            }
++            let span = record["evidence"]["key"].as_array().unwrap();
++            assert_eq!(
++                &source[span[0].as_u64().unwrap() as usize..span[1].as_u64().unwrap() as usize],
++                record["key"].as_str().unwrap().as_bytes()
++            );
+         }
+     }
+ }

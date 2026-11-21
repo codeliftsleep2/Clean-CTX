@@ -113,6 +113,10 @@ fn issue_162_retirement_acquisition_error_is_not_deletion() {
             .len(),
         owners.len()
     );
+    assert_eq!(
+        state.workspace_index_read().semantic_projection_owners(),
+        owners
+    );
     assert_eq!(edges(&state, root.path(), false), before);
 }
 
@@ -122,6 +126,7 @@ fn issue_162_retirement_reappearance_before_commit_preserves_owner() {
     let (root, config) = fixture();
     let state = McpState::new(config);
     let before = edges(&state, root.path(), false);
+    let owners = state.workspace_index_read().semantic_projection_owners();
     let mut probes = 0;
     let changed = state.reconcile_semantic_sources_for_test(|_| {
         probes += 1;
@@ -129,6 +134,10 @@ fn issue_162_retirement_reappearance_before_commit_preserves_owner() {
     });
     assert!(changed.is_err());
     assert_eq!(probes, 2, "one missing observation plus commit recheck");
+    assert_eq!(
+        state.workspace_index_read().semantic_projection_owners(),
+        owners
+    );
     assert_eq!(edges(&state, root.path(), false), before);
 }
 

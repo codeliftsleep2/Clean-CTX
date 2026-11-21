@@ -30,6 +30,19 @@ pub(crate) struct CompilationRequest<'a> {
 pub(crate) fn compile_source_artifact(
     request: CompilationRequest<'_>,
 ) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
+    compile_source_artifact_in_operation(
+        request,
+        #[cfg(feature = "typescript")]
+        None,
+    )
+}
+
+pub(crate) fn compile_source_artifact_in_operation(
+    request: CompilationRequest<'_>,
+    #[cfg(feature = "typescript")] operation: Option<
+        std::sync::Arc<crate::ir::typescript_resolution::shared_acquisition::Operation>,
+    >,
+) -> Result<SemanticCompilationArtifact, crate::error::CleanCtxError> {
     #[cfg(test)]
     if let Ok(injected) = TEST_INJECTED_IR_FAILURE.lock()
         && let Some(reason) = injected.as_ref()
@@ -80,13 +93,27 @@ pub(crate) fn compile_source_artifact(
                 .get("angular")
                 .is_none_or(|layer| layer.enabled)
             {
-                return crate::ir::typescript_resolution::TypeScriptAuthority::capture_with_demands(
+                if operation.is_none() {
+                    return crate::ir::typescript_resolution::TypeScriptAuthority::capture_with_demands(
+                        path, request.source, request.authorized_roots, request.typescript_project,
+                        crate::angular_meta::module_metadata::DECLARATION_FIELDS,
+                        crate::angular_meta::bootstrap_references::DEMANDED_APIS,
+                    );
+                }
+                return crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_operation(
                     path,
                     request.source,
                     request.authorized_roots,
                     request.typescript_project,
-                    crate::angular_meta::module_metadata::DECLARATION_FIELDS,
-                    crate::angular_meta::bootstrap_references::DEMANDED_APIS,
+                    (crate::angular_meta::module_metadata::DECLARATION_FIELDS,
+                    crate::angular_meta::bootstrap_references::DEMANDED_APIS),
+                    operation,
+                );
+            }
+            if operation.is_some() {
+                return crate::ir::typescript_resolution::TypeScriptAuthority::capture_in_operation(
+                    path, request.source, request.authorized_roots,
+                    request.typescript_project, (&[], &[]), operation,
                 );
             }
             if let Some(project) = request.typescript_project {

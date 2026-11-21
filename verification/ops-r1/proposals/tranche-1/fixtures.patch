@@ -1,0 +1,127 @@
+--- a/src/tests/architecture/ci_verify_r1.rs
++++ b/src/tests/architecture/ci_verify_r1.rs
+@@ -9,7 +9,8 @@
+ }
+ 
+ fn evidence(manifest: &Path) -> (String, String, String) {
+-    let groups = load(&manifest.join("fitness-membership.json"));
++    let mut groups = load(&manifest.join("fitness-membership.json"));
++    groups.as_array_mut().unwrap().extend(load(&manifest.join("golden-membership.json"))["groups"].as_array().unwrap().iter().cloned());
+     let measurements = load(&manifest.join("measurement-membership.json"));
+     let empirical: BTreeSet<_> = measurements
+         .as_array()
+@@ -83,6 +84,7 @@
+     for file in [
+         "membership.json",
+         "fitness-membership.json",
++        "golden-membership.json",
+         "measurement-membership.json",
+         "legacy-ignored.json",
+     ] {
+@@ -93,7 +95,9 @@
+         .unwrap();
+     }
+     let config = load(&manifest.join("membership.json"));
+-    for oracle in config["oracle_files"].as_array().unwrap() {
++    let mut source_inputs = config["oracle_files"].as_array().unwrap().clone();
++    source_inputs.extend(load(&manifest.join("golden-membership.json"))["frozen_witnesses"].as_array().unwrap().iter().cloned());
++    for oracle in &source_inputs {
+         let relative = oracle["path"].as_str().unwrap();
+         let target = root.join(relative);
+         std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+@@ -121,12 +125,23 @@
+         "measurement_ran",
+         "missing_measurement_registration",
+         "empty_fitness",
++        "missing_golden",
++        "golden_witness_changed",
+         "incomplete_fitness",
+         "invalid_oracle",
+         "oracle_content_changed",
+         "missing_oracle",
+         "cargo_failure",
++        "isolated_csharp_valid",
++        "isolated_typescript_valid",
++        "isolated_missing",
++        "isolated_ignored",
++        "isolated_missing_exit",
++        "isolated_nonzero_exit",
+     ] {
++        let isolated_mode = if case.starts_with("isolated_") {
++            Some(if case == "isolated_typescript_valid" { "typescript" } else { "csharp" })
++        } else { None };
+         let mut listing = listed.clone();
+         let mut execution = executed.clone();
+         let fitness_line = format!("test {fitness} ... ok\n");
+@@ -188,6 +203,14 @@
+             }
+             _ => {}
+         }
++        let golden_path = manifest.join("golden-membership.json");
++        let frozen_source = load(&golden_path)["frozen_witnesses"][0]["path"].as_str().unwrap().to_owned();
++        if case == "golden_witness_changed" {
++            std::fs::write(root.join(&frozen_source), "changed golden witness").unwrap();
++        }
++        if case == "missing_golden" {
++            std::fs::remove_file(&golden_path).unwrap();
++        }
+         let fitness_manifest = manifest.join("fitness-membership.json");
+         if matches!(case, "empty_fitness" | "incomplete_fitness") {
+             let mut value = load(&fitness_manifest);
+@@ -200,7 +223,9 @@
+         }
+         let oracle_path = config["oracle_files"][0]["path"].as_str().unwrap();
+         if matches!(case, "lf_checkout" | "crlf_checkout") {
+-            for oracle in config["oracle_files"].as_array().unwrap() {
++            let mut source_inputs = config["oracle_files"].as_array().unwrap().clone();
++            source_inputs.extend(load(&manifest.join("golden-membership.json"))["frozen_witnesses"].as_array().unwrap().iter().cloned());
++            for oracle in &source_inputs {
+                 let path = root.join(oracle["path"].as_str().unwrap());
+                 let original = std::fs::read_to_string(&path)
+                     .unwrap()
+@@ -225,6 +250,16 @@
+             .unwrap();
+         } else if case == "missing_oracle" {
+             std::fs::remove_file(root.join(oracle_path)).unwrap();
++        }
++        if let Some(mode) = isolated_mode {
++            let golden = load(&manifest.join("golden-membership.json"));
++            let mut selected = golden["isolated"][mode].as_array().unwrap().clone();
++            if case == "isolated_missing" { selected.clear(); }
++            execution = format!("     Running unittests src/lib.rs (target/debug/deps/clean_ctx-fixture)\nrunning {} tests\n", selected.len());
++            for test in selected {
++                execution.push_str(&format!("test {} ... {}\n", test.as_str().unwrap(), if case == "isolated_ignored" { "ignored" } else { "ok" }));
++            }
++            execution.push_str("test result: ok.\n");
+         }
+         let listing_path = root.join("listing.log");
+         let execution_path = root.join("execution.log");
+@@ -239,17 +274,23 @@
+             .arg(&listing_path)
+             .arg("--execution")
+             .arg(&execution_path)
+-            .args([
+-                "--suite-exit",
+-                if case == "cargo_failure" { "1" } else { "0" },
+-            ])
++            .args(if case == "isolated_missing_exit" { Vec::<&str>::new() } else {
++                vec!["--suite-exit", if matches!(case, "cargo_failure" | "isolated_nonzero_exit") { "1" } else { "0" }]
++            })
++            .args(isolated_mode.map(|mode| vec!["--feature-mode", mode]).unwrap_or_default())
+             .arg("--output")
+             .arg(&result_path)
+             .output()
+             .expect("Python is an existing repository verification prerequisite");
++        if case == "missing_golden" {
++            std::fs::copy(repo.join("verification/ci-verify-r1/golden-membership.json"), &golden_path).unwrap();
++        }
++        if case == "golden_witness_changed" {
++            std::fs::copy(repo.join(&frozen_source), root.join(&frozen_source)).unwrap();
++        }
+         let expected_success = matches!(
+             case,
+-            "valid" | "lf_checkout" | "crlf_checkout" | "interleaved_headers" | "nested_worker"
++            "valid" | "lf_checkout" | "crlf_checkout" | "interleaved_headers" | "nested_worker" | "isolated_csharp_valid" | "isolated_typescript_valid"
+         );
+         assert_eq!(
+             output.status.success(),

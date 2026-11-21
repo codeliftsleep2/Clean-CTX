@@ -172,6 +172,8 @@ fn registered_query(
             any(feature = "csharp", feature = "typescript", feature = "java")
         ))]
         QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
+        #[cfg(all(test, feature = "angular"))]
+        crate::ops_r1_observation::record(9, 1);
         Query::new(
             &identity
                 .language()
@@ -417,6 +419,8 @@ where
                 any(feature = "csharp", feature = "typescript", feature = "java")
             ))]
             QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
+            #[cfg(all(test, feature = "angular"))]
+            crate::ops_r1_observation::record(9, 1);
             dynamic_query = Query::new(&language, query_string)?;
             &dynamic_query
         }

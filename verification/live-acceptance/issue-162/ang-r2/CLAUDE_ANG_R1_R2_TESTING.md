@@ -1,8 +1,39 @@
 # Claude field testing: ANG-R1 and ANG-R2
 
 Agent: **Agent MaxHeadRoom**. Prepared 2026-11-19.
-Status: **FIELD EXECUTION UNRUN**. This is an operator/Claude test instruction,
+Status: **FIELD VERIFICATION BLOCKED BY REPORTED QUERY FAILURE**. This is an operator/Claude test instruction,
 not a Rust regression, CI result, owner authorization or capability certification.
+
+## Blocking field report (2026-11-19)
+
+The operator reports that workspace_query with type=resolver_registrations,
+direction=forward and a nonexistent route_path does not return and grows memory,
+including a workspace with no resolvers. The operator separately reports healthy
+hydration. Suspend repeated registration queries until the defect is resolved.
+This is a field failure report, not a verified allocation leak or infinite-loop
+diagnosis. Exact workspace scale, logs and memory measurements are not yet retained
+in this repository; do not invent them or relabel the earlier synthetic PASS.
+
+Static trace identifies query-specific amplification: the handler calls
+hydrate_resolver_owners before using the selector; that operation inventories all
+eligible TypeScript owners and requests full High semantic preparation. The shared
+publication batch prepares all jobs and retains the compiler's complete result
+vector before committing. Each compilation independently captures TypeScript
+authority with a fresh Resolver/Host. Project resolution can acquire program roots,
+units and witnesses for that capture. The absence of the selected route does not
+bypass any of this work. This establishes the implementation path and a scaling
+risk, not measured field causality or proof of a leak.
+
+The earlier growth witness varied registration records (2/16/64) at fixed owner
+count. It did not establish bounded work/memory while the number of unrelated
+TypeScript owners or project inputs grows. Correctness CI and 185 synthetic stdio
+checks therefore do not discharge this newly reported field failure. Required
+repair verification must include cold no-resolver and absent-route requests,
+controlled unrelated-owner/project growth, termination, allocation/retention
+observations and preservation of real positive/alias/sibling/currentness cases.
+Retain lower-bound semantics and distinguish acquisition failure from an empty
+answer. A selector-text filter, arbitrary timeout/cap or early empty response is
+not authorized as a substitute for correct discovery and bounded acquisition.
 
 ## Purpose and boundaries
 

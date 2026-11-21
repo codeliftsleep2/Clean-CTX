@@ -1,0 +1,355 @@
+[
+  {
+    "case": "fitness",
+    "identity": "mcp::semantic_compilation::ops_r1_acquisition_fitness::ops_r1_shared_acquisition_public_fitness",
+    "source": "src/tests/mcp/ops_r1_acquisition_fitness.rs",
+    "kind": "new shared RED/GREEN witness",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "precached_host_unit_project_and_owner_only_proof",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_host_unit_project_and_owner_only_proof",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "seed_is_not_sibling_disk_authority",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_seed_is_not_sibling_disk_authority",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "divergent_overlay_and_private_cache_are_not_overwritten",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_divergent_overlay_and_private_cache_are_not_overwritten",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "failed_partial_and_poisoned_leader_do_not_grant_or_poison",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_failed_partial_and_poisoned_leader_do_not_grant_or_poison",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "standalone_capture_and_missing_module_qualification",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_standalone_capture_and_missing_module_qualification",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "precached_attached_unit_replays_only_its_source",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_attached_unit_replays_only_its_source",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "failed_partial_after_one_unit_keeps_local_failure",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_failed_partial_after_one_unit_keeps_local_failure",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "precached_unaccounted_values_never_seal_from_nonempty_witnesses",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_unaccounted_values_never_seal_from_nonempty_witnesses",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "config_roots_and_route_changes_stay_independent",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_config_roots_and_route_changes_stay_independent",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "source_and_package_changes_invalidate_proof",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_source_and_package_changes_invalidate_proof",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "request_directory_and_inherited_project_remain_authoritative",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_request_directory_and_inherited_project_remain_authoritative",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "multiple_projects_and_operations_do_not_share_authority",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_multiple_projects_and_operations_do_not_share_authority",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "same_config_different_automatic_type_lookup_stays_distinct",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_same_config_different_automatic_type_lookup_stays_distinct",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "concurrent_owners_and_nested_acquisition_are_isolated",
+    "identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_concurrent_owners_and_nested_acquisition_are_isolated",
+    "source": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "kind": "new negative/preservation control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "bootstrap",
+    "identity": "mcp::semantic_compilation::angular_bootstrap_controls_tests::issue_162_bootstrap_controls_unchanged_caller_dependency_mutation_and_stale_restore",
+    "source": "src/tests/mcp/angular_bootstrap_controls_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "hydration_and_explicit",
+    "identity": "mcp::tool_handlers::semantic_publication_recovery_tests::successful_recovery_preserves_registered_render_and_hydration_behavior",
+    "source": "src/tests/mcp/semantic_publication_recovery.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "worker_order_non_ts",
+    "identity": "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_is_deterministic_for_pool_sizes_one_two_and_four",
+    "source": "src/tests/mcp/semantic_compilation_parallel.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "worker_failure_non_ts",
+    "identity": "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_reports_one_failed_job_without_losing_neighbors",
+    "source": "src/tests/mcp/semantic_compilation_parallel.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "batch_prepublication",
+    "identity": "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_superseded_job_commits_no_partial_authority",
+    "source": "src/tests/mcp/semantic_compilation_parallel.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "typescript_prepublication",
+    "identity": "mcp::tool_handlers::query::tests_issue_157_dependencies::issue_157_contributor_superseded_before_commit_rejects_candidate",
+    "source": "src/tests/mcp/workspace_query_issue_157_dependencies.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "typescript_persistence",
+    "identity": "mcp::tool_handlers::query::tests_issue_157_dependencies::issue_157_durable_projection_retains_and_validates_contributors",
+    "source": "src/tests/mcp/workspace_query_issue_157_dependencies.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "resolver_positive",
+    "identity": "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_alias",
+    "source": "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "resolver_positive_barrel",
+    "identity": "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_barrel",
+    "source": "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "resolver_positive_namespace",
+    "identity": "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_namespace",
+    "source": "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "resolver_positive_local",
+    "identity": "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_local",
+    "source": "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "retirement",
+    "identity": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_reappearance_before_commit_preserves_owner",
+    "source": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "csharp",
+    "identity": "mcp::tool_handlers::query::csharp_call_authority_lifecycle_tests::compatible_batch_call_items_prepare_once",
+    "source": "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "ambient_dependency",
+    "identity": "ir::typescript_resolution::ambient_acquisition_tests::issue_162_ambient_acquisition_shadowed_file_is_not_a_consumed_content_dependency",
+    "source": "src/tests/ir/typescript_ambient_acquisition_issue_162.rs",
+    "kind": "reused existing tracked preservation test",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features",
+    "runtime_selection": "Not yet executed; source/module mapping only"
+  },
+  {
+    "case": "retirement_confirmed",
+    "identity": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families",
+    "source": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "retirement_denial",
+    "identity": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion",
+    "source": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "retirement_wrong_kind",
+    "identity": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_wrong_kind_refuses_public_currentness_without_deletion",
+    "source": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "retirement_history",
+    "identity": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion",
+    "source": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "recovery_refusal",
+    "identity": "mcp::tool_handlers::semantic_publication_recovery_tests::compression_and_provision_refuse_publication_before_recovery",
+    "source": "src/tests/mcp/semantic_publication_recovery.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "hydration_refusal",
+    "identity": "mcp::tool_handlers::semantic_publication_recovery_tests::workspace_query_refuses_index_hydration_before_recovery",
+    "source": "src/tests/mcp/semantic_publication_recovery.rs",
+    "kind": "existing targeted lifecycle/failure control",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  },
+  {
+    "case": "csharp_preparation_failure",
+    "identity": "mcp::tool_handlers::query::csharp_call_authority_lifecycle_tests::failed_preparation_remains_dirty_and_returns_no_current_authority",
+    "source": "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "kind": "existing applicable negative control for strengthened CSharp batch authority assertions",
+    "package": "clean-ctx",
+    "target": "lib",
+    "features": "--all-features"
+  }
+]

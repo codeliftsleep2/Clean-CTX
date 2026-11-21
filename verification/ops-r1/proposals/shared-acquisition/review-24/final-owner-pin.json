@@ -1,0 +1,12 @@
+{
+  "source_tree_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+  "manifest_sha256": "661ae0180d4712cd6c620883a3a0650d013c0d768cf32472c00a1b78c299bf59",
+  "adapter_sha256": "ae22421e64dcab69a48470bc44a92d3c433b27e2394476f3ec463399e8f1fbd1",
+  "affected_cases": [
+    "hydration_and_explicit",
+    "csharp",
+    "csharp_preparation_failure",
+    "recovery_refusal",
+    "hydration_refusal"
+  ]
+}

@@ -1,0 +1,38 @@
+--- a/.github/workflows/ci.yml
++++ b/.github/workflows/ci.yml
+@@ -63,6 +63,35 @@
+           name: semantic-fitness-${{ github.sha }}-${{ github.run_attempt }}
+           path: target/issue-162/af-perf-001-*
+           if-no-files-found: warn
++      - name: GARC-002 isolated csharp
++        shell: pwsh
++        run: |
++          $out = "target/ops-r1-isolated-csharp"
++          New-Item -ItemType Directory -Path $out -Force | Out-Null
++          $profileArgs = @('--config','profile.test.opt-level=1','--config','profile.test.package."*".opt-level=3','--config','profile.test.debug-assertions=true','--config','profile.test.overflow-checks=true')
++          $env:CARGO_TERM_COLOR = 'never'
++          & cargo test -p clean-ctx --lib --no-default-features --features csharp @profileArgs -- --exact --test-threads=1 --format=pretty compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir 2>&1 | Tee-Object -FilePath "$out/execution.log"
++          $suiteExit = $LASTEXITCODE
++          & python scripts/verify-ci-membership.py --root . --feature-mode csharp --execution "$out/execution.log" --suite-exit $suiteExit --output "$out/receipt.json"
++          if ($LASTEXITCODE -ne 0) { throw 'GARC-002 csharp verification failed' }
++      - name: GARC-002 isolated typescript
++        shell: pwsh
++        run: |
++          $out = "target/ops-r1-isolated-typescript"
++          New-Item -ItemType Directory -Path $out -Force | Out-Null
++          $profileArgs = @('--config','profile.test.opt-level=1','--config','profile.test.package."*".opt-level=3','--config','profile.test.debug-assertions=true','--config','profile.test.overflow-checks=true')
++          $env:CARGO_TERM_COLOR = 'never'
++          & cargo test -p clean-ctx --lib --no-default-features --features typescript @profileArgs -- --exact --test-threads=1 --format=pretty compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership 2>&1 | Tee-Object -FilePath "$out/execution.log"
++          $suiteExit = $LASTEXITCODE
++          & python scripts/verify-ci-membership.py --root . --feature-mode typescript --execution "$out/execution.log" --suite-exit $suiteExit --output "$out/receipt.json"
++          if ($LASTEXITCODE -ne 0) { throw 'GARC-002 typescript verification failed' }
++      - name: retain isolated golden evidence
++        if: ${{ always() }}
++        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
++        with:
++          name: isolated-golden-${{ github.sha }}-${{ github.run_attempt }}
++          path: target/ops-r1-isolated-*
++          if-no-files-found: error
+       - name: cargo audit
+         run: |
+           cargo install cargo-audit --locked

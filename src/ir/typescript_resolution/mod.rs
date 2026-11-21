@@ -2,6 +2,7 @@
 pub(crate) mod arrow_selection;
 mod automatic_types;
 
+mod acquisition_inputs;
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_automatic_type_capture_issue_162.rs"]
 mod automatic_type_capture_tests;
@@ -13,6 +14,7 @@ pub(crate) mod constructor_parameters;
 pub(crate) mod declared_return_member;
 mod invocation_sites;
 pub(crate) mod member_declarations;
+pub(crate) mod shared_acquisition;
 
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_library_override_capture_issue_162.rs"]
@@ -359,3 +361,7 @@ mod local_input_option_tests;
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_erased_namespace_queries_issue_162.rs"]
 mod erased_namespace_query_tests;
+
+#[cfg(test)]
+#[path = "../../tests/ir/ops_r1_shared_acquisition_controls.rs"]
+mod ops_r1_shared_acquisition_controls;

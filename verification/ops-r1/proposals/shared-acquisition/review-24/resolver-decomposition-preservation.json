@@ -1,0 +1,18 @@
+{
+  "standing": "Static scenario/assertion preservation; execution still required",
+  "all_eight_scenarios_preserved": true,
+  "forms": [
+    "alias",
+    "barrel",
+    "namespace",
+    "local"
+  ],
+  "directions": [
+    "forward",
+    "reverse"
+  ],
+  "shared_direction_body_lstrip_sha256": "302b4c488a284409ebcc6634239d50c495e9a5e90d56fe878521465783e91125",
+  "original_source_sha256": "9347d8e8c3c4b2088dfa3feec4703395f5e702e058e520d780c10ce696b503c0",
+  "new_source_sha256": "7f59dfb18befb19c9f17b93e646b8b29d8421308e595302e1d9296cddc59c8c1",
+  "formatting_only_inside_direction_body": true
+}

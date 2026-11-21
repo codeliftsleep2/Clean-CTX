@@ -1,0 +1,11 @@
+{
+  "baseline": "25d17848f53e607313b877bdb64f5d791d280e20f11dc935c244d880f1b1a8eb",
+  "files": {
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs": "a05260c5402dea1594890d21a9b9306c4787fa0c71bc22508196854b37dc2230",
+    "src/tests/ir/ops_r1_shared_acquisition_isolation.rs": "7f87059494f87b780067875bf71e35de17417df6c988bdceff74764dba8ca582",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs": "3eb3fad095f0eade12cfc16650812ac8e0975f8b9ed1c387bae052e2610c27f6",
+    "src/tests/mcp/semantic_publication_recovery.rs": "bf71935540a93fe689f8d2c66a86248ed89b15721e66743db5604d69cc57939c",
+    "src/tests/mcp/semantic_retirement_controls_issue_162.rs": "3cf09c6c1f4fbc1e9b6095417b4933256fe79ef6622486509da96fab212e10c8"
+  },
+  "archive_sha256": "80b29f0a0258ddaf78a5621fa593d2b00eda9eab2080e888222106c06f721ed2"
+}

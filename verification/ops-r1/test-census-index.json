@@ -1,0 +1,32 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "generator_sha256": "d41e8e9a04e3411eebd1718d6215d7734c2dbe8aa4e2e2a1b3b9d593d0be5614",
+  "tracked_rust_files_scanned": 1483,
+  "source_test_functions_lexical": 5518,
+  "source_test_files_lexical": 850,
+  "retained_registered_identities": 5637,
+  "retained_execution_identities": 5637,
+  "outcomes": {
+    "ok": 5610,
+    "ignored": 27
+  },
+  "unique_function_name_source_candidates": 5586,
+  "unresolved_or_ambiguous_source_candidates": 51,
+  "historical_ci_source_head": "2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb",
+  "fitness_groups": 56,
+  "archive": "verification/ci-verify-r1/runtime-accounting-414-evidence.zip",
+  "archive_sha256": "c2a87318fb426e5c89adafac353971b32e58017a3476279b09248177c64d0c82",
+  "limitations": [
+    "Source scanner is lexical, not an AST/cfg evaluator.",
+    "Runtime identity is exact retained Cargo/libtest evidence, not current execution.",
+    "Function-name matches are candidates, not proof of module registration.",
+    "No coverage percentages, assertion value or semantic equivalence inferred from counts.",
+    "Macro-generated/parameterized tests may have no lexical function match.",
+    "Non-Rust script tests are inventoried by CI design, not represented as Rust tests."
+  ],
+  "generated_archive": "verification/ops-r1/test-census-evidence.zip",
+  "generated_archive_sha256": "7732962da957ecd88e4a9be46a1ad5e649fc081ac4861854425be645bcf6a32e",
+  "member_manifest_sha256": "12857e4a2bcbd406ba113c8a6d7bfb7707bfd5de35bf2fa486395da44a9adbbd",
+  "member_count": 1266
+}

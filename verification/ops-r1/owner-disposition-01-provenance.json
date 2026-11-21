@@ -1,0 +1,7 @@
+{
+  "source": "Owner-supplied OPS-R1 Owner Disposition 01 attachment",
+  "sha256": "23677cf3cd6e7e64d666f7e0867b2971905510a5692b80ed7ab62494b3e2ea19",
+  "tracked_copy": "verification/ops-r1/OWNER_DISPOSITION_01.md",
+  "followup": "A complete manual review of all tests is not a prerequisite for a justified and approved focused architectural enforcement tranche.",
+  "authorization_limit": "Cross-cutting implementation and new mandatory CI policy remain withheld; no protected authorization generated."
+}

@@ -1,0 +1,19 @@
+{
+  "standing": "Source variants reconstructed from archived inputs/patches; each matches its actual normalized build source-tree identity",
+  "source_trees": {
+    "baseline": "25d17848f53e607313b877bdb64f5d791d280e20f11dc935c244d880f1b1a8eb",
+    "initial": "6597c5374e4e77ae5b4ca26b229a9b6974b55b25dd62968a04104189ef2cb919",
+    "legacyedit-correction": "35728c887c63d929ada71cdc9824b3d56db475c7755909bbd1893dcb3f7d26d4",
+    "bounded-forms": "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+    "final": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f"
+  },
+  "only_accepted_source_files_changed": [
+    "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "src/tests/mcp/semantic_publication_recovery.rs",
+    "src/tests/mcp/semantic_retirement_controls_issue_162.rs"
+  ],
+  "archive_sha256": "d2abf74910f80c57a3e6b33707f6ada3a65062b619ef20a9ed25fcf700eaeb5d"
+}

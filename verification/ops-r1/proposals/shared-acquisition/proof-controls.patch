@@ -1,0 +1,511 @@
+diff --git a/src/ir/typescript_resolution/mod.rs b/src/ir/typescript_resolution/mod.rs
+--- a/src/ir/typescript_resolution/mod.rs
++++ b/src/ir/typescript_resolution/mod.rs
+@@ -361,3 +361,7 @@
+ #[cfg(test)]
+ #[path = "../../tests/ir/typescript_erased_namespace_queries_issue_162.rs"]
+ mod erased_namespace_query_tests;
++
++#[cfg(test)]
++#[path = "../../tests/ir/ops_r1_shared_acquisition_controls.rs"]
++mod ops_r1_shared_acquisition_controls;
+diff --git a/src/tests/ir/ops_r1_shared_acquisition_controls.rs b/src/tests/ir/ops_r1_shared_acquisition_controls.rs
+new file mode 100644
+--- /dev/null
++++ b/src/tests/ir/ops_r1_shared_acquisition_controls.rs
+@@ -0,0 +1,7 @@
++//! Concern-based registration; shared fixtures remain tracked in the test tree.
++#[path = "ops_r1_shared_acquisition_isolation.rs"]
++mod isolation;
++#[path = "ops_r1_shared_acquisition_proof.rs"]
++mod proof;
++#[path = "ops_r1_shared_acquisition_support.rs"]
++mod support;
+diff --git a/src/tests/ir/ops_r1_shared_acquisition_isolation.rs b/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
+new file mode 100644
+--- /dev/null
++++ b/src/tests/ir/ops_r1_shared_acquisition_isolation.rs
+@@ -0,0 +1,194 @@
++//! Configuration, ownership, concurrency and invalidation controls.
++use super::support::{acquire, fixture, resolver, write};
++use crate::ir::typescript_resolution::Resolver;
++use crate::ir::typescript_resolution::shared_acquisition::operation;
++use std::sync::Arc;
++
++#[test]
++fn ops_r1_shared_config_roots_and_route_changes_stay_independent() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    acquire(&mut first, &a);
++    write(
++        path,
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[],"strict":true},"include":["*.ts"]}"#,
++    );
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &b);
++    let extra = tempfile::tempdir().unwrap();
++    let mut third = Resolver::new(&[path.to_path_buf(), extra.path().to_path_buf()]).unwrap();
++    third.operation = Some(Arc::clone(&op));
++    third.acquisition_policy = "controls".into();
++    third.host.witnesses.enable();
++    third
++        .host
++        .seed(&a, &std::fs::read_to_string(&a).unwrap())
++        .unwrap();
++    acquire(&mut third, &a);
++    let mut fourth = resolver(path, "b.ts", &op);
++    acquire(&mut fourth, &path.join(".").join("b.ts"));
++    assert_eq!(op.counts(), [4, 4, 8]);
++}
++
++#[test]
++fn ops_r1_shared_source_and_package_changes_invalidate_proof() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    write(
++        path,
++        "node_modules/pkg/package.json",
++        r#"{"name":"pkg","version":"1.0.0","types":"index.d.ts"}"#,
++    );
++    write(
++        path,
++        "node_modules/pkg/index.d.ts",
++        "export declare class Token {}",
++    );
++    write(
++        path,
++        "a.ts",
++        "import {Token} from 'pkg'; export class A { token?: Token; }",
++    );
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    assert_eq!(first.program_units(&a).unwrap().len(), 3);
++    write(
++        path,
++        "node_modules/pkg/package.json",
++        r#"{"name":"pkg","version":"2.0.0","types":"index.d.ts"}"#,
++    );
++    let mut second = resolver(path, "b.ts", &op);
++    assert_eq!(second.program_units(&b).unwrap().len(), 3);
++    write(
++        path,
++        "a.ts",
++        "import {Token} from 'pkg'; export class Changed { token?: Token; }",
++    );
++    let mut third = resolver(path, "a.ts", &op);
++    assert_eq!(third.program_units(&a).unwrap().len(), 3);
++    assert_eq!(op.counts(), [3, 3, 9]);
++    assert!(!first.host.current());
++}
++
++#[test]
++fn ops_r1_shared_request_directory_and_inherited_project_remain_authoritative() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    write(
++        path,
++        "sub/tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"files":["c.ts"]}"#,
++    );
++    write(path, "sub/c.ts", "class C {}");
++    let a = path.join("a.ts");
++    let c = path.join("sub/c.ts");
++    let mut first = resolver(path, "sub/c.ts", &op);
++    assert_eq!(first.program_units(&c).unwrap().len(), 1);
++    let mut second = resolver(path, "sub/c.ts", &op);
++    let inherited = second
++        .in_source_project(&a, |resolver| resolver.program_units(&c))
++        .unwrap();
++    assert_eq!(inherited.len(), 2);
++    assert_eq!(op.counts(), [2, 2, 3]);
++    assert!(
++        second
++            .program_evidence
++            .contains_key(&path.join("tsconfig.json"))
++    );
++}
++
++#[test]
++fn ops_r1_shared_multiple_projects_and_operations_do_not_share_authority() {
++    let left = fixture();
++    let right = fixture();
++    let op = operation();
++    let mut a = resolver(left.path(), "a.ts", &op);
++    acquire(&mut a, &left.path().join("a.ts"));
++    let mut b = resolver(right.path(), "a.ts", &op);
++    acquire(&mut b, &right.path().join("a.ts"));
++    assert_eq!(op.counts(), [2, 2, 4]);
++    let next = operation();
++    let mut c = resolver(left.path(), "b.ts", &next);
++    acquire(&mut c, &left.path().join("b.ts"));
++    assert_eq!(next.counts(), [1, 1, 2]);
++}
++
++#[test]
++fn ops_r1_shared_same_config_different_automatic_type_lookup_stays_distinct() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    write(
++        path,
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true},"include":["**/*.ts"]}"#,
++    );
++    write(
++        path,
++        "node_modules/typescript/package.json",
++        r#"{"name":"typescript","version":"5.9.3"}"#,
++    );
++    write(path, "sub/c.ts", "class C { local?: Local; }");
++    write(
++        path,
++        "sub/node_modules/@types/local/index.d.ts",
++        "declare class Local {}",
++    );
++    let mut first = resolver(path, "a.ts", &op);
++    assert_eq!(first.program_units(&path.join("a.ts")).unwrap().len(), 3);
++    let mut second = resolver(path, "sub/c.ts", &op);
++    assert_eq!(
++        second.program_units(&path.join("sub/c.ts")).unwrap().len(),
++        4
++    );
++    assert_eq!(op.counts(), [2, 2, 7]);
++}
++
++#[test]
++fn ops_r1_shared_concurrent_owners_and_nested_acquisition_are_isolated() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let barrier = std::sync::Barrier::new(2);
++    std::thread::scope(|scope| {
++        let handles: Vec<_> = ["a.ts", "b.ts"]
++            .into_iter()
++            .map(|owner| {
++                let op = Arc::clone(&op);
++                let barrier = &barrier;
++                scope.spawn(move || {
++                    let mut resolver = resolver(path, owner, &op);
++                    barrier.wait();
++                    acquire(&mut resolver, &path.join(owner));
++                    assert!(resolver.host.current());
++                })
++            })
++            .collect();
++        for handle in handles {
++            handle.join().unwrap();
++        }
++    });
++    assert_eq!(op.counts(), [1, 1, 2]);
++    let mut nested = resolver(path, "a.ts", &op);
++    nested.program_active.insert(path.join("other-config.json"));
++    acquire(&mut nested, &path.join("a.ts"));
++    assert_eq!(
++        op.counts(),
++        [2, 2, 4],
++        "nested acquisitions do not wait on cross-group locks"
++    );
++    let mut recursive = resolver(path, "a.ts", &op);
++    recursive.program_active.insert(path.join("tsconfig.json"));
++    assert_eq!(
++        recursive.program_units(&path.join("a.ts")).unwrap_err(),
++        "Recursive program acquisition"
++    );
++}
+diff --git a/src/tests/ir/ops_r1_shared_acquisition_proof.rs b/src/tests/ir/ops_r1_shared_acquisition_proof.rs
+new file mode 100644
+--- /dev/null
++++ b/src/tests/ir/ops_r1_shared_acquisition_proof.rs
+@@ -0,0 +1,243 @@
++//! Acquisition receipt/provenance and failure controls.
++use super::support::{acquire, fixture, resolver, write};
++use crate::ir::typescript_resolution::acquisition_inputs::{Input, visit};
++use crate::ir::typescript_resolution::shared_acquisition::{basis, operation, reusable_sources};
++use crate::ir::typescript_resolution::{Resolver, TypeScriptAuthority, Witness};
++use std::sync::Arc;
++
++#[test]
++fn ops_r1_shared_precached_host_unit_project_and_owner_only_proof() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    assert!(first.unit(&a).is_some());
++    assert!(first.project_identity(&a).is_ok());
++    write(path, "owner-only.txt", "original");
++    assert!(first.host.read(&path.join("owner-only.txt")).is_some());
++    acquire(&mut first, &a);
++    let project = first.request_project(&a).unwrap();
++    let key = basis(&first, &a, &project).unwrap();
++    let proof = op.slot(key).lock().unwrap().as_ref().unwrap().clone();
++    assert_eq!(proof.sources[&a].bytes.as_ref(), "class A { peer?: Z; }");
++    let mut source_paths = Vec::new();
++    visit(&proof.inputs, |input| {
++        if let Input::Source(input) = input {
++            source_paths.push(input.path.clone());
++        }
++    });
++    assert!(source_paths.contains(&a) && source_paths.contains(&b));
++    assert!(!source_paths.contains(&path.join("owner-only.txt")));
++    write(path, "owner-only.txt", "changed");
++    assert!(!first.host.current());
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &b);
++    assert!(second.host.current());
++    assert_eq!(op.counts(), [1, 1, 2]);
++    assert_eq!(op.qualification_counts()[1], 1);
++}
++
++#[test]
++fn ops_r1_shared_seed_is_not_sibling_disk_authority() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    acquire(&mut first, &a);
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &b);
++    assert!(
++        second
++            .host
++            .witnesses
++            .iter()
++            .any(|w| matches!(w, Witness::Content {path, ..} if path == &a))
++    );
++    assert!(
++        !second
++            .host
++            .witnesses
++            .iter()
++            .any(|w| matches!(w, Witness::Content {path, ..} if path == &b))
++    );
++    write(path, "a.ts", "class A { changed: string; }");
++    assert!(!second.host.current());
++}
++
++#[test]
++fn ops_r1_shared_divergent_overlay_and_private_cache_are_not_overwritten() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    acquire(&mut first, &a);
++    let mut second = Resolver::new(&[path.to_path_buf()]).unwrap();
++    second.operation = Some(Arc::clone(&op));
++    second.acquisition_policy = "controls".into();
++    second.host.witnesses.enable();
++    let overlay = "class Different { peer?: Z; }";
++    second.host.seed(&a, overlay).unwrap();
++    assert!(second.unit(&a).is_some());
++    acquire(&mut second, &a);
++    assert_eq!(second.host.read(&a).unwrap().as_ref(), overlay);
++    assert_eq!(op.counts(), [2, 2, 4]);
++}
++
++#[test]
++fn ops_r1_shared_failed_partial_and_poisoned_leader_do_not_grant_or_poison() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    write(path, "b.ts", [255u8]);
++    let a = path.join("a.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    assert!(first.program_units(&a).is_err());
++    write(path, "b.ts", "class Z {}");
++    let mut second = resolver(path, "a.ts", &op);
++    acquire(&mut second, &a);
++    assert_eq!(op.counts(), [2, 1, 3]);
++    let invalid: crate::ir::typescript_resolution::acquisition_inputs::Inputs =
++        vec![Input::Observation(Arc::new(Witness::Unreadable {
++            path: a.clone(),
++        }))]
++        .into();
++    assert!(reusable_sources(&invalid, &op).is_none());
++    assert!(reusable_sources(&Arc::from([]), &op).is_none());
++    let other = operation();
++    let mut third = resolver(path, "a.ts", &other);
++    let project = third.request_project(&a).unwrap();
++    let key = basis(&third, &a, &project).unwrap();
++    let slot = other.slot(key);
++    assert!(
++        std::panic::catch_unwind(|| {
++            let _guard = slot.lock().unwrap();
++            panic!("failed leader");
++        })
++        .is_err()
++    );
++    acquire(&mut third, &a);
++    assert_eq!(other.counts(), [1, 1, 2]);
++}
++
++#[test]
++fn ops_r1_shared_standalone_capture_and_missing_module_qualification() {
++    let root = fixture();
++    let path = root.path();
++    let a = path.join("a.ts");
++    let source = std::fs::read_to_string(&a).unwrap();
++    let before = TypeScriptAuthority::capture(&a, &source, &[path.to_path_buf()]);
++    let op = operation();
++    let after = TypeScriptAuthority::capture_in_operation(
++        &a,
++        &source,
++        &[path.to_path_buf()],
++        None,
++        (&[], &[]),
++        Some(op),
++    );
++    assert_eq!(before.source_hash, after.source_hash);
++    assert_eq!(before.capture_current, after.capture_current);
++    assert_eq!(before.disposition, after.disposition);
++    assert_eq!(
++        serde_json::to_value(&before.references).unwrap(),
++        serde_json::to_value(&after.references).unwrap()
++    );
++    assert_eq!(
++        serde_json::to_value(&before).unwrap(),
++        serde_json::to_value(&after).unwrap(),
++        "receipt recording alone preserves standalone authority"
++    );
++    write(path, "a.ts", "import './absent'; class A { peer?: Z; }");
++    let op = operation();
++    let mut first = resolver(path, "a.ts", &op);
++    acquire(&mut first, &a);
++    assert!(
++        !first.program_evidence[&path.join("tsconfig.json")]
++            .missing_modules
++            .is_empty()
++    );
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &path.join("b.ts"));
++    assert!(second.host.current());
++    assert!(
++        !second.program_evidence[&path.join("tsconfig.json")]
++            .missing_modules
++            .is_empty()
++    );
++}
++
++#[test]
++fn ops_r1_shared_precached_attached_unit_replays_only_its_source() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "a.ts", &op);
++    acquire(&mut first, &a);
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &b);
++    let scope = second.host.witnesses.begin();
++    assert!(second.unit(&a).is_some());
++    let inputs = second.host.witnesses.finish(scope);
++    let mut sources = Vec::new();
++    visit(&inputs, |input| {
++        if let Input::Source(input) = input {
++            sources.push(input.path.clone());
++        }
++    });
++    assert!(sources.contains(&a));
++    assert!(!sources.contains(&b));
++    assert!(!sources.contains(&path.join("tsconfig.json")));
++}
++
++#[test]
++fn ops_r1_shared_failed_partial_after_one_unit_keeps_local_failure() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    write(path, "a.ts", [255u8]);
++    let b = path.join("b.ts");
++    let mut first = resolver(path, "b.ts", &op);
++    assert!(first.program_units(&b).is_err());
++    assert_eq!(op.counts(), [1, 0, 2]);
++    write(path, "a.ts", "class A { peer?: Z; }");
++    let mut second = resolver(path, "b.ts", &op);
++    acquire(&mut second, &b);
++    assert_eq!(op.counts(), [2, 1, 4]);
++    assert!(
++        first.program_units(&b).is_err(),
++        "existing owner-local failure memoization remains local"
++    );
++    assert_eq!(op.counts(), [2, 1, 4]);
++}
++
++#[test]
++fn ops_r1_shared_precached_unaccounted_values_never_seal_from_nonempty_witnesses() {
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let mut late = Resolver::new(&[path.to_path_buf()]).unwrap();
++    late.host
++        .seed(&a, &std::fs::read_to_string(&a).unwrap())
++        .unwrap();
++    assert!(late.unit(&a).is_some());
++    assert!(late.project_identity(&a).is_ok());
++    assert!(!late.host.witnesses.is_empty());
++    late.operation = Some(Arc::clone(&op));
++    late.acquisition_policy = "controls".into();
++    late.host.witnesses.enable();
++    acquire(&mut late, &a);
++    let project = late.request_project(&a).unwrap();
++    let key = basis(&late, &a, &project).unwrap();
++    assert!(op.slot(key).lock().unwrap().is_none());
++    let mut accounted = resolver(path, "b.ts", &op);
++    acquire(&mut accounted, &path.join("b.ts"));
++    assert_eq!(op.counts(), [2, 2, 4]);
++}
+diff --git a/src/tests/ir/ops_r1_shared_acquisition_support.rs b/src/tests/ir/ops_r1_shared_acquisition_support.rs
+new file mode 100644
+--- /dev/null
++++ b/src/tests/ir/ops_r1_shared_acquisition_support.rs
+@@ -0,0 +1,36 @@
++//! Scoped input, authority, currentness and failure falsifiers; no timing budget.
++use crate::ir::typescript_resolution::Resolver;
++use crate::ir::typescript_resolution::shared_acquisition::Operation;
++use std::{path::Path, sync::Arc};
++
++pub(super) fn write(root: &Path, name: &str, source: impl AsRef<[u8]>) {
++    let path = root.join(name);
++    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
++    std::fs::write(path, source).unwrap();
++}
++pub(super) fn fixture() -> tempfile::TempDir {
++    let root = tempfile::tempdir().unwrap();
++    write(
++        root.path(),
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"include":["*.ts"]}"#,
++    );
++    write(root.path(), "a.ts", "class A { peer?: Z; }");
++    write(root.path(), "b.ts", "class Z {}");
++    root
++}
++pub(super) fn resolver(root: &Path, owner: &str, op: &Arc<Operation>) -> Resolver {
++    let mut resolver = Resolver::new(&[root.to_path_buf()]).unwrap();
++    resolver.operation = Some(Arc::clone(op));
++    resolver.acquisition_policy = "controls".into();
++    resolver.host.witnesses.enable();
++    let path = root.join(owner);
++    resolver
++        .host
++        .seed(&path, &std::fs::read_to_string(&path).unwrap())
++        .unwrap();
++    resolver
++}
++pub(super) fn acquire(resolver: &mut Resolver, path: &Path) {
++    assert_eq!(resolver.program_units(path).unwrap().len(), 2);
++}

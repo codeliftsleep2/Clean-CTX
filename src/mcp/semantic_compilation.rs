@@ -513,3 +513,11 @@ mod angular_deleted_owner_membership_tests;
 #[cfg(all(test, feature = "typescript", feature = "angular"))]
 #[path = "../tests/mcp/semantic_retirement_controls_issue_162.rs"]
 mod semantic_retirement_controls_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/mcp/ops_r1_absent_route.rs"]
+mod ops_r1_repro_tests;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "../tests/mcp/ops_r1_acquisition_fitness.rs"]
+mod ops_r1_acquisition_fitness;

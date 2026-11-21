@@ -21,7 +21,7 @@ pub(crate) struct DeclarationId {
     pub kind: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
 pub(crate) enum Witness {
     Directory {
         path: PathBuf,
@@ -55,6 +55,8 @@ impl Witness {
     pub(crate) fn current(&self) -> bool {
         #[cfg(test)]
         crate::work_observations_af_perf_002::witness(self);
+        #[cfg(all(test, feature = "angular"))]
+        crate::ops_r1_observation::record(10, 1);
         #[cfg(all(test, feature = "angular"))]
         crate::angular_meta::admission_work_metrics::witness();
         match self {
@@ -102,10 +104,14 @@ impl Witness {
 
 /// One operation owns immutable bytes and every observation used to resolve them.
 pub(crate) struct Host {
-    roots: Vec<PathBuf>,
-    aliases: Vec<(PathBuf, PathBuf)>,
-    sources: BTreeMap<PathBuf, Option<Arc<str>>>,
-    pub witnesses: Vec<Witness>,
+    pub(super) roots: Vec<PathBuf>,
+    pub(super) aliases: Vec<(PathBuf, PathBuf)>,
+    pub(super) sources: BTreeMap<PathBuf, Option<Arc<str>>>,
+    pub(super) witnesses: super::acquisition_inputs::InputLog,
+    pub(super) source_inputs: BTreeMap<PathBuf, Arc<super::acquisition_inputs::SourceInput>>,
+    source_receipts: BTreeMap<PathBuf, super::acquisition_inputs::Inputs>,
+    pub(super) shared_inputs: Vec<super::shared_acquisition::BoundProgram>,
+    pub(super) supplied_inputs: BTreeMap<PathBuf, Arc<str>>,
 }
 
 impl Host {
@@ -151,17 +157,33 @@ impl Host {
         Ok(entries)
     }
     pub(crate) fn seed(&mut self, path: &Path, source: &str) -> Result<(), String> {
-        let path = self
-            .normalized(path)
-            .ok_or("Source snapshot outside scope")?;
+        let scope = self.witnesses.begin();
+        self.witnesses.roots();
+        let path = self.normalized(path);
+        let backing = self.witnesses.finish(scope);
+        let path = path.ok_or("Source snapshot outside scope")?;
         if let Some(existing) = self.sources.get(&path) {
-            return if existing.as_deref() == Some(source) {
-                Ok(())
-            } else {
-                Err("Cannot replace an already consumed TypeScript snapshot".into())
-            };
+            if existing.as_deref() != Some(source) {
+                return Err("Cannot replace an already consumed TypeScript snapshot".into());
+            }
+        } else {
+            let bytes: Arc<str> = Arc::from(source);
+            let input = Arc::new(super::acquisition_inputs::SourceInput {
+                path: path.clone(),
+                bytes: Arc::clone(&bytes),
+                supplied: true,
+                accounted: scope != usize::MAX,
+                backing,
+            });
+            self.source_inputs.insert(path.clone(), input);
+            let input = &self.source_inputs[&path];
+            self.source_receipts.insert(
+                path.clone(),
+                super::acquisition_inputs::source_receipt(input),
+            );
+            self.sources.insert(path.clone(), Some(bytes));
         }
-        self.sources.insert(path, Some(Arc::from(source)));
+        self.supplied_inputs.insert(path, Arc::from(source));
         Ok(())
     }
     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
@@ -196,13 +218,19 @@ impl Host {
                 .iter()
                 .map(|(_, physical)| physical.clone())
                 .collect(),
-            witnesses: aliases
-                .iter()
-                .map(|(route, physical)| Witness::Physical {
-                    path: route.clone(),
-                    target: physical.clone(),
-                })
-                .collect(),
+            witnesses: super::acquisition_inputs::InputLog::new(
+                aliases
+                    .iter()
+                    .map(|(route, physical)| Witness::Physical {
+                        path: route.clone(),
+                        target: physical.clone(),
+                    })
+                    .collect(),
+            ),
+            source_inputs: BTreeMap::new(),
+            source_receipts: BTreeMap::new(),
+            shared_inputs: Vec::new(),
+            supplied_inputs: BTreeMap::new(),
             aliases,
             sources: BTreeMap::new(),
         })
@@ -321,10 +349,45 @@ impl Host {
     }
 
     pub(crate) fn read(&mut self, path: &Path) -> Option<Arc<str>> {
-        let path = self.normalized(path)?;
-        if let Some(source) = self.sources.get(&path) {
-            return source.clone();
+        use super::acquisition_inputs::{SourceInput, source_receipt};
+        let scope = self.witnesses.begin();
+        self.witnesses.roots();
+        let normalized = self.normalized(path);
+        let Some(path) = normalized else {
+            self.witnesses.finish(scope);
+            return None;
+        };
+        if let Some(source) = self.sources.get(&path).cloned() {
+            if let Some(inputs) = self.source_receipts.get(&path) {
+                self.witnesses.attribute(inputs);
+            } else {
+                self.witnesses.attribute(&Arc::from([]));
+            }
+            self.witnesses.finish(scope);
+            return source;
         }
+        let shared = self
+            .shared_inputs
+            .iter()
+            .find_map(|bound| {
+                bound
+                    .sources
+                    .get(&path)
+                    .or_else(|| bound.proof.sources.get(&path))
+            })
+            .cloned();
+        if let Some(input) = shared {
+            self.witnesses.attribute(&source_receipt(&input));
+            let source = Arc::clone(&input.bytes);
+            self.source_inputs.insert(path.clone(), input);
+            self.source_receipts
+                .insert(path.clone(), source_receipt(&self.source_inputs[&path]));
+            self.sources.insert(path, Some(Arc::clone(&source)));
+            self.witnesses.finish(scope);
+            return Some(source);
+        }
+        #[cfg(all(test, feature = "angular"))]
+        crate::ops_r1_observation::record(8, 1);
         let source = match self.read_bytes(&path) {
             Ok(bytes) => {
                 self.witnesses.push(Witness::Content {
@@ -350,6 +413,22 @@ impl Host {
                 None
             }
         };
+        let backing = self.witnesses.finish(scope);
+        self.source_receipts
+            .insert(path.clone(), Arc::clone(&backing));
+        if let Some(bytes) = source.as_ref() {
+            let input = Arc::new(SourceInput {
+                path: path.clone(),
+                bytes: Arc::clone(bytes),
+                supplied: false,
+                accounted: scope != usize::MAX,
+                backing,
+            });
+            self.witnesses.source(&input);
+            self.source_inputs.insert(path.clone(), input);
+            self.source_receipts
+                .insert(path.clone(), source_receipt(&self.source_inputs[&path]));
+        }
         self.sources.insert(path, source.clone());
         source
     }

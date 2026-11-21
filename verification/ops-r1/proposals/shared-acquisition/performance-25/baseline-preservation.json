@@ -1,0 +1,12 @@
+{
+  "accepted_source_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+  "accepted_binary_sha256": "ce6dc4454eea4bd667eda9bc7185209914ad7fc7fac0cd65e9a13d6eefb58c7c",
+  "restored_isolated_source_to_accepted_baseline": true,
+  "restored_files": [
+    "src/ir/typescript_resolution/program.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "src/tests/mcp/semantic_publication_recovery.rs"
+  ],
+  "closed_experiments_repeated": false
+}

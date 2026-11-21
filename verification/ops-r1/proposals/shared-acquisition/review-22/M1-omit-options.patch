@@ -1,0 +1,11 @@
+--- a/src/ir/typescript_resolution/shared_acquisition.rs
++++ b/src/ir/typescript_resolution/shared_acquisition.rs
+@@ -156,7 +156,7 @@
+     serde_json::to_string(&serde_json::json!({
+         "config": config, "root": project.root, "base": project.base,
+         "mode": project.mode, "paths": project.paths, "conditions": project.conditions,
+-        "options": project.options, "ownership": project.ownership,
++        "options": serde_json::Value::Null, "ownership": project.ownership,
+         "compiler": project.compiler_version, "extensions": format!("{:?}", project.extensions),
+         "directory": file.parent(), "extension": file.extension().and_then(|s| s.to_str()),
+         "roots": resolver.host.roots, "aliases": resolver.host.aliases,

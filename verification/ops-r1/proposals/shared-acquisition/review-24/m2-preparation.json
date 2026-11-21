@@ -1,0 +1,11 @@
+{
+  "standing": "Sequential isolated M2/no-sharing candidate; M3 source and binary archived before transition",
+  "m3_source_archive_sha256": "25ec62ffc0bb9af4e7052406b04e44f30f148a1f3989fb3002edeece8e7f8e8a",
+  "m3_preserved_executable": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI\\target\\ops-r1\\m3-binary-control-24\\clean_ctx-c147437a0212f889.exe",
+  "m2_source_tree_sha256": "bfa685cafeb0536fe6d0f9330af3ef829adad8c6a7a04a67c255cc9cf49e086d",
+  "m2_manifest_sha256": "e524e39e31616ebf3c8b774ab88983eeb6e492629068621b59b1411c55f3db7b",
+  "m2_adapter_sha256": "6c357ca7783f620725af439d1df0b1e7ce15bfb6b78fa4e4bc77d1275a21b6b8",
+  "production_fault": "program_active.len()==0 disables operation-slot lookup only",
+  "m3_removed_from_current_isolated_source": true,
+  "accepted_production_unchanged": true
+}

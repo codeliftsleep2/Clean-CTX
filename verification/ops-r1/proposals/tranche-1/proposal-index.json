@@ -1,0 +1,179 @@
+{
+  "standing": "UNAPPLIED AND UNCOMPILED; owner review required",
+  "allfeature_required_identities": [
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "ir::pipeline::core::ci_runtime_query_tests::ci_runtime_core_query_warm_observation_avoids_recompiling_binary_owned_query",
+      "minimum": 1,
+      "tests": [
+        "ir::pipeline::core::ci_runtime_query_tests::ci_runtime_core_query_warm_observation_avoids_recompiling_binary_owned_query"
+      ],
+      "architectural_ids": [
+        "GARC-001"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir",
+      "minimum": 1,
+      "tests": [
+        "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir"
+      ],
+      "architectural_ids": [
+        "GARC-001"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_custom_invalid_and_mismatched_queries_stay_dynamic",
+      "minimum": 1,
+      "tests": [
+        "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_custom_invalid_and_mismatched_queries_stay_dynamic"
+      ],
+      "architectural_ids": [
+        "GARC-001"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership",
+      "minimum": 1,
+      "tests": [
+        "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership"
+      ],
+      "architectural_ids": [
+        "GARC-002"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::angular_deleted_owner_membership_tests::issue_162_deleted_owner_legacy_membership_is_retired",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::angular_deleted_owner_membership_tests::issue_162_deleted_owner_legacy_membership_is_retired"
+      ],
+      "architectural_ids": [
+        "GARC-003"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion"
+      ],
+      "architectural_ids": [
+        "GARC-003"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families"
+      ],
+      "architectural_ids": [
+        "GARC-003"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion"
+      ],
+      "architectural_ids": [
+        "GARC-003"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::restore_registration_boundary_tests::issue_162_unchanged_bootstrap_durable_registration_boundary",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::restore_registration_boundary_tests::issue_162_unchanged_bootstrap_durable_registration_boundary"
+      ],
+      "architectural_ids": [
+        "GARC-004"
+      ]
+    },
+    {
+      "package": "clean-ctx",
+      "target": "lib",
+      "filter": "mcp::semantic_compilation::restore_registration_config_matrix_tests::issue_162_restore_registration_config_preservation_matrix",
+      "minimum": 1,
+      "tests": [
+        "mcp::semantic_compilation::restore_registration_config_matrix_tests::issue_162_restore_registration_config_preservation_matrix"
+      ],
+      "architectural_ids": [
+        "GARC-004"
+      ]
+    }
+  ],
+  "isolated": {
+    "csharp": [
+      "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir"
+    ],
+    "typescript": [
+      "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir",
+      "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership"
+    ]
+  },
+  "files": [
+    {
+      "path": "verification/ci-verify-r1/membership.json",
+      "baseline_bytes_sha256": "da6ca832c8cdc39f965da69d2dd69e785ab8ef17e27684c1e321d1cb6261e191",
+      "candidate_utf8_lf_sha256": "8ffd6fc014ce3814cbdb51024a1df21c7ac95422039ef6197bdcdfd446fde44a",
+      "candidate_lines": 30
+    },
+    {
+      "path": "verification/ci-verify-r1/golden-membership.json",
+      "baseline_bytes_sha256": null,
+      "candidate_utf8_lf_sha256": "5ffa89068e57d8104633372a9401ceccd3ce149938498bb6081603436e6f1a6d",
+      "candidate_lines": 148
+    },
+    {
+      "path": "scripts/verify-ci-membership.py",
+      "baseline_bytes_sha256": "c42528291a588fa4af75902f5d4891f2f066dab8ef9d84188e2f74d858559ba8",
+      "candidate_utf8_lf_sha256": "b9027996f28b97d8e3a8271aba571cc34db600f8627266217c9ae665ba42956f",
+      "candidate_lines": 238
+    },
+    {
+      "path": "src/tests/architecture/ci_verify_r1.rs",
+      "baseline_bytes_sha256": "e33a29b7b8925c4c49a2a0ee37ca47b13adcbf06a2d915aa86c2c57e848e3d7a",
+      "candidate_utf8_lf_sha256": "56501ceb739d053805949fd0f4001bf915821639c2a692b76404e4203ecc70d1",
+      "candidate_lines": 321
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "baseline_bytes_sha256": "c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50",
+      "candidate_utf8_lf_sha256": "62642bd8a85a2f2c48e716ceca17f99d8c5994c316cef5afe0bda96667164dd4",
+      "candidate_lines": 99
+    },
+    {
+      "path": "docs/agent/verification.md",
+      "baseline_bytes_sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799",
+      "candidate_utf8_lf_sha256": "f7fde729c812b0914631b7c7f5712e4eddbe1c9f14373c64929809ca86765576",
+      "candidate_lines": 260
+    },
+    {
+      "path": "docs/architecture/knowledge-governance/protected.csv",
+      "baseline_bytes_sha256": "776417a1cb057f8a7e4c5dd3e619a7790a4832209f6fa679e74ea5266d0e08e6",
+      "candidate_utf8_lf_sha256": "a56d49898b4734382f88fac0f98c1e64ef53060aa152cbfc7e72a5d32a6664f5",
+      "candidate_lines": 344
+    }
+  ],
+  "execution_cost": "Zero additional allfeature runtime executions; one C#-only and two TS-only controls; each mode builds the lib test target once. No timing estimates claimed."
+}

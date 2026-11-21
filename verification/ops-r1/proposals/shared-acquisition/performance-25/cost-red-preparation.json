@@ -1,0 +1,11 @@
+{
+  "baseline_source_tree_sha256": "50fa4a778c08180a1ce391f9440e537d2e9d8df45c6c096d65f9625363e05bb0",
+  "candidate_source_tree_sha256": "1270621a113d93c1b367089cbe6e2c2b9b7c255c56120c609835792d25f7431d",
+  "manifest_sha256": "a51681b2a426c4a5a7f7c7c8b17e1817fac6b5760899ecdc07dcd1a579dd81fb",
+  "adapter_sha256": "b3ecf62ccf79350b8361a75b4a564d990a530c57241d169afaa2fba2fa0ee7ce",
+  "baseline_source_archive_sha256": "4df3af3a0f7358d4d9205b431d7a78c3501fde9b31d8a57ba37030af0e14513d",
+  "preserved_binary_sha256": "40139437570795ebd384e87803838669eda63ef0d64375039d4df7ba3257d7bc",
+  "production_changed": false,
+  "tests_executed": false,
+  "source_identity_algorithm": "Sorted path and normalized source SHA256 rows, compact JSON SHA256; existing reviewed monitor"
+}

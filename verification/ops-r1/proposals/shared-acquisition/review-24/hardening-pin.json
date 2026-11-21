@@ -1,0 +1,7 @@
+{
+  "source_tree_sha256": "6597c5374e4e77ae5b4ca26b229a9b6974b55b25dd62968a04104189ef2cb919",
+  "manifest_sha256": "5dd3b461e75ea90210a2120251be18d63ea2a24f522ed1b66db9e64550bc55e6",
+  "adapter_sha256": "3edb434bacc05b5a7ae64dd646dbe6687fb851ffc8ac1756693f745fcdafae5b",
+  "tests": 32,
+  "production_changed": false
+}

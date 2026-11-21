@@ -282,6 +282,12 @@ text/hash checks are not a Rust AST equivalence proof or executed verification.
 <!-- pcg:ANG-R2-mission-document-coverage:begin -->
 ## Covered ANG-R2 mission documents and assets
 
+The field-triggered [shared work amplification audit](ANG_R2_SHARED_WORK_AMPLIFICATION_AUDIT.md)
+records the reported absent-route hang/memory growth and broader source-path census,
+including shared consumers outside Angular. These are bounded investigation
+findings and proposed verification questions, not measured leak diagnosis,
+owner-approved repairs, amended authority or resolved field acceptance.
+
 The combined [Claude ANG-R1/ANG-R2 field testing instruction](../../verification/live-acceptance/issue-162/ang-r2/CLAUDE_ANG_R1_R2_TESTING.md)
 is covered by this mission-document component. It distinguishes baseline written
 membership from public key registration and executable eligibility, reuses current

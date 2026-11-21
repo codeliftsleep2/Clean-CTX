@@ -4,11 +4,11 @@ use super::{DeclarationId, Resolver, module_resolution::ModuleRequestKind, synta
 use std::path::Path;
 
 impl Resolver {
-    pub(super) fn ambient_scope_in_units(
+    pub(super) fn ambient_scope_in_units<'a>(
         &mut self,
         file: &Path,
         specifier: &str,
-        units: &[Unit],
+        units: impl IntoIterator<Item = &'a Unit>,
     ) -> Result<Option<NamespaceScope>, String> {
         let project = self.request_project(file)?;
         let mut blocks = Vec::new();
@@ -77,7 +77,7 @@ impl Resolver {
                 .map(|target| NamespaceScope::module(&target));
         }
         let units = self.program_units(file)?;
-        let ambient = self.ambient_scope_in_units(file, specifier, &units)?;
+        let ambient = self.ambient_scope_in_units(file, specifier, units.values())?;
         if let Some(scope) = &ambient
             && scope.blocks.iter().all(|id| id.name == specifier)
         {

@@ -1,0 +1,98 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-20",
+  "standing": "Static source review only; no application, build, test, grant or independent certification",
+  "patches": [
+    {
+      "path": "verification/ops-r1/proposals/p0/registration-and-tests.patch",
+      "sha256": "31c82852c0845c536af10af5277641061db8864c46bef9899aacf684a853061a",
+      "lines": 159
+    },
+    {
+      "path": "verification/ops-r1/proposals/p0/test-only-observations.patch",
+      "sha256": "c9eccd0c139381d035682bc8a16c7a4bfb93156f423528d117fbef5c9a3a6d31",
+      "lines": 152
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/ci.patch",
+      "sha256": "6e5700095a87439a500b87ee029cc642c407fc595bbfbb1a4b7bec23dd6855ae",
+      "lines": 38
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/fixtures.patch",
+      "sha256": "2105490acde29771478f72560f3795a59e109a563c43729d8dcf3aa3ab0e0e01",
+      "lines": 127
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/governance.patch",
+      "sha256": "43341b0db254d0bc049d4497f8b7ce801be7842a33eda4ae5bb7c05adaa4e183",
+      "lines": 41
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/membership.patch",
+      "sha256": "9b6b7fd4dbf7c72f9c36cfe28f5d0f04eb5b415acc7c7726964e980959624204",
+      "lines": 163
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/verifier.patch",
+      "sha256": "34ede99018fe5234df919f22775e0eff4204ae523dc9580394eeb678142ab473",
+      "lines": 80
+    }
+  ],
+  "source_and_authority_revisions": "verification/ops-r1/review-03/observed-revisions.json",
+  "p0_baseline_source_tree_sha256": "5b8314eb76bdad1adf3b24aab708f813f55288ea11c7275b07a6a22062695bda",
+  "p0_candidate_source_tree_sha256": "393f7d7b0ba31dbe0f78cceb43539dccdb120598a154af8c7a7c415b33a661c1",
+  "p0_candidate_source_file_count": 1522,
+  "p0_changed_source_files": 11,
+  "tranche_changed_files": 7,
+  "actual_protected_selections_unchanged": 342,
+  "proposed_future_protected_selections": 343,
+  "last_actual_capture": "target/ops-r1/checkpoint-20261120-113420",
+  "last_actual_descriptor_digest": "2eadec758ccfef3eb1751dd4c41a7b8146d07c0a918ca5d6eb2b7e097fe09bac",
+  "last_actual_admission": "E_GOVERNANCE_AUTHORIZATION_REQUIRED",
+  "checks": [
+    "Both separate patch groups pass git apply --check",
+    "Candidate Python verifier syntax parsed",
+    "P0 baseline-only source preflight passed without spawning a test",
+    "Source/authority snapshots recorded; current implementation paths unchanged"
+  ],
+  "findings": [
+    {
+      "id": "R03-01",
+      "issue": "Isolated verifier could omit actual Cargo exit",
+      "resolution": "Candidate requires execution/exit and adds six isolated valid/negative fixtures",
+      "standing": "Unexecuted proposed correction"
+    },
+    {
+      "id": "R03-02",
+      "issue": "Witness hash expected data needed explicit protected review binding",
+      "resolution": "Separate governance amendment proposes final-verification obligation plus protected golden component; count/duplicate frozen-witness checks added",
+      "standing": "Unapplied; actual B11 authorization still required"
+    },
+    {
+      "id": "R03-03",
+      "issue": "Polling-only deadline depended on memory-read responsiveness",
+      "resolution": "Separate wall watchdog, exact-child kill/wait and partial stop marker",
+      "standing": "Source reviewed; termination path unexecuted"
+    },
+    {
+      "id": "R03-04",
+      "issue": "Rust-only source pins omitted compile-time fixture/query data",
+      "resolution": "Pin tracked src/build inputs including byte-exact non-Rust assets; check baseline before application",
+      "standing": "Baseline preflight passed; proposed source not compiled"
+    },
+    {
+      "id": "R03-05",
+      "issue": "Post-capture identity and stage/fixture custody gaps",
+      "resolution": "Post source/executable checks, hashed stages/stop markers and fixture input verification; no peak inference without sample",
+      "standing": "Source reviewed; capture unexecuted"
+    }
+  ],
+  "limitations": [
+    "Rust uncompiled/unformatted",
+    "Verifier adversarial cases unexecuted",
+    "No potentially hanging child or production query run",
+    "Shared-consumer exposure not erased",
+    "Combined source application requires its own approved pin"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "standing": "Actual operator tracked-test captures; no CI or field acceptance",
+  "groups": [
+    {
+      "name": "performance-25-performance-25-baseline-20261120-234850",
+      "status": "ALL_SELECTED_CELLS_COMPLETED",
+      "review_sha256": "ceefbc875f62861ec8df1534d717f2d1283066368112abbd4760a13fd77925bf",
+      "selected_count": 10,
+      "captured_count": 10
+    },
+    {
+      "name": "performance-25-performance-25-baseline-20261120-235505",
+      "status": "STOPPED_FOR_REVIEW",
+      "review_sha256": "0cce73c20cc1858e079ae674e8581677c4414b6d3e9970351f29d267f2683d28",
+      "selected_count": 5,
+      "captured_count": 2
+    },
+    {
+      "name": "performance-25-performance-25-baselineb-20261121-001101",
+      "status": "ALL_SELECTED_CELLS_COMPLETED",
+      "review_sha256": "2e36759e8ed83d624e3f30251085b54a67495b661e2dafe6caf9fb889fe45903",
+      "selected_count": 3,
+      "captured_count": 3
+    },
+    {
+      "name": "performance-25-performance-25-cost-green-20261121-004623",
+      "status": "ALL_SELECTED_CELLS_COMPLETED",
+      "review_sha256": "c79b086f5dbca1bdc3fb4d144cab872d518030bfda708b726eed88fe0c45a89c",
+      "selected_count": 3,
+      "captured_count": 3
+    },
+    {
+      "name": "performance-25-performance-25-directory-green-20261121-013611",
+      "status": "ALL_SELECTED_CELLS_COMPLETED",
+      "review_sha256": "057a8d0328bf521f60f16563926e252453bc175b3faf35d7fedc7c07a053f289",
+      "selected_count": 7,
+      "captured_count": 7
+    }
+  ],
+  "archive": "performance-captures-and-final-source.zip",
+  "archive_sha256": "c4787d2ea1134ee1b84c0baa944aa5c024f4d7168435868123e169c3e868e266",
+  "member_count": 2396,
+  "retained_capture_count": 38,
+  "final_source_sha256": "c789349a46561b40c99d8cf2ed10a29e73e88292bd8416984ee2a4b5f83cdcda",
+  "final_controls_passed": 13
+}

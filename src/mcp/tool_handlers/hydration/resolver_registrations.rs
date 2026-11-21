@@ -24,6 +24,10 @@ pub(in crate::mcp::tool_handlers) fn hydrate_resolver_owners(
         .filter(|entry| entry.source_kind == SourceKind::TypeScript)
         .map(|entry| entry.owner.clone())
         .collect();
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::record(2, 1);
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::record(3, candidates.len());
     let discovered = candidates.len();
     let expected: std::collections::HashSet<_> = candidates
         .iter()

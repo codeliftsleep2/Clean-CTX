@@ -1,0 +1,25 @@
+{
+  "checks": [
+    {
+      "patch": "verification/ops-r1/proposals/shared-acquisition/observations-and-fitness.patch",
+      "result": "git apply --cached --check passed against disposable proposal index; no working-source application"
+    },
+    {
+      "patch": "verification/ops-r1/proposals/shared-acquisition/shared-acquisition.patch",
+      "result": "git apply --cached --check passed against disposable proposal index; no working-source application"
+    },
+    {
+      "patch": "verification/ops-r1/proposals/shared-acquisition/proof-controls.patch",
+      "result": "git apply --cached --check passed against disposable proposal index; no working-source application"
+    }
+  ],
+  "source_files_written": false,
+  "compilation_or_execution": false,
+  "witness_enum_and_truth_predicates_unchanged": true,
+  "persisted_authority_fields_unchanged": true,
+  "publication_source_unchanged": true,
+  "python_adapter_ast_valid": true,
+  "powershell_build_parse": "Passed without execution",
+  "rust_format_and_syntax": "Bounded rustfmt stdin/stdout only; no working-source writes, type-checking or Cargo",
+  "maximum_proposed_code_lines": 528
+}

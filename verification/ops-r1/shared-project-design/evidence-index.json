@@ -1,0 +1,224 @@
+{
+  "standing": "Historical pre-repair evidence; not corrected verification or publication",
+  "source_tree_sha256": "393f7d7b0ba31dbe0f78cceb43539dccdb120598a154af8c7a7c415b33a661c1",
+  "executable_sha256": "34d2a9ebd67ce949fd27cd373ba013996ba7eb5a9e80573ff5428b995cf89222",
+  "archive_sha256": "a287e34d1551ca7763fc9ddf278f944d794dae40bb0e0f81de85de99aa756674",
+  "files": [
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/fixture-inputs/node_modules/@angular/core/index.d.ts",
+      "sha256": "71549a0139b288c93af55de4ed59363d8458d4d2252d395f16cf112157151c30"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/fixture-inputs/node_modules/@angular/core/package.json",
+      "sha256": "b44c0e5244c51c174a2be9abd0259855687c0f926242ae3af50e9bd47f75a825"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/fixture-inputs/owner0.ts",
+      "sha256": "191ec790f42d3290c862aa61a8ea16b2dc9ef83e23ffe0e5f3d8998f452aba59"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/fixture-inputs/tsconfig.json",
+      "sha256": "c1f0f1de79c04dc9e11f336ed39dd5e6781582986e8b1b31fadb7ae0cd95ed8c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/fixture.json",
+      "sha256": "d25c9039ab402df4f1e63c67a61e7e0359c7a0d4a4798c719aa6278159ae81bb"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/memory.jsonl",
+      "sha256": "093359575bae30d59a9f1162576d5b3e17cd381b5b077afa6353218d961745c8"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/query-response.json",
+      "sha256": "36aaec0602181ed1e504d14ddb28bc32b22f7a15f19bffe0425f5b48574410f7"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/receipt.json",
+      "sha256": "da3e8013ae680accdfacbee9bbe62658ac3cd947eeb4a9dfaa3e1b9cd04011bd"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/stages.jsonl",
+      "sha256": "b41abaa07595a505794548913220b0f3ab0dd7b4be21436f38d67211ceed8006"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/stderr.txt",
+      "sha256": "a663a4ade4c8217a5644ba5f71e47f335879b45dd8c4592f5f30016e497b9946"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-1-20261120-130920/stdout.txt",
+      "sha256": "ff6dace3bb4d10bc049cbbfc176315e9deda48055d35e9943d013857ae945f3d"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/node_modules/@angular/core/index.d.ts",
+      "sha256": "71549a0139b288c93af55de4ed59363d8458d4d2252d395f16cf112157151c30"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/node_modules/@angular/core/package.json",
+      "sha256": "b44c0e5244c51c174a2be9abd0259855687c0f926242ae3af50e9bd47f75a825"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/owner0.ts",
+      "sha256": "816ee2ef5984e8f387cf9e6e8874cddc42601feee77ac6c4a4efe0ae7703906c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/owner1.ts",
+      "sha256": "cb053d2871e65da2723c37f42ac7d0a0abd02605884592c445fc3cb6ff86f481"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/owner2.ts",
+      "sha256": "02449c2c4dec622381a985d880ad1a27a0c8074a2587d95dba64ad3e26b6da8c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/owner3.ts",
+      "sha256": "1b73a236c8c0d294073833bd235e667aec612140b6229b2e7de54dfef3caf638"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture-inputs/tsconfig.json",
+      "sha256": "c1f0f1de79c04dc9e11f336ed39dd5e6781582986e8b1b31fadb7ae0cd95ed8c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/fixture.json",
+      "sha256": "7da5bfddf110ee13da82a76f29b0a1561d20eb6afaab34eaf63cf2028afbdeb3"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/memory.jsonl",
+      "sha256": "243c794310fbdbbf1ec9ead9a8542685edbe66a289fb94eba959d488b0b7f9ee"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/query-response.json",
+      "sha256": "2fc2d34e03da6eb79c5241923164f568ec85ac8ab45414c059654ff6a568378b"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/receipt.json",
+      "sha256": "6eb54492fb792d97fcdb06b0bbc3c2a5e14ae63ebc8832b907387edc6e7cd72a"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/stages.jsonl",
+      "sha256": "f7341a05ead079d14398525946eef383e0a8e0b1e91c2bffaba001877f91b36f"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/stderr.txt",
+      "sha256": "e632e10b66b1108eae0d08f7b5702e476a6adb2da4d5ae41e48061d880df9906"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-4-20261120-131545/stdout.txt",
+      "sha256": "4e3f2751c8f71318fb604ac127157695200d9db5e962f16c9a0e30cac608e483"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/node_modules/@angular/core/index.d.ts",
+      "sha256": "71549a0139b288c93af55de4ed59363d8458d4d2252d395f16cf112157151c30"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/node_modules/@angular/core/package.json",
+      "sha256": "b44c0e5244c51c174a2be9abd0259855687c0f926242ae3af50e9bd47f75a825"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner0.ts",
+      "sha256": "816ee2ef5984e8f387cf9e6e8874cddc42601feee77ac6c4a4efe0ae7703906c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner1.ts",
+      "sha256": "cb053d2871e65da2723c37f42ac7d0a0abd02605884592c445fc3cb6ff86f481"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner10.ts",
+      "sha256": "0b013f9dab80b7ae843d5268cf73ddaec46c28bc88be67828c29395159588a21"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner11.ts",
+      "sha256": "05f73da0f3ed4977a6e4ec75b94633bf91db444a063202111ed697d3dde868a2"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner12.ts",
+      "sha256": "2aafd68abeccf527c0a1b60318b3617c103d4c29c702621018085eade6f60e4a"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner13.ts",
+      "sha256": "a7f1aa37086d7b04cce3ade95c0278b98ea82de2b80c7d4c3986fc9697a923d9"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner14.ts",
+      "sha256": "eb22a7278882c7e7208ee8d8632a99d72ccdb9403a566efd079e35746de7b1aa"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner15.ts",
+      "sha256": "9413a02bec9cbbbc35706ca5809b85f247a862c8d847b79c4f01d63ea3d579b4"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner2.ts",
+      "sha256": "02449c2c4dec622381a985d880ad1a27a0c8074a2587d95dba64ad3e26b6da8c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner3.ts",
+      "sha256": "d60d41ec9453d835d6d5bf4d4f2558d04cdd61eb7a95fc963b0c730e52b5f3db"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner4.ts",
+      "sha256": "594116535779bc747e48d753e62235a8bf4a26e82872a144201d26cfd8cbd4fa"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner5.ts",
+      "sha256": "a3ed03e433f3a0ecd449a54a63be2803897ad3d6f4b3d8b8e7b221cd40ba11e8"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner6.ts",
+      "sha256": "3149fd151ca15f3ab7f8fcfe3cfd5fd0a00865ce616377f46618d2ce0ad37308"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner7.ts",
+      "sha256": "1ea296ebc42bc062d3ebc151179e16469375772e22c4ef389cf5f07ffc88b187"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner8.ts",
+      "sha256": "b13cfdf90cfe5d8f98f9570b3e858bf73f94052304a8429eed39baace74522de"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/owner9.ts",
+      "sha256": "ad03a6bd384ba5d617cf06a06aebf56ec01adafc3761fb8e2eede950aafbb032"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture-inputs/tsconfig.json",
+      "sha256": "c1f0f1de79c04dc9e11f336ed39dd5e6781582986e8b1b31fadb7ae0cd95ed8c"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/fixture.json",
+      "sha256": "d0e4bb6fc29b4e0fb360fcd3f0f5b7bf7d14117bd9c30f517abee9c798265152"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/memory.jsonl",
+      "sha256": "2cd01c159c5a1c343a802af309b3028ba9955099feaddd6b194a1e10d9d3fc1f"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/query-response.json",
+      "sha256": "6c505e0026e26d8fff27accf5ac5d941bb2cf1b5799a46bdaac81da2ffe544d3"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/receipt.json",
+      "sha256": "04e5c2a6462dfe304b59fc21761221f9f1462bc9089943ae5191622014c3622b"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/stages.jsonl",
+      "sha256": "413ce95db9cc653e103f3401c8501a8f6e563ae9f6ae0642c9706746030e7244"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/stderr.txt",
+      "sha256": "553eb908415faf23b938ede947644ca96e18f5a9f1be6573edd12621ae90ecb1"
+    },
+    {
+      "path": "target/ops-r1/p0-owner-16-20261120-131747/stdout.txt",
+      "sha256": "2feb87469e19d69ab1fc08353e5b216d4d987650f9c9c5501365127b9cad51fb"
+    },
+    {
+      "path": "target/ops-r1/p0-build-reviewed/build-receipt.json",
+      "sha256": "be1627deae056dfc79c0ccb471c34dc08b8fc9d3ed696696d85b740db2a64308"
+    },
+    {
+      "path": "target/ops-r1/p0-build-reviewed/build-stderr.txt",
+      "sha256": "92fbbb5f6d42a100632c340cdc1f01ae78eeee0237b812719a777113e0b7afc9"
+    },
+    {
+      "path": "target/ops-r1/p0-build-reviewed/build.jsonl",
+      "sha256": "69c8d307d548d23cb88669f84ec25457551453e3502cf6e29db89c764e881047"
+    }
+  ]
+}

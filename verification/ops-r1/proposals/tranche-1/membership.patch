@@ -1,0 +1,163 @@
+--- a/verification/ci-verify-r1/membership.json
++++ b/verification/ci-verify-r1/membership.json
+@@ -23,5 +23,8 @@
+   "fitness_groups_path": "fitness-membership.json",
+   "measurements_path": "measurement-membership.json",
+   "expected_fitness_groups": 56,
+-  "expected_measurements": 18
++  "expected_measurements": 18,
++  "golden_groups_path": "golden-membership.json",
++  "expected_golden_groups": 10,
++  "expected_frozen_golden_witnesses": 3
+ }
+--- /dev/null
++++ b/verification/ci-verify-r1/golden-membership.json
+@@ -0,0 +1,148 @@
++{
++  "standing": "Tranche-1 obligations; activation requires approved CI/verifier installation",
++  "groups": [
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "ir::pipeline::core::ci_runtime_query_tests::ci_runtime_core_query_warm_observation_avoids_recompiling_binary_owned_query",
++      "minimum": 1,
++      "tests": [
++        "ir::pipeline::core::ci_runtime_query_tests::ci_runtime_core_query_warm_observation_avoids_recompiling_binary_owned_query"
++      ],
++      "architectural_ids": [
++        "GARC-001"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir",
++      "minimum": 1,
++      "tests": [
++        "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir"
++      ],
++      "architectural_ids": [
++        "GARC-001"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_custom_invalid_and_mismatched_queries_stay_dynamic",
++      "minimum": 1,
++      "tests": [
++        "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_custom_invalid_and_mismatched_queries_stay_dynamic"
++      ],
++      "architectural_ids": [
++        "GARC-001"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership",
++      "minimum": 1,
++      "tests": [
++        "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership"
++      ],
++      "architectural_ids": [
++        "GARC-002"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::angular_deleted_owner_membership_tests::issue_162_deleted_owner_legacy_membership_is_retired",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::angular_deleted_owner_membership_tests::issue_162_deleted_owner_legacy_membership_is_retired"
++      ],
++      "architectural_ids": [
++        "GARC-003"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion"
++      ],
++      "architectural_ids": [
++        "GARC-003"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families"
++      ],
++      "architectural_ids": [
++        "GARC-003"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion"
++      ],
++      "architectural_ids": [
++        "GARC-003"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::restore_registration_boundary_tests::issue_162_unchanged_bootstrap_durable_registration_boundary",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::restore_registration_boundary_tests::issue_162_unchanged_bootstrap_durable_registration_boundary"
++      ],
++      "architectural_ids": [
++        "GARC-004"
++      ]
++    },
++    {
++      "package": "clean-ctx",
++      "target": "lib",
++      "filter": "mcp::semantic_compilation::restore_registration_config_matrix_tests::issue_162_restore_registration_config_preservation_matrix",
++      "minimum": 1,
++      "tests": [
++        "mcp::semantic_compilation::restore_registration_config_matrix_tests::issue_162_restore_registration_config_preservation_matrix"
++      ],
++      "architectural_ids": [
++        "GARC-004"
++      ]
++    }
++  ],
++  "isolated": {
++    "csharp": [
++      "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir"
++    ],
++    "typescript": [
++      "compression::capture_pipeline::core_ir_registration_tests::ci_runtime_complete_queries_preserve_captures_and_ir",
++      "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership"
++    ]
++  },
++  "frozen_witnesses": [
++    {
++      "path": "src/tests/ir/ci_runtime_core_query.rs",
++      "sha256": "bdc4c262d8b5f799e7c5fa4de44cdd16a662d493124d173a9cbab11f125387b3"
++    },
++    {
++      "path": "src/tests/mcp/angular_deleted_owner_membership_issue_162.rs",
++      "sha256": "1399e46e1b5e2573b1ba70021e9172957d448ceb74c3ffa039204b6a04222cc0"
++    },
++    {
++      "path": "src/tests/mcp/restore_registration_boundary_issue_162.rs",
++      "sha256": "08a75ac1be842f762c3b3ccef613e1062e8e9d821c35e214356e297cdd9ebae6"
++    }
++  ]
++}

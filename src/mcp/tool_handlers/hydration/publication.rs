@@ -186,6 +186,8 @@ pub(in crate::mcp::tool_handlers) fn compile_candidates_for(
     }
     for (publication, compiled) in publications.into_iter().zip(compiled) {
         terminal.push(commit_candidate(state, publication, compiled)?);
+        #[cfg(all(test, feature = "angular"))]
+        crate::ops_r1_observation::record(12, 1);
     }
     Ok(terminal)
 }
@@ -285,6 +287,8 @@ fn commit_candidate(
     publication: PreparedPublication,
     compiled: CompilationBatchResult,
 ) -> Result<CandidatePublication, String> {
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::record(11, 1);
     debug_assert_eq!(compiled.file_path, publication.validated);
     let Ok(mut artifact) = compiled.result else {
         return Ok(CandidatePublication::Failed);

@@ -1,0 +1,272 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "standing": "owner-checkpoint design; not installed mandatory policy",
+  "retained_registration_head": "2ada188e1d6fb981d7db8bc605ae1fe9101a3fdb",
+  "entries": [
+    {
+      "id": "GARC-001",
+      "aff": [
+        "AFF-003",
+        "AFF-010"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/CI_VERIFY_R1.md",
+        "sha256": "337c23b60837b1f2180fd9c810f031b7f346b9349a9fc0052e97920b640f3017",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "historical warm query compilation count becomes nonzero",
+      "positive_control": "captures/instructions equal; own parse and cursor",
+      "negative_counterexample": "historical warm query compilation count becomes nonzero",
+      "production_consumers": [
+        "CoreIRPass",
+        "capture pipeline; TS and C# registered complete definitions"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/ci-verify-r1/core-query-red-index.json",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/ir/ci_runtime_core_query.rs",
+      "source_sha256": "bdc4c262d8b5f799e7c5fa4de44cdd16a662d493124d173a9cbab11f125387b3",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "ir::pipeline::core::ci_runtime_query_tests::ci_runtime_core_query_warm_observation_avoids_recompiling_binary_owned_query"
+      },
+      "feature_configurations_proposed": [
+        "typescript",
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "exact custom/mismatch controls in core_ir_registration.rs"
+    },
+    {
+      "id": "GARC-002",
+      "aff": [
+        "AFF-004",
+        "AFF-010"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "verification/ci-verify-r1/feature-isolation-owner-disposition-03.txt",
+        "sha256": "660189ce30cd7cafeb067cd9baee4a8d08b30815087cd594d114d05396fbc7f1",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "supported isolated feature build or registered native obligation fails",
+      "positive_control": "source-owned native proof",
+      "negative_counterexample": "supported isolated feature build or registered native obligation fails",
+      "production_consumers": [
+        "native language layers",
+        "feature-specific registration and test support"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/ci-verify-r1/feature-isolation-green-index.json",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/ir/native_feature_evidence.rs",
+      "source_sha256": "0f614bd4845e56c8b6efd559aa7a570ae6b98c8152785d5bdbbf53af87e9ae70",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "ir::pipeline::core::native_feature_evidence_tests::ci_runtime_native_typescript_evidence_preserves_source_ownership"
+      },
+      "feature_configurations_proposed": [
+        "typescript",
+        "angular",
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "C#-only requires its own applicable controls; native TS test is not required there"
+    },
+    {
+      "id": "GARC-003",
+      "aff": [
+        "AFF-011",
+        "AFF-008"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md",
+        "sha256": "4662f0f7409aca9a63331372afb093d0854e424a003c5f77dc869b6a47a8d194",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "deleted or relocated owner survives, or recreation resurrects stale owner",
+      "positive_control": "initial/relocated/recreated exact membership",
+      "negative_counterexample": "deleted or relocated owner survives, or recreation resurrects stale owner",
+      "production_consumers": [
+        "shared semantic retirement",
+        "legacy Route ResolvedBy",
+        "typed registration owners"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/live-acceptance/issue-162/ang-r2/historical-witness-evidence.zip",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/mcp/angular_deleted_owner_membership_issue_162.rs",
+      "source_sha256": "1399e46e1b5e2573b1ba70021e9172957d448ceb74c3ffa039204b6a04222cc0",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "mcp::semantic_compilation::angular_deleted_owner_membership_tests::issue_162_deleted_owner_legacy_membership_is_retired"
+      },
+      "feature_configurations_proposed": [
+        "angular",
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "shared controls separately prove acquisition-error and independent-support distinctions"
+    },
+    {
+      "id": "GARC-004",
+      "aff": [
+        "AFF-008"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md",
+        "sha256": "4662f0f7409aca9a63331372afb093d0854e424a003c5f77dc869b6a47a8d194",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "valid configured unchanged projection rejected for missing optional identity",
+      "positive_control": "config-aware current restore succeeds",
+      "negative_counterexample": "valid configured unchanged projection rejected for missing optional identity",
+      "production_consumers": [
+        "current configuration-aware restore",
+        "historical configuration-aware restore"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/live-acceptance/issue-162/ang-r2/restore-validator-red-index.json",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/mcp/restore_registration_boundary_issue_162.rs",
+      "source_sha256": "08a75ac1be842f762c3b3ccef613e1062e8e9d821c35e214356e297cdd9ebae6",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "mcp::semantic_compilation::restore_registration_boundary_tests::issue_162_unchanged_bootstrap_durable_registration_boundary"
+      },
+      "feature_configurations_proposed": [
+        "angular",
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "config matrix separately rejects forged/stale/missing evidence and preserves historical H1"
+    },
+    {
+      "id": "GARC-005",
+      "aff": [
+        "AFF-001",
+        "AFF-002",
+        "AFF-005",
+        "AFF-007"
+      ],
+      "status": "required design gap; no tracked incident work-contract witness yet",
+      "authority": {
+        "path": "docs/architecture/contracts/angular-resolver.md",
+        "sha256": "e696b72d57e9530a04faa6a28794162b1887fbf98e205a90e7176b4f4fd40c13"
+      },
+      "registered_identity": null,
+      "counterexample": "cold absent-route/no-resolver with independently controlled owner/project growth",
+      "historical_evidence": "owner-reported three live failures and independently confirmed A01 broad work; not a synthetic RED",
+      "ci_enforcement": "pending exact legitimate-work assertion and operator RED/approved repair/GREEN",
+      "limitation": "no arbitrary work budget, loop or leak attribution inferred"
+    },
+    {
+      "id": "GARC-006",
+      "aff": [
+        "AFF-012",
+        "AFF-008"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/pcg-authoring.md",
+        "sha256": "cb7e92ad32e7b494b02883c501ad13dc1d77b3d269e19ba557212df2e265c984",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "candidate policy replaces accepted governing authority in rejection",
+      "positive_control": "accepted exact authority references remain",
+      "negative_counterexample": "candidate policy replaces accepted governing authority in rejection",
+      "production_consumers": [
+        "B11 document admission engine",
+        "agent publication workflow requires separate actual check"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": null,
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/pcg/document_admission_authority.rs",
+      "source_sha256": "f23d89db2610f4be2872a07e60aecd8d3b7c06085f67d84082a5893f34fe5938",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "pcg::documents::admission_authority::b11_rejection_exposes_exact_accepted_governing_reference_despite_candidate_policy_edit"
+      },
+      "feature_configurations_proposed": [
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "engine regression does not prove every publication invoked checker"
+    },
+    {
+      "id": "GARC-007",
+      "aff": [
+        "AFF-012"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/verification.md",
+        "sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "membership verifier accepts missing/ignored/duplicate/failed required execution",
+      "positive_control": "valid attributed listing and outcomes accepted",
+      "negative_counterexample": "membership verifier accepts missing/ignored/duplicate/failed required execution",
+      "production_consumers": [
+        "consolidated mandatory CI execution verifier"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/ci-verify-r1/evidence-index.json",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/architecture/ci_verify_r1.rs",
+      "source_sha256": "e33a29b7b8925c4c49a2a0ee37ca47b13adcbf06a2d915aa86c2c57e848e3d7a",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "ci_verify_r1::ci_verify_r1_required_execution_and_failure_contracts"
+      },
+      "feature_configurations_proposed": [
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "does not infer architectural coverage absent explicit required membership"
+    },
+    {
+      "id": "GARC-008",
+      "aff": [
+        "AFF-012"
+      ],
+      "status": "proposed golden membership; existing tracked test observed in historical CI",
+      "authority": {
+        "path": "docs/agent/verification.md",
+        "sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799",
+        "qualification": "current observed candidate revision; historical authority/execution revisions remain in linked receipts"
+      },
+      "protected_behavior_and_failure": "interleaved/nested real execution is misattributed or malformed output accepted",
+      "positive_control": "known valid merged streams accepted",
+      "negative_counterexample": "interleaved/nested real execution is misattributed or malformed output accepted",
+      "production_consumers": [
+        "Cargo/libtest execution evidence attribution"
+      ],
+      "ci_enforcement_location": "Existing ci.yml consolidated workspace execution; new GARC membership is PROPOSED, isolated-mode CI remains pending",
+      "historical_evidence": "verification/ci-verify-r1/consolidated-parser-red-index.json",
+      "evidence_standing": "Retained evidence where linked; no new historical mutation execution",
+      "source": "src/tests/architecture/ci_verify_r1.rs",
+      "source_sha256": "e33a29b7b8925c4c49a2a0ee37ca47b13adcbf06a2d915aa86c2c57e848e3d7a",
+      "registered_identity": {
+        "package": "clean-ctx",
+        "target": "unittests src/lib.rs",
+        "name": "ci_verify_r1::ci_verify_r1_required_execution_and_failure_contracts"
+      },
+      "feature_configurations_proposed": [
+        "all-features"
+      ],
+      "ci_enforcement": "existing consolidated suite; new golden membership check proposed, not installed",
+      "limitation": "shares an existing test with GARC-007; no duplicate execution"
+    }
+  ]
+}

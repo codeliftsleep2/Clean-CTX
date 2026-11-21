@@ -1,0 +1,19 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "authorization": "User approved the GREEN pin/adapter amendment and fresh output directory after Disposition 15 launcher blocker",
+  "category": "Source-pin/adapter amendment; original monitor and build behavior retained",
+  "original_adapter_sha256": "45c037c5c385916af5d109366e423dc28ec9ce68d7c55addce86029d919c9110",
+  "amended_adapter_sha256": "57cf1977854f9df112899c9d0d6ca06a151a76145f12ad19ae9ce221e304e0f4",
+  "original_green_pin_sha256": "458e4236c7e418ed212990783b79942fa0701dd594890117f8efac8582e93e58",
+  "amended_green_pin_sha256": "389a714aa2d037e73e92a623564c4198896bf2e5a6ccc2c00408381899f24ac5",
+  "new_source_pin": "verification/ops-r1/proposals/shared-acquisition/execution/reviewed-green-amendment-15-sources.json",
+  "accepted_source_tree_sha256": "91ff7766ca9f0aaa965734748c6aab8e6b186dd5da8f0d6a36e2dfb16d11efba",
+  "build_script_sha256": "af7ee07da3d00df45d21bef0c2b5a78165dd0ed5e112aedc9ec6735092ea42a0",
+  "monitor_sha256": "5acc4590c602ee2528c27419b446443fc1325664457adda0e1aab1639dec4484",
+  "original_definitions_archive_sha256": "05946b2e7b0cb188318ca8e21da8d7e358922ad7dd00fabad5712820ce1495c1",
+  "build_output_directory": "target/ops-r1/shared-green-amendment-15-build-reviewed",
+  "source_verification": "Passed source-only mode; no test launched",
+  "production_sources_changed": false,
+  "tests_executed": false,
+  "recorded_utc": "2026-11-20T22:33:10.015812+00:00"
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "experiment": "M1-omit-options",
+    "standing": "UNAPPLIED; not compiled or executed; isolated candidate only after separate approval",
+    "source": "src/ir/typescript_resolution/shared_acquisition.rs",
+    "accepted_raw_sha256": "65116e3a7a30390f7f04ba157673cb47ec18456d19fe3644dab3868f11817cd8",
+    "hypothetical_mutant_lf_sha256": "3f933ac2ddff1cacb87423996f50901bee7fa17d5e25afe092b652e52a0eea49",
+    "patch_sha256": "d0df1db5279252a04cad9b25a33f12b61655466b58f10507c73809dbd42ea995"
+  },
+  {
+    "experiment": "M2-disable-sharing",
+    "standing": "UNAPPLIED; not compiled or executed; isolated candidate only after separate approval",
+    "source": "src/ir/typescript_resolution/program.rs",
+    "accepted_raw_sha256": "82245fb24c56822c0d9d51805bdc307b886b794936531f95c7e7f66b6eaa271f",
+    "hypothetical_mutant_lf_sha256": "c57ee1104aa0b265af4621e81a0ece062f1146de5a1eede8e191346db1f02acc",
+    "patch_sha256": "1eaef479f9e772769355c02bc89da6acbe5a3a425763953b1aff674868e7c7f2"
+  },
+  {
+    "experiment": "M3-collapse-strict-false",
+    "standing": "UNAPPLIED selective grouping-only mutant; intended negative basis assertion failure; no execution",
+    "source": "src/ir/typescript_resolution/shared_acquisition.rs",
+    "accepted_raw_sha256": "65116e3a7a30390f7f04ba157673cb47ec18456d19fe3644dab3868f11817cd8",
+    "hypothetical_mutant_lf_sha256": "f94f1646cced272e3b8bea41c9cfe15cadd4993b7e896e8468ef25287a1ab20f",
+    "patch_sha256": "af2bc315dccfee30a64d193f3d27fa569ffdb8ccfa77d11a887ff84b31eb8d88"
+  }
+]

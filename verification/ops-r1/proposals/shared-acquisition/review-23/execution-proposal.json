@@ -1,0 +1,16 @@
+{
+  "standing": "Proposed isolation-only manifest/adapter application. Not applied; no build/test authorized",
+  "manifest_sha256": "c5348d3dd24e4903610cd7a137037e4fbe6e59b1eaab2206016908e28d26ef1f",
+  "manifest_destination": "verification/ops-r1/proposals/shared-acquisition/execution/reviewed-green-m3-23-sources.json",
+  "adapter_patch_sha256": "71c2ce412c5eb41907f4cd2d73fdd39ebdbcc077e12b8f789d3ae9d8a55b1358",
+  "hypothetical_adapter_sha256": "f45f674d43d099ffd33889dee4c203e1f79fbd7393c210d5d9b1d96269f05b7b",
+  "accepted_adapter_sha256": "eab639d02d55659fb41ea307895f19a9bb4fb486a448860bb16ae47329ee14d3",
+  "expected_detection_anchor": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs:59",
+  "expected_detection": "assert_ne on basis of fifth strict=false context versus second strict=true context, before changed acquisition",
+  "unchanged_case9_function_sha256": "edfc3ad1f6c69ef4afada31b432ab48b5e16587a057a2af49c848702ebc9d626",
+  "isolation_root": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI\\target\\ops-r1\\m3-isolated-23",
+  "build_output": "target/ops-r1/shared-m3-23-build-reviewed",
+  "cargo_command": "cargo test --lib --all-features --no-run --message-format=json",
+  "case_selector": "config_roots_and_route_changes_stay_independent",
+  "proposed_application": "Only in isolated snapshot: copy manifest into execution directory, git apply --check and apply adapter pin patch. Accepted source/adapter untouched."
+}

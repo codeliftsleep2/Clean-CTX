@@ -1,0 +1,25 @@
+# OPS-R1 invariant → consumers → counterexample → tests → CI → evidence
+
+Agent MaxHeadRoom. Protected scopes are bounded; unprotected scopes are explicit.
+
+| Invariant / AFF | Production consumers | Counterexample | Tracked test / required configuration | Gate and evidence / gap |
+| --- | --- | --- | --- | --- |
+| Registered immutable query lifetime / 003 | CoreIR/capture, TS and C# | Warm source observation compiles complete binary query again | ci_runtime_core_query.rs warm observation; core_ir_registration.rs exact/fallback controls; TS/C#/allfeatures | Existing workspace CI and frozen query RED/GREEN; mandatory isolated CI registration proposed. |
+| Independent project acquisition / 001/002 | Resolver/bootstrap, shared TS compilation and explicit-file operations | Fixed absent result with growing unrelated owners/project units causes redundant complete acquisition | No attributable work-contract regression yet | **UNPROTECTED for A04 independent growth**; source trace/field report only. |
+| Bounded temporary/live resource ownership / 005 | Shared executor/publication, TS units, C# artifacts | Completed operations retain unintended extra live state; whole-batch peak dominates | No current allocation/retained-artifact witness proving incident | **UNPROTECTED in this incident**; do not label RSS as leak. |
+| Current authoritative source/dependencies / 008 | Shared index, restore, publication | Stale/forged/changed witness accepted after proposed reuse | restore_registration_config_matrix_issue_162.rs plus TS witness and resolver lifecycle controls | Existing mandatory allfeature suite; preservation must be rerun on changed mechanisms, not banked from older code. |
+| Config authority separate from identity / 008 | Current and historical restore | enabled(config) true, optional routing identity absent | restore_registration_boundary_issue_162.rs unchanged bootstrap witness and preservation matrix | Historical exact RED, split GREEN and current production 185 checks; no current field acceptance. |
+| Source-owned retirement / 011 | Shared semantic projections, legacy relations, typed records | Deleted owner survives or sibling independent support disappears | angular_deleted_owner_membership_issue_162.rs and semantic_retirement_controls_issue_162.rs | Exact original/normalized identity association, frozen RED/GREEN, mandatory suite. |
+| Shared batch fail-before-commit / 009 | Ordinary hydration, resolver/bootstrap, C# dependency publication | Later-job failure/source change after earlier successful compile | Existing publication fault/supersession tests; exact all-earlier-owner no-commit witness needs applicability review | Source barrier confirmed; do not claim a universal transactional guarantee. **ENFORCEMENT GAP for proposed streaming change**. |
+| Supported feature isolation / 004/010 | Query registration, native layers and feature-specific fixtures | C#-only imports TS; TS-only imports Angular | Native feature/core-registration tests; isolated Cargo compile/list | Focused historical RED/five-mode GREEN; **MANDATORY CI GAP** in current broad/default jobs. |
+| Equivalent-flight coordination / 006 | Standard hydration | Concurrent equivalent attempts violate declared active-flight contract | src/tests/mcp/hydration_single_flight.rs; exact feature/module registration from census | Existing scope-specific tests; **resolver/bootstrap exposure remains unverified**, not protected by ordinary-flight tests. |
+| Stable-input progress / 007 | Resolver batch, C# dependency/EF stability, batch requalification | Stable work never returns; one-shot invalidation fails to converge | No exact absent-route controlled regression yet; existing invalidation tests protect specific schedules | **UNPROTECTED for reported scale/retention failure**; no production retry cap authorized. |
+| Real shutdown refusal/termination / 007 | Dispatcher | Shutdown not called; new requests still accepted | Existing shutdown-named tests do not assert those outcomes | **CONFIRMED ASSERTION GAP**; passing test count does not protect contract. |
+| Required test registration/execution / 012 | Entire mandatory CI path | Missing/ignored/duplicated/zero-result required selection | ci_verify_r1_required_execution_and_failure_contracts, actual verify-ci-membership.py | Existing 56 groups, explicit measurements/companions and ignore sets. **New GARC membership not installed**. |
+| Governed document knowledge / 012 | Agent authoring, corpus/protection/admission | Text guards pass while graph candidate is rejected/unadmitted | B11 authority/diagnostic tests; actual Rust document checker/operator receipt | Tests protect engine, not every workflow invocation. **OPS-R1 admission pending**; no forged grant. |
+
+Authority revisions are captured from actual source bytes in the checkpoint
+manifest; historic exact sources remain pinned by existing evidence indexes.
+Source presence and an inferred source-name match do not establish registered
+execution. Use machine identity census and manual module-path reconciliation for
+golden entries. Any family not reviewed here is **UNREVIEWED**, not implicitly safe.

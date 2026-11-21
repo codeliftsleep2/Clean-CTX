@@ -1,0 +1,88 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-20",
+  "head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "standing": "Current observed source bytes; unadmitted candidates identified by path; not a new authority grant",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "2a995cd74375309d1395d1d316f39b4493283948651952a39a7709c3abb86a59"
+    },
+    {
+      "path": ".clinerules/engineering.md",
+      "sha256": "36f8ba3e53fef5bc22f70858053685a757f76ad5e6c2504d680d30a292ad12b5"
+    },
+    {
+      "path": ".clinerules/encoding.md",
+      "sha256": "fd092255ff685e512846f831595211723c1c29db1e2a50859390eab357b1d99c"
+    },
+    {
+      "path": "docs/agent/architecture.md",
+      "sha256": "6218344e56de5a64de8a15fd39e390d02a657e3fabe048fbb7370598758cb47b"
+    },
+    {
+      "path": "docs/agent/verification.md",
+      "sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799"
+    },
+    {
+      "path": "docs/agent/pcg-authoring.md",
+      "sha256": "cb7e92ad32e7b494b02883c501ad13dc1d77b3d269e19ba557212df2e265c984"
+    },
+    {
+      "path": "docs/invariants/workspace-query.md",
+      "sha256": "7eea2b394a8001a92ba5fc1b9ee265d19a73e02237d8d29ad7f852cd795ce64b"
+    },
+    {
+      "path": "docs/invariants/persistence-publication.md",
+      "sha256": "b269b539256400ac34843370802b7e00c94a126b7af3fbd7e85396830dc6fccb"
+    },
+    {
+      "path": "docs/architecture/contracts/angular-resolver.md",
+      "sha256": "e696b72d57e9530a04faa6a28794162b1887fbf98e205a90e7176b4f4fd40c13"
+    },
+    {
+      "path": "docs/architecture/knowledge-governance/corpus.csv",
+      "sha256": "46760c5028d0b12339d3eb4baebd8c48117d083d78fdb1c8286ed1f91835647c"
+    },
+    {
+      "path": "docs/architecture/knowledge-governance/protected.csv",
+      "sha256": "776417a1cb057f8a7e4c5dd3e619a7790a4832209f6fa679e74ea5266d0e08e6"
+    },
+    {
+      "path": "scripts/verify-ci-membership.py",
+      "sha256": "c42528291a588fa4af75902f5d4891f2f066dab8ef9d84188e2f74d858559ba8"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "f4d19d9db2abd1e31957393776b8f1a3122d116b67a8f5cd5420a9f8fe2627fc"
+    },
+    {
+      "path": "Cargo.lock",
+      "sha256": "c1d18af45660ebb7dd3898ff567a856a18f85a2ba9344d15996c49b8a4e74a59"
+    },
+    {
+      "path": "verification/ops-r1/p0/run_bounded.py",
+      "sha256": "5acc4590c602ee2528c27419b446443fc1325664457adda0e1aab1639dec4484"
+    },
+    {
+      "path": "verification/ops-r1/p0/invoke-build-capture.ps1",
+      "sha256": "d43ef2e5f7fc0215afb2d940082fba17795b7f8fd95a8e655d29cdaad269e7b3"
+    },
+    {
+      "path": "verification/ops-r1/prepare-p0.py",
+      "sha256": "a94ac6f9b2df81bf488af00e42c15cac958cb27246d0af15833b97ddead883f8"
+    },
+    {
+      "path": "verification/ops-r1/prepare-tranche.py",
+      "sha256": "80b3345210a5437962ef8af0a237731633e0f20de4cc99e48fdfbd1a380206db"
+    },
+    {
+      "path": "verification/ops-r1/OWNER_DISPOSITION_03.md",
+      "sha256": "04334e8e5c2d45ee7d71c095f401462585190f671a99a55567acf74a5e2f8279"
+    }
+  ]
+}

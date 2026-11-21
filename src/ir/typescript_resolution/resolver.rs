@@ -30,8 +30,17 @@ pub(crate) struct Resolver {
         Vec<String>,
         Namespace,
     )>,
-    units: BTreeMap<PathBuf, Option<Unit>>,
-    pub(super) programs: BTreeMap<PathBuf, Result<Vec<Unit>, String>>,
+    units: BTreeMap<PathBuf, (Option<Unit>, super::acquisition_inputs::Inputs)>,
+    pub(super) acquisition_policy: String,
+    pub(super) attached_programs: Vec<super::shared_acquisition::BoundProgram>,
+    pub(super) operation: Option<std::sync::Arc<super::shared_acquisition::Operation>>,
+    pub(super) programs: BTreeMap<
+        PathBuf,
+        (
+            Result<super::shared_acquisition::ProgramUnits, String>,
+            super::acquisition_inputs::Inputs,
+        ),
+    >,
     pub(super) library_evidence: Vec<super::compiler_libraries::LibraryRequest>,
     pub(super) automatic_type_evidence: Vec<super::automatic_types::AutomaticTypeRequest>,
     pub(super) directive_evidence: Vec<super::program_directives::DirectiveRequest>,
@@ -39,9 +48,9 @@ pub(crate) struct Resolver {
     pub(super) scope_export_active:
         BTreeSet<(super::declared_scopes::NamespaceScope, String, Namespace)>,
     pub(super) program_evidence: BTreeMap<PathBuf, super::program::ProgramEvidence>,
-    projects: BTreeMap<PathBuf, Result<Project, String>>,
+    projects: BTreeMap<PathBuf, (Result<Project, String>, super::acquisition_inputs::Inputs)>,
     requested_project: Option<PathBuf>,
-    project_context: Option<Result<Project, String>>,
+    project_context: Option<(Result<Project, String>, super::acquisition_inputs::Inputs)>,
 }
 
 impl Resolver {
@@ -51,20 +60,27 @@ impl Resolver {
         action: impl FnOnce(&mut Self) -> T,
     ) -> T {
         let inherited = self.project_context.take();
-        self.project_context = Some(
-            inherited
-                .clone()
-                .unwrap_or_else(|| self.project_identity(file)),
-        );
+        let scope = self.host.witnesses.begin();
+        let selected = if let Some((value, inputs)) = inherited.as_ref() {
+            self.host.witnesses.attribute(inputs);
+            value.clone()
+        } else {
+            self.project_identity(file)
+        };
+        let inputs = self.host.witnesses.finish(scope);
+        self.project_context = Some((selected, inputs));
         let result = action(self);
         self.project_context = inherited;
         result
     }
 
     pub(super) fn request_project(&mut self, file: &Path) -> Result<Project, String> {
-        self.project_context
-            .clone()
-            .unwrap_or_else(|| self.project_identity(file))
+        if let Some((value, inputs)) = self.project_context.clone() {
+            self.host.witnesses.attribute(&inputs);
+            value
+        } else {
+            self.project_identity(file)
+        }
     }
     pub(super) fn resolution_file(&mut self, file: &Path) -> Option<PathBuf> {
         let project = self.request_project(file).ok();
@@ -114,16 +130,26 @@ impl Resolver {
     }
 
     pub(super) fn project_identity(&mut self, file: &Path) -> Result<Project, String> {
-        let file = self.host.normalized(file).ok_or("Source outside scope")?;
-        if let Some(project) = self.projects.get(&file) {
-            return project.clone();
+        let scope = self.host.witnesses.begin();
+        self.host.witnesses.roots();
+        let mut key = None;
+        let value = (|| {
+            let file = self.host.normalized(file).ok_or("Source outside scope")?;
+            if let Some((value, inputs)) = self.projects.get(&file) {
+                self.host.witnesses.attribute(inputs);
+                return value.clone();
+            }
+            key = Some(file.clone());
+            match self.requested_project.as_deref() {
+                Some(config) => Project::explicit(&mut self.host, config, &file),
+                None => Project::discover(&mut self.host, &file),
+            }
+        })();
+        let inputs = self.host.witnesses.finish(scope);
+        if let Some(key) = key {
+            self.projects.insert(key, (value.clone(), inputs));
         }
-        let project = match self.requested_project.as_deref() {
-            Some(config) => Project::explicit(&mut self.host, config, &file),
-            None => Project::discover(&mut self.host, &file),
-        };
-        self.projects.insert(file, project.clone());
-        project
+        value
     }
     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
         Self::with_project(roots, None)
@@ -137,6 +163,9 @@ impl Resolver {
             alias_active: BTreeSet::new(),
             scope_export_active: BTreeSet::new(),
             units: BTreeMap::new(),
+            acquisition_policy: String::new(),
+            attached_programs: Vec::new(),
+            operation: None,
             programs: BTreeMap::new(),
             program_active: BTreeSet::new(),
             directive_evidence: Vec::new(),
@@ -180,16 +209,44 @@ impl Resolver {
         }
     }
 
+    pub(super) fn can_use_program(&self, proof: &super::shared_acquisition::ProjectProof) -> bool {
+        self.units
+            .iter()
+            .all(|(path, (unit, _))| !proof.units.contains_key(path) || unit.is_some())
+    }
+
     pub(super) fn unit(&mut self, file: &Path) -> Option<Unit> {
-        let file = self.host.normalized(file)?;
-        if !self.units.contains_key(&file) {
-            let unit = self
-                .host
+        let scope = self.host.witnesses.begin();
+        let mut key = None;
+        let result = (|| {
+            let file = self.host.normalized(file)?;
+            if let Some((value, inputs)) = self.units.get(&file) {
+                self.host.witnesses.attribute(inputs);
+                return value.clone();
+            }
+            for proof in &self.attached_programs {
+                if let Some(unit) = proof.proof.units.get(&file) {
+                    // Parsing a cached unit depends on that source, not every sibling input.
+                    let input = proof
+                        .sources
+                        .get(&file)
+                        .or_else(|| proof.proof.sources.get(&file))?;
+                    self.host
+                        .witnesses
+                        .attribute(&super::acquisition_inputs::source_receipt(input));
+                    return Some(unit.clone());
+                }
+            }
+            key = Some(file.clone());
+            self.host
                 .read(&file)
-                .and_then(|source| Unit::parse(&file, &source));
-            self.units.insert(file.to_path_buf(), unit);
+                .and_then(|source| Unit::parse(&file, &source))
+        })();
+        let inputs = self.host.witnesses.finish(scope);
+        if let Some(key) = key {
+            self.units.insert(key, (result.clone(), inputs));
         }
-        self.units.get(&file).cloned().flatten()
+        result
     }
 
     fn local_set(

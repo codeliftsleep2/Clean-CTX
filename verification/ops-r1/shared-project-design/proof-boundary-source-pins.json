@@ -1,0 +1,109 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "standing": "Disposition 10 source/API investigation; Candidate B recommendation, no implementation",
+  "head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "source_tree_sha256": "393f7d7b0ba31dbe0f78cceb43539dccdb120598a154af8c7a7c415b33a661c1",
+  "owner_directive": {
+    "path": "C:\\Users\\MNasty\\.codex\\attachments\\73fa9954-5e88-4a32-ba6e-e7c9a90acc8a\\Pasted text.txt",
+    "sha256": "8e3c6b81d4327c3fc05ec2df6707a62d9f08ea3e8ae7ec340e5b0d60c4eb59ef"
+  },
+  "files": [
+    {
+      "path": "src/mcp/semantic_compilation/executor.rs",
+      "sha256": "4b594b116a2a5a900cdc33de7abe8cf4d3d6fae8b93c85e37350b7d7bbc7fd21"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/compile.rs",
+      "sha256": "0ff4cee8e41f69e966c6fb3850a2387c02232a921064561ce5f236ec30c57a9d"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/publication.rs",
+      "sha256": "96401542aa97891cab84526916a1558b985387570d8c33b72535faefa91d161c"
+    },
+    {
+      "path": "src/mcp/tool_helpers.rs",
+      "sha256": "bfda853b86811854966818b4471eccba98fe1790f26a6b6466099e71e21b02c7"
+    },
+    {
+      "path": "src/ir/typescript_resolution/host.rs",
+      "sha256": "084b033746ef4ea93f4f58efbbbee81b263bdd361f483bf5968ca50759253254"
+    },
+    {
+      "path": "src/ir/typescript_resolution/resolver.rs",
+      "sha256": "f7b9c829631e7a1de2744884321fb10c1163610c664cfb27b1cc931152a01598"
+    },
+    {
+      "path": "src/ir/typescript_resolution/capture.rs",
+      "sha256": "457ae2d1074bf38c529f6e4ff91d1b4eea4b0231145f59f203668310e599fd4e"
+    },
+    {
+      "path": "src/ir/typescript_resolution/program.rs",
+      "sha256": "08ca24d0e1f77f786f3ae891c536e349bcee741ef41ea9c5e2f49aaa294be465"
+    },
+    {
+      "path": "src/ir/typescript_resolution/project.rs",
+      "sha256": "bf1ae11a215eafda80150969c29184951e61a93e11810456b46147fca98147d8"
+    },
+    {
+      "path": "src/ir/typescript_resolution/project_membership.rs",
+      "sha256": "a5e37bf1a34482f162c2f5b1e71b64e28e0e1aa299794b2e91cbd2ffc79299cf"
+    },
+    {
+      "path": "src/ir/typescript_resolution/automatic_types.rs",
+      "sha256": "b58cbbc1c109d67fa53acd2780c9cb63afa17b32b8de76906737b43447c75100"
+    },
+    {
+      "path": "src/ir/typescript_resolution/compiler_libraries.rs",
+      "sha256": "73c851f5e648b09786a3c16d4d8b8669d032ebd34dd0f9f38fdc3b6d654576f1"
+    },
+    {
+      "path": "src/ir/typescript_resolution/ambient_modules.rs",
+      "sha256": "6bea74a8702ab788f6fa4f6846f9362841bf65393d480456dd5025aa104c4251"
+    },
+    {
+      "path": "src/ir/typescript_resolution/ambient_groups.rs",
+      "sha256": "50563c9badcaf01ae270ec4ef08586baeb3d96902d8b1f8fc37aca33cd29844f"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "2a995cd74375309d1395d1d316f39b4493283948651952a39a7709c3abb86a59"
+    },
+    {
+      "path": "docs/agent/pcg-authoring.md",
+      "sha256": "cb7e92ad32e7b494b02883c501ad13dc1d77b3d269e19ba557212df2e265c984"
+    },
+    {
+      "path": "docs/agent/architecture.md",
+      "sha256": "6218344e56de5a64de8a15fd39e390d02a657e3fabe048fbb7370598758cb47b"
+    },
+    {
+      "path": "docs/agent/verification.md",
+      "sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799"
+    },
+    {
+      "path": "docs/architecture/contracts/angular-resolver.md",
+      "sha256": "e696b72d57e9530a04faa6a28794162b1887fbf98e205a90e7176b4f4fd40c13"
+    },
+    {
+      "path": "src/ir/typescript_resolution/source_classification.rs",
+      "sha256": "0d5c64e83431270059a63a2d500aa1b956cae4233092cbd8e4dd0b1d6c60dc76"
+    },
+    {
+      "path": "src/ir/typescript_resolution/relative.rs",
+      "sha256": "369ab57665b27d3aa5c9d4ec4f58b76817551553c9d63abc37a1b2abe0652623"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/artifact.rs",
+      "sha256": "a9d9d851bead76cc1695989e18f497bf3e71be416e948b167db7db0c1061f00f"
+    },
+    {
+      "path": "docs/agent/ops-r1/OWNER_CHECKPOINT_09.md",
+      "sha256": "bfb09a8c08f8534fec683d8e51797f025564ef3e38e64ee5ef17b4e94aba8af7"
+    },
+    {
+      "path": "docs/agent/ops-r1/ACQUISITION_PROOF_BOUNDARY_DECISION.md",
+      "sha256": "7453eb50dbedf467eaab637c9515d2c92e9dd9f62a9e200fa6813cdfab0089fc"
+    }
+  ],
+  "verification": "Read-only source/hash inspection only; no runtime, test, build or document-admission execution"
+}

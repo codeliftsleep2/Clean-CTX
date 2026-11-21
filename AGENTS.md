@@ -251,6 +251,10 @@ file**.
   oversized files.
 - Do not evade the ceiling by moving content into another oversized helper,
   support, or generated-by-hand file.
+- `verification/**` is exempt from the source-file size policy by explicit
+  maintainer decision (2026-11-21). Preserve verification definitions and exact
+  historical evidence without splitting them to meet a source-code line budget.
+  Source files and tracked regression tests outside that directory remain enforced.
 - Generated dependency lockfiles (for example `Cargo.lock` and
   `package-lock.json`) are exempt because their structure is tool-owned and
   cannot be semantically decomposed. The exemption is filename-specific and

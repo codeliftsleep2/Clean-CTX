@@ -1,0 +1,32 @@
+{
+  "src/tests/ir/ops_r1_shared_acquisition_proof.rs": {
+    "before_raw_sha256": "a05260c5402dea1594890d21a9b9306c4787fa0c71bc22508196854b37dc2230",
+    "after_raw_sha256": "f4125a5cf7bcaf527a0b9aa972533366ed611d352d0ac570505e2146d8d47a02",
+    "lines": 258
+  },
+  "src/tests/ir/ops_r1_shared_acquisition_isolation.rs": {
+    "before_raw_sha256": "7f87059494f87b780067875bf71e35de17417df6c988bdceff74764dba8ca582",
+    "after_raw_sha256": "6b2fd9367e5b1c618f4c7a849effe22c01c2374623595649cfb8e4885ea0eeff",
+    "lines": 234
+  },
+  "src/tests/mcp/csharp_call_authority_lifecycle.rs": {
+    "before_raw_sha256": "3eb3fad095f0eade12cfc16650812ac8e0975f8b9ed1c387bae052e2610c27f6",
+    "after_raw_sha256": "2489f98cacfc71f2cbdbf844fd5e9ebd107a4247b05b9404ed452c0eeae96701",
+    "lines": 177
+  },
+  "src/tests/mcp/semantic_publication_recovery.rs": {
+    "before_raw_sha256": "bf71935540a93fe689f8d2c66a86248ed89b15721e66743db5604d69cc57939c",
+    "after_raw_sha256": "0b1ae2a63a672fb0d8851aafb9d2db8ab61e9e868ea7a01c3e9c173fc59ab82f",
+    "lines": 521
+  },
+  "src/tests/mcp/semantic_retirement_controls_issue_162.rs": {
+    "before_raw_sha256": "3cf09c6c1f4fbc1e9b6095417b4933256fe79ef6622486509da96fab212e10c8",
+    "after_raw_sha256": "b13cb6caf0bb4d090a375245351ccbd1aafa47b51838dd379450190b573dd360",
+    "lines": 333
+  },
+  "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs": {
+    "before_raw_sha256": "9347d8e8c3c4b2088dfa3feec4703395f5e702e058e520d780c10ce696b503c0",
+    "after_raw_sha256": "7f59dfb18befb19c9f17b93e646b8b29d8421308e595302e1d9296cddc59c8c1",
+    "lines": 416
+  }
+}

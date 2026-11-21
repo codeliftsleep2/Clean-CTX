@@ -1,0 +1,8 @@
+{
+  "source_tree_sha256": "50fa4a778c08180a1ce391f9440e537d2e9d8df45c6c096d65f9625363e05bb0",
+  "manifest_sha256": "b0023d56fbdb035888f858cf173670fb00a6ecfe064ebcacfad68e597b0dce30",
+  "adapter_sha256": "ec3da41068facc3291d27e2519cca72aed149e950d4637f4fd8652e9779bdb6e",
+  "diagnostic_accessor_corrected": true,
+  "production_unchanged": true,
+  "baseline_a_source_archive_sha256": "97d1ad605d8575b290db057e672f64f14f0b3f46625359e04f7d8acb2d55bde9"
+}

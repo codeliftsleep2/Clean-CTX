@@ -1,0 +1,80 @@
+--- a/scripts/verify-ci-membership.py
++++ b/scripts/verify-ci-membership.py
+@@ -105,7 +105,18 @@
+         rows = json.loads(data)
+         if not isinstance(rows, list) or len(rows) != fixture["rows"]:
+             raise ValueError(f"Invalid frozen oracle population: {path}")
+-    return config, groups, measurements, legacy
++    golden = read_json(manifest_dir / config["golden_groups_path"])
++    required = golden["groups"]
++    if not required or len(required) != config["expected_golden_groups"]:
++        raise ValueError("Missing/incomplete mandatory golden membership")
++    witnesses = golden["frozen_witnesses"]
++    if len(witnesses) != config["expected_frozen_golden_witnesses"] or len({w["path"] for w in witnesses}) != len(witnesses):
++        raise ValueError("Missing/duplicate frozen golden witnesses")
++    for witness in witnesses:
++        actual = (root / witness["path"]).read_bytes().replace(b"\r\n", b"\n")
++        if hashlib.sha256(actual).hexdigest() != witness["sha256"]:
++            raise ValueError(f"Golden witness identity changed: {witness['path']}")
++    return config, groups + required, measurements, legacy
+ 
+ 
+ def verify(root, listing, execution, suite_exit, manifest_dir):
+@@ -145,7 +156,7 @@
+         passed = all(ran.get(key) == ["ok"] for key in selected)
+         if not passed:
+             errors.append(f"Failed deterministic fitness group: {group['filter']}")
+-        fitness.append({"filter": group["filter"], "tests": expected, "passed": passed})
++        fitness.append({"filter": group["filter"], "tests": expected, "passed": passed, "architectural_ids": group.get("architectural_ids", [])})
+     for item in measurements:
+         selected = [key for key in listed if key[0] == item["package"] and key[3] == item["name"]]
+         if len(selected) != 1 or ran.get(selected[0]) != ["ignored"]:
+@@ -168,6 +179,32 @@
+     }
+ 
+ 
++
++def verify_isolated(root, mode, execution, suite_exit):
++    if execution is None or suite_exit is None:
++        raise ValueError("Isolated execution requires evidence and actual Cargo exit")
++    manifest = root / "verification/ci-verify-r1"
++    config, _, _, _ = prerequisites(root, manifest)
++    golden = read_json(manifest / config["golden_groups_path"])
++    expected = golden["isolated"][mode]
++    if not expected or len(set(expected)) != len(expected):
++        raise ValueError("Empty/duplicate isolated golden obligations")
++    ran = records(execution, False)
++    errors = []
++    actual = [key[3] for key in ran]
++    if set(actual) != set(expected) or len(actual) != len(expected):
++        errors.append(f"GARC-002 isolated {mode} membership mismatch")
++    for key, outcomes in ran.items():
++        if key[0] != "clean-ctx" or key[1].replace("\\", "/") != "unittests src/lib.rs" or outcomes != ["ok"]:
++            errors.append(f"GARC-002 isolated {mode} failed/unexpected outcome: {key}")
++    if suite_exit:
++        errors.append(f"GARC-002 isolated {mode} Cargo exit: {suite_exit}")
++    return {"errors": errors, "feature_mode": mode, "architectural_ids": ["GARC-002", "AFF-004", "AFF-010"],
++            "expected": expected, "outcomes": len(ran),
++            "execution_sha256": hashlib.sha256(execution.read_bytes()).hexdigest(),
++            "qualification": "Mode identity must also match retained CI command/configuration; output alone cannot prove Cargo features."}
++
++
+ def main():
+     parser = argparse.ArgumentParser()
+     parser.add_argument("--root", type=pathlib.Path, required=True)
+@@ -175,11 +212,14 @@
+     parser.add_argument("--execution", type=pathlib.Path)
+     parser.add_argument("--suite-exit", type=int)
+     parser.add_argument("--prerequisites-only", action="store_true")
++    parser.add_argument("--feature-mode", choices=["csharp", "typescript"])
+     parser.add_argument("--output", type=pathlib.Path, required=True)
+     args = parser.parse_args()
+     try:
+         manifest = args.root / "verification/ci-verify-r1"
+-        if args.prerequisites_only:
++        if args.feature_mode:
++            receipt = verify_isolated(args.root, args.feature_mode, args.execution, args.suite_exit)
++        elif args.prerequisites_only:
+             prerequisites(args.root, manifest)
+             receipt = {"errors": [], "category": "prerequisites only; no execution"}
+         else:

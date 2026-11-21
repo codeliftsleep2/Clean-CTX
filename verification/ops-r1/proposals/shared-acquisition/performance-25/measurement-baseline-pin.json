@@ -1,0 +1,12 @@
+{
+  "source_tree_sha256": "49c0c3dbb31b36f95a010bbc47967a74280f16d55d2ef12480edc33f49392d12",
+  "manifest_sha256": "2230fa0d8e6df68cd7c40b2922f842fb4187ad79b9522622bf75c36f13e0fc91",
+  "adapter_sha256": "a2ffd94f10db0c5b8d472377fbf300cbc276f82a91e53982a49b1c1741705a18",
+  "instrumentation_files": [
+    "src/ir/typescript_resolution/host.rs",
+    "src/tests/architecture/ops_r1_observation.rs",
+    "src/tests/mcp/ops_r1_absent_route.rs"
+  ],
+  "accepted_root_source_unchanged": true,
+  "scope": "Synthetic controlled geometry, not enterprise performance certification; persistence disabled; shape sampling outside query timer"
+}

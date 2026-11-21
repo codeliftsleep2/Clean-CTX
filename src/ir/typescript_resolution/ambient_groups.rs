@@ -25,7 +25,7 @@ impl Resolver {
         let mut owners = BTreeSet::new();
         for block in &scope.blocks {
             let mut found = false;
-            for unit in &program {
+            for unit in program.values() {
                 let Ok(external) = self.program_source_external(unit, &project) else {
                     return false;
                 };

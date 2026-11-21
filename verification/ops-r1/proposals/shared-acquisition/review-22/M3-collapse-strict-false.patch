@@ -1,0 +1,15 @@
+--- a/src/ir/typescript_resolution/shared_acquisition.rs
++++ b/src/ir/typescript_resolution/shared_acquisition.rs
+@@ -152,6 +152,12 @@
+     // Aliased request sources stay independent until route-equivalence is established.
+     if !resolver.host.supplied_inputs.contains_key(file) {
+         return None;
++    }
++    // PROPOSED ISOLATED MUTANT ONLY: collapse false strict key onto true.
++    if project.options.get("strict").is_some_and(|option| option.value == false) {
++        let mut changed = project.clone();
++        changed.options.get_mut("strict").unwrap().value = serde_json::Value::Bool(true);
++        return basis(resolver, file, &changed);
+     }
+     serde_json::to_string(&serde_json::json!({
+         "config": config, "root": project.root, "base": project.base,

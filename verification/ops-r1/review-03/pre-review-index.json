@@ -1,0 +1,39 @@
+{
+  "standing": "Exact proposals before Disposition-03 source-review corrections; unapplied/unrun",
+  "archive": "verification/ops-r1/review-03/pre-review-proposals.zip",
+  "archive_sha256": "fa5df9239c7dce41cd23a72d214817002738ad5515dedc57ea53d40b96a48bcb",
+  "members": [
+    {
+      "path": "verification/ops-r1/proposals/p0/proposal-index.json",
+      "sha256": "67891a8e0f3fc9f2da6289bc0bcc2abc9b04157d0a5134897ec471be435a84fb"
+    },
+    {
+      "path": "verification/ops-r1/proposals/p0/registration-and-tests.patch",
+      "sha256": "2d2414630e1a937c548b584cf832bbe08777c69ce81b1435326c0876b680c3a3"
+    },
+    {
+      "path": "verification/ops-r1/proposals/p0/test-only-observations.patch",
+      "sha256": "c9eccd0c139381d035682bc8a16c7a4bfb93156f423528d117fbef5c9a3a6d31"
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/ci.patch",
+      "sha256": "6e5700095a87439a500b87ee029cc642c407fc595bbfbb1a4b7bec23dd6855ae"
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/fixtures.patch",
+      "sha256": "34bdb03d7fc643cfc474b51425b7296b50215efaeebda5fdb0b38bba1956fdec"
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/membership.patch",
+      "sha256": "7a91657440a994b1df24dbca5318576d25907346f61842348d98a851338d39f5"
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/proposal-index.json",
+      "sha256": "e051f6193a6c163dc78ecd346a7b268e129b61ee0e0f55f61df7a368e848e082"
+    },
+    {
+      "path": "verification/ops-r1/proposals/tranche-1/verifier.patch",
+      "sha256": "df4cf210dfeb80436b61c59508d656e66021e3757f609e880316831ffdeb4567"
+    }
+  ]
+}

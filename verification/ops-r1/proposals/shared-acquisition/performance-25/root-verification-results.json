@@ -1,0 +1,20 @@
+{
+  "source_tree_sha256": "75d63dfb564a4f860c637160ec1d2bbbc8fcc89823cba06bbbfbae25dc71ab4c",
+  "executable_sha256": "40090c48894ab4ec05110d5a2aba2a2c651a128c8c57f87cb04fdc5b4d71a1b6",
+  "build_exit_code": 0,
+  "compiler_diagnostics": 0,
+  "root_focused_tests_passed": 4,
+  "scoped_clippy": {
+    "command": "cargo clippy --lib --tests --all-features -- -D warnings",
+    "exit_code": 0
+  },
+  "scoped_clippy_log_sha256": "9127268d84da703f40f4d3efce24ee6b6007f827a6b3c1db706d6f8dcf9097a1",
+  "source_archive": "formatted-root-source.zip",
+  "source_archive_sha256": "b450195dfbf2373b200b90b856ef3e0f88801f925bd6113d72201d6a9f9d758f",
+  "verification_archive": "root-verification-evidence.zip",
+  "verification_archive_sha256": "650bd0a53829e5c5d84e0a0d798414bf904e08968a014843fc3499b552079baf",
+  "ci_status": "Not executed or claimed",
+  "field_status": "Historical incident remains open",
+  "admission_status": "Fresh actual admission required before publication; not claimed",
+  "delivery_status": "No commit, push, merge or publication"
+}

@@ -1,0 +1,10 @@
+{
+  "accepted_baseline_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+  "candidate_source_tree_sha256": "75d63dfb564a4f860c637160ec1d2bbbc8fcc89823cba06bbbfbae25dc71ab4c",
+  "manifest_sha256": "f4d5434f7c571070fad63e1cd4ce4d24cc28b11440bd87341d2c5095ef2d0756",
+  "adapter_sha256": "03b5e3a566a1b56fe5bab64cf9e6c1b2a16b0e03e68856018951e73016c8c760",
+  "source_archive_sha256": "b450195dfbf2373b200b90b856ef3e0f88801f925bd6113d72201d6a9f9d758f",
+  "root_test_sha256": "5d7678b77342921f65f25289e1cfd0af2942b3ea6edffa93d41d55c24af223a5",
+  "isolated_test_sha256": "7e54801d444fb8e4fa41fe9505ab01455074427aafc9dbe7215de8384311b9cf",
+  "standing": "Root compilation and focused execution pending; historical evidence retains original identities"
+}

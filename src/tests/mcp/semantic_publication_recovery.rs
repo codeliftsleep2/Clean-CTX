@@ -237,6 +237,8 @@ fn successful_recovery_preserves_registered_render_and_hydration_behavior() {
         let response = dispatch(&restarted, id, tool, request(&root, &file));
         assert!(response.get("error").is_none(), "{response}");
         assert!(restarted.alias_for_path(&file).is_some());
+        assert_ne!(response["result"]["isError"], true);
+        assert_recovered_source(&restarted, &file, target, true);
         assert!(
             response["result"]["content"][0]["text"]
                 .as_str()
@@ -270,12 +272,42 @@ fn successful_recovery_preserves_registered_render_and_hydration_behavior() {
         }),
     );
     assert!(response.get("error").is_none(), "{response}");
-    assert!(
-        response["result"]["structuredContent"]["count"]
-            .as_u64()
-            .unwrap()
-            > 0
+    assert_ne!(response["result"]["isError"], true);
+    let result = &response["result"]["structuredContent"];
+    assert_eq!(result["count"], 1, "{response}");
+    let entities = result["entities"].as_array().unwrap();
+    assert_eq!(entities.len(), 1);
+    assert_eq!(entities[0]["name"], "HydratedOk");
+    assert_eq!(entities[0]["domain"], "builtin");
+    assert_eq!(entities[0]["entity_type"], "Class");
+    assert_eq!(
+        restarted.semantic_owner_path(entities[0]["file"].as_str().unwrap()),
+        restarted.semantic_owner_path(&file)
     );
+    assert_recovered_source(&restarted, &file, target, false);
+}
+
+fn assert_recovered_source(
+    state: &crate::mcp::McpState,
+    file: &str,
+    expected: &[u8],
+    requires_typescript: bool,
+) {
+    let alias = state.alias_for_path(file).expect("recovered source alias");
+    let snapshot = state
+        .semantic_snapshot(&alias)
+        .expect("recovered authority");
+    assert_eq!(snapshot.source_hash, crate::cache::content_hash(expected));
+    // Ordinary declaration hydration permits a LegacyEdit projection without TS proof.
+    // Explicit provision in this fixture retains TS authority and must not lose it.
+    if requires_typescript {
+        let authority = snapshot.authority.typescript_authority.as_ref().unwrap();
+        assert_eq!(
+            state.semantic_owner_path(&authority.source.to_string_lossy()),
+            state.semantic_owner_path(file)
+        );
+    }
+    assert!(snapshot.authority.is_current(&snapshot.source_hash));
 }
 
 #[test]

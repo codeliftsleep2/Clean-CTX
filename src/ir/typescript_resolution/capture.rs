@@ -110,6 +110,18 @@ impl TypeScriptAuthority {
         fields: &[&str],
         call_apis: &[(&str, &str)],
     ) -> Self {
+        Self::capture_in_operation(file, source, roots, project, (fields, call_apis), None)
+    }
+
+    pub(crate) fn capture_in_operation(
+        file: &Path,
+        source: &str,
+        roots: &[PathBuf],
+        project: Option<&Path>,
+        demands: (&[&str], &[(&str, &str)]),
+        operation: Option<std::sync::Arc<super::shared_acquisition::Operation>>,
+    ) -> Self {
+        let (fields, call_apis) = demands;
         let mut result = Self {
             source: file.to_path_buf(),
             source_route: file.to_path_buf(),
@@ -161,6 +173,12 @@ impl TypeScriptAuthority {
                 return result;
             }
         };
+        resolver.operation = operation;
+        if resolver.operation.is_some() {
+            resolver.host.witnesses.enable();
+        }
+        resolver.acquisition_policy =
+            serde_json::to_string(&(fields, call_apis)).unwrap_or_default();
         let capture = (|| {
             result.source = resolver
                 .host
@@ -311,7 +329,7 @@ impl TypeScriptAuthority {
         result.program_directives = resolver.directive_evidence.clone();
         result.programs = resolver.program_evidence.values().cloned().collect();
         result.capture_current = resolver.host.current() && capture.is_ok();
-        result.witnesses = resolver.host.witnesses;
+        result.witnesses = resolver.host.witnesses.into_vec();
         if let Err(error) = capture {
             result.disposition = Some(error);
         }

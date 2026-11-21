@@ -1,0 +1,152 @@
+--- a/src/mcp/tool_handlers/hydration/filesystem.rs
++++ b/src/mcp/tool_handlers/hydration/filesystem.rs
+@@ -243,8 +243,13 @@
+ 
+ #[cfg(any(feature = "angular", feature = "csharp", all(test, feature = "rust")))]
+ pub(crate) fn source_inventory(state: &McpState, roots: &[PathBuf]) -> InventoryManifest {
++    #[cfg(all(test, feature = "angular"))]
++    crate::ops_r1_observation::record(0, 1);
+     let (paths, attempted, traversal_completed, _) = enumerate_source_paths(state, roots);
+-    build_inventory(state, paths, attempted, traversal_completed)
++    let inventory = build_inventory(state, paths, attempted, traversal_completed);
++    #[cfg(all(test, feature = "angular"))]
++    crate::ops_r1_observation::record(1, inventory.entries.len());
++    inventory
+ }
+ 
+ fn enumerate_source_paths(state: &McpState, roots: &[PathBuf]) -> (Vec<String>, bool, bool, usize) {
+--- a/src/mcp/tool_handlers/hydration/resolver_registrations.rs
++++ b/src/mcp/tool_handlers/hydration/resolver_registrations.rs
+@@ -24,6 +24,10 @@
+         .filter(|entry| entry.source_kind == SourceKind::TypeScript)
+         .map(|entry| entry.owner.clone())
+         .collect();
++    #[cfg(all(test, feature = "angular"))]
++    crate::ops_r1_observation::record(2, 1);
++    #[cfg(all(test, feature = "angular"))]
++    crate::ops_r1_observation::record(3, candidates.len());
+     let discovered = candidates.len();
+     let expected: std::collections::HashSet<_> = candidates
+         .iter()
+--- a/src/mcp/semantic_compilation/executor.rs
++++ b/src/mcp/semantic_compilation/executor.rs
+@@ -58,8 +58,10 @@
+         self.full_semantic_parses
+             .fetch_add(jobs.len(), std::sync::atomic::Ordering::SeqCst);
+         self.pool.install(|| {
+-            jobs.into_par_iter()
++            let results: Vec<_> = jobs.into_par_iter()
+                 .map(|job| {
++                    #[cfg(all(test, feature = "angular"))]
++                    crate::ops_r1_observation::record(4, 1);
+                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                         compile_source_artifact(CompilationRequest {
+                             file_path: &job.file_path,
+@@ -82,12 +84,17 @@
+                             "semantic compilation worker panicked".to_string(),
+                         ))
+                     });
++                    #[cfg(all(test, feature = "angular"))]
++                    crate::ops_r1_observation::record(5, 1);
+                     CompilationBatchResult {
+                         file_path: job.file_path,
+                         result,
+                     }
+                 })
+-                .collect()
++                .collect();
++            #[cfg(all(test, feature = "angular"))]
++            crate::ops_r1_observation::batch_results(results.len());
++            results
+         })
+     }
+ }
+--- a/src/ir/typescript_resolution/program.rs
++++ b/src/ir/typescript_resolution/program.rs
+@@ -118,6 +118,8 @@
+         if !self.program_active.insert(config.clone()) {
+             return Err("Recursive program acquisition".into());
+         }
++        #[cfg(all(test, feature = "angular"))]
++        crate::ops_r1_observation::record(6, 1);
+         let result = (|| {
+             let config_inputs =
+                 super::project_config::document(&mut self.host, &config, &mut BTreeSet::new())?;
+@@ -136,6 +138,8 @@
+             let mut defaults_considered = false;
+             let mut suppress_default = false;
+             loop {
++                #[cfg(all(test, feature = "angular"))]
++                crate::ops_r1_observation::record(13, 1);
+                 if pending.is_empty() && module_requests.is_empty() && !defaults_considered {
+                     defaults_considered = true;
+                     if !suppress_default {
+@@ -188,6 +192,8 @@
+                 if units.contains_key(&path) {
+                     continue;
+                 }
++                #[cfg(all(test, feature = "angular"))]
++                crate::ops_r1_observation::record(7, 1);
+                 let unit = self
+                     .unit(&path)
+                     .ok_or("Program source unavailable or invalid")?;
+--- a/src/ir/typescript_resolution/host.rs
++++ b/src/ir/typescript_resolution/host.rs
+@@ -55,6 +55,8 @@
+     pub(crate) fn current(&self) -> bool {
+         #[cfg(test)]
+         crate::work_observations_af_perf_002::witness(self);
++        #[cfg(all(test, feature = "angular"))]
++        crate::ops_r1_observation::record(10, 1);
+         #[cfg(all(test, feature = "angular"))]
+         crate::angular_meta::admission_work_metrics::witness();
+         match self {
+@@ -325,6 +327,8 @@
+         if let Some(source) = self.sources.get(&path) {
+             return source.clone();
+         }
++        #[cfg(all(test, feature = "angular"))]
++        crate::ops_r1_observation::record(8, 1);
+         let source = match self.read_bytes(&path) {
+             Ok(bytes) => {
+                 self.witnesses.push(Witness::Content {
+--- a/src/compression/capture_pipeline.rs
++++ b/src/compression/capture_pipeline.rs
+@@ -172,6 +172,8 @@
+             any(feature = "csharp", feature = "typescript", feature = "java")
+         ))]
+         QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
++        #[cfg(all(test, feature = "angular"))]
++        crate::ops_r1_observation::record(9, 1);
+         Query::new(
+             &identity
+                 .language()
+@@ -417,6 +419,8 @@
+                 any(feature = "csharp", feature = "typescript", feature = "java")
+             ))]
+             QUERY_COMPILATION_COUNT.with(|count| count.set(count.get() + 1));
++            #[cfg(all(test, feature = "angular"))]
++            crate::ops_r1_observation::record(9, 1);
+             dynamic_query = Query::new(&language, query_string)?;
+             &dynamic_query
+         }
+--- a/src/mcp/tool_handlers/hydration/publication.rs
++++ b/src/mcp/tool_handlers/hydration/publication.rs
+@@ -186,6 +186,8 @@
+     }
+     for (publication, compiled) in publications.into_iter().zip(compiled) {
+         terminal.push(commit_candidate(state, publication, compiled)?);
++        #[cfg(all(test, feature = "angular"))]
++        crate::ops_r1_observation::record(12, 1);
+     }
+     Ok(terminal)
+ }
+@@ -285,6 +287,8 @@
+     publication: PreparedPublication,
+     compiled: CompilationBatchResult,
+ ) -> Result<CandidatePublication, String> {
++    #[cfg(all(test, feature = "angular"))]
++    crate::ops_r1_observation::record(11, 1);
+     debug_assert_eq!(compiled.file_path, publication.validated);
+     let Ok(mut artifact) = compiled.result else {
+         return Ok(CandidatePublication::Failed);

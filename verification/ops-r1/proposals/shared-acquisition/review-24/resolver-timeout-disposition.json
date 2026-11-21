@@ -1,0 +1,7 @@
+{
+  "standing": "Resource stop; not semantic RED; preserve all eight form/direction scenarios through four bounded test identities",
+  "original_source_raw_sha256": "9347d8e8c3c4b2088dfa3feec4703395f5e702e058e520d780c10ce696b503c0",
+  "failed_receipt": "target/ops-r1/p0-resolver_positive-20261120-222022/receipt.json",
+  "stop": "WALL_CAPTURE_STOP at60 seconds",
+  "change": "Four form-specific tests, each preserving both directions and original assertions"
+}

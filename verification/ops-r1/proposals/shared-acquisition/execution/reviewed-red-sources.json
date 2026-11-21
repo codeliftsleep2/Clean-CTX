@@ -1,0 +1,61 @@
+{
+  "standing": "Operator source pin only; approval and build receipt required",
+  "baseline_source_tree_sha256": "393f7d7b0ba31dbe0f78cceb43539dccdb120598a154af8c7a7c415b33a661c1",
+  "candidate_source_tree_sha256": "73bba237a6f178dcf424cb449f033335044c5e835cf56c0f94363d2213cc3a05",
+  "files": [
+    {
+      "path": "src/compression/capture_pipeline.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/capture.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/host.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/mod.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/program.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/resolver.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/shared_acquisition.rs"
+    },
+    {
+      "path": "src/lib.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/compile.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/executor.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/filesystem.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/publication.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/resolver_registrations.rs"
+    },
+    {
+      "path": "src/tests/architecture/ops_r1_observation.rs"
+    },
+    {
+      "path": "src/tests/mcp/ops_r1_absent_route.rs"
+    },
+    {
+      "path": "src/tests/mcp/ops_r1_acquisition_fitness.rs"
+    }
+  ],
+  "test_identities": [
+    "mcp::semantic_compilation::ops_r1_acquisition_fitness::ops_r1_shared_acquisition_public_fitness"
+  ]
+}

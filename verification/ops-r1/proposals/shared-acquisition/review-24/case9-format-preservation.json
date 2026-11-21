@@ -1,0 +1,7 @@
+{
+  "standing": "Original M3 test function differs only in formatting in hardened source; all lexical tokens and string literals retained",
+  "accepted_m3_original_function_sha256": "edfc3ad1f6c69ef4afada31b432ab48b5e16587a057a2af49c848702ebc9d626",
+  "hardened_function_sha256": "dc368b2caeaeb57a78619f0a3c7aef57d916cb8d377f36bb1465f9fcd403e307",
+  "identical_token_sequence_sha256": "d336e7818dfbbcbd091d0d64b50ce9463b6edf4a04ff28c80a22112b5b7ee948",
+  "byte_identity_claim": false
+}

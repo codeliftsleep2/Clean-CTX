@@ -1,0 +1,10 @@
+{
+  "baseline_source_sha256": "7ddaadaf7dbc8f7d2744d314f59d8933199f35fb2eadf48d825c154c0e9fec39",
+  "candidate_source_tree_sha256": "61d51bf59302c3688f3113da4f7ba3b6bdadac1f12398488e7519eec9d9ec794",
+  "manifest_sha256": "c6d4a3bb4b0344d9a400a623a43a7c2102b0d3e0a938c27d1d8a62ab18c70248",
+  "adapter_sha256": "2a2baf885db3b40a96767584a88ab98081c5745d496e323a0fa9ec57df529521",
+  "verified_import_green_archive_sha256": "723854bbced9004d0a3efae5aecd2c9f146e79d0a7fb0feea71a12b9ab7f4a0b",
+  "preserved_import_green_binary_sha256": "14f901a8cbb58b388826bb43b4f55a4e55276c3683f662c9cf1047ebf66a4c31",
+  "production_changed_from_import_green": false,
+  "new_test_identity": "ir::typescript_resolution::ops_r1_shared_acquisition_controls::cost::ops_r1_shared_empty_automatic_types_reuses_project_across_owner_directories"
+}

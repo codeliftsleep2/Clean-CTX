@@ -103,6 +103,32 @@ fn compatible_batch_call_items_prepare_once() {
 
     assert!(response.get("error").is_none(), "{response}");
     assert_eq!(state.test_csharp_reconciliation_count(), 1);
+    assert_eq!(
+        state.csharp_call_authority.status(),
+        CSharpCallAuthorityStatus::Current
+    );
+    let items = response["result"]["structuredContent"]["results"]
+        .as_array()
+        .expect("exact batch results");
+    assert_eq!(items.len(), 2);
+    let expected_owner = state.semantic_owner_path(&root.path().join("Calls.cs").to_string_lossy());
+    for (item, id) in items.iter().zip(["a", "b"]) {
+        assert_eq!(item["id"], id);
+        assert_eq!(item["status"], "ok", "{response}");
+        let edges = item["result"]["edges"].as_array().unwrap();
+        assert_eq!(edges.len(), 1, "{response}");
+        assert_eq!(edges[0]["subject"]["name"], "Go");
+        assert_eq!(edges[0]["object"]["name"], "Hit");
+        assert_eq!(edges[0]["relation"], "Calls");
+        for endpoint in ["subject", "object"] {
+            assert_eq!(edges[0][endpoint]["domain"], "builtin");
+            assert_eq!(edges[0][endpoint]["entity_type"], "Method");
+            assert_eq!(
+                state.semantic_owner_path(edges[0][endpoint]["file"].as_str().unwrap()),
+                expected_owner
+            );
+        }
+    }
 }
 
 #[test]

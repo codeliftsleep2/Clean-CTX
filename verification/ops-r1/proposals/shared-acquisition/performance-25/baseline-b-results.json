@@ -1,0 +1,238 @@
+{
+  "source_tree_sha256": "50fa4a778c08180a1ce391f9440e537d2e9d8df45c6c096d65f9625363e05bb0",
+  "review_sha256": "2e36759e8ed83d624e3f30251085b54a67495b661e2dafe6caf9fb889fe45903",
+  "status": "ALL_SELECTED_CELLS_COMPLETED",
+  "runs": [
+    {
+      "case": "flat-scripts-4",
+      "elapsed_seconds": 2.979725999990478,
+      "peak_working_set_bytes": 30724096,
+      "queries": [
+        {
+          "request": 0,
+          "elapsed_ms": 1394.1222,
+          "witness_checks": 2671,
+          "operations": [
+            {
+              "acquisitions": [
+                1,
+                1,
+                4
+              ],
+              "qualification": [
+                3,
+                3,
+                76,
+                243,
+                273
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 27663,
+              "unique_witnesses": 22,
+              "witnesses": 151
+            },
+            {
+              "owner": 3,
+              "serialized_witness_bytes": 30513,
+              "unique_witnesses": 22,
+              "witnesses": 166
+            }
+          ]
+        },
+        {
+          "request": 1,
+          "elapsed_ms": 121.36099999999999,
+          "witness_checks": 1176,
+          "operations": [
+            {
+              "acquisitions": [
+                0,
+                0,
+                0
+              ],
+              "qualification": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 27663,
+              "unique_witnesses": 22,
+              "witnesses": 151
+            },
+            {
+              "owner": 3,
+              "serialized_witness_bytes": 30513,
+              "unique_witnesses": 22,
+              "witnesses": 166
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "flat-scripts-16",
+      "elapsed_seconds": 6.59962519997498,
+      "peak_working_set_bytes": 35151872,
+      "queries": [
+        {
+          "request": 0,
+          "elapsed_ms": 2590.8558,
+          "witness_checks": 21451,
+          "operations": [
+            {
+              "acquisitions": [
+                1,
+                1,
+                16
+              ],
+              "qualification": [
+                15,
+                15,
+                208,
+                3195,
+                3705
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 47174,
+              "unique_witnesses": 58,
+              "witnesses": 252
+            },
+            {
+              "owner": 15,
+              "serialized_witness_bytes": 55730,
+              "unique_witnesses": 58,
+              "witnesses": 298
+            }
+          ]
+        },
+        {
+          "request": 1,
+          "elapsed_ms": 852.6831999999999,
+          "witness_checks": 9024,
+          "operations": [
+            {
+              "acquisitions": [
+                0,
+                0,
+                0
+              ],
+              "qualification": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 47174,
+              "unique_witnesses": 58,
+              "witnesses": 252
+            },
+            {
+              "owner": 15,
+              "serialized_witness_bytes": 55730,
+              "unique_witnesses": 58,
+              "witnesses": 298
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case": "directories-scripts-16",
+      "elapsed_seconds": 5.246475599997211,
+      "peak_working_set_bytes": 36978688,
+      "queries": [
+        {
+          "request": 0,
+          "elapsed_ms": 3284.9438,
+          "witness_checks": 29340,
+          "operations": [
+            {
+              "acquisitions": [
+                16,
+                16,
+                256
+              ],
+              "qualification": [
+                0,
+                0,
+                5216,
+                0,
+                0
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 71251,
+              "unique_witnesses": 109,
+              "witnesses": 376
+            },
+            {
+              "owner": 15,
+              "serialized_witness_bytes": 74545,
+              "unique_witnesses": 109,
+              "witnesses": 391
+            }
+          ]
+        },
+        {
+          "request": 1,
+          "elapsed_ms": 1187.4869,
+          "witness_checks": 12062,
+          "operations": [
+            {
+              "acquisitions": [
+                0,
+                0,
+                0
+              ],
+              "qualification": [
+                0,
+                0,
+                0,
+                0,
+                0
+              ]
+            }
+          ],
+          "retained_shape_samples": [
+            {
+              "owner": 0,
+              "serialized_witness_bytes": 71251,
+              "unique_witnesses": 109,
+              "witnesses": 376
+            },
+            {
+              "owner": 15,
+              "serialized_witness_bytes": 74545,
+              "unique_witnesses": 109,
+              "witnesses": 391
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

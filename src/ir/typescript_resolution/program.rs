@@ -107,27 +107,130 @@ impl Resolver {
         Ok(roots.into_iter().collect())
     }
 
-    pub(super) fn program_units(&mut self, file: &Path) -> Result<Vec<Unit>, String> {
-        let project = self.request_project(file)?;
-        let Some(config) = project.config else {
-            return Ok(Vec::new());
+    pub(super) fn program_units(
+        &mut self,
+        file: &Path,
+    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
+        let scope = self.host.witnesses.begin();
+        self.host.witnesses.roots();
+        let result = self.program_units_scoped(file);
+        self.host.witnesses.finish(scope);
+        result
+    }
+
+    fn program_units_scoped(
+        &mut self,
+        file: &Path,
+    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
+        use super::shared_acquisition::{ProjectProof, basis, reusable_sources};
+        use std::sync::Arc;
+        let project_scope = self.host.witnesses.begin();
+        let project = self.request_project(file);
+        let project_inputs = self.host.witnesses.finish(project_scope);
+        let project = project?;
+        let Some(config) = project.config.clone() else {
+            return Ok(Arc::new(BTreeMap::new()));
         };
-        if let Some(units) = self.programs.get(&config) {
-            return units.clone();
+        if let Some((value, inputs)) = self.programs.get(&config) {
+            self.host.witnesses.attribute(inputs);
+            return value.clone();
         }
         if !self.program_active.insert(config.clone()) {
             return Err("Recursive program acquisition".into());
         }
-        let result = (|| {
+        let operation = self.operation.clone();
+        let slot = operation
+            .as_ref()
+            .filter(|_| self.program_active.len() == 1)
+            .and_then(|operation| basis(self, file, &project).map(|basis| operation.slot(basis)));
+        // No mutable Resolver is stored in the group. The active recursion guard precedes this lock.
+        let mut slot = slot
+            .as_ref()
+            .map(|slot| slot.lock().unwrap_or_else(|poison| poison.into_inner()));
+        let candidate = slot.as_ref().and_then(|slot| slot.as_ref().cloned());
+        // Once sealed, qualification is parallel and never holds the group lock.
+        if candidate.is_some() {
+            drop(slot.take());
+        }
+        if let (Some(proof), Some(operation)) = (candidate, operation.as_ref())
+            && let Some(qualified) = proof.qualify(self, operation)
+        {
+            self.host
+                .witnesses
+                .import(qualified.witnesses, &qualified.bound.inputs);
+            self.program_evidence
+                .insert(config.clone(), proof.program.clone());
+            self.library_evidence
+                .extend(proof.libraries.iter().cloned());
+            self.automatic_type_evidence
+                .extend(proof.types.iter().cloned());
+            self.directive_evidence
+                .extend(proof.directives.iter().cloned());
+            self.consumed_entries.extend(proof.entries.iter().cloned());
+            self.host.shared_inputs.push(qualified.bound.clone());
+            self.attached_programs.push(qualified.bound.clone());
+            self.program_active.remove(&config);
+            let units = Arc::clone(&proof.units);
+            self.programs
+                .insert(config, (Ok(Arc::clone(&units)), qualified.bound.inputs));
+            return Ok(units);
+        }
+        let scope = self.host.witnesses.begin();
+        // Explicit project receipt can predate the program scope; a cache hit attributes it.
+        self.host.witnesses.attribute(&project_inputs);
+        self.host.witnesses.roots();
+        let libraries = self.library_evidence.len();
+        let types = self.automatic_type_evidence.len();
+        let directives = self.directive_evidence.len();
+        let entries = self.consumed_entries.len();
+        let result = self.acquire_program_units(file, &project, &config);
+        let inputs = self.host.witnesses.finish(scope);
+        self.program_active.remove(&config);
+        if let (Ok(units), Some(operation)) = (&result, operation.as_ref()) {
+            operation.completed();
+            if let Some(slot) = slot.as_mut()
+                && slot.is_none()
+                && let Some(sources) = reusable_sources(&inputs, operation)
+            {
+                // Failure/partial evidence is never installed in the cross-owner slot.
+                **slot = Some(Arc::new(ProjectProof {
+                    units: Arc::clone(units),
+                    inputs: Arc::clone(&inputs),
+                    sources: sources.all,
+                    supplied_sources: sources.supplied,
+                    program: self.program_evidence[&config].clone(),
+                    libraries: self.library_evidence[libraries..].to_vec(),
+                    types: self.automatic_type_evidence[types..].to_vec(),
+                    directives: self.directive_evidence[directives..].to_vec(),
+                    entries: self.consumed_entries[entries..].to_vec(),
+                }));
+            }
+        }
+        self.programs.insert(config, (result.clone(), inputs));
+        result
+    }
+
+    fn acquire_program_units(
+        &mut self,
+        file: &Path,
+        project: &super::project::Project,
+        config: &Path,
+    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
+        #[cfg(all(test, feature = "angular"))]
+        crate::ops_r1_observation::record(6, 1);
+        if let Some(operation) = &self.operation {
+            operation.attempt();
+        }
+        (|| {
             let config_inputs =
-                super::project_config::document(&mut self.host, &config, &mut BTreeSet::new())?;
+                super::project_config::document(&mut self.host, config, &mut BTreeSet::new())?;
             let no_resolve = project
                 .options
                 .get("noResolve")
                 .map(|option| option.value.as_bool().ok_or("Invalid noResolve"))
                 .transpose()?
                 .unwrap_or(false);
-            let mut pending = self.program_roots(&config, &config_inputs)?;
+            let mut pending = self.program_roots(config, &config_inputs)?;
             pending.extend(self.automatic_type_sources(file)?);
             let mut units = BTreeMap::new();
             let mut module_requests: Vec<(PathBuf, super::module_references::ModuleReference)> =
@@ -136,6 +239,8 @@ impl Resolver {
             let mut defaults_considered = false;
             let mut suppress_default = false;
             loop {
+                #[cfg(all(test, feature = "angular"))]
+                crate::ops_r1_observation::record(13, 1);
                 if pending.is_empty() && module_requests.is_empty() && !defaults_considered {
                     defaults_considered = true;
                     if !suppress_default {
@@ -188,6 +293,11 @@ impl Resolver {
                 if units.contains_key(&path) {
                     continue;
                 }
+                #[cfg(all(test, feature = "angular"))]
+                crate::ops_r1_observation::record(7, 1);
+                if let Some(operation) = &self.operation {
+                    operation.visit();
+                }
                 let unit = self
                     .unit(&path)
                     .ok_or("Program source unavailable or invalid")?;
@@ -219,25 +329,22 @@ impl Resolver {
                 }
             }
             self.program_evidence
-                .entry(config.clone())
+                .entry(config.to_path_buf())
                 .or_insert(ProgramEvidence {
-                    config: config.clone(),
+                    config: config.to_path_buf(),
                     missing_modules,
                     sources: units.keys().cloned().collect(),
                     groups: Vec::new(),
                     augmentations: Vec::new(),
                 });
-            Ok(units.into_values().collect())
-        })();
-        self.program_active.remove(&config);
-        self.programs.insert(config, result.clone());
-        result
+            Ok(std::sync::Arc::new(units))
+        })()
     }
 
     pub(super) fn global_units(&mut self, file: &Path) -> Result<Vec<Unit>, String> {
         let project = self.request_project(file)?;
         let mut globals = Vec::new();
-        for unit in self.program_units(file)? {
+        for unit in self.program_units(file)?.values().cloned() {
             if self.program_source_external(&unit, &project)? {
                 globals.extend(unit.ambient_globals);
             } else {
@@ -287,7 +394,7 @@ impl Resolver {
             return false;
         };
         let original = ids.clone();
-        for unit in units {
+        for unit in units.values().cloned() {
             let Ok(project) = self.request_project(file) else {
                 return false;
             };

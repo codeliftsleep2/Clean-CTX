@@ -6,43 +6,60 @@ use serde_json::{Value, json};
 use std::path::Path;
 
 #[test]
-fn issue_162_resolver_registration_cold_alias_barrel_namespace_local() {
+fn issue_162_resolver_registration_cold_alias() {
+    assert_cold_form("alias");
+}
+
+#[test]
+fn issue_162_resolver_registration_cold_barrel() {
+    assert_cold_form("barrel");
+}
+
+#[test]
+fn issue_162_resolver_registration_cold_namespace() {
+    assert_cold_form("namespace");
+}
+
+#[test]
+fn issue_162_resolver_registration_cold_local() {
+    assert_cold_form("local");
+}
+
+fn assert_cold_form(form: &str) {
     let _serial = crate::protocol::handler_response_serial();
-    for form in ["alias", "barrel", "namespace", "local"] {
-        for direction in ["forward", "reverse"] {
-            // A new fixture, state and never-created durable DB for EACH direction.
-            let (root, config) = fixture(form);
-            assert!(!Path::new(&config.persistence.db_path).exists());
-            if form == "barrel" {
-                assert!(
-                    !std::fs::read_to_string(root.path().join("one.ts"))
-                        .unwrap()
-                        .contains("Gate")
-                );
-            }
-            let state = McpState::new(config);
-            let answer = query(&state, root.path(), direction);
-            assert_eq!(
-                keys(&answer),
-                ["primary", "secondary"],
-                "{form} {direction}: {answer:#}"
+    for direction in ["forward", "reverse"] {
+        // A new fixture, state and never-created durable DB for EACH direction.
+        let (root, config) = fixture(form);
+        assert!(!Path::new(&config.persistence.db_path).exists());
+        if form == "barrel" {
+            assert!(
+                !std::fs::read_to_string(root.path().join("one.ts"))
+                    .unwrap()
+                    .contains("Gate")
             );
-            assert_eq!(answer["count"], 2);
-            for record in answer["registrations"].as_array().unwrap() {
-                assert_eq!(record["resolver"]["name"], "Gate");
-                assert_eq!(record["route_path"], "dashboard");
-                let file = record["evidence"]["source"].as_str().unwrap();
-                let source = std::fs::read(file).unwrap();
-                assert_eq!(
-                    record["evidence"]["source_hash"],
-                    crate::cache::content_hash(&source)
-                );
-                let span = record["evidence"]["key"].as_array().unwrap();
-                assert_eq!(
-                    &source[span[0].as_u64().unwrap() as usize..span[1].as_u64().unwrap() as usize],
-                    record["key"].as_str().unwrap().as_bytes()
-                );
-            }
+        }
+        let state = McpState::new(config);
+        let answer = query(&state, root.path(), direction);
+        assert_eq!(
+            keys(&answer),
+            ["primary", "secondary"],
+            "{form} {direction}: {answer:#}"
+        );
+        assert_eq!(answer["count"], 2);
+        for record in answer["registrations"].as_array().unwrap() {
+            assert_eq!(record["resolver"]["name"], "Gate");
+            assert_eq!(record["route_path"], "dashboard");
+            let file = record["evidence"]["source"].as_str().unwrap();
+            let source = std::fs::read(file).unwrap();
+            assert_eq!(
+                record["evidence"]["source_hash"],
+                crate::cache::content_hash(&source)
+            );
+            let span = record["evidence"]["key"].as_array().unwrap();
+            assert_eq!(
+                &source[span[0].as_u64().unwrap() as usize..span[1].as_u64().unwrap() as usize],
+                record["key"].as_str().unwrap().as_bytes()
+            );
         }
     }
 }

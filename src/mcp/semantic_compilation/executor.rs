@@ -1,5 +1,5 @@
 use super::artifact::SemanticCompilationArtifact;
-use super::compile::{CompilationRequest, compile_source_artifact};
+use super::compile::{CompilationRequest, compile_source_artifact_in_operation};
 use rayon::prelude::*;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -57,37 +57,51 @@ impl SemanticCompilerExecutor {
         #[cfg(test)]
         self.full_semantic_parses
             .fetch_add(jobs.len(), std::sync::atomic::Ordering::SeqCst);
+        #[cfg(feature = "typescript")]
+        let operation = crate::ir::typescript_resolution::shared_acquisition::operation();
         self.pool.install(|| {
-            jobs.into_par_iter()
+            let results: Vec<_> = jobs
+                .into_par_iter()
                 .map(|job| {
+                    #[cfg(all(test, feature = "angular"))]
+                    crate::ops_r1_observation::record(4, 1);
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        compile_source_artifact(CompilationRequest {
-                            file_path: &job.file_path,
-                            source: &job.source,
-                            fidelity: job.fidelity,
-                            config,
-                            authorized_roots: &job.authorized_roots,
-                            typescript_project: job.typescript_project.as_deref(),
-                            focus: None,
-                            skip_set: job.skip_set.as_ref(),
-                            path_alias: &job.path_alias,
-                            previous_version: job.previous_version,
-                            canonical_owner: &job.canonical_owner,
-                            #[cfg(feature = "csharp")]
-                            csharp_authority: None,
-                        })
+                        compile_source_artifact_in_operation(
+                            CompilationRequest {
+                                file_path: &job.file_path,
+                                source: &job.source,
+                                fidelity: job.fidelity,
+                                config,
+                                authorized_roots: &job.authorized_roots,
+                                typescript_project: job.typescript_project.as_deref(),
+                                focus: None,
+                                skip_set: job.skip_set.as_ref(),
+                                path_alias: &job.path_alias,
+                                previous_version: job.previous_version,
+                                canonical_owner: &job.canonical_owner,
+                                #[cfg(feature = "csharp")]
+                                csharp_authority: None,
+                            },
+                            #[cfg(feature = "typescript")]
+                            Some(std::sync::Arc::clone(&operation)),
+                        )
                     }))
                     .unwrap_or_else(|_| {
                         Err(crate::error::CleanCtxError::Ir(
                             "semantic compilation worker panicked".to_string(),
                         ))
                     });
+                    #[cfg(all(test, feature = "angular"))]
+                    crate::ops_r1_observation::record(5, 1);
                     CompilationBatchResult {
                         file_path: job.file_path,
                         result,
                     }
                 })
-                .collect()
+                .collect();
+            #[cfg(all(test, feature = "angular"))]
+            crate::ops_r1_observation::batch_results(results.len());
+            results
         })
     }
 }

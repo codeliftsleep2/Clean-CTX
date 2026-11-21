@@ -1,0 +1,9 @@
+{
+  "standing": "Legacy proof tests restored only in isolated mutant; accepted test hardening intact",
+  "source_tree_sha256": "1b088ca6914cba88981f5b7c59708ac73acf6a62aee01a57614664ea7cab8f9a",
+  "manifest_sha256": "1eebe6fa2b3e244c0d1bdf347f570a5f7e34bc1ea41d6ba028e1b4eb02d59c66",
+  "adapter_sha256": "ec34a89d81c50613f12f0c5bccd986e7758f9c615ffc536d7e66fdfc4f07760f",
+  "exact_legacy_proof_sha256": "a05260c5402dea1594890d21a9b9306c4787fa0c71bc22508196854b37dc2230",
+  "preserved_m2_hardened_executable_sha256": "3d40c8b32a25a61b11cb0cba64c30aa245c5c29688a3914f7496bb3814e3faad",
+  "hardened_source_archive_sha256": "6800c6488bc39bef0ff99696bd214f9863d6a0ea7fd542ed26c6b32d45e72a30"
+}

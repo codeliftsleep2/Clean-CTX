@@ -1,0 +1,11 @@
+{
+  "historical_red_source_sha256": "61d51bf59302c3688f3113da4f7ba3b6bdadac1f12398488e7519eec9d9ec794",
+  "candidate_source_tree_sha256": "c789349a46561b40c99d8cf2ed10a29e73e88292bd8416984ee2a4b5f83cdcda",
+  "manifest_sha256": "f4c28f135e7a63b3d7894f65b513bedb5c88791958debdcae8aec134e8880bd7",
+  "adapter_sha256": "76e391dea331a9b36bfb3deae5e3ddbe8d1ba700686cac1b2b6e88dd193dfb42",
+  "historical_red_archive_sha256": "f0ded4b9153b83913185f409da12a864928d502a65a7ec8c8a900a5d13d98701",
+  "preserved_red_binary_sha256": "addae44714ef17b949dd379ddb07a717e3796576ba51573db051146f1d1cccc6",
+  "changed_production_file": "src/ir/typescript_resolution/shared_acquisition.rs",
+  "test_sha256": "7e54801d444fb8e4fa41fe9505ab01455074427aafc9dbe7215de8384311b9cf",
+  "tests_executed": false
+}

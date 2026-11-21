@@ -132,6 +132,26 @@ try {
     [System.IO.File]::Delete((Join-Path $registryDirectory 'OTHER.rs'))
     [System.IO.File]::Delete((Join-Path $registryDirectory 'DISCOVERY_REGISTRY.md'))
 
+    $verificationDirectory = Join-Path $repository 'verification/nested'
+    [void][System.IO.Directory]::CreateDirectory($verificationDirectory)
+    Write-Lines (Join-Path $verificationDirectory 'evidence.json') 700
+    $result = Invoke-Validator $repository
+    Assert-Case 'verification artifacts are exempt by directory' (
+        $result.ExitCode -eq 0 -and
+        ($result.Failures -join "`n") -notmatch 'evidence.json' -and
+        ($result.LegacyDebt -join "`n") -notmatch 'evidence.json'
+    ) ($result | Out-String)
+
+    $siblingDirectory = Join-Path $repository 'verification-other'
+    [void][System.IO.Directory]::CreateDirectory($siblingDirectory)
+    Write-Lines (Join-Path $siblingDirectory 'source.rs') 616
+    $result = Invoke-Validator $repository
+    Assert-Case 'similarly named verification sibling remains enforced' (
+        $result.ExitCode -eq 1 -and
+        ($result.Failures -join "`n") -match 'ACTIVE-OVERSIZE.*verification-other/source.rs.*616 lines'
+    ) ($result | Out-String)
+    [System.IO.File]::Delete((Join-Path $siblingDirectory 'source.rs'))
+
     Write-Lines (Join-Path $repository 'committed.rs') 616
     Invoke-Git $repository @('add', 'committed.rs')
     Invoke-Git $repository @('commit', '--quiet', '-m', 'oversized active file')

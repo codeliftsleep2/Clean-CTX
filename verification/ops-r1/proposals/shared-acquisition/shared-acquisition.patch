@@ -1,0 +1,972 @@
+diff --git a/src/ir/typescript_resolution/acquisition_inputs.rs b/src/ir/typescript_resolution/acquisition_inputs.rs
+new file mode 100644
+--- /dev/null
++++ b/src/ir/typescript_resolution/acquisition_inputs.rs
+@@ -0,0 +1,125 @@
++//! Internal consumed-input receipts; existing persisted Witness truth is unchanged.
++use super::Witness;
++use std::{path::PathBuf, sync::Arc};
++
++pub(super) type Inputs = Arc<[Input]>;
++#[derive(Clone, Debug)]
++pub(super) enum Input {
++    Unaccounted,
++    Observation(Arc<Witness>),
++    Source(Arc<SourceInput>),
++    Dependencies(Inputs),
++}
++#[derive(Clone, Debug)]
++pub(super) struct SourceInput {
++    pub path: PathBuf,
++    pub bytes: Arc<str>,
++    pub supplied: bool,
++    pub accounted: bool,
++    pub backing: Inputs,
++}
++#[derive(Default)]
++pub(super) struct InputLog {
++    values: Vec<Witness>,
++    scopes: Vec<Vec<Input>>,
++    roots: Inputs,
++    enabled: bool,
++}
++impl std::ops::Deref for InputLog {
++    type Target = [Witness];
++    fn deref(&self) -> &Self::Target {
++        &self.values
++    }
++}
++impl InputLog {
++    pub fn new(values: Vec<Witness>) -> Self {
++        let roots = values
++            .iter()
++            .cloned()
++            .map(|w| Input::Observation(Arc::new(w)))
++            .collect::<Vec<_>>()
++            .into();
++        Self {
++            values,
++            scopes: Vec::new(),
++            roots,
++            enabled: false,
++        }
++    }
++    pub fn enable(&mut self) {
++        self.enabled = true;
++    }
++    pub fn roots(&mut self) {
++        self.attribute(&Arc::clone(&self.roots));
++    }
++    pub fn into_vec(self) -> Vec<Witness> {
++        self.values
++    }
++    pub fn push(&mut self, witness: Witness) {
++        if let Some(scope) = self.scopes.last_mut() {
++            scope.push(Input::Observation(Arc::new(witness.clone())));
++        }
++        self.values.push(witness);
++    }
++    pub fn begin(&mut self) -> usize {
++        if !self.enabled {
++            return usize::MAX;
++        }
++        let depth = self.scopes.len();
++        self.scopes.push(Vec::new());
++        depth
++    }
++    pub fn finish(&mut self, depth: usize) -> Inputs {
++        if depth == usize::MAX {
++            return Arc::from([]);
++        }
++        assert_eq!(self.scopes.len(), depth + 1, "native input scope nesting");
++        let inputs: Inputs = self.scopes.pop().expect("input scope").into();
++        self.attribute(&inputs);
++        inputs
++    }
++    pub fn attribute(&mut self, inputs: &Inputs) {
++        if let Some(scope) = self.scopes.last_mut() {
++            scope.push(if inputs.is_empty() {
++                Input::Unaccounted
++            } else {
++                Input::Dependencies(Arc::clone(inputs))
++            });
++        }
++    }
++    pub fn source(&mut self, source: &Arc<SourceInput>) {
++        if let Some(scope) = self.scopes.last_mut() {
++            scope.push(Input::Source(Arc::clone(source)));
++        }
++    }
++    pub fn import(&mut self, witnesses: Vec<Witness>, inputs: &Inputs) {
++        self.values.extend(witnesses);
++        self.attribute(inputs);
++    }
++}
++pub(super) fn source_receipt(source: &Arc<SourceInput>) -> Inputs {
++    vec![
++        Input::Dependencies(Arc::clone(&source.backing)),
++        Input::Source(Arc::clone(source)),
++    ]
++    .into()
++}
++/// Visit each recorded dependency node once; never enumerate or parse source files.
++pub(super) fn visit(inputs: &Inputs, mut consume: impl FnMut(&Input)) {
++    let mut pending = vec![(Arc::clone(inputs), 0)];
++    let mut seen = std::collections::BTreeSet::new();
++    while let Some((inputs, index)) = pending.pop() {
++        if index == 0 && !seen.insert(Arc::as_ptr(&inputs) as *const Input as usize) {
++            continue;
++        }
++        let Some(input) = inputs.get(index).cloned() else {
++            continue;
++        };
++        pending.push((inputs, index + 1));
++        if let Input::Dependencies(child) = input {
++            pending.push((child, 0));
++        } else {
++            consume(&input);
++        }
++    }
++}
+diff --git a/src/ir/typescript_resolution/ambient_groups.rs b/src/ir/typescript_resolution/ambient_groups.rs
+--- a/src/ir/typescript_resolution/ambient_groups.rs
++++ b/src/ir/typescript_resolution/ambient_groups.rs
+@@ -25,7 +25,7 @@
+         let mut owners = BTreeSet::new();
+         for block in &scope.blocks {
+             let mut found = false;
+-            for unit in &program {
++            for unit in program.values() {
+                 let Ok(external) = self.program_source_external(unit, &project) else {
+                     return false;
+                 };
+diff --git a/src/ir/typescript_resolution/ambient_modules.rs b/src/ir/typescript_resolution/ambient_modules.rs
+--- a/src/ir/typescript_resolution/ambient_modules.rs
++++ b/src/ir/typescript_resolution/ambient_modules.rs
+@@ -4,11 +4,11 @@
+ use std::path::Path;
+ 
+ impl Resolver {
+-    pub(super) fn ambient_scope_in_units(
++    pub(super) fn ambient_scope_in_units<'a>(
+         &mut self,
+         file: &Path,
+         specifier: &str,
+-        units: &[Unit],
++        units: impl IntoIterator<Item = &'a Unit>,
+     ) -> Result<Option<NamespaceScope>, String> {
+         let project = self.request_project(file)?;
+         let mut blocks = Vec::new();
+@@ -77,7 +77,7 @@
+                 .map(|target| NamespaceScope::module(&target));
+         }
+         let units = self.program_units(file)?;
+-        let ambient = self.ambient_scope_in_units(file, specifier, &units)?;
++        let ambient = self.ambient_scope_in_units(file, specifier, units.values())?;
+         if let Some(scope) = &ambient
+             && scope.blocks.iter().all(|id| id.name == specifier)
+         {
+diff --git a/src/ir/typescript_resolution/capture.rs b/src/ir/typescript_resolution/capture.rs
+--- a/src/ir/typescript_resolution/capture.rs
++++ b/src/ir/typescript_resolution/capture.rs
+@@ -174,6 +174,11 @@
+             }
+         };
+         resolver.operation = operation;
++        if resolver.operation.is_some() {
++            resolver.host.witnesses.enable();
++        }
++        resolver.acquisition_policy =
++            serde_json::to_string(&(fields, call_apis)).unwrap_or_default();
+         let capture = (|| {
+             result.source = resolver
+                 .host
+@@ -324,7 +329,7 @@
+         result.program_directives = resolver.directive_evidence.clone();
+         result.programs = resolver.program_evidence.values().cloned().collect();
+         result.capture_current = resolver.host.current() && capture.is_ok();
+-        result.witnesses = resolver.host.witnesses;
++        result.witnesses = resolver.host.witnesses.into_vec();
+         if let Err(error) = capture {
+             result.disposition = Some(error);
+         }
+diff --git a/src/ir/typescript_resolution/host.rs b/src/ir/typescript_resolution/host.rs
+--- a/src/ir/typescript_resolution/host.rs
++++ b/src/ir/typescript_resolution/host.rs
+@@ -104,10 +104,14 @@
+ 
+ /// One operation owns immutable bytes and every observation used to resolve them.
+ pub(crate) struct Host {
+-    roots: Vec<PathBuf>,
+-    aliases: Vec<(PathBuf, PathBuf)>,
+-    sources: BTreeMap<PathBuf, Option<Arc<str>>>,
+-    pub witnesses: Vec<Witness>,
++    pub(super) roots: Vec<PathBuf>,
++    pub(super) aliases: Vec<(PathBuf, PathBuf)>,
++    pub(super) sources: BTreeMap<PathBuf, Option<Arc<str>>>,
++    pub(super) witnesses: super::acquisition_inputs::InputLog,
++    pub(super) source_inputs: BTreeMap<PathBuf, Arc<super::acquisition_inputs::SourceInput>>,
++    source_receipts: BTreeMap<PathBuf, super::acquisition_inputs::Inputs>,
++    pub(super) shared_inputs: Vec<super::shared_acquisition::BoundProgram>,
++    pub(super) supplied_inputs: BTreeMap<PathBuf, Arc<str>>,
+ }
+ 
+ impl Host {
+@@ -153,17 +157,33 @@
+         Ok(entries)
+     }
+     pub(crate) fn seed(&mut self, path: &Path, source: &str) -> Result<(), String> {
+-        let path = self
+-            .normalized(path)
+-            .ok_or("Source snapshot outside scope")?;
++        let scope = self.witnesses.begin();
++        self.witnesses.roots();
++        let path = self.normalized(path);
++        let backing = self.witnesses.finish(scope);
++        let path = path.ok_or("Source snapshot outside scope")?;
+         if let Some(existing) = self.sources.get(&path) {
+-            return if existing.as_deref() == Some(source) {
+-                Ok(())
+-            } else {
+-                Err("Cannot replace an already consumed TypeScript snapshot".into())
+-            };
+-        }
+-        self.sources.insert(path, Some(Arc::from(source)));
++            if existing.as_deref() != Some(source) {
++                return Err("Cannot replace an already consumed TypeScript snapshot".into());
++            }
++        } else {
++            let bytes: Arc<str> = Arc::from(source);
++            let input = Arc::new(super::acquisition_inputs::SourceInput {
++                path: path.clone(),
++                bytes: Arc::clone(&bytes),
++                supplied: true,
++                accounted: scope != usize::MAX,
++                backing,
++            });
++            self.source_inputs.insert(path.clone(), input);
++            let input = &self.source_inputs[&path];
++            self.source_receipts.insert(
++                path.clone(),
++                super::acquisition_inputs::source_receipt(input),
++            );
++            self.sources.insert(path.clone(), Some(bytes));
++        }
++        self.supplied_inputs.insert(path, Arc::from(source));
+         Ok(())
+     }
+     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
+@@ -198,13 +218,19 @@
+                 .iter()
+                 .map(|(_, physical)| physical.clone())
+                 .collect(),
+-            witnesses: aliases
+-                .iter()
+-                .map(|(route, physical)| Witness::Physical {
+-                    path: route.clone(),
+-                    target: physical.clone(),
+-                })
+-                .collect(),
++            witnesses: super::acquisition_inputs::InputLog::new(
++                aliases
++                    .iter()
++                    .map(|(route, physical)| Witness::Physical {
++                        path: route.clone(),
++                        target: physical.clone(),
++                    })
++                    .collect(),
++            ),
++            source_inputs: BTreeMap::new(),
++            source_receipts: BTreeMap::new(),
++            shared_inputs: Vec::new(),
++            supplied_inputs: BTreeMap::new(),
+             aliases,
+             sources: BTreeMap::new(),
+         })
+@@ -323,9 +349,42 @@
+     }
+ 
+     pub(crate) fn read(&mut self, path: &Path) -> Option<Arc<str>> {
+-        let path = self.normalized(path)?;
+-        if let Some(source) = self.sources.get(&path) {
+-            return source.clone();
++        use super::acquisition_inputs::{SourceInput, source_receipt};
++        let scope = self.witnesses.begin();
++        self.witnesses.roots();
++        let normalized = self.normalized(path);
++        let Some(path) = normalized else {
++            self.witnesses.finish(scope);
++            return None;
++        };
++        if let Some(source) = self.sources.get(&path).cloned() {
++            if let Some(inputs) = self.source_receipts.get(&path) {
++                self.witnesses.attribute(inputs);
++            } else {
++                self.witnesses.attribute(&Arc::from([]));
++            }
++            self.witnesses.finish(scope);
++            return source;
++        }
++        let shared = self
++            .shared_inputs
++            .iter()
++            .find_map(|bound| {
++                bound
++                    .sources
++                    .get(&path)
++                    .or_else(|| bound.proof.sources.get(&path))
++            })
++            .cloned();
++        if let Some(input) = shared {
++            self.witnesses.attribute(&source_receipt(&input));
++            let source = Arc::clone(&input.bytes);
++            self.source_inputs.insert(path.clone(), input);
++            self.source_receipts
++                .insert(path.clone(), source_receipt(&self.source_inputs[&path]));
++            self.sources.insert(path, Some(Arc::clone(&source)));
++            self.witnesses.finish(scope);
++            return Some(source);
+         }
+         #[cfg(all(test, feature = "angular"))]
+         crate::ops_r1_observation::record(8, 1);
+@@ -354,6 +413,22 @@
+                 None
+             }
+         };
++        let backing = self.witnesses.finish(scope);
++        self.source_receipts
++            .insert(path.clone(), Arc::clone(&backing));
++        if let Some(bytes) = source.as_ref() {
++            let input = Arc::new(SourceInput {
++                path: path.clone(),
++                bytes: Arc::clone(bytes),
++                supplied: false,
++                accounted: scope != usize::MAX,
++                backing,
++            });
++            self.witnesses.source(&input);
++            self.source_inputs.insert(path.clone(), input);
++            self.source_receipts
++                .insert(path.clone(), source_receipt(&self.source_inputs[&path]));
++        }
+         self.sources.insert(path, source.clone());
+         source
+     }
+diff --git a/src/ir/typescript_resolution/mod.rs b/src/ir/typescript_resolution/mod.rs
+--- a/src/ir/typescript_resolution/mod.rs
++++ b/src/ir/typescript_resolution/mod.rs
+@@ -2,6 +2,7 @@
+ pub(crate) mod arrow_selection;
+ mod automatic_types;
+ 
++mod acquisition_inputs;
+ #[cfg(test)]
+ #[path = "../../tests/ir/typescript_automatic_type_capture_issue_162.rs"]
+ mod automatic_type_capture_tests;
+diff --git a/src/ir/typescript_resolution/program.rs b/src/ir/typescript_resolution/program.rs
+--- a/src/ir/typescript_resolution/program.rs
++++ b/src/ir/typescript_resolution/program.rs
+@@ -107,32 +107,130 @@
+         Ok(roots.into_iter().collect())
+     }
+ 
+-    pub(super) fn program_units(&mut self, file: &Path) -> Result<Vec<Unit>, String> {
+-        let project = self.request_project(file)?;
+-        let Some(config) = project.config else {
+-            return Ok(Vec::new());
++    pub(super) fn program_units(
++        &mut self,
++        file: &Path,
++    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
++        let scope = self.host.witnesses.begin();
++        self.host.witnesses.roots();
++        let result = self.program_units_scoped(file);
++        self.host.witnesses.finish(scope);
++        result
++    }
++
++    fn program_units_scoped(
++        &mut self,
++        file: &Path,
++    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
++        use super::shared_acquisition::{ProjectProof, basis, reusable_sources};
++        use std::sync::Arc;
++        let project_scope = self.host.witnesses.begin();
++        let project = self.request_project(file);
++        let project_inputs = self.host.witnesses.finish(project_scope);
++        let project = project?;
++        let Some(config) = project.config.clone() else {
++            return Ok(Arc::new(BTreeMap::new()));
+         };
+-        if let Some(units) = self.programs.get(&config) {
+-            return units.clone();
++        if let Some((value, inputs)) = self.programs.get(&config) {
++            self.host.witnesses.attribute(inputs);
++            return value.clone();
+         }
+         if !self.program_active.insert(config.clone()) {
+             return Err("Recursive program acquisition".into());
+         }
++        let operation = self.operation.clone();
++        let slot = operation
++            .as_ref()
++            .filter(|_| self.program_active.len() == 1)
++            .and_then(|operation| basis(self, file, &project).map(|basis| operation.slot(basis)));
++        // No mutable Resolver is stored in the group. The active recursion guard precedes this lock.
++        let mut slot = slot
++            .as_ref()
++            .map(|slot| slot.lock().unwrap_or_else(|poison| poison.into_inner()));
++        let candidate = slot.as_ref().and_then(|slot| slot.as_ref().cloned());
++        // Once sealed, qualification is parallel and never holds the group lock.
++        if candidate.is_some() {
++            drop(slot.take());
++        }
++        if let (Some(proof), Some(operation)) = (candidate, operation.as_ref())
++            && let Some(qualified) = proof.qualify(self, operation)
++        {
++            self.host
++                .witnesses
++                .import(qualified.witnesses, &qualified.bound.inputs);
++            self.program_evidence
++                .insert(config.clone(), proof.program.clone());
++            self.library_evidence
++                .extend(proof.libraries.iter().cloned());
++            self.automatic_type_evidence
++                .extend(proof.types.iter().cloned());
++            self.directive_evidence
++                .extend(proof.directives.iter().cloned());
++            self.consumed_entries.extend(proof.entries.iter().cloned());
++            self.host.shared_inputs.push(qualified.bound.clone());
++            self.attached_programs.push(qualified.bound.clone());
++            self.program_active.remove(&config);
++            let units = Arc::clone(&proof.units);
++            self.programs
++                .insert(config, (Ok(Arc::clone(&units)), qualified.bound.inputs));
++            return Ok(units);
++        }
++        let scope = self.host.witnesses.begin();
++        // Explicit project receipt can predate the program scope; a cache hit attributes it.
++        self.host.witnesses.attribute(&project_inputs);
++        self.host.witnesses.roots();
++        let libraries = self.library_evidence.len();
++        let types = self.automatic_type_evidence.len();
++        let directives = self.directive_evidence.len();
++        let entries = self.consumed_entries.len();
++        let result = self.acquire_program_units(file, &project, &config);
++        let inputs = self.host.witnesses.finish(scope);
++        self.program_active.remove(&config);
++        if let (Ok(units), Some(operation)) = (&result, operation.as_ref()) {
++            operation.completed();
++            if let Some(slot) = slot.as_mut()
++                && slot.is_none()
++                && let Some(sources) = reusable_sources(&inputs, operation)
++            {
++                // Failure/partial evidence is never installed in the cross-owner slot.
++                **slot = Some(Arc::new(ProjectProof {
++                    units: Arc::clone(units),
++                    inputs: Arc::clone(&inputs),
++                    sources: sources.all,
++                    supplied_sources: sources.supplied,
++                    program: self.program_evidence[&config].clone(),
++                    libraries: self.library_evidence[libraries..].to_vec(),
++                    types: self.automatic_type_evidence[types..].to_vec(),
++                    directives: self.directive_evidence[directives..].to_vec(),
++                    entries: self.consumed_entries[entries..].to_vec(),
++                }));
++            }
++        }
++        self.programs.insert(config, (result.clone(), inputs));
++        result
++    }
++
++    fn acquire_program_units(
++        &mut self,
++        file: &Path,
++        project: &super::project::Project,
++        config: &Path,
++    ) -> Result<super::shared_acquisition::ProgramUnits, String> {
+         #[cfg(all(test, feature = "angular"))]
+         crate::ops_r1_observation::record(6, 1);
+         if let Some(operation) = &self.operation {
+             operation.attempt();
+         }
+-        let result = (|| {
++        (|| {
+             let config_inputs =
+-                super::project_config::document(&mut self.host, &config, &mut BTreeSet::new())?;
++                super::project_config::document(&mut self.host, config, &mut BTreeSet::new())?;
+             let no_resolve = project
+                 .options
+                 .get("noResolve")
+                 .map(|option| option.value.as_bool().ok_or("Invalid noResolve"))
+                 .transpose()?
+                 .unwrap_or(false);
+-            let mut pending = self.program_roots(&config, &config_inputs)?;
++            let mut pending = self.program_roots(config, &config_inputs)?;
+             pending.extend(self.automatic_type_sources(file)?);
+             let mut units = BTreeMap::new();
+             let mut module_requests: Vec<(PathBuf, super::module_references::ModuleReference)> =
+@@ -231,7 +329,7 @@
+                 }
+             }
+             self.program_evidence
+-                .entry(config.clone())
++                .entry(config.to_path_buf())
+                 .or_insert(ProgramEvidence {
+                     config: config.clone(),
+                     missing_modules,
+@@ -239,22 +337,14 @@
+                     groups: Vec::new(),
+                     augmentations: Vec::new(),
+                 });
+-            Ok(units.into_values().collect())
+-        })();
+-        self.program_active.remove(&config);
+-        if result.is_ok()
+-            && let Some(operation) = &self.operation
+-        {
+-            operation.completed();
+-        }
+-        self.programs.insert(config, result.clone());
+-        result
++            Ok(std::sync::Arc::new(units))
++        })()
+     }
+ 
+     pub(super) fn global_units(&mut self, file: &Path) -> Result<Vec<Unit>, String> {
+         let project = self.request_project(file)?;
+         let mut globals = Vec::new();
+-        for unit in self.program_units(file)? {
++        for unit in self.program_units(file)?.values().cloned() {
+             if self.program_source_external(&unit, &project)? {
+                 globals.extend(unit.ambient_globals);
+             } else {
+@@ -304,7 +394,7 @@
+             return false;
+         };
+         let original = ids.clone();
+-        for unit in units {
++        for unit in units.values().cloned() {
+             let Ok(project) = self.request_project(file) else {
+                 return false;
+             };
+diff --git a/src/ir/typescript_resolution/resolver.rs b/src/ir/typescript_resolution/resolver.rs
+--- a/src/ir/typescript_resolution/resolver.rs
++++ b/src/ir/typescript_resolution/resolver.rs
+@@ -30,9 +30,17 @@
+         Vec<String>,
+         Namespace,
+     )>,
+-    units: BTreeMap<PathBuf, Option<Unit>>,
++    units: BTreeMap<PathBuf, (Option<Unit>, super::acquisition_inputs::Inputs)>,
++    pub(super) acquisition_policy: String,
++    pub(super) attached_programs: Vec<super::shared_acquisition::BoundProgram>,
+     pub(super) operation: Option<std::sync::Arc<super::shared_acquisition::Operation>>,
+-    pub(super) programs: BTreeMap<PathBuf, Result<Vec<Unit>, String>>,
++    pub(super) programs: BTreeMap<
++        PathBuf,
++        (
++            Result<super::shared_acquisition::ProgramUnits, String>,
++            super::acquisition_inputs::Inputs,
++        ),
++    >,
+     pub(super) library_evidence: Vec<super::compiler_libraries::LibraryRequest>,
+     pub(super) automatic_type_evidence: Vec<super::automatic_types::AutomaticTypeRequest>,
+     pub(super) directive_evidence: Vec<super::program_directives::DirectiveRequest>,
+@@ -40,9 +48,9 @@
+     pub(super) scope_export_active:
+         BTreeSet<(super::declared_scopes::NamespaceScope, String, Namespace)>,
+     pub(super) program_evidence: BTreeMap<PathBuf, super::program::ProgramEvidence>,
+-    projects: BTreeMap<PathBuf, Result<Project, String>>,
++    projects: BTreeMap<PathBuf, (Result<Project, String>, super::acquisition_inputs::Inputs)>,
+     requested_project: Option<PathBuf>,
+-    project_context: Option<Result<Project, String>>,
++    project_context: Option<(Result<Project, String>, super::acquisition_inputs::Inputs)>,
+ }
+ 
+ impl Resolver {
+@@ -52,20 +60,27 @@
+         action: impl FnOnce(&mut Self) -> T,
+     ) -> T {
+         let inherited = self.project_context.take();
+-        self.project_context = Some(
+-            inherited
+-                .clone()
+-                .unwrap_or_else(|| self.project_identity(file)),
+-        );
++        let scope = self.host.witnesses.begin();
++        let selected = if let Some((value, inputs)) = inherited.as_ref() {
++            self.host.witnesses.attribute(inputs);
++            value.clone()
++        } else {
++            self.project_identity(file)
++        };
++        let inputs = self.host.witnesses.finish(scope);
++        self.project_context = Some((selected, inputs));
+         let result = action(self);
+         self.project_context = inherited;
+         result
+     }
+ 
+     pub(super) fn request_project(&mut self, file: &Path) -> Result<Project, String> {
+-        self.project_context
+-            .clone()
+-            .unwrap_or_else(|| self.project_identity(file))
++        if let Some((value, inputs)) = self.project_context.clone() {
++            self.host.witnesses.attribute(&inputs);
++            value
++        } else {
++            self.project_identity(file)
++        }
+     }
+     pub(super) fn resolution_file(&mut self, file: &Path) -> Option<PathBuf> {
+         let project = self.request_project(file).ok();
+@@ -115,16 +130,26 @@
+     }
+ 
+     pub(super) fn project_identity(&mut self, file: &Path) -> Result<Project, String> {
+-        let file = self.host.normalized(file).ok_or("Source outside scope")?;
+-        if let Some(project) = self.projects.get(&file) {
+-            return project.clone();
+-        }
+-        let project = match self.requested_project.as_deref() {
+-            Some(config) => Project::explicit(&mut self.host, config, &file),
+-            None => Project::discover(&mut self.host, &file),
+-        };
+-        self.projects.insert(file, project.clone());
+-        project
++        let scope = self.host.witnesses.begin();
++        self.host.witnesses.roots();
++        let mut key = None;
++        let value = (|| {
++            let file = self.host.normalized(file).ok_or("Source outside scope")?;
++            if let Some((value, inputs)) = self.projects.get(&file) {
++                self.host.witnesses.attribute(inputs);
++                return value.clone();
++            }
++            key = Some(file.clone());
++            match self.requested_project.as_deref() {
++                Some(config) => Project::explicit(&mut self.host, config, &file),
++                None => Project::discover(&mut self.host, &file),
++            }
++        })();
++        let inputs = self.host.witnesses.finish(scope);
++        if let Some(key) = key {
++            self.projects.insert(key, (value.clone(), inputs));
++        }
++        value
+     }
+     pub(crate) fn new(roots: &[PathBuf]) -> Result<Self, String> {
+         Self::with_project(roots, None)
+@@ -138,6 +163,8 @@
+             alias_active: BTreeSet::new(),
+             scope_export_active: BTreeSet::new(),
+             units: BTreeMap::new(),
++            acquisition_policy: String::new(),
++            attached_programs: Vec::new(),
+             operation: None,
+             programs: BTreeMap::new(),
+             program_active: BTreeSet::new(),
+@@ -182,16 +209,44 @@
+         }
+     }
+ 
++    pub(super) fn can_use_program(&self, proof: &super::shared_acquisition::ProjectProof) -> bool {
++        self.units
++            .iter()
++            .all(|(path, (unit, _))| !proof.units.contains_key(path) || unit.is_some())
++    }
++
+     pub(super) fn unit(&mut self, file: &Path) -> Option<Unit> {
+-        let file = self.host.normalized(file)?;
+-        if !self.units.contains_key(&file) {
+-            let unit = self
+-                .host
++        let scope = self.host.witnesses.begin();
++        let mut key = None;
++        let result = (|| {
++            let file = self.host.normalized(file)?;
++            if let Some((value, inputs)) = self.units.get(&file) {
++                self.host.witnesses.attribute(inputs);
++                return value.clone();
++            }
++            for proof in &self.attached_programs {
++                if let Some(unit) = proof.proof.units.get(&file) {
++                    // Parsing a cached unit depends on that source, not every sibling input.
++                    let input = proof
++                        .sources
++                        .get(&file)
++                        .or_else(|| proof.proof.sources.get(&file))?;
++                    self.host
++                        .witnesses
++                        .attribute(&super::acquisition_inputs::source_receipt(input));
++                    return Some(unit.clone());
++                }
++            }
++            key = Some(file.clone());
++            self.host
+                 .read(&file)
+-                .and_then(|source| Unit::parse(&file, &source));
+-            self.units.insert(file.to_path_buf(), unit);
+-        }
+-        self.units.get(&file).cloned().flatten()
++                .and_then(|source| Unit::parse(&file, &source))
++        })();
++        let inputs = self.host.witnesses.finish(scope);
++        if let Some(key) = key {
++            self.units.insert(key, (result.clone(), inputs));
++        }
++        result
+     }
+ 
+     fn local_set(
+diff --git a/src/ir/typescript_resolution/shared_acquisition.rs b/src/ir/typescript_resolution/shared_acquisition.rs
+--- a/src/ir/typescript_resolution/shared_acquisition.rs
++++ b/src/ir/typescript_resolution/shared_acquisition.rs
+@@ -1,9 +1,20 @@
+-//! Operation-local deterministic acquisition observations; no sharing yet.
++//! Scoped operation-local acquisition proofs; owner results remain private.
+ use std::sync::Arc;
+ #[cfg(test)]
+ use std::sync::atomic::{AtomicUsize, Ordering};
+ #[derive(Default)]
+ pub(crate) struct Operation {
++    groups: Mutex<BTreeMap<String, Slot>>,
++    #[cfg(test)]
++    qualifications: AtomicUsize,
++    #[cfg(test)]
++    seal_checks: AtomicUsize,
++    #[cfg(test)]
++    qualified: AtomicUsize,
++    #[cfg(test)]
++    validation_checks: AtomicUsize,
++    #[cfg(test)]
++    qualification_inputs: AtomicUsize,
+     #[cfg(test)]
+     attempts: AtomicUsize,
+     #[cfg(test)]
+@@ -34,7 +45,13 @@
+     }
+     #[cfg(test)]
+     pub(crate) fn work_counts(&self) -> [usize; 5] {
+-        [0; 5]
++        [
++            self.qualifications.load(Ordering::Relaxed),
++            self.qualified.load(Ordering::Relaxed),
++            self.seal_checks.load(Ordering::Relaxed),
++            self.validation_checks.load(Ordering::Relaxed),
++            self.qualification_inputs.load(Ordering::Relaxed),
++        ]
+     }
+ }
+ #[cfg(test)]
+@@ -77,3 +94,209 @@
+     let operations = OBSERVED.with(|slot| slot.borrow_mut().take().expect("operation observation"));
+     (value, operations)
+ }
++
++use super::acquisition_inputs::{Input, Inputs, SourceInput, visit};
++use super::{Resolver, Witness, project::Project, syntax::Unit};
++use std::{
++    collections::BTreeMap,
++    path::{Path, PathBuf},
++    sync::Mutex,
++};
++pub(super) type ProgramUnits = Arc<BTreeMap<PathBuf, Unit>>;
++type Slot = Arc<Mutex<Option<Arc<ProjectProof>>>>;
++pub(super) struct ProjectProof {
++    pub units: ProgramUnits,
++    pub inputs: Inputs,
++    pub sources: Arc<BTreeMap<PathBuf, Arc<SourceInput>>>,
++    pub supplied_sources: Vec<Arc<SourceInput>>,
++    pub program: super::program::ProgramEvidence,
++    pub libraries: Vec<super::compiler_libraries::LibraryRequest>,
++    pub types: Vec<super::automatic_types::AutomaticTypeRequest>,
++    pub directives: Vec<super::program_directives::DirectiveRequest>,
++    pub entries: Vec<super::package_evidence::ConsumedModuleEntry>,
++}
++#[derive(Clone)]
++pub(super) struct BoundProgram {
++    pub proof: Arc<ProjectProof>,
++    pub inputs: Inputs,
++    pub sources: Arc<BTreeMap<PathBuf, Arc<SourceInput>>>,
++}
++pub(super) struct Qualified {
++    pub bound: BoundProgram,
++    pub witnesses: Vec<Witness>,
++}
++impl Operation {
++    pub(super) fn slot(&self, basis: String) -> Slot {
++        let mut groups = self
++            .groups
++            .lock()
++            .unwrap_or_else(|poison| poison.into_inner());
++        Arc::clone(
++            groups
++                .entry(basis)
++                .or_insert_with(|| Arc::new(Mutex::new(None))),
++        )
++    }
++    #[cfg(test)]
++    pub(crate) fn qualification_counts(&self) -> [usize; 3] {
++        [
++            self.qualifications.load(Ordering::Relaxed),
++            self.qualified.load(Ordering::Relaxed),
++            self.validation_checks.load(Ordering::Relaxed),
++        ]
++    }
++}
++/// Conservative basis: preserve logical routes; different request directories split.
++pub(super) fn basis(resolver: &Resolver, file: &Path, project: &Project) -> Option<String> {
++    let config = project.config.as_ref()?;
++    // Aliased request sources stay independent until route-equivalence is established.
++    if !resolver.host.supplied_inputs.contains_key(file) {
++        return None;
++    }
++    serde_json::to_string(&serde_json::json!({
++        "config": config, "root": project.root, "base": project.base,
++        "mode": project.mode, "paths": project.paths, "conditions": project.conditions,
++        "options": project.options, "ownership": project.ownership,
++        "compiler": project.compiler_version, "extensions": format!("{:?}", project.extensions),
++        "directory": file.parent(), "extension": file.extension().and_then(|s| s.to_str()),
++        "roots": resolver.host.roots, "aliases": resolver.host.aliases,
++        "demands": resolver.acquisition_policy,
++    }))
++    .ok()
++}
++pub(super) struct AcquiredSources {
++    pub all: Arc<BTreeMap<PathBuf, Arc<SourceInput>>>,
++    pub supplied: Vec<Arc<SourceInput>>,
++}
++pub(super) fn reusable_sources(inputs: &Inputs, _operation: &Operation) -> Option<AcquiredSources> {
++    if inputs.is_empty() {
++        return None;
++    }
++    let mut sources = BTreeMap::new();
++    let mut supplied = Vec::new();
++    let mut valid = true;
++    visit(inputs, |input| match input {
++        Input::Observation(witness) => {
++            #[cfg(test)]
++            _operation.seal_checks.fetch_add(1, Ordering::Relaxed);
++            valid &= witness.current();
++        }
++        Input::Source(source) => {
++            valid &= source.accounted;
++            if let Some(previous) = sources.insert(source.path.clone(), Arc::clone(source)) {
++                valid &= previous.bytes == source.bytes && previous.supplied == source.supplied;
++            } else if source.supplied {
++                supplied.push(Arc::clone(source));
++            }
++        }
++        Input::Unaccounted => valid = false,
++        Input::Dependencies(_) => unreachable!("visitor expands dependencies"),
++    });
++    valid.then(|| AcquiredSources {
++        all: Arc::new(sources),
++        supplied,
++    })
++}
++impl ProjectProof {
++    pub(super) fn qualify(
++        self: &Arc<Self>,
++        resolver: &mut Resolver,
++        _operation: &Operation,
++    ) -> Option<Qualified> {
++        #[cfg(test)]
++        _operation.qualifications.fetch_add(1, Ordering::Relaxed);
++        if !resolver.can_use_program(self) {
++            return None;
++        }
++        let mut sources = BTreeMap::new();
++        // Check only the recipient's already consumed inputs, not a second unit traversal.
++        for (path, cached) in &resolver.host.sources {
++            if let Some(source) = self.sources.get(path)
++                && cached.as_deref() != Some(source.bytes.as_ref())
++            {
++                return None;
++            }
++            if self.sources.contains_key(path)
++                && resolver
++                    .host
++                    .source_inputs
++                    .get(path)
++                    .is_some_and(|input| !input.accounted)
++            {
++                return None;
++            }
++        }
++        for (path, supplied) in &resolver.host.supplied_inputs {
++            let source = self.sources.get(path)?;
++            if supplied.as_ref() != source.bytes.as_ref() {
++                return None;
++            }
++            sources.insert(
++                path.clone(),
++                Arc::clone(resolver.host.source_inputs.get(path)?),
++            );
++        }
++        for source in &self.supplied_sources {
++            if sources.contains_key(&source.path) {
++                continue;
++            }
++            // Another owner's supplied bytes cannot authorize our dependency.
++            let disk = resolver.host.read(&source.path)?;
++            if disk.as_ref() != source.bytes.as_ref() {
++                return None;
++            }
++            let input = resolver.host.source_inputs.get(&source.path)?;
++            if input.supplied {
++                return None;
++            }
++            sources.insert(source.path.clone(), Arc::clone(input));
++        }
++        let mut inputs = Vec::new();
++        let mut witnesses = Vec::new();
++        let mut valid = true;
++        let mut consume = |input: &Input| {
++            #[cfg(test)]
++            _operation
++                .qualification_inputs
++                .fetch_add(1, Ordering::Relaxed);
++            if let Input::Observation(witness) = input {
++                if matches!(witness.as_ref(), Witness::Content { path, .. } if resolver.host.supplied_inputs.contains_key(path))
++                {
++                    return;
++                }
++                #[cfg(test)]
++                _operation.validation_checks.fetch_add(1, Ordering::Relaxed);
++                valid &= witness.current();
++                witnesses.push(witness.as_ref().clone());
++                inputs.push(Input::Observation(Arc::clone(witness)));
++            } else if let Input::Source(source) = input {
++                inputs.push(Input::Source(
++                    sources
++                        .get(&source.path)
++                        .cloned()
++                        .unwrap_or_else(|| Arc::clone(source)),
++                ));
++            } else if matches!(input, Input::Unaccounted) {
++                valid = false;
++            }
++        };
++        visit(&self.inputs, &mut consume);
++        // Role-bound source backing may add the necessary disk proof for a leader seed.
++        for source in sources.values() {
++            visit(&source.backing, &mut consume);
++        }
++        if !valid {
++            return None;
++        }
++        #[cfg(test)]
++        _operation.qualified.fetch_add(1, Ordering::Relaxed);
++        Some(Qualified {
++            bound: BoundProgram {
++                proof: Arc::clone(self),
++                inputs: inputs.into(),
++                sources: Arc::new(sources),
++            },
++            witnesses,
++        })
++    }
++}

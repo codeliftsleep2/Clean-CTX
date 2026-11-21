@@ -1,0 +1,180 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-20",
+  "checkout_head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "qualification": "Observed source revisions and archive custody only; not fresh historical RED/GREEN, full PCG closure or test execution.",
+  "owner_directive_sha256": "309a686a8d8ac7bd7005c8aa0fbf0c28009ea4d8da9d4218b4e1d339dadfe729",
+  "owner_directive_archive_sha256": "b3d1f8f7c05490d6a90af1f9cab877e0061ed3012c802300ae3590c9e88496d8",
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "2a995cd74375309d1395d1d316f39b4493283948651952a39a7709c3abb86a59",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": ".clinerules/engineering.md",
+      "sha256": "36f8ba3e53fef5bc22f70858053685a757f76ad5e6c2504d680d30a292ad12b5",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": ".clinerules/encoding.md",
+      "sha256": "fd092255ff685e512846f831595211723c1c29db1e2a50859390eab357b1d99c",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/agent/architecture.md",
+      "sha256": "6218344e56de5a64de8a15fd39e390d02a657e3fabe048fbb7370598758cb47b",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/agent/verification.md",
+      "sha256": "e193ace671f940aded90330079a28885d918389249e9cfdd48562bf76ff4e799",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/agent/pcg-authoring.md",
+      "sha256": "cb7e92ad32e7b494b02883c501ad13dc1d77b3d269e19ba557212df2e265c984",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/invariants/workspace-query.md",
+      "sha256": "7eea2b394a8001a92ba5fc1b9ee265d19a73e02237d8d29ad7f852cd795ce64b",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/invariants/persistence-publication.md",
+      "sha256": "b269b539256400ac34843370802b7e00c94a126b7af3fbd7e85396830dc6fccb",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/architecture/contracts/angular-resolver.md",
+      "sha256": "e696b72d57e9530a04faa6a28794162b1887fbf98e205a90e7176b4f4fd40c13",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/architecture/contracts/persistence-recovery.md",
+      "sha256": "1cce04314dfcdf9a17b43e7daa7992f67c59054011d703ff1da58ed8b94f7e6b",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/agent/CI_VERIFY_R1.md",
+      "sha256": "337c23b60837b1f2180fd9c810f031b7f346b9349a9fc0052e97920b640f3017",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "verification/ci-verify-r1/core-query-owner-disposition-02.txt",
+      "sha256": "228fef20f1dba477a4a3fd804b24ecf5ea3818f0f03b297b5f3efd3161927df5",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "verification/ci-verify-r1/feature-isolation-owner-disposition-03.txt",
+      "sha256": "660189ce30cd7cafeb067cd9baee4a8d08b30815087cd594d114d05396fbc7f1",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "verification/live-acceptance/issue-162/ang-r2/ANG_R2_OWNER_DISPOSITION_01.md",
+      "sha256": "c087caa5a9c6943f8ef3a094f77880affe49bb4a7fdac8c55b94cb0737c296fe",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md",
+      "sha256": "4662f0f7409aca9a63331372afb093d0854e424a003c5f77dc869b6a47a8d194",
+      "standing": "candidate source revision"
+    },
+    {
+      "path": "src/tests/ir/ci_runtime_core_query.rs",
+      "sha256": "bdc4c262d8b5f799e7c5fa4de44cdd16a662d493124d173a9cbab11f125387b3",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/compression/core_ir_registration.rs",
+      "sha256": "33ccb4bff6a1cf0edb9cd0bfbc21d5c91245420b818eb585dd9d96f5be82bdca",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/angular_deleted_owner_membership_issue_162.rs",
+      "sha256": "1399e46e1b5e2573b1ba70021e9172957d448ceb74c3ffa039204b6a04222cc0",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/semantic_retirement_controls_issue_162.rs",
+      "sha256": "3cf09c6c1f4fbc1e9b6095417b4933256fe79ef6622486509da96fab212e10c8",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/restore_registration_boundary_issue_162.rs",
+      "sha256": "08a75ac1be842f762c3b3ccef613e1062e8e9d821c35e214356e297cdd9ebae6",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/restore_registration_config_matrix_issue_162.rs",
+      "sha256": "223441a5cc8b7333bfda4547d0fb7ad5170654d511987c74bc3aa0550fdca580",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/architecture/semantic_work_static.rs",
+      "sha256": "55bda608d1a28e18134640dd64bcbe61c0d5fd97ed9cffadba8f130deb1ed97c",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/architecture/ci_verify_r1.rs",
+      "sha256": "e33a29b7b8925c4c49a2a0ee37ca47b13adcbf06a2d915aa86c2c57e848e3d7a",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/dispatcher_regression.rs",
+      "sha256": "24a9c2241a8a1f95890a8086fa116970a79baa6f3b0d203c9d3560877feb9367",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "src/tests/mcp/hydration_single_flight.rs",
+      "sha256": "8b17fd0fd493a8163a3652dbea01bda4de791d9483416dce1e5ba7c472cdf466",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "scripts/verify-ci-membership.py",
+      "sha256": "c42528291a588fa4af75902f5d4891f2f066dab8ef9d84188e2f74d858559ba8",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "c1382e43416438d160d60db7dfa033ae9c1c84f1de7503c06cfc8469c0b2ee50",
+      "standing": "observed source revision, not historical execution identity"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "f4d19d9db2abd1e31957393776b8f1a3122d116b67a8f5cd5420a9f8fe2627fc",
+      "standing": "observed source revision, not historical execution identity"
+    }
+  ],
+  "verified_evidence_archives": [
+    {
+      "index": "verification/ci-verify-r1/core-query-red-index.json",
+      "index_sha256": "64084660a26e3fa357c23442393037d63ce5f6cedd2357356ec44dfc527e6d1f",
+      "archive": "verification/ci-verify-r1/core-query-red-evidence.zip",
+      "archive_sha256": "4ad2c880b8a1f59ada27ed47bf97c6e03b479abb0aa56b8a81aa5c97a2dd1815",
+      "verified_members": 10
+    },
+    {
+      "index": "verification/ci-verify-r1/feature-isolation-green-index.json",
+      "index_sha256": "fad21e773be69d905b4964b90860abf47b69623c90fe00cf46428a3a81ae92df",
+      "archive": "verification/ci-verify-r1/feature-isolation-green-evidence.zip",
+      "archive_sha256": "66717125fad7034ce8981c5b38ebfdf47c6fbd3b8b0e0fe247913928873db487",
+      "verified_members": 8
+    },
+    {
+      "index": "verification/live-acceptance/issue-162/ang-r2/restore-validator-red-index.json",
+      "index_sha256": "b833a93970b6ac1b4ae2f3ce345fe9dfafdcd7fb71dc8fb876c7da902b822ac5",
+      "archive": "verification/live-acceptance/issue-162/ang-r2/restore-validator-red-evidence.zip",
+      "archive_sha256": "cfe1af5f38dce4a68c230713da3222e6f38f200b2a95caac667db1618d36d8f5",
+      "verified_members": 4
+    },
+    {
+      "index": "verification/live-acceptance/issue-162/ang-r2/restore-validator-green-index.json",
+      "index_sha256": "f5dd689564114a2d6577b532359a655edd87e12ff94d0e08fe231ab957b4398f",
+      "archive": "verification/live-acceptance/issue-162/ang-r2/restore-validator-green-evidence.zip",
+      "archive_sha256": "3deaf040025a20a4fbb340d7f145125f768ffa82cc4a1100fb42c2c8f3a2ba6d",
+      "verified_members": 8
+    }
+  ]
+}

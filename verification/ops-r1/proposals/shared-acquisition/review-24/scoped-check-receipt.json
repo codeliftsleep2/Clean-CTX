@@ -1,0 +1,15 @@
+{
+  "standing": "Scoped UTF8/BOM/active-file-size and provenance checks; not full repository guard or document admission",
+  "text_files_checked": 47,
+  "accepted_source_files_changed": [
+    "src/tests/ir/ops_r1_shared_acquisition_isolation.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs",
+    "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs",
+    "src/tests/mcp/semantic_publication_recovery.rs",
+    "src/tests/mcp/semantic_retirement_controls_issue_162.rs"
+  ],
+  "historical_evidence_unchanged": true,
+  "accepted_original_and_mutant_controls_preserved": true,
+  "production_sources_unchanged": true
+}

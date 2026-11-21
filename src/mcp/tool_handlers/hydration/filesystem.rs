@@ -243,8 +243,13 @@ fn root_inventories(roots: &[PathBuf], combined: &InventoryManifest) -> Vec<Root
 
 #[cfg(any(feature = "angular", feature = "csharp", all(test, feature = "rust")))]
 pub(crate) fn source_inventory(state: &McpState, roots: &[PathBuf]) -> InventoryManifest {
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::record(0, 1);
     let (paths, attempted, traversal_completed, _) = enumerate_source_paths(state, roots);
-    build_inventory(state, paths, attempted, traversal_completed)
+    let inventory = build_inventory(state, paths, attempted, traversal_completed);
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::record(1, inventory.entries.len());
+    inventory
 }
 
 fn enumerate_source_paths(state: &McpState, roots: &[PathBuf]) -> (Vec<String>, bool, bool, usize) {

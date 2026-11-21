@@ -1,0 +1,14 @@
+{
+  "standing": "M3 DETECTED by unchanged explicit basis inequality before changed acquisition",
+  "execution_receipt": "target\\ops-r1\\m3-isolated-23\\target\\ops-r1\\p0-config_roots_and_route_changes_stay_independent-20261120-221227\\receipt.json",
+  "execution_receipt_sha256": "9100596f15ab0bc7ee586145bc08ca7e108f46200039212fa1dda35d6a803a0e",
+  "actual_test_exit": 101,
+  "adapter_exit": 1,
+  "expected_assertion": "isolation.rs:59:5 assert_ne basis",
+  "source_tree_sha256": "96117651f06c96a11a63aa3cab70b8e4ab903e2f75fcaf6622e5f037987cab92",
+  "executable_sha256": "752226a7682cbcd23be795145720138bb8281ef8ec40c3a70becb7151f897020",
+  "elapsed_seconds": 0.21602890000212938,
+  "watchdog_or_resource_stop": false,
+  "loaded_false_and_positive_reuse_assertions": "passed before targeted assertion",
+  "no_mutation_promoted": true
+}

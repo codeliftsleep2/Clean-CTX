@@ -1,0 +1,42 @@
+{
+  "standing": "Disposition22 static review only",
+  "controls": 26,
+  "source_raw_sha256": {
+    "src/ir/typescript_resolution/acquisition_inputs.rs": "7b10b73cd42c50ccd9ae42319b28eeb6e8577d48834bcf3d40448882d341a75a",
+    "src/ir/typescript_resolution/ambient_groups.rs": "f9c93d0f7e36abf864dc47ef618246a802447cb2a765a36b52439a471f546ef6",
+    "src/ir/typescript_resolution/capture.rs": "36497d0502d5fc670e08c8b395c3d78d0e9b2bde199bc709f4bdb5330ab76ff2",
+    "src/ir/typescript_resolution/host.rs": "ecafbfe99616f9712293c211bb729bb8c420d4a52a02be66e3a5a890c9ada6ce",
+    "src/ir/typescript_resolution/program.rs": "82245fb24c56822c0d9d51805bdc307b886b794936531f95c7e7f66b6eaa271f",
+    "src/ir/typescript_resolution/resolver.rs": "19172b3038fc62e0d18f247196fa4518d65935b6b39e08201a5d80b287f61d04",
+    "src/ir/typescript_resolution/shared_acquisition.rs": "65116e3a7a30390f7f04ba157673cb47ec18456d19fe3644dab3868f11817cd8",
+    "src/mcp/compatibility/validator.rs": "f8b9c9d5501d78bbe57a5c3c200bd236703fe992a778efab29d56214f723cfe9",
+    "src/mcp/csharp_calls/lifecycle.rs": "45c47df90fe5b3625cf2d64793bc18291c20e4c725edeaf8f046c937378eb80d",
+    "src/mcp/semantic_compilation/executor.rs": "4a9c7848ca8c644eeb5cedd8a596ede246b7299d39c17aa8b4ca33e673a52302",
+    "src/mcp/state/retirement.rs": "6ed00af4cdb8321b47272f3e766f047bc156b9bc817b56507f6f06c1e47531a9",
+    "src/mcp/tool_handlers/hydration/publication.rs": "96401542aa97891cab84526916a1558b985387570d8c33b72535faefa91d161c",
+    "src/mcp/tool_handlers/hydration/resolver_registrations.rs": "06ecee8e6e868e7cb4548c3b0717dab26fbbd895103d7314d4d3fc12cdfd3a5f",
+    "src/tests/ir/ops_r1_shared_acquisition_isolation.rs": "7f87059494f87b780067875bf71e35de17417df6c988bdceff74764dba8ca582",
+    "src/tests/ir/ops_r1_shared_acquisition_proof.rs": "a05260c5402dea1594890d21a9b9306c4787fa0c71bc22508196854b37dc2230",
+    "src/tests/ir/typescript_ambient_acquisition_issue_162.rs": "4f3f1f55d97aad1cc5c49f124371468621c9b6222d402ce30fde0f4958a6265e",
+    "src/tests/mcp/angular_bootstrap_controls_issue_162.rs": "3c314141193088354fae655badf81263edb1cd4cf82655810aeacb4971b943e4",
+    "src/tests/mcp/angular_resolver_registration_lifecycle_issue_162.rs": "9347d8e8c3c4b2088dfa3feec4703395f5e702e058e520d780c10ce696b503c0",
+    "src/tests/mcp/csharp_call_authority_lifecycle.rs": "3eb3fad095f0eade12cfc16650812ac8e0975f8b9ed1c387bae052e2610c27f6",
+    "src/tests/mcp/ops_r1_acquisition_fitness.rs": "990906037d088e0eefb7df1022dad776675cda3beb03b02cc2bb106df492bae8",
+    "src/tests/mcp/semantic_compilation_parallel.rs": "2e566672b4b71b122a271f00ee74a8ff4cc00ba74a960e9dc5f9c66062cc1acf",
+    "src/tests/mcp/semantic_publication_recovery.rs": "bf71935540a93fe689f8d2c66a86248ed89b15721e66743db5604d69cc57939c",
+    "src/tests/mcp/semantic_retirement_controls_issue_162.rs": "3cf09c6c1f4fbc1e9b6095417b4933256fe79ef6622486509da96fab212e10c8",
+    "src/tests/mcp/workspace_query_issue_157_dependencies.rs": "0c5e83326c28f453251b9a9fb3b4c8ed7e8cb85ee68af955427a849a4ba6ae9b"
+  },
+  "artifact_sha256": {
+    "verification/ops-r1/proposals/shared-acquisition/review-22/control-defect-matrix.csv": "c620c053d9a642728a70f5f40d57762efe4e883c21fc4782a614b49e93dfe09b",
+    "verification/ops-r1/proposals/shared-acquisition/review-22/control-invariant-matrix.csv": "52288ff37a98c87df948ff786fe52f9bd708031a2f895658215c35bd82724f51",
+    "verification/ops-r1/proposals/shared-acquisition/review-22/M1-omit-options.patch": "d0df1db5279252a04cad9b25a33f12b61655466b58f10507c73809dbd42ea995",
+    "verification/ops-r1/proposals/shared-acquisition/review-22/M2-disable-sharing.patch": "1eaef479f9e772769355c02bc89da6acbe5a3a425763953b1aff674868e7c7f2",
+    "verification/ops-r1/proposals/shared-acquisition/review-22/M3-collapse-strict-false.patch": "af2bc315dccfee30a64d193f3d27fa569ffdb8ccfa77d11a887ff84b31eb8d88",
+    "verification/ops-r1/proposals/shared-acquisition/review-22/proposed-experiments.json": "548937e46a910d614037eab3dd26f2dce3b0bfe0b8891575141ef789eb1b3fd9"
+  },
+  "accepted_source_tree_sha256": "25d17848f53e607313b877bdb64f5d791d280e20f11dc935c244d880f1b1a8eb",
+  "production_and_test_sources_unchanged": true,
+  "tests_builds_or_mutants_executed": false,
+  "report_sha256": "fa35c9d500aae210905b52d34841606d59673232798b96131b49b4cf73ffe661"
+}

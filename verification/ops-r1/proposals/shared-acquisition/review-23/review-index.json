@@ -1,0 +1,15 @@
+{
+  "standing": "Prepared isolated M3; no builds/tests; proposed adapter amendment not applied",
+  "accepted_source_sha256": "25d17848f53e607313b877bdb64f5d791d280e20f11dc935c244d880f1b1a8eb",
+  "mutant_source_sha256": "96117651f06c96a11a63aa3cab70b8e4ab903e2f75fcaf6622e5f037987cab92",
+  "report_sha256": "487b55aa4b14ebecc1aa08da74505883cc0c2d7c9901a96819c16485542feb61",
+  "artifact_sha256": {
+    "execution-proposal.json": "e73be5a6e39db1ba186f42c8574832e7594e1067d52b075df99ddb6ace48dac9",
+    "isolated-adapter-pin.patch": "71c2ce412c5eb41907f4cd2d73fdd39ebdbcc077e12b8f789d3ae9d8a55b1358",
+    "isolation-receipt.json": "215b07c540481fa3fe321345d17aa8ed1f20db6c8abf4e50484350e8e56666ea",
+    "reviewed-green-m3-23-sources.json": "c5348d3dd24e4903610cd7a137037e4fbe6e59b1eaab2206016908e28d26ef1f"
+  },
+  "isolated_adapter_still_accepted_sha256": "eab639d02d55659fb41ea307895f19a9bb4fb486a448860bb16ae47329ee14d3",
+  "adapter_patch_static_applicability": "git apply --check passed; not applied",
+  "accepted_controls_unchanged": true
+}

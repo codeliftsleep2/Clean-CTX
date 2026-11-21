@@ -1,0 +1,24 @@
+{
+  "standing": "Proposed operator definitions, not permission to run",
+  "implementation": "Adapter imports the exact existing bounded monitor; it does not implement another process monitor or CI runner",
+  "files": [
+    {
+      "path": "verification/ops-r1/proposals/shared-acquisition/execution/capture.py",
+      "sha256": "45c037c5c385916af5d109366e423dc28ec9ce68d7c55addce86029d919c9110"
+    },
+    {
+      "path": "verification/ops-r1/proposals/shared-acquisition/execution/invoke-build-capture.ps1",
+      "sha256": "af7ee07da3d00df45d21bef0c2b5a78165dd0ed5e112aedc9ec6735092ea42a0"
+    },
+    {
+      "path": "verification/ops-r1/proposals/shared-acquisition/execution/reviewed-green-sources.json",
+      "sha256": "458e4236c7e418ed212990783b79942fa0701dd594890117f8efac8582e93e58"
+    },
+    {
+      "path": "verification/ops-r1/proposals/shared-acquisition/execution/reviewed-red-sources.json",
+      "sha256": "ca0aba6c734d91da73be356a8c74779816ca8af254e43a63d6fe7e529bd51e14"
+    }
+  ],
+  "tests": 26,
+  "original_monitor_sha256": "5acc4590c602ee2528c27419b446443fc1325664457adda0e1aab1639dec4484"
+}

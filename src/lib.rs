@@ -115,3 +115,7 @@ mod index_ngrx_noop_af_perf_002;
 #[cfg(all(test, feature = "csharp"))]
 #[path = "tests/mcp/artifact_operation_work_af_perf_002.rs"]
 mod artifact_operation_work_af_perf_002;
+
+#[cfg(all(test, feature = "angular"))]
+#[path = "tests/architecture/ops_r1_observation.rs"]
+pub(crate) mod ops_r1_observation;

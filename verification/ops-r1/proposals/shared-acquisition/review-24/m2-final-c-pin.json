@@ -1,0 +1,9 @@
+{
+  "source_tree_sha256": "2fe8c86f1b39d69ae286d4f24d4d5a79fb4e71768ab2c627ff0a06eaae461f58",
+  "accepted_hardened_source_sha256": "ac089ba19aeacf88e85f94a8752577546caca29b7a3f53d4049d646a431e3f8c",
+  "manifest_sha256": "24c0308b805f79c25256c5e11f6433e4473ca63d0eab252e7c77c0a6381e99e0",
+  "adapter_sha256": "f873f1ef80f3c5e93acfcef1a02877f0ad64ba0be1d013a3d885ca1f22e69f29",
+  "only_source_difference": [
+    "src/ir/typescript_resolution/program.rs"
+  ]
+}

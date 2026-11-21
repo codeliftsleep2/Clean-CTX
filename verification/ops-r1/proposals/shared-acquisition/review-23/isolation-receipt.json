@@ -1,0 +1,19 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "standing": "Isolated M3 preparation; no compilation/execution",
+  "isolation_root": "C:\\Users\\MNasty\\Desktop\\RustContextLayerAI\\target\\ops-r1\\m3-isolated-23",
+  "isolation_method": "Independent Git metadata/index, detached accepted HEAD, read-only object alternates; copied accepted working bytes",
+  "head": "0dd8d7503af3116241ad7c1e23c293b1d5849cc1",
+  "accepted_source_tree_sha256": "25d17848f53e607313b877bdb64f5d791d280e20f11dc935c244d880f1b1a8eb",
+  "mutant_source_tree_sha256": "96117651f06c96a11a63aa3cab70b8e4ab903e2f75fcaf6622e5f037987cab92",
+  "patch_sha256": "af2bc315dccfee30a64d193f3d27fa569ffdb8ccfa77d11a887ff84b31eb8d88",
+  "only_source_difference": [
+    "src/ir/typescript_resolution/shared_acquisition.rs"
+  ],
+  "original_production_file_sha256": "65116e3a7a30390f7f04ba157673cb47ec18456d19fe3644dab3868f11817cd8",
+  "mutant_production_file_sha256": "f94f1646cced272e3b8bea41c9cfe15cadd4993b7e896e8468ef25287a1ab20f",
+  "unchanged_test_sha256": "7f87059494f87b780067875bf71e35de17417df6c988bdceff74764dba8ca582",
+  "accepted_source_unchanged": true,
+  "builds_or_tests_executed": false,
+  "preparation_deviation": "Local no-checkout clone returned128; no candidate source or accepted files changed; used explicit independent Git initialization and read-only object alternates instead. No fetch, commit, or push."
+}

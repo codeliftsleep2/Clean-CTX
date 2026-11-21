@@ -1,0 +1,125 @@
+{
+  "standing": "Separate directory-work RED; verified exact-import correction retained",
+  "baseline_source_tree_sha256": "c9a8c4eb39fdbde19a34e320cfcc5a8222adbc91940af8aa9ce9b09f24c1ab7f",
+  "candidate_source_tree_sha256": "61d51bf59302c3688f3113da4f7ba3b6bdadac1f12398488e7519eec9d9ec794",
+  "files": [
+    {
+      "path": "src/compression/capture_pipeline.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/acquisition_inputs.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/ambient_groups.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/ambient_modules.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/capture.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/host.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/mod.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/program.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/resolver.rs"
+    },
+    {
+      "path": "src/ir/typescript_resolution/shared_acquisition.rs"
+    },
+    {
+      "path": "src/lib.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/compile.rs"
+    },
+    {
+      "path": "src/mcp/semantic_compilation/executor.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/filesystem.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/publication.rs"
+    },
+    {
+      "path": "src/mcp/tool_handlers/hydration/resolver_registrations.rs"
+    },
+    {
+      "path": "src/tests/architecture/ops_r1_observation.rs"
+    },
+    {
+      "path": "src/tests/ir/ops_r1_shared_acquisition_controls.rs"
+    },
+    {
+      "path": "src/tests/ir/ops_r1_shared_acquisition_isolation.rs"
+    },
+    {
+      "path": "src/tests/ir/ops_r1_shared_acquisition_proof.rs"
+    },
+    {
+      "path": "src/tests/ir/ops_r1_shared_acquisition_support.rs"
+    },
+    {
+      "path": "src/tests/mcp/ops_r1_absent_route.rs"
+    },
+    {
+      "path": "src/tests/mcp/ops_r1_acquisition_fitness.rs"
+    },
+    {
+      "path": "src/tests/ir/ops_r1_shared_acquisition_cost.rs"
+    }
+  ],
+  "test_identities": [
+    "mcp::semantic_compilation::ops_r1_acquisition_fitness::ops_r1_shared_acquisition_public_fitness",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_host_unit_project_and_owner_only_proof",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_seed_is_not_sibling_disk_authority",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_divergent_overlay_and_private_cache_are_not_overwritten",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_failed_partial_and_poisoned_leader_do_not_grant_or_poison",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_standalone_capture_and_missing_module_qualification",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_attached_unit_replays_only_its_source",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_failed_partial_after_one_unit_keeps_local_failure",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::proof::ops_r1_shared_precached_unaccounted_values_never_seal_from_nonempty_witnesses",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_config_roots_and_route_changes_stay_independent",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_source_and_package_changes_invalidate_proof",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_request_directory_and_inherited_project_remain_authoritative",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_multiple_projects_and_operations_do_not_share_authority",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_same_config_different_automatic_type_lookup_stays_distinct",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::isolation::ops_r1_shared_concurrent_owners_and_nested_acquisition_are_isolated",
+    "mcp::semantic_compilation::angular_bootstrap_controls_tests::issue_162_bootstrap_controls_unchanged_caller_dependency_mutation_and_stale_restore",
+    "mcp::tool_handlers::semantic_publication_recovery_tests::successful_recovery_preserves_registered_render_and_hydration_behavior",
+    "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_is_deterministic_for_pool_sizes_one_two_and_four",
+    "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_reports_one_failed_job_without_losing_neighbors",
+    "mcp::tool_handlers::hydration::semantic_compilation_parallel_tests::semantic_compilation_parallel_superseded_job_commits_no_partial_authority",
+    "mcp::tool_handlers::query::tests_issue_157_dependencies::issue_157_contributor_superseded_before_commit_rejects_candidate",
+    "mcp::tool_handlers::query::tests_issue_157_dependencies::issue_157_durable_projection_retains_and_validates_contributors",
+    "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_alias",
+    "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_barrel",
+    "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_namespace",
+    "mcp::semantic_compilation::angular_resolver_registration_lifecycle_tests::issue_162_resolver_registration_cold_local",
+    "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_reappearance_before_commit_preserves_owner",
+    "mcp::tool_handlers::query::csharp_call_authority_lifecycle_tests::compatible_batch_call_items_prepare_once",
+    "ir::typescript_resolution::ambient_acquisition_tests::issue_162_ambient_acquisition_shadowed_file_is_not_a_consumed_content_dependency",
+    "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_shared_supports_siblings_and_relationship_families",
+    "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_acquisition_error_is_not_deletion",
+    "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_wrong_kind_refuses_public_currentness_without_deletion",
+    "mcp::semantic_compilation::semantic_retirement_controls_tests::issue_162_retirement_history_and_owner_ordering_survive_deletion",
+    "mcp::tool_handlers::semantic_publication_recovery_tests::compression_and_provision_refuse_publication_before_recovery",
+    "mcp::tool_handlers::semantic_publication_recovery_tests::workspace_query_refuses_index_hydration_before_recovery",
+    "mcp::tool_handlers::query::csharp_call_authority_lifecycle_tests::failed_preparation_remains_dirty_and_returns_no_current_authority",
+    "mcp::semantic_compilation::ops_r1_repro_tests::ops_r1_absent_route_observation",
+    "mcp::semantic_compilation::ops_r1_repro_tests::ops_r1_fixed_job_project_observation",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::cost::ops_r1_shared_import_compacts_exact_constraints_without_losing_receipts",
+    "ir::typescript_resolution::ops_r1_shared_acquisition_controls::cost::ops_r1_shared_empty_automatic_types_reuses_project_across_owner_directories"
+  ],
+  "predecessor_source_pin_sha256": "21734cd76b0d8a2a008b07964d31238b39354dce75af1456059ff71862d567a0"
+}
