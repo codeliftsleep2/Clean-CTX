@@ -170,4 +170,17 @@ knowledge_content:
   - evidence:authority_revisions verification/ops-r1/authority-and-evidence-revisions.json#whole
   - evidence:golden_identity_design verification/ops-r1/golden-corpus-design.json#whole
   - statement:owner_checkpoint_01 docs/agent/ops-r1/OWNER_CHECKPOINT_01.md#whole
+  - observation:work_amplification_audit docs/agent/ANG_R2_SHARED_WORK_AMPLIFICATION_AUDIT.md#whole
+  - observation:preservation_investigation_17 docs/agent/ops-r1/OWNER_CHECKPOINT_17.md#whole
+  - observation:corrected_preservation_18 docs/agent/ops-r1/OWNER_CHECKPOINT_18.md#whole
+  - observation:corrected_test_adapter_19 docs/agent/ops-r1/OWNER_CHECKPOINT_19.md#whole
+  - observation:corrected_case_20 docs/agent/ops-r1/OWNER_CHECKPOINT_20.md#whole
+  - observation:remaining_preservation_21 docs/agent/ops-r1/OWNER_CHECKPOINT_21.md#whole
+  - observation:effectiveness_review_22 docs/agent/ops-r1/OWNER_CHECKPOINT_22.md#whole
+  - observation:isolated_mutation_23 docs/agent/ops-r1/OWNER_CHECKPOINT_23.md#whole
+  - observation:completed_hardening_24 docs/agent/ops-r1/ENGINEERING_REPORT_24.md#whole
+  - observation:performance_and_integration docs/agent/ops-r1/PERFORMANCE_AND_FAILURE_ATTRIBUTION_25.md#whole
+  - evidence:performance_capture_index verification/ops-r1/proposals/shared-acquisition/performance-25/performance-evidence-index.json#whole
+  - evidence:root_verification_results verification/ops-r1/proposals/shared-acquisition/performance-25/root-verification-results.json#whole
+  - evidence:integration_verification verification/ops-r1/proposals/integration-26/evidence-index.json#whole
 ```

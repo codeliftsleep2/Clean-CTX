@@ -1,0 +1,25 @@
+{
+  "category": "Static exact-byte checkout fidelity; no test execution",
+  "checks": [
+    {
+      "path": "verification/ops-r1/p0/run_bounded.py",
+      "sha256": "5acc4590c602ee2528c27419b446443fc1325664457adda0e1aab1639dec4484",
+      "staged_bytes_match": true
+    },
+    {
+      "path": "verification/ops-r1/proposals/integration-26/execution/capture.py",
+      "sha256": "adba6d774aefdeda56163c4936ac1bbd2d13cbb70380560673296c7779d3c086",
+      "staged_bytes_match": true
+    },
+    {
+      "path": "verification/ops-r1/proposals/integration-26/execution/reviewed-green-integration-26-sources.json",
+      "sha256": "23d9c6570455d7ac23f8429200f76d21b6f37997f5ad3185db41d43d92d74cba",
+      "staged_bytes_match": true
+    },
+    {
+      "path": "verification/ops-r1/proposals/integration-26/execution/invoke-build-capture.ps1",
+      "sha256": "af7ee07da3d00df45d21bef0c2b5a78165dd0ed5e112aedc9ec6735092ea42a0",
+      "PowerShell_CRLF_checkout_matches": true
+    }
+  ]
+}

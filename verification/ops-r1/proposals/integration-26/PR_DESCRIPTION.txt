@@ -1,0 +1,40 @@
+Share TypeScript project acquisition while preserving source authority
+
+Absent-route resolver queries previously repeated complete TypeScript project
+acquisition across unrelated owners and retained duplicate currentness constraints.
+Reuse qualified operation-local project proofs, compact exact imported constraints,
+and allow equivalent projects with explicit empty automatic types to share across
+owner directories. Every owner still compiles and publishes independently.
+
+Preserve supplied-versus-disk authority, configuration and route identity, fresh
+qualification, failure refusal, semantic retirement and persistence behavior.
+Strengthen the associated regression controls and retain attributable RED/GREEN
+source, executable and execution evidence.
+
+Final scoped integration validation:
+- Source: 9c4b40d2da333eb832e03153bcdd9e1bc49994a603a3341088d9d9777bcaacb1.
+- Formatting changed only two diagnostic test files; the successor was rebuilt.
+- Seven focused tests and all-feature scoped Clippy passed with zero diagnostics.
+- Eleven file-size validator tests and both repository guards passed.
+- Earlier 13 preservation controls and seven growth cells passed on their
+  separately pinned candidate; they are not relabeled as root-source executions.
+- The distributed 64-owner capture completed in 17 seconds; the baseline process
+  hit its unchanged 60-second safeguard. Cold/warm queries improved from about
+  40.3/18.4 seconds to 11.6/5.1 seconds in individual bounded captures.
+
+Final document reconciliation and six source-acquisition requests were ready,
+complete and current without diagnostics. Exact acquired source/content hashes
+were verified for 388 returned components. Protected state was unchanged; no grant
+was submitted and no publication occurred. See final-document-results.json.
+Residual qualification/currentness work still scales
+with owners times project evidence. These captures do not resolve the original
+field hang or reported memory retention.
+
+Ancillary owner-requested change: verification/** is exempt from source-file
+line limits, with validator coverage preserving enforcement outside that directory.
+Remove generated verification bytecode; retain exact historical evidence archives.
+Preserve exact OPS-R1 verification bytes across checkouts so recorded SHA-256 pins
+remain valid, with the existing PowerShell CRLF and strict UTF-8 policies retained.
+
+Remaining gates: full CI on the final candidate and separately authorized delivery. No protected
+grant, push, merge, publication or PR creation is part of this preparation.

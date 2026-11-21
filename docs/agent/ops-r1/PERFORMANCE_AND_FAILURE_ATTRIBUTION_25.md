@@ -5,8 +5,8 @@ Engineering candidate; no publication, CI, or field acceptance is implied.
 
 ## Outcome and integration recommendation
 
-Retain the two bounded corrections, subject to final root-source focused verification
-and scoped linting. Both have attributable tracked RED/GREEN regressions and matched
+Retain the two bounded corrections. Final root-source focused verification and
+scoped linting passed, as recorded below. Both have attributable tracked RED/GREEN regressions and matched
 public-query measurements. No global cache, timeout, retry, concurrency, discovery,
 completeness, or persistence policy changed.
 
@@ -188,6 +188,103 @@ original field incident OPEN. An uncontrolled Claude repetition or another compl
 mutation campaign is not required for this recommendation. A future field gate
 should batch unresolved real-workspace latency and retention questions after
 integration authorization and applicable CI/admission requirements.
+
+## Mission Directive 26 integration preparation
+
+Agent MaxHeadRoom, 2026-11-21. The investigation phase is closed for the two
+demonstrated defects. No M2/M3 campaign or performance investigation was repeated.
+The owner has already committed the accepted work locally as
+`a59d361e415861327412c8a25de5807003c8639e` on
+`(fix)Performance-Regression-Issues`; the mission comparison base is
+`0dd8d7503af3116241ad7c1e23c293b1d5849cc1`, not an assumed remote PR base.
+
+Static re-enumeration of the committed source matches the accepted digest
+`75d63dfb564a4f860c637160ec1d2bbbc8fcc89823cba06bbbfbae25dc71ab4c` exactly.
+The integration review classifies 17 production/test-observation files and 12
+tracked test files. Remaining paths are mission/governance records, reusable
+verification/evidence assets, or the separate owner-requested size-policy change.
+No workflow, dependency, protected selection or grant implementation is modified.
+The existing OPS-001 corpus membership candidate remains subject to actual
+admission; its presence in a local commit is not proof of authorization or admission.
+
+One generated Python bytecode file was inadvertently included in the local commit.
+Integration cleanup removes that file and adds verification-scoped bytecode ignores;
+archived historical bytes remain unchanged. This cleanup does not change the
+accepted Rust source identity. The earlier report's stale opening prerequisite
+was corrected to reflect the successful root tests and Clippy already recorded.
+
+The integration definitions and prepared commit/PR text are under
+`verification/ops-r1/proposals/integration-26/`. The scope CSV and source record
+from preparation are in `target/ops-r1/integration-26-preparation/`.
+The remaining exact operator command is:
+
+```powershell
+pwsh -NoProfile -File .\verification\ops-r1\proposals\integration-26\invoke-integration-checks.ps1
+```
+
+It checks all mission-modified Rust files with Cargo's Rust 2024 edition. If
+normalization changes source, it pins a separate successor, compiles it, runs
+seven affected bounded controls and scoped all-feature Clippy. If source remains
+unchanged, it reuses the accepted results rather than rerunning them. It also runs
+the focused file-size validator regressions, source guards and the actual existing
+B11 descriptor/context admission route, without submitting authorization or
+publishing. Descriptor refusal and incomplete context remain explicit outcomes.
+All runtime invocation is operator-owned under the current AGENTS.md boundary.
+
+### Actual integration results
+
+Capture: `target/ops-r1/integration-26-20261121-075244-830`.
+Rustfmt normalized only `src/tests/architecture/ops_r1_observation.rs` and
+`src/tests/mcp/ops_r1_absent_route.rs`. All assertion/fixture behavior is unchanged;
+the exact formatting diff is retained with the new source snapshot.
+
+Successor source SHA256:
+`9c4b40d2da333eb832e03153bcdd9e1bc49994a603a3341088d9d9777bcaacb1`.
+Executable SHA256:
+`741e5e4e74c37288f150fd42746e06932921f00ac59405666ad12d7dbd587656`.
+The fresh all-feature library test build returned exit 0 with zero compiler
+diagnostics. All seven exact bounded controls passed, with source/binary identities
+verified after execution and no resource stop: both new cost regressions, public
+acquisition fitness, persistence, source/package invalidation, config/root isolation,
+and directory-sensitive automatic types. Scoped all-feature Clippy returned exit 0.
+All 11 size-validator tests passed; size and strict UTF-8 repository guards passed.
+
+`verification/ops-r1/proposals/integration-26/integration-evidence.zip` retains exact
+successor source, formatting diff, build, raw test evidence, guard/Clippy logs and
+the original actual governance capture. Its index is `evidence-index.json`.
+The prior 13-control preservation and seven-cell performance results retain their
+original source identities; they were not relabeled as successor executions.
+
+The actual B11 descriptor returned exit 0, zero diagnostics and digest
+`9e90d27741c293b00912045b3a1723a7441089d62734b5c7a357fa984a9ea0a3`.
+Its accepted/proposed protected state digests are equal; no protected state change
+or grant was required for that candidate. The context was ready, complete and current
+at generation `a76b83eca5d551ee256134e68ae0e706c2e3d7704395db7227b5f7256b41e5f9`,
+with zero diagnostics and 221/221 registered identities represented. It explicitly
+reported `content_acquired:false`; context readiness is not source acquisition.
+False authorization/publication flags are preserved, not treated as proof of a
+missing grant when the protected state is unchanged.
+
+That context exposed missing explicit evidence components for later mission reports.
+OPS-001 has no previously protected components or relationships in the actual
+descriptor. Its unprotected evidence declaration was reconciled to include those
+reports and final verification indexes. No protected declaration, corpus membership
+or grant changed during integration preparation.
+
+At this authoring checkpoint the final document-only capture remains to be run:
+
+```powershell
+pwsh -NoProfile -File .\verification\ops-r1\proposals\integration-26\invoke-final-documents.ps1
+```
+
+It uses the existing checker and bounded stdio client for a fresh descriptor/context
+and returned source-acquisition requests for OPS-001 and its five direct controlling
+authorities. Exact results remain in the printed capture directory. A changed
+protected-state descriptor is a stop condition, not permission to submit a grant.
+This document records the checkpoint before that capture; final capture results are
+separate evidence. Full CI and authorized delivery remain outstanding. The original
+field hang and memory-retention questions remain OPEN. No extra architectural
+approval checkpoint or second golden test runner was introduced.
 
 ## Evidence association
 

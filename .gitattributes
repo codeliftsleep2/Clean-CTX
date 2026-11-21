@@ -15,3 +15,9 @@ src/tests/compression/fixtures/core_ir_csharp_before.scm text eol=lf
 # Versioned Git hooks are POSIX shell scripts and MUST stay LF (a CR would
 # break the shebang when git runs the hook).
 .githooks/* text eol=lf
+
+# OPS-R1 adapters, manifests and retained evidence use exact-byte SHA-256 pins.
+# Preserve their authored UTF-8 bytes across checkouts; encoding guards still apply.
+verification/ops-r1/** -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Retain the repository's existing PowerShell checkout policy.
+verification/ops-r1/**/*.ps1 text eol=crlf

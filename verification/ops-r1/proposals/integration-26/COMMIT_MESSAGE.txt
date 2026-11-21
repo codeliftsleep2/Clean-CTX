@@ -1,0 +1,20 @@
+Finalize OPS-R1 integration formatting and evidence
+
+Reconcile the accepted shared-acquisition candidate and preserve its exact
+source, verification and historical evidence identities. Normalize two diagnostic
+test files and verify the new source with seven focused tests and scoped Clippy.
+Remove generated
+Python bytecode and ignore future verification bytecode without changing
+retained evidence archives.
+Preserve hash-pinned OPS-R1 verification bytes across Git checkouts while retaining
+the existing PowerShell CRLF policy and UTF-8 guards.
+
+Record integration scope, governance requirements and the owner-authorized
+verification-directory size exemption separately from production corrections.
+
+Validation: seven affected tracked tests, scoped all-feature Clippy, eleven
+size-validator tests, both repository guards, and actual final document/source
+acquisition checks passed. Preserve the unresolved field incident and residual
+qualification/currentness cost as separate limitations.
+
+No push, merge, graph publication or CI success is implied.

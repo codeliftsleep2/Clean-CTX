@@ -1,0 +1,34 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "category": "Actual final checker and source acquisition verified",
+  "source_tree_sha256": "9c4b40d2da333eb832e03153bcdd9e1bc49994a603a3341088d9d9777bcaacb1",
+  "descriptor_digest": "66a74a94a8c3682b800109a194019606b415dad8b58398de72e245c7d7819329",
+  "context_generation": "3dc5ec6cdc8cee180e58a707564612388bd2f39595cdf8ad5009a43ed192840a",
+  "descriptor_diagnostics": [],
+  "protected_state_unchanged": true,
+  "context_ready_complete_current": true,
+  "source_acquisition_requests": 6,
+  "acquired_components_verified": 388,
+  "source_ids": [
+    "AUTH.FINAL_VERIFICATION",
+    "DOC-270",
+    "OPS-001",
+    "PERF-004-DOCTRINE",
+    "PERF-005-BOUNDED",
+    "VERIFY-001"
+  ],
+  "catalog_coverage": {
+    "identities": 221,
+    "represented": 221,
+    "unrepresented": []
+  },
+  "evidence_archive": "final-document-evidence.zip",
+  "evidence_archive_sha256": "5bc18da2497f27a5cd33cc91cea13e8a2aa9d4d6e6765b8089833e3fbd07632b",
+  "authorization_submitted": false,
+  "publication_performed": false,
+  "remaining_gates": [
+    "Full CI on final integration commit",
+    "Owner-authorized delivery"
+  ],
+  "original_field_incident": "OPEN; no field hang or memory-retention resolution claimed"
+}

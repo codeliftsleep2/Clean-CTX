@@ -1,0 +1,26 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "category": "Verified scoped integration successor; not full CI or field closure",
+  "previous_source_sha256": "75d63dfb564a4f860c637160ec1d2bbbc8fcc89823cba06bbbfbae25dc71ab4c",
+  "source_tree_sha256": "9c4b40d2da333eb832e03153bcdd9e1bc49994a603a3341088d9d9777bcaacb1",
+  "executable_sha256": "741e5e4e74c37288f150fd42746e06932921f00ac59405666ad12d7dbd587656",
+  "source_drift": "Rustfmt-only changes in two diagnostic test files",
+  "build_exit_code": 0,
+  "compiler_diagnostics": 0,
+  "tracked_tests_passed": 7,
+  "scoped_clippy_exit_code": 0,
+  "file_size_behavior_tests_passed": 11,
+  "guards": [
+    "file size PASS",
+    "UTF-8 PASS"
+  ],
+  "original_actual_descriptor_digest": "9e90d27741c293b00912045b3a1723a7441089d62734b5c7a357fa984a9ea0a3",
+  "original_protected_state_unchanged": true,
+  "original_context_standing": "ready, complete, current, zero diagnostics; content not acquired",
+  "final_document_reconciliation": "Unprotected evidence component reconciliation prepared; final actual capture pending",
+  "evidence_archive": "integration-evidence.zip",
+  "evidence_archive_sha256": "5896ee48b275a77587c91f3fc924b560cd57626ac5d538bbb08791d41d3e23c6",
+  "ci_status": "Pending",
+  "field_incident": "Open; no historical hang or leak resolution claimed",
+  "delivery_status": "No new commit, push, PR creation, merge or publication"
+}

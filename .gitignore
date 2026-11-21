@@ -51,3 +51,7 @@ scripts/agent/.scratch/
 
 #Codex Folder
 /.codex
+
+# Generated Python bytecode from operator verification tools.
+/verification/**/__pycache__/
+/verification/**/*.pyc
