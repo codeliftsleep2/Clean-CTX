@@ -1,7 +1,52 @@
 # OPS-R1 Directive 33 — directory-fragmented Angular acquisition
 
 Agent: **Agent MaxHeadRoom**. Date: 2026-11-23.
-Standing: local correction and controlled reproduction; field incident #190 remains open.
+Standing: field incident #190 unresolved; the earlier absent-key candidate does not establish a fix for the owner's `types: []` workspace.
+
+## Scope correction from the affected repository
+
+The owner confirmed that the affected tsconfigs contain `types: []`. The original
+directory-independent acquisition rule already covers that effective value.
+The measured missing-key/empty-discovery optimization below therefore does not
+explain this field incident. Its controlled results remain valid for their named
+scope, not evidence that the affected repository is fixed.
+
+The owner requested checks of every null/empty/no-content case. A new tracked
+matrix in `src/tests/ir/ops_r1_automatic_type_input_cases.rs` covers 26 cases:
+absent values, explicit/inherited empty arrays, null resets, inheritance overrides,
+visible default/named packages, blank strings and malformed/empty entries.
+All 26 passed before further production edits. Explicit and inherited empty arrays
+shared one acquisition across distinct owner directories. Null is an effective
+option reset, which can restore nonempty default discovery; malformed values do
+not grant an empty shared proof.
+
+The follow-up removes key-presence branching from production acquisition sharing.
+Every eligible miss goes through the same automatic-type producer and uses its
+actual successful empty result. No raw configuration shortcut remains in the
+production basis builder. This is behavior-preserving consolidation, not a new
+RED/GREEN defect claim or a demonstrated #190 fix. All 33 focused Rust tests pass
+after consolidation, including the three tests covering those 26 input cases,
+the existing acquisition controls, cold imported-registration forms, required
+publication failure, repeated absent queries and shared-consumption checks.
+Scoped all-feature library/test Clippy passes with warnings denied. The new matrix
+uses reviewed TypeScript 5.9.3 inputs; it does not certify every compiler release.
+No new performance measurement, full CI or actual-workspace run is claimed.
+
+Follow-up base HEAD: `5e49dc1077072ba5b4f67d9db4c61c6c308727e1`.
+Current source manifest SHA-256:
+`46145829e9f85cc03e3eef652fba8f969d123c133cfdbbb73b445b2a095ee14a`.
+Current focused test executable SHA-256:
+`86387c007757e1fcd06c495e495b3ae720a4bb3153a67e9508b7abbd51e92bdb`.
+Identity, build/source manifests and before/after matrix outputs are retained in
+`target/ops-r1/cost-33/type-input-*`; exact final test outcomes are in
+`target/ops-r1/cost-33/preservation-20261123-133434/results.json`.
+The earlier source/binary pins below remain historical and do not identify this
+follow-up build. No follow-up commit or publication was performed by this agent.
+
+The packet workflow below is retired as the active next step. The owner requires
+direct investigation against the actual affected repository using its own checkout
+and build, rather than substituting generated fixtures or transferring a packet.
+Frozen packet archives and earlier measurements are retained as historical evidence.
 
 ## Contract answer
 
@@ -127,7 +172,7 @@ stopped and reaped only their spawned child and preserved partial receipts.
 Sampling can miss short peaks or overshoot between observations. The watchdog
 stops are resource-control evidence, not semantic RED or failed correctness tests.
 
-## Deterministic and preservation evidence
+## Historical deterministic and preservation evidence
 
 The unchanged tracked test is
 `src/tests/ir/ops_r1_empty_automatic_types.rs`, registered through the normal
@@ -160,7 +205,7 @@ focused run uses fresh individual processes with explicit 180-second deadlines.
 The historical work-scaling case passes in 84.89 seconds in that final run.
 No required test is ignored or weakened.
 
-## Source and evidence identity
+## Historical source and evidence identity
 
 Starting HEAD: `e399118df6f948afd03c5cd9afe7ee6ded07d68a`.
 The working tree was initially clean. No delivery commit, push, merge or publication
@@ -249,7 +294,7 @@ enumeration. The packet requires the same preflight on the work machine before
 any real query. These are adapter observations, not additional Rust regressions.
 Receipt: `target/ops-r1/cost-33/pair-preflight-checks.json`.
 
-No new Rust source or executable changed during this handoff preparation. The
+No new Rust source or executable changed during the historical packet preparation. The
 earlier Rust RED/GREEN, 48-test and scoped lint evidence retain their exact source
 identities. No new field query, Claude pilot, full CI, commit or publication ran.
 The actual paired field results remain outstanding; the packet grants no automatic

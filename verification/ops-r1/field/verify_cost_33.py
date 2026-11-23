@@ -19,6 +19,7 @@ def main():
     parser.add_argument("--exe", type=Path, required=True)
     parser.add_argument("--prior-stdout", type=Path)
     parser.add_argument("--wall-seconds", type=int, choices=range(1, 181), default=60, metavar="1..180")
+    parser.add_argument("--filter", action="append", help="explicit focused test selection; repeat for multiple filters")
     args = parser.parse_args()
     exe = args.exe.resolve(strict=True)
     digest = hashlib.sha256(exe.read_bytes()).hexdigest()
@@ -30,6 +31,8 @@ def main():
                "ops_r1_warm_resolver_consumption_checks_shared_constraints_once",
                "ops_r1_repeated_absent_queries_preserve_retained_owner_evidence"]
     filters.append("ops_r1_empty_automatic_types_preserve_imported_registrations")
+    if args.filter:
+        filters = args.filter
     names = [line.removesuffix(": test") for line in listing.splitlines() if line.endswith(": test")]
     names = [name for name in names if any(f in name for f in filters) and name not in prior]
     assert names, "no remaining tests selected"

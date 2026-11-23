@@ -150,10 +150,15 @@ impl Operation {
         ]
     }
 }
-/// Preserve directory-dependent lookup unless explicit types disable that lookup.
+/// Fixture keys for tests that supply an explicit empty-list configuration.
 #[cfg(test)]
 pub(super) fn basis(resolver: &Resolver, file: &Path, project: &Project) -> Option<String> {
-    basis_with_empty_types(resolver, file, project, false)
+    let empty = project
+        .options
+        .get("types")
+        .and_then(|option| option.value.as_array())
+        .is_some_and(Vec::is_empty);
+    basis_with_empty_types(resolver, file, project, empty)
 }
 pub(super) fn basis_with_empty_types(
     resolver: &Resolver,
@@ -166,16 +171,10 @@ pub(super) fn basis_with_empty_types(
     if !resolver.host.supplied_inputs.contains_key(file) {
         return None;
     }
-    // Automatic type discovery starts at the request directory. An explicit
-    // empty list performs no such lookup; libraries use the selected config,
-    // while module and directive resolution use each acquired unit's own path.
-    let directory = if empty_types_proven
-        || project
-            .options
-            .get("types")
-            .and_then(|option| option.value.as_array())
-            .is_some_and(Vec::is_empty)
-    {
+    // Key sharing by the producer's proven empty result, never option presence.
+    // Libraries use the selected config; module/directive resolution uses each
+    // acquired unit's own path. Nonempty/refused inputs retain request context.
+    let directory = if empty_types_proven {
         None
     } else {
         file.parent()

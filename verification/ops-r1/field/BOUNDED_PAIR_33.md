@@ -1,6 +1,11 @@
 # OPS-R1 Directive 33 — originating-machine comparison
 
 Agent: **Agent MaxHeadRoom**. Prepared 2026-11-23. Incident #190 stays OPEN.
+Current disposition: **historical/superseded as an active handoff**. The owner
+confirmed the actual workspace uses `types: []` and requires direct testing in
+that repository. These frozen binaries predate the unified effective-input path.
+Do not use this packet as validation of the current source or as a #190 fix.
+The original procedure below is retained for provenance only.
 Owner disposition: retain the correction for review; require matched field evidence.
 
 ## What this packet establishes

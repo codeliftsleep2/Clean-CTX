@@ -1,4 +1,6 @@
 //! Concern-based registration; shared fixtures remain tracked in the test tree.
+#[path = "ops_r1_automatic_type_input_cases.rs"]
+mod automatic_type_input_cases;
 #[path = "ops_r1_shared_acquisition_cost.rs"]
 mod cost;
 #[path = "ops_r1_empty_automatic_types.rs"]

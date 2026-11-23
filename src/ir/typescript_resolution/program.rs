@@ -139,20 +139,19 @@ impl Resolver {
             return Err("Recursive program acquisition".into());
         }
         let operation = self.operation.clone();
-        // Only empty automatic-type discovery is directory-independent. Capture
-        // each owner's actual negative lookups, including for a shared recipient.
+        // Classify every effective input through the same producer, including
+        // explicit/inherited empty lists and absent/null-reset defaults. Capture
+        // each owner's actual lookups, including for a shared recipient.
         // Failed/nonempty discovery keeps the existing independent path and its
         // original acquisition/refusal order. This is not a negative-result cache.
-        let (automatic_names, automatic_inputs) = if operation.is_some()
-            && self.program_active.len() == 1
-            && !project.options.contains_key("types")
-        {
-            let automatic_scope = self.host.witnesses.begin();
-            let names = self.automatic_type_names(file);
-            (Some(names), self.host.witnesses.finish(automatic_scope))
-        } else {
-            (None, Arc::from([]))
-        };
+        let (automatic_names, automatic_inputs) =
+            if operation.is_some() && self.program_active.len() == 1 {
+                let automatic_scope = self.host.witnesses.begin();
+                let names = self.automatic_type_names(file);
+                (Some(names), self.host.witnesses.finish(automatic_scope))
+            } else {
+                (None, Arc::from([]))
+            };
         let empty_types = automatic_names
             .as_ref()
             .is_some_and(|names| names.as_ref().is_ok_and(BTreeSet::is_empty));
