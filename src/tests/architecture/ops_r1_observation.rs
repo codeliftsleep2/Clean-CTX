@@ -33,7 +33,7 @@ pub(crate) fn record(slot: usize, count: usize) {
     }
 }
 pub(crate) fn snapshot() -> serde_json::Value {
-    let values: serde_json::Map<String, serde_json::Value> = NAMES
+    let mut values: serde_json::Map<String, serde_json::Value> = NAMES
         .iter()
         .enumerate()
         .map(|(i, name)| {
@@ -43,7 +43,51 @@ pub(crate) fn snapshot() -> serde_json::Value {
             )
         })
         .collect();
+    for (name, counter) in EXTRA_NAMES.iter().zip(&EXTRA) {
+        values.insert((*name).into(), counter.load(Ordering::Relaxed).into());
+    }
     serde_json::Value::Object(values)
+}
+// Payload counts are lower bounds, not allocator size or RSS attribution.
+const EXTRA_NAMES: [&str; 13] = [
+    "distinct_operation_bases",
+    "shared_acquisitions",
+    "compile_live",
+    "compile_peak",
+    "acquire_live",
+    "acquire_peak",
+    "prepared_jobs",
+    "prepared_source_bytes",
+    "sealed_proofs",
+    "sealed_source_payload_bytes",
+    "inventory_owner_bytes",
+    "results_completed",
+    "acquisitions_completed",
+];
+static EXTRA: [AtomicU64; 13] = [const { AtomicU64::new(0) }; 13];
+pub(crate) fn extra(slot: usize, count: usize) {
+    if active() {
+        EXTRA[slot].fetch_add(count as u64, Ordering::Relaxed);
+    }
+}
+pub(crate) fn enter(slot: usize) -> Live {
+    let enabled = active();
+    if enabled {
+        let count = EXTRA[slot].fetch_add(1, Ordering::Relaxed) + 1;
+        EXTRA[slot + 1].fetch_max(count, Ordering::Relaxed);
+    }
+    Live { slot, enabled }
+}
+pub(crate) struct Live {
+    slot: usize,
+    enabled: bool,
+}
+impl Drop for Live {
+    fn drop(&mut self) {
+        if self.enabled {
+            EXTRA[self.slot].fetch_sub(1, Ordering::Relaxed);
+        }
+    }
 }
 pub(crate) fn sample(directory: &std::path::Path) -> Sample {
     use std::sync::{Arc, atomic::AtomicBool};
@@ -52,6 +96,9 @@ pub(crate) fn sample(directory: &std::path::Path) -> Sample {
         return Sample { stop, worker: None };
     }
     for count in &COUNTS {
+        count.store(0, Ordering::Relaxed);
+    }
+    for count in &EXTRA {
         count.store(0, Ordering::Relaxed);
     }
     ACTIVE.store(true, Ordering::Relaxed);

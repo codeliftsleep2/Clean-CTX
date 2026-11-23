@@ -136,6 +136,11 @@ pub(in crate::mcp::tool_handlers) fn compile_candidates_for(
     for resolved_path in resolved_paths {
         match prepare_candidate(state, resolved_path, workspace_root, requirement)? {
             PreparedCandidate::Compile(publication, job) => {
+                #[cfg(all(test, feature = "angular"))]
+                {
+                    crate::ops_r1_observation::extra(6, 1);
+                    crate::ops_r1_observation::extra(7, job.source.len());
+                }
                 publications.push(publication);
                 jobs.push(*job);
             }

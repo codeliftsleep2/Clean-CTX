@@ -64,6 +64,8 @@ impl SemanticCompilerExecutor {
                 .into_par_iter()
                 .map(|job| {
                     #[cfg(all(test, feature = "angular"))]
+                    let _live = crate::ops_r1_observation::enter(2);
+                    #[cfg(all(test, feature = "angular"))]
                     crate::ops_r1_observation::record(4, 1);
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         compile_source_artifact_in_operation(
@@ -93,6 +95,8 @@ impl SemanticCompilerExecutor {
                     });
                     #[cfg(all(test, feature = "angular"))]
                     crate::ops_r1_observation::record(5, 1);
+                    #[cfg(all(test, feature = "angular"))]
+                    crate::ops_r1_observation::extra(11, 1);
                     CompilationBatchResult {
                         file_path: job.file_path,
                         result,

@@ -131,6 +131,10 @@ impl Operation {
             .groups
             .lock()
             .unwrap_or_else(|poison| poison.into_inner());
+        #[cfg(all(test, feature = "angular"))]
+        if !groups.contains_key(&basis) {
+            crate::ops_r1_observation::extra(0, 1);
+        }
         Arc::clone(
             groups
                 .entry(basis)
@@ -147,7 +151,16 @@ impl Operation {
     }
 }
 /// Preserve directory-dependent lookup unless explicit types disable that lookup.
+#[cfg(test)]
 pub(super) fn basis(resolver: &Resolver, file: &Path, project: &Project) -> Option<String> {
+    basis_with_empty_types(resolver, file, project, false)
+}
+pub(super) fn basis_with_empty_types(
+    resolver: &Resolver,
+    file: &Path,
+    project: &Project,
+    empty_types_proven: bool,
+) -> Option<String> {
     let config = project.config.as_ref()?;
     // Aliased request sources stay independent until route-equivalence is established.
     if !resolver.host.supplied_inputs.contains_key(file) {
@@ -156,11 +169,12 @@ pub(super) fn basis(resolver: &Resolver, file: &Path, project: &Project) -> Opti
     // Automatic type discovery starts at the request directory. An explicit
     // empty list performs no such lookup; libraries use the selected config,
     // while module and directive resolution use each acquired unit's own path.
-    let directory = if project
-        .options
-        .get("types")
-        .and_then(|option| option.value.as_array())
-        .is_some_and(Vec::is_empty)
+    let directory = if empty_types_proven
+        || project
+            .options
+            .get("types")
+            .and_then(|option| option.value.as_array())
+            .is_some_and(Vec::is_empty)
     {
         None
     } else {

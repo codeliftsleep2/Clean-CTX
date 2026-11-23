@@ -122,7 +122,7 @@ impl Resolver {
         &mut self,
         file: &Path,
     ) -> Result<super::shared_acquisition::ProgramUnits, String> {
-        use super::shared_acquisition::{ProjectProof, basis, reusable_sources};
+        use super::shared_acquisition::{ProjectProof, basis_with_empty_types, reusable_sources};
         use std::sync::Arc;
         let project_scope = self.host.witnesses.begin();
         let project = self.request_project(file);
@@ -139,10 +139,30 @@ impl Resolver {
             return Err("Recursive program acquisition".into());
         }
         let operation = self.operation.clone();
+        // Only empty automatic-type discovery is directory-independent. Capture
+        // each owner's actual negative lookups, including for a shared recipient.
+        // Failed/nonempty discovery keeps the existing independent path and its
+        // original acquisition/refusal order. This is not a negative-result cache.
+        let (automatic_names, automatic_inputs) = if operation.is_some()
+            && self.program_active.len() == 1
+            && !project.options.contains_key("types")
+        {
+            let automatic_scope = self.host.witnesses.begin();
+            let names = self.automatic_type_names(file);
+            (Some(names), self.host.witnesses.finish(automatic_scope))
+        } else {
+            (None, Arc::from([]))
+        };
+        let empty_types = automatic_names
+            .as_ref()
+            .is_some_and(|names| names.as_ref().is_ok_and(BTreeSet::is_empty));
         let slot = operation
             .as_ref()
             .filter(|_| self.program_active.len() == 1)
-            .and_then(|operation| basis(self, file, &project).map(|basis| operation.slot(basis)));
+            .and_then(|operation| {
+                basis_with_empty_types(self, file, &project, empty_types)
+                    .map(|basis| operation.slot(basis))
+            });
         // No mutable Resolver is stored in the group. The active recursion guard precedes this lock.
         let mut slot = slot
             .as_ref()
@@ -153,8 +173,17 @@ impl Resolver {
             drop(slot.take());
         }
         if let (Some(proof), Some(operation)) = (candidate, operation.as_ref())
-            && let Some(qualified) = proof.qualify(self, operation)
+            && let Some(mut qualified) = proof.qualify(self, operation)
         {
+            if empty_types {
+                qualified.bound.inputs = vec![
+                    super::acquisition_inputs::Input::Dependencies(qualified.bound.inputs),
+                    super::acquisition_inputs::Input::Dependencies(Arc::clone(&automatic_inputs)),
+                ]
+                .into();
+            }
+            #[cfg(all(test, feature = "angular"))]
+            crate::ops_r1_observation::extra(1, 1);
             self.host
                 .witnesses
                 .import(qualified.witnesses, &qualified.bound.inputs);
@@ -178,20 +207,33 @@ impl Resolver {
         let scope = self.host.witnesses.begin();
         // Explicit project receipt can predate the program scope; a cache hit attributes it.
         self.host.witnesses.attribute(&project_inputs);
+        if automatic_names.is_some() {
+            self.host.witnesses.attribute(&automatic_inputs);
+        }
         self.host.witnesses.roots();
         let libraries = self.library_evidence.len();
         let types = self.automatic_type_evidence.len();
         let directives = self.directive_evidence.len();
         let entries = self.consumed_entries.len();
-        let result = self.acquire_program_units(file, &project, &config);
+        let result = self.acquire_program_units(file, &project, &config, automatic_names);
         let inputs = self.host.witnesses.finish(scope);
         self.program_active.remove(&config);
         if let (Ok(units), Some(operation)) = (&result, operation.as_ref()) {
             operation.completed();
+            #[cfg(all(test, feature = "angular"))]
+            crate::ops_r1_observation::extra(12, 1);
             if let Some(slot) = slot.as_mut()
                 && slot.is_none()
                 && let Some(sources) = reusable_sources(&inputs, operation)
             {
+                #[cfg(all(test, feature = "angular"))]
+                {
+                    crate::ops_r1_observation::extra(8, 1);
+                    crate::ops_r1_observation::extra(
+                        9,
+                        sources.all.values().map(|s| s.bytes.len()).sum(),
+                    );
+                }
                 // Failure/partial evidence is never installed in the cross-owner slot.
                 **slot = Some(Arc::new(ProjectProof {
                     units: Arc::clone(units),
@@ -215,7 +257,10 @@ impl Resolver {
         file: &Path,
         project: &super::project::Project,
         config: &Path,
+        automatic_names: Option<Result<BTreeSet<String>, String>>,
     ) -> Result<super::shared_acquisition::ProgramUnits, String> {
+        #[cfg(all(test, feature = "angular"))]
+        let _live = crate::ops_r1_observation::enter(4);
         #[cfg(all(test, feature = "angular"))]
         crate::ops_r1_observation::record(6, 1);
         if let Some(operation) = &self.operation {
@@ -231,7 +276,8 @@ impl Resolver {
                 .transpose()?
                 .unwrap_or(false);
             let mut pending = self.program_roots(config, &config_inputs)?;
-            pending.extend(self.automatic_type_sources(file)?);
+            let names = automatic_names.unwrap_or_else(|| self.automatic_type_names(file))?;
+            pending.extend(self.automatic_type_sources(file, names)?);
             let mut units = BTreeMap::new();
             let mut module_requests: Vec<(PathBuf, super::module_references::ModuleReference)> =
                 Vec::new();

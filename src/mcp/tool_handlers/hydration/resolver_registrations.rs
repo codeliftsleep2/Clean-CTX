@@ -18,6 +18,8 @@ pub(in crate::mcp::tool_handlers) fn hydrate_resolver_owners(
     #[cfg(test)]
     super::super::query::work_metrics::record_resolver_nomination();
     let inventory = source_inventory(state, &configured_roots(state, Some(root)));
+    #[cfg(all(test, feature = "angular"))]
+    crate::ops_r1_observation::extra(10, inventory.entries.iter().map(|e| e.owner.len()).sum());
     let candidates: Vec<_> = inventory
         .entries
         .iter()

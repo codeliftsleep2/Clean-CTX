@@ -1,0 +1,43 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "platform": "win32",
+  "machine": "AMD64",
+  "build_command": "cargo test --lib --all-features --no-run --message-format=json",
+  "provenance": "Task-observed builds and subsequent source/executable pins; not compiler-signed attestation",
+  "baseline": {
+    "executable": "target/ops-r1/cost-33/baseline.exe",
+    "executable_sha256": "7844e4662d673152aceb22373f389f87b9c396e0ff32994d79c58a433cad2bad",
+    "source_manifest": "target/ops-r1/cost-33/fixture-20261123-114214/sources.json",
+    "source_manifest_sha256": "eed15afac8545896d58ef0cb8ee61700914f68d91f435cc208e0766d58789ed8",
+    "build_log": "target/ops-r1/cost-33/build.jsonl",
+    "build_log_sha256": "931d843791db0afc10bd41f59a2f3e53789105911d57f302eb81ffc8aeeb1c76",
+    "features": [
+      "angular",
+      "csharp",
+      "default",
+      "dotnet",
+      "java",
+      "rust",
+      "spring_boot",
+      "typescript"
+    ]
+  },
+  "candidate": {
+    "executable": "target/ops-r1/cost-33/candidate.exe",
+    "executable_sha256": "3af4e4523adafd58b7746cbf2363949c640e8c13847fd6fdb350d5bf468fb01c",
+    "source_manifest": "target/ops-r1/cost-33/fixture-20261123-115525/sources.json",
+    "source_manifest_sha256": "d8b0bbb561f539c9dec4fac8fcb0239b494cf43865026ec1f3f79761722ad421",
+    "build_log": "target/ops-r1/cost-33/final-reviewed-build.jsonl",
+    "build_log_sha256": "ba3bc92bf6d077aaa1166d92c216624c6e8bc1a909ae9dfb189f10fcb406a5b6",
+    "features": [
+      "angular",
+      "csharp",
+      "default",
+      "dotnet",
+      "java",
+      "rust",
+      "spring_boot",
+      "typescript"
+    ]
+  }
+}

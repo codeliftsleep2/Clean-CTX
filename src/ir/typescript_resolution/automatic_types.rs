@@ -12,7 +12,26 @@ pub(crate) struct AutomaticTypeRequest {
 }
 
 impl Resolver {
-    pub(super) fn automatic_type_sources(&mut self, file: &Path) -> Result<Vec<PathBuf>, String> {
+    pub(super) fn automatic_type_sources(
+        &mut self,
+        file: &Path,
+        names: BTreeSet<String>,
+    ) -> Result<Vec<PathBuf>, String> {
+        let mut sources = Vec::new();
+        for name in names {
+            let resolved = self.type_directive(file, &name);
+            self.automatic_type_evidence.push(AutomaticTypeRequest {
+                name,
+                resolved: resolved.clone(),
+            });
+            sources.push(resolved?);
+        }
+        Ok(sources)
+    }
+
+    /// Name discovery records the request's own lookup receipts without resolving
+    /// packages or granting another directory's automatic-type authority.
+    pub(super) fn automatic_type_names(&mut self, file: &Path) -> Result<BTreeSet<String>, String> {
         let project = self.request_project(file)?;
         let mut names = BTreeSet::new();
         if let Some(types) = project.options.get("types") {
@@ -30,7 +49,7 @@ impl Resolver {
                 .and_then(super::project_version::known_release);
             // Reviewed TS6 default is empty; explicit directives still resolve.
             if release == Some((6, 0)) {
-                return Ok(Vec::new());
+                return Ok(names);
             }
             let mut roots = Vec::new();
             if let Some(option) = project.options.get("typeRoots") {
@@ -74,15 +93,6 @@ impl Resolver {
                 return Err("Automatic type default requires reviewed compiler evidence".into());
             }
         }
-        let mut sources = Vec::new();
-        for name in names {
-            let resolved = self.type_directive(file, &name);
-            self.automatic_type_evidence.push(AutomaticTypeRequest {
-                name,
-                resolved: resolved.clone(),
-            });
-            sources.push(resolved?);
-        }
-        Ok(sources)
+        Ok(names)
     }
 }
