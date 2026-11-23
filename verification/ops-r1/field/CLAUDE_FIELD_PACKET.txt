@@ -1,0 +1,97 @@
+OPS-R1: one bounded Claude field pilot on the originating work machine
+Agent MaxHeadRoom - preparation only; no field execution has occurred here.
+
+Paste the following into Claude on the machine containing the affected Angular
+workspace. Do not move proprietary source, raw logs, responses or memory captures
+to another computer or publish them. Return a sanitized findings summary only.
+
+MISSION
+Verify the original failure shape after the delivered shared-acquisition fixes:
+workspace_query, type=resolver_registrations, direction=forward, with a nonexistent
+route_path. Hydration was reported healthy; this must not be reclassified as an
+established hydration defect. There is no affected workspace on the development
+computer. Use the real workspace available in this Claude environment.
+
+DELIVERED IDENTITY AND PRECONDITIONS
+Development commit: d0db753c1335542b205efd38ce9c4f25ff103016
+Branch: (fix)Performance-Regression-Issues
+Accepted Rust source digest:
+679a676fe2d68641ee2b52e868e15a89c8b706052248b507f169c424573a6b3d
+Development libtest executable SHA-256 (NOT the production server):
+9fab55cc7df1eb53b022965fb43e7088458e221af8afd74dae70069b04164703
+
+Identify the exact connected production executable, its SHA-256, build revision,
+feature configuration, workspace identity and applicable server configuration.
+The development libtest hash must not be used as a production-binary pin.
+If this machine needs a build, batch one applicable production build through its
+normal operator-owned process and record it. Do not test an older server merely
+because Claude is already connected to it. Do not switch an active shared server
+or rebuild repeatedly during this pilot. No CI or synthetic campaign is requested.
+
+SAFETY BEFORE ANY REGISTRATION QUERY
+Use an isolated disposable Claude/server test instance, preserving existing
+workspace sources and durable state. Record whether its state is fresh, warm or
+unknown; do not equate a new connection with cold caches. Identify and record the
+exact isolated server PID. Do not attach termination controls to another session.
+
+Prepare an external independent monitor on this machine before the request:
+- 60-second wall deadline for the selected query.
+- 512 MiB observed server working-set stop threshold.
+- Exact monitored PID and exact-process termination only.
+- Five-second wait after termination, recording whether the process exited.
+- Preserve partial logs, memory samples, request time and stop reason.
+These are diagnostic safeguards, not product budgets or acceptance thresholds.
+If baseline memory already exceeds the threshold, process identity/monitoring
+cannot be established, or the isolated server cannot be safely stopped, do not
+send the query. Return that concrete safety limitation without changing limits.
+Do not rely on Claude remaining responsive to stop the request. Preserve original
+operator logs if present; absence of historical logs is not permission to invent
+historical counts or require reconstruction of the original hang.
+
+ONE INITIAL REQUEST
+Inspect the connected tool schema and use its actual workspace_query interface.
+Confirm the exact workspace root without broad source copying. Use existing
+readiness observations where available; record readiness and evidence separately.
+Do not run extra registration queries as a readiness check.
+
+Send exactly one request with these semantic arguments:
+  workspaceRoot: the actual affected Angular workspace root
+  type: resolver_registrations
+  direction: forward
+  route_path: one explicit route path established to be nonexistent
+Record the exact argument spelling. Use a singular query unless this host's actual
+schema requires a different envelope. Do not invent aliases or tool capabilities.
+
+Record start/finish, public response or error, discovery/compiled observations,
+server stderr, baseline/peak working set, sample count/interval and stop reason.
+Use existing production telemetry if available. Detailed OPS-R1 stage counters
+are test-only in the development diagnostics: do not claim production acquisition,
+qualification, parsing, witness, publication or retained-batch counts unless the
+actual connected build exposes them. Mark unavailable attribution explicitly.
+Do not enable new production instrumentation or change cache/timeout policies.
+
+STOP AFTER THIS REQUEST
+On timeout, memory stop, query error, identity drift or ambiguous monitoring,
+preserve partial evidence and stop. No automatic retry or warm query.
+On success, preserve the exact lower-bound/completeness semantics. Do not infer
+exhaustive absence from an empty result, resolver executability from registration,
+or incident resolution from a single completed request. Return the initial capture
+for review before further repetitions or lifecycle mutations. Additional related
+questions should be consolidated into this same isolated pilot where separately
+justified, rather than repeatedly switching the operator's normal environment.
+
+RETURN A SANITIZED SUMMARY
+1. Production binary identity, revision/features and connection provenance.
+2. Workspace revision/dirty-state summary and TypeScript/project scale, if known.
+3. Fresh/warm/unknown state, configuration and readiness observations.
+4. Exact query shape, result classification, elapsed time and termination status.
+5. Baseline/peak sampled memory and limitations; no leak claim from one peak.
+6. Available phase evidence versus unavailable counters.
+7. Evidence locations on this originating machine; do not copy proprietary files.
+8. Established findings, unresolved hypotheses and recommended next action.
+
+BOUNDARY
+No source edits, production repairs, global caches, resource-policy changes,
+commits, pushes, PRs, merges, CI runs or publication are requested by this pilot.
+The historical hang and reported memory growth remain open until supported field
+evidence explains them. Local synthetic stability and speedups are separate facts.
