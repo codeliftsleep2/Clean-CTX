@@ -1,0 +1,35 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-23",
+  "decision": "FIX",
+  "pair": {
+    "baseline": {
+      "source_sha256": "80df547b58a36198648098bb03835ab7ff8d32cd7fe126e7e11c3393f9187b6e",
+      "executable_sha256": "1384e62caf42b813bbd80902418be8bb94c133983a57425334a9f0b19a5acd01",
+      "cold_query_ms": 11354.9254,
+      "warm_query_ms": 3944.2179,
+      "warm_witness_checks": 51068,
+      "process_seconds": 16.708870599977672,
+      "sampled_peak_working_set_bytes": 45453312
+    },
+    "candidate": {
+      "source_sha256": "920fd52856fcdc8da3a4b11d79078adb2d300b00879a396bd68c2386751b87a6",
+      "executable_sha256": "d5dd65a5cdaa3d04b59ef247280d340984172a274eb2e49442a82b509e16cd79",
+      "cold_query_ms": 8624.3433,
+      "warm_query_ms": 2136.6931,
+      "warm_witness_checks": 26058,
+      "process_seconds": 16.355994899990037,
+      "sampled_peak_working_set_bytes": 45654016
+    }
+  },
+  "root_source_sha256": "c6fa2eeff1e27404eef7bbe284493983d448bb64bbc15705e31515e518714c02",
+  "root_focused_tests_passed": 18,
+  "historical_work_red": 176,
+  "required_and_green_work": 111,
+  "warm_checks_saved": 25010,
+  "observed_warm_speedup": 1.845944979183019,
+  "qualification": "One matched 64-owner pair, warm observer bookkeeping disabled in both. Cold worker instrumentation remains. No statistical guarantee, leak claim, field-incident resolution or full-CI claim.",
+  "boundary": "Final consumption closure only; typed exact facts; owner hashes and admissions independent; fresh standalone calls; preparation and publication unchanged.",
+  "archive": "validation-and-measurement-evidence.zip",
+  "archive_sha256": "e73148430e503dde21db6ae2ca1dde57353802e6a3ed47ec3e5205d66bda9443"
+}

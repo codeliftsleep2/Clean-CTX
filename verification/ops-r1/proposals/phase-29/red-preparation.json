@@ -1,0 +1,11 @@
+{
+  "baseline_source_sha256": "628e47c3696e9520b48870b4ee72c4ebc2b083cadd8ee7c546d079bddc040206",
+  "red_source_sha256": "3f232807eb223e3c26d2c6238259b0003f9b6a6416d707803d4153360db840e3",
+  "source_pin_sha256": "1a2d82e3640fffe8dd40798318084261acf58a5286bcc526ec5bfcc5817ab394",
+  "adapter_sha256": "69a954b7ecbbde185710f4d3cf03b1b4565c548c186c0d9abbc483389afc33a8",
+  "production_consumer_unchanged": true,
+  "new_tests": [
+    "mcp::semantic_compilation::ops_r1_acquisition_fitness::ops_r1_warm_resolver_consumption_checks_shared_constraints_once",
+    "mcp::tool_handlers::query::ops_r1_query_phase_currentness::ops_r1_resolver_consumption_refuses_config_edit_after_preparation"
+  ]
+}

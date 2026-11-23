@@ -188,11 +188,14 @@ pub(super) fn reusable_sources(inputs: &Inputs, _operation: &Operation) -> Optio
     let mut sources = BTreeMap::new();
     let mut supplied = Vec::new();
     let mut valid = true;
+    let mut checked = std::collections::HashSet::new();
     visit(inputs, |input| match input {
         Input::Observation(witness) => {
-            #[cfg(test)]
-            _operation.seal_checks.fetch_add(1, Ordering::Relaxed);
-            valid &= witness.current();
+            if checked.insert(witness.as_ref().clone()) {
+                #[cfg(test)]
+                _operation.seal_checks.fetch_add(1, Ordering::Relaxed);
+                valid &= witness.current();
+            }
         }
         Input::Source(source) => {
             valid &= source.accounted;
@@ -267,6 +270,9 @@ impl ProjectProof {
         let mut inputs = Vec::new();
         let mut witnesses = Vec::new();
         let mut valid = true;
+        // Only exact constraints within this qualification share a check. The
+        // next recipient gets a new set and revalidates against its own context.
+        let mut checked = std::collections::HashSet::new();
         let mut consume = |input: &Input| {
             #[cfg(test)]
             _operation
@@ -277,9 +283,11 @@ impl ProjectProof {
                 {
                     return;
                 }
-                #[cfg(test)]
-                _operation.validation_checks.fetch_add(1, Ordering::Relaxed);
-                valid &= witness.current();
+                if checked.insert(witness.as_ref().clone()) {
+                    #[cfg(test)]
+                    _operation.validation_checks.fetch_add(1, Ordering::Relaxed);
+                    valid &= witness.current();
+                }
                 witnesses.push(witness.as_ref().clone());
                 inputs.push(Input::Observation(Arc::clone(witness)));
             } else if let Input::Source(source) = input {

@@ -1,0 +1,8 @@
+{
+  "baseline_source_sha256": "45a63ac368403c8b0e6ac7a7af6375f757a296b82d210b8637cd67f0c9c3e6eb",
+  "red_source_sha256": "a0cd1481910f35b5a1e5d1337887c1227df8c099ee6ee52b4dc7866a0a33ed7b",
+  "test_file_sha256": "c3ee0e0e9001f46c82f579287305b653b1489bd6655623c43839c7d56439a67c",
+  "production_unchanged_from_validation_27": true,
+  "source_pin_sha256": "73f8cee9a03660a8a9b408867111e1849cd7931a6bb1225fc597e93f6003ba31",
+  "adapter_sha256": "7970bc38b28d85c1be239d479a4b63570fe8525bebc3f1cc719ed9cefc88aaeb"
+}

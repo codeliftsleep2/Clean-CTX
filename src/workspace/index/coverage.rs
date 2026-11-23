@@ -105,7 +105,7 @@ impl WorkspaceIndex {
             && (proof.source_hash != source_hash
                 || !proof.capture_current
                 || proof.disposition.is_some()
-                || !proof.witnesses.iter().all(|witness| witness.current()))
+                || !crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses))
         {
             return Err("TypeScript authority changed before index publication");
         }
@@ -187,25 +187,43 @@ impl WorkspaceIndex {
         fidelity: SemanticFidelity,
         source_hash: &str,
     ) -> bool {
-        self.semantic_coverage
-            .get(file_path)
-            .is_some_and(|coverage| {
-                #[cfg(feature = "typescript")]
-                if let Some(authority) = &coverage.typescript_authority
-                    && (authority.source_hash != source_hash
-                        || !authority.capture_current
-                        || authority.disposition.is_some()
-                        || !authority.witnesses.iter().all(|witness| witness.current()))
-                {
-                    return false;
-                }
-                coverage.source_hash == source_hash
-                    && coverage.fidelity >= fidelity
-                    && coverage
-                        .dependencies
+        self.has_current_semantic_projections(&[(file_path, fidelity, source_hash)])
+    }
+
+    /// One caller-owned evaluation boundary; nothing is retained after this call.
+    pub(crate) fn has_current_semantic_projections(
+        &self,
+        requests: &[(&str, SemanticFidelity, &str)],
+    ) -> bool {
+        #[cfg(feature = "typescript")]
+        let mut checked = std::collections::HashSet::new();
+        for &(file_path, fidelity, source_hash) in requests {
+            let Some(coverage) = self.semantic_coverage.get(file_path) else {
+                return false;
+            };
+            #[cfg(feature = "typescript")]
+            if let Some(authority) = &coverage.typescript_authority
+                && (authority.source_hash != source_hash
+                    || !authority.capture_current
+                    || authority.disposition.is_some()
+                    || !authority
+                        .witnesses
                         .iter()
-                        .all(|dependency| dependency.is_current())
-            })
+                        .all(|witness| !checked.insert(witness) || witness.current()))
+            {
+                return false;
+            }
+            if coverage.source_hash != source_hash
+                || coverage.fidelity < fidelity
+                || !coverage
+                    .dependencies
+                    .iter()
+                    .all(|dependency| dependency.is_current())
+            {
+                return false;
+            }
+        }
+        true
     }
 
     pub(crate) fn semantic_projection_fidelity(&self, file_path: &str) -> Option<SemanticFidelity> {

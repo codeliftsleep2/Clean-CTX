@@ -1,0 +1,107 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-23",
+  "recommendation": "READY_FOR_OWNER_INTEGRATION_REVIEW_WITH_EXTERNAL_GATES_OPEN",
+  "base_head": "dbf495517db50cc83fab747c34b33ff989704e27",
+  "final_source_tree_sha256": "679a676fe2d68641ee2b52e868e15a89c8b706052248b507f169c424573a6b3d",
+  "final_executable_sha256": "9fab55cc7df1eb53b022965fb43e7088458e221af8afd74dae70069b04164703",
+  "source_changed_since_retention_30": false,
+  "source_and_test_diff_sha256": "0ed89553f87efd3077a7ed70874126331811c6089d9498d6b39ebb656cb0b3e4",
+  "source_and_test_files": [
+    "src/ir/typescript_resolution/host.rs",
+    "src/ir/typescript_resolution/shared_acquisition.rs",
+    "src/mcp/semantic_compilation/retained.rs",
+    "src/mcp/tool_handlers/query.rs",
+    "src/mcp/tool_handlers/query/resolver_registrations.rs",
+    "src/tests/ir/ops_r1_phase_validation.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_controls.rs",
+    "src/tests/ir/ops_r1_shared_acquisition_cost.rs",
+    "src/tests/mcp/ops_r1_acquisition_fitness.rs",
+    "src/tests/mcp/ops_r1_query_phase_currentness.rs",
+    "src/workspace/index/coverage.rs",
+    "src/workspace/index/resolver_registrations.rs"
+  ],
+  "checks": {
+    "all_feature_library_test_build": "retention-30 exit 0 reused with exact source/binary identity",
+    "formatting": "integration wrapper completed focused normalization/check without source drift",
+    "scoped_clippy": "cargo clippy --lib --tests --all-features -- -D warnings; exit 0",
+    "repository_utf8": "PASS: 3175 text files",
+    "repository_file_sizes": "PASS: 12 active files; untouched legacy debt nonblocking",
+    "regressions": "18 focused phase-29 tests under identical production; 1 repeated-request test under exact final source. No relabeling as 19 final-source executions."
+  },
+  "governance": {
+    "descriptor_digest": "98a8bea70a1f8d146455a33f0c122e10c23b08f3d07b8077200d32c27bd199e1",
+    "protected_state_unchanged": true,
+    "diagnostics": [],
+    "context_generation": "e7ad85a61923f823584e106a3c0723f42270c656ac3722d9036d9a5c12d95d54",
+    "catalog_coverage": {
+      "identities": 221,
+      "represented": 221,
+      "unrepresented": []
+    },
+    "acquisition_payloads": [
+      {
+        "file": "2.payload.json",
+        "sha256": "cb9e1495095a2c85f71551f9455390de9c29ee4abf3122ccdf260deb67a76023",
+        "complete_units": 5
+      },
+      {
+        "file": "3.payload.json",
+        "sha256": "3dd0f09ff3edb1edf8e642a6b159d23209013fa166e8c778c18bae5ce631d02b",
+        "complete_units": 13
+      },
+      {
+        "file": "4.payload.json",
+        "sha256": "fadc1adb4fb3f01ed777e73953520fa55f204821845e00d6719333456793c5be",
+        "complete_units": 66
+      },
+      {
+        "file": "5.payload.json",
+        "sha256": "8bb9758f8a201723152beea625baf86b7e59bd1756f4741fad2c9cd3a9d6aa2c",
+        "complete_units": 2
+      },
+      {
+        "file": "6.payload.json",
+        "sha256": "bdc83da9f04d1cb3097c8014e8fe29b128c98d39aa5bf94efffe27aba1487e51",
+        "complete_units": 2
+      },
+      {
+        "file": "7.payload.json",
+        "sha256": "49cc84c42a7881e2404190360e726ca1b6673c821af90edb25c5b352d4f2899b",
+        "complete_units": 59
+      }
+    ],
+    "protected_admission_or_publication_claimed": false
+  },
+  "evidence": [
+    {
+      "path": "verification/ops-r1/proposals/validation-27/results.json",
+      "sha256": "e2bfb7ca4993039e5da1f73952d17995ea7ee4005488287ecd868db3ade46b99"
+    },
+    {
+      "path": "verification/ops-r1/proposals/currentness-28/observer-isolated-results.json",
+      "sha256": "84089b03d3b4ecf654159f0dd84f2fa3bfc751a34edbcbd17d976b2567d29065"
+    },
+    {
+      "path": "verification/ops-r1/proposals/phase-29/results.json",
+      "sha256": "4370b249246bc8e12204e9875b1c7221b7ce23608221c1bcd54c395f7d890406"
+    },
+    {
+      "path": "verification/ops-r1/proposals/retention-30/results.json",
+      "sha256": "fc6986d7ea95efcb22411faa95f5fa324eae9b0a8ffabe0b1633df871ee957df"
+    }
+  ],
+  "integration_archive": "integration-evidence.zip",
+  "integration_archive_sha256": "f11b993df5790aa320c952a4c9fd9e6713d16afb8c4c11934b62b431b1ab04d1",
+  "external_gates": [
+    "Full CI for the final delivered ref",
+    "Owner authorization for commit/push/PR/publication",
+    "Bounded real-workspace field acceptance; historical hang and memory incident remain open"
+  ],
+  "risks": [
+    "Single-pair fixture timing is not statistical certification",
+    "Repeated-request witness covers four owners and selected retained evidence, not allocator leaks or every cache",
+    "Residual qualification traversal and independent preparation work remain"
+  ],
+  "delivery_performed": false
+}

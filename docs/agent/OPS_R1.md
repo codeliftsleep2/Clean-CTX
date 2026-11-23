@@ -183,4 +183,10 @@ knowledge_content:
   - evidence:performance_capture_index verification/ops-r1/proposals/shared-acquisition/performance-25/performance-evidence-index.json#whole
   - evidence:root_verification_results verification/ops-r1/proposals/shared-acquisition/performance-25/root-verification-results.json#whole
   - evidence:integration_verification verification/ops-r1/proposals/integration-26/evidence-index.json#whole
+  - observation:residual_currentness_decision docs/agent/ops-r1/RESIDUAL_CURRENTNESS_29.md#whole
+  - evidence:per_call_validation verification/ops-r1/proposals/validation-27/results.json#whole
+  - evidence:retained_currentness_initial verification/ops-r1/proposals/currentness-28/results.json#whole
+  - evidence:retained_currentness_observer_isolated verification/ops-r1/proposals/currentness-28/observer-isolated-results.json#whole
+  - evidence:consumption_currentness_result verification/ops-r1/proposals/phase-29/results.json#whole
+  - evidence:repeated_request_retention verification/ops-r1/proposals/retention-30/results.json#whole
 ```

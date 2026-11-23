@@ -1,0 +1,719 @@
+--- a/src/ir/typescript_resolution/host.rs
++++ b/src/ir/typescript_resolution/host.rs
+@@ -52,6 +52,14 @@
+ }
+ 
+ impl Witness {
++    /// Recheck every exact constraint once within this call; never retain results.
++    pub(crate) fn all_current(witnesses: &[Self]) -> bool {
++        let mut checked = std::collections::HashSet::new();
++        witnesses
++            .iter()
++            .all(|witness| !checked.insert(witness) || witness.current())
++    }
++
+     pub(crate) fn current(&self) -> bool {
+         #[cfg(test)]
+         crate::work_observations_af_perf_002::witness(self);
+@@ -488,7 +496,7 @@
+     }
+ 
+     pub(crate) fn current(&self) -> bool {
+-        self.witnesses.iter().all(Witness::current)
++        Witness::all_current(&self.witnesses)
+     }
+ }
+ 
+--- a/src/ir/typescript_resolution/shared_acquisition.rs
++++ b/src/ir/typescript_resolution/shared_acquisition.rs
+@@ -188,11 +188,14 @@
+     let mut sources = BTreeMap::new();
+     let mut supplied = Vec::new();
+     let mut valid = true;
++    let mut checked = std::collections::HashSet::new();
+     visit(inputs, |input| match input {
+         Input::Observation(witness) => {
+-            #[cfg(test)]
+-            _operation.seal_checks.fetch_add(1, Ordering::Relaxed);
+-            valid &= witness.current();
++            if checked.insert(witness.as_ref().clone()) {
++                #[cfg(test)]
++                _operation.seal_checks.fetch_add(1, Ordering::Relaxed);
++                valid &= witness.current();
++            }
+         }
+         Input::Source(source) => {
+             valid &= source.accounted;
+@@ -267,6 +270,9 @@
+         let mut inputs = Vec::new();
+         let mut witnesses = Vec::new();
+         let mut valid = true;
++        // Only exact constraints within this qualification share a check. The
++        // next recipient gets a new set and revalidates against its own context.
++        let mut checked = std::collections::HashSet::new();
+         let mut consume = |input: &Input| {
+             #[cfg(test)]
+             _operation
+@@ -277,9 +283,11 @@
+                 {
+                     return;
+                 }
+-                #[cfg(test)]
+-                _operation.validation_checks.fetch_add(1, Ordering::Relaxed);
+-                valid &= witness.current();
++                if checked.insert(witness.as_ref().clone()) {
++                    #[cfg(test)]
++                    _operation.validation_checks.fetch_add(1, Ordering::Relaxed);
++                    valid &= witness.current();
++                }
+                 witnesses.push(witness.as_ref().clone());
+                 inputs.push(Input::Observation(Arc::clone(witness)));
+             } else if let Input::Source(source) = input {
+--- a/src/mcp/semantic_compilation/retained.rs
++++ b/src/mcp/semantic_compilation/retained.rs
+@@ -78,7 +78,7 @@
+             return authority.source_hash == source_hash
+                 && authority.capture_current
+                 && authority.disposition.is_none()
+-                && authority.witnesses.iter().all(|witness| witness.current());
++                && crate::ir::typescript_resolution::Witness::all_current(&authority.witnesses);
+         }
+         let _ = source_hash;
+         true
+--- a/src/mcp/tool_handlers/query.rs
++++ b/src/mcp/tool_handlers/query.rs
+@@ -1,4 +1,7 @@
+ // src/mcp/tool_handlers/query.rs
++#[cfg(all(test, feature = "angular"))]
++#[path = "../../tests/mcp/ops_r1_query_phase_currentness.rs"]
++mod ops_r1_query_phase_currentness;
+ //
+ // workspace_query handler — read-only MCP query API.
+ //
+--- a/src/mcp/tool_handlers/query/resolver_registrations.rs
++++ b/src/mcp/tool_handlers/query/resolver_registrations.rs
+@@ -88,18 +88,24 @@
+         };
+         let direction = direction.to_owned();
+         Ok(PreparedQuery::indexed(move |index| {
+-            // Validate each consumed owner once, not once per registration.
+-            if !footprints.iter().all(|proof| {
++            // Source ownership stays independent; exact filesystem constraints
++            // share work only within this final-consumption evaluation.
++            let sources_current = footprints.iter().all(|proof| {
+                 #[cfg(test)]
+                 super::work_metrics::record_resolver_owner_validation();
+-                proof.is_current()
+-                    && index.has_resolver_registration_admission(&proof.file_path)
+-                    && index.has_current_semantic_projection(
+-                        &proof.file_path,
++                proof.is_current() && index.has_resolver_registration_admission(&proof.file_path)
++            });
++            let projections: Vec<_> = footprints
++                .iter()
++                .map(|proof| {
++                    (
++                        proof.file_path.as_str(),
+                         crate::workspace::index::SemanticFidelity::High,
+                         proof.source_hash.as_deref().unwrap_or(""),
+                     )
+-            }) {
++                })
++                .collect();
++            if !sources_current || !index.has_current_semantic_projections(&projections) {
+                 return Err(QueryFailure::internal(
+                     "Registration source/dependency publication changed; retry",
+                 ));
+--- a/src/tests/ir/ops_r1_phase_validation.rs
++++ b/src/tests/ir/ops_r1_phase_validation.rs
+@@ -0,0 +1,106 @@
++//! A shared evaluation must distinguish typed facts, not merely source paths.
++use super::support::{fixture, write};
++use crate::ir::typescript_resolution::{TypeScriptAuthority, Witness};
++use crate::workspace::index::{SemanticFidelity, WorkspaceIndex};
++
++#[test]
++fn ops_r1_consumption_batch_refuses_conflicting_config_hashes_and_missing_owners() {
++    let root = fixture();
++    let path = root.path();
++    let a = path.join("a.ts");
++    let b = path.join("b.ts");
++    let a_source = "export class A {}";
++    let b_source = "export class B {}";
++    write(path, "a.ts", a_source);
++    write(path, "b.ts", b_source);
++    write(
++        path,
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noLib":true,"types":[],"strict":false},"include":["*.ts"]}"#,
++    );
++    let b_proof = TypeScriptAuthority::capture(&b, b_source, &[path.to_path_buf()]);
++    assert!(b_proof.capture_current && b_proof.disposition.is_none());
++    let old_config = b_proof
++        .witnesses
++        .iter()
++        .find_map(|witness| match witness {
++            Witness::Content { path, hash }
++                if path.file_name() == Some(std::ffi::OsStr::new("tsconfig.json")) =>
++            {
++                Some((path.clone(), hash.clone()))
++            }
++            _ => None,
++        })
++        .expect("old config is consumed evidence");
++    let b_hash = b_proof.source_hash.clone();
++    let mut index = WorkspaceIndex::new();
++    index
++        .replace_semantic_projection_with_retained_authority(
++            b.to_str().unwrap(),
++            vec![],
++            SemanticFidelity::High,
++            b_hash.clone(),
++            vec![],
++            Some(b_proof),
++        )
++        .unwrap();
++    write(
++        path,
++        "tsconfig.json",
++        r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noLib":true,"types":[],"strict":true},"include":["*.ts"]}"#,
++    );
++    let a_proof = TypeScriptAuthority::capture(&a, a_source, &[path.to_path_buf()]);
++    assert!(a_proof.capture_current && a_proof.disposition.is_none());
++    let current_config = a_proof
++        .witnesses
++        .iter()
++        .find_map(|witness| match witness {
++            Witness::Content { path, hash }
++                if path.file_name() == Some(std::ffi::OsStr::new("tsconfig.json")) =>
++            {
++                Some((path.clone(), hash.clone()))
++            }
++            _ => None,
++        })
++        .expect("current config is consumed evidence");
++    assert_eq!(old_config.0, current_config.0);
++    assert_ne!(old_config.1, current_config.1);
++    let a_hash = a_proof.source_hash.clone();
++    index
++        .replace_semantic_projection_with_retained_authority(
++            a.to_str().unwrap(),
++            vec![],
++            SemanticFidelity::High,
++            a_hash.clone(),
++            vec![],
++            Some(a_proof),
++        )
++        .unwrap();
++    let a_request = (a.to_str().unwrap(), SemanticFidelity::High, a_hash.as_str());
++    let b_request = (b.to_str().unwrap(), SemanticFidelity::High, b_hash.as_str());
++    assert!(index.has_current_semantic_projections(&[a_request]));
++    assert!(!index.has_current_semantic_projections(&[b_request]));
++    assert!(
++        !index.has_current_semantic_projections(&[a_request, b_request]),
++        "fresh same-path config fact must not authorize the stale hash"
++    );
++    assert!(!index.has_current_semantic_projections(&[b_request, a_request]));
++    assert!(!index.has_current_semantic_projections(&[(
++        a.to_str().unwrap(),
++        SemanticFidelity::High,
++        "wrong-owner-hash"
++    )]));
++    let missing = path.join("absent.ts");
++    assert!(!index.has_current_semantic_projections(&[(
++        missing.to_str().unwrap(),
++        SemanticFidelity::High,
++        "unknown"
++    )]));
++    std::fs::remove_file(path.join("tsconfig.json")).unwrap();
++    assert!(!index.has_current_semantic_projections(&[a_request]));
++    assert_eq!(
++        index.semantic_projection_fidelity(a.to_str().unwrap()),
++        Some(SemanticFidelity::High),
++        "failed currentness does not erase retained ownership"
++    );
++}
+--- a/src/tests/ir/ops_r1_shared_acquisition_controls.rs
++++ b/src/tests/ir/ops_r1_shared_acquisition_controls.rs
+@@ -3,6 +3,8 @@
+ mod cost;
+ #[path = "ops_r1_shared_acquisition_isolation.rs"]
+ mod isolation;
++#[path = "ops_r1_phase_validation.rs"]
++mod phase_validation;
+ #[path = "ops_r1_shared_acquisition_proof.rs"]
+ mod proof;
+ #[path = "ops_r1_shared_acquisition_support.rs"]
+--- a/src/tests/ir/ops_r1_shared_acquisition_cost.rs
++++ b/src/tests/ir/ops_r1_shared_acquisition_cost.rs
+@@ -2,6 +2,187 @@
+ use crate::ir::typescript_resolution::Witness;
+ use crate::ir::typescript_resolution::acquisition_inputs::{Input, InputLog, Inputs, visit};
+ use std::sync::Arc;
++
++#[test]
++fn ops_r1_shared_retained_currentness_checks_exact_constraints_once_per_call() {
++    use super::support::{fixture, write};
++    use crate::ir::typescript_resolution::TypeScriptAuthority;
++    use crate::workspace::index::{SemanticFidelity, WorkspaceIndex};
++    use std::collections::HashSet;
++
++    let root = fixture();
++    let path = root.path();
++    let source = "export class A {}";
++    write(path, "a.ts", source);
++    let file = path.join("a.ts");
++    let mut authority = TypeScriptAuthority::capture(&file, source, &[path.to_path_buf()]);
++    assert!(authority.capture_current);
++    assert!(
++        authority.disposition.is_none(),
++        "{:?}",
++        authority.disposition
++    );
++    assert!(!authority.witnesses.is_empty());
++    let config = authority
++        .witnesses
++        .iter()
++        .find_map(|witness| match witness {
++            Witness::Content { path, .. }
++                if path.file_name() == Some(std::ffi::OsStr::new("tsconfig.json")) =>
++            {
++                Some(path.clone())
++            }
++            _ => None,
++        })
++        .expect("configuration is an actually consumed disk-backed dependency");
++    assert_eq!(
++        config.canonicalize().unwrap(),
++        path.join("tsconfig.json").canonicalize().unwrap()
++    );
++    authority.witnesses.extend(authority.witnesses.clone());
++    let unique = authority.witnesses.iter().collect::<HashSet<_>>().len();
++    let hash = authority.source_hash.clone();
++    let mut index = WorkspaceIndex::new();
++    index
++        .replace_semantic_projection_with_retained_authority(
++            file.to_str().unwrap(),
++            vec![],
++            SemanticFidelity::High,
++            hash.clone(),
++            vec![],
++            Some(authority.clone()),
++        )
++        .expect("current native authority is admitted");
++    for _ in 0..2 {
++        crate::work_observations_af_perf_002::reset();
++        assert!(index.has_current_semantic_projection(
++            file.to_str().unwrap(),
++            SemanticFidelity::High,
++            &hash
++        ));
++        assert_eq!(
++            crate::work_observations_af_perf_002::snapshot().witnesses,
++            unique,
++            "one exact retained-currentness constraint per call"
++        );
++    }
++    let mut conflicting = authority;
++    conflicting.witnesses.push(Witness::Content {
++        path: config.clone(),
++        hash: crate::cache::content_hash(b"different source"),
++    });
++    assert!(
++        WorkspaceIndex::new()
++            .replace_semantic_projection_with_retained_authority(
++                file.to_str().unwrap(),
++                vec![],
++                SemanticFidelity::High,
++                hash.clone(),
++                vec![],
++                Some(conflicting),
++            )
++            .is_err(),
++        "distinct hash constraints must not be merged by path"
++    );
++    assert!(
++        !index.has_current_semantic_projection(
++            file.to_str().unwrap(),
++            SemanticFidelity::High,
++            &crate::cache::content_hash(b"export class Changed {}"),
++        ),
++        "the caller supplies current owner identity"
++    );
++    std::fs::write(
++        &config,
++        r#"{"compilerOptions":{"strict":true,"noLib":true,"types":[]}}"#,
++    )
++    .unwrap();
++    assert!(!index.has_current_semantic_projection(
++        file.to_str().unwrap(),
++        SemanticFidelity::High,
++        &hash
++    ));
++}
++
++#[test]
++fn ops_r1_shared_seal_checks_each_exact_constraint_once_per_call() {
++    use crate::ir::typescript_resolution::shared_acquisition::{operation, reusable_sources};
++
++    let root = tempfile::tempdir().unwrap();
++    let path = root.path().join("dependency.ts");
++    std::fs::write(&path, "class Original {}").unwrap();
++    let witness = Witness::Content {
++        path: path.clone(),
++        hash: crate::cache::content_hash(b"class Original {}"),
++    };
++    let inputs: Inputs = vec![
++        Input::Observation(Arc::new(witness.clone())),
++        Input::Observation(Arc::new(witness)),
++    ]
++    .into();
++    let op = operation();
++    for _ in 0..2 {
++        let before = op.work_counts()[2];
++        assert!(reusable_sources(&inputs, &op).is_some());
++        assert_eq!(
++            op.work_counts()[2] - before,
++            1,
++            "one exact seal constraint per call"
++        );
++    }
++    std::fs::write(&path, "class Changed {}").unwrap();
++    assert!(
++        reusable_sources(&inputs, &op).is_none(),
++        "later calls must revalidate"
++    );
++}
++
++#[test]
++fn ops_r1_shared_qualification_checks_each_exact_constraint_once_per_call() {
++    use super::support::{acquire, fixture, resolver, write};
++    use crate::ir::typescript_resolution::shared_acquisition::{basis, operation};
++    use std::collections::HashSet;
++
++    let root = fixture();
++    let path = root.path();
++    let op = operation();
++    let a = path.join("a.ts");
++    let mut leader = resolver(path, "a.ts", &op);
++    acquire(&mut leader, &a);
++    let project = leader.project_identity(&a).unwrap();
++    let key = basis(&leader, &a, &project).unwrap();
++    let proof = op.slot(key).lock().unwrap().as_ref().unwrap().clone();
++    for _ in 0..2 {
++        let mut recipient = resolver(path, "b.ts", &op);
++        let before = op.work_counts()[3];
++        let qualified = proof
++            .qualify(&mut recipient, &op)
++            .expect("equivalent recipient");
++        let mut unique = HashSet::new();
++        let mut observations = 0;
++        visit(&qualified.bound.inputs, |input| {
++            if let Input::Observation(witness) = input {
++                unique.insert(witness.as_ref().clone());
++                observations += 1;
++            }
++        });
++        assert!(
++            observations > unique.len(),
++            "duplicate receipt nodes remain attributable"
++        );
++        assert_eq!(
++            op.work_counts()[3] - before,
++            unique.len(),
++            "one exact qualification constraint per call"
++        );
++    }
++    write(path, "a.ts", "class Changed {}");
++    let mut changed = resolver(path, "b.ts", &op);
++    assert!(
++        proof.qualify(&mut changed, &op).is_none(),
++        "fresh recipient rejects changed disk authority"
++    );
++}
+ 
+ #[test]
+ fn ops_r1_shared_empty_automatic_types_reuses_project_across_owner_directories() {
+--- a/src/tests/mcp/ops_r1_acquisition_fitness.rs
++++ b/src/tests/mcp/ops_r1_acquisition_fitness.rs
+@@ -101,3 +101,155 @@
+         "equivalent project acquired once; owner compilation/publication remains four"
+     );
+ }
++
++#[test]
++fn ops_r1_warm_resolver_consumption_checks_shared_constraints_once() {
++    use std::collections::HashSet;
++    let _serial = crate::protocol::handler_response_serial();
++    let temp = tempfile::tempdir().unwrap();
++    let root = temp.path();
++    crate::tests::angular_authority_fixture::install(root);
++    std::fs::write(root.join("tsconfig.json"), r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"include":["*.ts"]}"#).unwrap();
++    for i in 0..4 {
++        let peer = if i == 3 { "class Peer0 {}\n" } else { "" };
++        std::fs::write(
++            root.join(format!("owner{i}.ts")),
++            format!("{peer}class Probe{i} {{ peer?: Peer0; }}\n"),
++        )
++        .unwrap();
++    }
++    let mut config = crate::tests::test_config();
++    config.proxy.auto_start = false;
++    config.persistence.enabled = false;
++    let state = McpState::new(config);
++    let query = || {
++        super::angular_resolver_registration_support::raw(
++            &state,
++            json!({"workspaceRoot":root,"type":"resolver_registrations","direction":"forward","route_path":"__ops_r1_absent__"}),
++        )
++    };
++    let cold = query();
++    assert!(cold.get("error").is_none(), "{cold:#}");
++    assert_ne!(cold["result"]["isError"], true);
++    assert_eq!(state.test_full_semantic_parses(), 4);
++    let (per_owner, shared) = {
++        let index = state.workspace_index_read();
++        let mut total = 0;
++        let mut union = HashSet::new();
++        for i in 0..4 {
++            let owner =
++                state.semantic_owner_path(&root.join(format!("owner{i}.ts")).to_string_lossy());
++            let proof = index
++                .retained_typescript_authority(&owner)
++                .expect("current native owner proof");
++            let unique: HashSet<_> = proof.witnesses.iter().cloned().collect();
++            assert!(!unique.is_empty());
++            total += unique.len();
++            union.extend(unique);
++        }
++        (total, union.len())
++    };
++    assert!(
++        shared < per_owner,
++        "owners demonstrably share exact typed constraints"
++    );
++    crate::work_observations_af_perf_002::reset();
++    let warm = query();
++    let checks = crate::work_observations_af_perf_002::snapshot().witnesses;
++    assert!(warm.get("error").is_none(), "{warm:#}");
++    assert_ne!(warm["result"]["isError"], true);
++    let result = &warm["result"]["structuredContent"];
++    assert_eq!(result["registrations"], json!([]));
++    assert_eq!(result["count"], 0);
++    assert_eq!(result["coverage"]["result_semantics"], "lower_bound");
++    assert_eq!(result["coverage"]["source_complete"], false);
++    assert_eq!(
++        state.test_full_semantic_parses(),
++        4,
++        "warm query must not compile again"
++    );
++    eprintln!(
++        "OPS_R1_PHASE_COUNTS preparation={per_owner} consumption_union={shared} actual={checks}"
++    );
++    assert_eq!(
++        checks,
++        per_owner + shared,
++        "one independent preparation phase and one shared consumption validation"
++    );
++}
++
++#[test]
++fn ops_r1_repeated_absent_queries_preserve_retained_owner_evidence() {
++    let _serial = crate::protocol::handler_response_serial();
++    let temp = tempfile::tempdir().unwrap();
++    let root = temp.path();
++    crate::tests::angular_authority_fixture::install(root);
++    std::fs::write(root.join("tsconfig.json"), r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"include":["*.ts"]}"#).unwrap();
++    for i in 0..4 {
++        let peer = if i == 3 { "class Peer0 {}\n" } else { "" };
++        std::fs::write(
++            root.join(format!("owner{i}.ts")),
++            format!("{peer}class Probe{i} {{ peer?: Peer0; }}\n"),
++        )
++        .unwrap();
++    }
++    let mut config = crate::tests::test_config();
++    config.proxy.auto_start = false;
++    config.persistence.enabled = false;
++    let state = McpState::new(config);
++    let retained = || {
++        let index = state.workspace_index_read();
++        (0..4)
++            .map(|i| {
++                let owner =
++                    state.semantic_owner_path(&root.join(format!("owner{i}.ts")).to_string_lossy());
++                let proof = index
++                    .retained_typescript_authority(&owner)
++                    .expect("retained native owner authority");
++                serde_json::to_vec(&proof.witnesses).unwrap()
++            })
++            .collect::<Vec<_>>()
++    };
++    let mut original = None;
++    let mut counts = Vec::new();
++    for request in 0..13 {
++        let (response, operations) = observe(|| {
++            super::angular_resolver_registration_support::raw(
++                &state,
++                json!({"workspaceRoot":root,"type":"resolver_registrations","direction":"forward","route_path":format!("__ops_r1_absent_{request}__")}),
++            )
++        });
++        assert!(response.get("error").is_none(), "{response:#}");
++        assert_ne!(response["result"]["isError"], true, "{response:#}");
++        let result = &response["result"]["structuredContent"];
++        assert_eq!(result["registrations"], json!([]));
++        assert_eq!(result["count"], 0);
++        assert_eq!(result["coverage"]["result_semantics"], "lower_bound");
++        assert_eq!(result["coverage"]["source_complete"], false);
++        assert_eq!(state.test_full_semantic_parses(), 4);
++        let actual: Vec<_> = operations.iter().map(|op| op.counts()).collect();
++        if request == 0 {
++            assert_eq!(actual, vec![[1, 1, 4]]);
++            original = Some(retained());
++        } else {
++            assert!(actual.iter().all(|counts| counts == &[0, 0, 0]));
++            assert_eq!(retained(), *original.as_ref().unwrap());
++        }
++        counts.push(actual);
++    }
++    let bytes: Vec<_> = original.unwrap().iter().map(Vec::len).collect();
++    eprintln!("OPS_R1_REPEATED_REQUESTS requests=13 parses=4 retained_witness_bytes={bytes:?}");
++    if let Ok(folder) = std::env::var("OPS_R1_EVIDENCE_DIR") {
++        std::fs::write(
++            std::path::Path::new(&folder).join("repeated-requests.json"),
++            serde_json::to_vec_pretty(&json!({
++                "requests":13,"owner_count":4,"semantic_parses":4,
++                "per_request_acquisitions":counts,"retained_witness_bytes_per_owner":bytes,
++                "retained_witness_bytes_unchanged":true,
++                "scope":"one state, distinct absent selectors; not allocator-leak proof"
++            }))
++            .unwrap(),
++        )
++        .unwrap();
++    }
++}
+--- a/src/tests/mcp/ops_r1_query_phase_currentness.rs
++++ b/src/tests/mcp/ops_r1_query_phase_currentness.rs
+@@ -0,0 +1,38 @@
++//! Preparation and consumption remain independently fresh production boundaries.
++use crate::mcp::McpState;
++use serde_json::json;
++
++#[test]
++fn ops_r1_resolver_consumption_refuses_config_edit_after_preparation() {
++    let _serial = crate::protocol::handler_response_serial();
++    let root = tempfile::tempdir().unwrap();
++    crate::tests::angular_authority_fixture::install(root.path());
++    let config_file = root.path().join("tsconfig.json");
++    std::fs::write(&config_file, r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noLib":true,"types":[]},"include":["*.ts"]}"#).unwrap();
++    std::fs::write(root.path().join("owner.ts"), "export class Owner {}").unwrap();
++    let mut config = crate::tests::test_config();
++    config.proxy.auto_start = false;
++    config.persistence.enabled = false;
++    let state = McpState::new(config);
++    let mut context = super::prepare::PreparationContext::new();
++    let prepared = super::resolver_registrations::prepare(
++        &json!({"workspaceRoot":root.path(),"type":"resolver_registrations","direction":"forward","route_path":"__ops_r1_absent__"}),
++        &state,
++        &mut context,
++    );
++    assert!(
++        prepared.is_indexed(),
++        "must reach the real prepared consumption boundary"
++    );
++    assert_eq!(state.test_full_semantic_parses(), 1);
++    std::fs::write(&config_file, r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","noLib":true,"types":[],"strict":true},"include":["*.ts"]}"#).unwrap();
++    let error = match prepared.evaluate_single(&state) {
++        Err(error) => error,
++        Ok(_) => panic!("consumption accepted config changed after preparation"),
++    };
++    assert_eq!(error.code, -32603);
++    assert_eq!(
++        error.message,
++        "Registration source/dependency publication changed; retry"
++    );
++}
+--- a/src/workspace/index/coverage.rs
++++ b/src/workspace/index/coverage.rs
+@@ -105,7 +105,7 @@
+             && (proof.source_hash != source_hash
+                 || !proof.capture_current
+                 || proof.disposition.is_some()
+-                || !proof.witnesses.iter().all(|witness| witness.current()))
++                || !crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses))
+         {
+             return Err("TypeScript authority changed before index publication");
+         }
+@@ -187,25 +187,43 @@
+         fidelity: SemanticFidelity,
+         source_hash: &str,
+     ) -> bool {
+-        self.semantic_coverage
+-            .get(file_path)
+-            .is_some_and(|coverage| {
+-                #[cfg(feature = "typescript")]
+-                if let Some(authority) = &coverage.typescript_authority
+-                    && (authority.source_hash != source_hash
+-                        || !authority.capture_current
+-                        || authority.disposition.is_some()
+-                        || !authority.witnesses.iter().all(|witness| witness.current()))
+-                {
+-                    return false;
+-                }
+-                coverage.source_hash == source_hash
+-                    && coverage.fidelity >= fidelity
+-                    && coverage
+-                        .dependencies
++        self.has_current_semantic_projections(&[(file_path, fidelity, source_hash)])
++    }
++
++    /// One caller-owned evaluation boundary; nothing is retained after this call.
++    pub(crate) fn has_current_semantic_projections(
++        &self,
++        requests: &[(&str, SemanticFidelity, &str)],
++    ) -> bool {
++        #[cfg(feature = "typescript")]
++        let mut checked = std::collections::HashSet::new();
++        for &(file_path, fidelity, source_hash) in requests {
++            let Some(coverage) = self.semantic_coverage.get(file_path) else {
++                return false;
++            };
++            #[cfg(feature = "typescript")]
++            if let Some(authority) = &coverage.typescript_authority
++                && (authority.source_hash != source_hash
++                    || !authority.capture_current
++                    || authority.disposition.is_some()
++                    || !authority
++                        .witnesses
+                         .iter()
+-                        .all(|dependency| dependency.is_current())
+-            })
++                        .all(|witness| !checked.insert(witness) || witness.current()))
++            {
++                return false;
++            }
++            if coverage.source_hash != source_hash
++                || coverage.fidelity < fidelity
++                || !coverage
++                    .dependencies
++                    .iter()
++                    .all(|dependency| dependency.is_current())
++            {
++                return false;
++            }
++        }
++        true
+     }
+ 
+     pub(crate) fn semantic_projection_fidelity(&self, file_path: &str) -> Option<SemanticFidelity> {
+--- a/src/workspace/index/resolver_registrations.rs
++++ b/src/workspace/index/resolver_registrations.rs
+@@ -62,7 +62,7 @@
+                 && proof.disposition.is_none()
+                 && crate::dictionary::path::canonical_identity_key(&proof.source.to_string_lossy())
+                     == crate::dictionary::path::canonical_identity_key(file)
+-                && proof.witnesses.iter().all(|witness| witness.current())
++                && crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses)
+                 && proof.admits_registration_projection(
+                     &edges,
+                     resolver_registrations.as_ref(),

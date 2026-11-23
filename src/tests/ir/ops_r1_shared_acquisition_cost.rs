@@ -4,6 +4,187 @@ use crate::ir::typescript_resolution::acquisition_inputs::{Input, InputLog, Inpu
 use std::sync::Arc;
 
 #[test]
+fn ops_r1_shared_retained_currentness_checks_exact_constraints_once_per_call() {
+    use super::support::{fixture, write};
+    use crate::ir::typescript_resolution::TypeScriptAuthority;
+    use crate::workspace::index::{SemanticFidelity, WorkspaceIndex};
+    use std::collections::HashSet;
+
+    let root = fixture();
+    let path = root.path();
+    let source = "export class A {}";
+    write(path, "a.ts", source);
+    let file = path.join("a.ts");
+    let mut authority = TypeScriptAuthority::capture(&file, source, &[path.to_path_buf()]);
+    assert!(authority.capture_current);
+    assert!(
+        authority.disposition.is_none(),
+        "{:?}",
+        authority.disposition
+    );
+    assert!(!authority.witnesses.is_empty());
+    let config = authority
+        .witnesses
+        .iter()
+        .find_map(|witness| match witness {
+            Witness::Content { path, .. }
+                if path.file_name() == Some(std::ffi::OsStr::new("tsconfig.json")) =>
+            {
+                Some(path.clone())
+            }
+            _ => None,
+        })
+        .expect("configuration is an actually consumed disk-backed dependency");
+    assert_eq!(
+        config.canonicalize().unwrap(),
+        path.join("tsconfig.json").canonicalize().unwrap()
+    );
+    authority.witnesses.extend(authority.witnesses.clone());
+    let unique = authority.witnesses.iter().collect::<HashSet<_>>().len();
+    let hash = authority.source_hash.clone();
+    let mut index = WorkspaceIndex::new();
+    index
+        .replace_semantic_projection_with_retained_authority(
+            file.to_str().unwrap(),
+            vec![],
+            SemanticFidelity::High,
+            hash.clone(),
+            vec![],
+            Some(authority.clone()),
+        )
+        .expect("current native authority is admitted");
+    for _ in 0..2 {
+        crate::work_observations_af_perf_002::reset();
+        assert!(index.has_current_semantic_projection(
+            file.to_str().unwrap(),
+            SemanticFidelity::High,
+            &hash
+        ));
+        assert_eq!(
+            crate::work_observations_af_perf_002::snapshot().witnesses,
+            unique,
+            "one exact retained-currentness constraint per call"
+        );
+    }
+    let mut conflicting = authority;
+    conflicting.witnesses.push(Witness::Content {
+        path: config.clone(),
+        hash: crate::cache::content_hash(b"different source"),
+    });
+    assert!(
+        WorkspaceIndex::new()
+            .replace_semantic_projection_with_retained_authority(
+                file.to_str().unwrap(),
+                vec![],
+                SemanticFidelity::High,
+                hash.clone(),
+                vec![],
+                Some(conflicting),
+            )
+            .is_err(),
+        "distinct hash constraints must not be merged by path"
+    );
+    assert!(
+        !index.has_current_semantic_projection(
+            file.to_str().unwrap(),
+            SemanticFidelity::High,
+            &crate::cache::content_hash(b"export class Changed {}"),
+        ),
+        "the caller supplies current owner identity"
+    );
+    std::fs::write(
+        &config,
+        r#"{"compilerOptions":{"strict":true,"noLib":true,"types":[]}}"#,
+    )
+    .unwrap();
+    assert!(!index.has_current_semantic_projection(
+        file.to_str().unwrap(),
+        SemanticFidelity::High,
+        &hash
+    ));
+}
+
+#[test]
+fn ops_r1_shared_seal_checks_each_exact_constraint_once_per_call() {
+    use crate::ir::typescript_resolution::shared_acquisition::{operation, reusable_sources};
+
+    let root = tempfile::tempdir().unwrap();
+    let path = root.path().join("dependency.ts");
+    std::fs::write(&path, "class Original {}").unwrap();
+    let witness = Witness::Content {
+        path: path.clone(),
+        hash: crate::cache::content_hash(b"class Original {}"),
+    };
+    let inputs: Inputs = vec![
+        Input::Observation(Arc::new(witness.clone())),
+        Input::Observation(Arc::new(witness)),
+    ]
+    .into();
+    let op = operation();
+    for _ in 0..2 {
+        let before = op.work_counts()[2];
+        assert!(reusable_sources(&inputs, &op).is_some());
+        assert_eq!(
+            op.work_counts()[2] - before,
+            1,
+            "one exact seal constraint per call"
+        );
+    }
+    std::fs::write(&path, "class Changed {}").unwrap();
+    assert!(
+        reusable_sources(&inputs, &op).is_none(),
+        "later calls must revalidate"
+    );
+}
+
+#[test]
+fn ops_r1_shared_qualification_checks_each_exact_constraint_once_per_call() {
+    use super::support::{acquire, fixture, resolver, write};
+    use crate::ir::typescript_resolution::shared_acquisition::{basis, operation};
+    use std::collections::HashSet;
+
+    let root = fixture();
+    let path = root.path();
+    let op = operation();
+    let a = path.join("a.ts");
+    let mut leader = resolver(path, "a.ts", &op);
+    acquire(&mut leader, &a);
+    let project = leader.project_identity(&a).unwrap();
+    let key = basis(&leader, &a, &project).unwrap();
+    let proof = op.slot(key).lock().unwrap().as_ref().unwrap().clone();
+    for _ in 0..2 {
+        let mut recipient = resolver(path, "b.ts", &op);
+        let before = op.work_counts()[3];
+        let qualified = proof
+            .qualify(&mut recipient, &op)
+            .expect("equivalent recipient");
+        let mut unique = HashSet::new();
+        let mut observations = 0;
+        visit(&qualified.bound.inputs, |input| {
+            if let Input::Observation(witness) = input {
+                unique.insert(witness.as_ref().clone());
+                observations += 1;
+            }
+        });
+        assert!(
+            observations > unique.len(),
+            "duplicate receipt nodes remain attributable"
+        );
+        assert_eq!(
+            op.work_counts()[3] - before,
+            unique.len(),
+            "one exact qualification constraint per call"
+        );
+    }
+    write(path, "a.ts", "class Changed {}");
+    let mut changed = resolver(path, "b.ts", &op);
+    assert!(
+        proof.qualify(&mut changed, &op).is_none(),
+        "fresh recipient rejects changed disk authority"
+    );
+}
+
+#[test]
 fn ops_r1_shared_empty_automatic_types_reuses_project_across_owner_directories() {
     use super::support::{acquire, fixture, resolver, write};
     use crate::ir::typescript_resolution::shared_acquisition::operation;

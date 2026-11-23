@@ -1,0 +1,10 @@
+{
+  "baseline_measurement_source_sha256": "c789349a46561b40c99d8cf2ed10a29e73e88292bd8416984ee2a4b5f83cdcda",
+  "candidate_measurement_source_sha256": "3bf64fa9585b8476b07605601d0686ef879a24126b7a1a1784c82f3b56b8df21",
+  "validated_root_source_sha256": "45a63ac368403c8b0e6ac7a7af6375f757a296b82d210b8637cd67f0c9c3e6eb",
+  "producer_sha256": "99fef16c25990936e6ff07263e22832278f53157ef0aae1c704d010105998c44",
+  "source_pin_sha256": "7b60bf6f995dbc2e19c1ed8a9e3f4f52e2c1f167a6fd29430b23b34a287a1bec",
+  "adapter_sha256": "8bb6d068e01de2554958fa45f4365c2708964c7da7421eb7fcb24b7a4cafeb02",
+  "changed_production_file": "src/ir/typescript_resolution/shared_acquisition.rs",
+  "fixture_and_instrumentation_unchanged": true
+}

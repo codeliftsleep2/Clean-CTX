@@ -78,7 +78,7 @@ impl RetainedAuthority {
             return authority.source_hash == source_hash
                 && authority.capture_current
                 && authority.disposition.is_none()
-                && authority.witnesses.iter().all(|witness| witness.current());
+                && crate::ir::typescript_resolution::Witness::all_current(&authority.witnesses);
         }
         let _ = source_hash;
         true

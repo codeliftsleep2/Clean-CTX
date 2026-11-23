@@ -1,0 +1,66 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-22",
+  "decision": "FIX",
+  "root_source_sha256": "45a63ac368403c8b0e6ac7a7af6375f757a296b82d210b8637cd67f0c9c3e6eb",
+  "focused_controls_passed": 13,
+  "pair": {
+    "baseline": {
+      "source_sha256": "c789349a46561b40c99d8cf2ed10a29e73e88292bd8416984ee2a4b5f83cdcda",
+      "executable_sha256": "db3cda35bd7ebe977347e72a087801f7013f6bd0f07c614b3ce200830475cfac",
+      "process_seconds": 19.017178000009153,
+      "peak_working_set_bytes": 46153728,
+      "cold_query_ms": 12347.7503,
+      "warm_query_ms": 5288.001,
+      "cold_witness_checks": 198927,
+      "warm_witness_checks": 61226,
+      "cold_operations": [
+        {
+          "acquisitions": [
+            1,
+            1,
+            64
+          ],
+          "qualification": [
+            63,
+            63,
+            1190,
+            75285,
+            83475
+          ]
+        }
+      ]
+    },
+    "candidate": {
+      "source_sha256": "3bf64fa9585b8476b07605601d0686ef879a24126b7a1a1784c82f3b56b8df21",
+      "executable_sha256": "79ee13b070b28e450f8abd8c9efbf3355f5e854eaa8c77e52158e9fc83cdd926",
+      "process_seconds": 18.223016100004315,
+      "peak_working_set_bytes": 46104576,
+      "cold_query_ms": 11102.817200000001,
+      "warm_query_ms": 5203.0484,
+      "cold_witness_checks": 147732,
+      "warm_witness_checks": 61226,
+      "cold_operations": [
+        {
+          "acquisitions": [
+            1,
+            1,
+            64
+          ],
+          "qualification": [
+            63,
+            63,
+            395,
+            24885,
+            83475
+          ]
+        }
+      ]
+    }
+  },
+  "cold_checks_saved": 51195,
+  "evidence_archive": "validation-and-measurement-evidence.zip",
+  "evidence_archive_sha256": "a1a375a7d89eb7bdf9982884d3e6d2e7cda82451cc413a9b31c11b9305ced61e",
+  "qualification": "One matched pair, not a timing guarantee; no warm improvement or leak claim",
+  "remaining_work": "Warm currentness cost remains; full gates deferred until engineering is complete"
+}

@@ -62,7 +62,7 @@ impl WorkspaceIndex {
                 && proof.disposition.is_none()
                 && crate::dictionary::path::canonical_identity_key(&proof.source.to_string_lossy())
                     == crate::dictionary::path::canonical_identity_key(file)
-                && proof.witnesses.iter().all(|witness| witness.current())
+                && crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses)
                 && proof.admits_registration_projection(
                     &edges,
                     resolver_registrations.as_ref(),

@@ -1,0 +1,121 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "source_tree_sha256": "679a676fe2d68641ee2b52e868e15a89c8b706052248b507f169c424573a6b3d",
+  "executable_sha256": "9fab55cc7df1eb53b022965fb43e7088458e221af8afd74dae70069b04164703",
+  "tracked_test": "mcp::semantic_compilation::ops_r1_acquisition_fitness::ops_r1_repeated_absent_queries_preserve_retained_owner_evidence",
+  "outcome": "1 passed; 0 failed; 0 ignored",
+  "observations": {
+    "owner_count": 4,
+    "per_request_acquisitions": [
+      [
+        [
+          1,
+          1,
+          4
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      [
+        [
+          0,
+          0,
+          0
+        ]
+      ]
+    ],
+    "requests": 13,
+    "retained_witness_bytes_per_owner": [
+      13078,
+      13078,
+      19579,
+      15598
+    ],
+    "retained_witness_bytes_unchanged": true,
+    "scope": "one state, distinct absent selectors; not allocator-leak proof",
+    "semantic_parses": 4
+  },
+  "process_seconds": 2.2059093000134453,
+  "sampled_peak_working_set_bytes": 30449664,
+  "memory_samples": 12,
+  "safety_stop": false,
+  "producer_unchanged_from_phase_29": true,
+  "archive": "repeated-request-evidence.zip",
+  "archive_sha256": "4f52ac58a23869eccad5a0d439216f6e1058d19dd2831a4ec36deb3629ad7e5d",
+  "scope_limit": "Four-owner single-state fixture; exact witness payload stable. No allocator-leak certification, other-cache coverage or historical field-incident resolution."
+}

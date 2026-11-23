@@ -1,0 +1,33 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-23",
+  "decision": "FIX",
+  "validated_root_source_sha256": "628e47c3696e9520b48870b4ee72c4ebc2b083cadd8ee7c546d079bddc040206",
+  "pair": {
+    "baseline": {
+      "source_sha256": "327c30d8521414d993101e2e46f95ea66ad0ea491a0f62f9bf90db0bfa8c49a1",
+      "executable_sha256": "827f71228d2832b2a465f3e6dfebca488202f78b89ea19dbd40d90a0dde5802f",
+      "cold_query_ms": 10877.8322,
+      "warm_query_ms": 4393.83,
+      "warm_witness_checks": 61226,
+      "process_seconds": 19.080210499989334,
+      "sampled_peak_working_set_bytes": 45842432
+    },
+    "candidate": {
+      "source_sha256": "80df547b58a36198648098bb03835ab7ff8d32cd7fe126e7e11c3393f9187b6e",
+      "executable_sha256": "1384e62caf42b813bbd80902418be8bb94c133983a57425334a9f0b19a5acd01",
+      "cold_query_ms": 10177.9115,
+      "warm_query_ms": 4147.6042,
+      "warm_witness_checks": 51068,
+      "process_seconds": 15.117031200032216,
+      "sampled_peak_working_set_bytes": 46510080
+    }
+  },
+  "warm_checks_saved": 10158,
+  "observed_warm_ms_saved": 246.22580000000016,
+  "qualification": "Single bounded diagnostic pair; warm caller-thread observer disabled, cold worker bookkeeping remains. No statistical timing, process-total attribution, memory reduction or leak-resolution claim.",
+  "complexity": "One small exact-constraint helper and four caller delegations; no persisted cache or cross-owner freshness reuse",
+  "evidence_archive": "observer-isolated-evidence.zip",
+  "evidence_archive_sha256": "3f5a03c935ec61f5132a105b7210f05135a1c01ef669e6bf859f955f592342ad",
+  "remaining_risk": "Owner-by-project evidence work remains; any cross-owner reuse needs an explicit freshness contract"
+}

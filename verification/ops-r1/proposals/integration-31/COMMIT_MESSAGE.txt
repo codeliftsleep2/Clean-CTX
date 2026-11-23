@@ -1,0 +1,9 @@
+Bound shared-acquisition qualification and consumption work
+
+Check exact typed witnesses once within each sealing, qualification and
+currentness call. Share exact filesystem validation within final resolver
+consumption while preserving independent owner authority and fresh preparation.
+
+Add deterministic work/currentness regressions and repeated absent-query
+retention coverage. Preserve original RED/GREEN and bounded timing evidence,
+including the unresolved field hang and memory-retention limitations.

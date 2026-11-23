@@ -1,0 +1,27 @@
+Agent MaxHeadRoom - OPS-R1 Directive 31 integration decision
+
+Recommendation: ready for owner integration review, with external gates open.
+Final source: 679a676fe2d68641ee2b52e868e15a89c8b706052248b507f169c424573a6b3d
+Final executable: 9fab55cc7df1eb53b022965fb43e7088458e221af8afd74dae70069b04164703
+
+Production scope: exact typed-witness checks once per call; final-consumption
+batch validation only. Independent source hashes, admission, fidelity,
+preparation/publication boundaries and refusal behavior are preserved.
+No persistent or cross-request validation-result cache was introduced.
+
+All-feature build and repeated-request test reused under exact final identity.
+Eighteen prior focused regressions remain attributable to their original source;
+production bytes are unchanged. Scoped Clippy, formatting and repository guards
+passed. Actual document context/source acquisition is ready, complete and current;
+protected state is unchanged. No protected publication or CI acceptance is claimed.
+
+One matched 64-owner fixture measured warm query 3.94 to 2.14 seconds and witness
+checks 51,068 to 26,058. Thirteen distinct absent selectors preserved witness bytes
+with four total compilations and one initial acquisition. Neither establishes
+absence of a leak or resolution of the historical real-workspace incident.
+
+Review source-and-test.diff, results.json and integration-evidence.zip. Prior
+RED/GREEN and performance/retention archives retain original source identities.
+Full CI and applicable field acceptance are external gates. No commit, push, PR,
+merge, authorization grant or publication was performed. Proposed commit/PR text
+is prepared only; delivery still requires owner authorization.

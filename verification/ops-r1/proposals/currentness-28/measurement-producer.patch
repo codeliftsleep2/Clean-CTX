@@ -1,0 +1,70 @@
+--- a/src/ir/typescript_resolution/host.rs
++++ b/src/ir/typescript_resolution/host.rs
+@@ -52,6 +52,14 @@
+ }
+ 
+ impl Witness {
++    /// Recheck every exact constraint once within this call; never retain results.
++    pub(crate) fn all_current(witnesses: &[Self]) -> bool {
++        let mut checked = std::collections::HashSet::new();
++        witnesses
++            .iter()
++            .all(|witness| !checked.insert(witness) || witness.current())
++    }
++
+     pub(crate) fn current(&self) -> bool {
+         #[cfg(test)]
+         crate::work_observations_af_perf_002::witness(self);
+@@ -488,7 +496,7 @@
+     }
+ 
+     pub(crate) fn current(&self) -> bool {
+-        self.witnesses.iter().all(Witness::current)
++        Witness::all_current(&self.witnesses)
+     }
+ }
+ 
+--- a/src/workspace/index/coverage.rs
++++ b/src/workspace/index/coverage.rs
+@@ -105,7 +105,7 @@
+             && (proof.source_hash != source_hash
+                 || !proof.capture_current
+                 || proof.disposition.is_some()
+-                || !proof.witnesses.iter().all(|witness| witness.current()))
++                || !crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses))
+         {
+             return Err("TypeScript authority changed before index publication");
+         }
+@@ -195,7 +195,9 @@
+                     && (authority.source_hash != source_hash
+                         || !authority.capture_current
+                         || authority.disposition.is_some()
+-                        || !authority.witnesses.iter().all(|witness| witness.current()))
++                        || !crate::ir::typescript_resolution::Witness::all_current(
++                            &authority.witnesses,
++                        ))
+                 {
+                     return false;
+                 }
+--- a/src/workspace/index/resolver_registrations.rs
++++ b/src/workspace/index/resolver_registrations.rs
+@@ -62,7 +62,7 @@
+                 && proof.disposition.is_none()
+                 && crate::dictionary::path::canonical_identity_key(&proof.source.to_string_lossy())
+                     == crate::dictionary::path::canonical_identity_key(file)
+-                && proof.witnesses.iter().all(|witness| witness.current())
++                && crate::ir::typescript_resolution::Witness::all_current(&proof.witnesses)
+                 && proof.admits_registration_projection(
+                     &edges,
+                     resolver_registrations.as_ref(),
+--- a/src/mcp/semantic_compilation/retained.rs
++++ b/src/mcp/semantic_compilation/retained.rs
+@@ -78,7 +78,7 @@
+             return authority.source_hash == source_hash
+                 && authority.capture_current
+                 && authority.disposition.is_none()
+-                && authority.witnesses.iter().all(|witness| witness.current());
++                && crate::ir::typescript_resolution::Witness::all_current(&authority.witnesses);
+         }
+         let _ = source_hash;
+         true

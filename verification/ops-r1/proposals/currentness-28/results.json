@@ -1,0 +1,66 @@
+{
+  "agent": "Agent MaxHeadRoom",
+  "date": "2026-11-22",
+  "decision": "DESIGN REVIEW",
+  "root_source_sha256": "628e47c3696e9520b48870b4ee72c4ebc2b083cadd8ee7c546d079bddc040206",
+  "focused_controls_passed": 15,
+  "pair": {
+    "baseline": {
+      "source_sha256": "3bf64fa9585b8476b07605601d0686ef879a24126b7a1a1784c82f3b56b8df21",
+      "executable_sha256": "79ee13b070b28e450f8abd8c9efbf3355f5e854eaa8c77e52158e9fc83cdd926",
+      "process_seconds": 17.60610049997922,
+      "peak_working_set_bytes": 45780992,
+      "cold_query_ms": 11162.6295,
+      "warm_query_ms": 5149.7054,
+      "cold_witness_checks": 147732,
+      "warm_witness_checks": 61226,
+      "cold_operations": [
+        {
+          "acquisitions": [
+            1,
+            1,
+            64
+          ],
+          "qualification": [
+            63,
+            63,
+            395,
+            24885,
+            83475
+          ]
+        }
+      ]
+    },
+    "candidate": {
+      "source_sha256": "45eeb810a5964276f47a54f223d5a7f72cc0bf9fe960a890f33f70035197c38f",
+      "executable_sha256": "9333f0cdf337c8d57bfc6acb19eab9309332956bdeb918c7caed67b30fae131b",
+      "process_seconds": 16.69016569998348,
+      "peak_working_set_bytes": 47534080,
+      "cold_query_ms": 10448.163299999998,
+      "warm_query_ms": 5460.571599999999,
+      "cold_witness_checks": 127416,
+      "warm_witness_checks": 51068,
+      "cold_operations": [
+        {
+          "acquisitions": [
+            1,
+            1,
+            64
+          ],
+          "qualification": [
+            63,
+            63,
+            395,
+            24885,
+            83475
+          ]
+        }
+      ]
+    }
+  },
+  "cold_checks_saved": 20316,
+  "evidence_archive": "validation-and-measurement-evidence.zip",
+  "evidence_archive_sha256": "76126365b06011250d2b0c91ad151946cfa095d4a9323dcd97ed9d1cf5f1aed3",
+  "qualification": "Warm checks fell but warm timing worsened in one legacy-instrumented pair; no warm improvement or leak claim",
+  "remaining_work": "Isolate test-observer bookkeeping cost before retention decision; full gates deferred"
+}

@@ -52,6 +52,14 @@ pub(crate) enum Witness {
 }
 
 impl Witness {
+    /// Recheck every exact constraint once within this call; never retain results.
+    pub(crate) fn all_current(witnesses: &[Self]) -> bool {
+        let mut checked = std::collections::HashSet::new();
+        witnesses
+            .iter()
+            .all(|witness| !checked.insert(witness) || witness.current())
+    }
+
     pub(crate) fn current(&self) -> bool {
         #[cfg(test)]
         crate::work_observations_af_perf_002::witness(self);
@@ -488,7 +496,7 @@ impl Host {
     }
 
     pub(crate) fn current(&self) -> bool {
-        self.witnesses.iter().all(Witness::current)
+        Witness::all_current(&self.witnesses)
     }
 }
 

@@ -1,0 +1,20 @@
+Repeated project evidence caused redundant filesystem validation during
+qualification and resolver-registration queries. This change deduplicates exact
+typed witness checks inside existing validation boundaries and shares their
+validation within one final-consumption evaluation. Owner source hashes,
+registration admission, fidelity, failure behavior and preparation/publication
+boundaries remain independently checked; no validation cache survives a call.
+
+Verification already retained: deterministic RED/GREEN work witnesses; eighteen
+focused preservation tests on phase-29; one test-only successor with thirteen
+successful distinct absent-route queries and unchanged retained owner evidence.
+A single matched 64-owner pair observed warm latency fall from 3.94 to 2.14 s
+and witness checks from 51,068 to 26,058. These are bounded fixture observations,
+not statistical certification or proof of historical incident resolution.
+
+Scoped integration formatting, all-feature library/test Clippy and repository
+guards passed without source drift. Actual document context and six authority
+source acquisitions were ready, complete and current, with zero diagnostics and
+unchanged protected state. No protected publication is claimed. Full CI and
+field acceptance remain separate. The original real-workspace hang and broader allocator/cache
+retention questions remain open. No delivery action is authorized by this draft.

@@ -1,0 +1,15 @@
+{
+  "baseline_measurement_source_sha256": "3bf64fa9585b8476b07605601d0686ef879a24126b7a1a1784c82f3b56b8df21",
+  "candidate_measurement_source_sha256": "45eeb810a5964276f47a54f223d5a7f72cc0bf9fe960a890f33f70035197c38f",
+  "validated_root_source_sha256": "628e47c3696e9520b48870b4ee72c4ebc2b083cadd8ee7c546d079bddc040206",
+  "changed_production_files": [
+    "src/ir/typescript_resolution/host.rs",
+    "src/workspace/index/coverage.rs",
+    "src/workspace/index/resolver_registrations.rs",
+    "src/mcp/semantic_compilation/retained.rs"
+  ],
+  "source_pin_sha256": "2ee610f25195b1218ec2e337eb77da7b9d08111e1bfc2b39d4ab6d23f8871a58",
+  "adapter_sha256": "8a1556221068655613b3edbe78f3f4f17a7f152395c0c7fa0a131e69440836ba",
+  "patch_sha256": "5f1c83d7d6f823e6d0558f9cea9130fa2009ce789353c3795667fbb97b524b9f",
+  "fixture_and_instrumentation_unchanged": true
+}

@@ -1,0 +1,7 @@
+{
+  "phase": "baseline",
+  "source_sha256": "327c30d8521414d993101e2e46f95ea66ad0ea491a0f62f9bf90db0bfa8c49a1",
+  "adapter_sha256": "ff8c818e48abbc9ba53d8a0b2fcf290f7371494f28e08612d37724b7f77a83c4",
+  "source_pin_sha256": "fa224e13f35d5af2669eadcc6d076efcf6fb973e4a27203586c004d1a6e1e296",
+  "scope": "Measurement workspace only; root candidate unchanged; warm observer bookkeeping isolated"
+}

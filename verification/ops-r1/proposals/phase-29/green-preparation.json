@@ -1,0 +1,14 @@
+{
+  "red_source_sha256": "3f232807eb223e3c26d2c6238259b0003f9b6a6416d707803d4153360db840e3",
+  "green_source_sha256": "c6fa2eeff1e27404eef7bbe284493983d448bb64bbc15705e31515e518714c02",
+  "historical_red_archive_sha256": "97947e7023dbcc16e467eb2815699515c635d046e0a365a005cd58d940257136",
+  "source_pin_sha256": "f717964e049df965b5f4a418e927051208878238f8065785d7a4703c050c46d6",
+  "adapter_sha256": "f1f323a74ad90f6b71b030439ed08ecf4adc3d104475ec7bf28df36ac2f6e96c",
+  "public_work_witness_sha256": "837948379f4be6647c0481420915c9594ab8a16d692701cee96a56eb9d3ab6f9",
+  "phase_edit_witness_sha256": "234f8108a04dae1922a0de7117174aaa7d9784ec4ab9dd0f468dec5ff4efdf2c",
+  "production_changed": [
+    "src/workspace/index/coverage.rs",
+    "src/mcp/tool_handlers/query/resolver_registrations.rs"
+  ],
+  "preparation_unchanged": true
+}

@@ -101,3 +101,155 @@ fn ops_r1_shared_acquisition_public_fitness() {
         "equivalent project acquired once; owner compilation/publication remains four"
     );
 }
+
+#[test]
+fn ops_r1_warm_resolver_consumption_checks_shared_constraints_once() {
+    use std::collections::HashSet;
+    let _serial = crate::protocol::handler_response_serial();
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    crate::tests::angular_authority_fixture::install(root);
+    std::fs::write(root.join("tsconfig.json"), r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"include":["*.ts"]}"#).unwrap();
+    for i in 0..4 {
+        let peer = if i == 3 { "class Peer0 {}\n" } else { "" };
+        std::fs::write(
+            root.join(format!("owner{i}.ts")),
+            format!("{peer}class Probe{i} {{ peer?: Peer0; }}\n"),
+        )
+        .unwrap();
+    }
+    let mut config = crate::tests::test_config();
+    config.proxy.auto_start = false;
+    config.persistence.enabled = false;
+    let state = McpState::new(config);
+    let query = || {
+        super::angular_resolver_registration_support::raw(
+            &state,
+            json!({"workspaceRoot":root,"type":"resolver_registrations","direction":"forward","route_path":"__ops_r1_absent__"}),
+        )
+    };
+    let cold = query();
+    assert!(cold.get("error").is_none(), "{cold:#}");
+    assert_ne!(cold["result"]["isError"], true);
+    assert_eq!(state.test_full_semantic_parses(), 4);
+    let (per_owner, shared) = {
+        let index = state.workspace_index_read();
+        let mut total = 0;
+        let mut union = HashSet::new();
+        for i in 0..4 {
+            let owner =
+                state.semantic_owner_path(&root.join(format!("owner{i}.ts")).to_string_lossy());
+            let proof = index
+                .retained_typescript_authority(&owner)
+                .expect("current native owner proof");
+            let unique: HashSet<_> = proof.witnesses.iter().cloned().collect();
+            assert!(!unique.is_empty());
+            total += unique.len();
+            union.extend(unique);
+        }
+        (total, union.len())
+    };
+    assert!(
+        shared < per_owner,
+        "owners demonstrably share exact typed constraints"
+    );
+    crate::work_observations_af_perf_002::reset();
+    let warm = query();
+    let checks = crate::work_observations_af_perf_002::snapshot().witnesses;
+    assert!(warm.get("error").is_none(), "{warm:#}");
+    assert_ne!(warm["result"]["isError"], true);
+    let result = &warm["result"]["structuredContent"];
+    assert_eq!(result["registrations"], json!([]));
+    assert_eq!(result["count"], 0);
+    assert_eq!(result["coverage"]["result_semantics"], "lower_bound");
+    assert_eq!(result["coverage"]["source_complete"], false);
+    assert_eq!(
+        state.test_full_semantic_parses(),
+        4,
+        "warm query must not compile again"
+    );
+    eprintln!(
+        "OPS_R1_PHASE_COUNTS preparation={per_owner} consumption_union={shared} actual={checks}"
+    );
+    assert_eq!(
+        checks,
+        per_owner + shared,
+        "one independent preparation phase and one shared consumption validation"
+    );
+}
+
+#[test]
+fn ops_r1_repeated_absent_queries_preserve_retained_owner_evidence() {
+    let _serial = crate::protocol::handler_response_serial();
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path();
+    crate::tests::angular_authority_fixture::install(root);
+    std::fs::write(root.join("tsconfig.json"), r#"{"compilerOptions":{"module":"esnext","moduleResolution":"bundler","moduleDetection":"legacy","noLib":true,"types":[]},"include":["*.ts"]}"#).unwrap();
+    for i in 0..4 {
+        let peer = if i == 3 { "class Peer0 {}\n" } else { "" };
+        std::fs::write(
+            root.join(format!("owner{i}.ts")),
+            format!("{peer}class Probe{i} {{ peer?: Peer0; }}\n"),
+        )
+        .unwrap();
+    }
+    let mut config = crate::tests::test_config();
+    config.proxy.auto_start = false;
+    config.persistence.enabled = false;
+    let state = McpState::new(config);
+    let retained = || {
+        let index = state.workspace_index_read();
+        (0..4)
+            .map(|i| {
+                let owner =
+                    state.semantic_owner_path(&root.join(format!("owner{i}.ts")).to_string_lossy());
+                let proof = index
+                    .retained_typescript_authority(&owner)
+                    .expect("retained native owner authority");
+                serde_json::to_vec(&proof.witnesses).unwrap()
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut original = None;
+    let mut counts = Vec::new();
+    for request in 0..13 {
+        let (response, operations) = observe(|| {
+            super::angular_resolver_registration_support::raw(
+                &state,
+                json!({"workspaceRoot":root,"type":"resolver_registrations","direction":"forward","route_path":format!("__ops_r1_absent_{request}__")}),
+            )
+        });
+        assert!(response.get("error").is_none(), "{response:#}");
+        assert_ne!(response["result"]["isError"], true, "{response:#}");
+        let result = &response["result"]["structuredContent"];
+        assert_eq!(result["registrations"], json!([]));
+        assert_eq!(result["count"], 0);
+        assert_eq!(result["coverage"]["result_semantics"], "lower_bound");
+        assert_eq!(result["coverage"]["source_complete"], false);
+        assert_eq!(state.test_full_semantic_parses(), 4);
+        let actual: Vec<_> = operations.iter().map(|op| op.counts()).collect();
+        if request == 0 {
+            assert_eq!(actual, vec![[1, 1, 4]]);
+            original = Some(retained());
+        } else {
+            assert!(actual.iter().all(|counts| counts == &[0, 0, 0]));
+            assert_eq!(retained(), *original.as_ref().unwrap());
+        }
+        counts.push(actual);
+    }
+    let bytes: Vec<_> = original.unwrap().iter().map(Vec::len).collect();
+    eprintln!("OPS_R1_REPEATED_REQUESTS requests=13 parses=4 retained_witness_bytes={bytes:?}");
+    if let Ok(folder) = std::env::var("OPS_R1_EVIDENCE_DIR") {
+        std::fs::write(
+            std::path::Path::new(&folder).join("repeated-requests.json"),
+            serde_json::to_vec_pretty(&json!({
+                "requests":13,"owner_count":4,"semantic_parses":4,
+                "per_request_acquisitions":counts,"retained_witness_bytes_per_owner":bytes,
+                "retained_witness_bytes_unchanged":true,
+                "scope":"one state, distinct absent selectors; not allocator-leak proof"
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+    }
+}

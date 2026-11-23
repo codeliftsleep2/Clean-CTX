@@ -1,4 +1,7 @@
 // src/mcp/tool_handlers/query.rs
+#[cfg(all(test, feature = "angular"))]
+#[path = "../../tests/mcp/ops_r1_query_phase_currentness.rs"]
+mod ops_r1_query_phase_currentness;
 //
 // workspace_query handler — read-only MCP query API.
 //

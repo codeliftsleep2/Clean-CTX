@@ -1,0 +1,100 @@
+--- a/src/workspace/index/coverage.rs
++++ b/src/workspace/index/coverage.rs
+@@ -187,27 +187,43 @@
+         fidelity: SemanticFidelity,
+         source_hash: &str,
+     ) -> bool {
+-        self.semantic_coverage
+-            .get(file_path)
+-            .is_some_and(|coverage| {
+-                #[cfg(feature = "typescript")]
+-                if let Some(authority) = &coverage.typescript_authority
+-                    && (authority.source_hash != source_hash
+-                        || !authority.capture_current
+-                        || authority.disposition.is_some()
+-                        || !crate::ir::typescript_resolution::Witness::all_current(
+-                            &authority.witnesses,
+-                        ))
+-                {
+-                    return false;
+-                }
+-                coverage.source_hash == source_hash
+-                    && coverage.fidelity >= fidelity
+-                    && coverage
+-                        .dependencies
++        self.has_current_semantic_projections(&[(file_path, fidelity, source_hash)])
++    }
++
++    /// One caller-owned evaluation boundary; nothing is retained after this call.
++    pub(crate) fn has_current_semantic_projections(
++        &self,
++        requests: &[(&str, SemanticFidelity, &str)],
++    ) -> bool {
++        #[cfg(feature = "typescript")]
++        let mut checked = std::collections::HashSet::new();
++        for &(file_path, fidelity, source_hash) in requests {
++            let Some(coverage) = self.semantic_coverage.get(file_path) else {
++                return false;
++            };
++            #[cfg(feature = "typescript")]
++            if let Some(authority) = &coverage.typescript_authority
++                && (authority.source_hash != source_hash
++                    || !authority.capture_current
++                    || authority.disposition.is_some()
++                    || !authority
++                        .witnesses
+                         .iter()
+-                        .all(|dependency| dependency.is_current())
+-            })
++                        .all(|witness| !checked.insert(witness) || witness.current()))
++            {
++                return false;
++            }
++            if coverage.source_hash != source_hash
++                || coverage.fidelity < fidelity
++                || !coverage
++                    .dependencies
++                    .iter()
++                    .all(|dependency| dependency.is_current())
++            {
++                return false;
++            }
++        }
++        true
+     }
+ 
+     pub(crate) fn semantic_projection_fidelity(&self, file_path: &str) -> Option<SemanticFidelity> {
+--- a/src/mcp/tool_handlers/query/resolver_registrations.rs
++++ b/src/mcp/tool_handlers/query/resolver_registrations.rs
+@@ -88,18 +88,24 @@
+         };
+         let direction = direction.to_owned();
+         Ok(PreparedQuery::indexed(move |index| {
+-            // Validate each consumed owner once, not once per registration.
+-            if !footprints.iter().all(|proof| {
++            // Source ownership stays independent; exact filesystem constraints
++            // share work only within this final-consumption evaluation.
++            let sources_current = footprints.iter().all(|proof| {
+                 #[cfg(test)]
+                 super::work_metrics::record_resolver_owner_validation();
+-                proof.is_current()
+-                    && index.has_resolver_registration_admission(&proof.file_path)
+-                    && index.has_current_semantic_projection(
+-                        &proof.file_path,
++                proof.is_current() && index.has_resolver_registration_admission(&proof.file_path)
++            });
++            let projections: Vec<_> = footprints
++                .iter()
++                .map(|proof| {
++                    (
++                        proof.file_path.as_str(),
+                         crate::workspace::index::SemanticFidelity::High,
+                         proof.source_hash.as_deref().unwrap_or(""),
+                     )
+-            }) {
++                })
++                .collect();
++            if !sources_current || !index.has_current_semantic_projections(&projections) {
+                 return Err(QueryFailure::internal(
+                     "Registration source/dependency publication changed; retry",
+                 ));

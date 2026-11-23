@@ -1,0 +1,8 @@
+{
+  "source_sha256": "26901bd503638ec321154358103076b66a3bdeeebc65e065df6f195a4ea0d5cd",
+  "executable_sha256": "583642ab06952086b0670a046ee454d5df928b1566dc8c677b081e77091acc66",
+  "archive_sha256": "1b7bcfe7d7d7c9312f822402f3d2211696af766e62d8cff1984f01aa9d60fea5",
+  "classification": "Original duplicate-work assertion passed; subsequent fixture used stale caller owner hash after editing supplied owner source",
+  "original_failure_preserved": true,
+  "remaining_controls_unexecuted": 14
+}

@@ -88,18 +88,24 @@ fn prepare_inner(
         };
         let direction = direction.to_owned();
         Ok(PreparedQuery::indexed(move |index| {
-            // Validate each consumed owner once, not once per registration.
-            if !footprints.iter().all(|proof| {
+            // Source ownership stays independent; exact filesystem constraints
+            // share work only within this final-consumption evaluation.
+            let sources_current = footprints.iter().all(|proof| {
                 #[cfg(test)]
                 super::work_metrics::record_resolver_owner_validation();
-                proof.is_current()
-                    && index.has_resolver_registration_admission(&proof.file_path)
-                    && index.has_current_semantic_projection(
-                        &proof.file_path,
+                proof.is_current() && index.has_resolver_registration_admission(&proof.file_path)
+            });
+            let projections: Vec<_> = footprints
+                .iter()
+                .map(|proof| {
+                    (
+                        proof.file_path.as_str(),
                         crate::workspace::index::SemanticFidelity::High,
                         proof.source_hash.as_deref().unwrap_or(""),
                     )
-            }) {
+                })
+                .collect();
+            if !sources_current || !index.has_current_semantic_projections(&projections) {
                 return Err(QueryFailure::internal(
                     "Registration source/dependency publication changed; retry",
                 ));

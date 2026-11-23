@@ -1,0 +1,9 @@
+{
+  "baseline_source_sha256": "9c4b40d2da333eb832e03153bcdd9e1bc49994a603a3341088d9d9777bcaacb1",
+  "red_source_sha256": "15c4aee4f5db231b812ddd6701407e18df3f52ac0ede41a74ffa78de6fb69deb",
+  "source_pin_sha256": "5c66552c58436ab83b940d6f44439877a53c12ae9a12416dfe96266086a407d0",
+  "adapter_sha256": "0837b5c00ec8669cadcfd8f176f465ce0bd7c8c379571b1fbcde6c9107b2ed3e",
+  "new_test_file_sha256": "15e902702a528727f8ddd7ee0464a8820ec01478ad49c80ba40469be5fa2512f",
+  "production_unchanged": true,
+  "preserved_baseline_binary_sha256": "741e5e4e74c37288f150fd42746e06932921f00ac59405666ad12d7dbd587656"
+}

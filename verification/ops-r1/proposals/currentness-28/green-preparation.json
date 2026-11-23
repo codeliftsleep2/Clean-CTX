@@ -1,0 +1,14 @@
+{
+  "historical_red_source_sha256": "a0cd1481910f35b5a1e5d1337887c1227df8c099ee6ee52b4dc7866a0a33ed7b",
+  "green_source_sha256": "26901bd503638ec321154358103076b66a3bdeeebc65e065df6f195a4ea0d5cd",
+  "historical_red_archive_sha256": "9f4eb29c92fdf465350b50d34a5f744308580e607c1127f7bc8b22947918583a",
+  "source_pin_sha256": "36466d024b78878abcb7fb92cf9299400b423803d87fff5ca37c6a4373a4ec9c",
+  "adapter_sha256": "1deac903173178eeef6a10daca9000004d5fb35db9a43b37631ba36817168389",
+  "unchanged_test_file_sha256": "c3ee0e0e9001f46c82f579287305b653b1489bd6655623c43839c7d56439a67c",
+  "changed_production_files": [
+    "src/ir/typescript_resolution/host.rs",
+    "src/workspace/index/coverage.rs",
+    "src/workspace/index/resolver_registrations.rs",
+    "src/mcp/semantic_compilation/retained.rs"
+  ]
+}

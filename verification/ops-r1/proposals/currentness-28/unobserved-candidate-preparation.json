@@ -1,0 +1,7 @@
+{
+  "phase": "candidate",
+  "source_sha256": "80df547b58a36198648098bb03835ab7ff8d32cd7fe126e7e11c3393f9187b6e",
+  "adapter_sha256": "aac10da6e36ce733ac24fac29416d008b2804741446a0c8f890ec994e8419d9e",
+  "source_pin_sha256": "92a7af45b0ac40c509192fee3f688dff9c4e26b1e8e4c7560a9f10c5a10d2d44",
+  "scope": "Measurement workspace only; root candidate unchanged; warm observer bookkeeping isolated"
+}
