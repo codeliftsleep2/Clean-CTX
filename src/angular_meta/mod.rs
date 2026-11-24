@@ -1,5 +1,3 @@
-// src/angular_meta/mod.rs
-//
 // Angular Meta-Layer — Tier 1 (Decorators) + Tier 2 (File-Triplet Bundling).
 //
 // The Meta-Layer is **purely additive**: it never modifies the existing
@@ -91,6 +89,8 @@ pub mod testing;
 #[cfg(feature = "typescript")]
 pub(crate) mod typed_provider_root;
 pub mod util;
+#[cfg(feature = "written_source_observations")]
+pub mod written_claim_composition;
 
 #[cfg(all(test, feature = "angular"))]
 pub(crate) use detect_metrics::{

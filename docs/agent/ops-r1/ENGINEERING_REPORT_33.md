@@ -301,7 +301,7 @@ The actual paired field results remain outstanding; the packet grants no automat
 incident closure.
 
 ```architecture-graph
-node: OPS-R1.DIRECTIVE-33
+node: OPS-033
 kind: EXPERIMENT
 status: INVESTIGATING
 title: Directory-fragmented empty automatic-type acquisition correction

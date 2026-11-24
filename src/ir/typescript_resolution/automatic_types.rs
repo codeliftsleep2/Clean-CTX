@@ -32,6 +32,12 @@ impl Resolver {
     /// Name discovery records the request's own lookup receipts without resolving
     /// packages or granting another directory's automatic-type authority.
     pub(super) fn automatic_type_names(&mut self, file: &Path) -> Result<BTreeSet<String>, String> {
+        #[cfg(test)]
+        super::e1_metrics::traversal(false);
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::automatic();
+        #[cfg(all(test, feature = "resolver_evidence_v2"))]
+        super::source_observations::request_budget::telemetry::legacy_probe::automatic(file);
         let project = self.request_project(file)?;
         let mut names = BTreeSet::new();
         if let Some(types) = project.options.get("types") {

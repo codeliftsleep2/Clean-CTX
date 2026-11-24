@@ -29,6 +29,8 @@ pub(crate) mod pcg_state;
 pub(crate) mod persistence_ir;
 pub(crate) mod prompts;
 pub(crate) mod proxy_stats;
+#[cfg(feature = "resolver_evidence_v2")]
+pub(crate) mod resolver_evidence;
 mod router;
 pub(crate) mod semantic_compilation;
 mod server;

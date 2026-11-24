@@ -48,6 +48,13 @@ generation, producer, or exhaustiveness proof.
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 536-557, original section `WSC-003`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `34f440a75292392fa60b0a22e9b337de9ba6e721fdcf89a7667455241f64018b`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+Version scope: the live-WorkspaceIndex answer requirement above continues for
+existing indexed operations. Explicit version-2 interactive resolver evidence is
+request-local, independently validated and never records incomplete acquisition as
+reusable hydration completion. It has no canonical index/publication side effects.
+Every mixed legacy/v2 batch refuses before workspace acquisition or execution.
+Pure legacy requests and batches retain their existing hydration contract.
+
 <!-- pcg:WSC-003:end -->
 <!-- pcg:WSC-004:begin -->
 ### WSC-004 Workspace Queries Respect Declared Workspace Scope
@@ -133,6 +140,15 @@ Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 6
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 636-648, original section `WSC-009`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `e7d3a4c45a906556542ee7ed3785399f9007e37a41a43abc501bd274125c5f0b`. Original text remains in Git history; this file is the sole current normative owner of this section.
 
+Explicit version-2 resolver-evidence items use a separate versioned request-local
+DTO and serving-boundary finalization; they do not enter indexed re-preparation.
+Initial support is homogeneous-v2 only: reject every batch mixing a v2 resolver
+evidence item with any legacy operation before workspace acquisition or execution.
+Pure legacy batches and their envelopes/common final index view remain unchanged.
+V2 items share one top-level scope, aggregate finite ledger and protected
+finalization partition; nested/item work cannot create additional allowances.
+Preserve ordered isolated outcomes and mandatory qualifications in both channels.
+
 <!-- pcg:WSC-009:end -->
 <!-- pcg:WSC-013:begin -->
 ### WSC-013 Authoritative Query Truth Is History-Independent
@@ -184,6 +200,16 @@ output schema; `workspace_query_coverage.rs`,
 `workspace_query_reverse_edge_completeness.rs`.
 
 Source provenance: commit `655f0a75`, `docs/ARCHITECTURAL_INVARIANTS.md` lines 822-850, original section `WSC-018`; source SHA-256 `3af6ad63ff76c246119799832820ca60002153172c317be0b3072519f8fa9d9e`; section SHA-256 `0971bb7bb4ea302098e9e35f5eaef6544ebd011bafe2f4de19b5fbf6de62b33f`. Original text remains in Git history; this file is the sole current normative owner of this section.
+
+Version-2 resolver evidence uses separate claim-scoped provenance and coverage
+fields; it must not create a legacy completeness certificate or put source-bearing
+provenance into legacy coverage_detail. Examined scope, predicate closure, current
+established matching count, returned count and response completeness are independent.
+Response-capacity withholding does not automatically invalidate established
+examination or closure. Closure must not be asserted if supporting evidence or
+material qualifications cannot be communicated. Withheld positive matches cannot
+become successful empty absence; open empty remains unknown. Closed supported
+written-source predicates never imply closed Angular/workspace coverage.
 
 <!-- pcg:WSC-018:end -->
 <!-- pcg:WSC-010:begin -->

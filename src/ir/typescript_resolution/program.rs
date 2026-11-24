@@ -215,6 +215,10 @@ impl Resolver {
         let directives = self.directive_evidence.len();
         let entries = self.consumed_entries.len();
         let result = self.acquire_program_units(file, &project, &config, automatic_names);
+        #[cfg(test)]
+        super::e1_metrics::acquisition(result.is_ok());
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::program_result(result.is_ok());
         let inputs = self.host.witnesses.finish(scope);
         self.program_active.remove(&config);
         if let (Ok(units), Some(operation)) = (&result, operation.as_ref()) {
@@ -260,6 +264,10 @@ impl Resolver {
     ) -> Result<super::shared_acquisition::ProgramUnits, String> {
         #[cfg(all(test, feature = "angular"))]
         let _live = crate::ops_r1_observation::enter(4);
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::program_attempt();
+        #[cfg(all(test, feature = "resolver_evidence_v2"))]
+        super::source_observations::request_budget::telemetry::legacy_probe::program(file);
         #[cfg(all(test, feature = "angular"))]
         crate::ops_r1_observation::record(6, 1);
         if let Some(operation) = &self.operation {

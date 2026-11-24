@@ -78,6 +78,8 @@ impl Witness {
                 crate::work_observations_af_perf_002::update(|s| s.reads += 1);
                 std::fs::read(path).is_ok_and(|bytes| {
                     #[cfg(test)]
+                    super::e1_metrics::read(path, bytes.len(), true);
+                    #[cfg(test)]
                     crate::work_observations_af_perf_002::update(|s| s.hashes += 1);
                     crate::cache::content_hash(&bytes) == *hash
                 })
@@ -112,6 +114,14 @@ impl Witness {
 
 /// One operation owns immutable bytes and every observation used to resolve them.
 pub(crate) struct Host {
+    #[cfg(feature = "written_source_observations")]
+    pub(super) direct_budget: Option<super::source_observations::request_budget::Request>,
+    #[cfg(feature = "written_source_observations")]
+    pub(super) direct_failure: Option<super::source_observations::request_budget::Stop>,
+    #[cfg(feature = "written_source_observations")]
+    pub(super) direct_reservations: Vec<super::source_observations::request_budget::Permit>,
+    #[cfg(feature = "written_source_observations")]
+    pub(super) direct_source: bool,
     pub(super) roots: Vec<PathBuf>,
     pub(super) aliases: Vec<(PathBuf, PathBuf)>,
     pub(super) sources: BTreeMap<PathBuf, Option<Arc<str>>>,
@@ -124,6 +134,12 @@ pub(crate) struct Host {
 
 impl Host {
     pub(super) fn directory(&mut self, path: &Path) -> Result<bool, String> {
+        #[cfg(feature = "written_source_observations")]
+        self.direct_work(
+            super::source_observations::request_budget::Work::Metadata,
+            path,
+        )
+        .map_err(|e| e.to_string())?;
         let path = self
             .normalized(path)
             .ok_or("Directory outside authorized scope")?;
@@ -154,6 +170,13 @@ impl Host {
         if !self.admits(&physical) {
             return Err("Directory outside authorized scope".into());
         }
+        #[cfg(feature = "written_source_observations")]
+        let entries = if self.direct_budget.is_some() {
+            self.direct_entries(&physical)?
+        } else {
+            directory_entries(&physical).map_err(|error| error.to_string())?
+        };
+        #[cfg(not(feature = "written_source_observations"))]
         let entries = directory_entries(&physical).map_err(|error| error.to_string())?;
         if self.normalized(path).as_ref() != Some(&physical) {
             return Err("Directory route changed during inventory".into());
@@ -222,6 +245,14 @@ impl Host {
             return Err("TypeScript resolution requires explicit authorized roots".into());
         }
         Ok(Self {
+            #[cfg(feature = "written_source_observations")]
+            direct_budget: None,
+            #[cfg(feature = "written_source_observations")]
+            direct_failure: None,
+            #[cfg(feature = "written_source_observations")]
+            direct_reservations: Vec::new(),
+            #[cfg(feature = "written_source_observations")]
+            direct_source: false,
             roots: aliases
                 .iter()
                 .map(|(_, physical)| physical.clone())
@@ -273,6 +304,12 @@ impl Host {
     }
 
     pub(crate) fn normalized(&mut self, path: &Path) -> Option<PathBuf> {
+        #[cfg(feature = "written_source_observations")]
+        self.direct_work(
+            super::source_observations::request_budget::Work::Physical,
+            path,
+        )
+        .ok()?;
         if path.to_str().is_none() {
             self.witnesses.push(Witness::Unreadable {
                 path: path.to_path_buf(),
@@ -306,6 +343,12 @@ impl Host {
         // This prevents a symlinked directory from allowing out-of-root reads.
         let mut ancestor = normalized.as_path();
         let physical = loop {
+            #[cfg(feature = "written_source_observations")]
+            self.direct_work(
+                super::source_observations::request_budget::Work::Metadata,
+                ancestor,
+            )
+            .ok()?;
             match std::fs::symlink_metadata(ancestor) {
                 Ok(_) => {
                     let target = match ancestor.canonicalize() {
@@ -442,9 +485,19 @@ impl Host {
     }
 
     fn read_bytes(&mut self, path: &Path) -> std::io::Result<Vec<u8>> {
+        #[cfg(feature = "written_source_observations")]
+        self.direct_work(
+            super::source_observations::request_budget::Work::Metadata,
+            path,
+        )?;
         let mut file = std::fs::File::open(path)?;
         #[cfg(windows)]
         {
+            #[cfg(feature = "written_source_observations")]
+            self.direct_work(
+                super::source_observations::request_budget::Work::Physical,
+                path,
+            )?;
             let target = super::host_windows::opened_path(&file)?;
             if target.to_str().is_none() {
                 self.witnesses.push(Witness::Unreadable { path: target });
@@ -465,12 +518,30 @@ impl Host {
                 target,
             });
         }
+        #[cfg(feature = "written_source_observations")]
+        if self.direct_budget.is_some() {
+            return self.read_direct_bytes(path, file);
+        }
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
+        #[cfg(test)]
+        super::e1_metrics::read(path, bytes.len(), false);
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::read(bytes.len(), false);
         Ok(bytes)
     }
 
     pub(crate) fn file(&mut self, path: &Path) -> bool {
+        #[cfg(feature = "written_source_observations")]
+        if self
+            .direct_work(
+                super::source_observations::request_budget::Work::Metadata,
+                path,
+            )
+            .is_err()
+        {
+            return false;
+        }
         let Some(path) = self.normalized(path) else {
             return false;
         };
@@ -522,7 +593,7 @@ fn directory_entries(path: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(entries)
 }
 
-fn shape(path: &Path) -> PathBuf {
+pub(super) fn shape(path: &Path) -> PathBuf {
     #[cfg(windows)]
     if let Some(text) = path.to_str() {
         if let Some(rest) = text.strip_prefix("\\\\?\\UNC\\") {

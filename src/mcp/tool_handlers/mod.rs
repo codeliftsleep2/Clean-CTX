@@ -21,6 +21,7 @@ pub(crate) mod pcg;
 pub(crate) mod pcg_documents;
 pub mod persistence;
 pub mod query;
+mod query_version;
 pub mod refresh;
 pub mod registry;
 pub mod stats;

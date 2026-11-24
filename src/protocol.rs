@@ -273,3 +273,25 @@ pub(crate) fn handler_response_serial() -> std::sync::MutexGuard<'static, ()> {
 #[cfg(test)]
 #[path = "tests/protocol.rs"]
 mod tests;
+
+/// The opt-in evidence adapter has already counted the full JSON-RPC envelope.
+#[cfg(feature = "resolver_evidence_v2")]
+pub(crate) fn send_prepared_json(payload: &str) -> bool {
+    #[cfg(test)]
+    {
+        capture_wire(payload);
+        if let Ok(value) = serde_json::from_str(payload) {
+            captured_responses().push(value);
+        }
+        true
+    }
+    #[cfg(not(test))]
+    {
+        use std::io::{self, Write};
+        let _lock = lock_or_recover_protocol!(STDOUT_MUTEX.lock(), "stdout");
+        let mut stdout = io::stdout().lock();
+        writeln!(stdout, "{payload}")
+            .and_then(|_| stdout.flush())
+            .is_ok()
+    }
+}

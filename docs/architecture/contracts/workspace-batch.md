@@ -43,6 +43,24 @@ Source: [docs/architecture/WORKSPACE_QUERY_BATCH_MIGRATION_PLAN_2026-09-28.md](.
 
 The original batch-size discussion remains a historical approval record; this extraction does not establish a new limit. Final acquired evidence and isolated outcomes are governed by WSC-009 and WSC-013.
 
+## Initial version-2 resolver-evidence batches
+
+Explicit contract_version 2 selects request-local qualified resolver evidence;
+missing version or explicit 1 retains existing legacy semantics. The initial v2
+operation accepts only interactive mode and canonical policy none. Every batch
+mixing v2 resolver evidence with any legacy operation is rejected before workspace
+acquisition or execution, even when that legacy operation would not hydrate. Pure
+legacy batches remain unchanged. A homogeneous-v2 batch owns one finite top-level
+ledger, scope and protected finalization partition; item-level scope/budget overrides
+are rejected. Budgets request capacity, not authorization: checked arithmetic and
+implementation-owned formulas precede work; approved server effective-budget ceilings
+are required before public E6-C activation, without selecting defaults during E6-B.
+Preserve item IDs/order and isolated outcomes. Structured and model-facing items
+carry the same qualified DTO and mandatory uncertainty. Repeated accounting snapshots
+refer to one aggregate request ledger and must not be summed as separate allowances.
+Response completeness is independent of established predicate closure and examination;
+withheld matches must remain explicit and cannot become successful empty absence.
+
 ```architecture-graph
 node: AUTH.WORKSPACE_BATCH
 kind: AUTHORITY

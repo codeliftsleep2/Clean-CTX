@@ -276,6 +276,22 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
         // The closure captures the parsed request data and dispatches
         // it on a worker thread. The reader thread returns immediately.
         if let Ok(req) = serde_json::from_str::<JsonRpcRequest>(&line) {
+            #[cfg(feature = "resolver_evidence_v2")]
+            {
+                let evidence = &dispatcher.state().resolver_evidence;
+                if req.method == "notifications/cancelled" {
+                    if let Some(params) = &req.params {
+                        evidence.cancel(&params["requestId"]);
+                    }
+                    continue;
+                }
+                if let Err(error) = evidence.queue(&req) {
+                    send_response(
+                        &serde_json::json!({"jsonrpc":"2.0","id":req.id,"error":{"code":error.code,"message":error.message}}),
+                    );
+                    continue;
+                }
+            }
             if req.method == "initialize" {
                 crate::observability::startup::event("clean_initialize_received");
             }
@@ -283,6 +299,10 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             if let Err(e) = dispatcher.spawn(&req, move |state| {
                 crate::mcp::router::dispatch(req_for_handler, state);
             }) {
+                #[cfg(feature = "resolver_evidence_v2")]
+                if let Some(id) = &req.id {
+                    dispatcher.state().resolver_evidence.retire(id);
+                }
                 eprintln!("[clean-ctx] ERROR: Failed to enqueue request: {}", e);
                 send_response(&serde_json::json!({
                     "jsonrpc": "2.0",

@@ -144,6 +144,12 @@ impl Unit {
     }
 
     pub(super) fn parse(path: &Path, source: &str) -> Option<Self> {
+        #[cfg(test)]
+        super::e1_metrics::parse(path, source.len());
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::parse(path);
+        #[cfg(all(test, feature = "resolver_evidence_v2"))]
+        super::source_observations::request_budget::telemetry::legacy_probe::parse(path);
         let language = if matches!(
             path.extension().and_then(|part| part.to_str()),
             Some("tsx" | "jsx")

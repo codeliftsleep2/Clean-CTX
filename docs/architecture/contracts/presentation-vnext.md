@@ -152,6 +152,26 @@ rejected regardless of token savings.
 
 Original examples retain their pre/post labels; the candidate forms in this shipped subset are production grammar. Source section SHA-256 `7c3f4e13c7ea5d967c5899bca0c59c807596afb8e516cf33a9db4eb1416c7ad9`. B4 and Tier C are not admitted as implemented grammar.
 
+## Version-2 resolver-evidence rendering
+
+The explicitly versioned request-local resolver-evidence DTO is the common source
+for structured, model-facing and batch-item rendering. Preserve claim kind, exact
+scope, supporting evidence, strength, separate unsupported applicability, currentness,
+coverage domains, predicate closure, failures, obligations, cancellation/exhaustion,
+matching/returned/withheld counts, response completeness and nonclaims. A proven
+written fact or declaration endpoint is not proven Angular semantics, runtime
+execution, canonical registration or workspace completeness. Withholding records
+for capacity does not itself undo established examination or predicate closure;
+closure may be asserted only if its supporting evidence and material qualifications
+can be communicated. Open empty is unknown; established positive matches withheld
+from output are observed_not_returned, never absence. If the minimum truthful
+envelope cannot fit, return an explicit resource failure. No authoritative-index
+boilerplate, qualification omission or response compression may strengthen a claim.
+The initial operation supports interactive mode/canonical policy none only;
+canonical collections, SCHEMA-vNext file presentation, Binary 0x04 and dv:2 are
+unchanged. Every mixed legacy/v2 batch refuses before acquisition/execution; pure
+legacy batches retain their contract.
+
 ```architecture-graph
 node: AUTH.PRESENTATION_VNEXT
 kind: AUTHORITY

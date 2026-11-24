@@ -19,14 +19,14 @@ unsafe extern "system" {
     ) -> i32;
 }
 
-pub(super) struct Junction(PathBuf);
+pub(crate) struct Junction(PathBuf);
 impl Drop for Junction {
     fn drop(&mut self) {
         std::fs::remove_dir(&self.0).expect("remove only the test junction");
     }
 }
 
-pub(super) fn junction(link: &Path, target: &Path) -> Junction {
+pub(crate) fn junction(link: &Path, target: &Path) -> Junction {
     let canonical = target.canonicalize().unwrap();
     let text = canonical.to_str().unwrap();
     let substitute = format!("\\??\\{}", text.strip_prefix("\\\\?\\").unwrap_or(text));

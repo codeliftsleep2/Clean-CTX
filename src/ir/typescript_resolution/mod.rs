@@ -26,6 +26,8 @@ mod declared_scopes;
 pub(crate) mod demanded_occurrences;
 mod global_bindings;
 mod host;
+#[cfg(feature = "written_source_observations")]
+mod host_direct_budget;
 #[cfg(windows)]
 mod host_windows;
 #[cfg(test)]
@@ -71,6 +73,8 @@ mod source_classification;
 mod string_literal;
 mod string_value;
 
+#[cfg(feature = "written_source_observations")]
+pub mod source_observations;
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_string_literals_issue_162.rs"]
 mod string_literal_tests;
@@ -158,7 +162,7 @@ mod project_context_tests;
 
 #[cfg(all(test, windows))]
 #[path = "../../tests/ir/typescript_windows_host_issue_162.rs"]
-mod windows_host_tests;
+pub(crate) mod windows_host_tests;
 
 #[cfg(test)]
 #[path = "../../tests/ir/typescript_declaration_groups_issue_162.rs"]
@@ -365,3 +369,10 @@ mod erased_namespace_query_tests;
 #[cfg(test)]
 #[path = "../../tests/ir/ops_r1_shared_acquisition_controls.rs"]
 mod ops_r1_shared_acquisition_controls;
+
+#[cfg(test)]
+#[path = "../../tests/ir/ops_r1_e1_measurement.rs"]
+mod e1_measurement;
+#[cfg(test)]
+#[path = "../../tests/ir/ops_r1_e1_metrics.rs"]
+pub(crate) mod e1_metrics;

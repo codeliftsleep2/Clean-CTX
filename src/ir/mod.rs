@@ -55,6 +55,9 @@ pub(crate) mod typescript_identifier_binding;
 pub(crate) mod typescript_object_members;
 #[cfg(feature = "typescript")]
 pub(crate) mod typescript_resolution;
+/// Opt-in written source evidence, separate from canonical semantic authority.
+#[cfg(feature = "written_source_observations")]
+pub use typescript_resolution::source_observations;
 pub(crate) mod typescript_this_property_binding;
 pub(crate) mod typescript_type_import_binding;
 pub(crate) mod typescript_value_import_binding;

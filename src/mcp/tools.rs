@@ -541,6 +541,8 @@ pub(crate) fn tool_list() -> Vec<serde_json::Value> {
 
 pub(crate) fn tool_list_for_state(state: &super::McpState) -> Vec<Value> {
     let mut tools = tool_list();
+    #[cfg(feature = "resolver_evidence_v2")]
+    super::resolver_evidence::schema::advertise(&mut tools, &state.resolver_evidence);
     if state.pcg.enabled() {
         tools.extend(super::tool_annotations::inject(vec![
             super::tool_handlers::pcg::descriptor(),

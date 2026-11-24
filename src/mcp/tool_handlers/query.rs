@@ -86,6 +86,9 @@ pub(super) use diagnostics::discovery_field;
 /// Handle `workspace_query` — read-only cross-file and file-local queries.
 pub(crate) fn handle_workspace_query(id: &Value, params: &Value, state: &McpState) {
     let args = &params["arguments"];
+    if super::query_version::intercept(id, args, state) {
+        return;
+    }
     if args.get("queries").is_some() {
         batch::handle(id, args, state);
         return;

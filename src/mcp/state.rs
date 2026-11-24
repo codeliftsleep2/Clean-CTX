@@ -125,6 +125,8 @@ pub struct CbmFilterState {
 /// let ir = state.ir_context_lock();  // Another thread holds ir_context, waiting for cache
 /// ```
 pub struct McpState {
+    #[cfg(feature = "resolver_evidence_v2")]
+    pub(crate) resolver_evidence: super::resolver_evidence::State,
     /// Session-pinned PCG profile; disabled unless explicitly configured.
     pub(crate) pcg: crate::mcp::pcg_state::PcgState,
     /// Path-alias dictionary (`α1`, `α2`, …). Mutated in place by
@@ -287,6 +289,8 @@ impl McpState {
 
         Self {
             pcg: crate::mcp::pcg_state::PcgState::from_environment(),
+            #[cfg(feature = "resolver_evidence_v2")]
+            resolver_evidence: super::resolver_evidence::State::from_environment(),
             dict: Mutex::new(PathDictionary::new()),
             physical_identities: Mutex::new(physical_identities),
             cache: RwLock::new(LocalStateCache::new()),

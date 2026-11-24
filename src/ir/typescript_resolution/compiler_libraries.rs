@@ -103,6 +103,10 @@ impl Resolver {
     }
 
     pub(super) fn initial_libraries(&mut self, file: &Path) -> Result<Vec<PathBuf>, String> {
+        #[cfg(test)]
+        super::e1_metrics::traversal(true);
+        #[cfg(feature = "resolver_evidence_v2")]
+        super::source_observations::request_budget::telemetry::library();
         let project = self.request_project(file)?;
         if let Some(option) = project.options.get("noLib") {
             if option.value.as_bool().ok_or("Invalid noLib")? {

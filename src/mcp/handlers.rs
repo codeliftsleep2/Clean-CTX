@@ -13,7 +13,7 @@ use serde_json::Value;
 
 /// Handle `initialize` — returns server capabilities and protocol version.
 pub(crate) fn handle_initialize(id: &Value, state: &McpState) {
-    if crate::protocol::send_response_checked(&serde_json::json!({
+    let response = serde_json::json!({
         "jsonrpc": "2.0",
         "id": id,
         "result": {
@@ -22,7 +22,11 @@ pub(crate) fn handle_initialize(id: &Value, state: &McpState) {
             "serverInfo": { "name": "clean-ctx", "version": "1.0.0" },
             "instructions": prompts::WORKFLOW_INSTRUCTIONS
         }
-    })) {
+    });
+    #[cfg(feature = "resolver_evidence_v2")]
+    let response =
+        super::resolver_evidence::schema::initialization(response, &state.resolver_evidence);
+    if crate::protocol::send_response_checked(&response) {
         state.start_cbm_after_initialize();
     }
 }

@@ -139,6 +139,10 @@ must reacquire or fail through existing categories, never synthesize registratio
 from names/edges or report successful empty proof. Non-applicable producer absence
 remains absence, not evidence for this capability. Retain historical payloads.
 
+Version scope: the canonical registration and operation requirements below remain
+unchanged for version 1. The separately specified version-2 interactive evidence
+contract does not relax canonical admission or substitute for v1 hydration.
+
 Add explicit workspace_query type resolver_registrations, operation format_version 1.
 Require authorized workspaceRoot. Forward direction requires string route_path
 (empty allowed); reverse requires nonempty string resolver_name. Reject missing or
@@ -205,6 +209,129 @@ no duplicate evaluator or repeated owner reconstruction. Do not reopen accepted 
 or blanket witness/lock/index optimization. Full gates are CI-owned; every local
 long-running invocation needs explicit per-run operator permission. No runtime
 eligibility, navigation, effective DI, execution or language certification is granted.
+
+## Version-2 interactive qualified resolver evidence
+
+An explicit `contract_version: 2` selects the advertised qualified-evidence
+contract. Missing version and explicit version 1 retain existing v1 behavior,
+including mandatory hydration, canonical identity, complete owner admission,
+refusal and publication. Unsupported versions or modes refuse before acquisition;
+there is no implicit fallback to v1. The initial v2 operation supports interactive
+mode only and canonical policy `none` only; omitted mode/policy normalize to those
+values. Exhaustive mode and `admitted_current` lookup are deferred, not silently
+implemented by legacy acquisition. `canonical_registrations` is always empty in
+this initial operation. Canonical registration queries remain available through v1.
+
+Request scope uses explicit workspaceRoot and existing trusted-root/withinPath
+admission. Forward selects an exact written route literal, including the empty
+string; reverse selects written reference text and never implies canonical runtime
+binding. Exactly one direction-appropriate selector is required. An optional
+nonempty source_files list selects only those physical application sources; it
+must not initiate unrelated workspace enumeration. Dependency files, including
+physical symlink targets in node_modules, are not application compilation owners.
+Direct declaration support may acquire required dependency evidence within existing
+trusted roots, with exact provenance and shared charges; it must not silently drop
+evidence required by the claim. Interactive v2 does not invoke whole-program
+acquisition, automatic ambient types, default-library traversal or canonical owner
+hydration. Imported arrays, runtime construction and contextual competitor closure
+are outside this initial written-source interpretation envelope, not resolved gaps
+in the canonical Angular capability.
+
+Qualified state is owned by the request and uses the existing E2 observation,
+E3 ledger, E4 direct-support and Angular-owned E5 composition boundaries. It creates
+no persistent registry, authoritative index entries, durable publication or canonical
+identity promotion. Candidate source admission is independent of optional direct
+and Angular-role admission. Source, support, mapping-site, namespace and authorized
+root identities must agree before composition. Serving-boundary validation checks
+only the exact evidence supporting each asserted claim. Changed source retracts
+dependent observations; changed consumed support/configuration degrades dependent
+interpretations without erasing independently current observations. Unconsumed
+configuration does not invalidate a syntax fact. Validation establishes currentness
+at observed boundaries, not an atomic filesystem snapshot or continuous freshness.
+
+Every classification identifies its claim kind, exact scope and supporting evidence.
+The public classifications are proven, strongly_supported, partial and unknown;
+supported/unsupported/unknown applicability is an independent field, not a strength.
+A proven written_source_mapping asserts only the acquired written bytes and spans.
+A proven direct_declaration_endpoint asserts only an exact physical declaration,
+not a complete TypeScript runtime binding, Angular role or execution. A strongly
+supported written_angular_routes_mapping requires already admitted current written
+source, compatible direct value-declaration support and bounded public Angular
+Routes-role evidence at the exact source/site/scope; no known relevant contextual
+contributor and only explicitly allowed unchecked-context obligations may remain.
+Partial requires identifiable current relevant support with unresolved interpretation
+obligations; unknown establishes no such stronger claim. Unsupported applicability
+preserves any independently established written fact. Classification performs no
+additional acquisition or validation I/O. No class implies canonical registration,
+runtime execution, JavaScript implementation identity, contextual closure or complete
+workspace coverage. No uncalibrated numerical confidence is permitted. This bounded
+operation does not certify or complete a canonical language/framework capability.
+
+Caller-supplied finite budgets request capacity; they do not authorize arbitrary
+consumption. A shared request ledger accounts for elapsed time, source/support bytes,
+live retained reservations, active expensive tasks, traversal units/edges, validation
+bytes/checks and response preparation. Directory enumeration, metadata operations,
+physical path validation, traversal and exclusion checks are charged to that ledger
+and separately counted. One traversal unit is charged before each directory advance,
+metadata/path-validation operation and exclusion check; parsing units and resolution
+edges are charged in the same cumulative unit/edge allowance, not separate quotas.
+Nested work and all v2 batch items use that one ledger. Checked arithmetic and
+implementation-owned conservative reservation formulas reject invalid, overflowing
+or unrepresentable requests before expensive work. Public E6-C activation requires
+separately approved server-side effective-budget ceilings. E6-B selects no production
+defaults or ceilings. Effective limits cannot exceed requested or approved capacity.
+
+Protected finalization is a partition of the same finite allowance. Reserve before
+expensive I/O/allocation where feasible, bound reads against concurrent source growth,
+and charge final validation, DTO ownership, escaping and both response channels.
+Cooperative parser/metadata work may overrun a checkpoint; report completed-after-stop
+work, observed overshoot and unmeasured allocator/ingress/transport overhead rather
+than claim a hard memory/deadline limit. Optional stopped work cannot strengthen a
+claim after stop. Remaining finalization capacity may independently admit completed
+source observations; unvalidated evidence cannot be served as current. Cross-request
+service admission/backpressure needs separate measured review before public activation.
+
+The owned `clean-ctx/resolver-evidence-answer` contract version 2 DTO has required
+query, execution, examined_scope, coverage, observations, direct_evidence,
+interpretations, canonical_registrations, matching_records, response_completeness,
+currentness, failures, obligations, search_conclusion and response_omissions fields,
+plus schema/rule versions. Each classification carries claim, claim_scope and
+supporting_evidence; each typed endpoint retains source/hash/span, namespace,
+resolution/package/configuration provenance and validation. Observations and
+interpretations remain distinct typed collections and cannot enter v1 registrations.
+
+Examined-scope coverage, predicate closure, established matching records, returned
+matching records and response completeness are independent. Count only current
+admitted matches for the named predicate; count arithmetic must satisfy established
+= returned + withheld, without implying workspace-wide cardinality. Withholding a
+complete record for response capacity makes response completeness partial but does
+not automatically invalidate already established examination or predicate closure.
+Closure may be communicated only when its supporting evidence and all material
+qualifications fit in the response. Otherwise report closure as uncommunicated/
+unknown, or fail explicitly if the minimum truthful envelope cannot fit. Never
+assert closed absence unless the exact predicate is established and current,
+established matching count is zero, and required closure support is communicated.
+Positive matches withheld from the response produce observed_not_returned, never
+successful empty absence. Empty results under open coverage mean unknown. Closed
+supported-written-source scope never implies closed Angular or workspace coverage.
+Omissions relevant to the predicate keep it open unless irrelevance is established.
+
+Acquisition failures, obligations, stale/unvalidated components, cancellation,
+exhaustion, response omissions and nonclaims are mandatory material qualifications.
+Structured, model-facing and per-item batch rendering derive from the same owned
+DTO and preserve those meanings. Whole records may be withheld with explicit counts;
+their qualifications must not be stripped to fit. Missing minimum qualification or
+closure support is a correctness defect, not successful compression. Source identities
+and component references must resolve exactly within their item/scope. JSON Schema
+conformance does not establish reference integrity, compatible claims, currentness,
+closure, count arithmetic, effective-capacity authorization or aggregate accounting.
+
+Initial homogeneous-v2 batches use one top-level workspace scope and aggregate
+budget, preserve ordered isolated outcomes and share finalization. Every batch
+mixing v2 resolver evidence with any legacy operation is rejected before workspace
+acquisition or execution, regardless of whether the legacy operation would hydrate.
+Pure legacy batches remain unchanged. No per-item scope or budget reset is permitted.
+
 
 <!-- pcg:RESOLVER-questions:end -->
 Source: [docs/agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md](../../agent/ISSUE_162_ROUTE_RESOLVER_ACCEPTANCE.md), baseline `ec7067fd`, original section SHA-256 `40111762876a985c81d9c6da796f992dc6faa6bbee04e2e668ee98e70bf080bf`.

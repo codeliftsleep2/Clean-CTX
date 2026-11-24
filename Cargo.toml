@@ -18,6 +18,10 @@ default = ["typescript", "csharp", "angular", "dotnet"]
 
 # Language layers (each enables a tree-sitter grammar)
 typescript = ["dep:tree-sitter-typescript"]
+# Staged Rust-only written evidence; no MCP/query/persistence integration.
+written_source_observations = ["typescript"]
+# Explicit public opt-in; also requires a valid operator ceiling profile.
+resolver_evidence_v2 = ["written_source_observations", "angular"]
 csharp     = ["dep:tree-sitter-c-sharp"]
 rust       = ["dep:tree-sitter-rust"]
 java       = ["dep:tree-sitter-java"]
